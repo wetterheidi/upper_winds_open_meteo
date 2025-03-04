@@ -5,7 +5,7 @@ mapboxgl.accessToken = MAPBOX_API_KEY;
 const map = new mapboxgl.Map({
     container: 'map',
     style: 'mapbox://styles/mapbox/streets-v11',
-    center: [13.4050, 52.5200], // Berlin
+    center: [13.4050, 52.5200],
     zoom: 10
 });
 
@@ -35,14 +35,14 @@ async function fetchWeather(lat, lng) {
     try {
         const roundedLat = lat.toFixed(4);
         const roundedLng = lng.toFixed(4);
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${roundedLat}&longitude=${roundedLng}&hourly=temperature,relative_humidity,wind_speed,wind_direction&pressure_levels=1000,925,850,700,500,300,200`;
-        console.log('Fetching from:', url); // Debug
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${roundedLat}&longitude=${roundedLng}&hourly=temperature_2m,temperature,relative_humidity,wind_speed,wind_direction&pressure_levels=1000,925,850,700,500,300,200&models=gfs_seamless`;
+        console.log('Fetching from:', url);
         const response = await fetch(url);
         if (!response.ok) {
             throw new Error(`HTTP error! Status: ${response.status}`);
         }
         const data = await response.json();
-        console.log('Response data:', data); // Debug
+        console.log('Response data:', data);
         if (!data.hourly) {
             throw new Error('No hourly data in response');
         }
@@ -71,6 +71,7 @@ function updateWeatherDisplay(index) {
     const time = weatherData.time[index];
     const levels = ['1000', '925', '850', '700', '500', '300', '200'];
     let output = `Time: ${time}\n`;
+    output += `Surface: T=${weatherData[`temperature_2m`][index]}°C\n`;
     levels.forEach(level => {
         const temp = weatherData[`temperature_${level}`][index];
         const rh = weatherData[`relative_humidity_${level}`][index];
