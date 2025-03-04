@@ -38,28 +38,36 @@ async function getAltitude(lng, lat) {
 // Fetch weather data from OpenMeteo
 async function fetchWeather(lat, lng) {
     try {
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&hourly=temperature,dewpoint,pressure,wind_speed,wind_direction&pressure_levels=1000,925,850,700,500,300,200`;
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&hourly=temperature,wind_speed,wind_direction&pressure_levels=1000,925,850,700,500,300,200`;
         const response = await fetch(url);
-        weatherData = (await response.json()).hourly;
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        const data = await response.json();
+        if (!data.hourly) {
+            throw new Error('No hourly data in response');
+        }
+        weatherData = data.hourly;
         document.getElementById('timeSlider').disabled = false;
-        updateWeatherDisplay(0); // Show initial data
+        updateWeatherDisplay(0);
     } catch (error) {
         console.error('Weather fetch error:', error);
-        document.getElementById('info').innerText += '\nError fetching weather data';
+        document.getElementById('info').innerText += `\nError fetching weather: ${error.message}`;
     }
 }
 
 // Update display based on slider position
 function updateWeatherDisplay(index) {
-    if (!weatherData) return;
+    if (!weatherData) {
+        document.getElementById('info').innerText += '\nNo weather data available';
+        return;
+    }
     const time = weatherData.time[index];
     const levels = ['1000', '925', '850', '700', '500', '300', '200'];
     let output = `Time: ${time}\n`;
     levels.forEach(level => {
         output += `${level}hPa: `
             + `T=${weatherData[`temperature_${level}`][index]}°C, `
-            + `Dew=${weatherData[`dewpoint_${level}`][index]}°C, `
-            + `P=${weatherData[`pressure_${level}`][index]}hPa, `
             + `Wind=${weatherData[`wind_speed_${level}`][index]}km/h @ `
             + `${weatherData[`wind_direction_${level}`][index]}°\n`;
     });
