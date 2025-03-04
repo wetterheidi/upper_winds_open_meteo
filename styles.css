@@ -1,0 +1,23 @@
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+}
+
+#map {
+    height: 70vh;
+    width: 100%;
+}
+
+#info {
+    height: 25vh;
+    width: 100%;
+    padding: 10px;
+    overflow-y: auto;
+    background-color: #f9f9f9;
+    white-space: pre-wrap; /* Preserve line breaks */
+}
+
+#timeSlider {
+    width: 100%;
+    padding: 10px 0;
+}

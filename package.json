@@ -1,0 +1,11 @@
+{
+    "name": "upper_winds_open_meteo",
+    "version": "1.0.0",
+    "description": "Upper winds visualization with Mapbox and OpenMeteo",
+    "scripts": {
+      "start": "npx live-server"
+    },
+    "devDependencies": {
+      "live-server": "^1.2.2"
+    }
+  }
