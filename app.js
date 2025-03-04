@@ -2,18 +2,15 @@
 const MAPBOX_API_KEY = 'pk.eyJ1Ijoid2V0dGVyaGVpZGkiLCJhIjoiY203dXNrZWRyMDN4bzJwb2pkbmI5ZXh4diJ9.tZkGHqinrfyNFC-8afYMzA';
 mapboxgl.accessToken = MAPBOX_API_KEY;
 
-// Initialize Mapbox map
 const map = new mapboxgl.Map({
     container: 'map',
     style: 'mapbox://styles/mapbox/streets-v11',
-    center: [11.1915, 48.0177], // Herrsching as default [lng, lat]
+    center: [13.4050, 52.5200], // Berlin
     zoom: 10
 });
 
-// Global weather data storage
 let weatherData = null;
 
-// Map click event
 map.on('click', async (e) => {
     const { lng, lat } = e.lngLat;
     const altitude = await getAltitude(lng, lat);
@@ -21,7 +18,6 @@ map.on('click', async (e) => {
     await fetchWeather(lat, lng);
 });
 
-// Fetch altitude using Mapbox Terrain API
 async function getAltitude(lng, lat) {
     try {
         const query = await fetch(
@@ -35,15 +31,18 @@ async function getAltitude(lng, lat) {
     }
 }
 
-// Fetch weather data from OpenMeteo
 async function fetchWeather(lat, lng) {
     try {
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&hourly=temperature,wind_speed,wind_direction&pressure_levels=1000,925,850,700,500,300,200`;
+        const roundedLat = lat.toFixed(4);
+        const roundedLng = lng.toFixed(4);
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${roundedLat}&longitude=${roundedLng}&hourly=temperature,relative_humidity,wind_speed,wind_direction&pressure_levels=1000,925,850,700,500,300,200`;
+        console.log('Fetching from:', url); // Debug
         const response = await fetch(url);
         if (!response.ok) {
             throw new Error(`HTTP error! Status: ${response.status}`);
         }
         const data = await response.json();
+        console.log('Response data:', data); // Debug
         if (!data.hourly) {
             throw new Error('No hourly data in response');
         }
@@ -56,7 +55,14 @@ async function fetchWeather(lat, lng) {
     }
 }
 
-// Update display based on slider position
+function calculateDewpoint(temp, rh) {
+    const a = 17.27;
+    const b = 237.7;
+    const alpha = (a * temp) / (b + temp) + Math.log(rh / 100);
+    const dewpoint = (b * alpha) / (a - alpha);
+    return dewpoint.toFixed(1);
+}
+
 function updateWeatherDisplay(index) {
     if (!weatherData) {
         document.getElementById('info').innerText += '\nNo weather data available';
@@ -66,15 +72,19 @@ function updateWeatherDisplay(index) {
     const levels = ['1000', '925', '850', '700', '500', '300', '200'];
     let output = `Time: ${time}\n`;
     levels.forEach(level => {
+        const temp = weatherData[`temperature_${level}`][index];
+        const rh = weatherData[`relative_humidity_${level}`][index];
+        const dewpoint = calculateDewpoint(temp, rh);
         output += `${level}hPa: `
-            + `T=${weatherData[`temperature_${level}`][index]}°C, `
+            + `T=${temp}°C, `
+            + `RH=${rh}%, `
+            + `Dew=${dewpoint}°C, `
             + `Wind=${weatherData[`wind_speed_${level}`][index]}km/h @ `
             + `${weatherData[`wind_direction_${level}`][index]}°\n`;
     });
     document.getElementById('info').innerText = output;
 }
 
-// Slider event listener
 document.getElementById('timeSlider').addEventListener('input', (e) => {
     updateWeatherDisplay(e.target.value);
 });
