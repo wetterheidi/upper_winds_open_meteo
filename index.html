@@ -10,7 +10,10 @@
 <body>
     <div id="map"></div>
     <div id="info">Click the map to fetch weather data</div>
-    <input type="range" id="timeSlider" min="0" max="167" value="0" disabled>
+    <div id="slider-container">
+        <label for="timeSlider" id="timeLabel">Select Time</label>
+        <input type="range" id="timeSlider" min="0" max="167" value="0" disabled>
+    </div>
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
     <script src="app.js"></script>
 </body>

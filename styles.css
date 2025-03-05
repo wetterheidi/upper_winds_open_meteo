@@ -9,15 +9,19 @@ body {
 }
 
 #info {
-    height: 25vh;
+    height: 20vh;
     width: 100%;
     padding: 10px;
     overflow-y: auto;
     background-color: #f9f9f9;
-    white-space: pre-wrap; /* Preserve line breaks */
+    white-space: pre-wrap;
 }
 
-#timeSlider {
-    width: 100%;
-    padding: 10px 0;
+#slider-container {
+    padding: 10px;
+}
+
+#timeLabel {
+    display: block;
+    margin-bottom: 5px;
 }

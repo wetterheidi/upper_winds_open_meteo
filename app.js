@@ -107,7 +107,7 @@ function calculateDewpoint(temp, rh) {
     return dewpoint.toFixed(1);
 }
 
-function updateWeatherDisplay(index) {
+/*function updateWeatherDisplay(index) {
     if (!weatherData) {
         document.getElementById('info').innerText += '\nNo weather data available';
         return;
@@ -128,7 +128,26 @@ function updateWeatherDisplay(index) {
             + `${weatherData[`wind_direction_${level}`][index]}°\n`;
     });
     document.getElementById('info').innerText = output;
+}*/
+
+function updateWeatherDisplay(index) {
+    if (!weatherData || !weatherData.time[index]) {
+        document.getElementById('info').innerText = 'No weather data available';
+        return;
+    }
+    const time = formatTime(weatherData.time[index]);
+    const levels = ['1000', '925', '850', '700', '500', '300', '200'];
+    let output = `Time: ${time}\n`;
+    output += `Surface: T=${weatherData[`temperature_2m`][index]}°C\n`;
+    levels.forEach(level => {
+        output += `${level}hPa: `
+            + `T=${weatherData[`temperature_${level}`][index]}°C, `
+            + `Wind=${weatherData[`wind_speed_${level}`][index]}km/h @ `
+            + `${weatherData[`wind_direction_${level}`][index]}°\n`;
+    });
+    document.getElementById('info').innerText = output;
 }
+
 
 document.getElementById('timeSlider').addEventListener('input', (e) => {
     updateWeatherDisplay(e.target.value);
@@ -156,4 +175,17 @@ function displayError(message) {
     setTimeout(() => {
         errorElement.style.display = 'none';
     }, 5000);
+}
+
+// Hilfsfunktion zum Formatieren von Zeitstempeln
+function formatTime(isoString) {
+    const date = new Date(isoString);
+    return date.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+    });
 }
