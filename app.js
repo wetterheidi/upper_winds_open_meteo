@@ -31,27 +31,71 @@ async function getAltitude(lng, lat) {
     }
 }
 
-async function fetchWeather(lat, lng) {
+async function fetchWeather(lat, lon) {
     try {
-        const roundedLat = lat.toFixed(4);
-        const roundedLng = lng.toFixed(4);
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${roundedLat}&longitude=${roundedLng}&hourly=temperature_2m,temperature,relative_humidity,wind_speed,wind_direction&pressure_levels=1000,925,850,700,500,300,200&models=gfs_seamless`;
-        console.log('Fetching from:', url);
-        const response = await fetch(url);
+        // Korrigierte URL mit den richtigen Parametern für Druckniveau-Daten
+        const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` + 
+            `&hourly=temperature_2m,wind_speed_10m,wind_direction_10m` + 
+            `&wind_speed_1000hPa=true&wind_direction_1000hPa=true` + 
+            `&wind_speed_925hPa=true&wind_direction_925hPa=true` + 
+            `&wind_speed_850hPa=true&wind_direction_850hPa=true` + 
+            `&wind_speed_700hPa=true&wind_direction_700hPa=true` + 
+            `&wind_speed_500hPa=true&wind_direction_500hPa=true` + 
+            `&wind_speed_300hPa=true&wind_direction_300hPa=true` + 
+            `&wind_speed_200hPa=true&wind_direction_200hPa=true` + 
+            `&models=gfs_seamless`);
+        
         if (!response.ok) {
             throw new Error(`HTTP error! Status: ${response.status}`);
         }
+        
         const data = await response.json();
-        console.log('Response data:', data);
-        if (!data.hourly) {
-            throw new Error('No hourly data in response');
-        }
+        
+        // Ausführlichere Logs für die geladenen Wetterdaten
+        console.log("Weather data fetched successfully:", data);
+        console.log("--------------------------------");
+        console.log("Standort:", `Lat: ${lat.toFixed(4)}, Lon: ${lon.toFixed(4)}`);
+        console.log("Zeitraum:", data.hourly.time[0], "bis", data.hourly.time[data.hourly.time.length - 1]);
+        console.log("Verfügbare Druckniveaus:", Object.keys(data.hourly)
+            .filter(key => key.includes('wind_speed_') || key.includes('wind_direction_'))
+            .map(key => key.replace('wind_speed_', '').replace('wind_direction_', '').replace('hPa', ''))
+            .filter((v, i, a) => a.indexOf(v) === i)
+            .sort()
+            .map(level => `${level}hPa`));
+        
+        // Beispieldaten für den aktuellen Zeitpunkt (Index 0)
+        console.log("--------------------------------");
+        console.log("Aktuelle Daten (erster Zeitpunkt):");
+        
+        // Oberflächendaten
+        console.log("Oberfläche:", {
+            "Temperatur": `${data.hourly.temperature_2m[0]}${data.hourly_units.temperature_2m}`,
+            "Wind": `${data.hourly.wind_speed_10m[0]}${data.hourly_units.wind_speed_10m} aus ${data.hourly.wind_direction_10m[0]}${data.hourly_units.wind_direction_10m}`
+        });
+        
+        // Daten für Druckniveaus
+        const levels = [1000, 925, 850, 700, 500, 300, 200];
+        levels.forEach(level => {
+            const speedKey = `wind_speed_${level}hPa`;
+            const directionKey = `wind_direction_${level}hPa`;
+            
+            if (data.hourly[speedKey] && data.hourly[directionKey]) {
+                console.log(`${level}hPa:`, {
+                    "Wind": `${data.hourly[speedKey][0]}${data.hourly_units[speedKey]} aus ${data.hourly[directionKey][0]}${data.hourly_units[directionKey]}`
+                });
+            }
+        });
+        console.log("--------------------------------");
+        
+        // Speichern der Daten in der globalen Variable
         weatherData = data.hourly;
-        document.getElementById('timeSlider').disabled = false;
-        updateWeatherDisplay(0);
+        
+        return data;
     } catch (error) {
-        console.error('Weather fetch error:', error);
-        document.getElementById('info').innerText += `\nError fetching weather: ${error.message}`;
+        console.error("Weather fetch error:", error);
+        // Optional: Benutzerfreundliche Fehleranzeige hinzufügen
+        displayError("Konnte keine Wetterdaten laden. Bitte versuchen Sie es später erneut.");
+        throw error;
     }
 }
 
@@ -89,3 +133,27 @@ function updateWeatherDisplay(index) {
 document.getElementById('timeSlider').addEventListener('input', (e) => {
     updateWeatherDisplay(e.target.value);
 });
+
+// Hilfsfunktion zum Anzeigen von Fehlern (füge diese am Ende der Datei hinzu)
+function displayError(message) {
+    // Erstelle oder finde ein Element zur Fehleranzeige
+    let errorElement = document.getElementById('error-message');
+    if (!errorElement) {
+        errorElement = document.createElement('div');
+        errorElement.id = 'error-message';
+        errorElement.style.color = 'red';
+        errorElement.style.padding = '10px';
+        errorElement.style.backgroundColor = 'rgba(255, 200, 200, 0.5)';
+        errorElement.style.borderRadius = '5px';
+        errorElement.style.margin = '10px';
+        document.body.insertBefore(errorElement, document.body.firstChild);
+    }
+    
+    errorElement.textContent = message;
+    errorElement.style.display = 'block';
+    
+    // Fehler nach 5 Sekunden ausblenden
+    setTimeout(() => {
+        errorElement.style.display = 'none';
+    }, 5000);
+}
