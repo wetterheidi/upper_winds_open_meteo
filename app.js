@@ -90,6 +90,12 @@ async function fetchWeather(lat, lon) {
         // Speichern der Daten in der globalen Variable
         weatherData = data.hourly;
         
+        //Time slieder check
+        const slider = document.getElementById('timeSlider');
+        slider.disabled = false;
+        console.log('Slider enabled:', !slider.disabled); // Should log "Slider enabled: true"
+        updateWeatherDisplay(0);
+
         return data;
     } catch (error) {
         console.error("Weather fetch error:", error);
@@ -148,9 +154,10 @@ function updateWeatherDisplay(index) {
     document.getElementById('info').innerText = output;
 }
 
-
-document.getElementById('timeSlider').addEventListener('input', (e) => {
-    updateWeatherDisplay(e.target.value);
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('timeSlider').addEventListener('input', (e) => {
+        updateWeatherDisplay(e.target.value);
+    });
 });
 
 // Hilfsfunktion zum Anzeigen von Fehlern (füge diese am Ende der Datei hinzu)
