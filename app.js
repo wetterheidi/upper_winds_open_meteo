@@ -10,9 +10,13 @@ const map = new mapboxgl.Map({
 });
 
 let weatherData = null;
+let lastLat = null;
+let lastLng = null; // Store last clicked coordinates for model change refetch
 
 map.on('click', async (e) => {
     const { lng, lat } = e.lngLat;
+    lastLat = lat;
+    lastLng = lng; // Save coordinates
     const altitude = await getAltitude(lng, lat);
     document.getElementById('info').innerText = `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}, Alt: ${altitude}m\nFetching weather...`;
     await fetchWeather(lat, lng);
@@ -33,9 +37,16 @@ async function getAltitude(lng, lat) {
 
 async function fetchWeather(lat, lon) {
     try {
-        // Korrigierte URL mit den richtigen Parametern für Druckniveau-Daten
+        const model = document.getElementById('modelSelect').value; // Get selected model
         const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` + 
             `&hourly=temperature_2m,wind_speed_10m,wind_direction_10m` + 
+            `&temperature_1000hPa=true&relative_humidity_1000hPa=true` +
+            `&temperature_925hPa=true&relative_humidity_925hPa=true` +
+            `&temperature_850hPa=true&relative_humidity_850hPa=true` +
+            `&temperature_700hPa=true&relative_humidity_700hPa=true` +
+            `&temperature_500hPa=true&relative_humidity_500hPa=true` +
+            `&temperature_300hPa=true&relative_humidity_300hPa=true` +
+            `&temperature_200hPa=true&relative_humidity_200hPa=true` +
             `&wind_speed_1000hPa=true&wind_direction_1000hPa=true` + 
             `&wind_speed_925hPa=true&wind_direction_925hPa=true` + 
             `&wind_speed_850hPa=true&wind_direction_850hPa=true` + 
@@ -43,7 +54,7 @@ async function fetchWeather(lat, lon) {
             `&wind_speed_500hPa=true&wind_direction_500hPa=true` + 
             `&wind_speed_300hPa=true&wind_direction_300hPa=true` + 
             `&wind_speed_200hPa=true&wind_direction_200hPa=true` + 
-            `&models=gfs_seamless`);
+            `&models=${model}`);
         
         if (!response.ok) {
             throw new Error(`HTTP error! Status: ${response.status}`);
@@ -51,7 +62,6 @@ async function fetchWeather(lat, lon) {
         
         const data = await response.json();
         
-        // Ausführlichere Logs für die geladenen Wetterdaten
         console.log("Weather data fetched successfully:", data);
         console.log("--------------------------------");
         console.log("Standort:", `Lat: ${lat.toFixed(4)}, Lon: ${lon.toFixed(4)}`);
@@ -63,22 +73,18 @@ async function fetchWeather(lat, lon) {
             .sort()
             .map(level => `${level}hPa`));
         
-        // Beispieldaten für den aktuellen Zeitpunkt (Index 0)
         console.log("--------------------------------");
         console.log("Aktuelle Daten (erster Zeitpunkt):");
         
-        // Oberflächendaten
         console.log("Oberfläche:", {
             "Temperatur": `${data.hourly.temperature_2m[0]}${data.hourly_units.temperature_2m}`,
             "Wind": `${data.hourly.wind_speed_10m[0]}${data.hourly_units.wind_speed_10m} aus ${data.hourly.wind_direction_10m[0]}${data.hourly_units.wind_direction_10m}`
         });
         
-        // Daten für Druckniveaus
         const levels = [1000, 925, 850, 700, 500, 300, 200];
         levels.forEach(level => {
             const speedKey = `wind_speed_${level}hPa`;
             const directionKey = `wind_direction_${level}hPa`;
-            
             if (data.hourly[speedKey] && data.hourly[directionKey]) {
                 console.log(`${level}hPa:`, {
                     "Wind": `${data.hourly[speedKey][0]}${data.hourly_units[speedKey]} aus ${data.hourly[directionKey][0]}${data.hourly_units[directionKey]}`
@@ -87,19 +93,16 @@ async function fetchWeather(lat, lon) {
         });
         console.log("--------------------------------");
         
-        // Speichern der Daten in der globalen Variable
         weatherData = data.hourly;
         
-        //Time slieder check
         const slider = document.getElementById('timeSlider');
         slider.disabled = false;
-        console.log('Slider enabled:', !slider.disabled); // Should log "Slider enabled: true"
+        console.log('Slider enabled:', !slider.disabled);
         updateWeatherDisplay(0);
 
         return data;
     } catch (error) {
         console.error("Weather fetch error:", error);
-        // Optional: Benutzerfreundliche Fehleranzeige hinzufügen
         displayError("Konnte keine Wetterdaten laden. Bitte versuchen Sie es später erneut.");
         throw error;
     }
@@ -113,56 +116,77 @@ function calculateDewpoint(temp, rh) {
     return dewpoint.toFixed(1);
 }
 
-/*function updateWeatherDisplay(index) {
-    if (!weatherData) {
-        document.getElementById('info').innerText += '\nNo weather data available';
-        return;
-    }
-    const time = weatherData.time[index];
-    const levels = ['1000', '925', '850', '700', '500', '300', '200'];
-    let output = `Time: ${time}\n`;
-    output += `Surface: T=${weatherData[`temperature_2m`][index]}°C\n`;
-    levels.forEach(level => {
-        const temp = weatherData[`temperature_${level}`][index];
-        const rh = weatherData[`relative_humidity_${level}`][index];
-        const dewpoint = calculateDewpoint(temp, rh);
-        output += `${level}hPa: `
-            + `T=${temp}°C, `
-            + `RH=${rh}%, `
-            + `Dew=${dewpoint}°C, `
-            + `Wind=${weatherData[`wind_speed_${level}`][index]}km/h @ `
-            + `${weatherData[`wind_direction_${level}`][index]}°\n`;
-    });
-    document.getElementById('info').innerText = output;
-}*/
-
 function updateWeatherDisplay(index) {
-    if (!weatherData || !weatherData.time[index]) {
+    if (!weatherData || !weatherData.time || !weatherData.time[index]) {
         document.getElementById('info').innerText = 'No weather data available';
         return;
     }
+    
     const time = formatTime(weatherData.time[index]);
-    const levels = ['1000', '925', '850', '700', '500', '300', '200'];
+    const levels = ['1000hPa', '925hPa', '850hPa', '700hPa', '500hPa', '300hPa', '200hPa'];
+    
     let output = `Time: ${time}\n`;
-    output += `Surface: T=${weatherData[`temperature_2m`][index]}°C\n`;
+    
+    if (weatherData.temperature_2m && weatherData.temperature_2m[index] !== undefined) {
+        output += `Surface: T=${weatherData.temperature_2m[index]}°C`;
+        if (weatherData.wind_speed_10m && weatherData.wind_direction_10m) {
+            output += `, Wind=${weatherData.wind_speed_10m[index]}km/h @ ${weatherData.wind_direction_10m[index]}°`;
+        }
+        output += '\n';
+    }
+    
     levels.forEach(level => {
-        output += `${level}hPa: `
-            + `T=${weatherData[`temperature_${level}`][index]}°C, `
-            + `Wind=${weatherData[`wind_speed_${level}`][index]}km/h @ `
-            + `${weatherData[`wind_direction_${level}`][index]}°\n`;
+        output += `${level}: `;
+        let hasData = false;
+        
+        if (weatherData[`temperature_${level}`] && weatherData[`temperature_${level}`][index] !== undefined) {
+            output += `T=${weatherData[`temperature_${level}`][index]}°C`;
+            hasData = true;
+        }
+        
+        if (weatherData[`relative_humidity_${level}`] && weatherData[`relative_humidity_${level}`][index] !== undefined) {
+            const rh = weatherData[`relative_humidity_${level}`][index];
+            if (hasData) output += ', ';
+            output += `RH=${rh}%`;
+            if (weatherData[`temperature_${level}`] && weatherData[`temperature_${level}`][index] !== undefined) {
+                const temp = weatherData[`temperature_${level}`][index];
+                const dewpoint = calculateDewpoint(temp, rh);
+                output += `, Dew=${dewpoint}°C`;
+            }
+            hasData = true;
+        }
+        
+        if (weatherData[`wind_speed_${level}`] && weatherData[`wind_direction_${level}`] &&
+            weatherData[`wind_speed_${level}`][index] !== undefined && 
+            weatherData[`wind_direction_${level}`][index] !== undefined) {
+            if (hasData) output += ', ';
+            output += `Wind=${weatherData[`wind_speed_${level}`][index]}km/h @ ${weatherData[`wind_direction_${level}`][index]}°`;
+            hasData = true;
+        }
+        
+        if (!hasData) {
+            output += 'Keine Daten verfügbar';
+        }
+        
+        output += '\n';
     });
+    
     document.getElementById('info').innerText = output;
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('timeSlider').addEventListener('input', (e) => {
-        updateWeatherDisplay(e.target.value);
+function formatTime(isoString) {
+    const date = new Date(isoString);
+    return date.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
     });
-});
+}
 
-// Hilfsfunktion zum Anzeigen von Fehlern (füge diese am Ende der Datei hinzu)
 function displayError(message) {
-    // Erstelle oder finde ein Element zur Fehleranzeige
     let errorElement = document.getElementById('error-message');
     if (!errorElement) {
         errorElement = document.createElement('div');
@@ -177,22 +201,33 @@ function displayError(message) {
     
     errorElement.textContent = message;
     errorElement.style.display = 'block';
-    
-    // Fehler nach 5 Sekunden ausblenden
     setTimeout(() => {
         errorElement.style.display = 'none';
     }, 5000);
 }
 
-// Hilfsfunktion zum Formatieren von Zeitstempeln
-function formatTime(isoString) {
-    const date = new Date(isoString);
-    return date.toLocaleString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true
-    });
-}
+// DOM fully loaded event
+document.addEventListener('DOMContentLoaded', () => {
+    const slider = document.getElementById('timeSlider');
+    if (slider) {
+        slider.addEventListener('input', (e) => {
+            updateWeatherDisplay(e.target.value);
+        });
+    } else {
+        console.error('Slider element not found');
+    }
+
+    const modelSelect = document.getElementById('modelSelect');
+    if (modelSelect) {
+        modelSelect.addEventListener('change', () => {
+            if (lastLat && lastLng) {
+                document.getElementById('info').innerText = `Lat: ${lastLat.toFixed(4)}, Lng: ${lastLng.toFixed(4)}\nFetching weather with ${modelSelect.value}...`;
+                fetchWeather(lastLat, lastLng);
+            } else {
+                displayError('Bitte erst eine Position auf der Karte auswählen.');
+            }
+        });
+    } else {
+        console.error('Model select element not found');
+    }
+});

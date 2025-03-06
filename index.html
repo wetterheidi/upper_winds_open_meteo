@@ -13,6 +13,13 @@
     <div id="slider-container">
         <label for="timeSlider" id="timeLabel">Select Time</label>
         <input type="range" id="timeSlider" min="0" max="167" value="0" disabled>
+        <label for="modelSelect">Forecast Model:</label>
+        <select id="modelSelect">
+            <option value="gfs_seamless" selected>GFS Seamless</option>
+            <option value="ecmwf_ifs">ECMWF IFS</option>
+            <option value="icon_eu">ICON EU</option>
+            <option value="meteofrance_seamless">Météo-France Seamless</option>
+        </select>
     </div>
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
     <script src="app.js"></script>

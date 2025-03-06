@@ -25,3 +25,13 @@ body {
     display: block;
     margin-bottom: 5px;
 }
+
+#timeSlider {
+    width: 100%;
+    margin-bottom: 10px;
+}
+
+#modelSelect {
+    padding: 5px;
+    font-size: 14px;
+}
