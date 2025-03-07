@@ -38,7 +38,7 @@ async function fetchWeather(lat, lon) {
     try {
         const model = document.getElementById('modelSelect').value;
         const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
-            `&hourly=temperature_2m,wind_speed_10m,wind_direction_10m,` +
+            `&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,` +
             `temperature_1000hPa,relative_humidity_1000hPa,wind_speed_1000hPa,wind_direction_1000hPa,` +
             `temperature_925hPa,relative_humidity_925hPa,wind_speed_925hPa,wind_direction_925hPa,` +
             `temperature_850hPa,relative_humidity_850hPa,wind_speed_850hPa,wind_direction_850hPa,` +
@@ -69,6 +69,8 @@ async function fetchWeather(lat, lon) {
         console.log("Aktuelle Daten (erster Zeitpunkt):");
         console.log("Oberfläche:", {
             "Temperatur": `${data.hourly.temperature_2m[0]}${data.hourly_units.temperature_2m}`,
+            "Luftfeuchtigkeit": `${data.hourly.relative_humidity_2m[0]}${data.hourly_units.relative_humidity_2m}`,
+            "Taupunkt": `${calculateDewpoint(data.hourly.temperature_2m[0], data.hourly.relative_humidity_2m[0])}${data.hourly_units.temperature_2m}`,
             "Wind": `${data.hourly.wind_speed_10m[0]}${data.hourly_units.wind_speed_10m} aus ${data.hourly.wind_direction_10m[0]}${data.hourly_units.wind_direction_10m}`
         });
         
@@ -120,6 +122,12 @@ function updateWeatherDisplay(index) {
     
     if (weatherData.temperature_2m && weatherData.temperature_2m[index] !== undefined) {
         output += `Surface: T=${weatherData.temperature_2m[index]}°C`;
+        if (weatherData.relative_humidity_2m && weatherData.relative_humidity_2m[index] !== undefined) {
+            const rh = weatherData.relative_humidity_2m[index];
+            output += `, RH=${rh}%`;
+            const dewpoint = calculateDewpoint(weatherData.temperature_2m[index], rh);
+            output += `, Dew=${dewpoint}°C`;
+        }
         if (weatherData.wind_speed_10m && weatherData.wind_direction_10m) {
             output += `, Wind=${weatherData.wind_speed_10m[index]}km/h @ ${weatherData.wind_direction_10m[index]}°`;
         }
