@@ -178,13 +178,17 @@ function gaussianInterpolation(y1, y2, h1, h2, hp) {
 function interpolateWeatherData(index) {
     if (!weatherData || !weatherData.time || lastAltitude === 'N/A') return [];
 
-    const step = parseInt(document.getElementById('interpStepSelect').value) || 200; // Default to 200 if not found
-    const levels = ['200 hPa', '300 hPa', '500 hPa', '700 hPa', '800 hPa', '850 hPa', '900 hPa', '925 hPa', '950 hPa', '1000 hPa'];
+    const step = parseInt(document.getElementById('interpStepSelect').value) || 200;
+    const refLevel = document.getElementById('refLevelSelect').value || 'AMSL';
     const baseHeight = Math.round(lastAltitude);
+    const levels = ['200 hPa', '300 hPa', '500 hPa', '700 hPa', '800 hPa', '850 hPa', '900 hPa', '925 hPa', '950 hPa', '1000 hPa'];
+    
+    // For AMSL: use absolute heights; for AGL: offset by baseHeight
+    const surfaceHeight = refLevel === 'AGL' ? 0 : baseHeight;
     const dataPoints = [
         {
-            level: `${baseHeight} m`,
-            height: baseHeight,
+            level: `${surfaceHeight} m`,
+            height: baseHeight, // Actual height for interpolation
             temp: weatherData.temperature_2m?.[index],
             rh: weatherData.relative_humidity_2m?.[index],
             dir: weatherData.wind_direction_10m?.[index],
@@ -211,21 +215,23 @@ function interpolateWeatherData(index) {
     const maxHeight = dataPoints[dataPoints.length - 1].height;
     const interpolated = [];
 
-    // Start interpolation at baseHeight + step
-    for (let hp = baseHeight + step; hp <= maxHeight; hp += step) {
-        const lower = dataPoints.filter(p => p.height <= hp).pop();
-        const upper = dataPoints.find(p => p.height > hp);
+    // Interpolation starts at surfaceHeight + step
+    for (let hp = surfaceHeight + step; hp <= (refLevel === 'AGL' ? maxHeight - baseHeight : maxHeight); hp += step) {
+        const actualHp = refLevel === 'AGL' ? hp + baseHeight : hp; // Convert to absolute height for interpolation
+        const lower = dataPoints.filter(p => p.height <= actualHp).pop();
+        const upper = dataPoints.find(p => p.height > actualHp);
         if (!lower || !upper) continue;
 
-        const temp = gaussianInterpolation(lower.temp, upper.temp, lower.height, upper.height, hp);
-        const rh = Math.max(0, Math.min(100, gaussianInterpolation(lower.rh, upper.rh, lower.height, upper.height, hp)));
-        const dir = gaussianInterpolation(lower.dir, upper.dir, lower.height, upper.height, hp);
-        const spd = gaussianInterpolation(lower.spd, upper.spd, lower.height, upper.height, hp);
+        const temp = gaussianInterpolation(lower.temp, upper.temp, lower.height, upper.height, actualHp);
+        const rh = Math.max(0, Math.min(100, gaussianInterpolation(lower.rh, upper.rh, lower.height, upper.height, actualHp)));
+        const dir = gaussianInterpolation(lower.dir, upper.dir, lower.height, upper.height, actualHp);
+        const spd = gaussianInterpolation(lower.spd, upper.spd, lower.height, upper.height, actualHp);
         const dew = calculateDewpoint(temp, rh);
 
         interpolated.push({
             level: `${hp} m`,
-            height: hp,
+            height: actualHp, // Store absolute height for sorting
+            displayHeight: hp, // Display height relative to reference
             temp: temp.toFixed(1),
             rh: rh.toFixed(1),
             dew: dew,
@@ -234,13 +240,14 @@ function interpolateWeatherData(index) {
         });
     }
 
-    // Add the surface row (terrain elevation)
-    const surfaceData = dataPoints.find(d => d.level === `${baseHeight} m`);
+    // Add the surface row
+    const surfaceData = dataPoints.find(d => d.level === `${surfaceHeight} m`);
     if (surfaceData) {
         const dew = (surfaceData.temp !== undefined && surfaceData.rh !== undefined) ? calculateDewpoint(surfaceData.temp, surfaceData.rh) : '-';
         interpolated.push({
-            level: surfaceData.level,
+            level: `${surfaceHeight} m`,
             height: surfaceData.height,
+            displayHeight: surfaceHeight,
             temp: surfaceData.temp?.toFixed(1) ?? '-',
             rh: surfaceData.rh?.toFixed(1) ?? '-',
             dew: dew,
@@ -249,7 +256,7 @@ function interpolateWeatherData(index) {
         });
     }
 
-    // Sort descending by height
+    // Sort descending by absolute height
     interpolated.sort((a, b) => b.height - a.height);
     return interpolated;
 }
@@ -273,7 +280,7 @@ function updateWeatherDisplay(index) {
     output += `<th style="width: 15%;">Dew (°C)</th>`;
     output += `<th style="width: 10%;">Dir (°)</th>`;
     output += `<th style="width: 15%;">Spd (kt)</th>`;
-    output += `<th style="width: 20%;">GH (m)</th>`;
+    output += `<th style="width: 20%;">Height (m)</th>`;
     output += `</tr>`;
 
     interpolatedData.forEach(data => {
@@ -284,7 +291,7 @@ function updateWeatherDisplay(index) {
         output += `<td>${data.dew}</td>`;
         output += `<td>${data.dir}</td>`;
         output += `<td>${data.spd}</td>`;
-        output += `<td>${data.height}</td>`;
+        output += `<td>${data.displayHeight}</td>`; // Use displayHeight for AGL/AMSL
         output += `</tr>`;
     });
 
@@ -315,10 +322,10 @@ function downloadTableAsAscii() {
     const filename = `${time}_${model}_HEIDIS.txt`;
 
     const interpolatedData = interpolateWeatherData(index);
-    let content = 'Level T RH Dew Dir Spd GH\n';
+    let content = 'Level T RH Dew Dir Spd Height\n';
 
     interpolatedData.forEach(data => {
-        content += `${data.level} ${data.temp} ${data.rh} ${data.dew} ${data.dir} ${data.spd} ${data.height}\n`;
+        content += `${data.level} ${data.temp} ${data.rh} ${data.dew} ${data.dir} ${data.spd} ${data.displayHeight}\n`;
     });
 
     const blob = new Blob([content], { type: 'text/plain' });
@@ -363,6 +370,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const infoPopup = document.getElementById('modelInfoPopup');
     const downloadButton = document.getElementById('downloadButton');
     const interpStepSelect = document.getElementById('interpStepSelect');
+    const refLevelSelect = document.getElementById('refLevelSelect');
 
     if (modelSelect) {
         modelSelect.addEventListener('change', () => {
@@ -417,5 +425,17 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     } else {
         console.error('Interpolation step select element not found');
+    }
+
+    if (refLevelSelect) {
+        refLevelSelect.addEventListener('change', () => {
+            if (weatherData && lastLat && lastLng) {
+                updateWeatherDisplay(document.getElementById('timeSlider').value || 0);
+            } else {
+                displayError('Please select a position and fetch weather data first.');
+            }
+        });
+    } else {
+        console.error('Reference level select element not found');
     }
 });
