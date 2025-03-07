@@ -36,8 +36,13 @@ map.on('click', async (e) => {
     currentMarker.togglePopup();
     
     document.getElementById('info').innerHTML = `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}, Alt: ${altitude}m<br>Fetching weather and models...`;
-    await fetchWeather(lat, lng);
-    await checkAvailableModels(lat, lng);
+    
+    const availableModels = await checkAvailableModels(lat, lng);
+    if (availableModels.length > 0) {
+        await fetchWeather(lat, lng);
+    } else {
+        document.getElementById('info').innerHTML = `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}, Alt: ${altitude}m<br>No models available.`;
+    }
 });
 
 async function getAltitude(lng, lat) {
@@ -95,7 +100,7 @@ async function checkAvailableModels(lat, lon) {
         'icon_d2'            // DWD ICON-D2 (Central EU)
     ];
     
-    let availableModels = '<br><strong>Available Models:</strong><ul>';
+    let availableModels = [];
     for (const model of modelList) {
         try {
             const response = await fetch(
@@ -106,16 +111,30 @@ async function checkAvailableModels(lat, lon) {
             }
             const data = await response.json();
             if (data.hourly && data.hourly.temperature_2m && data.hourly.temperature_2m.length > 0) {
-                availableModels += `<li>${model}</li>`;
+                availableModels.push(model);
             }
         } catch (error) {
             console.log(`${model} not available: ${error.message}`);
         }
     }
-    availableModels += '</ul>';
+    
+    const modelSelect = document.getElementById('modelSelect');
+    modelSelect.innerHTML = '';
+    availableModels.forEach(model => {
+        const option = document.createElement('option');
+        option.value = model;
+        option.textContent = model.replace('_', ' ').toUpperCase();
+        modelSelect.appendChild(option);
+    });
+    
+    const modelDisplay = availableModels.length > 0
+        ? `<br><strong>Available Models:</strong><ul>${availableModels.map(m => `<li>${m.replace('_', ' ').toUpperCase()}</li>`).join('')}</ul>`
+        : '<br><strong>Available Models:</strong> None';
     
     const currentContent = document.getElementById('info').innerHTML;
-    document.getElementById('info').innerHTML = currentContent + availableModels;
+    document.getElementById('info').innerHTML = currentContent + modelDisplay;
+    
+    return availableModels;
 }
 
 function calculateDewpoint(temp, rh) {
