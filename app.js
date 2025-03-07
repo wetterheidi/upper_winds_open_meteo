@@ -40,8 +40,11 @@ async function fetchWeather(lat, lon) {
         const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
             `&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,` +
             `temperature_1000hPa,relative_humidity_1000hPa,wind_speed_1000hPa,wind_direction_1000hPa,` +
+            `temperature_950hPa,relative_humidity_950hPa,wind_speed_950hPa,wind_direction_950hPa,` +
             `temperature_925hPa,relative_humidity_925hPa,wind_speed_925hPa,wind_direction_925hPa,` +
+            `temperature_900hPa,relative_humidity_900hPa,wind_speed_900hPa,wind_direction_900hPa,` +
             `temperature_850hPa,relative_humidity_850hPa,wind_speed_850hPa,wind_direction_850hPa,` +
+            `temperature_800hPa,relative_humidity_800hPa,wind_speed_800hPa,wind_direction_800hPa,` +
             `temperature_700hPa,relative_humidity_700hPa,wind_speed_700hPa,wind_direction_700hPa,` +
             `temperature_500hPa,relative_humidity_500hPa,wind_speed_500hPa,wind_direction_500hPa,` +
             `temperature_300hPa,relative_humidity_300hPa,wind_speed_300hPa,wind_direction_300hPa,` +
@@ -62,7 +65,7 @@ async function fetchWeather(lat, lon) {
             .filter(key => key.includes('wind_speed_') || key.includes('wind_direction_'))
             .map(key => key.replace('wind_speed_', '').replace('wind_direction_', '').replace('hPa', ''))
             .filter((v, i, a) => a.indexOf(v) === i)
-            .sort()
+            .sort((a, b) => b - a)
             .map(level => `${level}hPa`));
         
         console.log("--------------------------------");
@@ -74,7 +77,7 @@ async function fetchWeather(lat, lon) {
             "Wind": `${data.hourly.wind_speed_10m[0]}${data.hourly_units.wind_speed_10m} aus ${data.hourly.wind_direction_10m[0]}${data.hourly_units.wind_direction_10m}`
         });
         
-        const levels = [1000, 925, 850, 700, 500, 300, 200];
+        const levels = [1000, 950, 925, 900, 850, 800, 700, 500, 300, 200];
         levels.forEach(level => {
             const speedKey = `wind_speed_${level}hPa`;
             const directionKey = `wind_direction_${level}hPa`;
@@ -116,7 +119,7 @@ function updateWeatherDisplay(index) {
     }
     
     const time = formatTime(weatherData.time[index]);
-    const levels = ['1000hPa', '925hPa', '850hPa', '700hPa', '500hPa', '300hPa', '200hPa'];
+    const levels = ['1000hPa', '950hPa', '925hPa', '900hPa', '850hPa', '800hPa', '700hPa', '500hPa', '300hPa', '200hPa'];
     
     let output = `Time: ${time}\n`;
     
