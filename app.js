@@ -481,7 +481,7 @@ function Mittelwind(Höhe, xKomponente, yKomponente, Untergrenze, Obergrenze) {
 function updateWeatherDisplay(index) {
     if (!weatherData || !weatherData.time || !weatherData.time[index]) {
         document.getElementById('info').innerHTML = 'No weather data available';
-        document.getElementById('currentTime').innerHTML = '';
+        document.getElementById('selectedTime').innerHTML = 'Selected Time: ';
         return;
     }
 
@@ -515,8 +515,8 @@ function updateWeatherDisplay(index) {
     output += `</table>`;
     document.getElementById('info').innerHTML = output;
 
-    // Update #currentTime with Time
-    document.getElementById('currentTime').innerHTML = `Time: ${time}`;
+    // Update #selectedTime with Time
+    document.getElementById('selectedTime').innerHTML = `Selected Time: ${time}`;
 }
 
 function calculateMeanWind() {

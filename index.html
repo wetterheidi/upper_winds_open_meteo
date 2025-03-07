@@ -80,10 +80,16 @@
             margin-left: 10px;
             font-weight: bold;
         }
-        #currentTime {
-            margin-top: 5px;
+        #selectedTime {
             font-size: 14px;
             font-weight: bold;
+            display: block;
+            margin-bottom: 5px;
+        }
+        #timeSlider {
+            display: block;
+            width: 100%;
+            margin: 5px 0;
         }
     </style>
 </head>
@@ -91,12 +97,11 @@
     <div id="map"></div>
     <div id="info">Click the map to fetch weather data</div>
     <div id="slider-container">
-        <label for="timeSlider" id="timeLabel">Select Time</label>
+        <span id="selectedTime">Selected Time: </span>
         <input type="range" id="timeSlider" min="0" max="167" value="0" disabled>
         <label for="modelSelect">Forecast Model:</label>
         <select id="modelSelect"></select>
         <button id="modelInfoButton">ℹ️</button>
-        <div id="currentTime"></div> <!-- Added for time display -->
         <div id="modelInfoPopup"></div>
     </div>
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
