@@ -75,34 +75,37 @@ async function fetchWeather(lat, lon) {
             `temperature_300hPa,relative_humidity_300hPa,wind_speed_300hPa,wind_direction_300hPa,geopotential_height_300hPa,` +
             `temperature_200hPa,relative_humidity_200hPa,wind_speed_200hPa,wind_direction_200hPa,geopotential_height_200hPa` +
             `&models=${modelSelect}`);
-        
+
         if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-        
+
         const data = await response.json();
         weatherData = data.hourly;
 
         const modelMap = {
+            'icon_global': 'dwd_icon',
             'gfs_seamless': 'ncep_gfs013',
             'gfs_global': 'ncep_gfs025',
-            'icon_global': 'dwd_icon',
             'icon_eu': 'dwd_icon_eu',
             'icon_d2': 'dwd_icon_d2',
-            // Add more mappings as needed
+            'ecmwf_ifs025': 'ecmwf_ifs025',
+            'ecmwf_aifs025': 'ecmwf_aifs025_single',
+            'ncep_hrrr': 'ncep_hrrr_conus'
+            // Add more mappings as needed based on model-updates page
         };
         const model = modelMap[modelSelect] || modelSelect;
 
         const metaResponse = await fetch(`https://api.open-meteo.com/data/${model}/static/meta.json`);
         if (!metaResponse.ok) throw new Error(`Meta fetch failed: ${metaResponse.status}`);
         const metaData = await metaResponse.json();
-        
+
         const runDate = new Date(metaData.last_run_initialisation_time * 1000);
         const year = runDate.getUTCFullYear();
         const month = String(runDate.getUTCMonth() + 1).padStart(2, '0');
         const day = String(runDate.getUTCDate()).padStart(2, '0');
         const hour = String(runDate.getUTCHours()).padStart(2, '0');
         const minute = String(runDate.getUTCMinutes()).padStart(2, '0');
-        lastModelRun = `${year}-${month}-${day} ${hour}${minute} Z`;
-        
+        lastModelRun = `${year}-${month}-${day} ${hour}${minute}`;
+
         const slider = document.getElementById('timeSlider');
         slider.max = data.hourly.time.length - 1;
         slider.disabled = false;
@@ -118,7 +121,7 @@ async function fetchWeather(lat, lon) {
 async function checkAvailableModels(lat, lon) {
     const modelList = [
         'icon_global', 'gfs_seamless', 'gfs_global', 'ecmwf_ifs025', 'ecmwf_aifs025',
-        'ncep_hrrr', 'icon_eu', 'icon_d2'
+        'gem_global', 'ncep_hrrr', 'icon_eu', 'icon_d2', 'gfs025', 'icon_seamless'
     ];
 
     let availableModels = [];
@@ -255,6 +258,65 @@ function formatTime(isoString) {
     return `${year}-${month}-${day} ${hour}${minute}`;
 }
 
+function downloadTableAsAscii() {
+    if (!weatherData || !weatherData.time) {
+        displayError('No weather data available to download.');
+        return;
+    }
+
+    const index = document.getElementById('timeSlider').value || 0;
+    const model = document.getElementById('modelSelect').value.toUpperCase();
+    const time = formatTime(weatherData.time[index]).replace(' ', '_');
+    const filename = `${time}_${model}_HEIDIS.txt`;
+
+    const levels = ['200 hPa', '300 hPa', '500 hPa', '700 hPa', '800 hPa', '850 hPa', '900 hPa', '925 hPa', '950 hPa', '1000 hPa'];
+    let content = 'Level T RH Dew Dir Spd GH\n';
+
+    levels.forEach(level => {
+        const levelKey = level.replace(' ', '');
+        const temp = weatherData[`temperature_${levelKey}`]?.[index];
+        const rh = weatherData[`relative_humidity_${levelKey}`]?.[index];
+        const windDir = weatherData[`wind_direction_${levelKey}`]?.[index];
+        const windSpeed = weatherData[`wind_speed_${levelKey}`]?.[index];
+        const gh = weatherData[`geopotential_height_${levelKey}`]?.[index];
+
+        if ([temp, rh, windDir, windSpeed, gh].every(val => val === null || val === undefined || isNaN(val))) {
+            return;
+        }
+
+        const dewpoint = (temp !== undefined && temp !== null && !isNaN(temp) && rh !== undefined && rh !== null && !isNaN(rh))
+            ? calculateDewpoint(temp, rh) : '-';
+        const windSpeedKt = windSpeed !== undefined && windSpeed !== null && !isNaN(windSpeed) ? (windSpeed * 0.539957).toFixed(1) : '-';
+        const ghRounded = gh !== undefined && gh !== null && !isNaN(gh) ? Math.round(gh) : '-';
+
+        content += `${level} ${temp ?? '-'} ${rh ?? '-'} ${dewpoint} ${windDir ?? '-'} ${windSpeedKt} ${ghRounded}\n`;
+    });
+
+    const temp2m = weatherData.temperature_2m?.[index];
+    const rh2m = weatherData.relative_humidity_2m?.[index];
+    const windDir10m = weatherData.wind_direction_10m?.[index];
+    const windSpeed10m = weatherData.wind_speed_10m?.[index];
+
+    if (![temp2m, rh2m, windDir10m, windSpeed10m].every(val => val === null || val === undefined || isNaN(val))) {
+        const dewpoint2m = (temp2m !== undefined && temp2m !== null && !isNaN(temp2m) && rh2m !== undefined && rh2m !== null && !isNaN(rh2m))
+            ? calculateDewpoint(temp2m, rh2m) : '-';
+        const windSpeed10mKt = windSpeed10m !== undefined && windSpeed10m !== null && !isNaN(windSpeed10m) ? (windSpeed10m * 0.539957).toFixed(1) : '-';
+        const altitude = (lastAltitude !== 'N/A' && lastAltitude !== null) ? Math.round(lastAltitude) : '-';
+
+        content += `Surface ${temp2m ?? '-'} ${rh2m ?? '-'} ${dewpoint2m} ${windDir10m ?? '-'} ${windSpeed10mKt} ${altitude}\n`;
+    }
+
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+}
+
 function displayError(message) {
     let errorElement = document.getElementById('error-message');
     if (!errorElement) {
@@ -284,6 +346,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const modelSelect = document.getElementById('modelSelect');
     const infoButton = document.getElementById('modelInfoButton');
     const infoPopup = document.getElementById('modelInfoPopup');
+    const downloadButton = document.getElementById('downloadButton');
 
     if (modelSelect) {
         modelSelect.addEventListener('change', () => {
@@ -320,5 +383,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     } else {
         console.error('Model info button or popup element not found');
+    }
+
+    if (downloadButton) {
+        downloadButton.addEventListener('click', downloadTableAsAscii);
+    } else {
+        console.error('Download button element not found');
     }
 });
