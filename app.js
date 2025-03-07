@@ -96,7 +96,8 @@ async function checkAvailableModels(lat, lon) {
         'gfs_seamless',          // NOAA GFS mix
         'gfs_global',            // NOAA GFS 0.25°
         'icon_global',           // DWD ICON global 13 km
-        'ecmwf_ifs',             // ECMWF IFS (default open data)
+        'ecmwf_ifs025',          // ECMWF IFS (default open data)
+        'ecmwf_aifs025',         // ECMWF AIFS (experimental)
         'meteofrance_seamless',  // Météo-France ARPEGE mix
         'meteofrance_arpege_world', // ARPEGE global 0.25°
         'jma_seamless',          // JMA mix
