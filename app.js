@@ -62,25 +62,6 @@ async function getAltitude(lng, lat) {
 async function fetchWeather(lat, lon) {
     try {
         const modelSelect = document.getElementById('modelSelect').value;
-        const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
-            `&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,` +
-            `temperature_1000hPa,relative_humidity_1000hPa,wind_speed_1000hPa,wind_direction_1000hPa,geopotential_height_1000hPa,` +
-            `temperature_950hPa,relative_humidity_950hPa,wind_speed_950hPa,wind_direction_950hPa,geopotential_height_950hPa,` +
-            `temperature_925hPa,relative_humidity_925hPa,wind_speed_925hPa,wind_direction_925hPa,geopotential_height_925hPa,` +
-            `temperature_900hPa,relative_humidity_900hPa,wind_speed_900hPa,wind_direction_900hPa,geopotential_height_900hPa,` +
-            `temperature_850hPa,relative_humidity_850hPa,wind_speed_850hPa,wind_direction_850hPa,geopotential_height_850hPa,` +
-            `temperature_800hPa,relative_humidity_800hPa,wind_speed_800hPa,wind_direction_800hPa,geopotential_height_800hPa,` +
-            `temperature_700hPa,relative_humidity_700hPa,wind_speed_700hPa,wind_direction_700hPa,geopotential_height_700hPa,` +
-            `temperature_500hPa,relative_humidity_500hPa,wind_speed_500hPa,wind_direction_500hPa,geopotential_height_500hPa,` +
-            `temperature_300hPa,relative_humidity_300hPa,wind_speed_300hPa,wind_direction_300hPa,geopotential_height_300hPa,` +
-            `temperature_200hPa,relative_humidity_200hPa,wind_speed_200hPa,wind_direction_200hPa,geopotential_height_200hPa` +
-            `&models=${modelSelect}`);
-
-        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-
-        const data = await response.json();
-        weatherData = data.hourly;
-
         const modelMap = {
             'icon_global': 'dwd_icon',
             'gfs_seamless': 'ncep_gfs013',
@@ -93,11 +74,13 @@ async function fetchWeather(lat, lon) {
         };
         const model = modelMap[modelSelect] || modelSelect;
 
+        // Fetch model run time
         const metaResponse = await fetch(`https://api.open-meteo.com/data/${model}/static/meta.json`);
         if (!metaResponse.ok) throw new Error(`Meta fetch failed: ${metaResponse.status}`);
         const metaData = await metaResponse.json();
 
         const runDate = new Date(metaData.last_run_initialisation_time * 1000);
+        const now = new Date(); // Current date: March 7, 2025
         const year = runDate.getUTCFullYear();
         const month = String(runDate.getUTCMonth() + 1).padStart(2, '0');
         const day = String(runDate.getUTCDate()).padStart(2, '0');
@@ -105,14 +88,128 @@ async function fetchWeather(lat, lon) {
         const minute = String(runDate.getUTCMinutes()).padStart(2, '0');
         lastModelRun = `${year}-${month}-${day} ${hour}${minute}`;
 
+        // Adjust start date if in the future
+        let startDate = runDate;
+        if (runDate > now) {
+            startDate = new Date(now);
+            console.warn(`Run time ${lastModelRun} is in the future; using current date instead.`);
+        }
+        const startYear = startDate.getUTCFullYear();
+        const startMonth = String(startDate.getUTCMonth() + 1).padStart(2, '0');
+        const startDay = String(startDate.getUTCDate()).padStart(2, '0');
+        const startDateStr = `${startYear}-${startMonth}-${startDay}`;
+
+        // Set end date: 2 days for ICON-D2, 7 days for others
+        const endDate = new Date(startDate);
+        const forecastDays = modelSelect === 'icon_d2' ? 2 : 7;
+        endDate.setUTCDate(endDate.getUTCDate() + forecastDays);
+        const endYear = endDate.getUTCFullYear();
+        const endMonth = String(endDate.getUTCMonth() + 1).padStart(2, '0');
+        const endDay = String(endDate.getUTCDate()).padStart(2, '0');
+        const endDateStr = `${endYear}-${endMonth}-${endDay}`;
+
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+            `&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,` +
+            `temperature_1000hPa,relative_humidity_1000hPa,wind_speed_1000hPa,wind_direction_1000hPa,geopotential_height_1000hPa,` +
+            `temperature_950hPa,relative_humidity_950hPa,wind_speed_950hPa,wind_direction_950hPa,geopotential_height_950hPa,` +
+            `temperature_925hPa,relative_humidity_925hPa,wind_speed_925hPa,wind_direction_925hPa,geopotential_height_925hPa,` +
+            `temperature_900hPa,relative_humidity_900hPa,wind_speed_900hPa,wind_direction_900hPa,geopotential_height_900hPa,` +
+            `temperature_850hPa,relative_humidity_850hPa,wind_speed_850hPa,wind_direction_850hPa,geopotential_height_850hPa,` +
+            `temperature_800hPa,relative_humidity_800hPa,wind_speed_800hPa,wind_direction_800hPa,geopotential_height_800hPa,` +
+            `temperature_700hPa,relative_humidity_700hPa,wind_speed_700hPa,wind_direction_700hPa,geopotential_height_700hPa,` +
+            `temperature_500hPa,relative_humidity_500hPa,wind_speed_500hPa,wind_direction_500hPa,geopotential_height_500hPa,` +
+            `temperature_300hPa,relative_humidity_300hPa,wind_speed_300hPa,wind_direction_300hPa,geopotential_height_300hPa,` +
+            `temperature_200hPa,relative_humidity_200hPa,wind_speed_200hPa,wind_direction_200hPa,geopotential_height_200hPa` +
+            `&models=${modelSelect}&start_date=${startDateStr}&end_date=${endDateStr}`;
+
+        console.log('Fetching weather from:', url);
+        const response = await fetch(url);
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`HTTP error! Status: ${response.status} - ${errorText}`);
+        }
+
+        const data = await response.json();
+
+        // Filter data to start at or after run time
+        const runTimeMs = runDate.getTime();
+        const filteredIndices = data.hourly.time
+            .map((time, idx) => ({ time: new Date(time).getTime(), idx }))
+            .filter(t => t.time >= runTimeMs);
+
+        if (filteredIndices.length === 0) {
+            throw new Error('No data available after the model run time.');
+        }
+
+        const startIdx = filteredIndices[0].idx;
+        weatherData = {
+            time: data.hourly.time.slice(startIdx),
+            temperature_2m: data.hourly.temperature_2m.slice(startIdx),
+            relative_humidity_2m: data.hourly.relative_humidity_2m.slice(startIdx),
+            wind_speed_10m: data.hourly.wind_speed_10m.slice(startIdx),
+            wind_direction_10m: data.hourly.wind_direction_10m.slice(startIdx),
+            temperature_1000hPa: data.hourly.temperature_1000hPa.slice(startIdx),
+            relative_humidity_1000hPa: data.hourly.relative_humidity_1000hPa.slice(startIdx),
+            wind_speed_1000hPa: data.hourly.wind_speed_1000hPa.slice(startIdx),
+            wind_direction_1000hPa: data.hourly.wind_direction_1000hPa.slice(startIdx),
+            geopotential_height_1000hPa: data.hourly.geopotential_height_1000hPa.slice(startIdx),
+            temperature_950hPa: data.hourly.temperature_950hPa.slice(startIdx),
+            relative_humidity_950hPa: data.hourly.relative_humidity_950hPa.slice(startIdx),
+            wind_speed_950hPa: data.hourly.wind_speed_950hPa.slice(startIdx),
+            wind_direction_950hPa: data.hourly.wind_direction_950hPa.slice(startIdx),
+            geopotential_height_950hPa: data.hourly.geopotential_height_950hPa.slice(startIdx),
+            temperature_925hPa: data.hourly.temperature_925hPa.slice(startIdx),
+            relative_humidity_925hPa: data.hourly.relative_humidity_925hPa.slice(startIdx),
+            wind_speed_925hPa: data.hourly.wind_speed_925hPa.slice(startIdx),
+            wind_direction_925hPa: data.hourly.wind_direction_925hPa.slice(startIdx),
+            geopotential_height_925hPa: data.hourly.geopotential_height_925hPa.slice(startIdx),
+            temperature_900hPa: data.hourly.temperature_900hPa.slice(startIdx),
+            relative_humidity_900hPa: data.hourly.relative_humidity_900hPa.slice(startIdx),
+            wind_speed_900hPa: data.hourly.wind_speed_900hPa.slice(startIdx),
+            wind_direction_900hPa: data.hourly.wind_direction_900hPa.slice(startIdx),
+            geopotential_height_900hPa: data.hourly.geopotential_height_900hPa.slice(startIdx),
+            temperature_850hPa: data.hourly.temperature_850hPa.slice(startIdx),
+            relative_humidity_850hPa: data.hourly.relative_humidity_850hPa.slice(startIdx),
+            wind_speed_850hPa: data.hourly.wind_speed_850hPa.slice(startIdx),
+            wind_direction_850hPa: data.hourly.wind_direction_850hPa.slice(startIdx),
+            geopotential_height_850hPa: data.hourly.geopotential_height_850hPa.slice(startIdx),
+            temperature_800hPa: data.hourly.temperature_800hPa.slice(startIdx),
+            relative_humidity_800hPa: data.hourly.relative_humidity_800hPa.slice(startIdx),
+            wind_speed_800hPa: data.hourly.wind_speed_800hPa.slice(startIdx),
+            wind_direction_800hPa: data.hourly.wind_direction_800hPa.slice(startIdx),
+            geopotential_height_800hPa: data.hourly.geopotential_height_800hPa.slice(startIdx),
+            temperature_700hPa: data.hourly.temperature_700hPa.slice(startIdx),
+            relative_humidity_700hPa: data.hourly.relative_humidity_700hPa.slice(startIdx),
+            wind_speed_700hPa: data.hourly.wind_speed_700hPa.slice(startIdx),
+            wind_direction_700hPa: data.hourly.wind_direction_700hPa.slice(startIdx),
+            geopotential_height_700hPa: data.hourly.geopotential_height_700hPa.slice(startIdx),
+            temperature_500hPa: data.hourly.temperature_500hPa.slice(startIdx),
+            relative_humidity_500hPa: data.hourly.relative_humidity_500hPa.slice(startIdx),
+            wind_speed_500hPa: data.hourly.wind_speed_500hPa.slice(startIdx),
+            wind_direction_500hPa: data.hourly.wind_direction_500hPa.slice(startIdx),
+            geopotential_height_500hPa: data.hourly.geopotential_height_500hPa.slice(startIdx),
+            temperature_300hPa: data.hourly.temperature_300hPa.slice(startIdx),
+            relative_humidity_300hPa: data.hourly.relative_humidity_300hPa.slice(startIdx),
+            wind_speed_300hPa: data.hourly.wind_speed_300hPa.slice(startIdx),
+            wind_direction_300hPa: data.hourly.wind_direction_300hPa.slice(startIdx),
+            geopotential_height_300hPa: data.hourly.geopotential_height_300hPa.slice(startIdx),
+            temperature_200hPa: data.hourly.temperature_200hPa.slice(startIdx),
+            relative_humidity_200hPa: data.hourly.relative_humidity_200hPa.slice(startIdx),
+            wind_speed_200hPa: data.hourly.wind_speed_200hPa.slice(startIdx),
+            wind_direction_200hPa: data.hourly.wind_direction_200hPa.slice(startIdx),
+            geopotential_height_200hPa: data.hourly.geopotential_height_200hPa.slice(startIdx)
+        };
+
         const slider = document.getElementById('timeSlider');
-        slider.max = data.hourly.time.length - 1;
+        slider.max = weatherData.time.length - 1;
+        slider.value = 0; // Start at run time
         slider.disabled = false;
         updateWeatherDisplay(0);
         return data;
     } catch (error) {
         console.error("Weather fetch error:", error);
-        displayError("Could not load weather data.");
+        displayError(`Could not load weather data: ${error.message}`);
         throw error;
     }
 }
@@ -289,7 +386,7 @@ function interpolateWeatherData(index) {
         });
     }
 
-    interpolated.sort((a, b) => b.height - a.height);
+    interpolated.sort((a, b) => a.height - b.height);
     return interpolated;
 }
 
@@ -390,33 +487,32 @@ function updateWeatherDisplay(index) {
     const time = formatTime(weatherData.time[index]);
     const interpolatedData = interpolateWeatherData(index);
 
-    let output = `Time: ${time}<br><br>`;
+    let output = `Run: ${lastModelRun}<br>Time: ${time}<br><br>`;
 
     output += `<table border="1" style="border-collapse: collapse; width: 100%;">`;
     output += `<tr>`;
     output += `<th style="width: 15%;">Height (m)</th>`;
+    output += `<th style="width: 15%;">Pressure (hPa)</th>`;
     output += `<th style="width: 15%;">T (°C)</th>`;
-    output += `<th style="width: 15%;">RH (%)</th>`;
     output += `<th style="width: 15%;">Dew (°C)</th>`;
     output += `<th style="width: 15%;">Dir (°)</th>`;
     output += `<th style="width: 15%;">Spd (kt)</th>`;
-    output += `<th style="width: 15%;">Pressure (hPa)</th>`;
+    output += `<th style="width: 15%;">RH (%)</th>`;
     output += `</tr>`;
 
     interpolatedData.forEach(data => {
         output += `<tr>`;
         output += `<td>${data.displayHeight}</td>`;
+        output += `<td>${data.pressure}</td>`;
         output += `<td>${data.temp}</td>`;
-        output += `<td>${data.rh}</td>`;
         output += `<td>${data.dew}</td>`;
         output += `<td>${data.dir}</td>`;
         output += `<td>${data.spd}</td>`;
-        output += `<td>${data.pressure}</td>`;
+        output += `<td>${data.rh}</td>`;
         output += `</tr>`;
     });
 
     output += `</table>`;
-    output += `<div id="meanWindResult"></div>`;
 
     document.getElementById('info').innerHTML = output;
 }
@@ -445,7 +541,12 @@ function calculateMeanWind() {
     const [dir, spd] = meanWind;
 
     const result = `Mean Wind (${lowerLimit}-${upperLimit} m ${refLevel}): ${dir.toFixed(0)}° / ${spd.toFixed(1)} kt`;
-    document.getElementById('meanWindResult').innerHTML = `<br>${result}`;
+    const meanWindResult = document.getElementById('meanWindResult');
+    if (meanWindResult) {
+        meanWindResult.innerHTML = result;
+    } else {
+        console.error('Mean wind result element not found');
+    }
 }
 
 function formatTime(isoString) {
@@ -470,10 +571,10 @@ function downloadTableAsAscii() {
     const filename = `${time}_${model}_HEIDIS.txt`;
 
     const interpolatedData = interpolateWeatherData(index);
-    let content = 'Height T RH Dew Dir Spd Pressure\n';
+    let content = 'Height Pressure T Dew Dir Spd RH\n';
 
     interpolatedData.forEach(data => {
-        content += `${data.displayHeight} ${data.temp} ${data.rh} ${data.dew} ${data.dir} ${data.spd} ${data.pressure}\n`;
+        content += `${data.displayHeight} ${data.pressure} ${data.temp} ${data.dew} ${data.dir} ${data.spd} ${data.rh}\n`;
     });
 
     const blob = new Blob([content], { type: 'text/plain' });
