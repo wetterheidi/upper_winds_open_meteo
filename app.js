@@ -39,16 +39,16 @@ async function fetchWeather(lat, lon) {
         const model = document.getElementById('modelSelect').value;
         const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
             `&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,` +
-            `temperature_1000hPa,relative_humidity_1000hPa,wind_speed_1000hPa,wind_direction_1000hPa,` +
-            `temperature_950hPa,relative_humidity_950hPa,wind_speed_950hPa,wind_direction_950hPa,` +
-            `temperature_925hPa,relative_humidity_925hPa,wind_speed_925hPa,wind_direction_925hPa,` +
-            `temperature_900hPa,relative_humidity_900hPa,wind_speed_900hPa,wind_direction_900hPa,` +
-            `temperature_850hPa,relative_humidity_850hPa,wind_speed_850hPa,wind_direction_850hPa,` +
-            `temperature_800hPa,relative_humidity_800hPa,wind_speed_800hPa,wind_direction_800hPa,` +
-            `temperature_700hPa,relative_humidity_700hPa,wind_speed_700hPa,wind_direction_700hPa,` +
-            `temperature_500hPa,relative_humidity_500hPa,wind_speed_500hPa,wind_direction_500hPa,` +
-            `temperature_300hPa,relative_humidity_300hPa,wind_speed_300hPa,wind_direction_300hPa,` +
-            `temperature_200hPa,relative_humidity_200hPa,wind_speed_200hPa,wind_direction_200hPa` +
+            `temperature_1000hPa,relative_humidity_1000hPa,wind_speed_1000hPa,wind_direction_1000hPa,geopotential_height_1000hPa,` +
+            `temperature_950hPa,relative_humidity_950hPa,wind_speed_950hPa,wind_direction_950hPa,geopotential_height_950hPa,` +
+            `temperature_925hPa,relative_humidity_925hPa,wind_speed_925hPa,wind_direction_925hPa,geopotential_height_925hPa,` +
+            `temperature_900hPa,relative_humidity_900hPa,wind_speed_900hPa,wind_direction_900hPa,geopotential_height_900hPa,` +
+            `temperature_850hPa,relative_humidity_850hPa,wind_speed_850hPa,wind_direction_850hPa,geopotential_height_850hPa,` +
+            `temperature_800hPa,relative_humidity_800hPa,wind_speed_800hPa,wind_direction_800hPa,geopotential_height_800hPa,` +
+            `temperature_700hPa,relative_humidity_700hPa,wind_speed_700hPa,wind_direction_700hPa,geopotential_height_700hPa,` +
+            `temperature_500hPa,relative_humidity_500hPa,wind_speed_500hPa,wind_direction_500hPa,geopotential_height_500hPa,` +
+            `temperature_300hPa,relative_humidity_300hPa,wind_speed_300hPa,wind_direction_300hPa,geopotential_height_300hPa,` +
+            `temperature_200hPa,relative_humidity_200hPa,wind_speed_200hPa,wind_direction_200hPa,geopotential_height_200hPa` +
             `&models=${model}`);
         
         if (!response.ok) {
@@ -81,9 +81,11 @@ async function fetchWeather(lat, lon) {
         levels.forEach(level => {
             const speedKey = `wind_speed_${level}hPa`;
             const directionKey = `wind_direction_${level}hPa`;
+            const heightKey = `geopotential_height_${level}hPa`;
             if (data.hourly[speedKey] && data.hourly[directionKey]) {
                 console.log(`${level}hPa:`, {
-                    "Wind": `${data.hourly[speedKey][0]}${data.hourly_units[speedKey]} aus ${data.hourly[directionKey][0]}${data.hourly_units[directionKey]}`
+                    "Wind": `${data.hourly[speedKey][0]}${data.hourly_units[speedKey]} aus ${data.hourly[directionKey][0]}${data.hourly_units[directionKey]}`,
+                    "Geopotential Height": data.hourly[heightKey] ? `${data.hourly[heightKey][0]}${data.hourly_units[heightKey]}` : 'N/A'
                 });
             }
         });
@@ -119,23 +121,9 @@ function updateWeatherDisplay(index) {
     }
     
     const time = formatTime(weatherData.time[index]);
-    const levels = ['1000hPa', '950hPa', '925hPa', '900hPa', '850hPa', '800hPa', '700hPa', '500hPa', '300hPa', '200hPa'];
+    const levels = ['200hPa', '300hPa', '500hPa', '700hPa', '800hPa', '850hPa', '900hPa', '925hPa', '950hPa', '1000hPa'];
     
     let output = `Time: ${time}\n`;
-    
-    if (weatherData.temperature_2m && weatherData.temperature_2m[index] !== undefined) {
-        output += `Surface: T=${weatherData.temperature_2m[index]}°C`;
-        if (weatherData.relative_humidity_2m && weatherData.relative_humidity_2m[index] !== undefined) {
-            const rh = weatherData.relative_humidity_2m[index];
-            output += `, RH=${rh}%`;
-            const dewpoint = calculateDewpoint(weatherData.temperature_2m[index], rh);
-            output += `, Dew=${dewpoint}°C`;
-        }
-        if (weatherData.wind_speed_10m && weatherData.wind_direction_10m) {
-            output += `, Wind=${weatherData.wind_speed_10m[index]}km/h @ ${weatherData.wind_direction_10m[index]}°`;
-        }
-        output += '\n';
-    }
     
     levels.forEach(level => {
         output += `${level}: `;
@@ -162,7 +150,13 @@ function updateWeatherDisplay(index) {
             weatherData[`wind_speed_${level}`][index] !== undefined && 
             weatherData[`wind_direction_${level}`][index] !== undefined) {
             if (hasData) output += ', ';
-            output += `Wind=${weatherData[`wind_speed_${level}`][index]}km/h @ ${weatherData[`wind_direction_${level}`][index]}°`;
+            output += `Wind=${weatherData[`wind_direction_${level}`][index]}° ${weatherData[`wind_speed_${level}`][index]}km/h`;
+            hasData = true;
+        }
+        
+        if (weatherData[`geopotential_height_${level}`] && weatherData[`geopotential_height_${level}`][index] !== undefined) {
+            if (hasData) output += ', ';
+            output += `GH=${Math.round(weatherData[`geopotential_height_${level}`][index])}m`;
             hasData = true;
         }
         
@@ -172,6 +166,20 @@ function updateWeatherDisplay(index) {
         
         output += '\n';
     });
+    
+    if (weatherData.temperature_2m && weatherData.temperature_2m[index] !== undefined) {
+        output += `Surface: T=${weatherData.temperature_2m[index]}°C`;
+        if (weatherData.relative_humidity_2m && weatherData.relative_humidity_2m[index] !== undefined) {
+            const rh = weatherData.relative_humidity_2m[index];
+            output += `, RH=${rh}%`;
+            const dewpoint = calculateDewpoint(weatherData.temperature_2m[index], rh);
+            output += `, Dew=${dewpoint}°C`;
+        }
+        if (weatherData.wind_speed_10m && weatherData.wind_direction_10m) {
+            output += `, Wind=${weatherData.wind_direction_10m[index]}° ${weatherData.wind_speed_10m[index]}km/h`;
+        }
+        output += '\n';
+    }
     
     document.getElementById('info').innerText = output;
 }
