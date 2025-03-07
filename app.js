@@ -179,16 +179,15 @@ function interpolateWeatherData(index) {
     if (!weatherData || !weatherData.time || lastAltitude === 'N/A') return [];
 
     const step = parseInt(document.getElementById('interpStepSelect').value) || 200;
-    const refLevel = document.getElementById('refLevelSelect').value || 'AMSL';
+    const refLevel = document.getElementById('refLevelSelect').value || 'AGL';
     const baseHeight = Math.round(lastAltitude);
     const levels = ['200 hPa', '300 hPa', '500 hPa', '700 hPa', '800 hPa', '850 hPa', '900 hPa', '925 hPa', '950 hPa', '1000 hPa'];
     
-    // For AMSL: use absolute heights; for AGL: offset by baseHeight
     const surfaceHeight = refLevel === 'AGL' ? 0 : baseHeight;
     const dataPoints = [
         {
             level: `${surfaceHeight} m`,
-            height: baseHeight, // Actual height for interpolation
+            height: baseHeight,
             temp: weatherData.temperature_2m?.[index],
             rh: weatherData.relative_humidity_2m?.[index],
             dir: weatherData.wind_direction_10m?.[index],
@@ -215,9 +214,8 @@ function interpolateWeatherData(index) {
     const maxHeight = dataPoints[dataPoints.length - 1].height;
     const interpolated = [];
 
-    // Interpolation starts at surfaceHeight + step
     for (let hp = surfaceHeight + step; hp <= (refLevel === 'AGL' ? maxHeight - baseHeight : maxHeight); hp += step) {
-        const actualHp = refLevel === 'AGL' ? hp + baseHeight : hp; // Convert to absolute height for interpolation
+        const actualHp = refLevel === 'AGL' ? hp + baseHeight : hp;
         const lower = dataPoints.filter(p => p.height <= actualHp).pop();
         const upper = dataPoints.find(p => p.height > actualHp);
         if (!lower || !upper) continue;
@@ -230,8 +228,8 @@ function interpolateWeatherData(index) {
 
         interpolated.push({
             level: `${hp} m`,
-            height: actualHp, // Store absolute height for sorting
-            displayHeight: hp, // Display height relative to reference
+            height: actualHp,
+            displayHeight: hp,
             temp: temp.toFixed(1),
             rh: rh.toFixed(1),
             dew: dew,
@@ -240,7 +238,6 @@ function interpolateWeatherData(index) {
         });
     }
 
-    // Add the surface row
     const surfaceData = dataPoints.find(d => d.level === `${surfaceHeight} m`);
     if (surfaceData) {
         const dew = (surfaceData.temp !== undefined && surfaceData.rh !== undefined) ? calculateDewpoint(surfaceData.temp, surfaceData.rh) : '-';
@@ -256,9 +253,96 @@ function interpolateWeatherData(index) {
         });
     }
 
-    // Sort descending by absolute height
     interpolated.sort((a, b) => b.height - a.height);
     return interpolated;
+}
+
+function LIP(xVector, yVector, xValue) {
+    let reversed = false;
+    if (xVector[1] > xVector[0]) {
+        yVector = [...yVector].reverse();
+        xVector = [...xVector].reverse();
+        reversed = true;
+    }
+
+    const Dimension = xVector.length - 1;
+    try {
+        if (xValue > xVector[0] || xValue < xVector[Dimension]) {
+            let m, n;
+            if (xValue > xVector[0]) {
+                m = (yVector[1] - yVector[0]) / (xVector[1] - xVector[0]);
+                n = yVector[1] - m * xVector[1];
+            } else {
+                m = (yVector[Dimension] - yVector[Dimension - 1]) / (xVector[Dimension] - xVector[Dimension - 1]);
+                n = yVector[Dimension] - m * xVector[Dimension];
+            }
+            return m * xValue + n;
+        } else {
+            let i;
+            for (i = 1; i <= Dimension; i++) {
+                if (xValue >= xVector[i]) break;
+            }
+            const m = (yVector[i] - yVector[i - 1]) / (xVector[i] - xVector[i - 1]);
+            const n = yVector[i] - m * xVector[i];
+            return m * xValue + n;
+        }
+    } catch (error) {
+        return "interpolation error";
+    } finally {
+        if (reversed) {
+            yVector.reverse();
+            xVector.reverse();
+        }
+    }
+}
+
+function windSpeed(x, y) {
+    return Math.sqrt(x * x + y * y);
+}
+
+function windDirection(x, y) {
+    let dir = Math.atan2(x, y) * 180 / Math.PI;
+    dir = (270 - dir) % 360; // Convert to meteorological convention (0° = North, clockwise)
+    return dir < 0 ? dir + 360 : dir;
+}
+
+function Mittelwind(Höhe, xKomponente, yKomponente, Untergrenze, Obergrenze) {
+    const dddff = new Array(4);
+    let hSchicht = [Obergrenze];
+    let xSchicht = [Number(LIP(Höhe, xKomponente, Obergrenze))];
+    let ySchicht = [Number(LIP(Höhe, yKomponente, Obergrenze))];
+
+    const xUntergrenze = Number(LIP(Höhe, xKomponente, Untergrenze));
+    const yUntergrenze = Number(LIP(Höhe, yKomponente, Untergrenze));
+
+    for (let i = 0; i < Höhe.length; i++) {
+        if (Höhe[i] < Obergrenze && Höhe[i] > Untergrenze) {
+            hSchicht.push(Höhe[i]);
+            xSchicht.push(xKomponente[i]);
+            ySchicht.push(yKomponente[i]);
+        }
+    }
+
+    hSchicht.push(Untergrenze);
+    xSchicht.push(xUntergrenze);
+    ySchicht.push(yUntergrenze);
+
+    let xTrapez = 0;
+    let yTrapez = 0;
+    for (let i = 0; i < hSchicht.length - 1; i++) {
+        xTrapez += 0.5 * (xSchicht[i] + xSchicht[i + 1]) * (hSchicht[i] - hSchicht[i + 1]);
+        yTrapez += 0.5 * (ySchicht[i] + ySchicht[i + 1]) * (hSchicht[i] - hSchicht[i + 1]);
+    }
+
+    const xMittel = xTrapez / (hSchicht[0] - hSchicht[hSchicht.length - 1]);
+    const yMittel = yTrapez / (hSchicht[0] - hSchicht[hSchicht.length - 1]);
+
+    dddff[2] = xMittel;
+    dddff[3] = yMittel;
+    dddff[1] = windSpeed(xMittel, yMittel);
+    dddff[0] = windDirection(xMittel, yMittel);
+
+    return dddff;
 }
 
 function updateWeatherDisplay(index) {
@@ -291,13 +375,42 @@ function updateWeatherDisplay(index) {
         output += `<td>${data.dew}</td>`;
         output += `<td>${data.dir}</td>`;
         output += `<td>${data.spd}</td>`;
-        output += `<td>${data.displayHeight}</td>`; // Use displayHeight for AGL/AMSL
+        output += `<td>${data.displayHeight}</td>`;
         output += `</tr>`;
     });
 
     output += `</table>`;
+    output += `<div id="meanWindResult"></div>`; // Placeholder for mean wind result
 
     document.getElementById('info').innerHTML = output;
+}
+
+function calculateMeanWind() {
+    const index = document.getElementById('timeSlider').value || 0;
+    const interpolatedData = interpolateWeatherData(index);
+    const lowerLimit = parseFloat(document.getElementById('lowerLimit').value);
+    const upperLimit = parseFloat(document.getElementById('upperLimit').value);
+    const refLevel = document.getElementById('refLevelSelect').value || 'AGL';
+
+    if (isNaN(lowerLimit) || isNaN(upperLimit) || lowerLimit >= upperLimit) {
+        displayError('Invalid layer limits. Ensure Lower < Upper and both are numbers.');
+        return;
+    }
+
+    const baseHeight = Math.round(lastAltitude);
+    const heights = interpolatedData.map(d => refLevel === 'AGL' ? d.displayHeight + baseHeight : d.displayHeight);
+    const dirs = interpolatedData.map(d => parseFloat(d.dir));
+    const spds = interpolatedData.map(d => parseFloat(d.spd));
+
+    // Convert wind direction and speed to x, y components
+    const xKomponente = spds.map((spd, i) => spd * Math.sin((dirs[i] - 180) * Math.PI / 180));
+    const yKomponente = spds.map((spd, i) => spd * Math.cos((dirs[i] - 180) * Math.PI / 180));
+
+    const meanWind = Mittelwind(heights, xKomponente, yKomponente, lowerLimit, upperLimit);
+    const [dir, spd] = meanWind;
+
+    const result = `Mean Wind (${lowerLimit}-${upperLimit} m ${refLevel}): ${dir.toFixed(0)}° / ${spd.toFixed(1)} kt`;
+    document.getElementById('meanWindResult').innerHTML = `<br>${result}`;
 }
 
 function formatTime(isoString) {
@@ -371,6 +484,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const downloadButton = document.getElementById('downloadButton');
     const interpStepSelect = document.getElementById('interpStepSelect');
     const refLevelSelect = document.getElementById('refLevelSelect');
+    const calcMeanWindButton = document.getElementById('calcMeanWindButton');
 
     if (modelSelect) {
         modelSelect.addEventListener('change', () => {
@@ -437,5 +551,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     } else {
         console.error('Reference level select element not found');
+    }
+
+    if (calcMeanWindButton) {
+        calcMeanWindButton.addEventListener('click', calculateMeanWind);
+    } else {
+        console.error('Calculate mean wind button not found');
     }
 });
