@@ -61,7 +61,7 @@ async function getAltitude(lng, lat) {
 
 async function fetchWeather(lat, lon) {
     try {
-        const model = document.getElementById('modelSelect').value;
+        const modelSelect = document.getElementById('modelSelect').value;
         const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
             `&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,` +
             `temperature_1000hPa,relative_humidity_1000hPa,wind_speed_1000hPa,wind_direction_1000hPa,geopotential_height_1000hPa,` +
@@ -74,16 +74,41 @@ async function fetchWeather(lat, lon) {
             `temperature_500hPa,relative_humidity_500hPa,wind_speed_500hPa,wind_direction_500hPa,geopotential_height_500hPa,` +
             `temperature_300hPa,relative_humidity_300hPa,wind_speed_300hPa,wind_direction_300hPa,geopotential_height_300hPa,` +
             `temperature_200hPa,relative_humidity_200hPa,wind_speed_200hPa,wind_direction_200hPa,geopotential_height_200hPa` +
-            `&models=${model}`);
+            `&models=${modelSelect}`);
         
         if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
         
         const data = await response.json();
         weatherData = data.hourly;
-        lastModelRun = data.hourly.time[0];
+
+        // Map model names to their meta.json equivalents
+        const modelMap = {
+            'gfs_seamless': 'ncep_gfs013',
+            'gfs_global': 'ncep_gfs025',
+            'icon_global': 'dwd_icon',
+            'icon_eu': 'dwd_icon_eu',
+            'icon_d2': 'dwd_icon_d2',
+         'ecmwf_ifs025': 'ecmwf_ifs025', 
+         'ecmwf_aifs025': 'ecmwf_aifs025_single',
+        'ncep_hrrr': 'ncep_hrrr_conus',  
+            // Add more mappings as needed based on model-updates page
+        };
+        const model = modelMap[modelSelect] || modelSelect;
+
+        // Fetch run time from meta.json
+        const metaResponse = await fetch(`https://api.open-meteo.com/data/${model}/static/meta.json`);
+        if (!metaResponse.ok) throw new Error(`Meta fetch failed: ${metaResponse.status}`);
+        const metaData = await metaResponse.json();
+        
+        const runDate = new Date(metaData.last_run_initialisation_time * 1000);
+        const year = runDate.getUTCFullYear();
+        const month = String(runDate.getUTCMonth() + 1).padStart(2, '0');
+        const day = String(runDate.getUTCDate()).padStart(2, '0');
+        const hour = String(runDate.getUTCHours()).padStart(2, '0');
+        lastModelRun = `${year}-${month}-${day} ${hour}z`;
         
         const slider = document.getElementById('timeSlider');
-        slider.max = data.hourly.time.length - 1; // Sync with data length
+        slider.max = data.hourly.time.length - 1;
         slider.disabled = false;
         updateWeatherDisplay(0);
         return data;
@@ -97,9 +122,7 @@ async function fetchWeather(lat, lon) {
 async function checkAvailableModels(lat, lon) {
     const modelList = [
         'gfs_seamless', 'gfs_global', 'icon_global', 'ecmwf_ifs025', 'ecmwf_aifs025',
-        'meteofrance_seamless', 'meteofrance_arpege_world', 'jma_seamless', 'jma_global',
-        'gem_global', 'ncep_hrrr', 'icon_eu', 'icon_d2', 'meteofrance_arome_france',
-        'meteofrance_arome_france_hd', 'jma_msm', 'gfs025', 'ecmwf_ifs04', 'icon_seamless'
+        'ncep_hrrr', 'icon_eu', 'icon_d2'
     ];
     
     let availableModels = [];
@@ -282,8 +305,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const model = document.getElementById('modelSelect').value;
-            const runTime = new Date(lastModelRun);
-            const runText = `Model: ${model.replace('_', ' ').toUpperCase()}<br>Run: ${runTime.toUTCString().split(' ')[4]}Z (${runTime.toDateString()})`;
+            const runText = `Model: ${model.replace('_', ' ').toUpperCase()}<br>Run: ${lastModelRun}`;
 
             const buttonRect = infoButton.getBoundingClientRect();
             infoPopup.style.left = `${buttonRect.left}px`;
