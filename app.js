@@ -178,11 +178,12 @@ function gaussianInterpolation(y1, y2, h1, h2, hp) {
 function interpolateWeatherData(index) {
     if (!weatherData || !weatherData.time || lastAltitude === 'N/A') return [];
 
+    const step = parseInt(document.getElementById('interpStepSelect').value) || 200; // Default to 200 if not found
     const levels = ['200 hPa', '300 hPa', '500 hPa', '700 hPa', '800 hPa', '850 hPa', '900 hPa', '925 hPa', '950 hPa', '1000 hPa'];
     const baseHeight = Math.round(lastAltitude);
     const dataPoints = [
         {
-            level: `${baseHeight} m`, // Use terrain elevation as label
+            level: `${baseHeight} m`,
             height: baseHeight,
             temp: weatherData.temperature_2m?.[index],
             rh: weatherData.relative_humidity_2m?.[index],
@@ -210,8 +211,8 @@ function interpolateWeatherData(index) {
     const maxHeight = dataPoints[dataPoints.length - 1].height;
     const interpolated = [];
 
-    // Start interpolation 200m above surface
-    for (let hp = baseHeight + 200; hp <= maxHeight; hp += 200) {
+    // Start interpolation at baseHeight + step
+    for (let hp = baseHeight + step; hp <= maxHeight; hp += step) {
         const lower = dataPoints.filter(p => p.height <= hp).pop();
         const upper = dataPoints.find(p => p.height > hp);
         if (!lower || !upper) continue;
@@ -233,7 +234,7 @@ function interpolateWeatherData(index) {
         });
     }
 
-    // Add only the surface row (with terrain elevation label) from original data
+    // Add the surface row (terrain elevation)
     const surfaceData = dataPoints.find(d => d.level === `${baseHeight} m`);
     if (surfaceData) {
         const dew = (surfaceData.temp !== undefined && surfaceData.rh !== undefined) ? calculateDewpoint(surfaceData.temp, surfaceData.rh) : '-';
@@ -361,6 +362,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const infoButton = document.getElementById('modelInfoButton');
     const infoPopup = document.getElementById('modelInfoPopup');
     const downloadButton = document.getElementById('downloadButton');
+    const interpStepSelect = document.getElementById('interpStepSelect');
 
     if (modelSelect) {
         modelSelect.addEventListener('change', () => {
@@ -403,5 +405,17 @@ document.addEventListener('DOMContentLoaded', () => {
         downloadButton.addEventListener('click', downloadTableAsAscii);
     } else {
         console.error('Download button element not found');
+    }
+
+    if (interpStepSelect) {
+        interpStepSelect.addEventListener('change', () => {
+            if (weatherData && lastLat && lastLng) {
+                updateWeatherDisplay(document.getElementById('timeSlider').value || 0);
+            } else {
+                displayError('Please select a position and fetch weather data first.');
+            }
+        });
+    } else {
+        console.error('Interpolation step select element not found');
     }
 });
