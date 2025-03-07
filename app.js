@@ -1,4 +1,3 @@
-// Replace with your Mapbox API key
 const MAPBOX_API_KEY = 'pk.eyJ1Ijoid2V0dGVyaGVpZGkiLCJhIjoiY203dXNrZWRyMDN4bzJwb2pkbmI5ZXh4diJ9.tZkGHqinrfyNFC-8afYMzA';
 mapboxgl.accessToken = MAPBOX_API_KEY;
 
@@ -11,12 +10,12 @@ const map = new mapboxgl.Map({
 
 let weatherData = null;
 let lastLat = null;
-let lastLng = null; // Store last clicked coordinates for model change refetch
+let lastLng = null;
 
 map.on('click', async (e) => {
     const { lng, lat } = e.lngLat;
     lastLat = lat;
-    lastLng = lng; // Save coordinates
+    lastLng = lng;
     const altitude = await getAltitude(lng, lat);
     document.getElementById('info').innerText = `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}, Alt: ${altitude}m\nFetching weather...`;
     await fetchWeather(lat, lng);
@@ -37,23 +36,16 @@ async function getAltitude(lng, lat) {
 
 async function fetchWeather(lat, lon) {
     try {
-        const model = document.getElementById('modelSelect').value; // Get selected model
-        const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` + 
-            `&hourly=temperature_2m,wind_speed_10m,wind_direction_10m` + 
-            `&temperature_1000hPa=true&relative_humidity_1000hPa=true` +
-            `&temperature_925hPa=true&relative_humidity_925hPa=true` +
-            `&temperature_850hPa=true&relative_humidity_850hPa=true` +
-            `&temperature_700hPa=true&relative_humidity_700hPa=true` +
-            `&temperature_500hPa=true&relative_humidity_500hPa=true` +
-            `&temperature_300hPa=true&relative_humidity_300hPa=true` +
-            `&temperature_200hPa=true&relative_humidity_200hPa=true` +
-            `&wind_speed_1000hPa=true&wind_direction_1000hPa=true` + 
-            `&wind_speed_925hPa=true&wind_direction_925hPa=true` + 
-            `&wind_speed_850hPa=true&wind_direction_850hPa=true` + 
-            `&wind_speed_700hPa=true&wind_direction_700hPa=true` + 
-            `&wind_speed_500hPa=true&wind_direction_500hPa=true` + 
-            `&wind_speed_300hPa=true&wind_direction_300hPa=true` + 
-            `&wind_speed_200hPa=true&wind_direction_200hPa=true` + 
+        const model = document.getElementById('modelSelect').value;
+        const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+            `&hourly=temperature_2m,wind_speed_10m,wind_direction_10m,` +
+            `temperature_1000hPa,relative_humidity_1000hPa,wind_speed_1000hPa,wind_direction_1000hPa,` +
+            `temperature_925hPa,relative_humidity_925hPa,wind_speed_925hPa,wind_direction_925hPa,` +
+            `temperature_850hPa,relative_humidity_850hPa,wind_speed_850hPa,wind_direction_850hPa,` +
+            `temperature_700hPa,relative_humidity_700hPa,wind_speed_700hPa,wind_direction_700hPa,` +
+            `temperature_500hPa,relative_humidity_500hPa,wind_speed_500hPa,wind_direction_500hPa,` +
+            `temperature_300hPa,relative_humidity_300hPa,wind_speed_300hPa,wind_direction_300hPa,` +
+            `temperature_200hPa,relative_humidity_200hPa,wind_speed_200hPa,wind_direction_200hPa` +
             `&models=${model}`);
         
         if (!response.ok) {
@@ -75,7 +67,6 @@ async function fetchWeather(lat, lon) {
         
         console.log("--------------------------------");
         console.log("Aktuelle Daten (erster Zeitpunkt):");
-        
         console.log("Oberfläche:", {
             "Temperatur": `${data.hourly.temperature_2m[0]}${data.hourly_units.temperature_2m}`,
             "Wind": `${data.hourly.wind_speed_10m[0]}${data.hourly_units.wind_speed_10m} aus ${data.hourly.wind_direction_10m[0]}${data.hourly_units.wind_direction_10m}`
@@ -206,7 +197,6 @@ function displayError(message) {
     }, 5000);
 }
 
-// DOM fully loaded event
 document.addEventListener('DOMContentLoaded', () => {
     const slider = document.getElementById('timeSlider');
     if (slider) {
