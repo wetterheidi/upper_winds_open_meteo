@@ -93,11 +93,24 @@ async function fetchWeather(lat, lon) {
 
 async function checkAvailableModels(lat, lon) {
     const modelList = [
-        'gfs_seamless',      // NOAA GFS
-        'icon_global',       // DWD ICON Global
-        'ecmwf_ifs',         // ECMWF IFS
-        'ncep_hrrr',         // NOAA HRRR (US)
-        'icon_d2'            // DWD ICON-D2 (Central EU)
+        'gfs_seamless',          // NOAA GFS mix
+        'gfs_global',            // NOAA GFS 0.25°
+        'icon_global',           // DWD ICON global 13 km
+        'ecmwf_ifs',             // ECMWF IFS (default open data)
+        'meteofrance_seamless',  // Météo-France ARPEGE mix
+        'meteofrance_arpege_world', // ARPEGE global 0.25°
+        'jma_seamless',          // JMA mix
+        'jma_global',            // JMA GSM 0.25°
+        'gem_global',            // Environment Canada GEM 0.24°
+        'ncep_hrrr',             // NOAA HRRR 3 km (US)
+        'icon_eu',               // DWD ICON-EU 6.5 km (Europe)
+        'icon_d2',               // DWD ICON-D2 2.2 km (Central EU)
+        'meteofrance_arome_france', // AROME France 1.3 km
+        'meteofrance_arome_france_hd', // AROME France HD 0.25 km
+        'jma_msm',               // JMA MSM 5 km (Japan)
+        'gfs025',                // GFS ensemble 0.25°
+        'ecmwf_ifs04',           // ECMWF IFS ensemble 0.4°
+        'icon_seamless'          // ICON ensemble mix
     ];
     
     let availableModels = [];
