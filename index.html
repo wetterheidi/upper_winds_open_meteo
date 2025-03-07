@@ -5,41 +5,150 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Upper Winds - OpenMeteo</title>
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
     <style>
+        body, #info, #slider-container, #controls-container, #meanWindControls, button, select, label {
+            font-family: 'Roboto', sans-serif;
+        }
+        #info {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            max-height: 70vh;
+            overflow-y: auto;
+            width: 350px;
+            color: #333;
+            scrollbar-width: thin;
+            scrollbar-color: #888 #f0f0f0;
+        }
+        #info::-webkit-scrollbar {
+            width: 8px;
+        }
+        #info::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        #info::-webkit-scrollbar-track {
+            background: #f0f0f0;
+        }
         #info table {
             border-collapse: collapse;
             width: 100%;
             font-size: 14px;
         }
-        #info th,
-        #info td {
+        #info th, #info td {
             border: 1px solid #ccc;
             padding: 5px;
             text-align: center;
         }
         #info th {
-            background-color: #f0f0f0;
-            font-weight: bold;
+            background-color: #e0e0e0;
+            color: #222;
+            text-transform: uppercase;
+            font-size: 12px;
+            letter-spacing: 0.5px;
         }
         #info tr:nth-child(even) {
             background-color: #f9f9f9;
         }
-        #info th:nth-child(1),
-        #info td:nth-child(1) {
+        #info tr:hover {
+            background-color: #f0f8ff;
+        }
+        #info th:nth-child(1), #info td:nth-child(1),
+        #info th:nth-child(2), #info td:nth-child(2),
+        #info th:nth-child(5), #info td:nth-child(5),
+        #info th:nth-child(6), #info td:nth-child(6) {
             width: 15%;
         }
-        #info th:nth-child(2),
-        #info td:nth-child(2) {
-            width: 15%;
+        #slider-container {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: #fff;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            color: #333;
         }
-        #info th:nth-child(5),
-        #info td:nth-child(5) {
-            width: 15%;
+        #controls-container {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #fff;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
         }
-        #info th:nth-child(6),
-        #info td:nth-child(6) {
-            width: 15%;
+        #controls-container label {
+            margin-right: 5px;
+        }
+        #controls-container select, #controls-container button {
+            margin-bottom: 10px;
+        }
+        #modelSelect {
+            margin-right: 5px;
+        }
+        #modelInfoButton {
+            margin-left: 5px;
+            padding: 4px 8px;
+            font-size: 14px;
+        }
+        #meanWindControls {
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        #meanWindControls label, #meanWindControls input, #meanWindControls button {
+            margin-right: 10px;
+        }
+        #meanWindResult {
+            margin-left: 10px;
+            font-weight: bold;
+        }
+        #selectedTime {
+            font-size: 14px;
+            font-weight: bold;
+            display: block;
+            margin-bottom: 10px;
+        }
+        #timeSlider {
+            appearance: none;
+            -webkit-appearance: none;
+            display: block;
+            width: 100%;
+            height: 6px;
+            background: #ddd;
+            border-radius: 3px;
+            outline: none;
+            opacity: 0.8;
+            margin: 5px 0;
+            transition: opacity 0.2s;
+        }
+        #timeSlider:hover {
+            opacity: 1;
+        }
+        #timeSlider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #007bff;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
+        }
+        #timeSlider::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            background: #007bff;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
         }
         #modelInfoPopup {
             position: absolute;
@@ -51,45 +160,36 @@
             z-index: 1000;
             display: none;
         }
-        #slider-container {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            background: white;
-            padding: 10px;
-            border-radius: 5px;
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.3s;
         }
-        #modelSelect {
-            margin-right: 5px;
+        button:hover {
+            background: #0056b3;
         }
-        #modelInfoButton {
-            margin-left: 5px;
-        }
-        #meanWindControls {
-            margin-top: 10px;
-            display: flex;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        #meanWindControls label,
-        #meanWindControls input,
-        #meanWindControls button {
-            margin-right: 10px;
-        }
-        #meanWindResult {
-            margin-left: 10px;
-            font-weight: bold;
-        }
-        #selectedTime {
+        select, input[type="number"] {
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
             font-size: 14px;
-            font-weight: bold;
-            display: block;
-            margin-bottom: 5px;
         }
-        #timeSlider {
+        select:focus, input[type="number"]:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 3px rgba(0, 123, 255, 0.5);
+        }
+        #slider-container label {
+            margin-top: 10px;
             display: block;
-            width: 100%;
-            margin: 5px 0;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
@@ -104,23 +204,25 @@
         <button id="modelInfoButton">ℹ️</button>
         <div id="modelInfoPopup"></div>
     </div>
-    <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
-    <script src="app.js"></script>
-    <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'91c78d92897153e7',t:'MTc0MTMyMzg3Ni4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
-    <button id="downloadButton">Download Table</button>
-    <label for="interpStepSelect">Choose interpolation step:</label>
-    <select id="interpStepSelect">
-        <option value="100">100 m</option>
-        <option value="200" selected>200 m</option>
-        <option value="500">500 m</option>
-        <option value="1000">1000 m</option>
-        <option value="2000">2000 m</option>
-    </select>
-    <label for="refLevelSelect">Choose reference level for altitude:</label>
-    <select id="refLevelSelect">
-        <option value="AMSL">AMSL</option>
-        <option value="AGL" selected>AGL</option>
-    </select>
+    <div id="loading" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">
+        <div style="width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #007bff; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+    </div>
+    <div id="controls-container">
+        <button id="downloadButton">Download Table</button>
+        <label for="interpStepSelect">Interpolation Step:</label>
+        <select id="interpStepSelect">
+            <option value="100">100 m</option>
+            <option value="200" selected>200 m</option>
+            <option value="500">500 m</option>
+            <option value="1000">1000 m</option>
+            <option value="2000">2000 m</option>
+        </select>
+        <label for="refLevelSelect">Reference Level:</label>
+        <select id="refLevelSelect">
+            <option value="AMSL">AMSL</option>
+            <option value="AGL" selected>AGL</option>
+        </select>
+    </div>
     <div id="meanWindControls">
         <label for="lowerLimit">Lower Limit (m):</label>
         <input type="number" id="lowerLimit" min="0" step="100" value="0">
@@ -129,5 +231,8 @@
         <button id="calcMeanWindButton">Calculate Mean Wind</button>
         <div id="meanWindResult"></div>
     </div>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'91ccb19abeacb051',t:'MTc0MTM3Nzc4MC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'91cdcddc8f3a7bdc',t:'MTc0MTM4OTQyNC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+    <script src="app.js"></script>
+    <!-- Existing Cloudflare scripts remain unchanged -->
+</body>
 </html>
