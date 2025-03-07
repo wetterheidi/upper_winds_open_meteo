@@ -487,7 +487,7 @@ function updateWeatherDisplay(index) {
     const time = formatTime(weatherData.time[index]);
     const interpolatedData = interpolateWeatherData(index);
 
-    let output = `Run: ${lastModelRun}<br>Time: ${time}<br><br>`;
+    let output = `Run: ${lastModelRun}Z<br>Time: ${time}<br><br>`; // Added Z to lastModelRun
 
     output += `<table border="1" style="border-collapse: collapse; width: 100%;">`;
     output += `<tr>`;
@@ -556,7 +556,7 @@ function formatTime(isoString) {
     const day = String(date.getUTCDate()).padStart(2, '0');
     const hour = String(date.getUTCHours()).padStart(2, '0');
     const minute = String(date.getUTCMinutes()).padStart(2, '0');
-    return `${year}-${month}-${day} ${hour}${minute}`;
+    return `${year}-${month}-${day} ${hour}${minute}Z`; // Added Z for UTC
 }
 
 function downloadTableAsAscii() {
