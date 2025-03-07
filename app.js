@@ -90,7 +90,6 @@ async function fetchWeather(lat, lon) {
             'ecmwf_ifs025': 'ecmwf_ifs025',
             'ecmwf_aifs025': 'ecmwf_aifs025_single',
             'ncep_hrrr': 'ncep_hrrr_conus'
-            // Add more mappings as needed based on model-updates page
         };
         const model = modelMap[modelSelect] || modelSelect;
 
@@ -169,6 +168,90 @@ function calculateDewpoint(temp, rh) {
     return dewpoint.toFixed(1);
 }
 
+function gaussianInterpolation(y1, y2, h1, h2, hp) {
+    let w1 = 1 / Math.abs(h1 - hp);
+    let w2 = 1 / Math.abs(h2 - hp);
+    const yp = (w1 * y1 + w2 * y2) / (w1 + w2);
+    return yp;
+}
+
+function interpolateWeatherData(index) {
+    if (!weatherData || !weatherData.time || lastAltitude === 'N/A') return [];
+
+    const levels = ['200 hPa', '300 hPa', '500 hPa', '700 hPa', '800 hPa', '850 hPa', '900 hPa', '925 hPa', '950 hPa', '1000 hPa'];
+    const baseHeight = Math.round(lastAltitude);
+    const dataPoints = [
+        {
+            level: 'Surface',
+            height: baseHeight,
+            temp: weatherData.temperature_2m?.[index],
+            rh: weatherData.relative_humidity_2m?.[index],
+            dir: weatherData.wind_direction_10m?.[index],
+            spd: weatherData.wind_speed_10m?.[index] * 0.539957
+        }
+    ];
+
+    levels.forEach(level => {
+        const levelKey = level.replace(' ', '');
+        const gh = weatherData[`geopotential_height_${levelKey}`]?.[index];
+        if (gh !== undefined && gh !== null && !isNaN(gh)) {
+            dataPoints.push({
+                level: level,
+                height: Math.round(gh),
+                temp: weatherData[`temperature_${levelKey}`]?.[index],
+                rh: weatherData[`relative_humidity_${levelKey}`]?.[index],
+                dir: weatherData[`wind_direction_${levelKey}`]?.[index],
+                spd: weatherData[`wind_speed_${levelKey}`]?.[index] * 0.539957
+            });
+        }
+    });
+
+    dataPoints.sort((a, b) => a.height - b.height);
+    const maxHeight = dataPoints[dataPoints.length - 1].height;
+    const interpolated = [];
+
+    // Start interpolation 200m above surface
+    for (let hp = baseHeight + 200; hp <= maxHeight; hp += 200) {
+        const lower = dataPoints.filter(p => p.height <= hp).pop();
+        const upper = dataPoints.find(p => p.height > hp);
+        if (!lower || !upper) continue;
+
+        const temp = gaussianInterpolation(lower.temp, upper.temp, lower.height, upper.height, hp);
+        const rh = Math.max(0, Math.min(100, gaussianInterpolation(lower.rh, upper.rh, lower.height, upper.height, hp)));
+        const dir = gaussianInterpolation(lower.dir, upper.dir, lower.height, upper.height, hp);
+        const spd = gaussianInterpolation(lower.spd, upper.spd, lower.height, upper.height, hp);
+        const dew = calculateDewpoint(temp, rh);
+
+        interpolated.push({
+            level: `${hp} m`,
+            height: hp,
+            temp: temp.toFixed(1),
+            rh: rh.toFixed(1),
+            dew: dew,
+            dir: dir.toFixed(0),
+            spd: spd.toFixed(1)
+        });
+    }
+
+    // Add original data points
+    dataPoints.forEach(data => {
+        const dew = (data.temp !== undefined && data.rh !== undefined) ? calculateDewpoint(data.temp, data.rh) : '-';
+        interpolated.push({
+            level: data.level,
+            height: data.height,
+            temp: data.temp?.toFixed(1) ?? '-',
+            rh: data.rh?.toFixed(1) ?? '-',
+            dew: dew,
+            dir: data.dir?.toFixed(0) ?? '-',
+            spd: data.spd?.toFixed(1) ?? '-'
+        });
+    });
+
+    // Sort descending by height
+    interpolated.sort((a, b) => b.height - a.height);
+    return interpolated;
+}
+
 function updateWeatherDisplay(index) {
     if (!weatherData || !weatherData.time || !weatherData.time[index]) {
         document.getElementById('info').innerHTML = 'No weather data available';
@@ -176,7 +259,7 @@ function updateWeatherDisplay(index) {
     }
 
     const time = formatTime(weatherData.time[index]);
-    const levels = ['200 hPa', '300 hPa', '500 hPa', '700 hPa', '800 hPa', '850 hPa', '900 hPa', '925 hPa', '950 hPa', '1000 hPa'];
+    const interpolatedData = interpolateWeatherData(index);
 
     let output = `Time: ${time}<br><br>`;
 
@@ -191,57 +274,17 @@ function updateWeatherDisplay(index) {
     output += `<th style="width: 20%;">GH (m)</th>`;
     output += `</tr>`;
 
-    levels.forEach(level => {
-        const levelKey = level.replace(' ', '');
-        const temp = weatherData[`temperature_${levelKey}`]?.[index];
-        const rh = weatherData[`relative_humidity_${levelKey}`]?.[index];
-        const windDir = weatherData[`wind_direction_${levelKey}`]?.[index];
-        const windSpeed = weatherData[`wind_speed_${levelKey}`]?.[index];
-        const gh = weatherData[`geopotential_height_${levelKey}`]?.[index];
-
-        if ([temp, rh, windDir, windSpeed, gh].every(val => val === null || val === undefined || isNaN(val))) {
-            return;
-        }
-
+    interpolatedData.forEach(data => {
         output += `<tr>`;
-        output += `<td>${level}</td>`;
-
-        output += `<td>${temp !== undefined && temp !== null && !isNaN(temp) ? `${temp}` : '-'}</td>`;
-        output += `<td>${rh !== undefined && rh !== null && !isNaN(rh) ? `${rh}` : '-'}</td>`;
-
-        let dewpoint = (temp !== undefined && temp !== null && !isNaN(temp) && rh !== undefined && rh !== null && !isNaN(rh))
-            ? calculateDewpoint(temp, rh) : '-';
-        output += `<td>${dewpoint !== '-' ? `${dewpoint}` : '-'}</td>`;
-
-        output += `<td>${windDir !== undefined && windDir !== null && !isNaN(windDir) ? `${windDir}` : '-'}</td>`;
-        output += `<td>${windSpeed !== undefined && windSpeed !== null && !isNaN(windSpeed) ? `${(windSpeed * 0.539957).toFixed(1)}` : '-'}</td>`;
-        output += `<td>${gh !== undefined && gh !== null && !isNaN(gh) ? `${Math.round(gh)}` : '-'}</td>`;
-
+        output += `<td>${data.level}</td>`;
+        output += `<td>${data.temp}</td>`;
+        output += `<td>${data.rh}</td>`;
+        output += `<td>${data.dew}</td>`;
+        output += `<td>${data.dir}</td>`;
+        output += `<td>${data.spd}</td>`;
+        output += `<td>${data.height}</td>`;
         output += `</tr>`;
     });
-
-    const temp2m = weatherData.temperature_2m?.[index];
-    const rh2m = weatherData.relative_humidity_2m?.[index];
-    const windDir10m = weatherData.wind_direction_10m?.[index];
-    const windSpeed10m = weatherData.wind_speed_10m?.[index];
-
-    if (![temp2m, rh2m, windDir10m, windSpeed10m].every(val => val === null || val === undefined || isNaN(val))) {
-        output += `<tr>`;
-        output += `<td>Surface</td>`;
-
-        output += `<td>${temp2m !== undefined && temp2m !== null && !isNaN(temp2m) ? `${temp2m}` : '-'}</td>`;
-        output += `<td>${rh2m !== undefined && rh2m !== null && !isNaN(rh2m) ? `${rh2m}` : '-'}</td>`;
-
-        let dewpoint2m = (temp2m !== undefined && temp2m !== null && !isNaN(temp2m) && rh2m !== undefined && rh2m !== null && !isNaN(rh2m))
-            ? calculateDewpoint(temp2m, rh2m) : '-';
-        output += `<td>${dewpoint2m !== '-' ? `${dewpoint2m}` : '-'}</td>`;
-
-        output += `<td>${windDir10m !== undefined && windDir10m !== null && !isNaN(windDir10m) ? `${windDir10m}` : '-'}</td>`;
-        output += `<td>${windSpeed10m !== undefined && windSpeed10m !== null && !isNaN(windSpeed10m) ? `${(windSpeed10m * 0.539957).toFixed(1)}` : '-'}</td>`;
-        output += `<td>${(lastAltitude !== 'N/A' && lastAltitude !== null) ? `${Math.round(lastAltitude)}` : '-'}</td>`;
-
-        output += `</tr>`;
-    }
 
     output += `</table>`;
 
@@ -269,42 +312,12 @@ function downloadTableAsAscii() {
     const time = formatTime(weatherData.time[index]).replace(' ', '_');
     const filename = `${time}_${model}_HEIDIS.txt`;
 
-    const levels = ['200 hPa', '300 hPa', '500 hPa', '700 hPa', '800 hPa', '850 hPa', '900 hPa', '925 hPa', '950 hPa', '1000 hPa'];
+    const interpolatedData = interpolateWeatherData(index);
     let content = 'Level T RH Dew Dir Spd GH\n';
 
-    levels.forEach(level => {
-        const levelKey = level.replace(' ', '');
-        const temp = weatherData[`temperature_${levelKey}`]?.[index];
-        const rh = weatherData[`relative_humidity_${levelKey}`]?.[index];
-        const windDir = weatherData[`wind_direction_${levelKey}`]?.[index];
-        const windSpeed = weatherData[`wind_speed_${levelKey}`]?.[index];
-        const gh = weatherData[`geopotential_height_${levelKey}`]?.[index];
-
-        if ([temp, rh, windDir, windSpeed, gh].every(val => val === null || val === undefined || isNaN(val))) {
-            return;
-        }
-
-        const dewpoint = (temp !== undefined && temp !== null && !isNaN(temp) && rh !== undefined && rh !== null && !isNaN(rh))
-            ? calculateDewpoint(temp, rh) : '-';
-        const windSpeedKt = windSpeed !== undefined && windSpeed !== null && !isNaN(windSpeed) ? (windSpeed * 0.539957).toFixed(1) : '-';
-        const ghRounded = gh !== undefined && gh !== null && !isNaN(gh) ? Math.round(gh) : '-';
-
-        content += `${level} ${temp ?? '-'} ${rh ?? '-'} ${dewpoint} ${windDir ?? '-'} ${windSpeedKt} ${ghRounded}\n`;
+    interpolatedData.forEach(data => {
+        content += `${data.level} ${data.temp} ${data.rh} ${data.dew} ${data.dir} ${data.spd} ${data.height}\n`;
     });
-
-    const temp2m = weatherData.temperature_2m?.[index];
-    const rh2m = weatherData.relative_humidity_2m?.[index];
-    const windDir10m = weatherData.wind_direction_10m?.[index];
-    const windSpeed10m = weatherData.wind_speed_10m?.[index];
-
-    if (![temp2m, rh2m, windDir10m, windSpeed10m].every(val => val === null || val === undefined || isNaN(val))) {
-        const dewpoint2m = (temp2m !== undefined && temp2m !== null && !isNaN(temp2m) && rh2m !== undefined && rh2m !== null && !isNaN(rh2m))
-            ? calculateDewpoint(temp2m, rh2m) : '-';
-        const windSpeed10mKt = windSpeed10m !== undefined && windSpeed10m !== null && !isNaN(windSpeed10m) ? (windSpeed10m * 0.539957).toFixed(1) : '-';
-        const altitude = (lastAltitude !== 'N/A' && lastAltitude !== null) ? Math.round(lastAltitude) : '-';
-
-        content += `Surface ${temp2m ?? '-'} ${rh2m ?? '-'} ${dewpoint2m} ${windDir10m ?? '-'} ${windSpeed10mKt} ${altitude}\n`;
-    }
 
     const blob = new Blob([content], { type: 'text/plain' });
     const url = window.URL.createObjectURL(blob);
