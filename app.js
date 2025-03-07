@@ -175,6 +175,33 @@ function gaussianInterpolation(y1, y2, h1, h2, hp) {
     return yp;
 }
 
+function interpolatePressure(height, pressureLevels, heights) {
+    for (let i = 0; i < heights.length - 1; i++) {
+        if (height <= heights[i] && height >= heights[i + 1]) {
+            const p1 = pressureLevels[i];
+            const p2 = pressureLevels[i + 1];
+            const h1 = heights[i];
+            const h2 = heights[i + 1];
+            return p1 + (p2 - p1) * (height - h1) / (h2 - h1);
+        }
+    }
+    if (height > heights[0]) {
+        const p1 = pressureLevels[0];
+        const p2 = pressureLevels[1];
+        const h1 = heights[0];
+        const h2 = heights[1];
+        return p1 + (p2 - p1) * (height - h1) / (h2 - h1);
+    }
+    if (height < heights[heights.length - 1]) {
+        const p1 = pressureLevels[pressureLevels.length - 2];
+        const p2 = pressureLevels[pressureLevels.length - 1];
+        const h1 = heights[heights.length - 2];
+        const h2 = heights[heights.length - 1];
+        return p2 + (p1 - p2) * (height - h2) / (h1 - h2);
+    }
+    return '-';
+}
+
 function interpolateWeatherData(index) {
     if (!weatherData || !weatherData.time || lastAltitude === 'N/A') return [];
 
@@ -214,6 +241,13 @@ function interpolateWeatherData(index) {
     const maxHeight = dataPoints[dataPoints.length - 1].height;
     const interpolated = [];
 
+    const pressureLevels = [200, 300, 500, 700, 800, 850, 900, 925, 950, 1000];
+    const pressureHeights = levels.map(level => {
+        const levelKey = level.replace(' ', '');
+        return weatherData[`geopotential_height_${levelKey}`]?.[index] || null;
+    }).filter(h => h !== null && !isNaN(h)).map(h => Math.round(h));
+    pressureHeights.sort((a, b) => b - a);
+
     for (let hp = surfaceHeight + step; hp <= (refLevel === 'AGL' ? maxHeight - baseHeight : maxHeight); hp += step) {
         const actualHp = refLevel === 'AGL' ? hp + baseHeight : hp;
         const lower = dataPoints.filter(p => p.height <= actualHp).pop();
@@ -225,31 +259,33 @@ function interpolateWeatherData(index) {
         const dir = gaussianInterpolation(lower.dir, upper.dir, lower.height, upper.height, actualHp);
         const spd = gaussianInterpolation(lower.spd, upper.spd, lower.height, upper.height, actualHp);
         const dew = calculateDewpoint(temp, rh);
+        const pressure = interpolatePressure(actualHp, pressureLevels, pressureHeights);
 
         interpolated.push({
-            level: `${hp} m`,
             height: actualHp,
             displayHeight: hp,
             temp: temp.toFixed(1),
             rh: rh.toFixed(1),
             dew: dew,
             dir: dir.toFixed(0),
-            spd: spd.toFixed(1)
+            spd: spd.toFixed(1),
+            pressure: pressure === '-' ? '-' : pressure.toFixed(1)
         });
     }
 
     const surfaceData = dataPoints.find(d => d.level === `${surfaceHeight} m`);
     if (surfaceData) {
         const dew = (surfaceData.temp !== undefined && surfaceData.rh !== undefined) ? calculateDewpoint(surfaceData.temp, surfaceData.rh) : '-';
+        const pressure = interpolatePressure(surfaceData.height, pressureLevels, pressureHeights);
         interpolated.push({
-            level: `${surfaceHeight} m`,
             height: surfaceData.height,
             displayHeight: surfaceHeight,
             temp: surfaceData.temp?.toFixed(1) ?? '-',
             rh: surfaceData.rh?.toFixed(1) ?? '-',
             dew: dew,
             dir: surfaceData.dir?.toFixed(0) ?? '-',
-            spd: surfaceData.spd?.toFixed(1) ?? '-'
+            spd: surfaceData.spd?.toFixed(1) ?? '-',
+            pressure: pressure === '-' ? '-' : pressure.toFixed(1)
         });
     }
 
@@ -302,7 +338,7 @@ function windSpeed(x, y) {
 
 function windDirection(x, y) {
     let dir = Math.atan2(x, y) * 180 / Math.PI;
-    dir = (270 - dir) % 360; // Convert to meteorological convention (0° = North, clockwise)
+    dir = (270 - dir) % 360;
     return dir < 0 ? dir + 360 : dir;
 }
 
@@ -358,29 +394,29 @@ function updateWeatherDisplay(index) {
 
     output += `<table border="1" style="border-collapse: collapse; width: 100%;">`;
     output += `<tr>`;
-    output += `<th style="width: 15%;">Level</th>`;
+    output += `<th style="width: 15%;">Height (m)</th>`;
     output += `<th style="width: 15%;">T (°C)</th>`;
-    output += `<th style="width: 10%;">RH (%)</th>`;
+    output += `<th style="width: 15%;">RH (%)</th>`;
     output += `<th style="width: 15%;">Dew (°C)</th>`;
-    output += `<th style="width: 10%;">Dir (°)</th>`;
+    output += `<th style="width: 15%;">Dir (°)</th>`;
     output += `<th style="width: 15%;">Spd (kt)</th>`;
-    output += `<th style="width: 20%;">Height (m)</th>`;
+    output += `<th style="width: 15%;">Pressure (hPa)</th>`;
     output += `</tr>`;
 
     interpolatedData.forEach(data => {
         output += `<tr>`;
-        output += `<td>${data.level}</td>`;
+        output += `<td>${data.displayHeight}</td>`;
         output += `<td>${data.temp}</td>`;
         output += `<td>${data.rh}</td>`;
         output += `<td>${data.dew}</td>`;
         output += `<td>${data.dir}</td>`;
         output += `<td>${data.spd}</td>`;
-        output += `<td>${data.displayHeight}</td>`;
+        output += `<td>${data.pressure}</td>`;
         output += `</tr>`;
     });
 
     output += `</table>`;
-    output += `<div id="meanWindResult"></div>`; // Placeholder for mean wind result
+    output += `<div id="meanWindResult"></div>`;
 
     document.getElementById('info').innerHTML = output;
 }
@@ -402,7 +438,6 @@ function calculateMeanWind() {
     const dirs = interpolatedData.map(d => parseFloat(d.dir));
     const spds = interpolatedData.map(d => parseFloat(d.spd));
 
-    // Convert wind direction and speed to x, y components
     const xKomponente = spds.map((spd, i) => spd * Math.sin((dirs[i] - 180) * Math.PI / 180));
     const yKomponente = spds.map((spd, i) => spd * Math.cos((dirs[i] - 180) * Math.PI / 180));
 
@@ -435,10 +470,10 @@ function downloadTableAsAscii() {
     const filename = `${time}_${model}_HEIDIS.txt`;
 
     const interpolatedData = interpolateWeatherData(index);
-    let content = 'Level T RH Dew Dir Spd Height\n';
+    let content = 'Height T RH Dew Dir Spd Pressure\n';
 
     interpolatedData.forEach(data => {
-        content += `${data.level} ${data.temp} ${data.rh} ${data.dew} ${data.dir} ${data.spd} ${data.displayHeight}\n`;
+        content += `${data.displayHeight} ${data.temp} ${data.rh} ${data.dew} ${data.dir} ${data.spd} ${data.pressure}\n`;
     });
 
     const blob = new Blob([content], { type: 'text/plain' });
