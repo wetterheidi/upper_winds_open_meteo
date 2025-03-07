@@ -147,7 +147,15 @@ function updateWeatherDisplay(index) {
     output += `Time: ${time}<br><br>`;
     
     output += `<table border="1" style="border-collapse: collapse; width: 100%;">`;
-    output += `<tr><th>Level</th><th>T (°C)</th><th>RH (%)</th><th>Dew (°C)</th><th>Dir (°)</th><th>Spd (km/h)</th><th>GH (m)</th></tr>`;
+    output += `<tr>`;
+    output += `<th style="width: 15%;">Level</th>`;
+    output += `<th style="width: 15%;">T (°C)</th>`;
+    output += `<th style="width: 10%;">RH (%)</th>`;
+    output += `<th style="width: 15%;">Dew (°C)</th>`;
+    output += `<th style="width: 10%;">Dir (°)</th>`;
+    output += `<th style="width: 15%;">Spd (kt)</th>`;
+    output += `<th style="width: 20%;">GH (m)</th>`;
+    output += `</tr>`;
     
     levels.forEach(level => {
         const levelKey = level.replace(' ', '');
@@ -166,7 +174,7 @@ function updateWeatherDisplay(index) {
         let windDir = weatherData[`wind_direction_${levelKey}`]?.[index];
         let windSpeed = weatherData[`wind_speed_${levelKey}`]?.[index];
         output += `<td>${windDir !== undefined ? `${windDir}` : '-'}</td>`;
-        output += `<td>${windSpeed !== undefined ? `${windSpeed}` : '-'}</td>`;
+        output += `<td>${windSpeed !== undefined ? `${(windSpeed * 0.539957).toFixed(1)}` : '-'}</td>`;
         
         let gh = weatherData[`geopotential_height_${levelKey}`]?.[index];
         output += `<td>${gh !== undefined ? `${Math.round(gh)}` : '-'}</td>`;
@@ -189,7 +197,7 @@ function updateWeatherDisplay(index) {
     let windDir10m = weatherData.wind_direction_10m?.[index];
     let windSpeed10m = weatherData.wind_speed_10m?.[index];
     output += `<td>${windDir10m !== undefined ? `${windDir10m}` : '-'}</td>`;
-    output += `<td>${windSpeed10m !== undefined ? `${windSpeed10m}` : '-'}</td>`;
+    output += `<td>${windSpeed10m !== undefined ? `${(windSpeed10m * 0.539957).toFixed(1)}` : '-'}</td>`;
     
     output += `<td>${(lastAltitude !== 'N/A' && lastAltitude !== null) ? `${Math.round(lastAltitude)}` : '-'}</td>`;
     
