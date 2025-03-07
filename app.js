@@ -35,8 +35,9 @@ map.on('click', async (e) => {
     
     currentMarker.togglePopup();
     
-    document.getElementById('info').innerHTML = `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}, Alt: ${altitude}m<br>Fetching weather...`;
+    document.getElementById('info').innerHTML = `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}, Alt: ${altitude}m<br>Fetching weather and models...`;
     await fetchWeather(lat, lng);
+    await checkAvailableModels(lat, lng);
 });
 
 async function getAltitude(lng, lat) {
@@ -69,59 +70,52 @@ async function fetchWeather(lat, lon) {
             `temperature_200hPa,relative_humidity_200hPa,wind_speed_200hPa,wind_direction_200hPa,geopotential_height_200hPa` +
             `&models=${model}`);
         
-        if (!response.ok) {
-            throw new Error(`HTTP error! Status: ${response.status}`);
-        }
+        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
         
         const data = await response.json();
-        
-        console.log("Weather data fetched successfully:", data);
-        console.log("--------------------------------");
-        console.log("Standort:", `Lat: ${lat.toFixed(4)}, Lon: ${lon.toFixed(4)}`);
-        console.log("Zeitraum:", data.hourly.time[0], "bis", data.hourly.time[data.hourly.time.length - 1]);
-        console.log("Verfügbare Druckniveaus:", Object.keys(data.hourly)
-            .filter(key => key.includes('wind_speed_') || key.includes('wind_direction_'))
-            .map(key => key.replace('wind_speed_', '').replace('wind_direction_', '').replace('hPa', ''))
-            .filter((v, i, a) => a.indexOf(v) === i)
-            .sort((a, b) => b - a)
-            .map(level => `${level}hPa`));
-        
-        console.log("--------------------------------");
-        console.log("Aktuelle Daten (erster Zeitpunkt):");
-        console.log("Oberfläche:", {
-            "Temperatur": `${data.hourly.temperature_2m[0]}${data.hourly_units.temperature_2m}`,
-            "Luftfeuchtigkeit": `${data.hourly.relative_humidity_2m[0]}${data.hourly_units.relative_humidity_2m}`,
-            "Taupunkt": `${calculateDewpoint(data.hourly.temperature_2m[0], data.hourly.relative_humidity_2m[0])}${data.hourly_units.temperature_2m}`,
-            "Wind": `${data.hourly.wind_speed_10m[0]}${data.hourly_units.wind_speed_10m} aus ${data.hourly.wind_direction_10m[0]}${data.hourly_units.wind_direction_10m}`
-        });
-        
-        const levels = [1000, 950, 925, 900, 850, 800, 700, 500, 300, 200];
-        levels.forEach(level => {
-            const speedKey = `wind_speed_${level}hPa`;
-            const directionKey = `wind_direction_${level}hPa`;
-            const heightKey = `geopotential_height_${level}hPa`;
-            if (data.hourly[speedKey] && data.hourly[directionKey]) {
-                console.log(`${level}hPa:`, {
-                    "Wind": `${data.hourly[speedKey][0]}${data.hourly_units[speedKey]} aus ${data.hourly[directionKey][0]}${data.hourly_units[directionKey]}`,
-                    "Geopotential Height": data.hourly[heightKey] ? `${data.hourly[heightKey][0]}${data.hourly_units[heightKey]}` : 'N/A'
-                });
-            }
-        });
-        console.log("--------------------------------");
-        
         weatherData = data.hourly;
         
         const slider = document.getElementById('timeSlider');
         slider.disabled = false;
-        console.log('Slider enabled:', !slider.disabled);
         updateWeatherDisplay(0);
-
         return data;
     } catch (error) {
         console.error("Weather fetch error:", error);
-        displayError("Konnte keine Wetterdaten laden. Bitte versuchen Sie es später erneut.");
+        displayError("Could not load weather data.");
         throw error;
     }
+}
+
+async function checkAvailableModels(lat, lon) {
+    const modelList = [
+        'gfs_seamless',      // NOAA GFS
+        'icon_global',       // DWD ICON Global
+        'ecmwf_ifs',         // ECMWF IFS
+        'ncep_hrrr',         // NOAA HRRR (US)
+        'icon_d2'            // DWD ICON-D2 (Central EU)
+    ];
+    
+    let availableModels = '<br><strong>Available Models:</strong><ul>';
+    for (const model of modelList) {
+        try {
+            const response = await fetch(
+                `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m&models=${model}`
+            );
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            const data = await response.json();
+            if (data.hourly && data.hourly.temperature_2m && data.hourly.temperature_2m.length > 0) {
+                availableModels += `<li>${model}</li>`;
+            }
+        } catch (error) {
+            console.log(`${model} not available: ${error.message}`);
+        }
+    }
+    availableModels += '</ul>';
+    
+    const currentContent = document.getElementById('info').innerHTML;
+    document.getElementById('info').innerHTML = currentContent + availableModels;
 }
 
 function calculateDewpoint(temp, rh) {
@@ -210,14 +204,7 @@ function updateWeatherDisplay(index) {
 
 function formatTime(isoString) {
     const date = new Date(isoString);
-    return date.toLocaleString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true
-    });
+    return date.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
 }
 
 function displayError(message) {
@@ -235,17 +222,13 @@ function displayError(message) {
     
     errorElement.textContent = message;
     errorElement.style.display = 'block';
-    setTimeout(() => {
-        errorElement.style.display = 'none';
-    }, 5000);
+    setTimeout(() => errorElement.style.display = 'none', 5000);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
     const slider = document.getElementById('timeSlider');
     if (slider) {
-        slider.addEventListener('input', (e) => {
-            updateWeatherDisplay(e.target.value);
-        });
+        slider.addEventListener('input', (e) => updateWeatherDisplay(e.target.value));
     } else {
         console.error('Slider element not found');
     }
@@ -257,7 +240,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('info').innerHTML = `Lat: ${lastLat.toFixed(4)}, Lng: ${lastLng.toFixed(4)}<br>Fetching weather with ${modelSelect.value}...`;
                 fetchWeather(lastLat, lastLng);
             } else {
-                displayError('Bitte erst eine Position auf der Karte auswählen.');
+                displayError('Please select a position on the map first.');
             }
         });
     } else {
