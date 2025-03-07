@@ -19,7 +19,7 @@ map.on('click', async (e) => {
     lastLng = lng;
     const altitude = await getAltitude(lng, lat);
     lastAltitude = altitude;
-    document.getElementById('info').innerText = `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}, Alt: ${altitude}m\nFetching weather...`;
+    document.getElementById('info').innerHTML = `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}, Alt: ${altitude}m<br>Fetching weather...`;
     await fetchWeather(lat, lng);
 });
 
@@ -118,8 +118,8 @@ function calculateDewpoint(temp, rh) {
 
 function updateWeatherDisplay(index) {
     if (!weatherData || !weatherData.time || !weatherData.time[index]) {
-        document.getElementById('info').innerText = lastLat && lastLng && lastAltitude ?
-            `Lat: ${lastLat.toFixed(4)}, Lng: ${lastLng.toFixed(4)}, Alt: ${lastAltitude}m\nNo weather data available` :
+        document.getElementById('info').innerHTML = lastLat && lastLng && lastAltitude ?
+            `Lat: ${lastLat.toFixed(4)}, Lng: ${lastLng.toFixed(4)}, Alt: ${lastAltitude}m<br>No weather data available` :
             'No weather data available';
         return;
     }
@@ -127,69 +127,58 @@ function updateWeatherDisplay(index) {
     const time = formatTime(weatherData.time[index]);
     const levels = ['200hPa', '300hPa', '500hPa', '700hPa', '800hPa', '850hPa', '900hPa', '925hPa', '950hPa', '1000hPa'];
     
-    let output = `Lat: ${lastLat.toFixed(4)}, Lng: ${lastLng.toFixed(4)}, Alt: ${lastAltitude}m\n`;
-    output += `Time: ${time}\n`;
+    let output = `Lat: ${lastLat.toFixed(4)}, Lng: ${lastLng.toFixed(4)}, Alt: ${lastAltitude}m<br>`;
+    output += `Time: ${time}<br><br>`;
+    
+    output += `<table border="1" style="border-collapse: collapse; width: 100%;">`;
+    output += `<tr><th>Level</th><th>T</th><th>RH</th><th>Dew</th><th>Wind</th><th>GH</th></tr>`;
     
     levels.forEach(level => {
-        output += `${level}: `;
-        let hasData = false;
+        output += `<tr>`;
+        output += `<td>${level}</td>`;
         
-        if (weatherData[`temperature_${level}`] && weatherData[`temperature_${level}`][index] !== undefined) {
-            output += `T=${weatherData[`temperature_${level}`][index]}°C`;
-            hasData = true;
-        }
+        let temp = weatherData[`temperature_${level}`]?.[index];
+        output += `<td>${temp !== undefined ? `${temp}°C` : '-'}</td>`;
         
-        if (weatherData[`relative_humidity_${level}`] && weatherData[`relative_humidity_${level}`][index] !== undefined) {
-            const rh = weatherData[`relative_humidity_${level}`][index];
-            if (hasData) output += ', ';
-            output += `RH=${rh}%`;
-            if (weatherData[`temperature_${level}`] && weatherData[`temperature_${level}`][index] !== undefined) {
-                const temp = weatherData[`temperature_${level}`][index];
-                const dewpoint = calculateDewpoint(temp, rh);
-                output += `, Dew=${dewpoint}°C`;
-            }
-            hasData = true;
-        }
+        let rh = weatherData[`relative_humidity_${level}`]?.[index];
+        output += `<td>${rh !== undefined ? `${rh}%` : '-'}</td>`;
         
-        if (weatherData[`wind_speed_${level}`] && weatherData[`wind_direction_${level}`] &&
-            weatherData[`wind_speed_${level}`][index] !== undefined && 
-            weatherData[`wind_direction_${level}`][index] !== undefined) {
-            if (hasData) output += ', ';
-            output += `Wind=${weatherData[`wind_direction_${level}`][index]}° ${weatherData[`wind_speed_${level}`][index]}km/h`;
-            hasData = true;
-        }
+        let dewpoint = (temp !== undefined && rh !== undefined) ? calculateDewpoint(temp, rh) : '-';
+        output += `<td>${dewpoint !== '-' ? `${dewpoint}°C` : '-'}</td>`;
         
-        if (weatherData[`geopotential_height_${level}`] && weatherData[`geopotential_height_${level}`][index] !== undefined) {
-            if (hasData) output += ', ';
-            output += `GH=${Math.round(weatherData[`geopotential_height_${level}`][index])}m`;
-            hasData = true;
-        }
+        let windSpeed = weatherData[`wind_speed_${level}`]?.[index];
+        let windDir = weatherData[`wind_direction_${level}`]?.[index];
+        output += `<td>${(windSpeed !== undefined && windDir !== undefined) ? `${windDir}° ${windSpeed}km/h` : '-'}</td>`;
         
-        if (!hasData) {
-            output += 'Keine Daten verfügbar';
-        }
+        let gh = weatherData[`geopotential_height_${level}`]?.[index];
+        output += `<td>${gh !== undefined ? `${Math.round(gh)}m` : '-'}</td>`;
         
-        output += '\n';
+        output += `</tr>`;
     });
     
-    if (weatherData.temperature_2m && weatherData.temperature_2m[index] !== undefined) {
-        output += `Surface: T=${weatherData.temperature_2m[index]}°C`;
-        if (weatherData.relative_humidity_2m && weatherData.relative_humidity_2m[index] !== undefined) {
-            const rh = weatherData.relative_humidity_2m[index];
-            output += `, RH=${rh}%`;
-            const dewpoint = calculateDewpoint(weatherData.temperature_2m[index], rh);
-            output += `, Dew=${dewpoint}°C`;
-        }
-        if (weatherData.wind_speed_10m && weatherData.wind_direction_10m) {
-            output += `, Wind=${weatherData.wind_direction_10m[index]}° ${weatherData.wind_speed_10m[index]}km/h`;
-        }
-        if (lastAltitude !== 'N/A' && lastAltitude !== null) {
-            output += `, GH=${Math.round(lastAltitude)}m`;
-        }
-        output += '\n';
-    }
+    output += `<tr>`;
+    output += `<td>Surface</td>`;
     
-    document.getElementById('info').innerText = output;
+    let temp2m = weatherData.temperature_2m?.[index];
+    output += `<td>${temp2m !== undefined ? `${temp2m}°C` : '-'}</td>`;
+    
+    let rh2m = weatherData.relative_humidity_2m?.[index];
+    output += `<td>${rh2m !== undefined ? `${rh2m}%` : '-'}</td>`;
+    
+    let dewpoint2m = (temp2m !== undefined && rh2m !== undefined) ? calculateDewpoint(temp2m, rh2m) : '-';
+    output += `<td>${dewpoint2m !== '-' ? `${dewpoint2m}°C` : '-'}</td>`;
+    
+    let windSpeed10m = weatherData.wind_speed_10m?.[index];
+    let windDir10m = weatherData.wind_direction_10m?.[index];
+    output += `<td>${(windSpeed10m !== undefined && windDir10m !== undefined) ? `${windDir10m}° ${windSpeed10m}km/h` : '-'}</td>`;
+    
+    output += `<td>${(lastAltitude !== 'N/A' && lastAltitude !== null) ? `${Math.round(lastAltitude)}m` : '-'}</td>`;
+    
+    output += `</tr>`;
+    
+    output += `</table>`;
+    
+    document.getElementById('info').innerHTML = output;
 }
 
 function formatTime(isoString) {
@@ -238,7 +227,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (modelSelect) {
         modelSelect.addEventListener('change', () => {
             if (lastLat && lastLng) {
-                document.getElementById('info').innerText = `Lat: ${lastLat.toFixed(4)}, Lng: ${lastLng.toFixed(4)}\nFetching weather with ${modelSelect.value}...`;
+                document.getElementById('info').innerHTML = `Lat: ${lastLat.toFixed(4)}, Lng: ${lastLng.toFixed(4)}<br>Fetching weather with ${modelSelect.value}...`;
                 fetchWeather(lastLat, lastLng);
             } else {
                 displayError('Bitte erst eine Position auf der Karte auswählen.');
