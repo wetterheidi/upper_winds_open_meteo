@@ -141,34 +141,35 @@ function updateWeatherDisplay(index) {
     }
     
     const time = formatTime(weatherData.time[index]);
-    const levels = ['200hPa', '300hPa', '500hPa', '700hPa', '800hPa', '850hPa', '900hPa', '925hPa', '950hPa', '1000hPa'];
+    const levels = ['200 hPa', '300 hPa', '500 hPa', '700 hPa', '800 hPa', '850 hPa', '900 hPa', '925 hPa', '950 hPa', '1000 hPa'];
     
     let output = `Lat: ${lastLat.toFixed(4)}, Lng: ${lastLng.toFixed(4)}, Alt: ${lastAltitude}m<br>`;
     output += `Time: ${time}<br><br>`;
     
     output += `<table border="1" style="border-collapse: collapse; width: 100%;">`;
-    output += `<tr><th>Level</th><th>T</th><th>RH</th><th>Dew</th><th>Dir</th><th>Spd</th><th>GH</th></tr>`;
+    output += `<tr><th>Level</th><th>T (°C)</th><th>RH (%)</th><th>Dew (°C)</th><th>Dir (°)</th><th>Spd (km/h)</th><th>GH (m)</th></tr>`;
     
     levels.forEach(level => {
+        const levelKey = level.replace(' ', '');
         output += `<tr>`;
         output += `<td>${level}</td>`;
         
-        let temp = weatherData[`temperature_${level}`]?.[index];
-        output += `<td>${temp !== undefined ? `${temp}°C` : '-'}</td>`;
+        let temp = weatherData[`temperature_${levelKey}`]?.[index];
+        output += `<td>${temp !== undefined ? `${temp}` : '-'}</td>`;
         
-        let rh = weatherData[`relative_humidity_${level}`]?.[index];
-        output += `<td>${rh !== undefined ? `${rh}%` : '-'}</td>`;
+        let rh = weatherData[`relative_humidity_${levelKey}`]?.[index];
+        output += `<td>${rh !== undefined ? `${rh}` : '-'}</td>`;
         
         let dewpoint = (temp !== undefined && rh !== undefined) ? calculateDewpoint(temp, rh) : '-';
-        output += `<td>${dewpoint !== '-' ? `${dewpoint}°C` : '-'}</td>`;
+        output += `<td>${dewpoint !== '-' ? `${dewpoint}` : '-'}</td>`;
         
-        let windDir = weatherData[`wind_direction_${level}`]?.[index];
-        let windSpeed = weatherData[`wind_speed_${level}`]?.[index];
-        output += `<td>${windDir !== undefined ? `${windDir}°` : '-'}</td>`;
-        output += `<td>${windSpeed !== undefined ? `${windSpeed}km/h` : '-'}</td>`;
+        let windDir = weatherData[`wind_direction_${levelKey}`]?.[index];
+        let windSpeed = weatherData[`wind_speed_${levelKey}`]?.[index];
+        output += `<td>${windDir !== undefined ? `${windDir}` : '-'}</td>`;
+        output += `<td>${windSpeed !== undefined ? `${windSpeed}` : '-'}</td>`;
         
-        let gh = weatherData[`geopotential_height_${level}`]?.[index];
-        output += `<td>${gh !== undefined ? `${Math.round(gh)}m` : '-'}</td>`;
+        let gh = weatherData[`geopotential_height_${levelKey}`]?.[index];
+        output += `<td>${gh !== undefined ? `${Math.round(gh)}` : '-'}</td>`;
         
         output += `</tr>`;
     });
@@ -177,20 +178,20 @@ function updateWeatherDisplay(index) {
     output += `<td>Surface</td>`;
     
     let temp2m = weatherData.temperature_2m?.[index];
-    output += `<td>${temp2m !== undefined ? `${temp2m}°C` : '-'}</td>`;
+    output += `<td>${temp2m !== undefined ? `${temp2m}` : '-'}</td>`;
     
     let rh2m = weatherData.relative_humidity_2m?.[index];
-    output += `<td>${rh2m !== undefined ? `${rh2m}%` : '-'}</td>`;
+    output += `<td>${rh2m !== undefined ? `${rh2m}` : '-'}</td>`;
     
     let dewpoint2m = (temp2m !== undefined && rh2m !== undefined) ? calculateDewpoint(temp2m, rh2m) : '-';
-    output += `<td>${dewpoint2m !== '-' ? `${dewpoint2m}°C` : '-'}</td>`;
+    output += `<td>${dewpoint2m !== '-' ? `${dewpoint2m}` : '-'}</td>`;
     
     let windDir10m = weatherData.wind_direction_10m?.[index];
     let windSpeed10m = weatherData.wind_speed_10m?.[index];
-    output += `<td>${windDir10m !== undefined ? `${windDir10m}°` : '-'}</td>`;
-    output += `<td>${windSpeed10m !== undefined ? `${windSpeed10m}km/h` : '-'}</td>`;
+    output += `<td>${windDir10m !== undefined ? `${windDir10m}` : '-'}</td>`;
+    output += `<td>${windSpeed10m !== undefined ? `${windSpeed10m}` : '-'}</td>`;
     
-    output += `<td>${(lastAltitude !== 'N/A' && lastAltitude !== null) ? `${Math.round(lastAltitude)}m` : '-'}</td>`;
+    output += `<td>${(lastAltitude !== 'N/A' && lastAltitude !== null) ? `${Math.round(lastAltitude)}` : '-'}</td>`;
     
     output += `</tr>`;
     
