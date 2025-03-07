@@ -12,6 +12,7 @@ let weatherData = null;
 let lastLat = null;
 let lastLng = null;
 let lastAltitude = null;
+let currentMarker = null;
 
 map.on('click', async (e) => {
     const { lng, lat } = e.lngLat;
@@ -19,6 +20,21 @@ map.on('click', async (e) => {
     lastLng = lng;
     const altitude = await getAltitude(lng, lat);
     lastAltitude = altitude;
+    
+    if (currentMarker) {
+        currentMarker.remove();
+    }
+    
+    const popup = new mapboxgl.Popup({ offset: 25 })
+        .setHTML(`Lat: ${lat.toFixed(4)}<br>Lng: ${lng.toFixed(4)}<br>Alt: ${altitude}m`);
+    
+    currentMarker = new mapboxgl.Marker()
+        .setLngLat([lng, lat])
+        .setPopup(popup)
+        .addTo(map);
+    
+    currentMarker.togglePopup();
+    
     document.getElementById('info').innerHTML = `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}, Alt: ${altitude}m<br>Fetching weather...`;
     await fetchWeather(lat, lng);
 });

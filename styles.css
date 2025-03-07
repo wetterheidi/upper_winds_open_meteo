@@ -4,12 +4,12 @@ body {
 }
 
 #map {
-    height: 70vh;
+    height: 60vh;
     width: 100%;
 }
 
 #info {
-    height: 20vh;
+    height: 30vh;
     width: 100%;
     padding: 10px;
     overflow-y: auto;
