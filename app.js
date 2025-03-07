@@ -233,19 +233,20 @@ function interpolateWeatherData(index) {
         });
     }
 
-    // Add original data points
-    dataPoints.forEach(data => {
-        const dew = (data.temp !== undefined && data.rh !== undefined) ? calculateDewpoint(data.temp, data.rh) : '-';
+    // Add only the Surface row from original data
+    const surfaceData = dataPoints.find(d => d.level === 'Surface');
+    if (surfaceData) {
+        const dew = (surfaceData.temp !== undefined && surfaceData.rh !== undefined) ? calculateDewpoint(surfaceData.temp, surfaceData.rh) : '-';
         interpolated.push({
-            level: data.level,
-            height: data.height,
-            temp: data.temp?.toFixed(1) ?? '-',
-            rh: data.rh?.toFixed(1) ?? '-',
+            level: surfaceData.level,
+            height: surfaceData.height,
+            temp: surfaceData.temp?.toFixed(1) ?? '-',
+            rh: surfaceData.rh?.toFixed(1) ?? '-',
             dew: dew,
-            dir: data.dir?.toFixed(0) ?? '-',
-            spd: data.spd?.toFixed(1) ?? '-'
+            dir: surfaceData.dir?.toFixed(0) ?? '-',
+            spd: surfaceData.spd?.toFixed(1) ?? '-'
         });
-    });
+    }
 
     // Sort descending by height
     interpolated.sort((a, b) => b.height - a.height);
