@@ -1,14 +1,66 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Upper Winds - OpenMeteo</title>
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
+    <style>
+        #info table {
+            border-collapse: collapse;
+            width: 100%;
+            font-size: 14px;
+        }
+        #info th,
+        #info td {
+            border: 1px solid #ccc;
+            padding: 5px;
+            text-align: center;
+        }
+        #info th {
+            background-color: #f0f0f0;
+            font-weight: bold;
+        }
+        #info tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        #info th:nth-child(5),
+        #info td:nth-child(5) {
+            /* Dir */
+            width: 50px;
+        }
+        #info th:nth-child(6),
+        #info td:nth-child(6) {
+            /* Spd */
+            width: 70px;
+        }
+        #modelInfoPopup {
+            position: absolute;
+            background: white;
+            border: 1px solid #ccc;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            z-index: 1000;
+            display: none;
+        }
+        #slider-container {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        #modelSelect {
+            margin-right: 5px;
+        }
+        #modelInfoButton {
+            margin-left: 5px;
+        }
+    </style>
 </head>
-
 <body>
     <div id="map"></div>
     <div id="info">Click the map to fetch weather data</div>
@@ -16,50 +68,12 @@
         <label for="timeSlider" id="timeLabel">Select Time</label>
         <input type="range" id="timeSlider" min="0" max="167" value="0" disabled>
         <label for="modelSelect">Forecast Model:</label>
-        <select id="modelSelect">
-            <option value="gfs_seamless" selected>GFS Seamless</option>
-            <option value="ecmwf_ifs">ECMWF IFS</option>
-            <option value="icon_eu">ICON EU</option>
-            <option value="meteofrance_seamless">Météo-France Seamless</option>
-        </select>
+        <select id="modelSelect"></select>
+        <button id="modelInfoButton">ℹ️</button>
+        <div id="modelInfoPopup"></div>
     </div>
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
     <script src="app.js"></script>
+    <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'91c78d92897153e7',t:'MTc0MTMyMzg3Ni4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
 </body>
-
 </html>
-<style>
-    #info table {
-        border-collapse: collapse;
-        width: 100%;
-        font-size: 14px;
-    }
-
-    #info th,
-    #info td {
-        border: 1px solid #ccc;
-        padding: 5px;
-        text-align: center;
-    }
-
-    #info th {
-        background-color: #f0f0f0;
-        font-weight: bold;
-    }
-
-    #info tr:nth-child(even) {
-        background-color: #f9f9f9;
-    }
-
-    #info th:nth-child(5),
-    #info td:nth-child(5) {
-        /* Dir */
-        width: 50px;
-    }
-
-    #info th:nth-child(6),
-    #info td:nth-child(6) {
-        /* Spd */
-        width: 70px;
-    }
-</style>

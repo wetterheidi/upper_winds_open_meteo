@@ -13,6 +13,7 @@ let lastLat = null;
 let lastLng = null;
 let lastAltitude = null;
 let currentMarker = null;
+let lastModelRun = null;
 
 map.on('click', async (e) => {
     const { lng, lat } = e.lngLat;
@@ -35,13 +36,13 @@ map.on('click', async (e) => {
     
     currentMarker.togglePopup();
     
-    document.getElementById('info').innerHTML = `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}, Alt: ${altitude}m<br>Fetching weather and models...`;
+    document.getElementById('info').innerHTML = `Fetching weather and models...`;
     
     const availableModels = await checkAvailableModels(lat, lng);
     if (availableModels.length > 0) {
         await fetchWeather(lat, lng);
     } else {
-        document.getElementById('info').innerHTML = `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}, Alt: ${altitude}m<br>No models available.`;
+        document.getElementById('info').innerHTML = `No models available.`;
     }
 });
 
@@ -79,8 +80,10 @@ async function fetchWeather(lat, lon) {
         
         const data = await response.json();
         weatherData = data.hourly;
+        lastModelRun = data.hourly.time[0];
         
         const slider = document.getElementById('timeSlider');
+        slider.max = data.hourly.time.length - 1; // Sync with data length
         slider.disabled = false;
         updateWeatherDisplay(0);
         return data;
@@ -255,10 +258,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const modelSelect = document.getElementById('modelSelect');
+    const infoButton = document.getElementById('modelInfoButton');
+    const infoPopup = document.getElementById('modelInfoPopup');
+
     if (modelSelect) {
         modelSelect.addEventListener('change', () => {
             if (lastLat && lastLng) {
-                document.getElementById('info').innerHTML = `Lat: ${lastLat.toFixed(4)}, Lng: ${lastLng.toFixed(4)}<br>Fetching weather with ${modelSelect.value}...`;
+                document.getElementById('info').innerHTML = `Fetching weather with ${modelSelect.value}...`;
                 fetchWeather(lastLat, lastLng);
             } else {
                 displayError('Please select a position on the map first.');
@@ -266,5 +272,30 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     } else {
         console.error('Model select element not found');
+    }
+
+    if (infoButton && infoPopup) {
+        infoButton.addEventListener('click', () => {
+            if (!lastModelRun) {
+                displayError('No model run data available yet.');
+                return;
+            }
+
+            const model = document.getElementById('modelSelect').value;
+            const runTime = new Date(lastModelRun);
+            const runText = `Model: ${model.replace('_', ' ').toUpperCase()}<br>Run: ${runTime.toUTCString().split(' ')[4]}Z (${runTime.toDateString()})`;
+
+            const buttonRect = infoButton.getBoundingClientRect();
+            infoPopup.style.left = `${buttonRect.left}px`;
+            infoPopup.style.top = `${buttonRect.bottom + 5}px`;
+            infoPopup.innerHTML = runText;
+            infoPopup.style.display = 'block';
+
+            setTimeout(() => {
+                infoPopup.style.display = 'none';
+            }, 5000);
+        });
+    } else {
+        console.error('Model info button or popup element not found');
     }
 });
