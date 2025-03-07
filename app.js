@@ -182,7 +182,7 @@ function interpolateWeatherData(index) {
     const baseHeight = Math.round(lastAltitude);
     const dataPoints = [
         {
-            level: 'Surface',
+            level: `${baseHeight} m`, // Use terrain elevation as label
             height: baseHeight,
             temp: weatherData.temperature_2m?.[index],
             rh: weatherData.relative_humidity_2m?.[index],
@@ -233,8 +233,8 @@ function interpolateWeatherData(index) {
         });
     }
 
-    // Add only the Surface row from original data
-    const surfaceData = dataPoints.find(d => d.level === 'Surface');
+    // Add only the surface row (with terrain elevation label) from original data
+    const surfaceData = dataPoints.find(d => d.level === `${baseHeight} m`);
     if (surfaceData) {
         const dew = (surfaceData.temp !== undefined && surfaceData.rh !== undefined) ? calculateDewpoint(surfaceData.temp, surfaceData.rh) : '-';
         interpolated.push({
