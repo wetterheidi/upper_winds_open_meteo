@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,6 +8,7 @@
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
+
 <body>
     <div id="map"></div>
     <div id="info">Click the map to fetch weather data</div>
@@ -24,6 +26,7 @@
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
     <script src="app.js"></script>
 </body>
+
 </html>
 <style>
     #info table {
@@ -31,16 +34,32 @@
         width: 100%;
         font-size: 14px;
     }
-    #info th, #info td {
+
+    #info th,
+    #info td {
         border: 1px solid #ccc;
         padding: 5px;
         text-align: center;
     }
+
     #info th {
         background-color: #f0f0f0;
         font-weight: bold;
     }
+
     #info tr:nth-child(even) {
         background-color: #f9f9f9;
+    }
+
+    #info th:nth-child(5),
+    #info td:nth-child(5) {
+        /* Dir */
+        width: 50px;
+    }
+
+    #info th:nth-child(6),
+    #info td:nth-child(6) {
+        /* Spd */
+        width: 70px;
     }
 </style>

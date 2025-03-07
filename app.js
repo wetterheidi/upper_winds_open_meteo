@@ -131,7 +131,7 @@ function updateWeatherDisplay(index) {
     output += `Time: ${time}<br><br>`;
     
     output += `<table border="1" style="border-collapse: collapse; width: 100%;">`;
-    output += `<tr><th>Level</th><th>T</th><th>RH</th><th>Dew</th><th>Wind</th><th>GH</th></tr>`;
+    output += `<tr><th>Level</th><th>T</th><th>RH</th><th>Dew</th><th>Dir</th><th>Spd</th><th>GH</th></tr>`;
     
     levels.forEach(level => {
         output += `<tr>`;
@@ -146,9 +146,10 @@ function updateWeatherDisplay(index) {
         let dewpoint = (temp !== undefined && rh !== undefined) ? calculateDewpoint(temp, rh) : '-';
         output += `<td>${dewpoint !== '-' ? `${dewpoint}°C` : '-'}</td>`;
         
-        let windSpeed = weatherData[`wind_speed_${level}`]?.[index];
         let windDir = weatherData[`wind_direction_${level}`]?.[index];
-        output += `<td>${(windSpeed !== undefined && windDir !== undefined) ? `${windDir}° ${windSpeed}km/h` : '-'}</td>`;
+        let windSpeed = weatherData[`wind_speed_${level}`]?.[index];
+        output += `<td>${windDir !== undefined ? `${windDir}°` : '-'}</td>`;
+        output += `<td>${windSpeed !== undefined ? `${windSpeed}km/h` : '-'}</td>`;
         
         let gh = weatherData[`geopotential_height_${level}`]?.[index];
         output += `<td>${gh !== undefined ? `${Math.round(gh)}m` : '-'}</td>`;
@@ -168,9 +169,10 @@ function updateWeatherDisplay(index) {
     let dewpoint2m = (temp2m !== undefined && rh2m !== undefined) ? calculateDewpoint(temp2m, rh2m) : '-';
     output += `<td>${dewpoint2m !== '-' ? `${dewpoint2m}°C` : '-'}</td>`;
     
-    let windSpeed10m = weatherData.wind_speed_10m?.[index];
     let windDir10m = weatherData.wind_direction_10m?.[index];
-    output += `<td>${(windSpeed10m !== undefined && windDir10m !== undefined) ? `${windDir10m}° ${windSpeed10m}km/h` : '-'}</td>`;
+    let windSpeed10m = weatherData.wind_speed_10m?.[index];
+    output += `<td>${windDir10m !== undefined ? `${windDir10m}°` : '-'}</td>`;
+    output += `<td>${windSpeed10m !== undefined ? `${windSpeed10m}km/h` : '-'}</td>`;
     
     output += `<td>${(lastAltitude !== 'N/A' && lastAltitude !== null) ? `${Math.round(lastAltitude)}m` : '-'}</td>`;
     
