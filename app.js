@@ -11,12 +11,14 @@ const map = new mapboxgl.Map({
 let weatherData = null;
 let lastLat = null;
 let lastLng = null;
+let lastAltitude = null;
 
 map.on('click', async (e) => {
     const { lng, lat } = e.lngLat;
     lastLat = lat;
     lastLng = lng;
     const altitude = await getAltitude(lng, lat);
+    lastAltitude = altitude;
     document.getElementById('info').innerText = `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}, Alt: ${altitude}m\nFetching weather...`;
     await fetchWeather(lat, lng);
 });
@@ -177,6 +179,9 @@ function updateWeatherDisplay(index) {
         }
         if (weatherData.wind_speed_10m && weatherData.wind_direction_10m) {
             output += `, Wind=${weatherData.wind_direction_10m[index]}° ${weatherData.wind_speed_10m[index]}km/h`;
+        }
+        if (lastAltitude !== 'N/A' && lastAltitude !== null) {
+            output += `, GH=${Math.round(lastAltitude)}m`;
         }
         output += '\n';
     }
