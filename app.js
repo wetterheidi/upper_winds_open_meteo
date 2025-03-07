@@ -118,14 +118,17 @@ function calculateDewpoint(temp, rh) {
 
 function updateWeatherDisplay(index) {
     if (!weatherData || !weatherData.time || !weatherData.time[index]) {
-        document.getElementById('info').innerText = 'No weather data available';
+        document.getElementById('info').innerText = lastLat && lastLng && lastAltitude ?
+            `Lat: ${lastLat.toFixed(4)}, Lng: ${lastLng.toFixed(4)}, Alt: ${lastAltitude}m\nNo weather data available` :
+            'No weather data available';
         return;
     }
     
     const time = formatTime(weatherData.time[index]);
     const levels = ['200hPa', '300hPa', '500hPa', '700hPa', '800hPa', '850hPa', '900hPa', '925hPa', '950hPa', '1000hPa'];
     
-    let output = `Time: ${time}\n`;
+    let output = `Lat: ${lastLat.toFixed(4)}, Lng: ${lastLng.toFixed(4)}, Alt: ${lastAltitude}m\n`;
+    output += `Time: ${time}\n`;
     
     levels.forEach(level => {
         output += `${level}: `;
