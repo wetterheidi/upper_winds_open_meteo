@@ -21,23 +21,23 @@ map.on('click', async (e) => {
     lastLng = lng;
     const altitude = await getAltitude(lng, lat);
     lastAltitude = altitude;
-    
+
     if (currentMarker) {
         currentMarker.remove();
     }
-    
+
     const popup = new mapboxgl.Popup({ offset: 25 })
         .setHTML(`Lat: ${lat.toFixed(4)}<br>Lng: ${lng.toFixed(4)}<br>Alt: ${altitude}m`);
-    
+
     currentMarker = new mapboxgl.Marker()
         .setLngLat([lng, lat])
         .setPopup(popup)
         .addTo(map);
-    
+
     currentMarker.togglePopup();
-    
+
     document.getElementById('info').innerHTML = `Fetching weather and models...`;
-    
+
     const availableModels = await checkAvailableModels(lat, lng);
     if (availableModels.length > 0) {
         await fetchWeather(lat, lng);
@@ -81,21 +81,16 @@ async function fetchWeather(lat, lon) {
         const data = await response.json();
         weatherData = data.hourly;
 
-        // Map model names to their meta.json equivalents
         const modelMap = {
             'gfs_seamless': 'ncep_gfs013',
             'gfs_global': 'ncep_gfs025',
             'icon_global': 'dwd_icon',
             'icon_eu': 'dwd_icon_eu',
             'icon_d2': 'dwd_icon_d2',
-         'ecmwf_ifs025': 'ecmwf_ifs025', 
-         'ecmwf_aifs025': 'ecmwf_aifs025_single',
-        'ncep_hrrr': 'ncep_hrrr_conus',  
-            // Add more mappings as needed based on model-updates page
+            // Add more mappings as needed
         };
         const model = modelMap[modelSelect] || modelSelect;
 
-        // Fetch run time from meta.json
         const metaResponse = await fetch(`https://api.open-meteo.com/data/${model}/static/meta.json`);
         if (!metaResponse.ok) throw new Error(`Meta fetch failed: ${metaResponse.status}`);
         const metaData = await metaResponse.json();
@@ -105,7 +100,8 @@ async function fetchWeather(lat, lon) {
         const month = String(runDate.getUTCMonth() + 1).padStart(2, '0');
         const day = String(runDate.getUTCDate()).padStart(2, '0');
         const hour = String(runDate.getUTCHours()).padStart(2, '0');
-        lastModelRun = `${year}-${month}-${day} ${hour}z`;
+        const minute = String(runDate.getUTCMinutes()).padStart(2, '0');
+        lastModelRun = `${year}-${month}-${day} ${hour}${minute} Z`;
         
         const slider = document.getElementById('timeSlider');
         slider.max = data.hourly.time.length - 1;
@@ -121,10 +117,10 @@ async function fetchWeather(lat, lon) {
 
 async function checkAvailableModels(lat, lon) {
     const modelList = [
-        'gfs_seamless', 'gfs_global', 'icon_global', 'ecmwf_ifs025', 'ecmwf_aifs025',
+        'icon_global', 'gfs_seamless', 'gfs_global', 'ecmwf_ifs025', 'ecmwf_aifs025',
         'ncep_hrrr', 'icon_eu', 'icon_d2'
     ];
-    
+
     let availableModels = [];
     for (const model of modelList) {
         try {
@@ -142,7 +138,7 @@ async function checkAvailableModels(lat, lon) {
             console.log(`${model} not available: ${error.message}`);
         }
     }
-    
+
     const modelSelect = document.getElementById('modelSelect');
     modelSelect.innerHTML = '';
     availableModels.forEach(model => {
@@ -151,14 +147,14 @@ async function checkAvailableModels(lat, lon) {
         option.textContent = model.replace('_', ' ').toUpperCase();
         modelSelect.appendChild(option);
     });
-    
+
     const modelDisplay = availableModels.length > 0
         ? `<br><strong>Available Models:</strong><ul>${availableModels.map(m => `<li>${m.replace('_', ' ').toUpperCase()}</li>`).join('')}</ul>`
         : '<br><strong>Available Models:</strong> None';
-    
+
     const currentContent = document.getElementById('info').innerHTML;
     document.getElementById('info').innerHTML = currentContent + modelDisplay;
-    
+
     return availableModels;
 }
 
@@ -175,12 +171,12 @@ function updateWeatherDisplay(index) {
         document.getElementById('info').innerHTML = 'No weather data available';
         return;
     }
-    
+
     const time = formatTime(weatherData.time[index]);
     const levels = ['200 hPa', '300 hPa', '500 hPa', '700 hPa', '800 hPa', '850 hPa', '900 hPa', '925 hPa', '950 hPa', '1000 hPa'];
-    
+
     let output = `Time: ${time}<br><br>`;
-    
+
     output += `<table border="1" style="border-collapse: collapse; width: 100%;">`;
     output += `<tr>`;
     output += `<th style="width: 15%;">Level</th>`;
@@ -191,7 +187,7 @@ function updateWeatherDisplay(index) {
     output += `<th style="width: 15%;">Spd (kt)</th>`;
     output += `<th style="width: 20%;">GH (m)</th>`;
     output += `</tr>`;
-    
+
     levels.forEach(level => {
         const levelKey = level.replace(' ', '');
         const temp = weatherData[`temperature_${levelKey}`]?.[index];
@@ -199,59 +195,64 @@ function updateWeatherDisplay(index) {
         const windDir = weatherData[`wind_direction_${levelKey}`]?.[index];
         const windSpeed = weatherData[`wind_speed_${levelKey}`]?.[index];
         const gh = weatherData[`geopotential_height_${levelKey}`]?.[index];
-        
+
         if ([temp, rh, windDir, windSpeed, gh].every(val => val === null || val === undefined || isNaN(val))) {
             return;
         }
-        
+
         output += `<tr>`;
         output += `<td>${level}</td>`;
-        
+
         output += `<td>${temp !== undefined && temp !== null && !isNaN(temp) ? `${temp}` : '-'}</td>`;
         output += `<td>${rh !== undefined && rh !== null && !isNaN(rh) ? `${rh}` : '-'}</td>`;
-        
-        let dewpoint = (temp !== undefined && temp !== null && !isNaN(temp) && rh !== undefined && rh !== null && !isNaN(rh)) 
+
+        let dewpoint = (temp !== undefined && temp !== null && !isNaN(temp) && rh !== undefined && rh !== null && !isNaN(rh))
             ? calculateDewpoint(temp, rh) : '-';
         output += `<td>${dewpoint !== '-' ? `${dewpoint}` : '-'}</td>`;
-        
+
         output += `<td>${windDir !== undefined && windDir !== null && !isNaN(windDir) ? `${windDir}` : '-'}</td>`;
         output += `<td>${windSpeed !== undefined && windSpeed !== null && !isNaN(windSpeed) ? `${(windSpeed * 0.539957).toFixed(1)}` : '-'}</td>`;
         output += `<td>${gh !== undefined && gh !== null && !isNaN(gh) ? `${Math.round(gh)}` : '-'}</td>`;
-        
+
         output += `</tr>`;
     });
-    
+
     const temp2m = weatherData.temperature_2m?.[index];
     const rh2m = weatherData.relative_humidity_2m?.[index];
     const windDir10m = weatherData.wind_direction_10m?.[index];
     const windSpeed10m = weatherData.wind_speed_10m?.[index];
-    
+
     if (![temp2m, rh2m, windDir10m, windSpeed10m].every(val => val === null || val === undefined || isNaN(val))) {
         output += `<tr>`;
         output += `<td>Surface</td>`;
-        
+
         output += `<td>${temp2m !== undefined && temp2m !== null && !isNaN(temp2m) ? `${temp2m}` : '-'}</td>`;
         output += `<td>${rh2m !== undefined && rh2m !== null && !isNaN(rh2m) ? `${rh2m}` : '-'}</td>`;
-        
-        let dewpoint2m = (temp2m !== undefined && temp2m !== null && !isNaN(temp2m) && rh2m !== undefined && rh2m !== null && !isNaN(rh2m)) 
+
+        let dewpoint2m = (temp2m !== undefined && temp2m !== null && !isNaN(temp2m) && rh2m !== undefined && rh2m !== null && !isNaN(rh2m))
             ? calculateDewpoint(temp2m, rh2m) : '-';
         output += `<td>${dewpoint2m !== '-' ? `${dewpoint2m}` : '-'}</td>`;
-        
+
         output += `<td>${windDir10m !== undefined && windDir10m !== null && !isNaN(windDir10m) ? `${windDir10m}` : '-'}</td>`;
         output += `<td>${windSpeed10m !== undefined && windSpeed10m !== null && !isNaN(windSpeed10m) ? `${(windSpeed10m * 0.539957).toFixed(1)}` : '-'}</td>`;
         output += `<td>${(lastAltitude !== 'N/A' && lastAltitude !== null) ? `${Math.round(lastAltitude)}` : '-'}</td>`;
-        
+
         output += `</tr>`;
     }
-    
+
     output += `</table>`;
-    
+
     document.getElementById('info').innerHTML = output;
 }
 
 function formatTime(isoString) {
     const date = new Date(isoString);
-    return date.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    const hour = String(date.getUTCHours()).padStart(2, '0');
+    const minute = String(date.getUTCMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day} ${hour}${minute}`;
 }
 
 function displayError(message) {
@@ -266,7 +267,7 @@ function displayError(message) {
         errorElement.style.margin = '10px';
         document.body.insertBefore(errorElement, document.body.firstChild);
     }
-    
+
     errorElement.textContent = message;
     errorElement.style.display = 'block';
     setTimeout(() => errorElement.style.display = 'none', 5000);
