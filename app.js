@@ -3,7 +3,7 @@ mapboxgl.accessToken = MAPBOX_API_KEY;
 
 const map = new mapboxgl.Map({
     container: 'map',
-    style: 'mapbox://styles/mapbox/streets-v11',
+    style: 'mapbox://styles/mapbox/satellite-streets-v12',
     center: [11.1923, 48.0179],
     zoom: 10
 });
@@ -487,7 +487,8 @@ function updateWeatherDisplay(index) {
     const time = formatTime(weatherData.time[index]);
     const interpolatedData = interpolateWeatherData(index);
 
-    let output = `Run: ${lastModelRun}Z<br>Time: ${time}<br><br>`; // Added Z to lastModelRun
+    //let output = `Run: ${lastModelRun}Z<br>Time: ${time}<br><br>`; // Added Z to lastModelRun
+    let output = `Time: ${time}<br><br>`; // Added Z to lastModelRun
 
     output += `<table border="1" style="border-collapse: collapse; width: 100%;">`;
     output += `<tr>`;
