@@ -4,7 +4,7 @@ mapboxgl.accessToken = MAPBOX_API_KEY;
 const map = new mapboxgl.Map({
     container: 'map',
     style: 'mapbox://styles/mapbox/streets-v11',
-    center: [13.4050, 52.5200],
+    center: [11.1923, 48.0179],
     zoom: 10
 });
 
@@ -146,17 +146,14 @@ function calculateDewpoint(temp, rh) {
 
 function updateWeatherDisplay(index) {
     if (!weatherData || !weatherData.time || !weatherData.time[index]) {
-        document.getElementById('info').innerHTML = lastLat && lastLng && lastAltitude ?
-            `Lat: ${lastLat.toFixed(4)}, Lng: ${lastLng.toFixed(4)}, Alt: ${lastAltitude}m<br>No weather data available` :
-            'No weather data available';
+        document.getElementById('info').innerHTML = 'No weather data available';
         return;
     }
     
     const time = formatTime(weatherData.time[index]);
     const levels = ['200 hPa', '300 hPa', '500 hPa', '700 hPa', '800 hPa', '850 hPa', '900 hPa', '925 hPa', '950 hPa', '1000 hPa'];
     
-    let output = `Lat: ${lastLat.toFixed(4)}, Lng: ${lastLng.toFixed(4)}, Alt: ${lastAltitude}m<br>`;
-    output += `Time: ${time}<br><br>`;
+    let output = `Time: ${time}<br><br>`;
     
     output += `<table border="1" style="border-collapse: collapse; width: 100%;">`;
     output += `<tr>`;
