@@ -93,25 +93,10 @@ async function fetchWeather(lat, lon) {
 
 async function checkAvailableModels(lat, lon) {
     const modelList = [
-        'gfs_seamless',          // NOAA GFS mix
-        'gfs_global',            // NOAA GFS 0.25°
-        'icon_global',           // DWD ICON global 13 km
-        'ecmwf_ifs025',          // ECMWF IFS (default open data)
-        'ecmwf_aifs025',         // ECMWF AIFS (experimental)
-        'meteofrance_seamless',  // Météo-France ARPEGE mix
-        'meteofrance_arpege_world', // ARPEGE global 0.25°
-        'jma_seamless',          // JMA mix
-        'jma_global',            // JMA GSM 0.25°
-        'gem_global',            // Environment Canada GEM 0.24°
-        'ncep_hrrr',             // NOAA HRRR 3 km (US)
-        'icon_eu',               // DWD ICON-EU 6.5 km (Europe)
-        'icon_d2',               // DWD ICON-D2 2.2 km (Central EU)
-        'meteofrance_arome_france', // AROME France 1.3 km
-        'meteofrance_arome_france_hd', // AROME France HD 0.25 km
-        'jma_msm',               // JMA MSM 5 km (Japan)
-        'gfs025',                // GFS ensemble 0.25°
-        'ecmwf_ifs04',           // ECMWF IFS ensemble 0.4°
-        'icon_seamless'          // ICON ensemble mix
+        'gfs_seamless', 'gfs_global', 'icon_global', 'ecmwf_ifs025', 'ecmwf_aifs025',
+        'meteofrance_seamless', 'meteofrance_arpege_world', 'jma_seamless', 'jma_global',
+        'gem_global', 'ncep_hrrr', 'icon_eu', 'icon_d2', 'meteofrance_arome_france',
+        'meteofrance_arome_france_hd', 'jma_msm', 'gfs025', 'ecmwf_ifs04', 'icon_seamless'
     ];
     
     let availableModels = [];
@@ -186,49 +171,55 @@ function updateWeatherDisplay(index) {
     
     levels.forEach(level => {
         const levelKey = level.replace(' ', '');
+        const temp = weatherData[`temperature_${levelKey}`]?.[index];
+        const rh = weatherData[`relative_humidity_${levelKey}`]?.[index];
+        const windDir = weatherData[`wind_direction_${levelKey}`]?.[index];
+        const windSpeed = weatherData[`wind_speed_${levelKey}`]?.[index];
+        const gh = weatherData[`geopotential_height_${levelKey}`]?.[index];
+        
+        if ([temp, rh, windDir, windSpeed, gh].every(val => val === null || val === undefined || isNaN(val))) {
+            return;
+        }
+        
         output += `<tr>`;
         output += `<td>${level}</td>`;
         
-        let temp = weatherData[`temperature_${levelKey}`]?.[index];
-        output += `<td>${temp !== undefined ? `${temp}` : '-'}</td>`;
+        output += `<td>${temp !== undefined && temp !== null && !isNaN(temp) ? `${temp}` : '-'}</td>`;
+        output += `<td>${rh !== undefined && rh !== null && !isNaN(rh) ? `${rh}` : '-'}</td>`;
         
-        let rh = weatherData[`relative_humidity_${levelKey}`]?.[index];
-        output += `<td>${rh !== undefined ? `${rh}` : '-'}</td>`;
-        
-        let dewpoint = (temp !== undefined && rh !== undefined) ? calculateDewpoint(temp, rh) : '-';
+        let dewpoint = (temp !== undefined && temp !== null && !isNaN(temp) && rh !== undefined && rh !== null && !isNaN(rh)) 
+            ? calculateDewpoint(temp, rh) : '-';
         output += `<td>${dewpoint !== '-' ? `${dewpoint}` : '-'}</td>`;
         
-        let windDir = weatherData[`wind_direction_${levelKey}`]?.[index];
-        let windSpeed = weatherData[`wind_speed_${levelKey}`]?.[index];
-        output += `<td>${windDir !== undefined ? `${windDir}` : '-'}</td>`;
-        output += `<td>${windSpeed !== undefined ? `${(windSpeed * 0.539957).toFixed(1)}` : '-'}</td>`;
-        
-        let gh = weatherData[`geopotential_height_${levelKey}`]?.[index];
-        output += `<td>${gh !== undefined ? `${Math.round(gh)}` : '-'}</td>`;
+        output += `<td>${windDir !== undefined && windDir !== null && !isNaN(windDir) ? `${windDir}` : '-'}</td>`;
+        output += `<td>${windSpeed !== undefined && windSpeed !== null && !isNaN(windSpeed) ? `${(windSpeed * 0.539957).toFixed(1)}` : '-'}</td>`;
+        output += `<td>${gh !== undefined && gh !== null && !isNaN(gh) ? `${Math.round(gh)}` : '-'}</td>`;
         
         output += `</tr>`;
     });
     
-    output += `<tr>`;
-    output += `<td>Surface</td>`;
+    const temp2m = weatherData.temperature_2m?.[index];
+    const rh2m = weatherData.relative_humidity_2m?.[index];
+    const windDir10m = weatherData.wind_direction_10m?.[index];
+    const windSpeed10m = weatherData.wind_speed_10m?.[index];
     
-    let temp2m = weatherData.temperature_2m?.[index];
-    output += `<td>${temp2m !== undefined ? `${temp2m}` : '-'}</td>`;
-    
-    let rh2m = weatherData.relative_humidity_2m?.[index];
-    output += `<td>${rh2m !== undefined ? `${rh2m}` : '-'}</td>`;
-    
-    let dewpoint2m = (temp2m !== undefined && rh2m !== undefined) ? calculateDewpoint(temp2m, rh2m) : '-';
-    output += `<td>${dewpoint2m !== '-' ? `${dewpoint2m}` : '-'}</td>`;
-    
-    let windDir10m = weatherData.wind_direction_10m?.[index];
-    let windSpeed10m = weatherData.wind_speed_10m?.[index];
-    output += `<td>${windDir10m !== undefined ? `${windDir10m}` : '-'}</td>`;
-    output += `<td>${windSpeed10m !== undefined ? `${(windSpeed10m * 0.539957).toFixed(1)}` : '-'}</td>`;
-    
-    output += `<td>${(lastAltitude !== 'N/A' && lastAltitude !== null) ? `${Math.round(lastAltitude)}` : '-'}</td>`;
-    
-    output += `</tr>`;
+    if (![temp2m, rh2m, windDir10m, windSpeed10m].every(val => val === null || val === undefined || isNaN(val))) {
+        output += `<tr>`;
+        output += `<td>Surface</td>`;
+        
+        output += `<td>${temp2m !== undefined && temp2m !== null && !isNaN(temp2m) ? `${temp2m}` : '-'}</td>`;
+        output += `<td>${rh2m !== undefined && rh2m !== null && !isNaN(rh2m) ? `${rh2m}` : '-'}</td>`;
+        
+        let dewpoint2m = (temp2m !== undefined && temp2m !== null && !isNaN(temp2m) && rh2m !== undefined && rh2m !== null && !isNaN(rh2m)) 
+            ? calculateDewpoint(temp2m, rh2m) : '-';
+        output += `<td>${dewpoint2m !== '-' ? `${dewpoint2m}` : '-'}</td>`;
+        
+        output += `<td>${windDir10m !== undefined && windDir10m !== null && !isNaN(windDir10m) ? `${windDir10m}` : '-'}</td>`;
+        output += `<td>${windSpeed10m !== undefined && windSpeed10m !== null && !isNaN(windSpeed10m) ? `${(windSpeed10m * 0.539957).toFixed(1)}` : '-'}</td>`;
+        output += `<td>${(lastAltitude !== 'N/A' && lastAltitude !== null) ? `${Math.round(lastAltitude)}` : '-'}</td>`;
+        
+        output += `</tr>`;
+    }
     
     output += `</table>`;
     
