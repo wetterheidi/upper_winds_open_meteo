@@ -368,12 +368,12 @@ function interpolateWeatherData(index) {
         interpolated.push({
             height: actualHp,
             displayHeight: hp,
-            temp: temp.toFixed(1),
-            rh: rh.toFixed(1),
+            temp: temp.toFixed(0),
+            rh: rh.toFixed(0),
             dew: dew,
             dir: dir.toFixed(0),
-            spd: spd.toFixed(1),
-            pressure: pressure === '-' ? '-' : pressure.toFixed(1)
+            spd: spd.toFixed(0),
+            pressure: pressure === '-' ? '-' : pressure.toFixed(0)
         });
     }
 
@@ -384,12 +384,12 @@ function interpolateWeatherData(index) {
         interpolated.push({
             height: surfaceData.height,
             displayHeight: surfaceHeight,
-            temp: surfaceData.temp?.toFixed(1) ?? '-',
-            rh: surfaceData.rh?.toFixed(1) ?? '-',
+            temp: surfaceData.temp?.toFixed(0) ?? '-',
+            rh: surfaceData.rh?.toFixed(0) ?? '-',
             dew: dew,
             dir: surfaceData.dir?.toFixed(0) ?? '-',
-            spd: surfaceData.spd?.toFixed(1) ?? '-',
-            pressure: pressure === '-' ? '-' : pressure.toFixed(1)
+            spd: surfaceData.spd?.toFixed(0) ?? '-',
+            pressure: pressure === '-' ? '-' : pressure.toFixed(0)
         });
     }
 
@@ -546,7 +546,7 @@ function calculateMeanWind() {
     const meanWind = Mittelwind(heights, xKomponente, yKomponente, lowerLimit, upperLimit);
     const [dir, spd] = meanWind;
 
-    const result = `Mean Wind (${lowerLimit}-${upperLimit} m ${refLevel}): ${dir.toFixed(0)}° / ${spd.toFixed(1)} kt`;
+    const result = `Mean Wind (${lowerLimit}-${upperLimit} m ${refLevel}): ${dir.toFixed(0)}°  ${spd.toFixed(0)} kt`;
     const meanWindResult = document.getElementById('meanWindResult');
     if (meanWindResult) {
         meanWindResult.innerHTML = result;
