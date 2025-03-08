@@ -1,13 +1,7 @@
 const MAPBOX_API_KEY = 'pk.eyJ1Ijoid2V0dGVyaGVpZGkiLCJhIjoiY203dXNrZWRyMDN4bzJwb2pkbmI5ZXh4diJ9.tZkGHqinrfyNFC-8afYMzA';
 mapboxgl.accessToken = MAPBOX_API_KEY;
 
-const map = new mapboxgl.Map({
-    container: 'map',
-    style: 'mapbox://styles/mapbox/satellite-streets-v12',
-    center: [11.1923, 48.0179],
-    zoom: 10
-});
-
+let map;
 let weatherData = null;
 let lastLat = null;
 let lastLng = null;
@@ -15,36 +9,107 @@ let lastAltitude = null;
 let currentMarker = null;
 let lastModelRun = null;
 
-map.on('click', async (e) => {
-    const { lng, lat } = e.lngLat;
-    lastLat = lat;
-    lastLng = lng;
-    const altitude = await getAltitude(lng, lat);
-    lastAltitude = altitude;
+// Initialize the map and center it on the user's location if available
+function initMap() {
+    // Default coordinates (near Herrsching am Ammersee, Germany)
+    const defaultCenter = [11.1923, 48.0179];
+    const defaultZoom = 10;
 
-    if (currentMarker) {
-        currentMarker.remove();
-    }
+    // Initialize the map with default settings
+    map = new mapboxgl.Map({
+        container: 'map',
+        style: 'mapbox://styles/mapbox/satellite-streets-v12',
+        center: defaultCenter,
+        zoom: defaultZoom
+    });
 
-    const popup = new mapboxgl.Popup({ offset: 25 })
-        .setHTML(`Lat: ${lat.toFixed(4)}<br>Lng: ${lng.toFixed(4)}<br>Alt: ${altitude}m`);
+    // Attempt to get the user's current position
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            async (position) => {
+                const userCoords = [position.coords.longitude, position.coords.latitude];
+                // Center the map on the user's location
+                map.setCenter(userCoords);
+                map.setZoom(defaultZoom); // Keep the same zoom level
 
-    currentMarker = new mapboxgl.Marker()
-        .setLngLat([lng, lat])
-        .setPopup(popup)
-        .addTo(map);
+                // Add a marker at the user's location
+                if (currentMarker) {
+                    currentMarker.remove();
+                }
+                lastLat = position.coords.latitude;
+                lastLng = position.coords.longitude;
+                const altitude = await getAltitude(lastLng, lastLat);
+                lastAltitude = altitude;
 
-    currentMarker.togglePopup();
+                const popup = new mapboxgl.Popup({ offset: 25 })
+                    .setHTML(`Lat: ${lastLat.toFixed(4)}<br>Lng: ${lastLng.toFixed(4)}<br>Alt: ${altitude}m`);
 
-    document.getElementById('info').innerHTML = `Fetching weather and models...`;
+                currentMarker = new mapboxgl.Marker({ color: '#FF0000' }) // Red marker for user location
+                    .setLngLat(userCoords)
+                    .setPopup(popup)
+                    .addTo(map);
 
-    const availableModels = await checkAvailableModels(lat, lng);
-    if (availableModels.length > 0) {
-        await fetchWeather(lat, lng);
+                currentMarker.togglePopup();
+
+                // Fetch weather data for the user's location
+                document.getElementById('info').innerHTML = `Fetching weather and models...`;
+                const availableModels = await checkAvailableModels(lastLat, lastLng);
+                if (availableModels.length > 0) {
+                    await fetchWeather(lastLat, lastLng);
+                } else {
+                    document.getElementById('info').innerHTML = `No models available.`;
+                }
+            },
+            (error) => {
+                // Handle geolocation errors
+                console.warn(`Geolocation error: ${error.message}`);
+                displayError('Unable to retrieve your location. Using default location (Herrsching am Ammersee).');
+                // Map is already centered on default coordinates
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 10000, // 10 seconds timeout
+                maximumAge: 0
+            }
+        );
     } else {
-        document.getElementById('info').innerHTML = `No models available.`;
+        // Geolocation not supported by the browser
+        console.warn('Geolocation is not supported by this browser.');
+        displayError('Geolocation not supported. Using default location (Herrsching am Ammersee).');
     }
-});
+
+    // Add click event listener for manual map interaction
+    map.on('click', async (e) => {
+        const { lng, lat } = e.lngLat;
+        lastLat = lat;
+        lastLng = lng;
+        const altitude = await getAltitude(lng, lat);
+        lastAltitude = altitude;
+
+        if (currentMarker) {
+            currentMarker.remove();
+        }
+
+        const popup = new mapboxgl.Popup({ offset: 25 })
+            .setHTML(`Lat: ${lat.toFixed(4)}<br>Lng: ${lng.toFixed(4)}<br>Alt: ${altitude}m`);
+
+        currentMarker = new mapboxgl.Marker()
+            .setLngLat([lng, lat])
+            .setPopup(popup)
+            .addTo(map);
+
+        currentMarker.togglePopup();
+
+        document.getElementById('info').innerHTML = `Fetching weather and models...`;
+
+        const availableModels = await checkAvailableModels(lat, lng);
+        if (availableModels.length > 0) {
+            await fetchWeather(lat, lng);
+        } else {
+            document.getElementById('info').innerHTML = `No models available.`;
+        }
+    });
+}
 
 async function getAltitude(lng, lat) {
     try {
@@ -142,7 +207,6 @@ async function fetchWeather(lat, lon) {
 
         const startIdx = filteredIndices[0].idx;
         weatherData = {
-            // ... (weatherData object unchanged)
             time: data.hourly.time.slice(startIdx),
             temperature_2m: data.hourly.temperature_2m.slice(startIdx),
             relative_humidity_2m: data.hourly.relative_humidity_2m.slice(startIdx),
@@ -217,8 +281,7 @@ async function fetchWeather(lat, lon) {
 
 async function checkAvailableModels(lat, lon) {
     const modelList = [
-        'icon_global', 'icon_eu', 'icon_d2', 'ecmwf_ifs025', 'ecmwf_aifs025', 'gfs_seamless', 'gfs_global', 'ecmwf_ifs025', 'ecmwf_aifs025',
-        'gem_global', 'ncep_hrrr', 'gfs025', 'icon_seamless'
+        'icon_global', 'icon_eu', 'icon_d2', 'ecmwf_ifs025', 'ecmwf_aifs025', 'gfs_seamless', 'gfs_global', 'ncep_hrrr'
     ];
 
     let availableModels = [];
@@ -600,6 +663,9 @@ function displayError(message) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Initialize the map
+    initMap();
+
     const slider = document.getElementById('timeSlider');
     if (slider) {
         slider.addEventListener('input', (e) => updateWeatherDisplay(e.target.value));
