@@ -136,7 +136,10 @@ async function fetchWeather(lat, lon) {
             'ecmwf_aifs025': 'ecmwf_aifs025_single',
             'gfs_seamless': 'ncep_gfs013',
             'gfs_global': 'ncep_gfs025',
-            'ncep_hrrr': 'ncep_hrrr_conus'
+            'gfs_hrrr': 'ncep_hrrr_conus',
+            'arome_france': 'meteofrance_arome_france0025',
+            'gem_hrdps_continental': 'cmc_gem_hrdps',
+            'gem_regional': 'cmc_gem_rdps'
         };
         const model = modelMap[modelSelect.value] || modelSelect.value;
 
@@ -281,7 +284,7 @@ async function fetchWeather(lat, lon) {
 
 async function checkAvailableModels(lat, lon) {
     const modelList = [
-        'icon_global', 'icon_eu', 'icon_d2', 'ecmwf_ifs025', 'ecmwf_aifs025', 'gfs_seamless', 'gfs_global', 'ncep_hrrr'
+        'icon_global', 'icon_eu', 'icon_d2', 'ecmwf_ifs025', 'ecmwf_aifs025', 'gfs_seamless', 'gfs_global', 'gfs_hrrr','arome_france','gem_hrdps_continental','gem_regional'
     ];
 
     let availableModels = [];
@@ -602,7 +605,7 @@ function calculateMeanWind() {
     const [dir, spd] = meanWind;
 
     const roundedDir = roundToTens(dir); // Round mean wind direction to tens
-    const result = `Mean Wind (${lowerLimit}-${upperLimit} m ${refLevel}): ${roundedDir}° ${spd.toFixed(0)} kt`;
+    const result = `(${lowerLimit}-${upperLimit} m ${refLevel}): ${roundedDir}° ${spd.toFixed(0)} kt`;
     const meanWindResult = document.getElementById('meanWindResult');
     if (meanWindResult) {
         meanWindResult.innerHTML = result;
