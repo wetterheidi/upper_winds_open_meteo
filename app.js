@@ -604,14 +604,8 @@ function displayError(message) {
     if (!errorElement) {
         errorElement = document.createElement('div');
         errorElement.id = 'error-message';
-        errorElement.style.color = 'red';
-        errorElement.style.padding = '10px';
-        errorElement.style.backgroundColor = 'rgba(255, 200, 200, 0.5)';
-        errorElement.style.borderRadius = '5px';
-        errorElement.style.margin = '10px';
-        document.body.insertBefore(errorElement, document.body.firstChild);
+        document.body.appendChild(errorElement);
     }
-
     errorElement.textContent = message;
     errorElement.style.display = 'block';
     setTimeout(() => errorElement.style.display = 'none', 5000);
