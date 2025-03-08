@@ -495,13 +495,11 @@ function updateWeatherDisplay(index) {
 
     let output = `<table border="1" style="border-collapse: collapse; width: 100%;">`;
     output += `<tr>`;
-    output += `<th style="width: 15%;">Height (m)</th>`;
-    output += `<th style="width: 15%;">Pressure (hPa)</th>`;
-    output += `<th style="width: 15%;">T (°C)</th>`;
-    output += `<th style="width: 15%;">Dew (°C)</th>`;
-    output += `<th style="width: 15%;">Dir (°)</th>`;
-    output += `<th style="width: 15%;">Spd (kt)</th>`;
-    output += `<th style="width: 15%;">RH (%)</th>`;
+    output += `<th style="width: 20%;">Height (m)</th>`;
+    output += `<th style="width: 20%;">Pressure (hPa)</th>`;
+    output += `<th style="width: 20%;">T (°C)</th>`;
+    output += `<th style="width: 20%;">Dir (°)</th>`;
+    output += `<th style="width: 20%;">Spd (kt)</th>`;
     output += `</tr>`;
 
     interpolatedData.forEach(data => {
@@ -509,10 +507,8 @@ function updateWeatherDisplay(index) {
         output += `<td>${data.displayHeight}</td>`;
         output += `<td>${data.pressure}</td>`;
         output += `<td>${data.temp}</td>`;
-        output += `<td>${data.dew}</td>`;
         output += `<td>${roundToTens(data.dir)}</td>`; // Round wind direction to tens
         output += `<td>${data.spd}</td>`;
-        output += `<td>${data.rh}</td>`;
         output += `</tr>`;
     });
 
