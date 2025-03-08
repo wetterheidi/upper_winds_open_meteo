@@ -74,7 +74,7 @@
             color: #333;
             width: 90%;
             max-width: 300px;
-            z-index: 1000; /* Explicit stacking order */
+            z-index: 1000;
         }
         #bottom-container {
             position: absolute;
@@ -86,7 +86,7 @@
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             width: 100%;
             box-sizing: border-box;
-            z-index: 1000; /* Match slider */
+            z-index: 1000;
         }
         #meanWindControls {
             display: flex;
@@ -160,11 +160,13 @@
             padding: 10px;
             border-radius: 5px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-            z-index: 1500; /* Above slider and bottom container */
+            z-index: 1200;
             display: none;
             width: 220px;
             font-size: 14px;
             line-height: 1.4;
+            top: 100%;
+            left: 0;
         }
         button {
             background: #007bff;
@@ -185,6 +187,11 @@
             border-radius: 4px;
             font-size: 14px;
         }
+        #modelSelect {
+            position: relative;
+            z-index: 1500;
+            margin-right: 10px;
+        }
         #lowerLimit, #upperLimit {
             width: 70px;
         }
@@ -200,18 +207,14 @@
             font-size: 14px;
             font-weight: bold;
         }
-        #model-display {
-            margin-left: 5px;
-            font-size: 14px;
-            font-weight: bold;
-        }
+        /* Removed #model-display CSS since the element is gone */
         #error-message {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
-            background: #ffcccc; /* Solid light red */
-            color: red;
+            background: #ffcccc;
+            color: #000000;
             padding: 10px;
             border-radius: 0 0 5px 5px;
             text-align: center;
@@ -227,7 +230,7 @@
                 width: 90%;
                 max-width: 300px;
                 padding: 10px;
-                top: 50px; /* Below error bar */
+                top: 50px;
             }
             #bottom-container {
                 padding: 10px;
@@ -283,8 +286,11 @@
         <input type="range" id="timeSlider" min="0" max="167" value="0" disabled>
         <div id="model-row">
             <label for="modelSelect">Forecast Model:</label>
-            <select id="modelSelect" style="display: none;"></select>
-            <span id="model-display"></span>
+            <select id="modelSelect">
+                <option value="icon_global" selected>ICON GLOBAL</option>
+                <option value="gfs">GFS</option>
+                <option value="ecmwf">ECMWF</option>
+            </select>
             <button id="modelInfoButton">ℹ️</button>
         </div>
         <div id="modelInfoPopup"></div>

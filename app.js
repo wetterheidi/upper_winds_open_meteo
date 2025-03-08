@@ -205,7 +205,6 @@ async function fetchWeather(lat, lon) {
         slider.value = 0;
         slider.disabled = false;
         updateWeatherDisplay(0);
-        document.getElementById('model-display').textContent = modelSelect.value.replace('_', ' ').toUpperCase();
         document.getElementById('loading').style.display = 'none';
         return data;
     } catch (error) {
@@ -248,11 +247,6 @@ async function checkAvailableModels(lat, lon) {
         option.textContent = model.replace('_', ' ').toUpperCase();
         modelSelect.appendChild(option);
     });
-
-    // Set initial model display
-    if (availableModels.length > 0) {
-        document.getElementById('model-display').textContent = modelSelect.value.replace('_', ' ').toUpperCase();
-    }
 
     const modelDisplay = availableModels.length > 0
         ? `<br><strong>Available Models:</strong><ul>${availableModels.map(m => `<li>${m.replace('_', ' ').toUpperCase()}</li>`).join('')}</ul>`
