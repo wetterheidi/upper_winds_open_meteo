@@ -645,7 +645,7 @@ function calculateMeanWind() {
     const [dir, spd] = meanWind;
 
     const roundedDir = roundToTens(dir); // Round mean wind direction to tens
-    const result = `(${lowerLimit}-${upperLimit} m ${refLevel}): ${roundedDir}° ${spd.toFixed(0)} kt`;
+    const result = `Mean wind: (${lowerLimit}-${upperLimit} m ${refLevel}): ${roundedDir}° ${spd.toFixed(0)} kt`;
     const meanWindResult = document.getElementById('meanWindResult');
     if (meanWindResult) {
         meanWindResult.innerHTML = result;
