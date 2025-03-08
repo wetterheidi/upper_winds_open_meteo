@@ -65,12 +65,12 @@ async function fetchWeather(lat, lon) {
         const modelSelect = document.getElementById('modelSelect');
         const modelMap = {
             'icon_global': 'dwd_icon',
-            'gfs_seamless': 'ncep_gfs013',
-            'gfs_global': 'ncep_gfs025',
             'icon_eu': 'dwd_icon_eu',
             'icon_d2': 'dwd_icon_d2',
             'ecmwf_ifs025': 'ecmwf_ifs025',
             'ecmwf_aifs025': 'ecmwf_aifs025_single',
+            'gfs_seamless': 'ncep_gfs013',
+            'gfs_global': 'ncep_gfs025',
             'ncep_hrrr': 'ncep_hrrr_conus'
         };
         const model = modelMap[modelSelect.value] || modelSelect.value;
@@ -217,8 +217,8 @@ async function fetchWeather(lat, lon) {
 
 async function checkAvailableModels(lat, lon) {
     const modelList = [
-        'icon_global', 'gfs_seamless', 'gfs_global', 'ecmwf_ifs025', 'ecmwf_aifs025',
-        'gem_global', 'ncep_hrrr', 'icon_eu', 'icon_d2', 'gfs025', 'icon_seamless'
+        'icon_global', 'icon_eu', 'icon_d2', 'ecmwf_ifs025', 'ecmwf_aifs025', 'gfs_seamless', 'gfs_global', 'ecmwf_ifs025', 'ecmwf_aifs025',
+        'gem_global', 'ncep_hrrr', 'gfs025', 'icon_seamless'
     ];
 
     let availableModels = [];
