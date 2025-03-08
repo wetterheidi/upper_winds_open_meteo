@@ -324,7 +324,7 @@ async function fetchWeather(lat, lon) {
 
 async function checkAvailableModels(lat, lon) {
     const modelList = [
-        'icon_global', 'icon_eu', 'icon_d2', 'ecmwf_ifs025', 'ecmwf_aifs025', 'gfs_seamless', 'gfs_global', 'gfs_hrrr','arome_france','gem_hrdps_continental','gem_regional'
+        'icon_global', 'icon_eu', 'icon_d2', 'ecmwf_ifs025', 'ecmwf_aifs025', 'gfs_seamless', 'gfs_global', 'gfs_hrrr', 'arome_france', 'gem_hrdps_continental', 'gem_regional'
     ];
 
     let availableModels = [];
@@ -413,7 +413,7 @@ function interpolateWeatherData(index) {
     const refLevel = document.getElementById('refLevelSelect').value || 'AGL';
     const baseHeight = Math.round(lastAltitude);
     const levels = ['200 hPa', '300 hPa', '500 hPa', '700 hPa', '800 hPa', '850 hPa', '900 hPa', '925 hPa', '950 hPa', '1000 hPa'];
-    
+
     const surfaceHeight = refLevel === 'AGL' ? 0 : baseHeight;
     const dataPoints = [
         {
@@ -726,6 +726,13 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error('Slider element not found');
     }
 
+    console.log('Download button:', downloadButton);
+    if (downloadButton) {
+        downloadButton.addEventListener('click', downloadTableAsAscii);
+    } else {
+        console.error('Download button element not found');
+    }
+
     if (modelSelect) {
         modelSelect.addEventListener('change', () => {
             if (lastLat && lastLng) {
@@ -745,15 +752,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 displayError('No model run data available yet.');
                 return;
             }
-    
+
             const model = document.getElementById('modelSelect').value;
             const runText = `Model: ${model.replace('_', ' ').toUpperCase()}<br>Run: ${lastModelRun}`;
-    
+
             // Remove dynamic left positioning; rely on CSS
             infoPopup.style.top = `${infoButton.getBoundingClientRect().bottom + 5}px`; // Position below button
             infoPopup.innerHTML = runText;
             infoPopup.style.display = 'block';
-    
+
             setTimeout(() => {
                 infoPopup.style.display = 'none';
             }, 5000);
