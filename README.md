@@ -8,29 +8,56 @@ A web app to visualize upper-level wind, temperature, dewpoint, and pressure dat
 3. Replace `YOUR_MAPBOX_API_KEY_HERE` in `app.js` with your Mapbox API key.
 
 ## Features
-- Zoomable Mapbox map
-- Click to get coordinates, altitude, and weather data
-- Time slider for hourly forecasts (7 days)
+- Interactive Map: Zoomable Mapbox map with satellite-streets style.
+- Weather Data: Click the map to fetch coordinates, altitude, and hourly weather data for various pressure levels.
+- Model Selection: Choose from available forecast models (e.g., ICON GLOBAL, GFS, ECMWF) via a dropdown menu.
+Dropdown is always visible in #model-row with an info button (ℹ️) on the right showing model run details.
+- Time Slider: Navigate hourly forecasts up to 7 days (or 2 days for ICON D2).
+- Mean Wind Calculation: Compute average wind speed and direction between user-defined altitude layers.
+- Data Download: Export weather data as an ASCII text file.
+- Error Handling: Displays errors with a solid light red background (#ffcccc) at the top of the page.
 
 ## Dependencies
-- Mapbox GL JS (via CDN)
-- OpenMeteo API (no key required)
+- Mapbox GL JS: Loaded via CDN (https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js).
+- OpenMeteo API: No API key required.
+- Roboto Font: Via Google Fonts CDN.
 
-## API-Verwendung
+## Usage
+- Map Interaction:
+Click anywhere on the map to pin a location and fetch weather data.
+A marker with a popup shows latitude, longitude, and altitude.
+- Model Selection:
+Use the "Forecast Model" dropdown in the top-left slider container to switch models.
+Available models are dynamically populated based on OpenMeteo API responses.
+Click the ℹ️ button next to the dropdown to view the selected model’s last run time.
+- Time Navigation:
+After fetching data, use the slider to view weather at different times.
+- Weather Display:
+Data appears in a table at the bottom, showing height, pressure, temperature, dewpoint, wind direction, wind speed (in knots), and relative humidity.
+Interpolated data adjusts based on selected step size and reference level (AGL/AMSL).
+- Mean Wind:
+Enter lower and upper limits in the bottom container and click "Calculate Mean Wind" to see the result.
+- Download:
+Click "Download Table" to save the current weather table as a .txt file.
 
-Die Anwendung verwendet die Open-Meteo API, um Wetterdaten abzurufen. Die API-Anfrage für Windgeschwindigkeit und -richtung auf verschiedenen Druckniveaus erfordert ein spezielles Format:
+## API-Usage
 
-```
-https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=temperature_2m,wind_speed_10m,wind_direction_10m&wind_speed_{level}hPa=true&wind_direction_{level}hPa=true&models=gfs_seamless
-```
+The app uses the OpenMeteo API to retrieve weather data. 
 
-Dabei müssen die gewünschten Druckniveaus einzeln mit `wind_speed_{level}hPa=true` und `wind_direction_{level}hPa=true` angefordert werden, wobei `{level}` durch das gewünschte Druckniveau (z.B. 850, 700, 500) ersetzt wird.
+## Supported Pressure Levels
+- 1000 hPa (~100m)
+- 950 hPa (~500m)
+- 925 hPa (~750m)
+- 900 hPa (~1000m)
+- 850 hPa (~1500m)
+- 800 hPa (~2000m)
+- 700 hPa (~3000m)
+- 500 hPa (~5500m)
+- 300 hPa (~9000m)
+- 200 hPa (~12000m)
 
-### Unterstützte Druckniveaus
-- 1000 hPa (etwa 100m)
-- 925 hPa (etwa 750m)
-- 850 hPa (etwa 1500m)
-- 700 hPa (etwa 3000m)
-- 500 hPa (etwa 5500m)
-- 300 hPa (etwa 9000m)
-- 200 hPa (etwa 12000m)
+## Recent Changes
+- Model Selection UI: Replaced static model text with a persistent dropdown (#modelSelect) in #model-row, with the info button (#modelInfoButton) positioned to its right.
+- Error Display: Fixed error bar to use a solid #ffcccc background with black text, ensuring map visibility is blocked behind it.
+- Dropdown Visibility: Adjusted z-index values (#modelSelect at 1500, #modelInfoPopup at 1200) to ensure the dropdown menu appears above the info popup and button.
+- Code Cleanup: Removed #model-display from index.html and updated app.js to rely solely on #modelSelect for model selection logic.
