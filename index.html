@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -15,12 +16,14 @@
             display: flex;
             flex-direction: column;
         }
+
         #map {
             width: 100%;
             flex: 1 1 auto;
             min-height: 200px;
             z-index: 0;
         }
+
         #slider-container {
             background: #fff;
             padding: 15px;
@@ -32,6 +35,7 @@
             margin: 10px auto;
             z-index: 100;
         }
+
         #bottom-container {
             background: #fff;
             padding: 10px;
@@ -42,6 +46,7 @@
             z-index: 100;
             margin-bottom: 10px;
         }
+
         #info {
             background: rgba(255, 255, 255, 0.95);
             padding: 15px;
@@ -56,28 +61,37 @@
             scrollbar-color: #888 #f0f0f0;
             margin-top: 10px;
             z-index: 100;
-            box-sizing: border-box; /* Added to include padding in width */
+            box-sizing: border-box;
+            /* Added to include padding in width */
         }
+
         #info::-webkit-scrollbar {
             width: 8px;
         }
+
         #info::-webkit-scrollbar-thumb {
             background: #888;
             border-radius: 4px;
         }
+
         #info::-webkit-scrollbar-track {
             background: #f0f0f0;
         }
+
         #info table {
             border-collapse: collapse;
-            width: 100%; /* Changed from 90% to 100% to fully utilize #info's width */
+            width: 100%;
+            /* Changed from 90% to 100% to fully utilize #info's width */
             font-size: 16px;
         }
-        #info th, #info td {
+
+        #info th,
+        #info td {
             border: 1px solid #ccc;
             padding: 5px;
             text-align: center;
         }
+
         #info th {
             background-color: #e0e0e0;
             color: #222;
@@ -85,45 +99,58 @@
             font-size: 16px;
             letter-spacing: 0.5px;
         }
+
         #info tr:nth-child(even) {
             background-color: #f9f9f9;
         }
+
         #info tr:hover {
             background-color: #f0f8ff;
         }
+
         #meanWindControls {
             display: flex;
             align-items: center;
             flex-wrap: wrap;
             margin-bottom: 5px;
         }
-        #meanWindControls label, #meanWindControls input, #meanWindControls button {
+
+        #meanWindControls label,
+        #meanWindControls input,
+        #meanWindControls button {
             margin-right: 10px;
             margin-bottom: 5px;
         }
+
         #meanWindResult {
             margin-left: 10px;
             font-weight: bold;
         }
+
         #controls-row {
             display: flex;
             align-items: center;
             flex-wrap: wrap;
             margin-bottom: 5px;
         }
+
         #controls-row label {
             margin-right: 5px;
         }
-        #controls-row select, #controls-row button {
+
+        #controls-row select,
+        #controls-row button {
             margin-right: 10px;
             margin-bottom: 5px;
         }
+
         #selectedTime {
             font-size: 14px;
             font-weight: bold;
             display: block;
             margin-bottom: 10px;
         }
+
         #timeSlider {
             -webkit-appearance: none;
             display: block;
@@ -136,9 +163,11 @@
             margin: 5px 0;
             transition: opacity 0.2s;
         }
+
         #timeSlider:hover {
             opacity: 1;
         }
+
         #timeSlider::-webkit-slider-thumb {
             -webkit-appearance: none;
             width: 16px;
@@ -148,6 +177,7 @@
             cursor: pointer;
             box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
         }
+
         #timeSlider::-moz-range-thumb {
             width: 16px;
             height: 16px;
@@ -156,13 +186,36 @@
             cursor: pointer;
             box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
         }
+
+        #modelInfoButton {
+            background: transparent;
+            border: 2px solid white;
+            color: white;
+            width: 24px;
+            height: 24px;
+            padding: 0;
+            border-radius: 50%;
+            font-size: 16px;
+            line-height: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 0;
+        }
+
+        #modelInfoButton:hover {
+            background: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+
         #modelInfoPopup {
             position: absolute;
             background: white;
             border: 1px solid #ccc;
             padding: 10px;
             border-radius: 5px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
             z-index: 1200;
             display: none;
             width: 220px;
@@ -171,6 +224,7 @@
             top: 100%;
             left: 0;
         }
+
         button {
             background: #007bff;
             color: white;
@@ -181,28 +235,37 @@
             transition: background 0.3s;
             min-width: 70px;
         }
+
         button:hover {
             background: #0056b3;
         }
-        select, input[type="number"] {
+
+        select,
+        input[type="number"] {
             padding: 6px;
             border: 1px solid #ccc;
             border-radius: 4px;
             font-size: 12px;
         }
+
         #modelSelect {
             position: relative;
             z-index: 1500;
             margin-right: 10px;
         }
-        #lowerLimit, #upperLimit {
+
+        #lowerLimit,
+        #upperLimit {
             width: 80px;
         }
-        select:focus, input[type="number"]:focus {
+
+        select:focus,
+        input[type="number"]:focus {
             outline: none;
             border-color: #007bff;
             box-shadow: 0 0 3px rgba(0, 123, 255, 0.5);
         }
+
         #model-row {
             display: flex;
             align-items: center;
@@ -210,6 +273,7 @@
             font-size: 14px;
             font-weight: bold;
         }
+
         #error-message {
             position: absolute;
             top: 0;
@@ -223,14 +287,22 @@
             z-index: 2000;
             display: none;
         }
+
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
         }
+
         @media (max-width: 768px) {
             body {
                 flex-direction: column;
             }
+
             #slider-container {
                 order: 1;
                 width: 100%;
@@ -238,65 +310,90 @@
                 padding: 10px;
                 margin: 10px auto 0;
             }
+
             #map {
                 order: 2;
                 flex: 1 1 60vh;
             }
+
             #bottom-container {
                 order: 3;
                 width: 100%;
                 padding: 8px;
                 margin: 0 0 10px;
             }
+
             #info {
                 max-height: 30vh;
                 font-size: 13px;
-                max-width: 100%; /* Override max-width to fit the container */
-                padding: 8px; /* Match #bottom-container's padding for consistency */
+                max-width: 100%;
+                /* Override max-width to fit the container */
+                padding: 8px;
+                /* Match #bottom-container's padding for consistency */
             }
-            #info th, #info td {
+
+            #info th,
+            #info td {
                 padding: 3px;
                 font-size: 13px;
             }
-            #meanWindControls, #controls-row {
+
+            #meanWindControls,
+            #controls-row {
                 flex-direction: row;
                 flex-wrap: wrap;
                 align-items: center;
             }
-            #meanWindControls label, #meanWindControls input, #meanWindControls button,
-            #controls-row label, #controls-row select, #controls-row button {
+
+            #meanWindControls label,
+            #meanWindControls input,
+            #meanWindControls button,
+            #controls-row label,
+            #controls-row select,
+            #controls-row button {
                 margin-right: 5px;
                 margin-bottom: 5px;
                 font-size: 12px;
             }
+
             #meanWindResult {
                 margin-left: 5px;
                 margin-top: 0;
                 font-size: 12px;
             }
-            #lowerLimit, #upperLimit {
+
+            #lowerLimit,
+            #upperLimit {
                 width: 70px;
             }
+
             #model-row {
                 flex-wrap: wrap;
             }
+
             #modelInfoButton {
                 margin-top: 5px;
             }
         }
+
         @media (max-width: 400px) {
             #info {
                 max-height: 25vh;
             }
-            #info th, #info td {
+
+            #info th,
+            #info td {
                 font-size: 12px;
             }
-            #lowerLimit, #upperLimit {
+
+            #lowerLimit,
+            #upperLimit {
                 width: 60px;
             }
         }
     </style>
 </head>
+
 <body>
     <div id="map"></div>
     <div id="slider-container">
@@ -314,7 +411,9 @@
         <div id="modelInfoPopup"></div>
     </div>
     <div id="loading" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">
-        <div style="width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #007bff; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+        <div
+            style="width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #007bff; border-radius: 50%; animation: spin 1s linear infinite;">
+        </div>
     </div>
     <div id="bottom-container">
         <div id="meanWindControls">
@@ -345,6 +444,7 @@
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
     <script src="app.js"></script>
     <!-- Existing Cloudflare scripts remain unchanged -->
-    <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'91ce572bdae4bd03',t:'MTc0MTM5NTA0OC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
+    <script>(function () { function c() { var b = a.contentDocument || a.contentWindow.document; if (b) { var d = b.createElement('script'); d.innerHTML = "window.__CF$cv$params={r:'91ce572bdae4bd03',t:'MTc0MTM5NTA0OC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);"; b.getElementsByTagName('head')[0].appendChild(d) } } if (document.body) { var a = document.createElement('iframe'); a.height = 1; a.width = 1; a.style.position = 'absolute'; a.style.top = 0; a.style.left = 0; a.style.border = 'none'; a.style.visibility = 'hidden'; document.body.appendChild(a); if ('loading' !== document.readyState) c(); else if (window.addEventListener) document.addEventListener('DOMContentLoaded', c); else { var e = document.onreadystatechange || function () { }; document.onreadystatechange = function (b) { e(b); 'loading' !== document.readyState && (document.onreadystatechange = e, c()) } } } })();</script>
 </body>
+
 </html>
