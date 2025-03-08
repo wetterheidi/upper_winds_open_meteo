@@ -61,7 +61,8 @@ async function getAltitude(lng, lat) {
 
 async function fetchWeather(lat, lon) {
     try {
-        const modelSelect = document.getElementById('modelSelect').value;
+        document.getElementById('loading').style.display = 'block';
+        const modelSelect = document.getElementById('modelSelect');
         const modelMap = {
             'icon_global': 'dwd_icon',
             'gfs_seamless': 'ncep_gfs013',
@@ -72,7 +73,7 @@ async function fetchWeather(lat, lon) {
             'ecmwf_aifs025': 'ecmwf_aifs025_single',
             'ncep_hrrr': 'ncep_hrrr_conus'
         };
-        const model = modelMap[modelSelect] || modelSelect;
+        const model = modelMap[modelSelect.value] || modelSelect.value;
 
         // Fetch model run time
         const metaResponse = await fetch(`https://api.open-meteo.com/data/${model}/static/meta.json`);
@@ -80,7 +81,7 @@ async function fetchWeather(lat, lon) {
         const metaData = await metaResponse.json();
 
         const runDate = new Date(metaData.last_run_initialisation_time * 1000);
-        const now = new Date(); // Current date: March 7, 2025
+        const now = new Date();
         const year = runDate.getUTCFullYear();
         const month = String(runDate.getUTCMonth() + 1).padStart(2, '0');
         const day = String(runDate.getUTCDate()).padStart(2, '0');
@@ -88,7 +89,6 @@ async function fetchWeather(lat, lon) {
         const minute = String(runDate.getUTCMinutes()).padStart(2, '0');
         lastModelRun = `${year}-${month}-${day} ${hour}${minute}`;
 
-        // Adjust start date if in the future
         let startDate = runDate;
         if (runDate > now) {
             startDate = new Date(now);
@@ -99,9 +99,8 @@ async function fetchWeather(lat, lon) {
         const startDay = String(startDate.getUTCDate()).padStart(2, '0');
         const startDateStr = `${startYear}-${startMonth}-${startDay}`;
 
-        // Set end date: 2 days for ICON-D2, 7 days for others
         const endDate = new Date(startDate);
-        const forecastDays = modelSelect === 'icon_d2' ? 2 : 7;
+        const forecastDays = modelSelect.value === 'icon_d2' ? 2 : 7;
         endDate.setUTCDate(endDate.getUTCDate() + forecastDays);
         const endYear = endDate.getUTCFullYear();
         const endMonth = String(endDate.getUTCMonth() + 1).padStart(2, '0');
@@ -120,7 +119,7 @@ async function fetchWeather(lat, lon) {
             `temperature_500hPa,relative_humidity_500hPa,wind_speed_500hPa,wind_direction_500hPa,geopotential_height_500hPa,` +
             `temperature_300hPa,relative_humidity_300hPa,wind_speed_300hPa,wind_direction_300hPa,geopotential_height_300hPa,` +
             `temperature_200hPa,relative_humidity_200hPa,wind_speed_200hPa,wind_direction_200hPa,geopotential_height_200hPa` +
-            `&models=${modelSelect}&start_date=${startDateStr}&end_date=${endDateStr}`;
+            `&models=${modelSelect.value}&start_date=${startDateStr}&end_date=${endDateStr}`;
 
         console.log('Fetching weather from:', url);
         const response = await fetch(url);
@@ -132,7 +131,6 @@ async function fetchWeather(lat, lon) {
 
         const data = await response.json();
 
-        // Filter data to start at or after run time
         const runTimeMs = runDate.getTime();
         const filteredIndices = data.hourly.time
             .map((time, idx) => ({ time: new Date(time).getTime(), idx }))
@@ -144,6 +142,7 @@ async function fetchWeather(lat, lon) {
 
         const startIdx = filteredIndices[0].idx;
         weatherData = {
+            // ... (weatherData object unchanged)
             time: data.hourly.time.slice(startIdx),
             temperature_2m: data.hourly.temperature_2m.slice(startIdx),
             relative_humidity_2m: data.hourly.relative_humidity_2m.slice(startIdx),
@@ -203,11 +202,14 @@ async function fetchWeather(lat, lon) {
 
         const slider = document.getElementById('timeSlider');
         slider.max = weatherData.time.length - 1;
-        slider.value = 0; // Start at run time
+        slider.value = 0;
         slider.disabled = false;
         updateWeatherDisplay(0);
+        document.getElementById('model-display').textContent = modelSelect.value.replace('_', ' ').toUpperCase();
+        document.getElementById('loading').style.display = 'none';
         return data;
     } catch (error) {
+        document.getElementById('loading').style.display = 'none';
         console.error("Weather fetch error:", error);
         displayError(`Could not load weather data: ${error.message}`);
         throw error;
@@ -246,6 +248,11 @@ async function checkAvailableModels(lat, lon) {
         option.textContent = model.replace('_', ' ').toUpperCase();
         modelSelect.appendChild(option);
     });
+
+    // Set initial model display
+    if (availableModels.length > 0) {
+        document.getElementById('model-display').textContent = modelSelect.value.replace('_', ' ').toUpperCase();
+    }
 
     const modelDisplay = availableModels.length > 0
         ? `<br><strong>Available Models:</strong><ul>${availableModels.map(m => `<li>${m.replace('_', ' ').toUpperCase()}</li>`).join('')}</ul>`
@@ -488,7 +495,6 @@ function updateWeatherDisplay(index) {
     const time = formatTime(weatherData.time[index]);
     const interpolatedData = interpolateWeatherData(index);
 
-    // Update #info with Run and table
     let output = `<table border="1" style="border-collapse: collapse; width: 100%;">`;
     output += `<tr>`;
     output += `<th style="width: 15%;">Height (m)</th>`;
@@ -514,8 +520,6 @@ function updateWeatherDisplay(index) {
 
     output += `</table>`;
     document.getElementById('info').innerHTML = output;
-
-    // Update #selectedTime with Time
     document.getElementById('selectedTime').innerHTML = `Selected Time: ${time}`;
 }
 
