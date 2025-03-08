@@ -219,10 +219,15 @@
             z-index: 1200;
             display: none;
             width: 220px;
+            /* Fixed width */
             font-size: 14px;
             line-height: 1.4;
-            top: 100%;
-            left: 0;
+            top: calc(100% + 5px);
+            /* Below the button */
+            right: 0;
+            /* Align right edge with button’s right edge */
+            transform: translateX(10%);
+            /* Shift left so left edge aligns with button’s right edge, adjust as needed */
         }
 
         button {

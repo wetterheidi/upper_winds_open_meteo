@@ -745,23 +745,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 displayError('No model run data available yet.');
                 return;
             }
+    
             const model = document.getElementById('modelSelect').value;
             const runText = `Model: ${model.replace('_', ' ').toUpperCase()}<br>Run: ${lastModelRun}`;
-            const buttonRect = infoButton.getBoundingClientRect();
-            infoPopup.style.left = `${buttonRect.left}px`;
-            infoPopup.style.top = `${buttonRect.bottom + 5}px`;
+    
+            // Remove dynamic left positioning; rely on CSS
+            infoPopup.style.top = `${infoButton.getBoundingClientRect().bottom + 5}px`; // Position below button
             infoPopup.innerHTML = runText;
             infoPopup.style.display = 'block';
-            setTimeout(() => infoPopup.style.display = 'none', 5000);
+    
+            setTimeout(() => {
+                infoPopup.style.display = 'none';
+            }, 5000);
         });
     } else {
         console.error('Model info button or popup element not found');
-    }
-
-    if (downloadButton) {
-        downloadButton.addEventListener('click', downloadTableAsAscii);
-    } else {
-        console.error('Download button element not found');
     }
 
     if (interpStepSelect) {
