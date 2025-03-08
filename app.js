@@ -56,6 +56,10 @@ function initMap() {
                 const availableModels = await checkAvailableModels(lastLat, lastLng);
                 if (availableModels.length > 0) {
                     await fetchWeather(lastLat, lastLng);
+                    // After weather data is fetched and displayed, calculate mean wind
+                    if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
+                        calculateMeanWind();
+                    }
                 } else {
                     document.getElementById('info').innerHTML = `No models available.`;
                 }
@@ -64,7 +68,23 @@ function initMap() {
                 // Handle geolocation errors
                 console.warn(`Geolocation error: ${error.message}`);
                 displayError('Unable to retrieve your location. Using default location (Herrsching am Ammersee).');
-                // Map is already centered on default coordinates
+                // Fetch weather for default location and calculate mean wind
+                lastLat = defaultCenter[1];
+                lastLng = defaultCenter[0];
+                getAltitude(lastLng, lastLat).then(async (altitude) => {
+                    lastAltitude = altitude;
+                    document.getElementById('info').innerHTML = `Fetching weather and models...`;
+                    const availableModels = await checkAvailableModels(lastLat, lastLng);
+                    if (availableModels.length > 0) {
+                        await fetchWeather(lastLat, lastLng);
+                        // After weather data is fetched and displayed, calculate mean wind
+                        if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
+                            calculateMeanWind();
+                        }
+                    } else {
+                        document.getElementById('info').innerHTML = `No models available.`;
+                    }
+                });
             },
             {
                 enableHighAccuracy: true,
@@ -76,6 +96,22 @@ function initMap() {
         // Geolocation not supported by the browser
         console.warn('Geolocation is not supported by this browser.');
         displayError('Geolocation not supported. Using default location (Herrsching am Ammersee).');
+        lastLat = defaultCenter[1];
+        lastLng = defaultCenter[0];
+        getAltitude(lastLng, lastLat).then(async (altitude) => {
+            lastAltitude = altitude;
+            document.getElementById('info').innerHTML = `Fetching weather and models...`;
+            const availableModels = await checkAvailableModels(lastLat, lastLng);
+            if (availableModels.length > 0) {
+                await fetchWeather(lastLat, lastLng);
+                // After weather data is fetched and displayed, calculate mean wind
+                if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
+                    calculateMeanWind();
+                }
+            } else {
+                document.getElementById('info').innerHTML = `No models available.`;
+            }
+        });
     }
 
     // Add click event listener for manual map interaction
@@ -105,6 +141,10 @@ function initMap() {
         const availableModels = await checkAvailableModels(lat, lng);
         if (availableModels.length > 0) {
             await fetchWeather(lat, lng);
+            // After weather data is fetched and displayed, calculate mean wind
+            if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
+                calculateMeanWind();
+            }
         } else {
             document.getElementById('info').innerHTML = `No models available.`;
         }
@@ -665,24 +705,26 @@ function displayError(message) {
     setTimeout(() => errorElement.style.display = 'none', 5000);
 }
 
+
+
 document.addEventListener('DOMContentLoaded', () => {
-    // Initialize the map
     initMap();
 
     const slider = document.getElementById('timeSlider');
-    if (slider) {
-        slider.addEventListener('input', (e) => updateWeatherDisplay(e.target.value));
-    } else {
-        console.error('Slider element not found');
-    }
-
     const modelSelect = document.getElementById('modelSelect');
     const infoButton = document.getElementById('modelInfoButton');
     const infoPopup = document.getElementById('modelInfoPopup');
     const downloadButton = document.getElementById('downloadButton');
     const interpStepSelect = document.getElementById('interpStepSelect');
     const refLevelSelect = document.getElementById('refLevelSelect');
-    const calcMeanWindButton = document.getElementById('calcMeanWindButton');
+    const lowerLimitInput = document.getElementById('lowerLimit');
+    const upperLimitInput = document.getElementById('upperLimit');
+
+    if (slider) {
+        slider.addEventListener('input', (e) => updateWeatherDisplay(e.target.value));
+    } else {
+        console.error('Slider element not found');
+    }
 
     if (modelSelect) {
         modelSelect.addEventListener('change', () => {
@@ -703,19 +745,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 displayError('No model run data available yet.');
                 return;
             }
-
             const model = document.getElementById('modelSelect').value;
             const runText = `Model: ${model.replace('_', ' ').toUpperCase()}<br>Run: ${lastModelRun}`;
-
             const buttonRect = infoButton.getBoundingClientRect();
             infoPopup.style.left = `${buttonRect.left}px`;
             infoPopup.style.top = `${buttonRect.bottom + 5}px`;
             infoPopup.innerHTML = runText;
             infoPopup.style.display = 'block';
-
-            setTimeout(() => {
-                infoPopup.style.display = 'none';
-            }, 5000);
+            setTimeout(() => infoPopup.style.display = 'none', 5000);
         });
     } else {
         console.error('Model info button or popup element not found');
@@ -751,9 +788,27 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error('Reference level select element not found');
     }
 
-    if (calcMeanWindButton) {
-        calcMeanWindButton.addEventListener('click', calculateMeanWind);
+    if (lowerLimitInput) {
+        lowerLimitInput.addEventListener('input', () => {
+            if (weatherData && lastLat && lastLng) {
+                calculateMeanWind();
+            } else {
+                displayError('Please select a position and fetch weather data first.');
+            }
+        });
     } else {
-        console.error('Calculate mean wind button not found');
+        console.error('Lower limit input element not found');
+    }
+
+    if (upperLimitInput) {
+        upperLimitInput.addEventListener('input', () => {
+            if (weatherData && lastLat && lastLng) {
+                calculateMeanWind();
+            } else {
+                displayError('Please select a position and fetch weather data first.');
+            }
+        });
+    } else {
+        console.error('Upper limit input element not found');
     }
 });
