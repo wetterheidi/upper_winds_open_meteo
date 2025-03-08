@@ -11,15 +11,15 @@
         body {
             font-family: 'Roboto', sans-serif;
             margin: 0;
-            min-height: 100vh; /* Ensure full height */
+            min-height: 100vh;
             display: flex;
             flex-direction: column;
         }
         #map {
             width: 100%;
-            flex: 1 1 auto; /* Grow and shrink as needed */
-            min-height: 200px; /* Minimum height for usability */
-            z-index: 0; /* Base layer */
+            flex: 1 1 auto;
+            min-height: 200px;
+            z-index: 0;
         }
         #slider-container {
             background: #fff;
@@ -29,17 +29,17 @@
             color: #333;
             width: 90%;
             max-width: 300px;
-            margin: 10px auto; /* Centered with margin */
-            z-index: 100; /* Above map */
+            margin: 10px auto;
+            z-index: 100;
         }
         #bottom-container {
             background: #fff;
-            padding: 15px;
+            padding: 10px; /* Reduced padding */
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             width: 100%;
             box-sizing: border-box;
-            z-index: 100; /* Above map */
+            z-index: 100;
             margin-bottom: 10px;
         }
         #info {
@@ -94,28 +94,28 @@
             display: flex;
             align-items: center;
             flex-wrap: wrap;
-            margin-bottom: 10px;
+            margin-bottom: 5px; /* Reduced margin */
         }
         #meanWindControls label, #meanWindControls input, #meanWindControls button {
-            margin-right: 15px;
-            margin-bottom: 10px;
+            margin-right: 10px; /* Reduced margin */
+            margin-bottom: 5px; /* Reduced margin */
         }
         #meanWindResult {
-            margin-left: 15px;
+            margin-left: 10px; /* Reduced margin */
             font-weight: bold;
         }
         #controls-row {
             display: flex;
             align-items: center;
             flex-wrap: wrap;
-            margin-bottom: 10px;
+            margin-bottom: 5px; /* Reduced margin */
         }
         #controls-row label {
             margin-right: 5px;
         }
         #controls-row select, #controls-row button {
-            margin-right: 15px;
-            margin-bottom: 10px;
+            margin-right: 10px; /* Reduced margin */
+            margin-bottom: 5px; /* Reduced margin */
         }
         #selectedTime {
             font-size: 14px;
@@ -174,20 +174,20 @@
             background: #007bff;
             color: white;
             border: none;
-            padding: 8px 12px;
+            padding: 6px 10px; /* Reduced padding */
             border-radius: 4px;
             cursor: pointer;
             transition: background 0.3s;
-            min-width: 80px;
+            min-width: 70px; /* Reduced min-width */
         }
         button:hover {
             background: #0056b3;
         }
         select, input[type="number"] {
-            padding: 8px;
+            padding: 6px; /* Reduced padding */
             border: 1px solid #ccc;
             border-radius: 4px;
-            font-size: 14px;
+            font-size: 12px; /* Reduced font size */
         }
         #modelSelect {
             position: relative;
@@ -195,7 +195,7 @@
             margin-right: 10px;
         }
         #lowerLimit, #upperLimit {
-            width: 100px; /* Constrain width */
+            width: 80px; /* Slightly smaller for compactness */
         }
         select:focus, input[type="number"]:focus {
             outline: none;
@@ -231,21 +231,21 @@
                 flex-direction: column;
             }
             #slider-container {
-                order: 1; /* Top */
+                order: 1;
                 width: 90%;
                 max-width: 300px;
                 padding: 10px;
-                margin: 10px auto 0; /* Top margin only */
+                margin: 10px auto 0;
             }
             #map {
-                order: 2; /* Middle */
-                flex: 1 1 60vh; /* Take up most space, min 60vh */
+                order: 2;
+                flex: 1 1 60vh;
             }
             #bottom-container {
-                order: 3; /* Bottom */
+                order: 3;
                 width: 100%;
-                padding: 10px;
-                margin: 0 0 10px; /* Bottom margin */
+                padding: 8px; /* Further reduced padding */
+                margin: 0 0 10px;
             }
             #info {
                 max-height: 30vh;
@@ -256,22 +256,23 @@
                 font-size: 11px;
             }
             #meanWindControls, #controls-row {
-                flex-direction: column;
-                align-items: flex-start;
+                flex-direction: row; /* Switch back to row for compactness */
+                flex-wrap: wrap;
+                align-items: center;
             }
             #meanWindControls label, #meanWindControls input, #meanWindControls button,
-            #controls-row select, #controls-row button {
-                width: auto;
-                max-width: 150px;
-                margin-right: 0;
-                margin-bottom: 10px;
-            }
-            #lowerLimit, #upperLimit {
-                width: 100px;
+            #controls-row label, #controls-row select, #controls-row button {
+                margin-right: 5px; /* Tighter spacing */
+                margin-bottom: 5px;
+                font-size: 12px; /* Smaller font */
             }
             #meanWindResult {
-                margin-left: 0;
-                margin-top: 10px;
+                margin-left: 5px;
+                margin-top: 0;
+                font-size: 12px;
+            }
+            #lowerLimit, #upperLimit {
+                width: 70px; /* Even smaller for mobile */
             }
             #model-row {
                 flex-wrap: wrap;
@@ -288,7 +289,7 @@
                 font-size: 10px;
             }
             #lowerLimit, #upperLimit {
-                width: 90px;
+                width: 60px;
             }
         }
     </style>
