@@ -269,7 +269,7 @@ function calculateDewpoint(temp, rh) {
     const b = 237.7;
     const alpha = (a * temp) / (b + temp) + Math.log(rh / 100);
     const dewpoint = (b * alpha) / (a - alpha);
-    return dewpoint.toFixed(1);
+    return dewpoint.toFixed(0);
 }
 
 function gaussianInterpolation(y1, y2, h1, h2, hp) {
@@ -485,6 +485,10 @@ function Mittelwind(Höhe, xKomponente, yKomponente, Untergrenze, Obergrenze) {
     return dddff;
 }
 
+function roundToTens(value) {
+    return Math.round(value / 10) * 10;
+}
+
 function updateWeatherDisplay(index) {
     if (!weatherData || !weatherData.time || !weatherData.time[index]) {
         document.getElementById('info').innerHTML = 'No weather data available';
@@ -512,7 +516,7 @@ function updateWeatherDisplay(index) {
         output += `<td>${data.pressure}</td>`;
         output += `<td>${data.temp}</td>`;
         output += `<td>${data.dew}</td>`;
-        output += `<td>${data.dir}</td>`;
+        output += `<td>${roundToTens(data.dir)}</td>`; // Round wind direction to tens
         output += `<td>${data.spd}</td>`;
         output += `<td>${data.rh}</td>`;
         output += `</tr>`;
@@ -546,7 +550,8 @@ function calculateMeanWind() {
     const meanWind = Mittelwind(heights, xKomponente, yKomponente, lowerLimit, upperLimit);
     const [dir, spd] = meanWind;
 
-    const result = `Mean Wind (${lowerLimit}-${upperLimit} m ${refLevel}): ${dir.toFixed(0)}°  ${spd.toFixed(0)} kt`;
+    const roundedDir = roundToTens(dir); // Round mean wind direction to tens
+    const result = `Mean Wind (${lowerLimit}-${upperLimit} m ${refLevel}): ${roundedDir}° ${spd.toFixed(0)} kt`;
     const meanWindResult = document.getElementById('meanWindResult');
     if (meanWindResult) {
         meanWindResult.innerHTML = result;
