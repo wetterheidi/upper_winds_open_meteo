@@ -645,7 +645,7 @@ function calculateMeanWind() {
     const [dir, spd] = meanWind;
 
     const roundedDir = roundToTens(dir); // Round mean wind direction to tens
-    const result = `Mean wind: (${lowerLimit}-${upperLimit} m ${refLevel}): ${roundedDir}° ${spd.toFixed(0)} kt`;
+    const result = `Mean wind (${lowerLimit}-${upperLimit} m ${refLevel}): ${roundedDir}° ${spd.toFixed(0)} kt`;
     const meanWindResult = document.getElementById('meanWindResult');
     if (meanWindResult) {
         meanWindResult.innerHTML = result;
@@ -676,7 +676,7 @@ function downloadTableAsAscii() {
     const filename = `${time}_${model}_HEIDIS.txt`;
 
     const interpolatedData = interpolateWeatherData(index);
-    let content = 'Height Pressure T Dew Dir Spd RH\n';
+    let content = 'h(m) p(hPa) T(°C) Dew(°C) Dir(°) Spd(kt) RH(%)\n';
 
     interpolatedData.forEach(data => {
         content += `${data.displayHeight} ${data.pressure} ${data.temp} ${data.dew} ${data.dir} ${data.spd} ${data.rh}\n`;
