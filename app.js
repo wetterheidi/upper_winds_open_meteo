@@ -241,16 +241,12 @@ async function fetchWeather(lat, lon) {
 
         const data = await response.json();
 
-        // Find the correct index for the desired time (2025-03-08 12:00Z)
-        const targetTime = "2025-03-08T12:00";
-        const targetIndex = data.hourly.time.indexOf(targetTime);
-        if (targetIndex === -1) {
-            console.error(`Target time ${targetTime} not found in API response. Available times:`, data.hourly.time.slice(0, 10));
-            throw new Error(`Target time ${targetTime} not found in API response.`);
-        }
-        console.log(`Target time ${targetTime} found at index:`, targetIndex, 'First few times:', data.hourly.time.slice(targetIndex, targetIndex + 10));
+        // Use the first time from the API response instead of a fixed target
+        const targetIndex = 0; // Start from the first available time
+        const firstTime = data.hourly.time[targetIndex];
+        console.log(`Using first available time: ${firstTime} at index: ${targetIndex}`);
 
-        // Slice the data starting from the target time
+        // Slice the data starting from the first time
         weatherData = {
             time: data.hourly.time.slice(targetIndex),
             temperature_2m: data.hourly.temperature_2m.slice(targetIndex),
@@ -338,12 +334,12 @@ async function fetchWeather(lat, lon) {
         const slider = document.getElementById('timeSlider');
         slider.min = 0;
         slider.max = weatherData.time.length - 1;
-        slider.value = 0; // Start at 12:00Z
+        slider.value = 0; // Start at the first available time
         console.log('Before UI update, slider value:', slider.value, 'corresponding to:', weatherData.time[slider.value]);
 
         // Force immediate UI update
         updateWeatherDisplay(0);
-        console.log('Initial UI update called with index 0 (12:00Z), time should be:', weatherData.time[0]);
+        console.log('Initial UI update called with index 0, time should be:', weatherData.time[0]);
 
         // Aggressive resets to ensure the slider stays at 0
         [100, 500, 1000, 2000].forEach(delay => {
@@ -364,8 +360,8 @@ async function fetchWeather(lat, lon) {
                         console.error(`Final UI mismatch: Displayed ${displayedTime} but expected ${expectedTime}, forcing correction`);
                         slider.value = 0;
                         updateWeatherDisplay(0);
-                        // Manually set the DOM to ensure correctness
-                        document.getElementById('selectedTime').innerHTML = `Selected Time: ${expectedTime}`;
+                        // Manually set the DOM with raw input time as fallback
+                        document.getElementById('selectedTime').innerHTML = `Selected Time: ${weatherData.time[0].replace('T', ' ').slice(0, -3)}Z`;
                         document.getElementById('info').innerHTML = ''; // Clear and re-render
                         updateWeatherDisplay(0);
                     }
@@ -383,33 +379,6 @@ async function fetchWeather(lat, lon) {
         displayError(`Could not load weather data: ${error.message}`);
         throw error;
     }
-}
-
-function updateWeatherDisplay(index) {
-    if (!weatherData || !weatherData.time || !weatherData.time[index]) {
-        console.error('No weather data available for index:', index);
-        document.getElementById('info').innerHTML = 'No weather data available';
-        document.getElementById('selectedTime').innerHTML = 'Selected Time: ';
-        return;
-    }
-
-    console.log('updateWeatherDisplay called with index:', index, 'time from weatherData:', weatherData.time[index]);
-    const time = formatTime(weatherData.time[index]);
-    console.log('Formatted time for display:', time);
-
-    const interpolatedData = interpolateWeatherData(index);
-    let output = `<table border="1" style="border-collapse: collapse; width: 100%;">`;
-    output += `<tr><th style="width: 20%;">Height (m)</th><th style="width: 20%;">Dir (°)</th><th style="width: 20%;">Spd (kt)</th><th style="width: 20%;">T (°C)</th></tr>`;
-
-    interpolatedData.forEach(data => {
-        output += `<tr><td>${data.displayHeight}</td><td>${roundToTens(data.dir)}</td><td>${data.spd}</td><td>${data.temp}</td></tr>`;
-    });
-
-    output += `</table>`;
-    document.getElementById('info').innerHTML = output;
-    document.getElementById('selectedTime').innerHTML = `Selected Time: ${time}`;
-
-    calculateMeanWind();
 }
 
 function updateWeatherDisplay(index) {
@@ -657,10 +626,9 @@ function windSpeed(x, y) {
     return Math.sqrt(x * x + y * y);
 }
 
-function windDirection(x, y) {
-    let dir = Math.atan2(x, y) * 180 / Math.PI;
-    dir = (270 - dir) % 360;
-    return dir < 0 ? dir + 360 : dir;
+function windDirection(u, v) {
+    let dir = Math.atan2(-u, -v) * 180 / Math.PI; // Correct meteorological direction
+    return (dir + 360) % 360; // Ensure 0–360°
 }
 
 function Mittelwind(Höhe, xKomponente, yKomponente, Untergrenze, Obergrenze) {
@@ -694,10 +662,10 @@ function Mittelwind(Höhe, xKomponente, yKomponente, Untergrenze, Obergrenze) {
     const xMittel = xTrapez / (hSchicht[0] - hSchicht[hSchicht.length - 1]);
     const yMittel = yTrapez / (hSchicht[0] - hSchicht[hSchicht.length - 1]);
 
-    dddff[2] = xMittel;
-    dddff[3] = yMittel;
-    dddff[1] = windSpeed(xMittel, yMittel);
-    dddff[0] = windDirection(xMittel, yMittel);
+    dddff[2] = xMittel; // u component
+    dddff[3] = yMittel; // v component
+    dddff[1] = windSpeed(xMittel, yMittel); // Speed
+    dddff[0] = windDirection(xMittel, yMittel); // Direction
 
     return dddff;
 }
@@ -709,8 +677,8 @@ function roundToTens(value) {
 function calculateMeanWind() {
     const index = document.getElementById('timeSlider').value || 0;
     const interpolatedData = interpolateWeatherData(index);
-    const lowerLimit = parseFloat(document.getElementById('lowerLimit').value);
-    const upperLimit = parseFloat(document.getElementById('upperLimit').value);
+    const lowerLimit = parseFloat(document.getElementById('lowerLimit').value) || 0;
+    const upperLimit = parseFloat(document.getElementById('upperLimit').value) || 3000;
     const refLevel = document.getElementById('refLevelSelect').value || 'AGL';
 
     if (isNaN(lowerLimit) || isNaN(upperLimit) || lowerLimit >= upperLimit) {
@@ -720,11 +688,12 @@ function calculateMeanWind() {
 
     const baseHeight = Math.round(lastAltitude);
     const heights = interpolatedData.map(d => refLevel === 'AGL' ? d.displayHeight + baseHeight : d.displayHeight);
-    const dirs = interpolatedData.map(d => parseFloat(d.dir));
-    const spds = interpolatedData.map(d => parseFloat(d.spd));
+    const dirs = interpolatedData.map(d => parseFloat(d.dir) || 0); // Fallback to 0 if NaN
+    const spds = interpolatedData.map(d => parseFloat(d.spd) || 0); // Fallback to 0 if NaN
 
-    const xKomponente = spds.map((spd, i) => spd * Math.sin((dirs[i] - 180) * Math.PI / 180));
-    const yKomponente = spds.map((spd, i) => spd * Math.cos((dirs[i] - 180) * Math.PI / 180));
+    // Correct u, v components for wind blowing from
+    const xKomponente = spds.map((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180)); // u (east-west)
+    const yKomponente = spds.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180)); // v (north-south)
 
     const meanWind = Mittelwind(heights, xKomponente, yKomponente, lowerLimit, upperLimit);
     const [dir, spd] = meanWind;
@@ -734,6 +703,7 @@ function calculateMeanWind() {
     const meanWindResult = document.getElementById('meanWindResult');
     if (meanWindResult) {
         meanWindResult.innerHTML = result;
+        console.log('Calculated Mean Wind:', result, 'u:', meanWind[2], 'v:', meanWind[3]);
     } else {
         console.error('Mean wind result element not found');
     }
