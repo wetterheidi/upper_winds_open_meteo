@@ -826,7 +826,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const debouncedUpdate = debounce((e) => {
             const index = parseInt(e.target.value);
             console.log('Slider input event fired, value:', index, 'corresponding time:', weatherData.time[index]);
-            updateWeatherDisplay(index);
+            updateWeatherDisplay(index); // Update weather display
+            if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
+                calculateMeanWind(); // Update mean wind
+            }
         }, 100);
 
         slider.addEventListener('input', debouncedUpdate);
@@ -834,6 +837,10 @@ document.addEventListener('DOMContentLoaded', () => {
         slider.addEventListener('change', (e) => {
             const index = parseInt(e.target.value);
             console.log('Slider change event fired, value:', index, 'corresponding time:', weatherData.time[index]);
+            updateWeatherDisplay(index); // Update weather display
+            if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
+                calculateMeanWind(); // Update mean wind
+            }
         });
 
         // Remove the continuous reset (replaced by final check in fetchWeather)
@@ -881,6 +888,9 @@ document.addEventListener('DOMContentLoaded', () => {
         interpStepSelect.addEventListener('change', () => {
             if (weatherData && lastLat && lastLng) {
                 updateWeatherDisplay(document.getElementById('timeSlider').value || 0);
+                if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
+                    calculateMeanWind(); // Update mean wind when step changes
+                }
             } else {
                 displayError('Please select a position and fetch weather data first.');
             }
@@ -893,6 +903,9 @@ document.addEventListener('DOMContentLoaded', () => {
         refLevelSelect.addEventListener('change', () => {
             if (weatherData && lastLat && lastLng) {
                 updateWeatherDisplay(document.getElementById('timeSlider').value || 0);
+                if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
+                    calculateMeanWind(); // Update mean wind when reference level changes
+                }
             } else {
                 displayError('Please select a position and fetch weather data first.');
             }
