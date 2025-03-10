@@ -247,7 +247,9 @@ async function fetchWeather(lat, lon) {
             `temperature_800hPa,relative_humidity_800hPa,wind_speed_800hPa,wind_direction_800hPa,geopotential_height_800hPa,` +
             `temperature_700hPa,relative_humidity_700hPa,wind_speed_700hPa,wind_direction_700hPa,geopotential_height_700hPa,` +
             `temperature_500hPa,relative_humidity_500hPa,wind_speed_500hPa,wind_direction_500hPa,geopotential_height_500hPa,` +
+            `temperature_400hPa,relative_humidity_400hPa,wind_speed_400hPa,wind_direction_400hPa,geopotential_height_400hPa,` +
             `temperature_300hPa,relative_humidity_300hPa,wind_speed_300hPa,wind_direction_300hPa,geopotential_height_300hPa,` +
+            `temperature_250hPa,relative_humidity_250hPa,wind_speed_250hPa,wind_direction_250hPa,geopotential_height_250hPa,` +
             `temperature_200hPa,relative_humidity_200hPa,wind_speed_200hPa,wind_direction_200hPa,geopotential_height_200hPa` +
             `&models=${modelSelect.value}&start_date=${startDateStr}&end_date=${endDateStr}`;
 
@@ -312,11 +314,21 @@ async function fetchWeather(lat, lon) {
             wind_speed_500hPa: data.hourly.wind_speed_500hPa.slice(targetIndex),
             wind_direction_500hPa: data.hourly.wind_direction_500hPa.slice(targetIndex),
             geopotential_height_500hPa: data.hourly.geopotential_height_500hPa.slice(targetIndex),
+            temperature_400hPa: data.hourly.temperature_400hPa.slice(targetIndex),
+            relative_humidity_400hPa: data.hourly.relative_humidity_400hPa.slice(targetIndex),
+            wind_speed_400hPa: data.hourly.wind_speed_400hPa.slice(targetIndex),
+            wind_direction_400hPa: data.hourly.wind_direction_400hPa.slice(targetIndex),
+            geopotential_height_400hPa: data.hourly.geopotential_height_400hPa.slice(targetIndex),
             temperature_300hPa: data.hourly.temperature_300hPa.slice(targetIndex),
             relative_humidity_300hPa: data.hourly.relative_humidity_300hPa.slice(targetIndex),
             wind_speed_300hPa: data.hourly.wind_speed_300hPa.slice(targetIndex),
             wind_direction_300hPa: data.hourly.wind_direction_300hPa.slice(targetIndex),
             geopotential_height_300hPa: data.hourly.geopotential_height_300hPa.slice(targetIndex),
+            temperature_250hPa: data.hourly.temperature_250hPa.slice(targetIndex),
+            relative_humidity_250hPa: data.hourly.relative_humidity_250hPa.slice(targetIndex),
+            wind_speed_250hPa: data.hourly.wind_speed_250hPa.slice(targetIndex),
+            wind_direction_250hPa: data.hourly.wind_direction_250hPa.slice(targetIndex),
+            geopotential_height_250hPa: data.hourly.geopotential_height_250hPa.slice(targetIndex),
             temperature_200hPa: data.hourly.temperature_200hPa.slice(targetIndex),
             relative_humidity_200hPa: data.hourly.relative_humidity_200hPa.slice(targetIndex),
             wind_speed_200hPa: data.hourly.wind_speed_200hPa.slice(targetIndex),
@@ -341,7 +353,7 @@ async function fetchWeather(lat, lon) {
             wind_direction_10m: weatherData.wind_direction_10m
         });
         console.group('Pressure Level Data (filtered)');
-        const pressureLevels = ['1000hPa', '950hPa', '925hPa', '900hPa', '850hPa', '800hPa', '700hPa', '500hPa', '300hPa', '200hPa'];
+        const pressureLevels = ['1000hPa', '950hPa', '925hPa', '900hPa', '850hPa', '800hPa', '700hPa', '500hPa', '400hPa', '300hPa', '250hPa', '200hPa'];
         pressureLevels.forEach(level => {
             console.group(level);
             console.table({
@@ -473,10 +485,23 @@ async function checkAvailableModels(lat, lon) {
 }
 
 function calculateDewpoint(temp, rh) {
-    const a = 17.27;
-    const b = 237.7;
-    const alpha = (a * temp) / (b + temp) + Math.log(rh / 100);
-    const dewpoint = (b * alpha) / (a - alpha);
+    const aLiquid = 17.27;  // Coefficient for liquid water
+    const bLiquid = 237.7;  // Constant for liquid water (°C)
+    const aIce = 21.87;     // Coefficient for ice
+    const bIce = 265.5;     // Constant for ice (°C)
+
+    let alpha, dewpoint;
+
+    if (temp >= 0) {
+        // Magnus formula for liquid water (T ≥ 0°C)
+        alpha = (aLiquid * temp) / (bLiquid + temp) + Math.log(rh / 100);
+        dewpoint = (bLiquid * alpha) / (aLiquid - alpha);
+    } else {
+        // Magnus formula for ice (T < 0°C)
+        alpha = (aIce * temp) / (bIce + temp) + Math.log(rh / 100);
+        dewpoint = (bIce * alpha) / (aIce - alpha);
+    }
+
     return dewpoint.toFixed(0);
 }
 
@@ -520,7 +545,7 @@ function interpolateWeatherData(index) {
     const step = parseInt(document.getElementById('interpStepSelect').value) || 200;
     const refLevel = document.getElementById('refLevelSelect').value || 'AGL';
     const baseHeight = Math.round(lastAltitude);
-    const levels = ['200 hPa', '300 hPa', '500 hPa', '700 hPa', '800 hPa', '850 hPa', '900 hPa', '925 hPa', '950 hPa', '1000 hPa'];
+    const levels = ['200 hPa', '250hPa', '300 hPa', '400hPa', '500 hPa', '700 hPa', '800 hPa', '850 hPa', '900 hPa', '925 hPa', '950 hPa', '1000 hPa'];
 
     const surfaceHeight = refLevel === 'AGL' ? 0 : baseHeight;
     const dataPoints = [
@@ -553,7 +578,7 @@ function interpolateWeatherData(index) {
     const maxHeight = dataPoints[dataPoints.length - 1].height;
     const interpolated = [];
 
-    const pressureLevels = [200, 300, 500, 700, 800, 850, 900, 925, 950, 1000];
+    const pressureLevels = [200, 250, 300, 400, 500, 700, 800, 850, 900, 925, 950, 1000];
     const pressureHeights = levels.map(level => {
         const levelKey = level.replace(' ', '');
         return weatherData[`geopotential_height_${levelKey}`]?.[index] || null;
