@@ -385,9 +385,8 @@ async function fetchWeather(lat, lon) {
                         console.error(`Final UI mismatch: Displayed ${displayedTime} but expected ${expectedTime}, forcing correction`);
                         slider.value = 0;
                         updateWeatherDisplay(0);
-                        // Manually set the DOM with raw input time as fallback
                         document.getElementById('selectedTime').innerHTML = `Selected Time: ${weatherData.time[0].replace('T', ' ').slice(0, -3)}Z`;
-                        document.getElementById('info').innerHTML = ''; // Clear and re-render
+                        document.getElementById('info').innerHTML = '';
                         updateWeatherDisplay(0);
                     }
                     slider.disabled = false;
@@ -675,6 +674,13 @@ function Mittelwind(Höhe, xKomponente, yKomponente, Untergrenze, Obergrenze) {
     xSchicht.push(xUntergrenze);
     ySchicht.push(yUntergrenze);
 
+    // Sort arrays in descending order of height
+    const indices = hSchicht.map((_, idx) => idx);
+    indices.sort((a, b) => hSchicht[b] - hSchicht[a]); // Descending order
+    hSchicht = indices.map(i => hSchicht[i]);
+    xSchicht = indices.map(i => xSchicht[i]);
+    ySchicht = indices.map(i => ySchicht[i]);
+
     let xTrapez = 0;
     let yTrapez = 0;
     for (let i = 0; i < hSchicht.length - 1; i++) {
@@ -700,33 +706,50 @@ function roundToTens(value) {
 function calculateMeanWind() {
     const index = document.getElementById('timeSlider').value || 0;
     const interpolatedData = interpolateWeatherData(index);
-    const lowerLimit = parseFloat(document.getElementById('lowerLimit').value) || 0;
-    const upperLimit = parseFloat(document.getElementById('upperLimit').value) || 3000;
+    let lowerLimitInput = parseFloat(document.getElementById('lowerLimit').value) || 0;
+    let upperLimitInput = parseFloat(document.getElementById('upperLimit').value) || 3000;
     const refLevel = document.getElementById('refLevelSelect').value || 'AGL';
+    const baseHeight = Math.round(lastAltitude);
 
-    if (isNaN(lowerLimit) || isNaN(upperLimit) || lowerLimit >= upperLimit) {
+    console.log('refLevel in calculateMeanWind:', refLevel); // Debug log
+
+    if (lastAltitude === 'N/A') {
+        displayError('Terrain altitude unavailable. Cannot calculate mean wind.');
+        return;
+    }
+
+    if (isNaN(lowerLimitInput) || isNaN(upperLimitInput) || lowerLimitInput >= upperLimitInput) {
         displayError('Invalid layer limits. Ensure Lower < Upper and both are numbers.');
         return;
     }
 
-    const baseHeight = Math.round(lastAltitude);
-    const heights = interpolatedData.map(d => refLevel === 'AGL' ? d.displayHeight + baseHeight : d.displayHeight);
-    const dirs = interpolatedData.map(d => parseFloat(d.dir) || 0); // Fallback to 0 if NaN
-    const spds = interpolatedData.map(d => parseFloat(d.spd) || 0); // Fallback to 0 if NaN
+    // Enforce minimum lower limit in ASL/AMSL mode
+    if ((refLevel === 'ASL' || refLevel === 'AMSL') && lowerLimitInput < baseHeight) {
+        displayError(`Lower limit adjusted to terrain altitude (${baseHeight} m ${refLevel}) as it cannot be below ground level in ${refLevel} mode.`);
+        lowerLimitInput = baseHeight;
+        document.getElementById('lowerLimit').value = lowerLimitInput; // Update input field
+    }
 
-    // Correct u, v components for wind blowing from
-    const xKomponente = spds.map((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180)); // u (east-west)
-    const yKomponente = spds.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180)); // v (north-south)
+    // Adjust limits based on reference level
+    const lowerLimit = refLevel === 'AGL' ? lowerLimitInput + baseHeight : lowerLimitInput;
+    const upperLimit = refLevel === 'AGL' ? upperLimitInput + baseHeight : upperLimitInput;
+
+    const heights = interpolatedData.map(d => refLevel === 'AGL' ? d.displayHeight + baseHeight : d.displayHeight);
+    const dirs = interpolatedData.map(d => parseFloat(d.dir) || 0);
+    const spds = interpolatedData.map(d => parseFloat(d.spd) || 0);
+
+    const xKomponente = spds.map((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
+    const yKomponente = spds.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
 
     const meanWind = Mittelwind(heights, xKomponente, yKomponente, lowerLimit, upperLimit);
     const [dir, spd] = meanWind;
 
-    const roundedDir = roundToTens(dir); // Round mean wind direction to tens
-    const result = `Mean wind (${lowerLimit}-${upperLimit} m ${refLevel}): ${roundedDir}° ${spd.toFixed(0)} kt`;
+    const roundedDir = roundToTens(dir);
+    const result = `Mean wind (${lowerLimitInput}-${upperLimitInput} m ${refLevel}): ${roundedDir}° ${spd.toFixed(0)} kt`;
     const meanWindResult = document.getElementById('meanWindResult');
     if (meanWindResult) {
         meanWindResult.innerHTML = result;
-        console.log('Calculated Mean Wind:', result, 'u:', meanWind[2], 'v:', meanWind[3]);
+        console.log('Calculated Mean Wind:', result, 'u:', meanWind[2], 'v:', meanWind[3], 'Adjusted Limits:', { lowerLimit, upperLimit });
     } else {
         console.error('Mean wind result element not found');
     }
