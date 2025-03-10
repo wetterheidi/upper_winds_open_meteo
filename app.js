@@ -189,29 +189,49 @@ async function fetchWeather(lat, lon) {
         const metaData = await metaResponse.json();
 
         const runDate = new Date(metaData.last_run_initialisation_time * 1000);
-        const now = new Date();
+        const utcNow = new Date(Date.UTC(
+            new Date().getUTCFullYear(),
+            new Date().getUTCMonth(),
+            new Date().getUTCDate(),
+            new Date().getUTCHours(),
+            new Date().getUTCMinutes(),
+            new Date().getUTCSeconds()
+        ));
         const year = runDate.getUTCFullYear();
         const month = String(runDate.getUTCMonth() + 1).padStart(2, '0');
         const day = String(runDate.getUTCDate()).padStart(2, '0');
         const hour = String(runDate.getUTCHours()).padStart(2, '0');
         const minute = String(runDate.getUTCMinutes()).padStart(2, '0');
-        lastModelRun = `${year}-${month}-${day} ${hour}${minute}`;
-        console.log('Model Run Time:', lastModelRun, runDate);
+        lastModelRun = `${year}-${month}-${day} ${hour}${minute}Z`;
+        console.log('Model Run Time (UTC):', lastModelRun, runDate);
 
-        let startDate = runDate;
-        if (runDate > now) {
-            startDate = new Date(now);
-            console.warn(`Run time ${lastModelRun} is in the future; using current date instead.`);
+        // Calculate forecast start time with proper day increment
+        let newHour = (runDate.getUTCHours() + 6) % 24;
+        let newDay = runDate.getUTCDate() + Math.floor((runDate.getUTCHours() + 6) / 24);
+        let newMonth = runDate.getUTCMonth();
+        let newYear = runDate.getUTCFullYear();
+        if (newDay > new Date(newYear, newMonth + 1, 0).getUTCDate()) {
+            newDay = 1;
+            newMonth = (newMonth + 1) % 12;
+            if (newMonth === 0) newYear++;
+        }
+        let startDate = new Date(Date.UTC(newYear, newMonth, newDay, newHour));
+        console.log('Calculated startDate:', startDate.toISOString()); // Debug
+        if (startDate > utcNow) {
+            console.warn(`Forecast start ${formatTime(startDate.toISOString())} is in the future; using current UTC date instead.`);
+            startDate = utcNow;
         }
         const startYear = startDate.getUTCFullYear();
         const startMonth = String(startDate.getUTCMonth() + 1).padStart(2, '0');
         const startDay = String(startDate.getUTCDate()).padStart(2, '0');
         const startDateStr = `${startYear}-${startMonth}-${startDay}`;
-        console.log('Start Date:', startDateStr);
+        console.log('Forecast Start Date (UTC):', startDateStr);
 
-        const endDate = new Date(startDate);
-        const forecastDays = modelSelect.value === 'icon_d2' ? 2 : 7;
-        endDate.setUTCDate(endDate.getUTCDate() + forecastDays);
+        const endDate = new Date(Date.UTC(
+            startDate.getUTCFullYear(),
+            startDate.getUTCMonth(),
+            startDate.getUTCDate() + (modelSelect.value === 'icon_d2' ? 2 : 7)
+        ));
         const endYear = endDate.getUTCFullYear();
         const endMonth = String(endDate.getUTCMonth() + 1).padStart(2, '0');
         const endDay = String(endDate.getUTCDate()).padStart(2, '0');
@@ -231,7 +251,7 @@ async function fetchWeather(lat, lon) {
             `temperature_200hPa,relative_humidity_200hPa,wind_speed_200hPa,wind_direction_200hPa,geopotential_height_200hPa` +
             `&models=${modelSelect.value}&start_date=${startDateStr}&end_date=${endDateStr}`;
 
-        console.log('Fetching weather from:', url);
+            console.log('Fetching weather from (UTC):', url);
         const response = await fetch(url);
 
         if (!response.ok) {
@@ -240,12 +260,11 @@ async function fetchWeather(lat, lon) {
         }
 
         const data = await response.json();
-
-        // Use the first time from the API response instead of a fixed target
-        const targetIndex = 0; // Start from the first available time
+        console.log('Raw API Response:', data); // Debug
+        const targetIndex = 0;
         const firstTime = data.hourly.time[targetIndex];
-        console.log(`Using first available time: ${firstTime} at index: ${targetIndex}`);
-
+        console.log(`Using first available time (UTC): ${firstTime} at index: ${targetIndex}`);
+    
         // Slice the data starting from the first time
         weatherData = {
             time: data.hourly.time.slice(targetIndex),
@@ -304,6 +323,12 @@ async function fetchWeather(lat, lon) {
             wind_direction_200hPa: data.hourly.wind_direction_200hPa.slice(targetIndex),
             geopotential_height_200hPa: data.hourly.geopotential_height_200hPa.slice(targetIndex)
         } || {};
+
+         // Validate UTC
+         if (weatherData.time && weatherData.time.length > 0 && !weatherData.time[0].endsWith('Z')) {
+            console.warn('Weather data time not in UTC format:', weatherData.time[0]);
+        }
+        console.log('WeatherData times (UTC):', weatherData.time.slice(0, 5)); // First 5 times
 
         // Log the filtered weatherData
         console.group('Filtered weatherData (After Slicing)');
@@ -389,9 +414,9 @@ function updateWeatherDisplay(index) {
         return;
     }
 
-    console.log('updateWeatherDisplay called with index:', index, 'time from weatherData:', weatherData.time[index]);
-    const time = formatTime(weatherData.time[index]);
-    console.log('Formatted time for display:', time);
+    console.log('updateWeatherDisplay called with index:', index, 'time from weatherData (UTC):', weatherData.time[index]);
+    const time = formatTime(weatherData.time[index]); // Already UTC
+    console.log('Formatted time for display (UTC):', time);
 
     const interpolatedData = interpolateWeatherData(index);
     let output = `<table border="1" style="border-collapse: collapse; width: 100%;">`;
@@ -403,9 +428,7 @@ function updateWeatherDisplay(index) {
 
     output += `</table>`;
     document.getElementById('info').innerHTML = output;
-    document.getElementById('selectedTime').innerHTML = `Selected Time: ${time}`;
-
-    calculateMeanWind();
+    document.getElementById('selectedTime').innerHTML = `Selected Time: ${time}`; // UTC
 }
 
 async function checkAvailableModels(lat, lon) {
@@ -710,8 +733,8 @@ function calculateMeanWind() {
 }
 
 function formatTime(timeStr) {
-    console.log('Formatting time:', timeStr); // Debug log to confirm execution
-    // Parse as UTC explicitly using Date.UTC
+    console.log('Formatting time:', timeStr); // Debug log
+    // Parse as UTC explicitly
     const date = new Date(Date.UTC(
         parseInt(timeStr.slice(0, 4)), // Year
         parseInt(timeStr.slice(5, 7)) - 1, // Month (0-based)
@@ -724,7 +747,7 @@ function formatTime(timeStr) {
     const day = String(date.getUTCDate()).padStart(2, '0');
     const hour = String(date.getUTCHours()).padStart(2, '0');
     const minute = String(date.getUTCMinutes()).padStart(2, '0');
-    return `${year}-${month}-${day} ${hour}${minute}Z`;
+    return `${year}-${month}-${day} ${hour}${minute}Z`; // Explicit UTC marker
 }
 
 function downloadTableAsAscii() {
@@ -735,7 +758,7 @@ function downloadTableAsAscii() {
 
     const index = document.getElementById('timeSlider').value || 0;
     const model = document.getElementById('modelSelect').value.toUpperCase();
-    const time = formatTime(weatherData.time[index]).replace(' ', '_');
+    const time = formatTime(weatherData.time[index]).replace(' ', '_'); // UTC
     const filename = `${time}_${model}_HEIDIS.txt`;
 
     const interpolatedData = interpolateWeatherData(index);
