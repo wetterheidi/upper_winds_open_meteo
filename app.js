@@ -1,4 +1,4 @@
-const MAPBOX_API_KEY = 'pk.eyJ1Ijoid2V0dGVyaGVpZGkiLCJhIjoiY203dXNrZWRyMDN4bzJwb2pkbmI5ZXh4diJ9.tZkGHqinrfyNFC-8afYMzA';
+const MAPBOX_API_KEY = 'pk.eyJ1Ijoid2V0dGVyaGVpZGkiLCJhIjoiY204NHRjcTQyMGhrajJwcGd2cDk4c3BueSJ9.1Bp6N2umWQEKAT1GZlOAHQ'; // github.io token
 mapboxgl.accessToken = MAPBOX_API_KEY;
 
 let map;

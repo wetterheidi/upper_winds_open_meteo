@@ -1,6 +1,6 @@
 # Upper Winds - OpenMeteo
 
-A web app to visualize upper-level wind, temperature, dewpoint, and pressure data using Mapbox and OpenMeteo.
+A web app to visualize upper-level wind and temperature data using Mapbox and OpenMeteo.
 
 ## Setup
 1. Clone the repo: `git clone https://github.com/wetterheidi/upper_winds_open_meteo.git`
@@ -11,11 +11,11 @@ A web app to visualize upper-level wind, temperature, dewpoint, and pressure dat
 - Interactive Map: Zoomable Mapbox map with satellite-streets style.
 - Weather Data: Click the map to fetch coordinates, altitude, and hourly weather data for various pressure levels.
 - Model Selection: Choose from available forecast models (e.g., ICON GLOBAL, GFS, ECMWF) via a dropdown menu.
-Dropdown is always visible in #model-row with an info button (ℹ️) on the right showing model run details.
+Dropdown is always visible with an info button (ℹ️) on the right showing model run details.
 - Time Slider: Navigate hourly forecasts up to 7 days (or 2 days for ICON D2).
 - Mean Wind Calculation: Compute average wind speed and direction between user-defined altitude layers.
-- Data Download: Export weather data as an ASCII text file.
-- Error Handling: Displays errors with a solid light red background (#ffcccc) at the top of the page.
+- Data Download: Export weather data (wind, temperature, dewpoint and pressure) as an ASCII text file.
+- Error Handling: Displays errors with a solid light red background at the top of the page.
 
 ## Dependencies
 - Mapbox GL JS: Loaded via CDN (https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js).
@@ -52,12 +52,16 @@ The app uses the OpenMeteo API to retrieve weather data.
 - 850 hPa (~1500m)
 - 800 hPa (~2000m)
 - 700 hPa (~3000m)
+- 600 hPa (~4200m)
 - 500 hPa (~5500m)
+- 400 hPa (~7000m)
 - 300 hPa (~9000m)
+- 250 hPa (~10000m)
 - 200 hPa (~12000m)
 
 ## Recent Changes
-- Model Selection UI: Replaced static model text with a persistent dropdown (#modelSelect) in #model-row, with the info button (#modelInfoButton) positioned to its right.
-- Error Display: Fixed error bar to use a solid #ffcccc background with black text, ensuring map visibility is blocked behind it.
-- Dropdown Visibility: Adjusted z-index values (#modelSelect at 1500, #modelInfoPopup at 1200) to ensure the dropdown menu appears above the info popup and button.
-- Code Cleanup: Removed #model-display from index.html and updated app.js to rely solely on #modelSelect for model selection logic.
+- This is the first release.
+
+## Warning
+
+Although I've tested the output, be careful when using the data. Be aware that the data might be incorrect.
