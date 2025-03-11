@@ -271,25 +271,49 @@ async function fetchWeather(lat, lon, currentTime = null) {
         // Identify the last valid index where key data are non-null
         const keyVariables = [
             'temperature_2m', 'relative_humidity_2m', 'wind_speed_10m', 'wind_direction_10m', // Surface data
-            'temperature_850hPa', 'wind_speed_850hPa', 'wind_direction_850hPa', // Representative pressure level
-            'geopotential_height_850hPa' // Ensure height data for interpolation
+            'temperature_1000hPa', 'relative_humidity_1000hPa', 'wind_speed_1000hPa', 'wind_direction_1000hPa', 'geopotential_height_1000hPa',
+            'temperature_950hPa', 'relative_humidity_950hPa', 'wind_speed_950hPa', 'wind_direction_950hPa', 'geopotential_height_950hPa',
+            'temperature_925hPa', 'relative_humidity_925hPa', 'wind_speed_925hPa', 'wind_direction_925hPa', 'geopotential_height_925hPa',
+            'temperature_900hPa', 'relative_humidity_900hPa', 'wind_speed_900hPa', 'wind_direction_900hPa', 'geopotential_height_900hPa',
+            'temperature_850hPa', 'relative_humidity_850hPa', 'wind_speed_850hPa', 'wind_direction_850hPa', 'geopotential_height_850hPa',
+            'temperature_800hPa', 'relative_humidity_800hPa', 'wind_speed_800hPa', 'wind_direction_800hPa', 'geopotential_height_800hPa',
+            'temperature_700hPa', 'relative_humidity_700hPa', 'wind_speed_700hPa', 'wind_direction_700hPa', 'geopotential_height_700hPa',
+            'temperature_600hPa', 'relative_humidity_600hPa', 'wind_speed_600hPa', 'wind_direction_600hPa', 'geopotential_height_600hPa',
+            'temperature_500hPa', 'relative_humidity_500hPa', 'wind_speed_500hPa', 'wind_direction_500hPa', 'geopotential_height_500hPa',
+            'temperature_400hPa', 'relative_humidity_400hPa', 'wind_speed_400hPa', 'wind_direction_400hPa', 'geopotential_height_400hPa',
+            'temperature_300hPa', 'relative_humidity_300hPa', 'wind_speed_300hPa', 'wind_direction_300hPa', 'geopotential_height_300hPa',
+            'temperature_250hPa', 'relative_humidity_250hPa', 'wind_speed_250hPa', 'wind_direction_250hPa', 'geopotential_height_250hPa',
+            'temperature_200hPa', 'relative_humidity_200hPa', 'wind_speed_200hPa', 'wind_direction_200hPa', 'geopotential_height_200hPa'
         ];
-        let lastValidIndex = data.hourly.time.length - 1;
-        for (let i = lastValidIndex; i >= 0; i--) {
+
+        // Corrected truncation logic
+        let lastValidIndex = -1; // Initialize to -1 to handle the case where no valid index is found
+        for (let i = data.hourly.time.length - 1; i >= 0; i--) {
             const allValid = keyVariables.every(variable => {
                 const value = data.hourly[variable]?.[i];
                 return value !== null && value !== undefined && !isNaN(value);
             });
-            if (!allValid) {
-                lastValidIndex = i;
-            } else {
+            if (allValid) {
+                lastValidIndex = i; // Set to the last fully valid index
                 break; // Stop at the first fully valid index from the end
+            } else {
+                const failingVars = keyVariables.filter(variable => {
+                    const value = data.hourly[variable]?.[i];
+                    return value === null || value === undefined || isNaN(value);
+                });
+                console.warn(`Invalid data at index ${i} due to null values in:`, failingVars);
             }
         }
-        lastValidIndex = Math.max(0, lastValidIndex); // Ensure we don't go below 0
+
+        // If no valid index was found, default to 0 and slice up to 1 to avoid empty data
+        if (lastValidIndex === -1) {
+            console.warn('No valid data found in the entire dataset; defaulting to first index.');
+            lastValidIndex = 0;
+        }
+
         console.log('Last valid index after truncation:', lastValidIndex, 'Original length:', data.hourly.time.length);
 
-        // Slice the data starting from targetIndex up to the last valid index
+        // Slice the data starting from targetIndex up to the last valid index (inclusive)
         weatherData = {
             time: data.hourly.time.slice(targetIndex, lastValidIndex + 1),
             temperature_2m: data.hourly.temperature_2m?.slice(targetIndex, lastValidIndex + 1) || [],
@@ -632,23 +656,36 @@ function interpolateWeatherData(index) {
         }
     ];
 
+    console.log(`Surface data at index ${index}:`, {
+        temp: weatherData.temperature_2m?.[index],
+        rh: weatherData.relative_humidity_2m?.[index],
+        dir: weatherData.wind_direction_10m?.[index],
+        spd: weatherData.wind_speed_10m?.[index]
+    });
+
     levels.forEach(level => {
         const levelKey = level.replace(' ', '');
         const gh = weatherData[`geopotential_height_${levelKey}`]?.[index];
         if (gh !== undefined && gh !== null && !isNaN(gh)) {
-            dataPoints.push({
+            const point = {
                 level: level,
                 height: Math.round(gh),
                 temp: weatherData[`temperature_${levelKey}`]?.[index],
                 rh: weatherData[`relative_humidity_${levelKey}`]?.[index],
                 dir: weatherData[`wind_direction_${levelKey}`]?.[index],
                 spd: weatherData[`wind_speed_${levelKey}`]?.[index] * 0.539957
-            });
+            };
+            dataPoints.push(point);
+            console.log(`Added ${level} at index ${index}:`, point);
+        } else {
+            console.log(`Skipped ${level} at index ${index} due to invalid geopotential_height:`, gh);
         }
     });
 
+    console.log(`Total dataPoints at index ${index}:`, dataPoints.length, dataPoints);
+
     if (dataPoints.length < 2 || dataPoints.every(dp => dp.temp === undefined || dp.dir === undefined || dp.spd === undefined)) {
-        console.warn('Insufficient or invalid data at index:', index);
+        console.warn('Insufficient or invalid data at index:', index, 'dataPoints:', dataPoints);
         return [{ displayHeight: 0, dir: NaN, spd: 0, temp: '-' }]; // Return minimal data to trigger table
     }
 
