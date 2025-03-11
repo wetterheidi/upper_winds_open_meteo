@@ -399,8 +399,8 @@ async function fetchWeather(lat, lon, currentTime = null) {
         slider.value = newSliderIndex;
         console.log('Slider set to index:', slider.value, 'corresponding to:', weatherData.time[slider.value]);
 
-        // Update UI with the selected time
-        updateWeatherDisplay(newSliderIndex);
+        // Update UI with the selected time and original requested time
+        updateWeatherDisplay(newSliderIndex, currentTime); // Pass currentTime for range check
         console.log('UI updated with index:', newSliderIndex, 'time:', weatherData.time[newSliderIndex]);
 
         // Single validation after delay
@@ -410,10 +410,10 @@ async function fetchWeather(lat, lon, currentTime = null) {
             if (displayedTime !== expectedTime) {
                 console.error(`UI mismatch: Displayed ${displayedTime} but expected ${expectedTime}, forcing correction`);
                 slider.value = newSliderIndex;
-                updateWeatherDisplay(newSliderIndex);
+                updateWeatherDisplay(newSliderIndex, currentTime); // Pass currentTime
                 document.getElementById('selectedTime').innerHTML = `Selected Time: ${weatherData.time[newSliderIndex].replace('T', ' ').slice(0, -3)}Z`;
                 document.getElementById('info').innerHTML = '';
-                updateWeatherDisplay(newSliderIndex);
+                updateWeatherDisplay(newSliderIndex, currentTime);
             }
             slider.disabled = false;
         }, 2000);
@@ -429,11 +429,23 @@ async function fetchWeather(lat, lon, currentTime = null) {
     }
 }
 
-function updateWeatherDisplay(index) {
+function updateWeatherDisplay(index, originalTime = null) {
     if (!weatherData || !weatherData.time || !weatherData.time[index]) {
         console.error('No weather data available for index:', index);
         document.getElementById('info').innerHTML = 'No weather data available';
         document.getElementById('selectedTime').innerHTML = 'Selected Time: ';
+        return;
+    }
+
+    // Validate that the original requested time is within the forecast range
+    const lastValidIndex = weatherData.time.length - 1;
+    const lastAvailableTime = new Date(weatherData.time[lastValidIndex]);
+    if (originalTime && new Date(originalTime) > lastAvailableTime) {
+        const formattedLastTime = formatTime(weatherData.time[lastValidIndex]);
+        displayError(`Forecast only available until ${formattedLastTime}. Please select an earlier time.`);
+        const slider = document.getElementById('timeSlider');
+        slider.value = lastValidIndex; // Reset to the last valid time
+        updateWeatherDisplay(lastValidIndex); // Update UI with the last valid time
         return;
     }
 
@@ -585,6 +597,11 @@ function interpolateWeatherData(index) {
             });
         }
     });
+
+    if (dataPoints.length < 2 || dataPoints.every(dp => dp.temp === undefined || dp.dir === undefined || dp.spd === undefined)) {
+        console.warn('Insufficient or invalid data at index:', index);
+        return [{ displayHeight: 0, dir: NaN, spd: 0, temp: '-' }]; // Return minimal data to trigger table
+    }
 
     dataPoints.sort((a, b) => a.height - b.height);
     const maxHeight = dataPoints[dataPoints.length - 1].height;
