@@ -36,7 +36,7 @@ function initMap() {
                 const altitude = await getAltitude(lastLng, lastLat); // Wait for altitude
                 lastAltitude = altitude !== null ? altitude : 'N/A';
         
-                const popup = L.popup({ offset: [0, -25] })
+                const popup = L.popup({ offset: [0,0] })
                     .setLatLng(userCoords)
                     .setContent(`Lat: ${lastLat.toFixed(4)}<br>Lng: ${lastLng.toFixed(4)}<br>Alt: ${lastAltitude}m`);
         
