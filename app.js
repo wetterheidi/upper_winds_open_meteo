@@ -1,7 +1,3 @@
-const MAPBOX_API_KEY = 'sk.eyJ1Ijoid2V0dGVyaGVpZGkiLCJhIjoiY204NHUwajJ4MTJqdjJsb3BpMncydmRsNCJ9.isBMZOcC6_K851KAmd4Abw'; // github.io token
-//const MAPBOX_API_KEY = 'pk.eyJ1Ijoid2V0dGVyaGVpZGkiLCJhIjoiY203dXNrZWRyMDN4bzJwb2pkbmI5ZXh4diJ9.tZkGHqinrfyNFC-8afYMzA'; // general token
-mapboxgl.accessToken = MAPBOX_API_KEY;
-
 let map;
 let weatherData = null;
 let lastLat = null;
@@ -12,52 +8,47 @@ let lastModelRun = null;
 
 // Initialize the map and center it on the user's location if available
 function initMap() {
-    // Default coordinates (near Herrsching am Ammersee, Germany)
-    const defaultCenter = [11.1923, 48.0179];
+    // Default coordinates (Herrsching am Ammersee, Germany)
+    const defaultCenter = [48.0179, 11.1923]; // Corrected to [lat, lng]
     const defaultZoom = 10;
 
-    // Initialize the map with default settings
-    map = new mapboxgl.Map({
-        container: 'map',
-        style: 'mapbox://styles/mapbox/satellite-streets-v12',
-        center: defaultCenter,
-        zoom: defaultZoom
-    });
+    // Initialize the map without immediate setView
+    map = L.map('map');
+
+    // Add OpenStreetMap tiles
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
 
     // Attempt to get the user's current position
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
             async (position) => {
-                const userCoords = [position.coords.longitude, position.coords.latitude];
-                // Center the map on the user's location
-                map.setCenter(userCoords);
-                map.setZoom(defaultZoom); // Keep the same zoom level
-
-                // Add a marker at the user's location
+                const userCoords = [position.coords.latitude, position.coords.longitude];
+                map.setView(userCoords, defaultZoom);
+        
                 if (currentMarker) {
                     currentMarker.remove();
                 }
                 lastLat = position.coords.latitude;
                 lastLng = position.coords.longitude;
-                const altitude = await getAltitude(lastLng, lastLat);
-                lastAltitude = altitude;
-
-                const popup = new mapboxgl.Popup({ offset: 25 })
-                    .setHTML(`Lat: ${lastLat.toFixed(4)}<br>Lng: ${lastLng.toFixed(4)}<br>Alt: ${altitude}m`);
-
-                currentMarker = new mapboxgl.Marker({ color: '#FF0000' }) // Red marker for user location
-                    .setLngLat(userCoords)
-                    .setPopup(popup)
-                    .addTo(map);
-
-                currentMarker.togglePopup();
-
-                // Fetch weather data for the user's location
+                const altitude = await getAltitude(lastLng, lastLat); // Wait for altitude
+                lastAltitude = altitude !== null ? altitude : 'N/A';
+        
+                const popup = L.popup({ offset: [0, -25] })
+                    .setLatLng(userCoords)
+                    .setContent(`Lat: ${lastLat.toFixed(4)}<br>Lng: ${lastLng.toFixed(4)}<br>Alt: ${lastAltitude}m`);
+        
+                currentMarker = L.marker(userCoords, { color: '#FF0000' })
+                    .bindPopup(popup)
+                    .addTo(map)
+                    .openPopup();
+        
                 document.getElementById('info').innerHTML = `Fetching weather and models...`;
                 const availableModels = await checkAvailableModels(lastLat, lastLng);
                 if (availableModels.length > 0) {
                     await fetchWeather(lastLat, lastLng);
-                    // After weather data is fetched and displayed, calculate mean wind
                     if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
                         calculateMeanWind();
                     }
@@ -66,19 +57,17 @@ function initMap() {
                 }
             },
             (error) => {
-                // Handle geolocation errors
                 console.warn(`Geolocation error: ${error.message}`);
                 displayError('Unable to retrieve your location. Using default location (Herrsching am Ammersee).');
-                // Fetch weather for default location and calculate mean wind
-                lastLat = defaultCenter[1];
-                lastLng = defaultCenter[0];
+                map.setView(defaultCenter, defaultZoom); // Fallback to default
+                lastLat = defaultCenter[0];
+                lastLng = defaultCenter[1];
                 getAltitude(lastLng, lastLat).then(async (altitude) => {
-                    lastAltitude = altitude;
+                    lastAltitude = altitude !== null ? altitude : 'N/A';
                     document.getElementById('info').innerHTML = `Fetching weather and models...`;
                     const availableModels = await checkAvailableModels(lastLat, lastLng);
                     if (availableModels.length > 0) {
                         await fetchWeather(lastLat, lastLng);
-                        // After weather data is fetched and displayed, calculate mean wind
                         if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
                             calculateMeanWind();
                         }
@@ -89,23 +78,22 @@ function initMap() {
             },
             {
                 enableHighAccuracy: true,
-                timeout: 10000, // 10 seconds timeout
+                timeout: 10000,
                 maximumAge: 0
             }
         );
     } else {
-        // Geolocation not supported by the browser
         console.warn('Geolocation is not supported by this browser.');
         displayError('Geolocation not supported. Using default location (Herrsching am Ammersee).');
-        lastLat = defaultCenter[1];
-        lastLng = defaultCenter[0];
+        map.setView(defaultCenter, defaultZoom); // Set default if geolocation unsupported
+        lastLat = defaultCenter[0];
+        lastLng = defaultCenter[1];
         getAltitude(lastLng, lastLat).then(async (altitude) => {
-            lastAltitude = altitude;
+            lastAltitude = altitude !== null ? altitude : 'N/A';
             document.getElementById('info').innerHTML = `Fetching weather and models...`;
             const availableModels = await checkAvailableModels(lastLat, lastLng);
             if (availableModels.length > 0) {
                 await fetchWeather(lastLat, lastLng);
-                // After weather data is fetched and displayed, calculate mean wind
                 if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
                     calculateMeanWind();
                 }
@@ -117,32 +105,29 @@ function initMap() {
 
     // Add click event listener for manual map interaction
     map.on('click', async (e) => {
-        const { lng, lat } = e.lngLat;
+        const { lat, lng } = e.latlng;
         lastLat = lat;
         lastLng = lng;
-        const altitude = await getAltitude(lng, lat);
-        lastAltitude = altitude;
-
+        const altitude = await getAltitude(lat, lng); // Use updated getAltitude
+        lastAltitude = altitude !== null ? altitude : 'N/A';
+    
         if (currentMarker) {
             currentMarker.remove();
         }
-
-        const popup = new mapboxgl.Popup({ offset: 25 })
-            .setHTML(`Lat: ${lat.toFixed(4)}<br>Lng: ${lng.toFixed(4)}<br>Alt: ${altitude}m`);
-
-        currentMarker = new mapboxgl.Marker()
-            .setLngLat([lng, lat])
-            .setPopup(popup)
-            .addTo(map);
-
-        currentMarker.togglePopup();
-
+    
+        const popup = L.popup({ offset: [0, -25] })
+            .setLatLng([lat, lng])
+            .setContent(`Lat: ${lat.toFixed(4)}<br>Lng: ${lng.toFixed(4)}<br>Alt: ${lastAltitude}m`);
+    
+        currentMarker = L.marker([lat, lng], { color: '#FF0000' })
+            .bindPopup(popup)
+            .addTo(map)
+            .openPopup();
+    
         document.getElementById('info').innerHTML = `Fetching weather and models...`;
-
         const availableModels = await checkAvailableModels(lat, lng);
         if (availableModels.length > 0) {
             await fetchWeather(lat, lng);
-            // After weather data is fetched and displayed, calculate mean wind
             if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
                 calculateMeanWind();
             }
@@ -152,15 +137,28 @@ function initMap() {
     });
 }
 
-async function getAltitude(lng, lat) {
+async function getAltitude(lat, lng) {
     try {
-        const query = await fetch(
-            `https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2/tilequery/${lng},${lat}.json?layers=contour&access_token=${MAPBOX_API_KEY}`
+        console.log('Fetching altitude from Open-Elevation for:', { lat, lng });
+        const response = await fetch(
+            `https://api.open-elevation.com/api/v1/lookup?locations=${lat},${lng}`
         );
-        const data = await query.json();
-        return data.features[0]?.properties.ele || 'N/A';
+        console.log('API response status:', response.status);
+        if (!response.ok) {
+            throw new Error(`Elevation fetch failed: ${response.status} - ${response.statusText}`);
+        }
+        const data = await response.json();
+        console.log('API response data:', data);
+        const elevation = data.results[0]?.elevation;
+        if (elevation === undefined || elevation === null) {
+            console.warn('No elevation data returned for coordinates:', { lat, lng });
+            return 'N/A';
+        }
+        console.log('Elevation fetched:', elevation, 'm for lat:', lat, 'lng:', lng);
+        return elevation;
     } catch (error) {
-        console.error('Altitude fetch error:', error);
+        console.error('Error fetching elevation:', error.message);
+        displayError(`Could not fetch elevation data: ${error.message}`);
         return 'N/A';
     }
 }
@@ -466,7 +464,7 @@ async function fetchWeather(lat, lon, currentTime = null) {
         setTimeout(() => {
             const slider = document.getElementById('timeSlider');
             console.log('SetTimeout triggered - Slider state: min:', slider.min, 'max:', slider.max, 'value:', slider.value,
-                        'weatherData.time.length:', weatherData?.time?.length);
+                'weatherData.time.length:', weatherData?.time?.length);
             const displayedTime = document.getElementById('selectedTime').innerHTML.replace('Selected Time: ', '');
             const expectedTime = formatTime(weatherData.time[slider.value]);
             if (displayedTime !== expectedTime || !weatherData.time[slider.value]) {
@@ -507,29 +505,33 @@ function updateWeatherDisplay(index, originalTime = null) {
         document.getElementById('info').innerHTML = 'No weather data available';
         document.getElementById('selectedTime').innerHTML = 'Selected Time: ';
         const slider = document.getElementById('timeSlider');
-        if (slider) slider.value = 0; // Reset to a valid index
+        if (slider) slider.value = 0;
         return;
     }
 
-    // Validate that the original requested time is within the forecast range
     const lastValidIndex = weatherData.time.length - 1;
     const lastAvailableTime = new Date(weatherData.time[lastValidIndex]);
     if (originalTime && new Date(originalTime) > lastAvailableTime) {
         const formattedLastTime = formatTime(weatherData.time[lastValidIndex]);
         displayError(`Forecast only available until ${formattedLastTime}. Please select an earlier time.`);
         const slider = document.getElementById('timeSlider');
-        slider.value = lastValidIndex; // Reset to the last valid time
-        updateWeatherDisplay(lastValidIndex); // Update UI with the last valid time
+        slider.value = lastValidIndex;
+        updateWeatherDisplay(lastValidIndex);
         return;
     }
 
     console.log('updateWeatherDisplay called with index:', index, 'time from weatherData (UTC):', weatherData.time[index]);
-    const time = formatTime(weatherData.time[index]); // Already UTC
+    const time = formatTime(weatherData.time[index]);
     console.log('Formatted time for display (UTC):', time);
 
     const interpolatedData = interpolateWeatherData(index);
-    let output = `<table border="1" style="border-collapse: collapse; width: 100%;">`;
-    output += `<tr><th style="width: 20%;">Height (m)</th><th style="width: 20%;">Dir (°)</th><th style="width: 20%;">Spd (kt)</th><th style="width: 20%;">T (°C)</th></tr>`;
+    const refLevel = document.getElementById('refLevelSelect').value || 'AGL';
+
+    // Round lastAltitude to nearest ten for display only
+    const displayAltitude = (lastAltitude !== 'N/A' && !isNaN(lastAltitude)) ? roundToTens(Number(lastAltitude)) : 'N/A';
+    let output = `<p>Altitude: ${displayAltitude}m (${refLevel})</p>`;
+    output += `<table border="1" style="border-collapse: collapse; width: 100%;">`;
+    output += `<tr><th style="width: 20%;">Height (m ${refLevel})</th><th style="width: 20%;">Dir (°)</th><th style="width: 20%;">Spd (kt)</th><th style="width: 20%;">T (°C)</th></tr>`;
 
     interpolatedData.forEach(data => {
         output += `<tr><td>${data.displayHeight}</td><td>${roundToTens(data.dir)}</td><td>${data.spd}</td><td>${data.temp}</td></tr>`;
@@ -537,7 +539,7 @@ function updateWeatherDisplay(index, originalTime = null) {
 
     output += `</table>`;
     document.getElementById('info').innerHTML = output;
-    document.getElementById('selectedTime').innerHTML = `Selected Time: ${time}`; // UTC
+    document.getElementById('selectedTime').innerHTML = `Selected Time: ${time}`;
 }
 
 async function checkAvailableModels(lat, lon) {
@@ -985,7 +987,7 @@ document.addEventListener('DOMContentLoaded', () => {
     slider.value = 0; // Initialize to 0 (12:00Z)
     slider.setAttribute('autocomplete', 'off'); // Prevent browser autofill
     console.log('Initial slider state - min:', slider.min, 'max:', slider.max, 'value:', slider.value,
-                'weatherData.time:', weatherData?.time);
+        'weatherData.time:', weatherData?.time);
 
     // Debounce function
     function debounce(func, wait) {
@@ -1001,7 +1003,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const slider = document.getElementById('timeSlider');
         const index = parseInt(e.target.value);
         console.log('Slider input event fired - min:', slider.min, 'max:', slider.max, 'value:', index,
-                    'weatherData.time[index]:', weatherData?.time[index], 'length:', weatherData?.time?.length);
+            'weatherData.time[index]:', weatherData?.time[index], 'length:', weatherData?.time?.length);
         if (index >= 0 && index <= (weatherData?.time?.length - 1 || 0)) {
             updateWeatherDisplay(index);
             if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
@@ -1024,7 +1026,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const slider = document.getElementById('timeSlider');
         const index = parseInt(e.target.value);
         console.log('Slider change event fired - min:', slider.min, 'max:', slider.max, 'value:', index,
-                    'weatherData.time[index]:', weatherData?.time[index], 'length:', weatherData?.time?.length);
+            'weatherData.time[index]:', weatherData?.time[index], 'length:', weatherData?.time?.length);
         if (index >= 0 && index <= (weatherData?.time?.length - 1 || 0)) {
             updateWeatherDisplay(index);
             if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
@@ -1049,7 +1051,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const currentIndex = parseInt(slider.value) || 0;
                 const currentTime = weatherData && weatherData.time ? weatherData.time[currentIndex] : null;
                 console.log('Current selected time before model change:', currentTime);
-    
+
                 document.getElementById('info').innerHTML = `Fetching weather with ${modelSelect.value}...`;
                 fetchWeather(lastLat, lastLng, currentTime); // Pass the current time to fetchWeather
             } else {
