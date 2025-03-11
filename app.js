@@ -268,78 +268,99 @@ async function fetchWeather(lat, lon, currentTime = null) {
         const firstTime = data.hourly.time[targetIndex];
         console.log(`Using first available time (UTC): ${firstTime} at index: ${targetIndex}`);
 
-        // Slice the data starting from the first time
+        // Identify the last valid index where key data are non-null
+        const keyVariables = [
+            'temperature_2m', 'relative_humidity_2m', 'wind_speed_10m', 'wind_direction_10m', // Surface data
+            'temperature_850hPa', 'wind_speed_850hPa', 'wind_direction_850hPa', // Representative pressure level
+            'geopotential_height_850hPa' // Ensure height data for interpolation
+        ];
+        let lastValidIndex = data.hourly.time.length - 1;
+        for (let i = lastValidIndex; i >= 0; i--) {
+            const allValid = keyVariables.every(variable => {
+                const value = data.hourly[variable]?.[i];
+                return value !== null && value !== undefined && !isNaN(value);
+            });
+            if (!allValid) {
+                lastValidIndex = i;
+            } else {
+                break; // Stop at the first fully valid index from the end
+            }
+        }
+        lastValidIndex = Math.max(0, lastValidIndex); // Ensure we don't go below 0
+        console.log('Last valid index after truncation:', lastValidIndex, 'Original length:', data.hourly.time.length);
+
+        // Slice the data starting from targetIndex up to the last valid index
         weatherData = {
-            time: data.hourly.time.slice(targetIndex),
-            temperature_2m: data.hourly.temperature_2m.slice(targetIndex),
-            relative_humidity_2m: data.hourly.relative_humidity_2m.slice(targetIndex),
-            wind_speed_10m: data.hourly.wind_speed_10m.slice(targetIndex),
-            wind_direction_10m: data.hourly.wind_direction_10m.slice(targetIndex),
-            temperature_1000hPa: data.hourly.temperature_1000hPa.slice(targetIndex),
-            relative_humidity_1000hPa: data.hourly.relative_humidity_1000hPa.slice(targetIndex),
-            wind_speed_1000hPa: data.hourly.wind_speed_1000hPa.slice(targetIndex),
-            wind_direction_1000hPa: data.hourly.wind_direction_1000hPa.slice(targetIndex),
-            geopotential_height_1000hPa: data.hourly.geopotential_height_1000hPa.slice(targetIndex),
-            temperature_950hPa: data.hourly.temperature_950hPa.slice(targetIndex),
-            relative_humidity_950hPa: data.hourly.relative_humidity_950hPa.slice(targetIndex),
-            wind_speed_950hPa: data.hourly.wind_speed_950hPa.slice(targetIndex),
-            wind_direction_950hPa: data.hourly.wind_direction_950hPa.slice(targetIndex),
-            geopotential_height_950hPa: data.hourly.geopotential_height_950hPa.slice(targetIndex),
-            temperature_925hPa: data.hourly.temperature_925hPa.slice(targetIndex),
-            relative_humidity_925hPa: data.hourly.relative_humidity_925hPa.slice(targetIndex),
-            wind_speed_925hPa: data.hourly.wind_speed_925hPa.slice(targetIndex),
-            wind_direction_925hPa: data.hourly.wind_direction_925hPa.slice(targetIndex),
-            geopotential_height_925hPa: data.hourly.geopotential_height_925hPa.slice(targetIndex),
-            temperature_900hPa: data.hourly.temperature_900hPa.slice(targetIndex),
-            relative_humidity_900hPa: data.hourly.relative_humidity_900hPa.slice(targetIndex),
-            wind_speed_900hPa: data.hourly.wind_speed_900hPa.slice(targetIndex),
-            wind_direction_900hPa: data.hourly.wind_direction_900hPa.slice(targetIndex),
-            geopotential_height_900hPa: data.hourly.geopotential_height_900hPa.slice(targetIndex),
-            temperature_850hPa: data.hourly.temperature_850hPa.slice(targetIndex),
-            relative_humidity_850hPa: data.hourly.relative_humidity_850hPa.slice(targetIndex),
-            wind_speed_850hPa: data.hourly.wind_speed_850hPa.slice(targetIndex),
-            wind_direction_850hPa: data.hourly.wind_direction_850hPa.slice(targetIndex),
-            geopotential_height_850hPa: data.hourly.geopotential_height_850hPa.slice(targetIndex),
-            temperature_800hPa: data.hourly.temperature_800hPa.slice(targetIndex),
-            relative_humidity_800hPa: data.hourly.relative_humidity_800hPa.slice(targetIndex),
-            wind_speed_800hPa: data.hourly.wind_speed_800hPa.slice(targetIndex),
-            wind_direction_800hPa: data.hourly.wind_direction_800hPa.slice(targetIndex),
-            geopotential_height_800hPa: data.hourly.geopotential_height_800hPa.slice(targetIndex),
-            temperature_700hPa: data.hourly.temperature_700hPa.slice(targetIndex),
-            relative_humidity_700hPa: data.hourly.relative_humidity_700hPa.slice(targetIndex),
-            wind_speed_700hPa: data.hourly.wind_speed_700hPa.slice(targetIndex),
-            wind_direction_700hPa: data.hourly.wind_direction_700hPa.slice(targetIndex),
-            geopotential_height_700hPa: data.hourly.geopotential_height_700hPa.slice(targetIndex),
-            temperature_600hPa: data.hourly.temperature_600hPa.slice(targetIndex),
-            relative_humidity_600hPa: data.hourly.relative_humidity_600hPa.slice(targetIndex),
-            wind_speed_600hPa: data.hourly.wind_speed_600hPa.slice(targetIndex),
-            wind_direction_600hPa: data.hourly.wind_direction_600hPa.slice(targetIndex),
-            geopotential_height_600hPa: data.hourly.geopotential_height_600hPa.slice(targetIndex),
-            temperature_500hPa: data.hourly.temperature_500hPa.slice(targetIndex),
-            relative_humidity_500hPa: data.hourly.relative_humidity_500hPa.slice(targetIndex),
-            wind_speed_500hPa: data.hourly.wind_speed_500hPa.slice(targetIndex),
-            wind_direction_500hPa: data.hourly.wind_direction_500hPa.slice(targetIndex),
-            geopotential_height_500hPa: data.hourly.geopotential_height_500hPa.slice(targetIndex),
-            temperature_400hPa: data.hourly.temperature_400hPa.slice(targetIndex),
-            relative_humidity_400hPa: data.hourly.relative_humidity_400hPa.slice(targetIndex),
-            wind_speed_400hPa: data.hourly.wind_speed_400hPa.slice(targetIndex),
-            wind_direction_400hPa: data.hourly.wind_direction_400hPa.slice(targetIndex),
-            geopotential_height_400hPa: data.hourly.geopotential_height_400hPa.slice(targetIndex),
-            temperature_300hPa: data.hourly.temperature_300hPa.slice(targetIndex),
-            relative_humidity_300hPa: data.hourly.relative_humidity_300hPa.slice(targetIndex),
-            wind_speed_300hPa: data.hourly.wind_speed_300hPa.slice(targetIndex),
-            wind_direction_300hPa: data.hourly.wind_direction_300hPa.slice(targetIndex),
-            geopotential_height_300hPa: data.hourly.geopotential_height_300hPa.slice(targetIndex),
-            temperature_250hPa: data.hourly.temperature_250hPa.slice(targetIndex),
-            relative_humidity_250hPa: data.hourly.relative_humidity_250hPa.slice(targetIndex),
-            wind_speed_250hPa: data.hourly.wind_speed_250hPa.slice(targetIndex),
-            wind_direction_250hPa: data.hourly.wind_direction_250hPa.slice(targetIndex),
-            geopotential_height_250hPa: data.hourly.geopotential_height_250hPa.slice(targetIndex),
-            temperature_200hPa: data.hourly.temperature_200hPa.slice(targetIndex),
-            relative_humidity_200hPa: data.hourly.relative_humidity_200hPa.slice(targetIndex),
-            wind_speed_200hPa: data.hourly.wind_speed_200hPa.slice(targetIndex),
-            wind_direction_200hPa: data.hourly.wind_direction_200hPa.slice(targetIndex),
-            geopotential_height_200hPa: data.hourly.geopotential_height_200hPa.slice(targetIndex)
+            time: data.hourly.time.slice(targetIndex, lastValidIndex + 1),
+            temperature_2m: data.hourly.temperature_2m?.slice(targetIndex, lastValidIndex + 1) || [],
+            relative_humidity_2m: data.hourly.relative_humidity_2m?.slice(targetIndex, lastValidIndex + 1) || [],
+            wind_speed_10m: data.hourly.wind_speed_10m?.slice(targetIndex, lastValidIndex + 1) || [],
+            wind_direction_10m: data.hourly.wind_direction_10m?.slice(targetIndex, lastValidIndex + 1) || [],
+            temperature_1000hPa: data.hourly.temperature_1000hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            relative_humidity_1000hPa: data.hourly.relative_humidity_1000hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            wind_speed_1000hPa: data.hourly.wind_speed_1000hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            wind_direction_1000hPa: data.hourly.wind_direction_1000hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            geopotential_height_1000hPa: data.hourly.geopotential_height_1000hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            temperature_950hPa: data.hourly.temperature_950hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            relative_humidity_950hPa: data.hourly.relative_humidity_950hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            wind_speed_950hPa: data.hourly.wind_speed_950hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            wind_direction_950hPa: data.hourly.wind_direction_950hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            geopotential_height_950hPa: data.hourly.geopotential_height_950hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            temperature_925hPa: data.hourly.temperature_925hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            relative_humidity_925hPa: data.hourly.relative_humidity_925hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            wind_speed_925hPa: data.hourly.wind_speed_925hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            wind_direction_925hPa: data.hourly.wind_direction_925hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            geopotential_height_925hPa: data.hourly.geopotential_height_925hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            temperature_900hPa: data.hourly.temperature_900hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            relative_humidity_900hPa: data.hourly.relative_humidity_900hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            wind_speed_900hPa: data.hourly.wind_speed_900hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            wind_direction_900hPa: data.hourly.wind_direction_900hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            geopotential_height_900hPa: data.hourly.geopotential_height_900hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            temperature_850hPa: data.hourly.temperature_850hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            relative_humidity_850hPa: data.hourly.relative_humidity_850hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            wind_speed_850hPa: data.hourly.wind_speed_850hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            wind_direction_850hPa: data.hourly.wind_direction_850hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            geopotential_height_850hPa: data.hourly.geopotential_height_850hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            temperature_800hPa: data.hourly.temperature_800hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            relative_humidity_800hPa: data.hourly.relative_humidity_800hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            wind_speed_800hPa: data.hourly.wind_speed_800hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            wind_direction_800hPa: data.hourly.wind_direction_800hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            geopotential_height_800hPa: data.hourly.geopotential_height_800hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            temperature_700hPa: data.hourly.temperature_700hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            relative_humidity_700hPa: data.hourly.relative_humidity_700hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            wind_speed_700hPa: data.hourly.wind_speed_700hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            wind_direction_700hPa: data.hourly.wind_direction_700hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            geopotential_height_700hPa: data.hourly.geopotential_height_700hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            temperature_600hPa: data.hourly.temperature_600hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            relative_humidity_600hPa: data.hourly.relative_humidity_600hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            wind_speed_600hPa: data.hourly.wind_speed_600hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            wind_direction_600hPa: data.hourly.wind_direction_600hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            geopotential_height_600hPa: data.hourly.geopotential_height_600hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            temperature_500hPa: data.hourly.temperature_500hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            relative_humidity_500hPa: data.hourly.relative_humidity_500hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            wind_speed_500hPa: data.hourly.wind_speed_500hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            wind_direction_500hPa: data.hourly.wind_direction_500hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            geopotential_height_500hPa: data.hourly.geopotential_height_500hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            temperature_400hPa: data.hourly.temperature_400hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            relative_humidity_400hPa: data.hourly.relative_humidity_400hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            wind_speed_400hPa: data.hourly.wind_speed_400hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            wind_direction_400hPa: data.hourly.wind_direction_400hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            geopotential_height_400hPa: data.hourly.geopotential_height_400hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            temperature_300hPa: data.hourly.temperature_300hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            relative_humidity_300hPa: data.hourly.relative_humidity_300hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            wind_speed_300hPa: data.hourly.wind_speed_300hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            wind_direction_300hPa: data.hourly.wind_direction_300hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            geopotential_height_300hPa: data.hourly.geopotential_height_300hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            temperature_250hPa: data.hourly.temperature_250hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            relative_humidity_250hPa: data.hourly.relative_humidity_250hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            wind_speed_250hPa: data.hourly.wind_speed_250hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            wind_direction_250hPa: data.hourly.wind_direction_250hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            geopotential_height_250hPa: data.hourly.geopotential_height_250hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            temperature_200hPa: data.hourly.temperature_200hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            relative_humidity_200hPa: data.hourly.relative_humidity_200hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            wind_speed_200hPa: data.hourly.wind_speed_200hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            wind_direction_200hPa: data.hourly.wind_direction_200hPa?.slice(targetIndex, lastValidIndex + 1) || [],
+            geopotential_height_200hPa: data.hourly.geopotential_height_200hPa?.slice(targetIndex, lastValidIndex + 1) || []
         } || {};
 
         // Validate UTC
@@ -349,7 +370,7 @@ async function fetchWeather(lat, lon, currentTime = null) {
         console.log('WeatherData times (UTC):', weatherData.time.slice(0, 5));
 
         // Log the filtered weatherData
-        console.group('Filtered weatherData (After Slicing)');
+        console.group('Filtered weatherData (After Truncation)');
         console.log('Time (filtered):', weatherData.time);
         console.log('Surface Data (filtered):');
         console.table({
@@ -376,7 +397,20 @@ async function fetchWeather(lat, lon, currentTime = null) {
 
         const slider = document.getElementById('timeSlider');
         slider.min = 0;
-        slider.max = weatherData.time.length - 1;
+        slider.max = weatherData.time.length - 1; // Updated to reflect truncated length
+
+        // Handle case where there's only one data point
+        if (weatherData.time.length <= 1) {
+            console.warn('Only one time step available, disabling slider interactivity');
+            slider.disabled = true;
+            slider.style.opacity = '0.5'; // Visual feedback
+            slider.style.cursor = 'not-allowed';
+            document.getElementById('info').innerHTML += '<br><strong>Note:</strong> Only one forecast time available. Slider disabled.';
+        } else {
+            slider.disabled = false;
+            slider.style.opacity = '1';
+            slider.style.cursor = 'pointer';
+        }
 
         // Set the slider to the closest time to currentTime (if provided and valid)
         let newSliderIndex = 0;
@@ -396,26 +430,39 @@ async function fetchWeather(lat, lon, currentTime = null) {
             console.log('No valid current time provided or invalid, defaulting to index 0');
         }
 
-        slider.value = newSliderIndex;
+        slider.value = Math.min(newSliderIndex, weatherData.time.length - 1);
         console.log('Slider set to index:', slider.value, 'corresponding to:', weatherData.time[slider.value]);
 
         // Update UI with the selected time and original requested time
-        updateWeatherDisplay(newSliderIndex, currentTime); // Pass currentTime for range check
-        console.log('UI updated with index:', newSliderIndex, 'time:', weatherData.time[newSliderIndex]);
+        updateWeatherDisplay(slider.value, currentTime); // Pass currentTime for range check
+        console.log('UI updated with index:', slider.value, 'time:', weatherData.time[slider.value]);
 
         // Single validation after delay
         setTimeout(() => {
+            const slider = document.getElementById('timeSlider');
+            console.log('SetTimeout triggered - Slider state: min:', slider.min, 'max:', slider.max, 'value:', slider.value,
+                        'weatherData.time.length:', weatherData?.time?.length);
             const displayedTime = document.getElementById('selectedTime').innerHTML.replace('Selected Time: ', '');
-            const expectedTime = formatTime(weatherData.time[newSliderIndex]);
-            if (displayedTime !== expectedTime) {
-                console.error(`UI mismatch: Displayed ${displayedTime} but expected ${expectedTime}, forcing correction`);
-                slider.value = newSliderIndex;
-                updateWeatherDisplay(newSliderIndex, currentTime); // Pass currentTime
-                document.getElementById('selectedTime').innerHTML = `Selected Time: ${weatherData.time[newSliderIndex].replace('T', ' ').slice(0, -3)}Z`;
+            const expectedTime = formatTime(weatherData.time[slider.value]);
+            if (displayedTime !== expectedTime || !weatherData.time[slider.value]) {
+                console.error(`UI mismatch or invalid time: Displayed ${displayedTime} but expected ${expectedTime}, forcing correction`);
+                const validIndex = Math.min(slider.value, weatherData.time.length - 1);
+                slider.value = validIndex >= 0 ? validIndex : 0; // Fallback to 0 if negative
+                updateWeatherDisplay(slider.value, currentTime);
+                document.getElementById('selectedTime').innerHTML = `Selected Time: ${weatherData.time[slider.value].replace('T', ' ').slice(0, -3)}Z`;
                 document.getElementById('info').innerHTML = '';
-                updateWeatherDisplay(newSliderIndex, currentTime);
+                updateWeatherDisplay(slider.value, currentTime);
             }
-            slider.disabled = false;
+            if (weatherData.time.length > 1) {
+                if (slider.disabled || slider.style.pointerEvents === 'none') {
+                    console.warn('Slider was disabled or blocked, fixing now');
+                    slider.disabled = false;
+                    slider.style.pointerEvents = 'auto'; // Ensure clickable
+                    slider.style.opacity = '1';
+                    slider.style.cursor = 'pointer';
+                }
+                console.log('Slider enabled, final value:', slider.value, 'max:', slider.max);
+            }
         }, 2000);
 
         document.getElementById('loading').style.display = 'none';
@@ -430,10 +477,12 @@ async function fetchWeather(lat, lon, currentTime = null) {
 }
 
 function updateWeatherDisplay(index, originalTime = null) {
-    if (!weatherData || !weatherData.time || !weatherData.time[index]) {
-        console.error('No weather data available for index:', index);
+    if (!weatherData || !weatherData.time || index < 0 || index >= weatherData.time.length) {
+        console.error('No weather data available or index out of bounds:', index, 'Length:', weatherData?.time?.length);
         document.getElementById('info').innerHTML = 'No weather data available';
         document.getElementById('selectedTime').innerHTML = 'Selected Time: ';
+        const slider = document.getElementById('timeSlider');
+        if (slider) slider.value = 0; // Reset to a valid index
         return;
     }
 
@@ -871,6 +920,7 @@ function displayError(message) {
 
 
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM fully loaded, initializing map...');
     initMap();
 
     const slider = document.getElementById('timeSlider');
@@ -883,9 +933,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const lowerLimitInput = document.getElementById('lowerLimit');
     const upperLimitInput = document.getElementById('upperLimit');
 
-    console.log('Elements found:', { slider, modelSelect, infoButton, infoPopup, downloadButton, interpStepSelect, refLevelSelect, lowerLimitInput, upperLimitInput });
+    console.log('Elements found:', {
+        slider, modelSelect, infoButton, infoPopup, downloadButton,
+        interpStepSelect, refLevelSelect, lowerLimitInput, upperLimitInput
+    });
 
-    // Debounce function to limit rapid event firing
+    if (!slider) {
+        console.error('Slider element not found in DOM');
+        displayError('Slider element missing. Check HTML.');
+        return;
+    }
+
+    slider.value = 0; // Initialize to 0 (12:00Z)
+    slider.setAttribute('autocomplete', 'off'); // Prevent browser autofill
+    console.log('Initial slider state - min:', slider.min, 'max:', slider.max, 'value:', slider.value,
+                'weatherData.time:', weatherData?.time);
+
+    // Debounce function
     function debounce(func, wait) {
         let timeout;
         return function (...args) {
@@ -894,36 +958,50 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    if (slider) {
-        slider.value = 0; // Initialize to 0 (12:00Z)
-        slider.setAttribute('autocomplete', 'off'); // Prevent browser autofill
-        console.log('Initial slider value set to:', slider.value, 'corresponding to:', weatherData ? weatherData.time[0] : 'no data yet');
-
-        // Debounced input event handler
-        const debouncedUpdate = debounce((e) => {
-            const index = parseInt(e.target.value);
-            console.log('Slider input event fired, value:', index, 'corresponding time:', weatherData.time[index]);
-            updateWeatherDisplay(index); // Update weather display
+    // Debounced input event handler
+    const debouncedUpdate = debounce((e) => {
+        const slider = document.getElementById('timeSlider');
+        const index = parseInt(e.target.value);
+        console.log('Slider input event fired - min:', slider.min, 'max:', slider.max, 'value:', index,
+                    'weatherData.time[index]:', weatherData?.time[index], 'length:', weatherData?.time?.length);
+        if (index >= 0 && index <= (weatherData?.time?.length - 1 || 0)) {
+            updateWeatherDisplay(index);
             if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
-                calculateMeanWind(); // Update mean wind
+                calculateMeanWind();
             }
-        }, 100);
-
-        slider.addEventListener('input', debouncedUpdate);
-
-        slider.addEventListener('change', (e) => {
-            const index = parseInt(e.target.value);
-            console.log('Slider change event fired, value:', index, 'corresponding time:', weatherData.time[index]);
-            updateWeatherDisplay(index); // Update weather display
+        } else {
+            console.warn('Slider value out of bounds, resetting to 0. Index:', index, 'Max:', weatherData?.time?.length - 1);
+            slider.value = 0;
+            updateWeatherDisplay(0);
             if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
-                calculateMeanWind(); // Update mean wind
+                calculateMeanWind();
             }
-        });
+        }
+    }, 100);
 
-        // Remove the continuous reset (replaced by final check in fetchWeather)
-    } else {
-        console.error('Slider element not found');
-    }
+    slider.addEventListener('input', debouncedUpdate);
+    console.log('Input event listener attached to slider');
+
+    slider.addEventListener('change', (e) => {
+        const slider = document.getElementById('timeSlider');
+        const index = parseInt(e.target.value);
+        console.log('Slider change event fired - min:', slider.min, 'max:', slider.max, 'value:', index,
+                    'weatherData.time[index]:', weatherData?.time[index], 'length:', weatherData?.time?.length);
+        if (index >= 0 && index <= (weatherData?.time?.length - 1 || 0)) {
+            updateWeatherDisplay(index);
+            if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
+                calculateMeanWind();
+            }
+        } else {
+            console.warn('Slider value out of bounds, resetting to 0. Index:', index, 'Max:', weatherData?.time?.length - 1);
+            slider.value = 0;
+            updateWeatherDisplay(0);
+            if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
+                calculateMeanWind();
+            }
+        }
+    });
+    console.log('Change event listener attached to slider');
 
     if (modelSelect) {
         modelSelect.addEventListener('change', () => {
