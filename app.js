@@ -164,7 +164,7 @@ async function getAltitude(lng, lat) {
     }
 }
 
-async function fetchWeather(lat, lon) {
+async function fetchWeather(lat, lon, currentTime = null) {
     try {
         document.getElementById('loading').style.display = 'block';
         const modelSelect = document.getElementById('modelSelect');
@@ -216,7 +216,7 @@ async function fetchWeather(lat, lon) {
             if (newMonth === 0) newYear++;
         }
         let startDate = new Date(Date.UTC(newYear, newMonth, newDay, newHour));
-        console.log('Calculated startDate:', startDate.toISOString()); // Debug
+        console.log('Calculated startDate:', startDate.toISOString());
         if (startDate > utcNow) {
             console.warn(`Forecast start ${formatTime(startDate.toISOString())} is in the future; using current UTC date instead.`);
             startDate = utcNow;
@@ -254,7 +254,7 @@ async function fetchWeather(lat, lon) {
             `temperature_200hPa,relative_humidity_200hPa,wind_speed_200hPa,wind_direction_200hPa,geopotential_height_200hPa` +
             `&models=${modelSelect.value}&start_date=${startDateStr}&end_date=${endDateStr}`;
 
-            console.log('Fetching weather from (UTC):', url);
+        console.log('Fetching weather from (UTC):', url);
         const response = await fetch(url);
 
         if (!response.ok) {
@@ -263,11 +263,11 @@ async function fetchWeather(lat, lon) {
         }
 
         const data = await response.json();
-        console.log('Raw API Response:', data); // Debug
+        console.log('Raw API Response:', data);
         const targetIndex = 0;
         const firstTime = data.hourly.time[targetIndex];
         console.log(`Using first available time (UTC): ${firstTime} at index: ${targetIndex}`);
-    
+
         // Slice the data starting from the first time
         weatherData = {
             time: data.hourly.time.slice(targetIndex),
@@ -342,11 +342,11 @@ async function fetchWeather(lat, lon) {
             geopotential_height_200hPa: data.hourly.geopotential_height_200hPa.slice(targetIndex)
         } || {};
 
-         // Validate UTC
-         if (weatherData.time && weatherData.time.length > 0 && !weatherData.time[0].endsWith('Z')) {
+        // Validate UTC
+        if (weatherData.time && weatherData.time.length > 0 && !weatherData.time[0].endsWith('Z')) {
             console.warn('Weather data time not in UTC format:', weatherData.time[0]);
         }
-        console.log('WeatherData times (UTC):', weatherData.time.slice(0, 5)); // First 5 times
+        console.log('WeatherData times (UTC):', weatherData.time.slice(0, 5));
 
         // Log the filtered weatherData
         console.group('Filtered weatherData (After Slicing)');
@@ -377,40 +377,46 @@ async function fetchWeather(lat, lon) {
         const slider = document.getElementById('timeSlider');
         slider.min = 0;
         slider.max = weatherData.time.length - 1;
-        slider.value = 0; // Start at the first available time
-        console.log('Before UI update, slider value:', slider.value, 'corresponding to:', weatherData.time[slider.value]);
 
-        // Force immediate UI update
-        updateWeatherDisplay(0);
-        console.log('Initial UI update called with index 0, time should be:', weatherData.time[0]);
+        // Set the slider to the closest time to currentTime (if provided and valid)
+        let newSliderIndex = 0;
+        if (currentTime && weatherData.time.length > 0 && currentTime !== null) {
+            const currentTimestamp = new Date(currentTime).getTime();
+            let minDiff = Infinity;
+            weatherData.time.forEach((time, index) => {
+                const timeTimestamp = new Date(time).getTime();
+                const diff = Math.abs(timeTimestamp - currentTimestamp);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    newSliderIndex = index;
+                }
+            });
+            console.log(`Closest time to ${currentTime}: ${weatherData.time[newSliderIndex]} at index ${newSliderIndex}`);
+        } else {
+            console.log('No valid current time provided or invalid, defaulting to index 0');
+        }
 
-        // Aggressive resets to ensure the slider stays at 0
-        [100, 500, 1000, 2000].forEach(delay => {
-            setTimeout(() => {
-                const currentValue = parseInt(slider.value);
-                console.log(`Check at ${delay}ms, slider value: ${currentValue}, corresponding to: ${weatherData.time[currentValue]}`);
-                if (currentValue !== 0) {
-                    console.warn(`Slider value changed to ${currentValue} at ${delay}ms, forcing reset to 0`);
-                    slider.value = 0;
-                    updateWeatherDisplay(0);
-                }
-                // Final correction after last check
-                if (delay === 2000) {
-                    console.log('Final validation at 2000ms');
-                    const displayedTime = document.getElementById('selectedTime').innerHTML.replace('Selected Time: ', '');
-                    const expectedTime = formatTime(weatherData.time[0]);
-                    if (displayedTime !== expectedTime) {
-                        console.error(`Final UI mismatch: Displayed ${displayedTime} but expected ${expectedTime}, forcing correction`);
-                        slider.value = 0;
-                        updateWeatherDisplay(0);
-                        document.getElementById('selectedTime').innerHTML = `Selected Time: ${weatherData.time[0].replace('T', ' ').slice(0, -3)}Z`;
-                        document.getElementById('info').innerHTML = '';
-                        updateWeatherDisplay(0);
-                    }
-                    slider.disabled = false;
-                }
-            }, delay);
-        });
+        slider.value = newSliderIndex;
+        console.log('Slider set to index:', slider.value, 'corresponding to:', weatherData.time[slider.value]);
+
+        // Update UI with the selected time
+        updateWeatherDisplay(newSliderIndex);
+        console.log('UI updated with index:', newSliderIndex, 'time:', weatherData.time[newSliderIndex]);
+
+        // Single validation after delay
+        setTimeout(() => {
+            const displayedTime = document.getElementById('selectedTime').innerHTML.replace('Selected Time: ', '');
+            const expectedTime = formatTime(weatherData.time[newSliderIndex]);
+            if (displayedTime !== expectedTime) {
+                console.error(`UI mismatch: Displayed ${displayedTime} but expected ${expectedTime}, forcing correction`);
+                slider.value = newSliderIndex;
+                updateWeatherDisplay(newSliderIndex);
+                document.getElementById('selectedTime').innerHTML = `Selected Time: ${weatherData.time[newSliderIndex].replace('T', ' ').slice(0, -3)}Z`;
+                document.getElementById('info').innerHTML = '';
+                updateWeatherDisplay(newSliderIndex);
+            }
+            slider.disabled = false;
+        }, 2000);
 
         document.getElementById('loading').style.display = 'none';
         return data;
@@ -905,14 +911,18 @@ document.addEventListener('DOMContentLoaded', () => {
     if (modelSelect) {
         modelSelect.addEventListener('change', () => {
             if (lastLat && lastLng) {
+                // Capture the current selected time before fetching new data
+                const slider = document.getElementById('timeSlider');
+                const currentIndex = parseInt(slider.value) || 0;
+                const currentTime = weatherData && weatherData.time ? weatherData.time[currentIndex] : null;
+                console.log('Current selected time before model change:', currentTime);
+    
                 document.getElementById('info').innerHTML = `Fetching weather with ${modelSelect.value}...`;
-                fetchWeather(lastLat, lastLng);
+                fetchWeather(lastLat, lastLng, currentTime); // Pass the current time to fetchWeather
             } else {
                 displayError('Please select a position on the map first.');
             }
         });
-    } else {
-        console.error('Model select element not found');
     }
 
     if (infoButton && infoPopup) {
