@@ -35,3 +35,75 @@ body {
     padding: 5px;
     font-size: 14px;
 }
+
+I’m glad you’re happy with the separate CSS file approach! I understand your concern—the table columns are currently uneven in width due to the natural distribution of content, and you’d like them to have equal widths again, similar to the previous width: 20% setup for each column. We can achieve this by enforcing equal column widths using CSS, ensuring all four columns (Height, Dir, Spd, T) are uniformly sized within the #info table.
+
+Step 1: Diagnose the Issue
+Current Behavior: With the CSS in styles.css, the table’s columns adjust their widths based on content because we removed the inline width: 20% from the <th> tags and relied on width: 100% on the table with natural distribution. This leads to uneven column widths.
+Desired Behavior: Each column should have an equal width (e.g., 25% of the table width), regardless of content, to maintain the uniform look you preferred.
+Step 2: Fix Column Widths
+To enforce equal widths, we’ll use the table-layout: fixed property combined with explicit column widths (e.g., 25% for each of the four columns). We’ll update the styles.css file accordingly.
+
+Updated styles.css
+Replace the existing content of styles.css with the following:
+
+css
+
+Collapse
+
+Wrap
+
+Copy
+#map { min-height: 200px; height: 50vh; width: 100%; }
+#info { margin-top: 10px; font-family: Arial, sans-serif; }
+
+#info table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    font-size: 14px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    table-layout: fixed; /* Enforce fixed column widths */
+}
+
+#info th {
+    background: linear-gradient(to bottom, #f0f4f8, #d9e2ec);
+    color: #333;
+    font-weight: bold;
+    padding: 10px 8px;
+    border-bottom: 2px solid #ccc;
+    text-align: center;
+    vertical-align: middle;
+    width: 25%; /* Equal width for each column */
+}
+
+#info tr:nth-child(even) {
+    background: linear-gradient(to bottom, #f9f9f9, #f1f1f1);
+}
+
+#info tr:nth-child(odd) {
+    background: linear-gradient(to bottom, #ffffff, #f7f7f7);
+}
+
+#info tr:hover {
+    background: linear-gradient(to bottom, #e6f0fa, #d9e2ec);
+}
+
+#info td {
+    padding: 8px 8px;
+    border-bottom: 1px solid #ddd;
+    text-align: center;
+    vertical-align: middle;
+    width: 25%; /* Equal width for each column */
+    overflow: hidden; /* Handle overflow content */
+    text-overflow: ellipsis; /* Add ellipsis for truncated text if needed */
+}
+
+@media (max-width: 600px) {
+    #info table {
+        font-size: 12px;
+    }
+    #info th, #info td {
+        padding: 6px 4px;
+    }
+}

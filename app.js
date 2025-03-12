@@ -573,9 +573,8 @@ function updateWeatherDisplay(index, originalTime = null) {
 
     // Round lastAltitude to nearest ten for display only
     const displayAltitude = (lastAltitude !== 'N/A' && !isNaN(lastAltitude)) ? roundToTens(Number(lastAltitude)) : 'N/A';
-    let output = `<p>Altitude: ${displayAltitude}m (${refLevel})</p>`;
-    output += `<table border="1" style="border-collapse: collapse; width: 100%;">`;
-    output += `<tr><th style="width: 20%;">Height (m ${refLevel})</th><th style="width: 20%;">Dir (°)</th><th style="width: 20%;">Spd (kt)</th><th style="width: 20%;">T (°C)</th></tr>`;
+    let output = `<table>`;
+    output += `<tr><th>Height (m ${refLevel})</th><th>Dir (°)</th><th>Spd (kt)</th><th>T (°C)</th></tr>`;
 
     interpolatedData.forEach(data => {
         output += `<tr><td>${data.displayHeight}</td><td>${roundToTens(data.dir)}</td><td>${data.spd}</td><td>${data.temp}</td></tr>`;
@@ -688,7 +687,7 @@ function interpolateWeatherData(index) {
 
     const step = parseInt(document.getElementById('interpStepSelect').value) || 200;
     const refLevel = document.getElementById('refLevelSelect').value || 'AGL';
-    const baseHeight = Math.round(lastAltitude);
+    const baseHeight = Number(lastAltitude); // Keep unrounded for calculations
     const levels = ['200 hPa', '250hPa', '300 hPa', '400hPa', '500 hPa', '600hPa', '700 hPa', '800 hPa', '850 hPa', '900 hPa', '925 hPa', '950 hPa', '1000 hPa'];
 
     const surfaceHeight = refLevel === 'AGL' ? 0 : baseHeight;
@@ -760,9 +759,12 @@ function interpolateWeatherData(index) {
         const dew = calculateDewpoint(temp, rh);
         const pressure = interpolatePressure(actualHp, pressureLevels, pressureHeights);
 
+        // Round displayHeight only in AMSL mode
+        const displayHeight = refLevel === 'AMSL' ? roundToTens(hp) : hp;
+
         interpolated.push({
             height: actualHp,
-            displayHeight: hp,
+            displayHeight: displayHeight,
             temp: temp.toFixed(0),
             rh: rh.toFixed(0),
             dew: dew,
@@ -776,9 +778,11 @@ function interpolateWeatherData(index) {
     if (surfaceData) {
         const dew = (surfaceData.temp !== undefined && surfaceData.rh !== undefined) ? calculateDewpoint(surfaceData.temp, surfaceData.rh) : '-';
         const pressure = interpolatePressure(surfaceData.height, pressureLevels, pressureHeights);
+        // Round surfaceHeight only in AMSL mode
+        const displaySurfaceHeight = refLevel === 'AMSL' ? roundToTens(surfaceHeight) : surfaceHeight;
         interpolated.push({
             height: surfaceData.height,
-            displayHeight: surfaceHeight,
+            displayHeight: displaySurfaceHeight,
             temp: surfaceData.temp?.toFixed(0) ?? '-',
             rh: surfaceData.rh?.toFixed(0) ?? '-',
             dew: dew,
