@@ -1,3 +1,7 @@
+html {
+    font-size: 13px;
+}
+
 #map {
     height: 52vh;
     width: 100%;
@@ -16,6 +20,8 @@
 
 body {
     font-family: 'Roboto', sans-serif;
+    font-size: 13px;
+    font-weight: 400;
     margin: 0;
     padding: 10px;
     min-height: 100vh;
@@ -23,6 +29,38 @@ body {
     flex-direction: column;
     box-sizing: border-box;
     /* Include padding in height calculation */
+}
+
+/* Ensure all elements inherit consistently */
+* {
+    font-size: 13px;
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+}
+
+/* Specific overrides for consistency */
+#info, #info table, #info th, #info td {
+    font-family: 'Roboto', sans-serif; /* Replace Arial */
+    font-size: 13px;
+    font-weight: 400;
+}
+
+#selectedTime, #meanWindResult, #model-row, input[type="number"], select, button {
+    font-family: 'Roboto', sans-serif;
+    font-size: 13px;
+    font-weight: 400;
+}
+
+/* Keep your existing styles, just ensure font consistency */
+#info th {
+    background-color: #e0e0e0;
+    color: #222;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+#meanWindResult {
+    margin-left: 10px;
 }
 
 .controls,
