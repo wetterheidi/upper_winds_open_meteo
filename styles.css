@@ -39,13 +39,21 @@ body {
 }
 
 /* Specific overrides for consistency */
-#info, #info table, #info th, #info td {
-    font-family: 'Roboto', sans-serif; /* Replace Arial */
+#info,
+#info table,
+#info th,
+#info td {
+    font-family: 'Roboto', sans-serif;
+    /* Replace Arial */
     font-size: 13px;
     font-weight: 400;
 }
 
-#selectedTime, #meanWindResult, #model-row, input[type="number"], select, button {
+#selectedTime,
+#model-row,
+input[type="number"],
+select,
+button {
     font-family: 'Roboto', sans-serif;
     font-size: 13px;
     font-weight: 400;
@@ -57,10 +65,6 @@ body {
     color: #222;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-}
-
-#meanWindResult {
-    margin-left: 10px;
 }
 
 .controls,
@@ -98,9 +102,28 @@ body {
     box-sizing: border-box;
     z-index: 100;
     margin-bottom: 10px;
-    flex: 1 0 auto;
-    overflow: auto;
-    max-height: 40vh;
+    flex: 0 0 auto;
+    max-height: calc(48vh - 60px);
+    overflow-y: auto;
+    display: grid;
+    grid-template-rows: auto auto auto;
+    gap: 10px;
+    scrollbar-width: thin; /* For Firefox */
+    scrollbar-color: #ddd #fff; /* Thumb: light gray, Track: white (matches background) */
+}
+
+/* For Chrome, Edge, and Safari */
+#bottom-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+#bottom-container::-webkit-scrollbar-thumb {
+    background: #ddd; /* Light gray thumb */
+    border-radius: 4px;
+}
+
+#bottom-container::-webkit-scrollbar-track {
+    background: #fff; /* Match #bottom-container's background */
 }
 
 #info {
@@ -118,8 +141,10 @@ body {
     margin-top: 10px;
     z-index: 100;
     box-sizing: border-box;
-    max-height: 40vh; /* Adjust as needed */
-    overflow-y: auto; /* Already present, keep this */
+    max-height: 40vh;
+    /* Adjust as needed */
+    overflow-y: auto;
+    /* Already present, keep this */
 }
 
 #info::-webkit-scrollbar {
@@ -166,39 +191,143 @@ body {
 }
 
 #meanWindControls {
-    display: flex;
+    display: grid;
+    grid-template-columns: 110px 80px 110px 80px minmax(0, 1fr);
+    /* Use minmax to control 1fr */
     align-items: center;
-    flex-wrap: wrap;
-    margin-bottom: 5px;
-}
-
-#meanWindControls label,
-#meanWindControls input,
-#meanWindControls button {
-    margin-right: 10px;
-    margin-bottom: 5px;
-}
-
-#meanWindResult {
-    margin-left: 10px;
-    font-weight: bold;
+    justify-items: start;
+    /* Align all items to the left */
+    gap: 5px;
 }
 
 #controls-row {
-    display: flex;
+    display: grid;
+    grid-template-columns: 110px 80px 110px 80px minmax(0, 1fr);
+    /* Match columns */
     align-items: center;
-    flex-wrap: wrap;
-    margin-bottom: 5px;
+    justify-items: start;
+    /* Align all items to the left */
+    gap: 5px;
 }
 
+#meanWindControls input {
+    width: 80px;
+    /* Base width */
+    box-sizing: border-box;
+    /* Ensure padding/border don’t increase width */
+}
+
+#controls-row select {
+    width: 80px;
+    /* Match inputs */
+    padding: 6px;
+    box-sizing: border-box;
+}
+
+#meanWindControls label,
 #controls-row label {
-    margin-right: 5px;
+    text-align: left;
+    font-size: 13px;
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    white-space: nowrap;
+    /* Prevent label text from wrapping */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    /* Truncate if too long */
 }
 
+#meanWindResult {
+    font-size: 13px;
+    font-family: 'Roboto', sans-serif;
+    font-weight: bold;
+    text-align: left;
+    white-space: nowrap;
+    /* Prevent wrapping */
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Ensure button and info fit in the second row */
+#controls-row button {
+    grid-column: 5 / 6;
+    width: auto;
+    /* Let button size naturally */
+    min-width: 100px;
+    /* Ensure it’s not too small */
+    padding: 6px 10px;
+}
+
+/* Move #info to its own row */
+#bottom-container #info {
+    grid-column: 1 / -1;
+    /* Span all columns */
+    grid-row: 3;
+    /* Third row */
+    max-height: 40vh;
+    overflow-y: auto;
+    width: 100%;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    margin: 0;
+}
+
+#bottom-container #loading {
+    grid-column: 1 / -1;
+    /* Span all columns */
+    grid-row: 3;
+    /* Third row, same as #info */
+    display: none;
+    /* Hidden by default */
+}
+
+#controls-row #info {
+    grid-column: 1 / 6;
+    /* Span full width in a new row */
+    margin-top: 10px;
+}
+
+#controls-row #loading {
+    grid-column: 1 / 6;
+    /* Span full width if visible */
+}
+
+#meanWindControls input,
 #controls-row select,
 #controls-row button {
-    margin-right: 10px;
-    margin-bottom: 5px;
+    font-size: 13px;
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    margin: 0;
+    box-sizing: border-box;
+}
+
+#meanWindControls input {
+    width: 80px;
+}
+
+#controls-row select {
+    width: 80px;
+    padding: 6px;
+}
+
+#meanWindResult {
+    font-size: 13px;
+    font-family: 'Roboto', sans-serif;
+    font-weight: bold;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#controls-row button {
+    grid-column: 5 / 6;
+    width: auto;
+    min-width: 100px;
+    padding: 6px 10px;
 }
 
 #selectedTime {
@@ -315,11 +444,10 @@ input[type="number"] {
     margin-right: 10px;
 }
 
-#lowerLimit,
-#upperLimit {
-    width: 80px;
+#meanWindControls input {
+    box-sizing: border-box;
+    width: 100%; /* Let the grid column define the width */
 }
-
 select:focus,
 input[type="number"]:focus {
     outline: 2px solid;
@@ -361,23 +489,17 @@ input[type="number"]:focus {
 /* Desktop-specific centering */
 @media (min-width: 769px) {
     #bottom-container {
-        display: flex;
-        flex-direction: column;
-        /* Stack children vertically */
-        align-items: center;
-        /* Center horizontally */
-        width: auto;
-        /* Allow it to shrink-wrap content up to max-width */
-        max-width: 800px;
-        /* Match #info's max-width for consistency */
-        margin: 0 auto;
-        /* Center the container itself */
+        display: grid; /* Restore grid */
+        grid-template-rows: auto auto auto; /* Keep three rows */
+        align-items: start; /* Align items to the top */
+        justify-items: start; /* Align to the left */
+        width: 100%;
+        max-width: 800px; /* Keep max-width */
+        margin: 0 auto; /* Center the container itself */
         padding: 10px;
     }
-
     #info {
-        width: 100%;
-        /* Ensure #info fills the container's width */
+        width: 100%; /* Ensure #info fills the container */
     }
 }
 
@@ -423,31 +545,41 @@ input[type="number"]:focus {
 
     #meanWindControls,
     #controls-row {
-        flex-direction: row;
-        flex-wrap: wrap;
-        align-items: center;
+        grid-template-columns: 110px 80px 110px 80px;
+        grid-template-rows: auto auto; /* Two rows: inputs/selects, then result/button */
     }
 
-    #meanWindControls label,
-    #meanWindControls input,
-    #meanWindControls button,
-    #controls-row label,
-    #controls-row select,
-    #controls-row button {
-        margin-right: 5px;
-        margin-bottom: 5px;
-        font-size: 13px;
+    #meanWindControls {
+        grid-template-columns: 110px 80px 110px 80px;
     }
 
-    #meanWindResult {
-        margin-left: 5px;
-        margin-top: 0;
-        font-size: 13px;
+    #controls-row {
+        grid-template-columns: 110px 80px 110px 80px;
     }
 
     #lowerLimit,
     #upperLimit {
         width: 70px;
+    }
+
+    #controls-row select {
+        width: 70px;
+    }
+
+    /* Move #meanWindResult to the second row, spanning all columns */
+    #meanWindResult {
+        grid-column: 1 / 5; /* Span all four columns */
+        grid-row: 2; /* Second row */
+        margin-top: 5px; /* Add some spacing */
+    }
+
+    /* Move #downloadButton to the second row, spanning all columns */
+    #controls-row button {
+        grid-column: 1 / 5; /* Span all four columns */
+        grid-row: 2; /* Second row */
+        margin-top: 5px; /* Add some spacing */
+        width: auto; /* Let it size naturally */
+        min-width: 100px; /* Ensure it’s not too small */
     }
 
     #model-row {
@@ -469,9 +601,36 @@ input[type="number"]:focus {
         font-size: 13px;
     }
 
+    #meanWindControls,
+    #controls-row {
+        grid-template-columns: 95px 65px 95px 65px; /* Remove the 1fr column */
+        grid-template-rows: auto auto; /* Two rows: inputs/selects, then result/button */
+    }
+
+    #meanWindControls label,
+    #controls-row label {
+        font-size: 12px;
+    }
+
     #lowerLimit,
     #upperLimit {
-        width: 60px;
+        width: 65px;
+    }
+
+    #controls-row select {
+        width: 65px;
+    }
+
+    /* Move #meanWindResult to the second row, spanning all columns */
+    #meanWindResult {
+        grid-column: 1 / 5; /* Span all four columns */
+        grid-row: 2; /* Second row */
+    }
+
+    /* Move #downloadButton to the second row, spanning all columns */
+    #controls-row button {
+        grid-column: 1 / 5; /* Span all four columns */
+        grid-row: 2; /* Second row */
     }
 }
 
