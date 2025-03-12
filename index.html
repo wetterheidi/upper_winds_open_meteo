@@ -12,7 +12,7 @@
 </head>
 
 <body>
-    <div id="map"></div>
+    <div id="map" aria-label="Interactive map for selecting weather location"></div>
     <div id="slider-container">
         <span id="selectedTime">Selected Time: </span>
         <input type="range" id="timeSlider" min="0" max="167" value="0" disabled>
@@ -34,23 +34,23 @@
     </div>
     <div id="bottom-container">
         <div id="meanWindControls">
-            <label for="lowerLimit">Lower Limit (m):</label>
+            <label for="lowerLimit" title="Lower altitude for mean wind calculation">Lower Limit (m):</label>
             <input type="number" id="lowerLimit" min="0" step="100" value="0">
-            <label for="upperLimit">Upper Limit (m):</label>
+            <label for="upperLimit" title="Upper altitude for mean wind calculation">Upper Limit (m):</label>
             <input type="number" id="upperLimit" min="0" step="100" value="3000">
             <div id="meanWindResult"></div>
         </div>
         <div id="controls-row">
-            <label for="interpStepSelect">Step:</label>
-            <select id="interpStepSelect">
+            <label for="interpStepSelect" title="Select the altitude interval for weather data interpolation">Step:</label>
+            <select id="interpStepSelect" aria-label="Interpolation step interval">
                 <option value="100">100 m</option>
                 <option value="200" selected>200 m</option>
                 <option value="500">500 m</option>
                 <option value="1000">1000 m</option>
                 <option value="2000">2000 m</option>
             </select>
-            <label for="refLevelSelect">Reference:</label>
-            <select id="refLevelSelect">
+            <label for="refLevelSelect" title="AGL: Above Ground Level, AMSL: Above Mean Sea Level">Reference:</label>
+            <select id="refLevelSelect" aria-label="Reference level">
                 <option value="AMSL">AMSL</option>
                 <option value="AGL" selected>AGL</option>
             </select>
@@ -67,5 +67,4 @@
     <!-- Existing Cloudflare scripts remain unchanged -->
     <script>(function () { function c() { var b = a.contentDocument || a.contentWindow.document; if (b) { var d = b.createElement('script'); d.innerHTML = "window.__CF$cv$params={r:'91ce572bdae4bd03',t:'MTc0MTM5NTA0OC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);"; b.getElementsByTagName('head')[0].appendChild(d) } } if (document.body) { var a = document.createElement('iframe'); a.height = 1; a.width = 1; a.style.position = 'absolute'; a.style.top = 0; a.style.left = 0; a.style.border = 'none'; a.style.visibility = 'hidden'; document.body.appendChild(a); if ('loading' !== document.readyState) c(); else if (window.addEventListener) document.addEventListener('DOMContentLoaded', c); else { var e = document.onreadystatechange || function () { }; document.onreadystatechange = function (b) { e(b); 'loading' !== document.readyState && (document.onreadystatechange = e, c()) } } } })();</script>
 </body>
-
 </html>
