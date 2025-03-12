@@ -9,17 +9,49 @@ let lastModelRun = null;
 // Initialize the map and center it on the user's location if available
 function initMap() {
     // Default coordinates (Herrsching am Ammersee, Germany)
-    const defaultCenter = [48.0179, 11.1923]; // Corrected to [lat, lng]
+    const defaultCenter = [48.0179, 11.1923];
     const defaultZoom = 10;
 
-    // Initialize the map without immediate setView
+    // Initialize the map and set default view immediately
     map = L.map('map');
+    map.setView(defaultCenter, defaultZoom); // Set view before geolocation attempt
 
     // Add OpenStreetMap tiles
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
+
+    // Define the custom icon using favicon.ico
+    const customIcon = L.icon({
+        iconUrl: 'favicon.ico',
+        iconSize: [32, 32],
+        iconAnchor: [16, 32],
+        popupAnchor: [0, -32],
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+        shadowSize: [41, 41],
+        shadowAnchor: [13, 32]
+    });
+
+    // Add initial marker at default location
+    const initialAltitude = 'N/A'; // Will be updated later if geolocation succeeds
+    const initialPopup = L.popup({ offset: [0, 10] })
+        .setLatLng(defaultCenter)
+        .setContent(`Lat: ${defaultCenter[0].toFixed(4)}<br>Lng: ${defaultCenter[1].toFixed(4)}<br>Alt: ${initialAltitude}`);
+    currentMarker = L.marker(defaultCenter, { icon: customIcon })
+        .bindPopup(initialPopup)
+        .addTo(map)
+        .openPopup();
+
+    // Function to update marker popup with altitude
+    const updateMarkerPopup = (lat, lng, altitude) => {
+        const popup = L.popup({ offset: [0, 10] })
+            .setLatLng([lat, lng])
+            .setContent(`Lat: ${lat.toFixed(4)}<br>Lng: ${lng.toFixed(4)}<br>Alt: ${altitude}m`);
+        if (currentMarker) {
+            currentMarker.setPopupContent(popup.getContent()).openPopup();
+        }
+    };
 
     // Attempt to get the user's current position
     if (navigator.geolocation) {
@@ -27,24 +59,24 @@ function initMap() {
             async (position) => {
                 const userCoords = [position.coords.latitude, position.coords.longitude];
                 map.setView(userCoords, defaultZoom);
-        
+
                 if (currentMarker) {
                     currentMarker.remove();
                 }
                 lastLat = position.coords.latitude;
                 lastLng = position.coords.longitude;
-                const altitude = await getAltitude(lastLng, lastLat); // Wait for altitude
+                const altitude = await getAltitude(lastLat, lastLng);
                 lastAltitude = altitude !== null ? altitude : 'N/A';
-        
-                const popup = L.popup({ offset: [0,0] })
+
+                const popup = L.popup({ offset: [0, 10] })
                     .setLatLng(userCoords)
                     .setContent(`Lat: ${lastLat.toFixed(4)}<br>Lng: ${lastLng.toFixed(4)}<br>Alt: ${lastAltitude}m`);
-        
-                currentMarker = L.marker(userCoords, { color: '#FF0000' })
+
+                currentMarker = L.marker(userCoords, { icon: customIcon })
                     .bindPopup(popup)
                     .addTo(map)
                     .openPopup();
-        
+
                 document.getElementById('info').innerHTML = `Fetching weather and models...`;
                 const availableModels = await checkAvailableModels(lastLat, lastLng);
                 if (availableModels.length > 0) {
@@ -59,11 +91,17 @@ function initMap() {
             (error) => {
                 console.warn(`Geolocation error: ${error.message}`);
                 displayError('Unable to retrieve your location. Using default location (Herrsching am Ammersee).');
-                map.setView(defaultCenter, defaultZoom); // Fallback to default
-                lastLat = defaultCenter[0];
-                lastLng = defaultCenter[1];
-                getAltitude(lastLng, lastLat).then(async (altitude) => {
+                // Update existing marker with altitude when available
+                getAltitude(defaultCenter[0], defaultCenter[1]).then(async (altitude) => {
                     lastAltitude = altitude !== null ? altitude : 'N/A';
+                    lastLat = defaultCenter[0];
+                    lastLng = defaultCenter[1];
+                    const popup = L.popup({ offset: [0, 10] })
+                        .setLatLng(defaultCenter)
+                        .setContent(`Lat: ${lastLat.toFixed(4)}<br>Lng: ${lastLng.toFixed(4)}<br>Alt: ${lastAltitude}`);
+                    if (currentMarker) {
+                        currentMarker.setPopupContent(popup.getContent()).openPopup();
+                    }
                     document.getElementById('info').innerHTML = `Fetching weather and models...`;
                     const availableModels = await checkAvailableModels(lastLat, lastLng);
                     if (availableModels.length > 0) {
@@ -85,11 +123,17 @@ function initMap() {
     } else {
         console.warn('Geolocation is not supported by this browser.');
         displayError('Geolocation not supported. Using default location (Herrsching am Ammersee).');
-        map.setView(defaultCenter, defaultZoom); // Set default if geolocation unsupported
-        lastLat = defaultCenter[0];
-        lastLng = defaultCenter[1];
-        getAltitude(lastLng, lastLat).then(async (altitude) => {
+        // Map view and initial marker already set, proceed with altitude and weather
+        getAltitude(defaultCenter[0], defaultCenter[1]).then(async (altitude) => {
             lastAltitude = altitude !== null ? altitude : 'N/A';
+            lastLat = defaultCenter[0];
+            lastLng = defaultCenter[1];
+            const popup = L.popup({ offset: [0, 10] })
+                .setLatLng(defaultCenter)
+                .setContent(`Lat: ${lastLat.toFixed(4)}<br>Lng: ${lastLng.toFixed(4)}<br>Alt: ${lastAltitude}`);
+            if (currentMarker) {
+                currentMarker.setPopupContent(popup.getContent()).openPopup();
+            }
             document.getElementById('info').innerHTML = `Fetching weather and models...`;
             const availableModels = await checkAvailableModels(lastLat, lastLng);
             if (availableModels.length > 0) {
@@ -108,22 +152,22 @@ function initMap() {
         const { lat, lng } = e.latlng;
         lastLat = lat;
         lastLng = lng;
-        const altitude = await getAltitude(lat, lng); // Use updated getAltitude
+        const altitude = await getAltitude(lat, lng);
         lastAltitude = altitude !== null ? altitude : 'N/A';
-    
+
         if (currentMarker) {
             currentMarker.remove();
         }
-    
-        const popup = L.popup({ offset: [0, -25] })
+
+        const popup = L.popup({ offset: [0, 10] })
             .setLatLng([lat, lng])
             .setContent(`Lat: ${lat.toFixed(4)}<br>Lng: ${lng.toFixed(4)}<br>Alt: ${lastAltitude}m`);
-    
-        currentMarker = L.marker([lat, lng], { color: '#FF0000' })
+
+        currentMarker = L.marker([lat, lng], { icon: customIcon })
             .bindPopup(popup)
             .addTo(map)
             .openPopup();
-    
+
         document.getElementById('info').innerHTML = `Fetching weather and models...`;
         const availableModels = await checkAvailableModels(lat, lng);
         if (availableModels.length > 0) {
