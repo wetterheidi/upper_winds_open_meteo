@@ -8,21 +8,17 @@ let lastModelRun = null;
 
 // Initialize the map and center it on the user's location if available
 function initMap() {
-    // Default coordinates (Herrsching am Ammersee, Germany)
     const defaultCenter = [48.0179, 11.1923];
     const defaultZoom = 10;
 
-    // Initialize the map and set default view immediately
     map = L.map('map');
-    map.setView(defaultCenter, defaultZoom); // Set view before geolocation attempt
+    map.setView(defaultCenter, defaultZoom);
 
-    // Add OpenStreetMap tiles
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
 
-    // Define the custom icon using favicon.ico
     const customIcon = L.icon({
         iconUrl: 'favicon.ico',
         iconSize: [32, 32],
@@ -33,8 +29,7 @@ function initMap() {
         shadowAnchor: [13, 32]
     });
 
-    // Add initial marker at default location
-    const initialAltitude = 'N/A'; // Will be updated later if geolocation succeeds
+    const initialAltitude = 'N/A';
     const initialPopup = L.popup({ offset: [0, 10] })
         .setLatLng(defaultCenter)
         .setContent(`Lat: ${defaultCenter[0].toFixed(4)}<br>Lng: ${defaultCenter[1].toFixed(4)}<br>Alt: ${initialAltitude}`);
@@ -43,17 +38,9 @@ function initMap() {
         .addTo(map)
         .openPopup();
 
-    // Function to update marker popup with altitude
-    const updateMarkerPopup = (lat, lng, altitude) => {
-        const popup = L.popup({ offset: [0, 10] })
-            .setLatLng([lat, lng])
-            .setContent(`Lat: ${lat.toFixed(4)}<br>Lng: ${lng.toFixed(4)}<br>Alt: ${altitude}m`);
-        if (currentMarker) {
-            currentMarker.setPopupContent(popup.getContent()).openPopup();
-        }
-    };
+    // Recenter map after initial marker placement
+    recenterMap();
 
-    // Attempt to get the user's current position
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
             async (position) => {
@@ -77,6 +64,9 @@ function initMap() {
                     .addTo(map)
                     .openPopup();
 
+                // Recenter map after geolocation marker placement
+                recenterMap();
+
                 document.getElementById('info').innerHTML = `Fetching weather and models...`;
                 const availableModels = await checkAvailableModels(lastLat, lastLng);
                 if (availableModels.length > 0) {
@@ -91,7 +81,6 @@ function initMap() {
             (error) => {
                 console.warn(`Geolocation error: ${error.message}`);
                 displayError('Unable to retrieve your location. Using default location (Herrsching am Ammersee).');
-                // Update existing marker with altitude when available
                 getAltitude(defaultCenter[0], defaultCenter[1]).then(async (altitude) => {
                     lastAltitude = altitude !== null ? altitude : 'N/A';
                     lastLat = defaultCenter[0];
@@ -102,6 +91,9 @@ function initMap() {
                     if (currentMarker) {
                         currentMarker.setPopupContent(popup.getContent()).openPopup();
                     }
+                    // Recenter map after default marker update
+                    recenterMap();
+
                     document.getElementById('info').innerHTML = `Fetching weather and models...`;
                     const availableModels = await checkAvailableModels(lastLat, lastLng);
                     if (availableModels.length > 0) {
@@ -123,7 +115,6 @@ function initMap() {
     } else {
         console.warn('Geolocation is not supported by this browser.');
         displayError('Geolocation not supported. Using default location (Herrsching am Ammersee).');
-        // Map view and initial marker already set, proceed with altitude and weather
         getAltitude(defaultCenter[0], defaultCenter[1]).then(async (altitude) => {
             lastAltitude = altitude !== null ? altitude : 'N/A';
             lastLat = defaultCenter[0];
@@ -134,6 +125,9 @@ function initMap() {
             if (currentMarker) {
                 currentMarker.setPopupContent(popup.getContent()).openPopup();
             }
+            // Recenter map after default marker update
+            recenterMap();
+
             document.getElementById('info').innerHTML = `Fetching weather and models...`;
             const availableModels = await checkAvailableModels(lastLat, lastLng);
             if (availableModels.length > 0) {
@@ -147,7 +141,6 @@ function initMap() {
         });
     }
 
-    // Add click event listener for manual map interaction
     map.on('click', async (e) => {
         const { lat, lng } = e.latlng;
         lastLat = lat;
@@ -168,6 +161,9 @@ function initMap() {
             .addTo(map)
             .openPopup();
 
+        // Recenter map after marker placement
+        recenterMap();
+
         document.getElementById('info').innerHTML = `Fetching weather and models...`;
         const availableModels = await checkAvailableModels(lat, lng);
         if (availableModels.length > 0) {
@@ -179,6 +175,16 @@ function initMap() {
             document.getElementById('info').innerHTML = `No models available.`;
         }
     });
+}
+
+function recenterMap() {
+    if (map && currentMarker) {
+        map.invalidateSize(); // Update map dimensions
+        map.panTo(currentMarker.getLatLng()); // Center on marker
+        console.log('Map recentered on marker at:', currentMarker.getLatLng());
+    } else {
+        console.warn('Cannot recenter map: map or marker not defined');
+    }
 }
 
 async function getAltitude(lat, lng) {
@@ -574,7 +580,7 @@ function updateWeatherDisplay(index, originalTime = null) {
     // Round lastAltitude to nearest ten for display only
     const displayAltitude = (lastAltitude !== 'N/A' && !isNaN(lastAltitude)) ? roundToTens(Number(lastAltitude)) : 'N/A';
     let output = `<table>`;
-    output += `<tr><th>Height (m ${refLevel})</th><th>Dir (°)</th><th>Spd (kt)</th><th>T (°C)</th></tr>`;
+    output += `<tr><th>Height (m ${refLevel})</th><th>Dir (deg)</th><th>Spd (kt)</th><th>T (C)</th></tr>`;
 
     interpolatedData.forEach(data => {
         output += `<tr><td>${data.displayHeight}</td><td>${roundToTens(data.dir)}</td><td>${data.spd}</td><td>${data.temp}</td></tr>`;
@@ -1183,5 +1189,20 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     } else {
         console.error('Upper limit input element not found');
+    }
+    // Observe changes to #info to detect table load and trigger map recenter
+    const infoElement = document.getElementById('info');
+    if (infoElement) {
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.type === 'childList' || mutation.type === 'characterData') {
+                    // Table content changed, recenter the map
+                    setTimeout(recenterMap, 100); // Slight delay to ensure DOM update
+                }
+            });
+        });
+        observer.observe(infoElement, { childList: true, subtree: true, characterData: true });
+    } else {
+        console.error('Info element not found for MutationObserver');
     }
 });

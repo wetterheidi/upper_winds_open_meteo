@@ -9,6 +9,22 @@ html {
     z-index: 0;
 }
 
+/* Leaflet popup customization */
+.leaflet-popup-content {
+    font-size: 13px; /* Adjust this value */
+    font-family: 'Roboto', sans-serif;
+    line-height: 1.0;
+}
+
+.leaflet-popup-content-wrapper {
+    padding: 0.5px;
+    border-radius: 5px;
+}
+
+.leaflet-popup-content-wrapper {
+    word-wrap: break-word;
+}
+
 #info {
     background: rgba(255, 255, 255, 0.95);
     padding: 15px;
