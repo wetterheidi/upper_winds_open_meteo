@@ -65,7 +65,7 @@ html {
 .menu li {
     padding: 10px;
     border-bottom: 1px solid #eee;
-    position: relative;
+    position: relative; /* Keep for submenu positioning */
 }
 
 .menu li:last-child {
@@ -79,20 +79,19 @@ html {
 .submenu {
     list-style: none;
     padding: 0;
-    margin: 0;
-    background: linear-gradient(to bottom, #ffffff, #f7f7f7);
-    border: 1px solid #ccc;
-    position: absolute;
-    top: 100%; /* Changed from top: 0 to top: 100% to open below */
-    left: 0; /* Changed from left: 100% to left: 0 to align with parent */
-    min-width: 200px; /* Match .menu width for consistency */
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    margin: 0 0 0 10px; /* Indent submenu slightly */
+    background: linear-gradient(to bottom, #ffffff, #f7f7f7); /* Match .menu */
+    border: none; /* Remove border since it’s inside .menu */
+    position: static; /* Integrate into .menu’s flow */
+    min-width: 0; /* Let it match .menu’s width minus indent */
+    box-shadow: none; /* No shadow since it’s part of .menu */
     z-index: 300;
 }
 
 .submenu li {
     padding: 10px;
     border-bottom: 1px solid #eee;
+    font-size: 13px;
 }
 
 .submenu li:last-child {
@@ -103,13 +102,25 @@ html {
     background: #f0f8ff;
 }
 
-.hidden {
-    display: none;
+.submenu select {
+    width: 100%;
+    padding: 6px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 13px !important;
+    font-family: 'Roboto', sans-serif;
+    background: #fff;
+    line-height: 1.4;
 }
 
-/* Show submenu on hover */
-.menu li:hover .submenu {
-    display: block;
+.submenu select:focus {
+    outline: 2px solid;
+    border-color: #4da8da;
+    box-shadow: 0 0 3px rgba(0, 123, 255, 0.5);
+}
+
+.hidden {
+    display: none;
 }
 
 #info {
@@ -277,7 +288,7 @@ button {
 
 #meanWindControls {
     display: grid;
-    grid-template-columns: 110px 80px 110px 80px minmax(0, 1fr);
+    grid-template-columns: 135px 70px 135px 70px minmax(0, 1fr);
     /* Use minmax to control 1fr */
     align-items: center;
     justify-items: start;
@@ -287,7 +298,7 @@ button {
 
 #controls-row {
     display: grid;
-    grid-template-columns: 110px 80px 110px 80px minmax(0, 1fr);
+    grid-template-columns: 135px 70px 135px 70px minmax(0, 1fr);
     /* Match columns */
     align-items: center;
     justify-items: start;
@@ -296,7 +307,7 @@ button {
 }
 
 #meanWindControls input {
-    width: 80px;
+    width: 70px;
     /* Base width */
     box-sizing: border-box;
     /* Ensure padding/border don’t increase width */
@@ -383,7 +394,7 @@ button {
 }
 
 #meanWindControls input {
-    width: 80px;
+    width: 70px;
 }
 
 #controls-row select {
@@ -520,6 +531,7 @@ input[type="number"] {
     position: relative;
     z-index: 1500;
     margin-right: 10px;
+    font-size: 13px !important; /* Ensure it’s enforced */
 }
 
 #meanWindControls input {
@@ -618,16 +630,16 @@ input[type="number"]:focus {
 
     #meanWindControls,
     #controls-row {
-        grid-template-columns: 110px 80px 110px 80px;
+        grid-template-columns: 135px 70px 135px 70px;
         grid-template-rows: auto auto; /* Two rows: inputs/selects, then result/button */
     }
 
     #meanWindControls {
-        grid-template-columns: 110px 80px 110px 80px;
+        grid-template-columns: 135px 70px 135px 70px;
     }
 
     #controls-row {
-        grid-template-columns: 110px 80px 110px 80px;
+        grid-template-columns: 135px 70px 135px 70px;
     }
 
     #lowerLimit,
@@ -676,22 +688,22 @@ input[type="number"]:focus {
 
     #meanWindControls,
     #controls-row {
-        grid-template-columns: 95px 65px 95px 65px; /* Remove the 1fr column */
+        grid-template-columns: 100px 60px 100px 60px; /* Remove the 1fr column */
         grid-template-rows: auto auto; /* Two rows: inputs/selects, then result/button */
     }
 
     #meanWindControls label,
     #controls-row label {
-        font-size: 12px;
+        font-size: 11px;
     }
 
     #lowerLimit,
     #upperLimit {
-        width: 65px;
+        width: 60px;
     }
 
     #controls-row select {
-        width: 65px;
+        width: 60px;
     }
 
     /* Move #meanWindResult to the second row, spanning all columns */

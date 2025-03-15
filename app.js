@@ -914,8 +914,51 @@ document.addEventListener('DOMContentLoaded', () => {
         hamburgerBtn.addEventListener('click', () => {
             menu.classList.toggle('hidden');
         });
+
+        // Add click handlers for submenu toggling
+        const menuItems = menu.querySelectorAll('li > span');
+        menuItems.forEach(item => {
+            item.addEventListener('click', (e) => {
+                const submenu = item.nextElementSibling; // The <ul class="submenu">
+                if (submenu && submenu.classList.contains('submenu')) {
+                    submenu.classList.toggle('hidden');
+                    // Close other open submenus
+                    menu.querySelectorAll('.submenu').forEach(otherSubmenu => {
+                        if (otherSubmenu !== submenu && !otherSubmenu.classList.contains('hidden')) {
+                            otherSubmenu.classList.add('hidden');
+                        }
+                    });
+                }
+                e.stopPropagation(); // Prevent event from bubbling up to hamburgerBtn
+            });
+        });
+
+        // Close submenus when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!menu.contains(e.target) && !hamburgerBtn.contains(e.target)) {
+                menu.querySelectorAll('.submenu').forEach(submenu => {
+                    submenu.classList.add('hidden');
+                });
+            }
+        });
+    }
+
+    refLevelSelect.addEventListener('change', updateReferenceLabels);
+    updateReferenceLabels(); // Initial call to set labels
+
+    if (refLevelSelect) {
+        refLevelSelect.addEventListener('change', () => {
+            if (weatherData && lastLat && lastLng) {
+                updateWeatherDisplay(document.getElementById('timeSlider').value || 0);
+                if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
+                    calculateMeanWind();
+                }
+            } else {
+                displayError('Please select a position and fetch weather data first.');
+            }
+        });
     } else {
-        console.error('Hamburger button or menu element not found');
+        console.error('Reference level select element not found');
     }
 
     // Debounce function (unchanged)
@@ -1007,21 +1050,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     } else {
         console.error('Interpolation step select element not found');
-    }
-
-    if (refLevelSelect) {
-        refLevelSelect.addEventListener('change', () => {
-            if (weatherData && lastLat && lastLng) {
-                updateWeatherDisplay(document.getElementById('timeSlider').value || 0);
-                if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
-                    calculateMeanWind();
-                }
-            } else {
-                displayError('Please select a position and fetch weather data first.');
-            }
-        });
-    } else {
-        console.error('Reference level select element not found');
     }
 
     if (lowerLimitInput) {

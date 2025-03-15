@@ -22,7 +22,17 @@
                     <li id="modelRunInfo"></li>
                 </ul>
             </li>
-            <!-- Add more top-level <li> items here later -->
+            <li>
+                <span>Reference Level</span>
+                <ul class="submenu hidden">
+                    <li>
+                        <select id="refLevelSelect">
+                            <option value="agl" selected>AGL</option>
+                            <option value="amsl">AMSL</option>
+                        </select>
+                    </li>
+                </ul>
+            </li>
         </ul>
     </div>
     <div id="slider-container">
@@ -59,11 +69,6 @@
                 <option value="500">500 m</option>
                 <option value="1000">1000 m</option>
                 <option value="2000">2000 m</option>
-            </select>
-            <label for="refLevelSelect" title="AGL: Above Ground Level, AMSL: Above Mean Sea Level">Reference:</label>
-            <select id="refLevelSelect" aria-label="Reference level">
-                <option value="AMSL">AMSL</option>
-                <option value="AGL" selected>AGL</option>
             </select>
             <button id="downloadButton">Download Table</button>
             <div id="info">Click on the map to fetch weather data.</div>
