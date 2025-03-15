@@ -717,8 +717,21 @@ function interpolateWeatherData(index) {
 
         const temp = Utils.gaussianInterpolation(lower.temp, upper.temp, lower.height, upper.height, actualHp);
         const rh = Math.max(0, Math.min(100, Utils.gaussianInterpolation(lower.rh, upper.rh, lower.height, upper.height, actualHp)));
-        const dir = Utils.gaussianInterpolation(lower.dir, upper.dir, lower.height, upper.height, actualHp);
-        const spd = Utils.gaussianInterpolation(lower.spd, upper.spd, lower.height, upper.height, actualHp);
+        
+        // Step 1: Convert dir/spd to u/v components
+        const lowerU = -lower.spd * Math.sin(lower.dir * Math.PI / 180); // u = -spd * sin(dir)
+        const lowerV = -lower.spd * Math.cos(lower.dir * Math.PI / 180); // v = -spd * cos(dir)
+        const upperU = -upper.spd * Math.sin(upper.dir * Math.PI / 180);
+        const upperV = -upper.spd * Math.cos(upper.dir * Math.PI / 180);
+
+        // Step 2: Interpolate u and v
+        const u = Utils.gaussianInterpolation(lowerU, upperU, lower.height, upper.height, actualHp);
+        const v = Utils.gaussianInterpolation(lowerV, upperV, lower.height, upper.height, actualHp);
+
+        // Step 3: Recalculate spd and dir from interpolated u/v
+        const spd = Utils.windSpeed(u, v);
+        const dir = Utils.windDirection(u, v);
+        
         const dew = Utils.calculateDewpoint(temp, rh);
         const pressure = Utils.interpolatePressure(actualHp, pressureLevels, pressureHeights);
 
