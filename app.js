@@ -14,11 +14,25 @@ function initMap() {
     map = L.map('map');
     map.setView(defaultCenter, defaultZoom);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-    }).addTo(map);
+    // Define base layers
+    const baseMaps = {
+        "OpenStreetMap": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }),
+        "OpenTopoMap": L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+            maxZoom: 17,
+            attribution: 'Map data: © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, SRTM | Map style: © <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)'
+        })
+    };
 
+    // Add default layer (e.g., OpenTopoMap)
+    baseMaps["OpenTopoMap"].addTo(map);
+
+    // Add layer control
+    L.control.layers(baseMaps).addTo(map);
+
+    // Rest of your code remains unchanged
     const customIcon = L.icon({
         iconUrl: 'favicon.ico',
         iconSize: [32, 32],
@@ -38,7 +52,6 @@ function initMap() {
         .addTo(map)
         .openPopup();
 
-    // Recenter map after initial marker placement
     recenterMap();
 
     if (navigator.geolocation) {
@@ -267,7 +280,7 @@ async function fetchWeather(lat, lon, currentTime = null) {
         let startDate = new Date(Date.UTC(newYear, newMonth, newDay, newHour));
         console.log('Calculated startDate:', startDate.toISOString());
         if (startDate > utcNow) {
-            console.warn(`Forecast start ${formatTime(startDate.toISOString())} is in the future; using current UTC date instead.`);
+            console.warn(`Forecast start ${Utils.formatTime(startDate.toISOString())} is in the future; using current UTC date instead.`);
             startDate = utcNow;
         }
         const startYear = startDate.getUTCFullYear();
@@ -335,30 +348,28 @@ async function fetchWeather(lat, lon, currentTime = null) {
             'temperature_200hPa', 'relative_humidity_200hPa', 'wind_speed_200hPa', 'wind_direction_200hPa', 'geopotential_height_200hPa'
         ];
 
-        // Corrected truncation logic
-        let lastValidIndex = -1; // Initialize to -1 to handle the case where no valid index is found
+        // New truncation logic: Keep all time steps unless surface data is missing
+        const criticalSurfaceVars = ['temperature_2m', 'wind_speed_10m', 'wind_direction_10m'];
+        let lastValidIndex = data.hourly.time.length - 1;
+
         for (let i = data.hourly.time.length - 1; i >= 0; i--) {
-            const allValid = keyVariables.every(variable => {
+            const surfaceValid = criticalSurfaceVars.every(variable => {
                 const value = data.hourly[variable]?.[i];
                 return value !== null && value !== undefined && !isNaN(value);
             });
-            if (allValid) {
-                lastValidIndex = i; // Set to the last fully valid index
-                break; // Stop at the first fully valid index from the end
+            if (!surfaceValid) {
+                lastValidIndex = i - 1; // Trim only if surface data is invalid
+                console.warn(`Trimming at index ${i} due to missing surface data`);
             } else {
-                const failingVars = keyVariables.filter(variable => {
-                    const value = data.hourly[variable]?.[i];
-                    return value === null || value === undefined || isNaN(value);
-                });
-                console.warn(`Invalid data at index ${i} due to null values in:`, failingVars);
+                break; // Stop when we find the last valid surface data
             }
         }
 
-        // If no valid index was found, default to 0 and slice up to 1 to avoid empty data
-        if (lastValidIndex === -1) {
-            console.warn('No valid data found in the entire dataset; defaulting to first index.');
+        if (lastValidIndex < 0) {
+            console.warn('No valid surface data found; defaulting to first index.');
             lastValidIndex = 0;
         }
+
 
         console.log('Last valid index after truncation:', lastValidIndex, 'Original length:', data.hourly.time.length);
 
@@ -453,7 +464,8 @@ async function fetchWeather(lat, lon, currentTime = null) {
             wind_direction_10m: weatherData.wind_direction_10m
         });
         console.group('Pressure Level Data (filtered)');
-        const pressureLevels = ['1000hPa', '950hPa', '925hPa', '900hPa', '850hPa', '800hPa', '700hPa', '600hPa', '500hPa', '400hPa', '300hPa', '250hPa', '200hPa'];
+        const pressureLevels = ['1000hPa', '950hPa', '925hPa', '900hPa', '850hPa', '800hPa', '700hPa', '600hPa', '500hPa', '400hPa', '300hPa', '250hPa', '200hPa']
+
         pressureLevels.forEach(level => {
             console.group(level);
             console.table({
@@ -516,7 +528,7 @@ async function fetchWeather(lat, lon, currentTime = null) {
             console.log('SetTimeout triggered - Slider state: min:', slider.min, 'max:', slider.max, 'value:', slider.value,
                 'weatherData.time.length:', weatherData?.time?.length);
             const displayedTime = document.getElementById('selectedTime').innerHTML.replace('Selected Time: ', '');
-            const expectedTime = formatTime(weatherData.time[slider.value]);
+            const expectedTime = Utils.formatTime(weatherData.time[slider.value]);
             if (displayedTime !== expectedTime || !weatherData.time[slider.value]) {
                 console.error(`UI mismatch or invalid time: Displayed ${displayedTime} but expected ${expectedTime}, forcing correction`);
                 const validIndex = Math.min(slider.value, weatherData.time.length - 1);
@@ -562,7 +574,7 @@ function updateWeatherDisplay(index, originalTime = null) {
     const lastValidIndex = weatherData.time.length - 1;
     const lastAvailableTime = new Date(weatherData.time[lastValidIndex]);
     if (originalTime && new Date(originalTime) > lastAvailableTime) {
-        const formattedLastTime = formatTime(weatherData.time[lastValidIndex]);
+        const formattedLastTime = Utils.formatTime(weatherData.time[lastValidIndex]);
         displayError(`Forecast only available until ${formattedLastTime}. Please select an earlier time.`);
         const slider = document.getElementById('timeSlider');
         slider.value = lastValidIndex;
@@ -571,19 +583,19 @@ function updateWeatherDisplay(index, originalTime = null) {
     }
 
     console.log('updateWeatherDisplay called with index:', index, 'time from weatherData (UTC):', weatherData.time[index]);
-    const time = formatTime(weatherData.time[index]);
+    const time = Utils.formatTime(weatherData.time[index]);
     console.log('Formatted time for display (UTC):', time);
 
     const interpolatedData = interpolateWeatherData(index);
     const refLevel = document.getElementById('refLevelSelect').value || 'AGL';
 
     // Round lastAltitude to nearest ten for display only
-    const displayAltitude = (lastAltitude !== 'N/A' && !isNaN(lastAltitude)) ? roundToTens(Number(lastAltitude)) : 'N/A';
+    const displayAltitude = (lastAltitude !== 'N/A' && !isNaN(lastAltitude)) ? Utils.roundToTens(Number(lastAltitude)) : 'N/A';
     let output = `<table>`;
     output += `<tr><th>Height (m ${refLevel})</th><th>Dir (deg)</th><th>Spd (kt)</th><th>T (C)</th></tr>`;
 
     interpolatedData.forEach(data => {
-        output += `<tr><td>${data.displayHeight}</td><td>${roundToTens(data.dir)}</td><td>${data.spd}</td><td>${data.temp}</td></tr>`;
+        output += `<tr><td>${data.displayHeight}</td><td>${Utils.roundToTens(data.dir)}</td><td>${data.spd}</td><td>${data.temp}</td></tr>`;
     });
 
     output += `</table>`;
@@ -631,61 +643,6 @@ async function checkAvailableModels(lat, lon) {
     document.getElementById('info').innerHTML = currentContent + modelDisplay;
 
     return availableModels;
-}
-
-function calculateDewpoint(temp, rh) {
-    const aLiquid = 17.27;  // Coefficient for liquid water
-    const bLiquid = 237.7;  // Constant for liquid water (°C)
-    const aIce = 21.87;     // Coefficient for ice
-    const bIce = 265.5;     // Constant for ice (°C)
-
-    let alpha, dewpoint;
-
-    if (temp >= 0) {
-        // Magnus formula for liquid water (T ≥ 0°C)
-        alpha = (aLiquid * temp) / (bLiquid + temp) + Math.log(rh / 100);
-        dewpoint = (bLiquid * alpha) / (aLiquid - alpha);
-    } else {
-        // Magnus formula for ice (T < 0°C)
-        alpha = (aIce * temp) / (bIce + temp) + Math.log(rh / 100);
-        dewpoint = (bIce * alpha) / (aIce - alpha);
-    }
-
-    return dewpoint.toFixed(0);
-}
-
-function gaussianInterpolation(y1, y2, h1, h2, hp) {
-    let w1 = 1 / Math.abs(h1 - hp);
-    let w2 = 1 / Math.abs(h2 - hp);
-    const yp = (w1 * y1 + w2 * y2) / (w1 + w2);
-    return yp;
-}
-
-function interpolatePressure(height, pressureLevels, heights) {
-    for (let i = 0; i < heights.length - 1; i++) {
-        if (height <= heights[i] && height >= heights[i + 1]) {
-            const p1 = pressureLevels[i];
-            const p2 = pressureLevels[i + 1];
-            const h1 = heights[i];
-            const h2 = heights[i + 1];
-            return p1 + (p2 - p1) * (height - h1) / (h2 - h1);
-        }
-    }
-    if (height > heights[0]) {
-        const p1 = pressureLevels[0];
-        const p2 = pressureLevels[1];
-        const h1 = heights[0];
-        const h2 = heights[1];
-        return p1 + (p2 - p1) * (height - h1) / (h2 - h1);
-    }
-    if (height < heights[heights.length - 1]) {
-        const p1 = pressureLevels[pressureLevels.length - 2];
-        const p2 = pressureLevels[pressureLevels.length - 1];
-        const h1 = heights[heights.length - 2];
-        const h2 = heights[heights.length - 1];
-        return p2 + (p1 - p2) * (height - h2) / (h1 - h2);
-    }
-    return '-';
 }
 
 function interpolateWeatherData(index) {
@@ -758,15 +715,15 @@ function interpolateWeatherData(index) {
         const upper = dataPoints.find(p => p.height > actualHp);
         if (!lower || !upper) continue;
 
-        const temp = gaussianInterpolation(lower.temp, upper.temp, lower.height, upper.height, actualHp);
-        const rh = Math.max(0, Math.min(100, gaussianInterpolation(lower.rh, upper.rh, lower.height, upper.height, actualHp)));
-        const dir = gaussianInterpolation(lower.dir, upper.dir, lower.height, upper.height, actualHp);
-        const spd = gaussianInterpolation(lower.spd, upper.spd, lower.height, upper.height, actualHp);
-        const dew = calculateDewpoint(temp, rh);
-        const pressure = interpolatePressure(actualHp, pressureLevels, pressureHeights);
+        const temp = Utils.gaussianInterpolation(lower.temp, upper.temp, lower.height, upper.height, actualHp);
+        const rh = Math.max(0, Math.min(100, Utils.gaussianInterpolation(lower.rh, upper.rh, lower.height, upper.height, actualHp)));
+        const dir = Utils.gaussianInterpolation(lower.dir, upper.dir, lower.height, upper.height, actualHp);
+        const spd = Utils.gaussianInterpolation(lower.spd, upper.spd, lower.height, upper.height, actualHp);
+        const dew = Utils.calculateDewpoint(temp, rh);
+        const pressure = Utils.interpolatePressure(actualHp, pressureLevels, pressureHeights);
 
         // Round displayHeight only in AMSL mode
-        const displayHeight = refLevel === 'AMSL' ? roundToTens(hp) : hp;
+        const displayHeight = refLevel === 'AMSL' ? Utils.roundToTens(hp) : hp;
 
         interpolated.push({
             height: actualHp,
@@ -782,10 +739,10 @@ function interpolateWeatherData(index) {
 
     const surfaceData = dataPoints.find(d => d.level === `${surfaceHeight} m`);
     if (surfaceData) {
-        const dew = (surfaceData.temp !== undefined && surfaceData.rh !== undefined) ? calculateDewpoint(surfaceData.temp, surfaceData.rh) : '-';
-        const pressure = interpolatePressure(surfaceData.height, pressureLevels, pressureHeights);
+        const dew = (surfaceData.temp !== undefined && surfaceData.rh !== undefined) ? Utils.calculateDewpoint(surfaceData.temp, surfaceData.rh) : '-';
+        const pressure = Utils.interpolatePressure(surfaceData.height, pressureLevels, pressureHeights);
         // Round surfaceHeight only in AMSL mode
-        const displaySurfaceHeight = refLevel === 'AMSL' ? roundToTens(surfaceHeight) : surfaceHeight;
+        const displaySurfaceHeight = refLevel === 'AMSL' ? Utils.roundToTens(surfaceHeight) : surfaceHeight;
         interpolated.push({
             height: surfaceData.height,
             displayHeight: displaySurfaceHeight,
@@ -800,104 +757,6 @@ function interpolateWeatherData(index) {
 
     interpolated.sort((a, b) => a.height - b.height);
     return interpolated;
-}
-
-function LIP(xVector, yVector, xValue) {
-    let reversed = false;
-    if (xVector[1] > xVector[0]) {
-        yVector = [...yVector].reverse();
-        xVector = [...xVector].reverse();
-        reversed = true;
-    }
-
-    const Dimension = xVector.length - 1;
-    try {
-        if (xValue > xVector[0] || xValue < xVector[Dimension]) {
-            let m, n;
-            if (xValue > xVector[0]) {
-                m = (yVector[1] - yVector[0]) / (xVector[1] - xVector[0]);
-                n = yVector[1] - m * xVector[1];
-            } else {
-                m = (yVector[Dimension] - yVector[Dimension - 1]) / (xVector[Dimension] - xVector[Dimension - 1]);
-                n = yVector[Dimension] - m * xVector[Dimension];
-            }
-            return m * xValue + n;
-        } else {
-            let i;
-            for (i = 1; i <= Dimension; i++) {
-                if (xValue >= xVector[i]) break;
-            }
-            const m = (yVector[i] - yVector[i - 1]) / (xVector[i] - xVector[i - 1]);
-            const n = yVector[i] - m * xVector[i];
-            return m * xValue + n;
-        }
-    } catch (error) {
-        return "interpolation error";
-    } finally {
-        if (reversed) {
-            yVector.reverse();
-            xVector.reverse();
-        }
-    }
-}
-
-function windSpeed(x, y) {
-    return Math.sqrt(x * x + y * y);
-}
-
-function windDirection(u, v) {
-    let dir = Math.atan2(-u, -v) * 180 / Math.PI; // Correct meteorological direction
-    return (dir + 360) % 360; // Ensure 0–360°
-}
-
-function Mittelwind(Höhe, xKomponente, yKomponente, Untergrenze, Obergrenze) {
-    const dddff = new Array(4);
-    let hSchicht = [Obergrenze];
-    let xSchicht = [Number(LIP(Höhe, xKomponente, Obergrenze))];
-    let ySchicht = [Number(LIP(Höhe, yKomponente, Obergrenze))];
-
-    const xUntergrenze = Number(LIP(Höhe, xKomponente, Untergrenze));
-    const yUntergrenze = Number(LIP(Höhe, yKomponente, Untergrenze));
-
-    for (let i = 0; i < Höhe.length; i++) {
-        if (Höhe[i] < Obergrenze && Höhe[i] > Untergrenze) {
-            hSchicht.push(Höhe[i]);
-            xSchicht.push(xKomponente[i]);
-            ySchicht.push(yKomponente[i]);
-        }
-    }
-
-    hSchicht.push(Untergrenze);
-    xSchicht.push(xUntergrenze);
-    ySchicht.push(yUntergrenze);
-
-    // Sort arrays in descending order of height
-    const indices = hSchicht.map((_, idx) => idx);
-    indices.sort((a, b) => hSchicht[b] - hSchicht[a]); // Descending order
-    hSchicht = indices.map(i => hSchicht[i]);
-    xSchicht = indices.map(i => xSchicht[i]);
-    ySchicht = indices.map(i => ySchicht[i]);
-
-    let xTrapez = 0;
-    let yTrapez = 0;
-    for (let i = 0; i < hSchicht.length - 1; i++) {
-        xTrapez += 0.5 * (xSchicht[i] + xSchicht[i + 1]) * (hSchicht[i] - hSchicht[i + 1]);
-        yTrapez += 0.5 * (ySchicht[i] + ySchicht[i + 1]) * (hSchicht[i] - hSchicht[i + 1]);
-    }
-
-    const xMittel = xTrapez / (hSchicht[0] - hSchicht[hSchicht.length - 1]);
-    const yMittel = yTrapez / (hSchicht[0] - hSchicht[hSchicht.length - 1]);
-
-    dddff[2] = xMittel; // u component
-    dddff[3] = yMittel; // v component
-    dddff[1] = windSpeed(xMittel, yMittel); // Speed
-    dddff[0] = windDirection(xMittel, yMittel); // Direction
-
-    return dddff;
-}
-
-function roundToTens(value) {
-    return Math.round(value / 10) * 10;
 }
 
 function calculateMeanWind() {
@@ -938,10 +797,10 @@ function calculateMeanWind() {
     const xKomponente = spds.map((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
     const yKomponente = spds.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
 
-    const meanWind = Mittelwind(heights, xKomponente, yKomponente, lowerLimit, upperLimit);
+    const meanWind = Utils.calculateMeanWind(heights, xKomponente, yKomponente, lowerLimit, upperLimit);
     const [dir, spd] = meanWind;
 
-    const roundedDir = roundToTens(dir);
+    const roundedDir = Utils.roundToTens(dir);
     const result = `Mean wind (${lowerLimitInput}-${upperLimitInput} m ${refLevel}): ${roundedDir}° ${spd.toFixed(0)} kt`;
     const meanWindResult = document.getElementById('meanWindResult');
     if (meanWindResult) {
@@ -952,24 +811,6 @@ function calculateMeanWind() {
     }
 }
 
-function formatTime(timeStr) {
-    console.log('Formatting time:', timeStr); // Debug log
-    // Parse as UTC explicitly
-    const date = new Date(Date.UTC(
-        parseInt(timeStr.slice(0, 4)), // Year
-        parseInt(timeStr.slice(5, 7)) - 1, // Month (0-based)
-        parseInt(timeStr.slice(8, 10)), // Day
-        parseInt(timeStr.slice(11, 13)), // Hour
-        parseInt(timeStr.slice(14, 16)) // Minute
-    ));
-    const year = date.getUTCFullYear();
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(date.getUTCDate()).padStart(2, '0');
-    const hour = String(date.getUTCHours()).padStart(2, '0');
-    const minute = String(date.getUTCMinutes()).padStart(2, '0');
-    return `${year}-${month}-${day} ${hour}${minute}Z`; // Explicit UTC marker
-}
-
 function downloadTableAsAscii() {
     if (!weatherData || !weatherData.time) {
         displayError('No weather data available to download.');
@@ -978,7 +819,7 @@ function downloadTableAsAscii() {
 
     const index = document.getElementById('timeSlider').value || 0;
     const model = document.getElementById('modelSelect').value.toUpperCase();
-    const time = formatTime(weatherData.time[index]).replace(' ', '_'); // UTC
+    const time = Utils.formatTime(weatherData.time[index]).replace(' ', '_'); // UTC
     const filename = `${time}_${model}_HEIDIS.txt`;
 
     const interpolatedData = interpolateWeatherData(index);
