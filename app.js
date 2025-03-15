@@ -16,6 +16,19 @@ function updateModelRunInfo() {
     }
 }
 
+function updateReferenceLabels() {
+    const refLevel = document.getElementById('refLevelSelect').value || 'AGL';
+    console.log('Updating labels to refLevel:', refLevel);
+    // Update table header (already handled by updateWeatherDisplay)
+    // Update mean wind result if it exists
+    const meanWindResult = document.getElementById('meanWindResult');
+    if (meanWindResult && meanWindResult.innerHTML) {
+        const currentText = meanWindResult.innerHTML;
+        const updatedText = currentText.replace(/\((\d+)-(\d+) m [A-Za-z]+\)/, `($1-$2 m ${refLevel})`);
+        meanWindResult.innerHTML = updatedText;
+    }
+}
+
 // Initialize the map and center it on the user's location if available
 function initMap() {
     const defaultCenter = [48.0179, 11.1923];
@@ -123,6 +136,8 @@ function initMap() {
                     if (availableModels.length > 0) {
                         await fetchWeather(lastLat, lastLng);
                         updateModelRunInfo();
+                        updateReferenceLabels(); // Add this
+                        updateWeatherDisplay(0); // Force initial display
                         if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
                             calculateMeanWind();
                         }
@@ -142,6 +157,7 @@ function initMap() {
         displayError('Geolocation not supported. Using default location (Herrsching am Ammersee).');
         getAltitude(defaultCenter[0], defaultCenter[1]).then(async (altitude) => {
             lastAltitude = altitude !== null ? altitude : 'N/A';
+            console.log('Default location altitude:', lastAltitude); // Should be ~580
             lastLat = defaultCenter[0];
             lastLng = defaultCenter[1];
             const popup = L.popup({ offset: [0, 10] })
@@ -214,26 +230,16 @@ function recenterMap() {
 
 async function getAltitude(lat, lng) {
     try {
-        console.log('Fetching altitude from Open-Elevation for:', { lat, lng });
         const response = await fetch(
             `https://api.open-elevation.com/api/v1/lookup?locations=${lat},${lng}`
         );
-        console.log('API response status:', response.status);
-        if (!response.ok) {
-            throw new Error(`Elevation fetch failed: ${response.status} - ${response.statusText}`);
-        }
+        if (!response.ok) throw new Error(`Elevation fetch failed: ${response.status}`);
         const data = await response.json();
-        console.log('API response data:', data);
         const elevation = data.results[0]?.elevation;
-        if (elevation === undefined || elevation === null) {
-            console.warn('No elevation data returned for coordinates:', { lat, lng });
-            return 'N/A';
-        }
-        console.log('Elevation fetched:', elevation, 'm for lat:', lat, 'lng:', lng);
-        return elevation;
+        console.log('Fetched elevation:', elevation); // Should be ~580 for [48.0179, 11.1923]
+        return elevation !== undefined && elevation !== null ? elevation : 'N/A';
     } catch (error) {
         console.error('Error fetching elevation:', error.message);
-        displayError(`Could not fetch elevation data: ${error.message}`);
         return 'N/A';
     }
 }
@@ -575,7 +581,7 @@ async function fetchWeather(lat, lon, currentTime = null) {
 
 function updateWeatherDisplay(index, originalTime = null) {
     if (!weatherData || !weatherData.time || index < 0 || index >= weatherData.time.length) {
-        console.error('No weather data available or index out of bounds:', index, 'Length:', weatherData?.time?.length);
+        console.error('No weather data available or index out of bounds:', index);
         document.getElementById('info').innerHTML = 'No weather data available';
         document.getElementById('selectedTime').innerHTML = 'Selected Time: ';
         const slider = document.getElementById('timeSlider');
@@ -583,33 +589,15 @@ function updateWeatherDisplay(index, originalTime = null) {
         return;
     }
 
-    const lastValidIndex = weatherData.time.length - 1;
-    const lastAvailableTime = new Date(weatherData.time[lastValidIndex]);
-    if (originalTime && new Date(originalTime) > lastAvailableTime) {
-        const formattedLastTime = Utils.formatTime(weatherData.time[lastValidIndex]);
-        displayError(`Forecast only available until ${formattedLastTime}. Please select an earlier time.`);
-        const slider = document.getElementById('timeSlider');
-        slider.value = lastValidIndex;
-        updateWeatherDisplay(lastValidIndex);
-        return;
-    }
-
-    console.log('updateWeatherDisplay called with index:', index, 'time from weatherData (UTC):', weatherData.time[index]);
     const time = Utils.formatTime(weatherData.time[index]);
-    console.log('Formatted time for display (UTC):', time);
-
     const interpolatedData = interpolateWeatherData(index);
     const refLevel = document.getElementById('refLevelSelect').value || 'AGL';
 
-    // Round lastAltitude to nearest ten for display only
-    const displayAltitude = (lastAltitude !== 'N/A' && !isNaN(lastAltitude)) ? Utils.roundToTens(Number(lastAltitude)) : 'N/A';
     let output = `<table>`;
     output += `<tr><th>Height (m ${refLevel})</th><th>Dir (deg)</th><th>Spd (kt)</th><th>T (C)</th></tr>`;
-
     interpolatedData.forEach(data => {
         output += `<tr><td>${data.displayHeight}</td><td>${Utils.roundToTens(data.dir)}</td><td>${data.spd}</td><td>${data.temp}</td></tr>`;
     });
-
     output += `</table>`;
     document.getElementById('info').innerHTML = output;
     document.getElementById('selectedTime').innerHTML = `Selected Time: ${time}`;
@@ -662,27 +650,23 @@ function interpolateWeatherData(index) {
 
     const step = parseInt(document.getElementById('interpStepSelect').value) || 200;
     const refLevel = document.getElementById('refLevelSelect').value || 'AGL';
-    const baseHeight = Number(lastAltitude); // Keep unrounded for calculations
+    const baseHeight = Number(lastAltitude); // Terrain altitude (e.g., 580 m for default location)
     const levels = ['200 hPa', '250hPa', '300 hPa', '400hPa', '500 hPa', '600hPa', '700 hPa', '800 hPa', '850 hPa', '900 hPa', '925 hPa', '950 hPa', '1000 hPa'];
 
+    // Surface height: 0 for AGL, baseHeight for AMSL
     const surfaceHeight = refLevel === 'AGL' ? 0 : baseHeight;
     const dataPoints = [
         {
             level: `${surfaceHeight} m`,
-            height: baseHeight,
+            height: baseHeight, // Actual height for interpolation
             temp: weatherData.temperature_2m?.[index],
             rh: weatherData.relative_humidity_2m?.[index],
             dir: weatherData.wind_direction_10m?.[index],
-            spd: weatherData.wind_speed_10m?.[index] * 0.539957
+            spd: weatherData.wind_speed_10m?.[index] * 0.539957 // Convert m/s to knots
         }
     ];
 
-    console.log(`Surface data at index ${index}:`, {
-        temp: weatherData.temperature_2m?.[index],
-        rh: weatherData.relative_humidity_2m?.[index],
-        dir: weatherData.wind_direction_10m?.[index],
-        spd: weatherData.wind_speed_10m?.[index]
-    });
+    console.log(`Surface setup - refLevel: ${refLevel}, baseHeight: ${baseHeight}, surfaceHeight: ${surfaceHeight}`);
 
     levels.forEach(level => {
         const levelKey = level.replace(' ', '');
@@ -697,58 +681,64 @@ function interpolateWeatherData(index) {
                 spd: weatherData[`wind_speed_${levelKey}`]?.[index] * 0.539957
             };
             dataPoints.push(point);
-            console.log(`Added ${level} at index ${index}:`, point);
-        } else {
-            console.log(`Skipped ${level} at index ${index} due to invalid geopotential_height:`, gh);
         }
     });
 
-    console.log(`Total dataPoints at index ${index}:`, dataPoints.length, dataPoints);
-
     if (dataPoints.length < 2 || dataPoints.every(dp => dp.temp === undefined || dp.dir === undefined || dp.spd === undefined)) {
-        console.warn('Insufficient or invalid data at index:', index, 'dataPoints:', dataPoints);
-        return [{ displayHeight: 0, dir: NaN, spd: 0, temp: '-' }]; // Return minimal data to trigger table
+        console.warn('Insufficient data at index:', index);
+        return [{ displayHeight: surfaceHeight, dir: NaN, spd: 0, temp: '-' }];
     }
 
     dataPoints.sort((a, b) => a.height - b.height);
     const maxHeight = dataPoints[dataPoints.length - 1].height;
     const interpolated = [];
 
+    // Explicitly add surface data as the first row
+    const surfaceData = dataPoints[0];
+    const dewSurface = Utils.calculateDewpoint(surfaceData.temp, surfaceData.rh);
     const pressureLevels = [200, 250, 300, 400, 500, 600, 700, 800, 850, 900, 925, 950, 1000];
     const pressureHeights = levels.map(level => {
         const levelKey = level.replace(' ', '');
         return weatherData[`geopotential_height_${levelKey}`]?.[index] || null;
     }).filter(h => h !== null && !isNaN(h)).map(h => Math.round(h));
     pressureHeights.sort((a, b) => b - a);
+    const pressureSurface = Utils.interpolatePressure(surfaceData.height, pressureLevels, pressureHeights);
 
+    interpolated.push({
+        height: surfaceData.height,
+        displayHeight: surfaceHeight,
+        temp: surfaceData.temp?.toFixed(0) ?? '-',
+        rh: surfaceData.rh?.toFixed(0) ?? '-',
+        dew: dewSurface,
+        dir: surfaceData.dir?.toFixed(0) ?? '-',
+        spd: surfaceData.spd?.toFixed(0) ?? '-',
+        pressure: pressureSurface === '-' ? '-' : pressureSurface.toFixed(0)
+    });
+
+    // Interpolation loop for levels above the surface
     for (let hp = surfaceHeight + step; hp <= (refLevel === 'AGL' ? maxHeight - baseHeight : maxHeight); hp += step) {
-        const actualHp = refLevel === 'AGL' ? hp + baseHeight : hp;
+        const actualHp = refLevel === 'AGL' ? hp + baseHeight : hp; // Absolute height for interpolation
         const lower = dataPoints.filter(p => p.height <= actualHp).pop();
         const upper = dataPoints.find(p => p.height > actualHp);
         if (!lower || !upper) continue;
 
         const temp = Utils.gaussianInterpolation(lower.temp, upper.temp, lower.height, upper.height, actualHp);
         const rh = Math.max(0, Math.min(100, Utils.gaussianInterpolation(lower.rh, upper.rh, lower.height, upper.height, actualHp)));
-        
-        // Step 1: Convert dir/spd to u/v components
-        const lowerU = -lower.spd * Math.sin(lower.dir * Math.PI / 180); // u = -spd * sin(dir)
-        const lowerV = -lower.spd * Math.cos(lower.dir * Math.PI / 180); // v = -spd * cos(dir)
+
+        const lowerU = -lower.spd * Math.sin(lower.dir * Math.PI / 180);
+        const lowerV = -lower.spd * Math.cos(lower.dir * Math.PI / 180);
         const upperU = -upper.spd * Math.sin(upper.dir * Math.PI / 180);
         const upperV = -upper.spd * Math.cos(upper.dir * Math.PI / 180);
 
-        // Step 2: Interpolate u and v
         const u = Utils.gaussianInterpolation(lowerU, upperU, lower.height, upper.height, actualHp);
         const v = Utils.gaussianInterpolation(lowerV, upperV, lower.height, upper.height, actualHp);
 
-        // Step 3: Recalculate spd and dir from interpolated u/v
         const spd = Utils.windSpeed(u, v);
         const dir = Utils.windDirection(u, v);
-        
         const dew = Utils.calculateDewpoint(temp, rh);
         const pressure = Utils.interpolatePressure(actualHp, pressureLevels, pressureHeights);
 
-        // Round displayHeight only in AMSL mode
-        const displayHeight = refLevel === 'AMSL' ? Utils.roundToTens(hp) : hp;
+        const displayHeight = refLevel === 'AGL' ? Utils.roundToTens(hp) : Utils.roundToTens(actualHp);
 
         interpolated.push({
             height: actualHp,
@@ -762,25 +752,13 @@ function interpolateWeatherData(index) {
         });
     }
 
-    const surfaceData = dataPoints.find(d => d.level === `${surfaceHeight} m`);
-    if (surfaceData) {
-        const dew = (surfaceData.temp !== undefined && surfaceData.rh !== undefined) ? Utils.calculateDewpoint(surfaceData.temp, surfaceData.rh) : '-';
-        const pressure = Utils.interpolatePressure(surfaceData.height, pressureLevels, pressureHeights);
-        // Round surfaceHeight only in AMSL mode
-        const displaySurfaceHeight = refLevel === 'AMSL' ? Utils.roundToTens(surfaceHeight) : surfaceHeight;
-        interpolated.push({
-            height: surfaceData.height,
-            displayHeight: displaySurfaceHeight,
-            temp: surfaceData.temp?.toFixed(0) ?? '-',
-            rh: surfaceData.rh?.toFixed(0) ?? '-',
-            dew: dew,
-            dir: surfaceData.dir?.toFixed(0) ?? '-',
-            spd: surfaceData.spd?.toFixed(0) ?? '-',
-            pressure: pressure === '-' ? '-' : pressure.toFixed(0)
-        });
-    }
-
-    interpolated.sort((a, b) => a.height - b.height);
+    console.log('Interpolated data for display:', interpolated.map(d => ({
+        displayHeight: d.displayHeight,
+        actualHeight: d.height,
+        temp: d.temp,
+        dir: d.dir,
+        spd: d.spd
+    })));
     return interpolated;
 }
 
@@ -837,22 +815,28 @@ function calculateMeanWind() {
 }
 
 function downloadTableAsAscii() {
+    console.log('downloadTableAsAscii called');
     if (!weatherData || !weatherData.time) {
+        console.log('No weather data:', weatherData);
         displayError('No weather data available to download.');
         return;
     }
 
     const index = document.getElementById('timeSlider').value || 0;
+    console.log('Slider index:', index);
     const model = document.getElementById('modelSelect').value.toUpperCase();
-    const time = Utils.formatTime(weatherData.time[index]).replace(' ', '_'); // UTC
+    const time = Utils.formatTime(weatherData.time[index]).replace(' ', '_');
     const filename = `${time}_${model}_HEIDIS.txt`;
+    console.log('Filename:', filename);
 
     const interpolatedData = interpolateWeatherData(index);
+    console.log('Interpolated data:', interpolatedData);
     let content = 'h(m) p(hPa) T(°C) Dew(°C) Dir(°) Spd(kt) RH(%)\n';
 
     interpolatedData.forEach(data => {
         content += `${data.displayHeight} ${data.pressure} ${data.temp} ${data.dew} ${data.dir} ${data.spd} ${data.rh}\n`;
     });
+    console.log('File content preview:', content.slice(0, 200));
 
     const blob = new Blob([content], { type: 'text/plain' });
     const url = window.URL.createObjectURL(blob);
@@ -863,6 +847,7 @@ function downloadTableAsAscii() {
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
+    console.log('Download triggered');
 }
 
 function displayError(message) {
@@ -877,91 +862,31 @@ function displayError(message) {
     setTimeout(() => errorElement.style.display = 'none', 5000);
 }
 
-
-
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOM fully loaded, initializing map...');
     initMap();
 
     const slider = document.getElementById('timeSlider');
     const modelSelect = document.getElementById('modelSelect');
+    const downloadButton = document.getElementById('downloadButton');
     const hamburgerBtn = document.getElementById('hamburgerBtn');
     const menu = document.getElementById('menu');
-    const downloadButton = document.getElementById('downloadButton');
     const interpStepSelect = document.getElementById('interpStepSelect');
     const refLevelSelect = document.getElementById('refLevelSelect');
     const lowerLimitInput = document.getElementById('lowerLimit');
     const upperLimitInput = document.getElementById('upperLimit');
 
-    console.log('Elements found:', {
-        slider, modelSelect, hamburgerBtn, menu, downloadButton,
-        interpStepSelect, refLevelSelect, lowerLimitInput, upperLimitInput
-    });
+    console.log('Elements:', { slider, modelSelect, downloadButton, hamburgerBtn, menu, interpStepSelect, refLevelSelect, lowerLimitInput, upperLimitInput });
 
     if (!slider) {
-        console.error('Slider element not found in DOM');
+        console.error('Slider missing');
         displayError('Slider element missing. Check HTML.');
         return;
     }
 
     slider.value = 0;
     slider.setAttribute('autocomplete', 'off');
-    console.log('Initial slider state - min:', slider.min, 'max:', slider.max, 'value:', slider.value,
-        'weatherData.time:', weatherData?.time);
 
-    // Hamburger menu toggle
-    if (hamburgerBtn && menu) {
-        hamburgerBtn.addEventListener('click', () => {
-            menu.classList.toggle('hidden');
-        });
-
-        // Add click handlers for submenu toggling
-        const menuItems = menu.querySelectorAll('li > span');
-        menuItems.forEach(item => {
-            item.addEventListener('click', (e) => {
-                const submenu = item.nextElementSibling; // The <ul class="submenu">
-                if (submenu && submenu.classList.contains('submenu')) {
-                    submenu.classList.toggle('hidden');
-                    // Close other open submenus
-                    menu.querySelectorAll('.submenu').forEach(otherSubmenu => {
-                        if (otherSubmenu !== submenu && !otherSubmenu.classList.contains('hidden')) {
-                            otherSubmenu.classList.add('hidden');
-                        }
-                    });
-                }
-                e.stopPropagation(); // Prevent event from bubbling up to hamburgerBtn
-            });
-        });
-
-        // Close submenus when clicking outside
-        document.addEventListener('click', (e) => {
-            if (!menu.contains(e.target) && !hamburgerBtn.contains(e.target)) {
-                menu.querySelectorAll('.submenu').forEach(submenu => {
-                    submenu.classList.add('hidden');
-                });
-            }
-        });
-    }
-
-    refLevelSelect.addEventListener('change', updateReferenceLabels);
-    updateReferenceLabels(); // Initial call to set labels
-
-    if (refLevelSelect) {
-        refLevelSelect.addEventListener('change', () => {
-            if (weatherData && lastLat && lastLng) {
-                updateWeatherDisplay(document.getElementById('timeSlider').value || 0);
-                if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
-                    calculateMeanWind();
-                }
-            } else {
-                displayError('Please select a position and fetch weather data first.');
-            }
-        });
-    } else {
-        console.error('Reference level select element not found');
-    }
-
-    // Debounce function (unchanged)
     function debounce(func, wait) {
         let timeout;
         return function (...args) {
@@ -970,60 +895,52 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    const debouncedUpdate = debounce((e) => {
-        const slider = document.getElementById('timeSlider');
-        const index = parseInt(e.target.value);
-        console.log('Slider input event fired - min:', slider.min, 'max:', slider.max, 'value:', index,
-            'weatherData.time[index]:', weatherData?.time[index], 'length:', weatherData?.time?.length);
-        if (index >= 0 && index <= (weatherData?.time?.length - 1 || 0)) {
-            updateWeatherDisplay(index);
-            if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
-                calculateMeanWind();
+    if (slider) {
+        const debouncedUpdate = debounce((e) => {
+            const index = parseInt(e.target.value);
+            console.log('Slider input triggered - index:', index, 'weatherData.time:', weatherData?.time?.[index]);
+            if (weatherData && index >= 0 && index < weatherData.time.length) {
+                updateWeatherDisplay(index);
+                if (lastLat && lastLng && lastAltitude !== 'N/A') calculateMeanWind();
+            } else {
+                console.warn('Invalid slider index or no data:', index);
+                slider.value = 0;
+                updateWeatherDisplay(0);
             }
-        } else {
-            console.warn('Slider value out of bounds, resetting to 0. Index:', index, 'Max:', weatherData?.time?.length - 1);
-            slider.value = 0;
-            updateWeatherDisplay(0);
-            if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
-                calculateMeanWind();
-            }
-        }
-    }, 100);
+        }, 100);
 
-    slider.addEventListener('input', debouncedUpdate);
-    console.log('Input event listener attached to slider');
-
-    slider.addEventListener('change', (e) => {
-        const slider = document.getElementById('timeSlider');
-        const index = parseInt(e.target.value);
-        console.log('Slider change event fired - min:', slider.min, 'max:', slider.max, 'value:', index,
-            'weatherData.time[index]:', weatherData?.time[index], 'length:', weatherData?.time?.length);
-        if (index >= 0 && index <= (weatherData?.time?.length - 1 || 0)) {
-            updateWeatherDisplay(index);
-            if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
-                calculateMeanWind();
+        slider.addEventListener('input', debouncedUpdate);
+        slider.addEventListener('change', (e) => {
+            const index = parseInt(e.target.value);
+            console.log('Slider change triggered - index:', index, 'weatherData.time:', weatherData?.time?.[index]);
+            if (weatherData && index >= 0 && index < weatherData.time.length) {
+                updateWeatherDisplay(index);
+                if (lastLat && lastLng && lastAltitude !== 'N/A') calculateMeanWind();
+            } else {
+                console.warn('Slider out of bounds, resetting to 0');
+                slider.value = 0;
+                updateWeatherDisplay(0);
             }
-        } else {
-            console.warn('Slider value out of bounds, resetting to 0. Index:', index, 'Max:', weatherData?.time?.length - 1);
-            slider.value = 0;
-            updateWeatherDisplay(0);
-            if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
-                calculateMeanWind();
-            }
-        }
-    });
-    console.log('Change event listener attached to slider');
+        });
+    }
 
     if (modelSelect) {
         modelSelect.addEventListener('change', () => {
             if (lastLat && lastLng) {
                 const slider = document.getElementById('timeSlider');
                 const currentIndex = parseInt(slider.value) || 0;
-                const currentTime = weatherData && weatherData.time ? weatherData.time[currentIndex] : null;
-                console.log('Current selected time before model change:', currentTime);
+                const currentTime = weatherData?.time?.[currentIndex] || null;
+                console.log('Model change triggered - new model:', modelSelect.value, 'currentTime:', currentTime);
                 document.getElementById('info').innerHTML = `Fetching weather with ${modelSelect.value}...`;
                 fetchWeather(lastLat, lastLng, currentTime).then(() => {
-                    updateModelRunInfo(); // Update menu after fetch
+                    console.log('Model fetch completed - new weatherData:', weatherData);
+                    updateModelRunInfo();
+                    updateReferenceLabels();
+                    updateWeatherDisplay(slider.value);
+                    if (lastLat && lastLng && lastAltitude !== 'N/A') calculateMeanWind();
+                }).catch(err => {
+                    console.error('Model fetch failed:', err);
+                    displayError(`Failed to fetch weather: ${err.message}`);
                 });
             } else {
                 displayError('Please select a position on the map first.');
@@ -1032,48 +949,82 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (downloadButton) {
-        downloadButton.addEventListener('click', downloadTableAsAscii);
-    } else {
-        console.error('Download button element not found');
+        downloadButton.addEventListener('click', () => {
+            console.log('Download button clicked!');
+            downloadTableAsAscii();
+        });
+    }
+
+    if (hamburgerBtn && menu) {
+        hamburgerBtn.addEventListener('click', () => menu.classList.toggle('hidden'));
+        const menuItems = menu.querySelectorAll('li > span');
+        menuItems.forEach(item => {
+            item.addEventListener('click', (e) => {
+                const submenu = item.nextElementSibling;
+                if (submenu && submenu.classList.contains('submenu')) {
+                    submenu.classList.toggle('hidden');
+                    menu.querySelectorAll('.submenu').forEach(other => {
+                        if (other !== submenu && !other.classList.contains('hidden')) other.classList.add('hidden');
+                    });
+                }
+                e.stopPropagation();
+            });
+        });
+        document.addEventListener('click', (e) => {
+            if (!menu.contains(e.target) && !hamburgerBtn.contains(e.target)) {
+                menu.querySelectorAll('.submenu').forEach(submenu => submenu.classList.add('hidden'));
+            }
+        });
+    }
+
+    if (refLevelSelect) {
+        refLevelSelect.addEventListener('change', () => {
+            console.log('Ref level changed:', refLevelSelect.value);
+            updateReferenceLabels();
+            if (weatherData && lastLat && lastLng) {
+                updateWeatherDisplay(slider.value || 0);
+                if (lastAltitude !== 'N/A') calculateMeanWind();
+            }
+        });
+        console.log('Initial refLevel:', refLevelSelect.value);
+        updateReferenceLabels(); // Initial label setup
+        if (weatherData && lastLat && lastLng) {
+            updateWeatherDisplay(0); // Initial table display
+        }
     }
 
     if (interpStepSelect) {
         interpStepSelect.addEventListener('change', () => {
+            console.log('Interpolation step changed:', interpStepSelect.value);
             if (weatherData && lastLat && lastLng) {
-                updateWeatherDisplay(document.getElementById('timeSlider').value || 0);
-                if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
-                    calculateMeanWind();
-                }
+                updateWeatherDisplay(slider.value || 0);
+                if (lastAltitude !== 'N/A') calculateMeanWind();
             } else {
                 displayError('Please select a position and fetch weather data first.');
             }
         });
-    } else {
-        console.error('Interpolation step select element not found');
     }
 
     if (lowerLimitInput) {
-        lowerLimitInput.addEventListener('input', () => {
-            if (weatherData && lastLat && lastLng) {
+        lowerLimitInput.addEventListener('input', debounce(() => {
+            console.log('Lower limit changed:', lowerLimitInput.value);
+            if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
                 calculateMeanWind();
             } else {
                 displayError('Please select a position and fetch weather data first.');
             }
-        });
-    } else {
-        console.error('Lower limit input element not found');
+        }, 300));
     }
 
     if (upperLimitInput) {
-        upperLimitInput.addEventListener('input', () => {
-            if (weatherData && lastLat && lastLng) {
+        upperLimitInput.addEventListener('input', debounce(() => {
+            console.log('Upper limit changed:', upperLimitInput.value);
+            if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
                 calculateMeanWind();
             } else {
                 displayError('Please select a position and fetch weather data first.');
             }
-        });
-    } else {
-        console.error('Upper limit input element not found');
+        }, 300));
     }
 
     const infoElement = document.getElementById('info');
@@ -1086,7 +1037,5 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
         observer.observe(infoElement, { childList: true, subtree: true, characterData: true });
-    } else {
-        console.error('Info element not found for MutationObserver');
     }
 });
