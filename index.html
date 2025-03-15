@@ -13,6 +13,18 @@
 
 <body>
     <div id="map" aria-label="Interactive map for selecting weather location"></div>
+    <div class="hamburger-menu">
+        <button id="hamburgerBtn" aria-label="Open menu">☰</button>
+        <ul id="menu" class="menu hidden">
+            <li>
+                <span>Model Run</span>
+                <ul class="submenu hidden">
+                    <li id="modelRunInfo"></li>
+                </ul>
+            </li>
+            <!-- Add more top-level <li> items here later -->
+        </ul>
+    </div>
     <div id="slider-container">
         <span id="selectedTime">Selected Time: </span>
         <input type="range" id="timeSlider" min="0" max="167" value="0" disabled>
@@ -23,7 +35,6 @@
                 <option value="gfs">GFS</option>
                 <option value="ecmwf">ECMWF</option>
             </select>
-            <button id="modelInfoButton">ℹ️</button>
         </div>
         <div id="modelInfoPopup"></div>
     </div>

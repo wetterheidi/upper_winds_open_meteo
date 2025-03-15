@@ -6,6 +6,16 @@ let lastAltitude = null;
 let currentMarker = null;
 let lastModelRun = null;
 
+// Update model run info in menu
+function updateModelRunInfo() {
+    const modelRunInfo = document.getElementById('modelRunInfo');
+    const modelSelect = document.getElementById('modelSelect');
+    if (modelRunInfo && lastModelRun) {
+        const model = modelSelect.value;
+        modelRunInfo.innerHTML = `Model: ${model.replace('_', ' ').toUpperCase()}<br> Run: ${lastModelRun}`;
+    }
+}
+
 // Initialize the map and center it on the user's location if available
 function initMap() {
     const defaultCenter = [48.0179, 11.1923];
@@ -84,6 +94,7 @@ function initMap() {
                 const availableModels = await checkAvailableModels(lastLat, lastLng);
                 if (availableModels.length > 0) {
                     await fetchWeather(lastLat, lastLng);
+                    updateModelRunInfo();
                     if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
                         calculateMeanWind();
                     }
@@ -111,6 +122,7 @@ function initMap() {
                     const availableModels = await checkAvailableModels(lastLat, lastLng);
                     if (availableModels.length > 0) {
                         await fetchWeather(lastLat, lastLng);
+                        updateModelRunInfo();
                         if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
                             calculateMeanWind();
                         }
@@ -873,8 +885,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const slider = document.getElementById('timeSlider');
     const modelSelect = document.getElementById('modelSelect');
-    const infoButton = document.getElementById('modelInfoButton');
-    const infoPopup = document.getElementById('modelInfoPopup');
+    const hamburgerBtn = document.getElementById('hamburgerBtn');
+    const menu = document.getElementById('menu');
     const downloadButton = document.getElementById('downloadButton');
     const interpStepSelect = document.getElementById('interpStepSelect');
     const refLevelSelect = document.getElementById('refLevelSelect');
@@ -882,7 +894,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const upperLimitInput = document.getElementById('upperLimit');
 
     console.log('Elements found:', {
-        slider, modelSelect, infoButton, infoPopup, downloadButton,
+        slider, modelSelect, hamburgerBtn, menu, downloadButton,
         interpStepSelect, refLevelSelect, lowerLimitInput, upperLimitInput
     });
 
@@ -892,12 +904,21 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    slider.value = 0; // Initialize to 0 (12:00Z)
-    slider.setAttribute('autocomplete', 'off'); // Prevent browser autofill
+    slider.value = 0;
+    slider.setAttribute('autocomplete', 'off');
     console.log('Initial slider state - min:', slider.min, 'max:', slider.max, 'value:', slider.value,
         'weatherData.time:', weatherData?.time);
 
-    // Debounce function
+    // Hamburger menu toggle
+    if (hamburgerBtn && menu) {
+        hamburgerBtn.addEventListener('click', () => {
+            menu.classList.toggle('hidden');
+        });
+    } else {
+        console.error('Hamburger button or menu element not found');
+    }
+
+    // Debounce function (unchanged)
     function debounce(func, wait) {
         let timeout;
         return function (...args) {
@@ -906,7 +927,6 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    // Debounced input event handler
     const debouncedUpdate = debounce((e) => {
         const slider = document.getElementById('timeSlider');
         const index = parseInt(e.target.value);
@@ -954,35 +974,18 @@ document.addEventListener('DOMContentLoaded', () => {
     if (modelSelect) {
         modelSelect.addEventListener('change', () => {
             if (lastLat && lastLng) {
-                // Capture the current selected time before fetching new data
                 const slider = document.getElementById('timeSlider');
                 const currentIndex = parseInt(slider.value) || 0;
                 const currentTime = weatherData && weatherData.time ? weatherData.time[currentIndex] : null;
                 console.log('Current selected time before model change:', currentTime);
-
                 document.getElementById('info').innerHTML = `Fetching weather with ${modelSelect.value}...`;
-                fetchWeather(lastLat, lastLng, currentTime); // Pass the current time to fetchWeather
+                fetchWeather(lastLat, lastLng, currentTime).then(() => {
+                    updateModelRunInfo(); // Update menu after fetch
+                });
             } else {
                 displayError('Please select a position on the map first.');
             }
         });
-    }
-
-    if (infoButton && infoPopup) {
-        infoButton.addEventListener('click', () => {
-            if (!lastModelRun) {
-                displayError('No model run data available yet.');
-                return;
-            }
-            const model = document.getElementById('modelSelect').value;
-            const runText = `Model: ${model.replace('_', ' ').toUpperCase()}<br>Run: ${lastModelRun}`;
-            infoPopup.style.top = `${infoButton.getBoundingClientRect().bottom + 5}px`;
-            infoPopup.innerHTML = runText;
-            infoPopup.style.display = 'block';
-            setTimeout(() => infoPopup.style.display = 'none', 5000);
-        });
-    } else {
-        console.error('Model info button or popup element not found');
     }
 
     if (downloadButton) {
@@ -996,7 +999,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (weatherData && lastLat && lastLng) {
                 updateWeatherDisplay(document.getElementById('timeSlider').value || 0);
                 if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
-                    calculateMeanWind(); // Update mean wind when step changes
+                    calculateMeanWind();
                 }
             } else {
                 displayError('Please select a position and fetch weather data first.');
@@ -1011,7 +1014,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (weatherData && lastLat && lastLng) {
                 updateWeatherDisplay(document.getElementById('timeSlider').value || 0);
                 if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
-                    calculateMeanWind(); // Update mean wind when reference level changes
+                    calculateMeanWind();
                 }
             } else {
                 displayError('Please select a position and fetch weather data first.');
@@ -1044,14 +1047,13 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
         console.error('Upper limit input element not found');
     }
-    // Observe changes to #info to detect table load and trigger map recenter
+
     const infoElement = document.getElementById('info');
     if (infoElement) {
         const observer = new MutationObserver((mutations) => {
             mutations.forEach((mutation) => {
                 if (mutation.type === 'childList' || mutation.type === 'characterData') {
-                    // Table content changed, recenter the map
-                    setTimeout(recenterMap, 100); // Slight delay to ensure DOM update
+                    setTimeout(recenterMap, 100);
                 }
             });
         });

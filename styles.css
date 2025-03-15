@@ -5,7 +5,8 @@ html {
 #map {
     height: 30%;
     width: 100%;
-    flex: 1 0 25%; /* Takes precedence over flex: 0 0 auto */
+    margin-top: 90px; /* Space for slider-container */
+    flex: 1 0 25%;
     z-index: 0;
 }
 
@@ -23,6 +24,92 @@ html {
 
 .leaflet-popup-content-wrapper {
     word-wrap: break-word;
+}
+
+.hamburger-menu {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    z-index: 300;
+}
+
+#hamburgerBtn {
+    font-size: 24px;
+    padding: 5px 10px;
+    background: #4da8da;
+    color: white;
+    border-color: #4da8da;
+    border: none;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+#hamburgerBtn:hover {
+    background: #555;
+}
+
+.menu {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    background: linear-gradient(to bottom, #ffffff, #f7f7f7);
+    border: 1px solid #ccc;
+    position: absolute;
+    top: 40px;
+    left: 0;
+    min-width: 200px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    z-index: 300;
+}
+
+.menu li {
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+    position: relative;
+}
+
+.menu li:last-child {
+    border-bottom: none;
+}
+
+.menu li:hover {
+    background: #f0f8ff;
+}
+
+.submenu {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    background: linear-gradient(to bottom, #ffffff, #f7f7f7);
+    border: 1px solid #ccc;
+    position: absolute;
+    top: 100%; /* Changed from top: 0 to top: 100% to open below */
+    left: 0; /* Changed from left: 100% to left: 0 to align with parent */
+    min-width: 200px; /* Match .menu width for consistency */
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    z-index: 300;
+}
+
+.submenu li {
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.submenu li:last-child {
+    border-bottom: none;
+}
+
+.submenu li:hover {
+    background: #f0f8ff;
+}
+
+.hidden {
+    display: none;
+}
+
+/* Show submenu on hover */
+.menu li:hover .submenu {
+    display: block;
 }
 
 #info {
@@ -118,10 +205,11 @@ button {
     color: #333;
     width: 90%;
     max-width: 300px;
-    margin: 10px auto;
-    z-index: 100;
-    flex: 0 0 auto;
-    /* Fixed size for slider */
+    position: fixed;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 200; /* Above hamburger and map */
 }
 
 #bottom-container {
@@ -133,8 +221,8 @@ button {
     box-sizing: border-box;
     z-index: 100;
     margin-bottom: 10px;
-    flex: 0 0 auto; /* Revert to fixed size based on content */
-    max-height: calc(100vh - 30vh - 100px); /* Limit to remaining viewport height minus map and slider */
+    flex: 0 0 auto;
+    max-height: calc(100vh - 30vh - 100px);
     overflow-y: auto;
     display: grid;
     grid-template-rows: auto auto auto;
@@ -485,7 +573,7 @@ input[type="number"]:focus {
         justify-items: start;
         width: 100%;
         max-width: 800px;
-        margin: 0 auto;
+        margin: 10px auto;
         padding: 10px;
     }
     #info {
@@ -499,16 +587,14 @@ input[type="number"]:focus {
     }
 
     #slider-container {
-        order: 1;
-        width: 100%;
-        max-width: 300px;
-        padding: 10px;
-        margin: 10px auto 0;
+        width: 90%;
+        top: 10px;
+        left: 50%;
+        transform: translateX(-50%);
     }
 
     #map {
-        order: 2;
-        flex: 1 0 30%;
+        margin-top: 90px; /* Consistent space */
     }
 
     #bottom-container {
@@ -619,10 +705,18 @@ input[type="number"]:focus {
         grid-column: 1 / 5; /* Span all four columns */
         grid-row: 2; /* Second row */
     }
+    #slider-container {
+        width: 90%;
+        padding: 5px;
+    }
+
+    #map {
+        margin-top: 90px;
+    }
 }
 
 #slider-container {
-    padding: 10px;
+    padding: 5px;
 }
 
 #timeLabel {
