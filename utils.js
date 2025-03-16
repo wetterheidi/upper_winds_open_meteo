@@ -32,7 +32,72 @@ class Utils {
     }
 
     static convertHeight(value, toUnit) {
+        const numericValue = parseFloat(value);
+        if (isNaN(numericValue)) {
+            return 'N/A';
+        }
         return toUnit === 'ft' ? value * 3.28084 : value; // m to ft or unchanged if m
+    }
+
+    static convertWind(value, toUnit, fromUnit = 'km/h') {
+        if (value === undefined || value === null || isNaN(value)) return 'N/A';
+        let speedInKmH;
+        switch (fromUnit) {
+            case 'km/h':
+                speedInKmH = value;
+                break;
+            case 'm/s':
+                speedInKmH = value * 3.6;
+                break;
+            case 'kt':
+                speedInKmH = value * 1.852;
+                break;
+            case 'mph':
+                speedInKmH = value * 1.60934;
+                break; // Double-check this break is present
+            case 'bft':
+                speedInKmH = Utils.beaufortToKnots(value) * 1.852;
+                break;
+            default:
+                speedInKmH = value;
+                break;
+        }
+        switch (toUnit) {
+            case 'km/h':
+                return speedInKmH;
+            case 'm/s':
+                return speedInKmH / 3.6;
+            case 'kt':
+                return speedInKmH / 1.852;
+            case 'mph':
+                return speedInKmH / 1.60934;
+            case 'bft':
+                return Utils.knotsToBeaufort(speedInKmH / 1.852);
+            default:
+                return speedInKmH / 1.852;
+        }
+    }
+    
+    // Helper functions (assuming you have or need these)
+    static knotsToBeaufort(knots) {
+        if (knots < 1) return 0;
+        if (knots <= 3) return 1;
+        if (knots <= 6) return 2;
+        if (knots <= 10) return 3;
+        if (knots <= 16) return 4;
+        if (knots <= 21) return 5;
+        if (knots <= 27) return 6;
+        if (knots <= 33) return 7;
+        if (knots <= 40) return 8;
+        if (knots <= 47) return 9;
+        if (knots <= 55) return 10;
+        if (knots <= 63) return 11;
+        return 12;
+    }
+    
+    static beaufortToKnots(bft) {
+        const thresholds = [0, 1, 3, 6, 10, 16, 21, 27, 33, 40, 47, 55, 63];
+        return thresholds[bft] || 63; // Default to max if bft > 12
     }
 
     // Calculate dewpoint from temperature (°C) and relative humidity (%)
