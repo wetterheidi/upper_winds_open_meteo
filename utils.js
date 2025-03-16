@@ -22,6 +22,11 @@ class Utils {
         return Math.round(value / 10) * 10;
     }
 
+
+    static convertHeight(value, toUnit) {
+        return toUnit === 'ft' ? value * 3.28084 : value; // m to ft or unchanged if m
+    }
+
     // Calculate dewpoint from temperature (°C) and relative humidity (%)
     static calculateDewpoint(temp, rh) {
         const aLiquid = 17.27;

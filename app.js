@@ -27,10 +27,6 @@ function updateReferenceLabels() {
     }
 }
 
-function convertHeight(value, toUnit) {
-    return toUnit === 'ft' ? value * 3.28084 : value; // m to ft or unchanged if m
-}
-
 function getHeightUnit() {
     return document.querySelector('input[name="heightUnit"]:checked')?.value || 'm';
 }
@@ -47,8 +43,8 @@ function updateHeightUnitLabels() {
         const regex = /\((\d+)-(\d+) m\b[^)]*\)/;
         if (regex.test(currentText)) {
             const [_, lower, upper] = currentText.match(regex);
-            const newLower = convertHeight(parseFloat(lower), heightUnit);
-            const newUpper = convertHeight(parseFloat(upper), heightUnit);
+            const newLower = Utils.convertHeight(parseFloat(lower), heightUnit);
+            const newUpper = Utils.convertHeight(parseFloat(upper), heightUnit);
             meanWindResult.innerHTML = currentText.replace(regex, `(${Math.round(newLower)}-${Math.round(newUpper)} ${heightUnit} ${refLevel})`);
         }
     }
@@ -639,7 +635,7 @@ function updateWeatherDisplay(index, originalTime = null) {
                 rowClass = 'wind-very-high';
             }
         }
-        const displayHeight = convertHeight(data.displayHeight, heightUnit);
+        const displayHeight = Utils.convertHeight(data.displayHeight, heightUnit);
         output += `<tr class="${rowClass}"><td>${Math.round(displayHeight)}</td><td>${Utils.roundToTens(data.dir)}</td><td>${data.spd}</td><td>${data.temp}</td></tr>`;
     });
     output += `</table>`;
@@ -821,7 +817,7 @@ function calculateMeanWind() {
     if ((refLevel === 'AMSL') && lowerLimitInput < baseHeight) {
         displayError(`Lower limit adjusted to terrain altitude (${baseHeight} m ${refLevel}) as it cannot be below ground level in ${refLevel} mode.`);
         lowerLimitInput = baseHeight;
-        document.getElementById('lowerLimit').value = convertHeight(lowerLimitInput, heightUnit);
+        document.getElementById('lowerLimit').value = Utils.convertHeight(lowerLimitInput, heightUnit);
     }
 
     const lowerLimit = refLevel === 'AGL' ? lowerLimitInput + baseHeight : lowerLimitInput;
@@ -838,8 +834,8 @@ function calculateMeanWind() {
     const [dir, spd] = meanWind;
 
     const roundedDir = Utils.roundToTens(dir);
-    const displayLower = Math.round(convertHeight(lowerLimitInput, heightUnit));
-    const displayUpper = Math.round(convertHeight(upperLimitInput, heightUnit));
+    const displayLower = Math.round(Utils.convertHeight(lowerLimitInput, heightUnit));
+    const displayUpper = Math.round(Utils.convertHeight(upperLimitInput, heightUnit));
     const result = `Mean wind (${displayLower}-${displayUpper} ${heightUnit} ${refLevel}): ${roundedDir}° ${spd.toFixed(0)} kt`;
     const meanWindResult = document.getElementById('meanWindResult');
     if (meanWindResult) {
@@ -878,13 +874,13 @@ function downloadTableAsAscii() {
         pressureLevels.map(l => parseInt(l)), 
         pressureLevels.map(l => weatherData[`geopotential_height_${l}`]?.[index]).filter(h => h !== undefined)) : 'N/A';
 
-    const displaySurfaceHeight = Math.round(convertHeight(surfaceHeight, heightUnit));
+    const displaySurfaceHeight = Math.round(Utils.convertHeight(surfaceHeight, heightUnit));
     content += `${displaySurfaceHeight} ${surfacePressure === 'N/A' ? 'N/A' : surfacePressure.toFixed(1)} ${surfaceTemp?.toFixed(1) ?? 'N/A'} ${surfaceDew?.toFixed(1) ?? 'N/A'} ${surfaceDir?.toFixed(0) ?? 'N/A'} ${surfaceSpd?.toFixed(0) ?? 'N/A'} ${surfaceRH?.toFixed(0) ?? 'N/A'}\n`;
 
     const interpolatedData = interpolateWeatherData(index);
     interpolatedData.forEach(data => {
         if (data.displayHeight !== surfaceHeight) {
-            const displayHeight = Math.round(convertHeight(data.displayHeight, heightUnit));
+            const displayHeight = Math.round(Utils.convertHeight(data.displayHeight, heightUnit));
             content += `${displayHeight} ${data.pressure} ${data.temp} ${data.dew} ${data.dir} ${data.spd} ${data.rh}\n`;
         }
     });

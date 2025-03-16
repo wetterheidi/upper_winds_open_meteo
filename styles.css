@@ -985,7 +985,7 @@ input[type="number"]:focus {
 }
 
 #info table tr.wind-high {
-    border: 2px solid yellow !important; /* Keep for debugging */
+    border: 2px solid #f5f34f !important; /* Keep for debugging */
 }
 
 #info table tr.wind-very-high {
