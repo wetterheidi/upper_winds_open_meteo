@@ -22,6 +22,14 @@ class Utils {
         return Math.round(value / 10) * 10;
     }
 
+    static convertTemperature(value, toUnit) {
+        // Check if value is a valid number; if not, return 'N/A'
+        const numericValue = parseFloat(value);
+        if (isNaN(numericValue)) {
+            return 'N/A';
+        }
+        return toUnit === '°F' ? numericValue * 9 / 5 + 32 : numericValue; // °C to °F or unchanged if °C
+    }
 
     static convertHeight(value, toUnit) {
         return toUnit === 'ft' ? value * 3.28084 : value; // m to ft or unchanged if m
