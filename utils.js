@@ -37,7 +37,7 @@ class Utils {
             alpha = (aIce * temp) / (bIce + temp) + Math.log(rh / 100);
             dewpoint = (bIce * alpha) / (aIce - alpha);
         }
-        return dewpoint.toFixed(0);
+        return isNaN(dewpoint) ? null : dewpoint; // Return number or null if invalid
     }
 
     // Gaussian-weighted interpolation between two points

@@ -646,24 +646,22 @@ function interpolateWeatherData(index) {
     if (!weatherData || !weatherData.time || lastAltitude === 'N/A') return [];
 
     const step = parseInt(document.getElementById('interpStepSelect').value) || 200;
-    const refLevel = document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL';    const baseHeight = Number(lastAltitude); // Terrain altitude (e.g., 580 m for default location)
-    const levels = ['200 hPa', '250hPa', '300 hPa', '400hPa', '500 hPa', '600hPa', '700 hPa', '800 hPa', '850 hPa', '900 hPa', '925 hPa', '950 hPa', '1000 hPa'];
-
-    // Surface height: 0 for AGL, baseHeight for AMSL
+    const refLevel = document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL';
+    const baseHeight = Math.round(lastAltitude);
     const surfaceHeight = refLevel === 'AGL' ? 0 : baseHeight;
+
     const dataPoints = [
         {
             level: `${surfaceHeight} m`,
-            height: baseHeight, // Actual height for interpolation
+            height: baseHeight,
             temp: weatherData.temperature_2m?.[index],
             rh: weatherData.relative_humidity_2m?.[index],
             dir: weatherData.wind_direction_10m?.[index],
-            spd: weatherData.wind_speed_10m?.[index] * 0.539957 // Convert m/s to knots
+            spd: weatherData.wind_speed_10m?.[index] * 0.539957
         }
     ];
 
-    console.log(`Surface setup - refLevel: ${refLevel}, baseHeight: ${baseHeight}, surfaceHeight: ${surfaceHeight}`);
-
+    const levels = ['200hPa', '250hPa', '300hPa', '400hPa', '500hPa', '600hPa', '700hPa', '800hPa', '850hPa', '900hPa', '925hPa', '950hPa', '1000hPa'];
     levels.forEach(level => {
         const levelKey = level.replace(' ', '');
         const gh = weatherData[`geopotential_height_${levelKey}`]?.[index];
@@ -680,81 +678,69 @@ function interpolateWeatherData(index) {
         }
     });
 
-    if (dataPoints.length < 2 || dataPoints.every(dp => dp.temp === undefined || dp.dir === undefined || dp.spd === undefined)) {
+    if (dataPoints.length < 2) {
         console.warn('Insufficient data at index:', index);
-        return [{ displayHeight: surfaceHeight, dir: NaN, spd: 0, temp: '-' }];
+        return [{ displayHeight: surfaceHeight, pressure: 'N/A', temp: 'N/A', dew: 'N/A', dir: 'N/A', spd: 'N/A', rh: 'N/A' }];
     }
 
     dataPoints.sort((a, b) => a.height - b.height);
     const maxHeight = dataPoints[dataPoints.length - 1].height;
     const interpolated = [];
 
-    // Explicitly add surface data as the first row
+    // Surface data
     const surfaceData = dataPoints[0];
     const dewSurface = Utils.calculateDewpoint(surfaceData.temp, surfaceData.rh);
     const pressureLevels = [200, 250, 300, 400, 500, 600, 700, 800, 850, 900, 925, 950, 1000];
-    const pressureHeights = levels.map(level => {
-        const levelKey = level.replace(' ', '');
-        return weatherData[`geopotential_height_${levelKey}`]?.[index] || null;
-    }).filter(h => h !== null && !isNaN(h)).map(h => Math.round(h));
-    pressureHeights.sort((a, b) => b - a);
+    const pressureHeights = levels.map(level => weatherData[`geopotential_height_${level}`]?.[index]).filter(h => h !== null && !isNaN(h)).map(h => Math.round(h));
     const pressureSurface = Utils.interpolatePressure(surfaceData.height, pressureLevels, pressureHeights);
 
     interpolated.push({
         height: surfaceData.height,
         displayHeight: surfaceHeight,
-        temp: surfaceData.temp?.toFixed(0) ?? '-',
-        rh: surfaceData.rh?.toFixed(0) ?? '-',
-        dew: dewSurface,
-        dir: surfaceData.dir?.toFixed(0) ?? '-',
-        spd: surfaceData.spd?.toFixed(0) ?? '-',
-        pressure: pressureSurface === '-' ? '-' : pressureSurface.toFixed(0)
+        pressure: pressureSurface === '-' ? 'N/A' : pressureSurface.toFixed(1),
+        temp: surfaceData.temp?.toFixed(1) ?? 'N/A',
+        dew: dewSurface?.toFixed(1) ?? 'N/A',
+        dir: surfaceData.dir?.toFixed(0) ?? 'N/A',
+        spd: surfaceData.spd?.toFixed(0) ?? 'N/A',
+        rh: surfaceData.rh?.toFixed(0) ?? 'N/A'
     });
 
-    // Interpolation loop for levels above the surface
+    // Interpolation for higher levels
     for (let hp = surfaceHeight + step; hp <= (refLevel === 'AGL' ? maxHeight - baseHeight : maxHeight); hp += step) {
-        const actualHp = refLevel === 'AGL' ? hp + baseHeight : hp; // Absolute height for interpolation
+        const actualHp = refLevel === 'AGL' ? hp + baseHeight : hp;
         const lower = dataPoints.filter(p => p.height <= actualHp).pop();
         const upper = dataPoints.find(p => p.height > actualHp);
         if (!lower || !upper) continue;
 
         const temp = Utils.gaussianInterpolation(lower.temp, upper.temp, lower.height, upper.height, actualHp);
         const rh = Math.max(0, Math.min(100, Utils.gaussianInterpolation(lower.rh, upper.rh, lower.height, upper.height, actualHp)));
-
-        const lowerU = -lower.spd * Math.sin(lower.dir * Math.PI / 180);
-        const lowerV = -lower.spd * Math.cos(lower.dir * Math.PI / 180);
-        const upperU = -upper.spd * Math.sin(upper.dir * Math.PI / 180);
-        const upperV = -upper.spd * Math.cos(upper.dir * Math.PI / 180);
-
-        const u = Utils.gaussianInterpolation(lowerU, upperU, lower.height, upper.height, actualHp);
-        const v = Utils.gaussianInterpolation(lowerV, upperV, lower.height, upper.height, actualHp);
-
+        const u = Utils.gaussianInterpolation(
+            -lower.spd * Math.sin(lower.dir * Math.PI / 180),
+            -upper.spd * Math.sin(upper.dir * Math.PI / 180),
+            lower.height, upper.height, actualHp
+        );
+        const v = Utils.gaussianInterpolation(
+            -lower.spd * Math.cos(lower.dir * Math.PI / 180),
+            -upper.spd * Math.cos(upper.dir * Math.PI / 180),
+            lower.height, upper.height, actualHp
+        );
         const spd = Utils.windSpeed(u, v);
         const dir = Utils.windDirection(u, v);
         const dew = Utils.calculateDewpoint(temp, rh);
         const pressure = Utils.interpolatePressure(actualHp, pressureLevels, pressureHeights);
 
-        const displayHeight = refLevel === 'AGL' ? Utils.roundToTens(hp) : Utils.roundToTens(actualHp);
-
         interpolated.push({
             height: actualHp,
-            displayHeight: displayHeight,
-            temp: temp.toFixed(0),
-            rh: rh.toFixed(0),
-            dew: dew,
+            displayHeight: refLevel === 'AGL' ? Utils.roundToTens(hp) : Utils.roundToTens(actualHp),
+            pressure: pressure === '-' ? 'N/A' : pressure.toFixed(1),
+            temp: temp.toFixed(1),
+            dew: dew?.toFixed(1) ?? 'N/A',
             dir: dir.toFixed(0),
             spd: spd.toFixed(0),
-            pressure: pressure === '-' ? '-' : pressure.toFixed(0)
+            rh: rh.toFixed(0)
         });
     }
 
-    console.log('Interpolated data for display:', interpolated.map(d => ({
-        displayHeight: d.displayHeight,
-        actualHeight: d.height,
-        temp: d.temp,
-        dir: d.dir,
-        spd: d.spd
-    })));
     return interpolated;
 }
 
@@ -824,16 +810,42 @@ function downloadTableAsAscii() {
     const filename = `${time}_${model}_HEIDIS.txt`;
     console.log('Filename:', filename);
 
-    const interpolatedData = interpolateWeatherData(index);
-    console.log('Interpolated data:', interpolatedData);
-
-    // Get the selected reference level from radio buttons
     const refLevel = document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL';
     const heightHeader = refLevel === 'AGL' ? 'h(mAGL)' : 'h(mAMSL)';
     let content = `${heightHeader} p(hPa) T(°C) Dew(°C) Dir(°) Spd(kt) RH(%)\n`;
 
+    // Raw surface data for the first row
+    const baseHeight = Math.round(lastAltitude);
+    const surfaceHeight = refLevel === 'AGL' ? 0 : baseHeight;
+    const surfaceTemp = weatherData.temperature_2m?.[index];
+    const surfaceRH = weatherData.relative_humidity_2m?.[index];
+    const surfaceSpd = weatherData.wind_speed_10m?.[index] * 0.539957; // km/h to knots
+    const surfaceDir = weatherData.wind_direction_10m?.[index];
+    const surfaceDew = Utils.calculateDewpoint(surfaceTemp, surfaceRH);
+    const pressureLevels = ['1000hPa', '950hPa', '925hPa', '900hPa', '850hPa', '800hPa', '700hPa', '600hPa', '500hPa', '400hPa', '300hPa', '250hPa', '200hPa'];
+    const availablePressure = pressureLevels.find(level => weatherData[`geopotential_height_${level}`]?.[index] !== undefined);
+    const surfacePressure = availablePressure ? Utils.interpolatePressure(baseHeight, 
+        pressureLevels.map(l => parseInt(l)), 
+        pressureLevels.map(l => weatherData[`geopotential_height_${l}`]?.[index]).filter(h => h !== undefined)) : 'N/A';
+
+    // Debug log
+    console.log('Surface values:', {
+        temp: surfaceTemp,
+        rh: surfaceRH,
+        spd: surfaceSpd,
+        dir: surfaceDir,
+        dew: surfaceDew,
+        pressure: surfacePressure
+    });
+
+    content += `${surfaceHeight} ${surfacePressure === 'N/A' ? 'N/A' : surfacePressure.toFixed(1)} ${surfaceTemp?.toFixed(1) ?? 'N/A'} ${surfaceDew?.toFixed(1) ?? 'N/A'} ${surfaceDir?.toFixed(0) ?? 'N/A'} ${surfaceSpd?.toFixed(0) ?? 'N/A'} ${surfaceRH?.toFixed(0) ?? 'N/A'}\n`;
+
+    // Interpolated data for subsequent rows
+    const interpolatedData = interpolateWeatherData(index);
     interpolatedData.forEach(data => {
-        content += `${data.displayHeight} ${data.pressure} ${data.temp} ${data.dew} ${data.dir} ${data.spd} ${data.rh}\n`;
+        if (data.displayHeight !== surfaceHeight) { // Skip the surface row
+            content += `${data.displayHeight} ${data.pressure} ${data.temp} ${data.dew} ${data.dir} ${data.spd} ${data.rh}\n`;
+        }
     });
     console.log('File content preview:', content.slice(0, 200));
 
