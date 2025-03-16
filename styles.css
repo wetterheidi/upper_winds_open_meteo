@@ -5,14 +5,16 @@ html {
 #map {
     height: 30%;
     width: 100%;
-    margin-top: 90px; /* Space for slider-container */
+    margin-top: 90px;
+    /* Space for slider-container */
     flex: 1 0 25%;
     z-index: 0;
 }
 
 /* Leaflet popup customization */
 .leaflet-popup-content {
-    font-size: 13px; /* Adjust this value */
+    font-size: 13px;
+    /* Adjust this value */
     font-family: 'Roboto', sans-serif;
     line-height: 1.0;
 }
@@ -28,14 +30,14 @@ html {
 
 .hamburger-menu {
     position: fixed;
-    top: 10px;
-    left: 10px;
+    top: 5px;
+    left: 5px;
     z-index: 300;
 }
 
 #hamburgerBtn {
-    font-size: 24px;
-    padding: 5px 10px;
+    font-size: 20px;
+    padding: 3px 8px;
     background: #4da8da;
     color: white;
     border-color: #4da8da;
@@ -45,7 +47,7 @@ html {
 }
 
 #hamburgerBtn:hover {
-    background: #555;
+    background: #0056b3;
 }
 
 .menu {
@@ -60,12 +62,14 @@ html {
     min-width: 200px;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
     z-index: 300;
+    border-radius: 8px; /* Add rounded corners */
+    overflow: hidden; /* Ensure child elements respect the rounded boundary */
 }
 
 .menu li {
     padding: 10px;
     border-bottom: 1px solid #eee;
-    position: relative; /* Keep for submenu positioning */
+    position: relative;
 }
 
 .menu li:last-child {
@@ -79,17 +83,18 @@ html {
 .submenu {
     list-style: none;
     padding: 0;
-    margin: 0 0 0 10px; /* Indent submenu slightly */
-    background: linear-gradient(to bottom, #ffffff, #f7f7f7); /* Match .menu */
-    border: none; /* Remove border since it’s inside .menu */
-    position: static; /* Integrate into .menu’s flow */
-    min-width: 0; /* Let it match .menu’s width minus indent */
-    box-shadow: none; /* No shadow since it’s part of .menu */
+    margin: 0 0 0 10px;
+    background: linear-gradient(to bottom, #ffffff, #f7f7f7);
+    border: none;
+    position: static;
+    min-width: 0;
+    box-shadow: none;
     z-index: 300;
+    border-radius: 0;
 }
 
 .submenu li {
-    padding: 10px;
+    padding: 8px 10px; /* Adjusted padding for radio buttons */
     border-bottom: 1px solid #eee;
     font-size: 13px;
 }
@@ -100,6 +105,49 @@ html {
 
 .submenu li:hover {
     background: #f0f8ff;
+}
+
+/* New styles for radio buttons */
+.submenu .radio-label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-family: 'Roboto', sans-serif;
+    font-size: 13px;
+    font-weight: 400;
+}
+
+.submenu input[type="radio"] {
+    appearance: none; /* Remove default styling */
+    width: 16px;
+    height: 16px;
+    border: 2px solid #4da8da; /* Match button color */
+    border-radius: 50%; /* Circular radio buttons */
+    margin-right: 8px;
+    background-color: #fff;
+    cursor: pointer;
+    position: relative;
+}
+
+.submenu input[type="radio"]:checked::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 8px;
+    height: 8px;
+    background: #4da8da;
+    border-radius: 50%;
+}
+
+.submenu input[type="radio"]:hover:not(:checked) {
+    background: #e6f0fa; /* Light hover effect */
+}
+
+.submenu input[type="radio"]:focus {
+    outline: none;
+    box-shadow: 0 0 3px rgba(0, 123, 255, 0.5);
 }
 
 .submenu select {
@@ -128,7 +176,8 @@ html {
     padding: 15px;
     border-radius: 8px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-    max-height: 100%; /* Use 100% of #bottom-container's height */
+    max-height: 100%;
+    /* Use 100% of #bottom-container's height */
     overflow-y: auto;
     width: 100%;
     max-width: 600px;
@@ -210,7 +259,8 @@ button {
 
 #slider-container {
     background: #fff;
-    padding: 15px;
+    padding: 10px;
+    /* Increased padding for better spacing */
     border-radius: 8px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
     color: #333;
@@ -218,9 +268,10 @@ button {
     max-width: 300px;
     position: fixed;
     top: 10px;
+    /* Default value */
     left: 50%;
     transform: translateX(-50%);
-    z-index: 200; /* Above hamburger and map */
+    z-index: 200;
 }
 
 #bottom-container {
@@ -248,12 +299,14 @@ button {
 }
 
 #bottom-container::-webkit-scrollbar-thumb {
-    background: #ddd; /* Light gray thumb */
+    background: #ddd;
+    /* Light gray thumb */
     border-radius: 4px;
 }
 
 #bottom-container::-webkit-scrollbar-track {
-    background: #fff; /* Match #bottom-container's background */
+    background: #fff;
+    /* Match #bottom-container's background */
 }
 
 #info table {
@@ -531,13 +584,16 @@ input[type="number"] {
     position: relative;
     z-index: 1500;
     margin-right: 10px;
-    font-size: 13px !important; /* Ensure it’s enforced */
+    font-size: 13px !important;
+    /* Ensure it’s enforced */
 }
 
 #meanWindControls input {
     box-sizing: border-box;
-    width: 100%; /* Let the grid column define the width */
+    width: 100%;
+    /* Let the grid column define the width */
 }
+
 select:focus,
 input[type="number"]:focus {
     outline: 2px solid;
@@ -588,6 +644,7 @@ input[type="number"]:focus {
         margin: 10px auto;
         padding: 10px;
     }
+
     #info {
         width: 100%;
     }
@@ -606,7 +663,8 @@ input[type="number"]:focus {
     }
 
     #map {
-        margin-top: 90px; /* Consistent space */
+        margin-top: 90px;
+        /* Consistent space */
     }
 
     #bottom-container {
@@ -631,7 +689,8 @@ input[type="number"]:focus {
     #meanWindControls,
     #controls-row {
         grid-template-columns: 135px 70px 135px 70px;
-        grid-template-rows: auto auto; /* Two rows: inputs/selects, then result/button */
+        grid-template-rows: auto auto;
+        /* Two rows: inputs/selects, then result/button */
     }
 
     #meanWindControls {
@@ -639,7 +698,11 @@ input[type="number"]:focus {
     }
 
     #controls-row {
-        grid-template-columns: 135px 70px 135px 70px;
+        display: grid;
+        grid-template-columns: 135px 70px auto minmax(0, 1fr);  /* Adjusted columns */
+        align-items: center;
+        justify-items: start;
+        gap: 5px;
     }
 
     #lowerLimit,
@@ -648,23 +711,28 @@ input[type="number"]:focus {
     }
 
     #controls-row select {
-        width: 70px;
+        width: 70px; /* Matches current width */
+        padding: 6px;
+        box-sizing: border-box;
     }
 
     /* Move #meanWindResult to the second row, spanning all columns */
     #meanWindResult {
-        grid-column: 1 / 5; /* Span all four columns */
-        grid-row: 2; /* Second row */
-        margin-top: 5px; /* Add some spacing */
+        grid-column: 1 / 5;
+        /* Span all four columns */
+        grid-row: 2;
+        /* Second row */
+        margin-top: 5px;
+        /* Add some spacing */
     }
 
     /* Move #downloadButton to the second row, spanning all columns */
     #controls-row button {
-        grid-column: 1 / 5; /* Span all four columns */
-        grid-row: 2; /* Second row */
-        margin-top: 5px; /* Add some spacing */
-        width: auto; /* Let it size naturally */
-        min-width: 100px; /* Ensure it’s not too small */
+        grid-column: 3 / 4; /* Move to third column, after select */
+        width: auto;
+        min-width: 100px; /* Maintains button size */
+        padding: 6px 10px;
+        margin-left: 5px; /* Optional: adds slight spacing from select */
     }
 
     #model-row {
@@ -676,6 +744,80 @@ input[type="number"]:focus {
     }
 }
 
+@media (max-width: 480px) {
+    #slider-container {
+        top: 35px;
+        /* Increased to clear hamburger menu and its potential dropdown */
+        padding: 8px;
+        /* Slightly reduced padding */
+        max-width: 90%;
+        /* Ensure it fits within narrow screens */
+    }
+
+    #hamburgerBtn {
+        font-size: 18px;
+        /* Further reduce button size */
+        padding: 2px 6px;
+        /* Tighten padding */
+    }
+
+    .menu {
+        left: 5px;
+        min-width: 120px;
+        top: 30px;
+        border-radius: 8px; /* Maintain rounded corners */
+    }
+
+    .submenu {
+        margin: 0 0 0 5px;
+    }
+
+    .submenu li {
+        padding: 6px 8px; /* Slightly tighter for small screens */
+    }
+
+    .submenu input[type="radio"] {
+        width: 14px;
+        height: 14px;
+    }
+
+    .submenu input[type="radio"]:checked::after {
+        width: 6px;
+        height: 6px;
+    }
+
+    #map {
+        margin-top: 115px;
+        /* Ensure map clears the adjusted slider position */
+    }
+
+    #controls-row {
+        grid-template-columns: 100px 60px auto; /* Simplified for small screens, remove 1fr */
+        grid-template-rows: auto auto; /* Allow wrapping if needed */
+    }
+
+    #controls-row label {
+        font-size: 11px;
+    }
+
+    #controls-row select {
+        width: 60px;
+    }
+
+    #controls-row button {
+        grid-column: 3 / 4; /* Still in third column */
+        grid-row: 1; /* Keep in first row */
+        min-width: 80px; /* Slightly smaller for narrow screens */
+        margin-left: 5px;
+    }
+
+    /* If info or other elements follow, ensure they adjust */
+    #bottom-container #info {
+        grid-column: 1 / -1;
+        grid-row: 2; /* Moves below controls */
+    }
+}
+
 @media (max-width: 400px) {
     #info {
         max-height: 40vh;
@@ -684,12 +826,21 @@ input[type="number"]:focus {
     #info th,
     #info td {
         font-size: 13px;
+        padding: 4px 2px; /* Reduce padding for compactness */
+    }
+
+    #info table {
+        font-size: 12px; /* Slightly smaller text */
+        width: 100%;
     }
 
     #meanWindControls,
     #controls-row {
-        grid-template-columns: 100px 60px 100px 60px; /* Remove the 1fr column */
-        grid-template-rows: auto auto; /* Two rows: inputs/selects, then result/button */
+        grid-template-columns: 100px 60px auto; /* Keep label, select, button */
+        grid-template-rows: auto auto; /* Two rows: controls, then info */
+        gap: 5px;
+        position: relative; /* Ensure positioning context */
+        z-index: 150; /* Above #info to prevent overlap */
     }
 
     #meanWindControls label,
@@ -708,22 +859,48 @@ input[type="number"]:focus {
 
     /* Move #meanWindResult to the second row, spanning all columns */
     #meanWindResult {
-        grid-column: 1 / 5; /* Span all four columns */
-        grid-row: 2; /* Second row */
+        grid-column: 1 / 5;
+        /* Span all four columns */
+        grid-row: 2;
+        /* Second row */
     }
 
     /* Move #downloadButton to the second row, spanning all columns */
     #controls-row button {
-        grid-column: 1 / 5; /* Span all four columns */
-        grid-row: 2; /* Second row */
+        grid-column: 3 / 4; /* After select */
+        grid-row: 1; /* First row with label and select */
+        min-width: 70px; /* Slightly smaller to fit */
+        padding: 4px 8px; /* Reduce padding for narrow screens */
+        margin-left: 5px;
     }
+
     #slider-container {
+        top: 35px;
+        /* Increased to clear hamburger menu and its potential dropdown */
         width: 90%;
         padding: 5px;
     }
 
     #map {
-        margin-top: 90px;
+        margin-top: 110px;
+    }
+
+    #bottom-container {
+        display: grid;
+        grid-template-rows: auto auto; /* Ensure two distinct rows */
+        gap: 5px;
+        padding: 5px; /* Reduce padding */
+        max-height: calc(100vh - 90px); /* Account for map and slider */
+        overflow-y: auto;
+    }
+
+    #bottom-container #info {
+        grid-column: 1 / -1; /* Full width */
+        grid-row: 2; /* Second row, below controls */
+        max-height: 40vh; /* Limit height to prevent overlap */
+        overflow-y: auto;
+        z-index: 100; /* Below controls */
+        margin-top: 5px; /* Space from button */
     }
 }
 

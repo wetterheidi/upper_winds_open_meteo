@@ -26,10 +26,14 @@
                 <span>Reference Level</span>
                 <ul class="submenu hidden">
                     <li>
-                        <select id="refLevelSelect">
-                            <option value="AGL" selected>AGL</option>
-                            <option value="AMSL">AMSL</option>
-                        </select>
+                        <label class="radio-label">
+                            <input type="radio" name="refLevel" value="AGL" checked> AGL
+                        </label>
+                    </li>
+                    <li>
+                        <label class="radio-label">
+                            <input type="radio" name="refLevel" value="AMSL"> AMSL
+                        </label>
                     </li>
                 </ul>
             </li>
@@ -62,7 +66,8 @@
             <div id="meanWindResult"></div>
         </div>
         <div id="controls-row">
-            <label for="interpStepSelect" title="Select the altitude interval for weather data interpolation">Step:</label>
+            <label for="interpStepSelect"
+                title="Select the altitude interval for weather data interpolation">Step:</label>
             <select id="interpStepSelect" aria-label="Interpolation step interval">
                 <option value="100">100 m</option>
                 <option value="200" selected>200 m</option>
@@ -83,4 +88,5 @@
     <script src="app.js"></script>
     <script>(function () { function c() { var b = a.contentDocument || a.contentWindow.document; if (b) { var d = b.createElement('script'); d.innerHTML = "window.__CF$cv$params={r:'91ce572bdae4bd03',t:'MTc0MTM5NTA0OC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);"; b.getElementsByTagName('head')[0].appendChild(d) } } if (document.body) { var a = document.createElement('iframe'); a.height = 1; a.width = 1; a.style.position = 'absolute'; a.style.top = 0; a.style.left = 0; a.style.border = 'none'; a.style.visibility = 'hidden'; document.body.appendChild(a); if ('loading' !== document.readyState) c(); else if (window.addEventListener) document.addEventListener('DOMContentLoaded', c); else { var e = document.onreadystatechange || function () { }; document.onreadystatechange = function (b) { e(b); 'loading' !== document.readyState && (document.onreadystatechange = e, c()) } } } })();</script>
 </body>
+
 </html>

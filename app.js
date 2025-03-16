@@ -17,10 +17,8 @@ function updateModelRunInfo() {
 }
 
 function updateReferenceLabels() {
-    const refLevel = document.getElementById('refLevelSelect').value || 'AGL';
+    const refLevel = document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL';
     console.log('Updating labels to refLevel:', refLevel);
-    // Update table header (already handled by updateWeatherDisplay)
-    // Update mean wind result if it exists
     const meanWindResult = document.getElementById('meanWindResult');
     if (meanWindResult && meanWindResult.innerHTML) {
         const currentText = meanWindResult.innerHTML;
@@ -588,10 +586,9 @@ function updateWeatherDisplay(index, originalTime = null) {
         if (slider) slider.value = 0;
         return;
     }
-
+    const refLevel = document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL';
     const time = Utils.formatTime(weatherData.time[index]);
     const interpolatedData = interpolateWeatherData(index);
-    const refLevel = document.getElementById('refLevelSelect').value || 'AGL';
 
     let output = `<table>`;
     output += `<tr><th>Height (m ${refLevel})</th><th>Dir (deg)</th><th>Spd (kt)</th><th>T (C)</th></tr>`;
@@ -649,8 +646,7 @@ function interpolateWeatherData(index) {
     if (!weatherData || !weatherData.time || lastAltitude === 'N/A') return [];
 
     const step = parseInt(document.getElementById('interpStepSelect').value) || 200;
-    const refLevel = document.getElementById('refLevelSelect').value || 'AGL';
-    const baseHeight = Number(lastAltitude); // Terrain altitude (e.g., 580 m for default location)
+    const refLevel = document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL';    const baseHeight = Number(lastAltitude); // Terrain altitude (e.g., 580 m for default location)
     const levels = ['200 hPa', '250hPa', '300 hPa', '400hPa', '500 hPa', '600hPa', '700 hPa', '800 hPa', '850 hPa', '900 hPa', '925 hPa', '950 hPa', '1000 hPa'];
 
     // Surface height: 0 for AGL, baseHeight for AMSL
@@ -767,8 +763,7 @@ function calculateMeanWind() {
     const interpolatedData = interpolateWeatherData(index);
     let lowerLimitInput = parseFloat(document.getElementById('lowerLimit').value) || 0;
     let upperLimitInput = parseFloat(document.getElementById('upperLimit').value) || 3000;
-    const refLevel = document.getElementById('refLevelSelect').value || 'AGL';
-    const baseHeight = Math.round(lastAltitude);
+    const refLevel = document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL'; const baseHeight = Math.round(lastAltitude);
 
     console.log('refLevel in calculateMeanWind:', refLevel); // Debug log
 
@@ -872,11 +867,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const hamburgerBtn = document.getElementById('hamburgerBtn');
     const menu = document.getElementById('menu');
     const interpStepSelect = document.getElementById('interpStepSelect');
-    const refLevelSelect = document.getElementById('refLevelSelect');
+    const refLevelRadios = document.querySelectorAll('input[name="refLevel"]');
     const lowerLimitInput = document.getElementById('lowerLimit');
     const upperLimitInput = document.getElementById('upperLimit');
 
-    console.log('Elements:', { slider, modelSelect, downloadButton, hamburgerBtn, menu, interpStepSelect, refLevelSelect, lowerLimitInput, upperLimitInput });
+    console.log('Elements:', { slider, modelSelect, downloadButton, hamburgerBtn, menu, interpStepSelect, refLevelRadios, lowerLimitInput, upperLimitInput });
 
     if (!slider) {
         console.error('Slider missing');
@@ -977,16 +972,20 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    if (refLevelSelect) {
-        refLevelSelect.addEventListener('change', () => {
-            console.log('Ref level changed:', refLevelSelect.value);
-            updateReferenceLabels();
-            if (weatherData && lastLat && lastLng) {
-                updateWeatherDisplay(slider.value || 0);
-                if (lastAltitude !== 'N/A') calculateMeanWind();
-            }
+    if (refLevelRadios.length > 0) {
+        refLevelRadios.forEach(radio => {
+            radio.addEventListener('change', () => {
+                const selectedValue = document.querySelector('input[name="refLevel"]:checked').value;
+                console.log('Ref level changed:', selectedValue);
+                updateReferenceLabels();
+                if (weatherData && lastLat && lastLng) {
+                    updateWeatherDisplay(slider.value || 0);
+                    if (lastAltitude !== 'N/A') calculateMeanWind();
+                }
+            });
         });
-        console.log('Initial refLevel:', refLevelSelect.value);
+        const initialValue = document.querySelector('input[name="refLevel"]:checked').value;
+        console.log('Initial refLevel:', initialValue);
         updateReferenceLabels(); // Initial label setup
         if (weatherData && lastLat && lastLng) {
             updateWeatherDisplay(0); // Initial table display
