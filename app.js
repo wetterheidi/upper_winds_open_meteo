@@ -619,15 +619,28 @@ function updateWeatherDisplay(index, originalTime = null) {
         return;
     }
     const refLevel = document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL';
-    const heightUnit = getHeightUnit();
+    const heightUnit = getHeightUnit(); // Get selected height unit (m or ft)
     const time = Utils.formatTime(weatherData.time[index]);
     const interpolatedData = interpolateWeatherData(index);
 
     let output = `<table>`;
     output += `<tr><th>Height (${heightUnit} ${refLevel})</th><th>Dir (deg)</th><th>Spd (kt)</th><th>T (C)</th></tr>`;
     interpolatedData.forEach(data => {
+        const spd = parseFloat(data.spd); // Ensure spd is a number
+        let rowClass = '';
+        if (!isNaN(spd)) {
+            if (spd <= 3) {
+                rowClass = 'wind-low';
+            } else if (spd > 3 && spd <= 10) {
+                rowClass = 'wind-moderate';
+            } else if (spd > 10 && spd <= 16) {
+                rowClass = 'wind-high';
+            } else {
+                rowClass = 'wind-very-high';
+            }
+        }
         const displayHeight = convertHeight(data.displayHeight, heightUnit);
-        output += `<tr><td>${Math.round(displayHeight)}</td><td>${Utils.roundToTens(data.dir)}</td><td>${data.spd}</td><td>${data.temp}</td></tr>`;
+        output += `<tr class="${rowClass}"><td>${Math.round(displayHeight)}</td><td>${Utils.roundToTens(data.dir)}</td><td>${data.spd}</td><td>${data.temp}</td></tr>`;
     });
     output += `</table>`;
     document.getElementById('info').innerHTML = output;

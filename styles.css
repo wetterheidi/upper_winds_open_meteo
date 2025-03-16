@@ -975,6 +975,23 @@ input[type="number"]:focus {
     /* Add ellipsis for truncated text if needed */
 }
 
+/* Enhanced wind speed styles */
+#info table tr.wind-low {
+    border: 2px solid lightblue !important; /* Keep for debugging */
+}
+
+#info table tr.wind-moderate {
+    border: 2px solid lightgreen !important; /* Keep for debugging */
+}
+
+#info table tr.wind-high {
+    border: 2px solid yellow !important; /* Keep for debugging */
+}
+
+#info table tr.wind-very-high {
+    border: 2px solid #ffcccc !important; /* Keep for debugging */
+}
+
 @media (max-width: 600px) {
     #info table {
         font-size: 13px;
