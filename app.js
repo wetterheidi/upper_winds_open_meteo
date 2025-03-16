@@ -826,7 +826,11 @@ function downloadTableAsAscii() {
 
     const interpolatedData = interpolateWeatherData(index);
     console.log('Interpolated data:', interpolatedData);
-    let content = 'h(m) p(hPa) T(°C) Dew(°C) Dir(°) Spd(kt) RH(%)\n';
+
+    // Get the selected reference level from radio buttons
+    const refLevel = document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL';
+    const heightHeader = refLevel === 'AGL' ? 'h(mAGL)' : 'h(mAMSL)';
+    let content = `${heightHeader} p(hPa) T(°C) Dew(°C) Dir(°) Spd(kt) RH(%)\n`;
 
     interpolatedData.forEach(data => {
         content += `${data.displayHeight} ${data.pressure} ${data.temp} ${data.dew} ${data.dir} ${data.spd} ${data.rh}\n`;
