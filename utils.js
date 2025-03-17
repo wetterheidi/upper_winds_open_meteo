@@ -290,7 +290,7 @@ class Utils {
         }
         const { DateTime } = luxon;
 
-        const { timezone } = await Utils.getLocationData(lat, lng);
+        const { timezone,timezone_abbreviation } = await Utils.getLocationData(lat, lng);
         const utcDate = DateTime.fromISO(utcTimeStr, { zone: 'UTC' });
         const localDate = utcDate.setZone(timezone);
         return localDate.toFormat('yyyy-MM-dd HHmm') + ` ${timezone_abbreviation}`;
