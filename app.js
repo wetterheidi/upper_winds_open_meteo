@@ -73,25 +73,18 @@ function getWindSpeedUnit() {
 }
 
 function updateWindUnitLabels() {
-    const windSpeedUnit = getWindSpeedUnit(); // Get the currently selected wind speed unit
+    const windSpeedUnit = getWindSpeedUnit();
     const meanWindResult = document.getElementById('meanWindResult');
-
     if (meanWindResult && meanWindResult.innerHTML) {
         const currentText = meanWindResult.innerHTML;
-        // Regular expression to match the wind speed portion (e.g., "10 kt", "18.5 km/h")
-        const regex = /(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/;
+        const regex = /: (\d+(?:\.\d+)?)\s*([a-zA-Z\/]+)$/; // Match after colon and degrees
         if (regex.test(currentText)) {
             const [_, speedValue, currentUnit] = currentText.match(regex);
             const numericSpeed = parseFloat(speedValue);
             if (!isNaN(numericSpeed)) {
-                // Convert the wind speed to the new unit
-                const newSpeed = Utils.convertWind(numericSpeed, windSpeedUnit);
+                const newSpeed = Utils.convertWind(numericSpeed, windSpeedUnit, currentUnit);
                 const formattedSpeed = newSpeed === 'N/A' ? 'N/A' : (windSpeedUnit === 'bft' ? Math.round(newSpeed) : newSpeed.toFixed(1));
-                // Replace the old speed and unit with the new ones
-                const newText = currentText.replace(regex, `${formattedSpeed} ${windSpeedUnit}`);
-                meanWindResult.innerHTML = newText;
-            } else {
-                console.warn('Invalid speed value in meanWindResult:', speedValue);
+                meanWindResult.innerHTML = currentText.replace(regex, `: ${formattedSpeed} ${windSpeedUnit}`);
             }
         }
     }
@@ -812,14 +805,14 @@ function calculateMeanWind() {
     const index = document.getElementById('timeSlider').value || 0;
     const interpolatedData = interpolateWeatherData(index);
     let lowerLimitInput = parseFloat(document.getElementById('lowerLimit').value) || 0;
-    let upperLimitInput = parseFloat(document.getElementById('upperLimit').value) || 3000;
+    let upperLimitInput = parseFloat(document.getElementById('upperLimit').value);
     const refLevel = document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL';
     const heightUnit = getHeightUnit();
     const windSpeedUnit = getWindSpeedUnit(); // Add wind speed unit
     const baseHeight = Math.round(lastAltitude);
 
-    if (lastAltitude === 'N/A') {
-        displayError('Terrain altitude unavailable. Cannot calculate mean wind.');
+    if (!weatherData || lastAltitude === 'N/A') {
+        handleError('Cannot calculate mean wind: missing data or altitude');
         return;
     }
 

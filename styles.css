@@ -1,3 +1,9 @@
+:root {
+    --label-width: 135px;
+    --input-width: 70px;
+    --grid-columns: var(--label-width) var(--input-width) var(--label-width) var(--input-width) minmax(0, 1fr);
+}
+
 html {
     font-size: 13px;
 }
@@ -187,7 +193,7 @@ html {
     z-index: 100;
     box-sizing: border-box;
     white-space: pre-wrap;
-    font-family: 'Roboto', sans-serif; /* Preferred over Arial for consistency */
+    font-family: 'Roboto', sans-serif;
     font-size: 13px;
     font-weight: 400;
 }
@@ -338,73 +344,53 @@ button {
     background-color: #f0f8ff;
 }
 
-#meanWindControls {
+#meanWindControls, #controls-row {
     display: grid;
-    grid-template-columns: 135px 70px 135px 70px minmax(0, 1fr);
-    /* Use minmax to control 1fr */
+    grid-template-columns: var(--grid-columns);
     align-items: center;
     justify-items: start;
-    /* Align all items to the left */
     gap: 5px;
 }
 
-#controls-row {
-    display: grid;
-    grid-template-columns: 135px 70px 135px 70px minmax(0, 1fr);
-    /* Match columns */
-    align-items: center;
-    justify-items: start;
-    /* Align all items to the left */
-    gap: 5px;
-}
-
-#meanWindControls input {
-    width: 70px;
-    /* Base width */
+#meanWindControls input,
+#lowerLimit,
+#upperLimit {
+    width: var(--input-width);
     box-sizing: border-box;
-    /* Ensure padding/border don’t increase width */
 }
 
 #controls-row select {
-    width: 80px;
-    /* Match inputs */
+    width: var(--input-width);
     padding: 6px;
     box-sizing: border-box;
 }
 
 #meanWindControls label,
 #controls-row label {
+    width: var(--label-width);
     text-align: left;
     font-size: 13px;
     font-family: 'Roboto', sans-serif;
     font-weight: 400;
     white-space: nowrap;
-    /* Prevent label text from wrapping */
     overflow: hidden;
     text-overflow: ellipsis;
-    /* Truncate if too long */
 }
 
 #meanWindResult {
     font-size: 13px;
     font-family: 'Roboto', sans-serif;
     font-weight: bold;
-    font-size: 14px;
-    font-style: italic;
     text-align: left;
     white-space: nowrap;
-    /* Prevent wrapping */
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-/* Ensure button and info fit in the second row */
 #controls-row button {
-    grid-column: 5 / 6;
+    grid-column: 5 / 6; /* Desktop default */
     width: auto;
-    /* Let button size naturally */
     min-width: 100px;
-    /* Ensure it’s not too small */
     padding: 6px 10px;
 }
 
@@ -414,15 +400,6 @@ button {
     grid-row: 3;
     padding: 10px;
     margin: 0;
-}
-
-#bottom-container #loading {
-    grid-column: 1 / -1;
-    /* Span all columns */
-    grid-row: 3;
-    /* Third row, same as #info */
-    display: none;
-    /* Hidden by default */
 }
 
 #controls-row #info {
@@ -449,9 +426,19 @@ button {
     width: 70px;
 }
 
+#controls-row {
+    display: grid;
+    grid-template-columns: var(--grid-columns);
+    align-items: center;
+    justify-items: start;
+    gap: 5px;
+}
+
 #controls-row select {
-    width: 80px;
+    width: var(--input-width);
     padding: 6px;
+    box-sizing: border-box;
+    margin-right: 5px; /* Add spacing to the right of the select */
 }
 
 #meanWindResult {
@@ -646,6 +633,9 @@ input[type="number"]:focus {
 }
 
 @media (max-width: 768px) {
+    :root {
+        --grid-columns: var(--label-width) var(--input-width) var(--label-width) var(--input-width);
+    }
     body {
         flex-direction: column;
     }
@@ -681,55 +671,28 @@ input[type="number"]:focus {
         font-size: 13px;
     }
 
-    #meanWindControls,
-    #controls-row {
-        grid-template-columns: 135px 70px 135px 70px;
+    #meanWindControls, #controls-row {
         grid-template-rows: auto auto;
-        /* Two rows: inputs/selects, then result/button */
-    }
-
-    #meanWindControls {
-        grid-template-columns: 135px 70px 135px 70px;
-    }
-
-    #controls-row {
-        display: grid;
-        grid-template-columns: 135px 70px auto minmax(0, 1fr);  /* Adjusted columns */
-        align-items: center;
-        justify-items: start;
-        gap: 5px;
-    }
-
-    #lowerLimit,
-    #upperLimit {
-        width: 70px;
-    }
-
-    #controls-row select {
-        width: 70px; /* Matches current width */
-        padding: 6px;
-        box-sizing: border-box;
     }
 
     /* Move #meanWindResult to the second row, spanning all columns */
     #meanWindResult {
         grid-column: 1 / 5;
-        /* Span all four columns */
         grid-row: 2;
-        /* Second row */
         margin-top: 5px;
-        /* Add some spacing */
     }
 
     /* Move #downloadButton to the second row, spanning all columns */
     #controls-row button {
-        grid-column: 3 / 4; /* Move to third column, after select */
-        width: auto;
-        min-width: 100px; /* Maintains button size */
-        padding: 6px 10px;
-        margin-left: 5px; /* Optional: adds slight spacing from select */
+        grid-column: 3 / 4;
+        grid-row: 1;
+        margin-left: 5px;
     }
 
+    #controls-row select {
+        margin-right: 5px; /* Ensure space before button */
+    }
+    
     #model-row {
         flex-wrap: wrap;
     }
@@ -740,6 +703,11 @@ input[type="number"]:focus {
 }
 
 @media (max-width: 480px) {
+    :root {
+        --label-width: 100px;
+        --input-width: 60px;
+        --grid-columns: var(--label-width) var(--input-width) auto;
+    }
     #slider-container {
         top: 35px;
         /* Increased to clear hamburger menu and its potential dropdown */
@@ -799,11 +767,15 @@ input[type="number"]:focus {
         width: 60px;
     }
 
+    #meanWindControls label,
+    #controls-row label {
+        font-size: 11px;
+    }
+
     #controls-row button {
-        grid-column: 3 / 4; /* Still in third column */
-        grid-row: 1; /* Keep in first row */
-        min-width: 80px; /* Slightly smaller for narrow screens */
-        margin-left: 5px;
+        grid-column: 3 / 4;
+        grid-row: 1;
+        min-width: 80px;
     }
 
     /* If info or other elements follow, ensure they adjust */
@@ -814,6 +786,12 @@ input[type="number"]:focus {
 }
 
 @media (max-width: 400px) {
+    :root {
+        --label-width: 100px;
+        --input-width: 60px;
+        --grid-columns: var(--label-width) var(--input-width) auto;
+    }
+
     #info {
         max-height: 40vh;
     }
@@ -829,44 +807,16 @@ input[type="number"]:focus {
         width: 100%;
     }
 
-    #meanWindControls,
-    #controls-row {
-        grid-template-columns: 100px 60px auto; /* Keep label, select, button */
-        grid-template-rows: auto auto; /* Two rows: controls, then info */
-        gap: 5px;
-        position: relative; /* Ensure positioning context */
-        z-index: 150; /* Above #info to prevent overlap */
-    }
-
     #meanWindControls label,
     #controls-row label {
         font-size: 11px;
     }
 
-    #lowerLimit,
-    #upperLimit {
-        width: 60px;
-    }
-
-    #controls-row select {
-        width: 60px;
-    }
-
-    /* Move #meanWindResult to the second row, spanning all columns */
-    #meanWindResult {
-        grid-column: 1 / 5;
-        /* Span all four columns */
-        grid-row: 2;
-        /* Second row */
-    }
-
-    /* Move #downloadButton to the second row, spanning all columns */
     #controls-row button {
-        grid-column: 3 / 4; /* After select */
-        grid-row: 1; /* First row with label and select */
-        min-width: 70px; /* Slightly smaller to fit */
-        padding: 4px 8px; /* Reduce padding for narrow screens */
-        margin-left: 5px;
+        grid-column: 3 / 4;
+        grid-row: 1;
+        min-width: 70px;
+        padding: 4px 8px;
     }
 
     #slider-container {
@@ -999,7 +949,7 @@ input[type="number"]:focus {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    display: none; /* Hidden by default, toggled via JS */
+    display: none;
     flex-direction: column;
     align-items: center;
     justify-content: center;
@@ -1023,7 +973,7 @@ input[type="number"]:focus {
     margin-top: 10px;
     font-size: 13px;
     color: #333;
-    font-family: Arial, sans-serif;
+    font-family: Roboto, sans-serif;
 }
 
 /* Spin animation */
@@ -1032,7 +982,6 @@ input[type="number"]:focus {
     100% { transform: rotate(360deg); }
 }
 
-/* Pulse animation (add if not already present) */
 @keyframes pulse {
     0% { transform: scale(1); }
     50% { transform: scale(1.1); }
