@@ -251,6 +251,50 @@ class Utils {
 
         return dddff;
     }
+
+    // Cache for time zones and elevations
+    static locationCache = new Map();
+
+    // New function to fetch time zone and elevation from Open-Meteo
+    static async getLocationData(lat, lng) {
+        const cacheKey = `${lat.toFixed(4)},${lng.toFixed(4)}`;
+        if (Utils.locationCache.has(cacheKey)) {
+            return Utils.locationCache.get(cacheKey);
+        }
+
+        try {
+            const response = await fetch(
+                `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&timezone=auto`
+            );
+            if (!response.ok) throw new Error(`Open-Meteo fetch failed: ${response.status}`);
+            const data = await response.json();
+            const locationData = {
+                timezone: data.timezone || 'UTC', // Fallback to UTC
+                timezone_abbreviation: data.timezone_abbreviation || 'UTC', // Fallback to UTC
+                elevation: data.elevation !== undefined ? data.elevation : 'N/A'
+            };
+            Utils.locationCache.set(cacheKey, locationData);
+            console.log(`Fetched location data for ${cacheKey}:`, locationData);
+            return locationData;
+        } catch (error) {
+            console.error('Error fetching location data:', error.message);
+            return { timezone: 'UTC', elevation: 'N/A' }; // Fallback
+        }
+    }
+
+    // Updated formatLocalTime using Open-Meteo time zone
+    static async formatLocalTime(utcTimeStr, lat, lng) {
+        if (!window.luxon) {
+            console.warn('Luxon not available, falling back to UTC');
+            return Utils.formatTime(utcTimeStr);
+        }
+        const { DateTime } = luxon;
+
+        const { timezone } = await Utils.getLocationData(lat, lng);
+        const utcDate = DateTime.fromISO(utcTimeStr, { zone: 'UTC' });
+        const localDate = utcDate.setZone(timezone);
+        return localDate.toFormat('yyyy-MM-dd HHmm') + ` ${timezone_abbreviation}`;
+    }
 }
 
 window.Utils = Utils;

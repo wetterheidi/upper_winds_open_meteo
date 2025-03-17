@@ -97,6 +97,21 @@
                     </li>
                 </ul>
             </li>
+            <li>
+                <span>Time zone</span>
+                <ul class="submenu hidden">
+                    <li>
+                        <label class="radio-label">
+                            <input type="radio" name="timeZone" value="Z" checked> Z
+                        </label>
+                    </li>
+                    <li>
+                        <label class="radio-label">
+                            <input type="radio" name="timeZone" value="loc"> loc
+                        </label>
+                    </li>
+                </ul>
+            </li>
         </ul>
     </div>
     <div id="slider-container">
@@ -143,6 +158,7 @@
             </div>
         </div>
     </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/luxon/3.4.4/luxon.min.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="utils.js"></script>
     <script src="app.js"></script>

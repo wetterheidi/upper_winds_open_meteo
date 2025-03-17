@@ -14,6 +14,15 @@ function updateModelRunInfo() {
         const model = modelSelect.value;
         modelRunInfo.innerHTML = `Model: ${model.replace('_', ' ').toUpperCase()}<br> Run: ${lastModelRun}`;
     }
+    // Activate this to switch to local time for model run info and modify function to async function
+    /*if (modelRunInfo && lastModelRun) {
+        const model = modelSelect.value;
+        const timeZone = document.querySelector('input[name="timeZone"]:checked')?.value || 'Z';
+        const displayTime = timeZone === 'Z' || !lastLat || !lastLng
+            ? lastModelRun
+            : await Utils.formatLocalTime(lastModelRun.replace(' ', 'T') + ':00Z', lastLat, lastLng);
+        modelRunInfo.innerHTML = `Model: ${model.replace('_', ' ').toUpperCase()}<br> Run: ${displayTime}`;
+    }*/
 }
 
 function updateReferenceLabels() {
@@ -85,6 +94,15 @@ function updateWindUnitLabels() {
                 console.warn('Invalid speed value in meanWindResult:', speedValue);
             }
         }
+    }
+}
+
+async function getDisplayTime(utcTimeStr) {
+    const timeZone = document.querySelector('input[name="timeZone"]:checked')?.value || 'Z';
+    if (timeZone === 'Z' || !lastLat || !lastLng) {
+        return Utils.formatTime(utcTimeStr); // Synchronous
+    } else {
+        return await Utils.formatLocalTime(utcTimeStr, lastLat, lastLng); // Async
     }
 }
 
@@ -196,7 +214,7 @@ function initMap() {
                         await fetchWeather(lastLat, lastLng);
                         updateModelRunInfo();
                         updateReferenceLabels(); // Add this
-                        updateWeatherDisplay(0); // Force initial display
+                        await updateWeatherDisplay(0); // Force initial display
                         if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
                             calculateMeanWind();
                         }
@@ -596,7 +614,7 @@ async function fetchWeather(lat, lon, currentTime = null) {
         console.log('Slider set to index:', slider.value, 'corresponding to:', weatherData.time[slider.value]);
 
         // Update UI with the selected time and original requested time
-        updateWeatherDisplay(slider.value, currentTime); // Pass currentTime for range check
+        await updateWeatherDisplay(slider.value, currentTime); // Pass currentTime for range check
         console.log('UI updated with index:', slider.value, 'time:', weatherData.time[slider.value]);
 
         // Single validation after delay
@@ -638,7 +656,7 @@ async function fetchWeather(lat, lon, currentTime = null) {
     }
 }
 
-function updateWeatherDisplay(index, originalTime = null) {
+async function updateWeatherDisplay(index, originalTime = null) {
     if (!weatherData || !weatherData.time || index < 0 || index >= weatherData.time.length) {
         console.error('No weather data available or index out of bounds:', index);
         document.getElementById('info').innerHTML = 'No weather data available';
@@ -651,7 +669,7 @@ function updateWeatherDisplay(index, originalTime = null) {
     const heightUnit = getHeightUnit();
     const windSpeedUnit = getWindSpeedUnit();
     const temperatureUnit = getTemperatureUnit();
-    const time = Utils.formatTime(weatherData.time[index]);
+    const time = await getDisplayTime(weatherData.time[index]); // Await is fine here because function is async
     const interpolatedData = interpolateWeatherData(index);
 
     let output = `<table>`;
@@ -660,19 +678,17 @@ function updateWeatherDisplay(index, originalTime = null) {
         const spd = parseFloat(data.spd);
         let rowClass = '';
         if (windSpeedUnit === 'bft') {
-            // Use raw Beaufort force for classification
-            const bft = Math.round(spd); // Ensure integer
-            if (bft <= 1) rowClass = 'wind-low';         // Bft 0-1
-            else if (bft <= 3) rowClass = 'wind-moderate'; // Bft 2-3
-            else if (bft <= 4) rowClass = 'wind-high';    // Bft 4
-            else rowClass = 'wind-very-high';             // Bft 5+
+            const bft = Math.round(spd);
+            if (bft <= 1) rowClass = 'wind-low';
+            else if (bft <= 3) rowClass = 'wind-moderate';
+            else if (bft <= 4) rowClass = 'wind-high';
+            else rowClass = 'wind-very-high';
         } else {
-            // Convert to knots for other units
             const spdInKt = Utils.convertWind(spd, 'kt', windSpeedUnit);
-            if (spdInKt <= 3) rowClass = 'wind-low';      // ≤ 3 kt
-            else if (spdInKt <= 10) rowClass = 'wind-moderate'; // ≤ 10 kt
-            else if (spdInKt <= 16) rowClass = 'wind-high';    // ≤ 16 kt
-            else rowClass = 'wind-very-high';                  // > 16 kt
+            if (spdInKt <= 3) rowClass = 'wind-low';
+            else if (spdInKt <= 10) rowClass = 'wind-moderate';
+            else if (spdInKt <= 16) rowClass = 'wind-high';
+            else rowClass = 'wind-very-high';
         }
         const displayHeight = Utils.convertHeight(data.displayHeight, heightUnit);
         const displayTemp = Utils.convertTemperature(data.temp, temperatureUnit === 'C' ? '°C' : '°F');
@@ -914,6 +930,8 @@ function downloadTableAsAscii() {
     const index = document.getElementById('timeSlider').value || 0;
     const model = document.getElementById('modelSelect').value.toUpperCase();
     const time = Utils.formatTime(weatherData.time[index]).replace(' ', '_');
+    //Activate next line to use local time for the file name!!!
+    //const time = getDisplayTime(weatherData.time[index]).replace(' ', '_').replace(/[^\w-]/g, ''); // Clean for filename
     const filename = `${time}_${model}_HEIDIS.txt`;
     const heightUnit = getHeightUnit();
     const temperatureUnit = getTemperatureUnit();
@@ -1030,30 +1048,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Existing slider event listener (unchanged)
     if (slider) {
-        const debouncedUpdate = debounce((e) => {
+        const debouncedUpdate = debounce(async (e) => {
             const index = parseInt(e.target.value);
-            console.log('Slider input triggered - index:', index, 'weatherData.time:', weatherData?.time?.[index]);
+            console.log('Slider input triggered - index:', index);
             if (weatherData && index >= 0 && index < weatherData.time.length) {
-                updateWeatherDisplay(index);
+                await updateWeatherDisplay(index); // Await here
                 if (lastLat && lastLng && lastAltitude !== 'N/A') calculateMeanWind();
             } else {
-                console.warn('Invalid slider index or no data:', index);
                 slider.value = 0;
-                updateWeatherDisplay(0);
+                await updateWeatherDisplay(0); // Await here
             }
         }, 100);
 
         slider.addEventListener('input', debouncedUpdate);
-        slider.addEventListener('change', (e) => {
+        slider.addEventListener('change', async (e) => {
             const index = parseInt(e.target.value);
-            console.log('Slider change triggered - index:', index, 'weatherData.time:', weatherData?.time?.[index]);
+            console.log('Slider change triggered - index:', index);
             if (weatherData && index >= 0 && index < weatherData.time.length) {
-                updateWeatherDisplay(index);
+                await updateWeatherDisplay(index); // Await here
                 if (lastLat && lastLng && lastAltitude !== 'N/A') calculateMeanWind();
             } else {
-                console.warn('Slider out of bounds, resetting to 0');
                 slider.value = 0;
-                updateWeatherDisplay(0);
+                await updateWeatherDisplay(0); // Await here
             }
         });
     }
@@ -1067,16 +1083,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 const currentTime = weatherData?.time?.[currentIndex] || null;
                 console.log('Model change triggered - new model:', modelSelect.value, 'currentTime:', currentTime);
                 document.getElementById('info').innerHTML = `Fetching weather with ${modelSelect.value}...`;
-                fetchWeather(lastLat, lastLng, currentTime).then(() => {
-                    console.log('Model fetch completed - new weatherData:', weatherData);
-                    updateModelRunInfo();
-                    updateReferenceLabels();
-                    updateWeatherDisplay(slider.value);
-                    if (lastLat && lastLng && lastAltitude !== 'N/A') calculateMeanWind();
-                }).catch(err => {
-                    console.error('Model fetch failed:', err);
-                    displayError(`Failed to fetch weather: ${err.message}`);
-                });
+                fetchWeather(lastLat, lastLng, currentTime);
+                console.log('Model fetch completed - new weatherData:', weatherData);
+                updateModelRunInfo();
+                updateWeatherDisplay(slider.value);
+                updateReferenceLabels();
+                if (lastLat && lastLng && lastAltitude !== 'N/A') calculateMeanWind();
             } else {
                 displayError('Please select a position on the map first.');
             }
@@ -1176,6 +1188,20 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
         updateWindUnitLabels(); // Initial setup
+    }
+
+    //Add time zone listener
+    const timeZoneRadios = document.querySelectorAll('input[name="timeZone"]');
+    if (timeZoneRadios.length > 0) {
+        timeZoneRadios.forEach(radio => {
+            radio.addEventListener('change', async () => { // Make this async
+                console.log('Time zone changed:', radio.value);
+                if (weatherData && lastLat && lastLng) {
+                    await updateWeatherDisplay(slider.value || 0); // Await here
+                    updateModelRunInfo(); // Already async
+                }
+            });
+        });
     }
     // Existing interpStepSelect event listener (unchanged)
     if (interpStepSelect) {
