@@ -1,20 +1,9 @@
 class Utils {
     // Format ISO time string to UTC (e.g., "2025-03-15T00:00Z" -> "2025-03-15 0000Z")
     static formatTime(timeStr) {
-        console.log('Formatting time:', timeStr);
-        const date = new Date(Date.UTC(
-            parseInt(timeStr.slice(0, 4)), // Year
-            parseInt(timeStr.slice(5, 7)) - 1, // Month (0-based)
-            parseInt(timeStr.slice(8, 10)), // Day
-            parseInt(timeStr.slice(11, 13)), // Hour
-            parseInt(timeStr.slice(14, 16)) // Minute
-        ));
-        const year = date.getUTCFullYear();
-        const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-        const day = String(date.getUTCDate()).padStart(2, '0');
-        const hour = String(date.getUTCHours()).padStart(2, '0');
-        const minute = String(date.getUTCMinutes()).padStart(2, '0');
-        return `${year}-${month}-${day} ${hour}${minute}Z`;
+        if (!window.luxon) return timeStr; // Fallback
+        const { DateTime } = luxon;
+        return DateTime.fromISO(timeStr, { zone: 'UTC' }).toFormat('yyyy-MM-dd HHmm') + 'Z';
     }
 
     // Round a number to the nearest ten

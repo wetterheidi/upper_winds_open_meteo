@@ -716,68 +716,60 @@ function interpolateWeatherData(index) {
     const baseHeight = Math.round(lastAltitude);
     const surfaceHeight = refLevel === 'AGL' ? 0 : baseHeight;
 
+    // Surface data
     const surfaceData = {
-        level: `${surfaceHeight} m`,
+        displayHeight: surfaceHeight,
         height: baseHeight,
-        temp: weatherData.temperature_2m?.[index],
-        rh: weatherData.relative_humidity_2m?.[index],
-        dir: weatherData.wind_direction_10m?.[index],
-        spd: Utils.convertWind(weatherData.wind_speed_10m?.[index], windSpeedUnit, 'km/h'),
-        spdKt: Utils.convertWind(weatherData.wind_speed_10m?.[index], 'kt', 'km/h') // Add knots
+        temp: weatherData.temperature_2m?.[index] ?? 'N/A',
+        rh: weatherData.relative_humidity_2m?.[index] ?? 'N/A',
+        dir: weatherData.wind_direction_10m?.[index] ?? 'N/A',
+        spd: Utils.convertWind(weatherData.wind_speed_10m?.[index], windSpeedUnit, 'km/h') ?? 'N/A',
+        spdKt: Utils.convertWind(weatherData.wind_speed_10m?.[index], 'kt', 'km/h') ?? 'N/A'
     };
 
-    const dataPoints = [];
+    // Pre-filter valid pressure level data points
     const levels = ['200hPa', '250hPa', '300hPa', '400hPa', '500hPa', '600hPa', '700hPa', '800hPa', '850hPa', '900hPa', '925hPa', '950hPa', '1000hPa'];
-    levels.forEach(level => {
-        const levelKey = level.replace(' ', '');
-        const gh = weatherData[`geopotential_height_${levelKey}`]?.[index];
-        if (gh !== undefined && gh !== null && !isNaN(gh)) {
-            const spdKt = Utils.convertWind(weatherData[`wind_speed_${levelKey}`]?.[index], 'kt', 'km/h');
-            dataPoints.push({
-                level: level,
+    const dataPoints = levels
+        .map(level => {
+            const levelKey = level.replace(' ', '');
+            const gh = weatherData[`geopotential_height_${levelKey}`]?.[index];
+            if (gh === undefined || gh === null || isNaN(gh)) return null;
+            return {
+                level,
                 height: Math.round(gh),
-                temp: weatherData[`temperature_${levelKey}`]?.[index],
-                rh: weatherData[`relative_humidity_${levelKey}`]?.[index],
-                dir: weatherData[`wind_direction_${levelKey}`]?.[index],
-                spd: Utils.convertWind(weatherData[`wind_speed_${levelKey}`]?.[index], windSpeedUnit, 'km/h'),
-                spdKt: spdKt // Store knots for interpolation
-            });
-        }
-    });
+                temp: weatherData[`temperature_${levelKey}`]?.[index] ?? 'N/A',
+                rh: weatherData[`relative_humidity_${levelKey}`]?.[index] ?? 'N/A',
+                dir: weatherData[`wind_direction_${levelKey}`]?.[index] ?? 'N/A',
+                spd: Utils.convertWind(weatherData[`wind_speed_${levelKey}`]?.[index], windSpeedUnit, 'km/h') ?? 'N/A',
+                spdKt: Utils.convertWind(weatherData[`wind_speed_${levelKey}`]?.[index], 'kt', 'km/h') ?? 'N/A'
+            };
+        })
+        .filter(point => point !== null)
+        .sort((a, b) => a.height - b.height); // Ascending order
 
-    if (dataPoints.length === 0) {
-        return [{
-            displayHeight: surfaceHeight,
-            pressure: 'N/A',
-            temp: surfaceData.temp ?? 'N/A',
-            dew: Utils.calculateDewpoint(surfaceData.temp, surfaceData.rh) ?? 'N/A',
-            dir: surfaceData.dir ?? 'N/A',
-            spd: surfaceData.spd ?? 'N/A',
-            rh: surfaceData.rh ?? 'N/A'
-        }];
+    if (!dataPoints.length) {
+        const dew = Utils.calculateDewpoint(surfaceData.temp, surfaceData.rh) ?? 'N/A';
+        return [{ ...surfaceData, pressure: 'N/A', dew }];
     }
 
-    dataPoints.sort((a, b) => a.height - b.height);
-    const maxHeight = dataPoints[dataPoints.length - 1].height;
-    const interpolated = [];
+    // Pressure interpolation setup
+    const pressureLevels = levels.map(l => parseInt(l.replace('hPa', ''))).reverse();
+    const pressureHeights = dataPoints.map(p => p.height).reverse();
 
-    const dewSurface = Utils.calculateDewpoint(surfaceData.temp, surfaceData.rh);
-    const pressureLevels = [200, 250, 300, 400, 500, 600, 700, 800, 850, 900, 925, 950, 1000];
-    const pressureHeights = levels.map(level => weatherData[`geopotential_height_${level}`]?.[index]).filter(h => h !== null && !isNaN(h)).map(h => Math.round(h));
+    // Start with surface data
+    const dewSurface = Utils.calculateDewpoint(surfaceData.temp, surfaceData.rh) ?? 'N/A';
     const pressureSurface = Utils.interpolatePressure(surfaceData.height, pressureLevels, pressureHeights);
-
-    interpolated.push({
-        height: surfaceData.height,
-        displayHeight: surfaceHeight,
+    const interpolated = [{
+        ...surfaceData,
         pressure: pressureSurface === '-' ? 'N/A' : pressureSurface,
-        temp: surfaceData.temp ?? 'N/A',
-        dew: dewSurface ?? 'N/A',
-        dir: surfaceData.dir ?? 'N/A',
-        spd: surfaceData.spd ?? 'N/A',
-        rh: surfaceData.rh ?? 'N/A'
-    });
+        dew: dewSurface
+    }];
 
-    for (let hp = surfaceHeight + step; hp <= (refLevel === 'AGL' ? maxHeight - baseHeight : maxHeight); hp += step) {
+    // Interpolate between valid points
+    const maxHeight = dataPoints[dataPoints.length - 1].height;
+    const heightRange = refLevel === 'AGL' ? maxHeight - baseHeight : maxHeight;
+
+    for (let hp = surfaceHeight + step; hp <= heightRange; hp += step) {
         const actualHp = refLevel === 'AGL' ? hp + baseHeight : hp;
         const lower = dataPoints.filter(p => p.height <= actualHp).pop();
         const upper = dataPoints.find(p => p.height > actualHp);
@@ -795,8 +787,8 @@ function interpolateWeatherData(index) {
             -upper.spdKt * Math.cos(upper.dir * Math.PI / 180),
             lower.height, upper.height, actualHp
         );
-        const spdKt = Utils.windSpeed(u, v); // Speed in knots
-        const spd = Utils.convertWind(spdKt, windSpeedUnit, 'kt'); // Convert to display unit
+        const spdKt = Utils.windSpeed(u, v);
+        const spd = Utils.convertWind(spdKt, windSpeedUnit, 'kt');
         const dir = Utils.windDirection(u, v);
         const dew = Utils.calculateDewpoint(temp, rh);
         const pressure = Utils.interpolatePressure(actualHp, pressureLevels, pressureHeights);
