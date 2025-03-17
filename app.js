@@ -180,7 +180,7 @@ function initMap() {
             },
             async (error) => {
                 console.warn(`Geolocation error: ${error.message}`);
-                displayError('Unable to retrieve your location. Using default location.');
+                Utils.handleError('Unable to retrieve your location. Using default location.');
                 lastLat = defaultCenter[0];
                 lastLng = defaultCenter[1];
                 lastAltitude = await getAltitude(lastLat, lastLng); // Await here too
@@ -207,7 +207,7 @@ function initMap() {
         );
     } else {
         console.warn('Geolocation not supported.');
-        displayError('Geolocation not supported. Using default location.');
+        Utils.handleError('Geolocation not supported. Using default location.');
         lastLat = defaultCenter[0];
         lastLng = defaultCenter[1];
         lastAltitude = getAltitude(lastLat, lastLng);
@@ -604,7 +604,7 @@ async function fetchWeather(lat, lon, currentTime = null) {
         weatherData = weatherData || {};
         document.getElementById('loading').style.display = 'none';
         console.error("Weather fetch error:", error);
-        displayError(`Could not load weather data: ${error.message}`);
+        Utils.handleError(`Could not load weather data: ${error.message}`);
         throw error;
     }
 }
@@ -821,12 +821,12 @@ function calculateMeanWind() {
     upperLimitInput = heightUnit === 'ft' ? upperLimitInput / 3.28084 : upperLimitInput;
 
     if (isNaN(lowerLimitInput) || isNaN(upperLimitInput) || lowerLimitInput >= upperLimitInput) {
-        displayError('Invalid layer limits. Ensure Lower < Upper and both are numbers.');
+        Utils.handleError('Invalid layer limits. Ensure Lower < Upper and both are numbers.');
         return;
     }
 
     if ((refLevel === 'AMSL') && lowerLimitInput < baseHeight) {
-        displayError(`Lower limit adjusted to terrain altitude (${baseHeight} m ${refLevel}) as it cannot be below ground level in ${refLevel} mode.`);
+        Utils.handleError(`Lower limit adjusted to terrain altitude (${baseHeight} m ${refLevel}) as it cannot be below ground level in ${refLevel} mode.`);
         lowerLimitInput = baseHeight;
         document.getElementById('lowerLimit').value = Utils.convertHeight(lowerLimitInput, heightUnit);
     }
@@ -836,7 +836,7 @@ function calculateMeanWind() {
 
     // Check if interpolatedData is valid
     if (!interpolatedData || interpolatedData.length === 0) {
-        displayError('No valid weather data available to calculate mean wind.');
+        Utils.handleError('No valid weather data available to calculate mean wind.');
         return;
     }
 
@@ -868,7 +868,7 @@ function calculateMeanWind() {
 
 function downloadTableAsAscii() {
     if (!weatherData || !weatherData.time) {
-        displayError('No weather data available to download.');
+        Utils.handleError('No weather data available to download.');
         return;
     }
 
@@ -913,7 +913,7 @@ function downloadTableAsAscii() {
 
     const interpolatedData = interpolateWeatherData(index);
     if (!interpolatedData || interpolatedData.length === 0) {
-        displayError('No interpolated data available to download.');
+        Utils.handleError('No interpolated data available to download.');
         return;
     }
 
@@ -974,11 +974,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     console.log('Elements:', { slider, modelSelect, downloadButton, hamburgerBtn, menu, interpStepSelect, refLevelRadios, lowerLimitInput, upperLimitInput, windSpeedUnitRadios });
 
-    if (!slider) {
-        console.error('Slider missing');
-        displayError('Slider element missing. Check HTML.');
-        return;
-    }
+    if (!slider) Utils.handleError('Slider element missing. Check HTML.');
 
     slider.value = 0;
     slider.setAttribute('autocomplete', 'off');
@@ -1035,7 +1031,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateReferenceLabels();
                 if (lastLat && lastLng && lastAltitude !== 'N/A') calculateMeanWind();
             } else {
-                displayError('Please select a position on the map first.');
+                Utils.handleError('Please select a position on the map first.');
             }
         });
     }
@@ -1156,7 +1152,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateWeatherDisplay(slider.value || 0);
                 if (lastAltitude !== 'N/A') calculateMeanWind();
             } else {
-                displayError('Please select a position and fetch weather data first.');
+                Utils.handleError('Please select a position and fetch weather data first.');
             }
         });
     }
@@ -1168,7 +1164,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
                 calculateMeanWind();
             } else {
-                displayError('Please select a position and fetch weather data first.');
+                Utils.handleError('Please select a position and fetch weather data first.');
             }
         }, 300));
     }
@@ -1180,7 +1176,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
                 calculateMeanWind();
             } else {
-                displayError('Please select a position and fetch weather data first.');
+                Utils.handleError('Please select a position and fetch weather data first.');
             }
         }, 300));
     }

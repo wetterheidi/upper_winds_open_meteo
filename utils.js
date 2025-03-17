@@ -284,6 +284,11 @@ class Utils {
         const localDate = utcDate.setZone(timezone);
         return localDate.toFormat('yyyy-MM-dd HHmm') + ` ${timezone_abbreviation}`;
     }
+
+    static handleError(message, log = true) {
+        if (log) console.error(message);
+        displayError(message);
+    }
 }
 
 window.Utils = Utils;
