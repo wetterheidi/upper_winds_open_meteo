@@ -160,24 +160,19 @@ function initMap() {
                 const userCoords = [position.coords.latitude, position.coords.longitude];
                 map.setView(userCoords, defaultZoom);
 
-                if (currentMarker) {
-                    currentMarker.remove();
-                }
+                if (currentMarker) currentMarker.remove();
                 lastLat = position.coords.latitude;
                 lastLng = position.coords.longitude;
-                const altitude = await getAltitude(lastLat, lastLng);
-                lastAltitude = altitude !== null ? altitude : 'N/A';
+                lastAltitude = await getAltitude(lastLat, lastLng); // Await the async call
 
                 const popup = L.popup({ offset: [0, 10] })
                     .setLatLng(userCoords)
                     .setContent(`Lat: ${lastLat.toFixed(4)}<br>Lng: ${lastLng.toFixed(4)}<br>Alt: ${lastAltitude}m`);
-
                 currentMarker = L.marker(userCoords, { icon: customIcon })
                     .bindPopup(popup)
                     .addTo(map)
                     .openPopup();
 
-                // Recenter map after geolocation marker placement
                 recenterMap();
 
                 document.getElementById('info').innerHTML = `Fetching weather and models...`;
@@ -185,110 +180,85 @@ function initMap() {
                 if (availableModels.length > 0) {
                     await fetchWeather(lastLat, lastLng);
                     updateModelRunInfo();
-                    if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
-                        calculateMeanWind();
-                    }
+                    if (weatherData && lastAltitude !== 'N/A') calculateMeanWind();
                 } else {
                     document.getElementById('info').innerHTML = `No models available.`;
                 }
             },
-            (error) => {
+            async (error) => {
                 console.warn(`Geolocation error: ${error.message}`);
-                displayError('Unable to retrieve your location. Using default location (Herrsching am Ammersee).');
-                getAltitude(defaultCenter[0], defaultCenter[1]).then(async (altitude) => {
-                    lastAltitude = altitude !== null ? altitude : 'N/A';
-                    lastLat = defaultCenter[0];
-                    lastLng = defaultCenter[1];
-                    const popup = L.popup({ offset: [0, 10] })
-                        .setLatLng(defaultCenter)
-                        .setContent(`Lat: ${lastLat.toFixed(4)}<br>Lng: ${lastLng.toFixed(4)}<br>Alt: ${lastAltitude}`);
-                    if (currentMarker) {
-                        currentMarker.setPopupContent(popup.getContent()).openPopup();
-                    }
-                    // Recenter map after default marker update
-                    recenterMap();
+                displayError('Unable to retrieve your location. Using default location.');
+                lastLat = defaultCenter[0];
+                lastLng = defaultCenter[1];
+                lastAltitude = await getAltitude(lastLat, lastLng); // Await here too
+                const popup = L.popup({ offset: [0, 10] })
+                    .setLatLng(defaultCenter)
+                    .setContent(`Lat: ${lastLat.toFixed(4)}<br>Lng: ${lastLng.toFixed(4)}<br>Alt: ${lastAltitude}m`);
+                if (currentMarker) {
+                    currentMarker.setPopupContent(popup.getContent()).openPopup();
+                }
+                recenterMap();
 
-                    document.getElementById('info').innerHTML = `Fetching weather and models...`;
-                    const availableModels = await checkAvailableModels(lastLat, lastLng);
-                    if (availableModels.length > 0) {
-                        await fetchWeather(lastLat, lastLng);
-                        updateModelRunInfo();
-                        updateReferenceLabels(); // Add this
-                        await updateWeatherDisplay(0); // Force initial display
-                        if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
-                            calculateMeanWind();
-                        }
-                    } else {
-                        document.getElementById('info').innerHTML = `No models available.`;
-                    }
-                });
+                document.getElementById('info').innerHTML = `Fetching weather and models...`;
+                const availableModels = await checkAvailableModels(lastLat, lastLng);
+                if (availableModels.length > 0) {
+                    await fetchWeather(lastLat, lastLng);
+                    updateModelRunInfo();
+                    await updateWeatherDisplay(0);
+                    if (lastAltitude !== 'N/A') calculateMeanWind();
+                } else {
+                    document.getElementById('info').innerHTML = `No models available.`;
+                }
             },
-            {
-                enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 0
-            }
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
     } else {
-        console.warn('Geolocation is not supported by this browser.');
-        displayError('Geolocation not supported. Using default location (Herrsching am Ammersee).');
-        getAltitude(defaultCenter[0], defaultCenter[1]).then(async (altitude) => {
-            lastAltitude = altitude !== null ? altitude : 'N/A';
-            console.log('Default location altitude:', lastAltitude); // Should be ~580
-            lastLat = defaultCenter[0];
-            lastLng = defaultCenter[1];
-            const popup = L.popup({ offset: [0, 10] })
-                .setLatLng(defaultCenter)
-                .setContent(`Lat: ${lastLat.toFixed(4)}<br>Lng: ${lastLng.toFixed(4)}<br>Alt: ${lastAltitude}`);
-            if (currentMarker) {
-                currentMarker.setPopupContent(popup.getContent()).openPopup();
-            }
-            // Recenter map after default marker update
-            recenterMap();
+        console.warn('Geolocation not supported.');
+        displayError('Geolocation not supported. Using default location.');
+        lastLat = defaultCenter[0];
+        lastLng = defaultCenter[1];
+        lastAltitude = getAltitude(lastLat, lastLng);
+        const popup = L.popup({ offset: [0, 10] })
+            .setLatLng(defaultCenter)
+            .setContent(`Lat: ${lastLat.toFixed(4)}<br>Lng: ${lastLng.toFixed(4)}<br>Alt: ${lastAltitude}m`);
+        if (currentMarker) {
+            currentMarker.setPopupContent(popup.getContent()).openPopup();
+        }
+        recenterMap();
 
-            document.getElementById('info').innerHTML = `Fetching weather and models...`;
-            const availableModels = await checkAvailableModels(lastLat, lastLng);
-            if (availableModels.length > 0) {
-                await fetchWeather(lastLat, lastLng);
-                if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
-                    calculateMeanWind();
-                }
-            } else {
-                document.getElementById('info').innerHTML = `No models available.`;
-            }
-        });
+        document.getElementById('info').innerHTML = `Fetching weather and models...`;
+        const availableModels = checkAvailableModels(lastLat, lastLng);
+        if (availableModels.length > 0) {
+            fetchWeather(lastLat, lastLng);
+            if (lastAltitude !== 'N/A') calculateMeanWind();
+        } else {
+            document.getElementById('info').innerHTML = `No models available.`;
+        }
     }
 
     map.on('click', async (e) => {
         const { lat, lng } = e.latlng;
         lastLat = lat;
         lastLng = lng;
-        const altitude = await getAltitude(lat, lng);
-        lastAltitude = altitude !== null ? altitude : 'N/A';
+        lastAltitude = await getAltitude(lat, lng);
 
-        if (currentMarker) {
-            currentMarker.remove();
-        }
+        if (currentMarker) currentMarker.remove();
 
         const popup = L.popup({ offset: [0, 10] })
             .setLatLng([lat, lng])
             .setContent(`Lat: ${lat.toFixed(4)}<br>Lng: ${lng.toFixed(4)}<br>Alt: ${lastAltitude}m`);
-
         currentMarker = L.marker([lat, lng], { icon: customIcon })
             .bindPopup(popup)
             .addTo(map)
             .openPopup();
 
-        // Recenter map after marker placement
         recenterMap();
 
         document.getElementById('info').innerHTML = `Fetching weather and models...`;
         const availableModels = await checkAvailableModels(lat, lng);
         if (availableModels.length > 0) {
             await fetchWeather(lat, lng);
-            if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
-                calculateMeanWind();
-            }
+            if (lastAltitude !== 'N/A') calculateMeanWind();
         } else {
             document.getElementById('info').innerHTML = `No models available.`;
         }
@@ -306,19 +276,9 @@ function recenterMap() {
 }
 
 async function getAltitude(lat, lng) {
-    try {
-        const response = await fetch(
-            `https://api.open-elevation.com/api/v1/lookup?locations=${lat},${lng}`
-        );
-        if (!response.ok) throw new Error(`Elevation fetch failed: ${response.status}`);
-        const data = await response.json();
-        const elevation = data.results[0]?.elevation;
-        console.log('Fetched elevation:', elevation); // Should be ~580 for [48.0179, 11.1923]
-        return elevation !== undefined && elevation !== null ? elevation : 'N/A';
-    } catch (error) {
-        console.error('Error fetching elevation:', error.message);
-        return 'N/A';
-    }
+    const { elevation } = await Utils.getLocationData(lat, lng);
+    console.log('Fetched elevation from Open-Meteo:', elevation);
+    return elevation !== 'N/A' ? elevation : 'N/A';
 }
 
 async function fetchWeather(lat, lon, currentTime = null) {
