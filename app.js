@@ -119,25 +119,17 @@ function initMap() {
         }),
         "Esri Satellite": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
             maxZoom: 19,
-            attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
-        }),
-        "Esri Street": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
-            maxZoom: 19,
-            attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
-        }),
-        "Esri Topo": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
-            maxZoom: 19,
-            attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+            attribution: 'Tiles © Esri — Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
         })
     };
 
-    // Add default layer (e.g., OpenTopoMap)
-    baseMaps["Esri Street"].addTo(map);
+    // Set OpenTopoMap as the default layer
+    baseMaps["OpenTopoMap"].addTo(map);
 
     // Add layer control
     L.control.layers(baseMaps).addTo(map);
 
-    // Rest of your code remains unchanged
+    // Custom icon setup
     const customIcon = L.icon({
         iconUrl: 'favicon.ico',
         iconSize: [32, 32],
@@ -148,17 +140,48 @@ function initMap() {
         shadowAnchor: [13, 32]
     });
 
+    // Initial marker setup with draggable option
     const initialAltitude = 'N/A';
     const initialPopup = L.popup({ offset: [0, 10] })
         .setLatLng(defaultCenter)
         .setContent(`Lat: ${defaultCenter[0].toFixed(4)}<br>Lng: ${defaultCenter[1].toFixed(4)}<br>Alt: ${initialAltitude}`);
-    currentMarker = L.marker(defaultCenter, { icon: customIcon })
+    currentMarker = L.marker(defaultCenter, { 
+        icon: customIcon,
+        draggable: true // Enable dragging
+    })
         .bindPopup(initialPopup)
         .addTo(map)
         .openPopup();
 
+    // Add dragend event listener
+    currentMarker.on('dragend', async (e) => {
+        const marker = e.target;
+        const position = marker.getLatLng();
+        lastLat = position.lat;
+        lastLng = position.lng;
+        lastAltitude = await getAltitude(lastLat, lastLng);
+
+        // Update popup content
+        const popupContent = `Lat: ${lastLat.toFixed(4)}<br>Lng: ${lastLng.toFixed(4)}<br>Alt: ${lastAltitude}m`;
+        marker.setPopupContent(popupContent).openPopup();
+
+        recenterMap();
+
+        // Fetch weather data for new position
+        document.getElementById('info').innerHTML = `Fetching weather and models...`;
+        const availableModels = await checkAvailableModels(lastLat, lastLng);
+        if (availableModels.length > 0) {
+            await fetchWeather(lastLat, lastLng);
+            updateModelRunInfo();
+            if (lastAltitude !== 'N/A') calculateMeanWind();
+        } else {
+            document.getElementById('info').innerHTML = `No models available.`;
+        }
+    });
+
     recenterMap();
 
+    // Geolocation handling
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
             async (position) => {
@@ -168,15 +191,42 @@ function initMap() {
                 if (currentMarker) currentMarker.remove();
                 lastLat = position.coords.latitude;
                 lastLng = position.coords.longitude;
-                lastAltitude = await getAltitude(lastLat, lastLng); // Await the async call
+                lastAltitude = await getAltitude(lastLat, lastLng);
 
                 const popup = L.popup({ offset: [0, 10] })
                     .setLatLng(userCoords)
                     .setContent(`Lat: ${lastLat.toFixed(4)}<br>Lng: ${lastLng.toFixed(4)}<br>Alt: ${lastAltitude}m`);
-                currentMarker = L.marker(userCoords, { icon: customIcon })
+                currentMarker = L.marker(userCoords, { 
+                    icon: customIcon,
+                    draggable: true // Enable dragging for geolocation marker
+                })
                     .bindPopup(popup)
                     .addTo(map)
                     .openPopup();
+
+                // Add dragend event for geolocation marker
+                currentMarker.on('dragend', async (e) => {
+                    const marker = e.target;
+                    const position = marker.getLatLng();
+                    lastLat = position.lat;
+                    lastLng = position.lng;
+                    lastAltitude = await getAltitude(lastLat, lastLng);
+
+                    const popupContent = `Lat: ${lastLat.toFixed(4)}<br>Lng: ${lastLng.toFixed(4)}<br>Alt: ${lastAltitude}m`;
+                    marker.setPopupContent(popupContent).openPopup();
+
+                    recenterMap();
+
+                    document.getElementById('info').innerHTML = `Fetching weather and models...`;
+                    const availableModels = await checkAvailableModels(lastLat, lastLng);
+                    if (availableModels.length > 0) {
+                        await fetchWeather(lastLat, lastLng);
+                        updateModelRunInfo();
+                        if (lastAltitude !== 'N/A') calculateMeanWind();
+                    } else {
+                        document.getElementById('info').innerHTML = `No models available.`;
+                    }
+                });
 
                 recenterMap();
 
@@ -195,7 +245,7 @@ function initMap() {
                 Utils.handleError('Unable to retrieve your location. Using default location.');
                 lastLat = defaultCenter[0];
                 lastLng = defaultCenter[1];
-                lastAltitude = await getAltitude(lastLat, lastLng); // Await here too
+                lastAltitude = await getAltitude(lastLat, lastLng);
                 const popup = L.popup({ offset: [0, 10] })
                     .setLatLng(defaultCenter)
                     .setContent(`Lat: ${lastLat.toFixed(4)}<br>Lng: ${lastLng.toFixed(4)}<br>Alt: ${lastAltitude}m`);
@@ -241,6 +291,7 @@ function initMap() {
         }
     }
 
+    // Map click event for placing new marker
     map.on('click', async (e) => {
         const { lat, lng } = e.latlng;
         lastLat = lat;
@@ -252,10 +303,37 @@ function initMap() {
         const popup = L.popup({ offset: [0, 10] })
             .setLatLng([lat, lng])
             .setContent(`Lat: ${lat.toFixed(4)}<br>Lng: ${lng.toFixed(4)}<br>Alt: ${lastAltitude}m`);
-        currentMarker = L.marker([lat, lng], { icon: customIcon })
+        currentMarker = L.marker([lat, lng], { 
+            icon: customIcon,
+            draggable: true // Enable dragging for click-placed marker
+        })
             .bindPopup(popup)
             .addTo(map)
             .openPopup();
+
+        // Add dragend event for click-placed marker
+        currentMarker.on('dragend', async (e) => {
+            const marker = e.target;
+            const position = marker.getLatLng();
+            lastLat = position.lat;
+            lastLng = position.lng;
+            lastAltitude = await getAltitude(lastLat, lastLng);
+
+            const popupContent = `Lat: ${lastLat.toFixed(4)}<br>Lng: ${lastLng.toFixed(4)}<br>Alt: ${lastAltitude}m`;
+            marker.setPopupContent(popupContent).openPopup();
+
+            recenterMap();
+
+            document.getElementById('info').innerHTML = `Fetching weather and models...`;
+            const availableModels = await checkAvailableModels(lastLat, lastLng);
+            if (availableModels.length > 0) {
+                await fetchWeather(lastLat, lastLng);
+                updateModelRunInfo();
+                if (lastAltitude !== 'N/A') calculateMeanWind();
+            } else {
+                document.getElementById('info').innerHTML = `No models available.`;
+            }
+        });
 
         recenterMap();
 
