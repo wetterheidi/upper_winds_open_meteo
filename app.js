@@ -5,6 +5,10 @@ let lastLng = null;
 let lastAltitude = null;
 let currentMarker = null;
 let lastModelRun = null;
+let landingPatternPolygon = null;
+let secondlandingPatternPolygon = null; 
+let thirdLandingPatternLine = null;
+
 
 // Update model run info in menu
 function updateModelRunInfo() {
@@ -120,11 +124,19 @@ function initMap() {
         "Esri Satellite": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
             maxZoom: 19,
             attribution: 'Tiles © Esri — Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+        }),
+        "Esri Street": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 19,
+            attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+        }),
+        "Esri Topo": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 19,
+            attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
         })
     };
 
-    // Set OpenTopoMap as the default layer
-    baseMaps["OpenTopoMap"].addTo(map);
+    // Add default layer (e.g., OpenTopoMap)
+    baseMaps["Esri Street"].addTo(map);
 
     // Add layer control
     L.control.layers(baseMaps).addTo(map);
@@ -145,7 +157,7 @@ function initMap() {
     const initialPopup = L.popup({ offset: [0, 10] })
         .setLatLng(defaultCenter)
         .setContent(`Lat: ${defaultCenter[0].toFixed(4)}<br>Lng: ${defaultCenter[1].toFixed(4)}<br>Alt: ${initialAltitude}`);
-    currentMarker = L.marker(defaultCenter, { 
+    currentMarker = L.marker(defaultCenter, {
         icon: customIcon,
         draggable: true // Enable dragging
     })
@@ -196,7 +208,7 @@ function initMap() {
                 const popup = L.popup({ offset: [0, 10] })
                     .setLatLng(userCoords)
                     .setContent(`Lat: ${lastLat.toFixed(4)}<br>Lng: ${lastLng.toFixed(4)}<br>Alt: ${lastAltitude}m`);
-                currentMarker = L.marker(userCoords, { 
+                currentMarker = L.marker(userCoords, {
                     icon: customIcon,
                     draggable: true // Enable dragging for geolocation marker
                 })
@@ -223,6 +235,7 @@ function initMap() {
                         await fetchWeather(lastLat, lastLng);
                         updateModelRunInfo();
                         if (lastAltitude !== 'N/A') calculateMeanWind();
+                        updateLandingPattern();
                     } else {
                         document.getElementById('info').innerHTML = `No models available.`;
                     }
@@ -303,7 +316,7 @@ function initMap() {
         const popup = L.popup({ offset: [0, 10] })
             .setLatLng([lat, lng])
             .setContent(`Lat: ${lat.toFixed(4)}<br>Lng: ${lng.toFixed(4)}<br>Alt: ${lastAltitude}m`);
-        currentMarker = L.marker([lat, lng], { 
+        currentMarker = L.marker([lat, lng], {
             icon: customIcon,
             draggable: true // Enable dragging for click-placed marker
         })
@@ -658,6 +671,7 @@ async function fetchWeather(lat, lon, currentTime = null) {
 
         // Update UI with the selected time and original requested time
         await updateWeatherDisplay(slider.value, currentTime); // Pass currentTime for range check
+        updateLandingPattern();
         console.log('UI updated with index:', slider.value, 'time:', weatherData.time[slider.value]);
 
         // Single validation after delay
@@ -742,6 +756,7 @@ async function updateWeatherDisplay(index, originalTime = null) {
     output += `</table>`;
     document.getElementById('info').innerHTML = output;
     document.getElementById('selectedTime').innerHTML = `Selected Time: ${time}`;
+    updateLandingPattern();
 }
 
 async function checkAvailableModels(lat, lon) {
@@ -1033,6 +1048,175 @@ function downloadTableAsAscii() {
     window.URL.revokeObjectURL(url);
 }
 
+
+function updateLandingPattern() {
+    const showLandingPattern = document.getElementById('showLandingPattern').checked;
+    const sliderIndex = parseInt(document.getElementById('timeSlider').value) || 0;
+
+    // Remove existing lines if they exist
+    if (landingPatternPolygon) {
+        landingPatternPolygon.remove();
+        landingPatternPolygon = null;
+    }
+    if (secondlandingPatternPolygon) {
+        secondlandingPatternPolygon.remove();
+        secondlandingPatternPolygon = null;
+    }
+    if (thirdLandingPatternLine) {
+        thirdLandingPatternLine.remove();
+        thirdLandingPatternLine = null;
+    }
+
+    if (!showLandingPattern || !weatherData || !weatherData.time || !currentMarker || sliderIndex >= weatherData.time.length) {
+        return; // Exit if not checked, no data, or no marker
+    }
+
+    const markerLatLng = currentMarker.getLatLng();
+    const lat = markerLatLng.lat;
+    const lng = markerLatLng.lng;
+    const baseHeight = Math.round(lastAltitude);
+
+    // Get interpolated data for all lines
+    const interpolatedData = interpolateWeatherData(sliderIndex);
+    if (!interpolatedData || interpolatedData.length === 0) {
+        console.warn('No interpolated data available for mean wind calculation');
+        return;
+    }
+
+    const heights = interpolatedData.map(d => d.height);
+    const dirs = interpolatedData.map(d => (typeof d.dir === 'number' && !isNaN(d.dir)) ? parseFloat(d.dir) : 0);
+    const spds = interpolatedData.map(d => (typeof d.spd === 'number' && !isNaN(d.spd)) ? Utils.convertWind(parseFloat(d.spd), 'kt', getWindSpeedUnit()) : 0);
+
+    // --- First Line (Mean Wind 0m–100m AGL) ---
+    const lowerLimitFirst = baseHeight; // Surface
+    const upperLimitFirst = baseHeight + 100;
+
+    const xKomponenteFirst = spds.map((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
+    const yKomponenteFirst = spds.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
+
+    const meanWindFirst = Utils.calculateMeanWind(heights, xKomponenteFirst, yKomponenteFirst, lowerLimitFirst, upperLimitFirst);
+    const meanWindDirFirst = meanWindFirst[0]; // Direction in degrees
+    const meanWindSpeedKtFirst = meanWindFirst[1]; // Speed in knots
+
+    if (meanWindSpeedKtFirst === null || isNaN(meanWindSpeedKtFirst) || meanWindDirFirst === undefined || meanWindDirFirst === null || isNaN(meanWindDirFirst)) {
+        console.warn('No valid mean wind speed or direction available for 0-100m');
+        return;
+    }
+
+    let lengthMetersFirst;
+    if (meanWindSpeedKtFirst < 5) {
+        lengthMetersFirst = 100 * 3; // 300m
+    } else if (meanWindSpeedKtFirst >= 5 && meanWindSpeedKtFirst < 12) {
+        lengthMetersFirst = 100 * 2; // 200m
+    } else if (meanWindSpeedKtFirst >= 12 && meanWindSpeedKtFirst <= 18) {
+        lengthMetersFirst = 100 * 1; // 100m
+    } else {
+        lengthMetersFirst = 50; // 50m
+    }
+
+    const metersPerDegreeLat = 111000;
+    const distanceFirst = lengthMetersFirst / metersPerDegreeLat;
+    const bearingFirst = (meanWindDirFirst + 180) % 360; // Direction wind is blowing TO
+    const radBearingFirst = bearingFirst * Math.PI / 180;
+    const deltaLatFirst = distanceFirst * Math.cos(radBearingFirst);
+    const deltaLngFirst = distanceFirst * Math.sin(radBearingFirst) / Math.cos(lat * Math.PI / 180);
+    const endLatFirst = lat + deltaLatFirst;
+    const endLngFirst = lng + deltaLngFirst;
+
+    landingPatternPolygon = L.polyline(
+        [[lat, lng], [endLatFirst, endLngFirst]],
+        {
+            color: 'red',
+            weight: 3,
+            opacity: 0.8,
+            dashArray: '5, 10'
+        }
+    ).addTo(map);
+
+    // --- Second Line (Mean Wind 100m–200m AGL) ---
+    const lowerLimitSecond = baseHeight + 100;
+    const upperLimitSecond = baseHeight + 200;
+
+    const xKomponenteSecond = spds.map((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
+    const yKomponenteSecond = spds.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
+
+    const meanWindSecond = Utils.calculateMeanWind(heights, xKomponenteSecond, yKomponenteSecond, lowerLimitSecond, upperLimitSecond);
+    const meanWindSpeedKtSecond = meanWindSecond[1];
+
+    let angle, lengthMetersSecond;
+    if (meanWindSpeedKtSecond < 5) {
+        angle = 108;
+        lengthMetersSecond = 316;
+    } else if (meanWindSpeedKtSecond >= 5) {
+        angle = 124;
+        lengthMetersSecond = 361;
+    }
+
+    const bearingSecond = (bearingFirst + angle) % 360;
+    const distanceSecond = lengthMetersSecond / metersPerDegreeLat;
+    const radBearingSecond = bearingSecond * Math.PI / 180;
+    const deltaLatSecond = distanceSecond * Math.cos(radBearingSecond);
+    const deltaLngSecond = distanceSecond * Math.sin(radBearingSecond) / Math.cos(endLatFirst * Math.PI / 180);
+    const endLatSecond = endLatFirst + deltaLatSecond;
+    const endLngSecond = endLngFirst + deltaLngSecond;
+
+    secondlandingPatternPolygon = L.polyline(
+        [[endLatFirst, endLngFirst], [endLatSecond, endLngSecond]],
+        {
+            color: 'red',
+            weight: 3,
+            opacity: 0.8,
+            dashArray: '5, 10'
+        }
+    ).addTo(map);
+
+    // --- Third Line (Mean Wind 200m–300m AGL) ---
+    const lowerLimitThird = baseHeight + 200;
+    const upperLimitThird = baseHeight + 300;
+
+    const xKomponenteThird = spds.map((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
+    const yKomponenteThird = spds.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
+
+    const meanWindThird = Utils.calculateMeanWind(heights, xKomponenteThird, yKomponenteThird, lowerLimitThird, upperLimitThird);
+    const meanWindDirThird = meanWindThird[0]; // Direction in degrees
+    const meanWindSpeedKtThird = meanWindThird[1]; // Speed in knots
+
+    let lengthMetersThird;
+    if (meanWindSpeedKtThird < 5) {
+        lengthMetersThird = 100 * 3; // 300m
+    } else if (meanWindSpeedKtThird >= 5 && meanWindSpeedKtThird <= 12) {
+        lengthMetersThird = 100 * 4; // 400m
+    } else if (meanWindSpeedKtThird > 12 && meanWindSpeedKtThird <= 18) {
+        lengthMetersThird = 100 * 5; // 500m
+    } else { // > 18 kt
+        lengthMetersThird = 100 * 6; // 600m
+    }
+
+    const bearingThird = (meanWindDirThird) % 360; // Direction wind is blowing TO
+    const distanceThird = lengthMetersThird / metersPerDegreeLat;
+    const radBearingThird = bearingThird * Math.PI / 180;
+    const deltaLatThird = distanceThird * Math.cos(radBearingThird);
+    const deltaLngThird = distanceThird * Math.sin(radBearingThird) / Math.cos(endLatSecond * Math.PI / 180);
+    const endLatThird = endLatSecond + deltaLatThird;
+    const endLngThird = endLngSecond + deltaLngThird;
+
+    thirdLandingPatternLine = L.polyline(
+        [[endLatSecond, endLngSecond], [endLatThird, endLngThird]],
+        {
+            color: 'red',
+            weight: 3,
+            opacity: 0.8,
+            dashArray: '5, 10'
+        }
+    ).addTo(map);
+
+    console.log(`First line: From [${lat}, ${lng}] to [${endLatFirst}, ${endLngFirst}], Mean wind speed 0-100m: ${meanWindSpeedKtFirst.toFixed(1)} kt, Direction: ${meanWindDirFirst.toFixed(1)}°, Length: ${lengthMetersFirst}m`);
+    console.log(`Second line: From [${endLatFirst}, ${endLngFirst}] to [${endLatSecond}, ${endLngSecond}], Mean wind speed 100-200m: ${meanWindSpeedKtSecond.toFixed(1)} kt, Angle: ${angle}°, Length: ${lengthMetersSecond}m`);
+    console.log(`Third line: From [${endLatSecond}, ${endLngSecond}] to [${endLatThird}, ${endLngThird}], Mean wind speed 200-300m: ${meanWindSpeedKtThird.toFixed(1)} kt, Direction: ${meanWindDirThird.toFixed(1)}°, Length: ${lengthMetersThird}m`);
+
+    map.invalidateSize(); // Force map redraw
+}
+
 function displayError(message) {
     let errorElement = document.getElementById('error-message');
     if (!errorElement) {
@@ -1269,6 +1453,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 Utils.handleError('Please select a position and fetch weather data first.');
             }
         }, 300));
+    }
+
+    // LandingPattern event listener
+    const showLandingPatternCheckbox = document.getElementById('showLandingPattern');
+    if (showLandingPatternCheckbox) {
+        showLandingPatternCheckbox.addEventListener('change', () => {
+            console.log('Show landing pattern toggled:', showLandingPatternCheckbox.checked);
+            updateLandingPattern();
+            if (showLandingPatternCheckbox.checked && weatherData && lastLat && lastLng) {
+                recenterMap(); // Ensure the line is visible
+            }
+        });
     }
 
     // Existing MutationObserver for recentering map (unchanged)
