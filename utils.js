@@ -66,7 +66,7 @@ class Utils {
                 return speedInKmH / 1.852;
         }
     }
-    
+
     // Helper functions (assuming you have or need these)
     static knotsToBeaufort(knots) {
         if (knots < 1) return 0;
@@ -83,7 +83,7 @@ class Utils {
         if (knots <= 63) return 11;
         return 12;
     }
-    
+
     static beaufortToKnots(bft) {
         const thresholds = [0, 1, 3, 6, 10, 16, 21, 27, 33, 40, 47, 55, 63];
         return thresholds[bft] || 63; // Default to max if bft > 12
@@ -279,10 +279,70 @@ class Utils {
         }
         const { DateTime } = luxon;
 
-        const { timezone,timezone_abbreviation } = await Utils.getLocationData(lat, lng);
+        const { timezone, timezone_abbreviation } = await Utils.getLocationData(lat, lng);
         const utcDate = DateTime.fromISO(utcTimeStr, { zone: 'UTC' });
         const localDate = utcDate.setZone(timezone);
         return localDate.toFormat('yyyy-MM-dd HHmm') + ` ${timezone_abbreviation}`;
+    }
+
+    //Functions for wind calculations
+    /**
+    * Normalize an angle to 0-360 degrees
+     */
+    static normalizeAngle(angle) {
+        return (angle % 360 + 360) % 360;
+    }
+
+    /**
+     * Calculate wind angle (wind direction relative to true course)
+     */
+    static calculateWindAngle(trueCourse, windDirection) {
+        let angle = Utils.normalizeAngle(windDirection - trueCourse);
+        if (angle > 180) angle -= 360; // -180 to 180
+        return angle;
+    }
+
+    /**
+     * Calculate wind components
+     */
+    static calculateWindComponents(windSpeed, windAngle) {
+        const radians = windAngle * (Math.PI / 180);
+        const crosswind = windSpeed * Math.sin(radians); // Positive = right, negative = left
+        const headwind = windSpeed * Math.cos(radians);  // Positive = headwind, negative = tailwind
+        return { crosswind, headwind };
+    }
+
+    /**
+     * Calculate wind correction angle (WCA)
+     */
+    static calculateWCA(crosswind, trueAirspeed) {
+        const radians = Math.asin(crosswind / trueAirspeed);
+        const wca = radians * (180 / Math.PI);
+        return isNaN(wca) ? 0 : wca; // Negative if wind from left, positive if from right
+    }
+
+    /**
+     * Calculate ground speed
+     */
+    static calculateGroundSpeed(trueAirspeed, headwind) {
+        return trueAirspeed - headwind;
+    }
+
+    /**
+     * Main function to calculate flight parameters
+     */
+    static calculateFlightParameters(trueCourse, windDirection, windSpeed, trueAirspeed) {
+        const windAngle = Utils.calculateWindAngle(trueCourse, windDirection);
+        const { crosswind, headwind } = Utils.calculateWindComponents(windSpeed, windAngle);
+        const wca = Utils.calculateWCA(crosswind, trueAirspeed);
+        const groundSpeed = Utils.calculateGroundSpeed(trueAirspeed, headwind);
+
+        return {
+            crosswind: Number(crosswind.toFixed(2)),
+            headwind: Number(headwind.toFixed(2)),
+            wca: Number(wca.toFixed(2)),
+            groundSpeed: Number(groundSpeed.toFixed(2))
+        };
     }
 
     static handleError(message, log = true) {

@@ -8,6 +8,7 @@ let lastModelRun = null;
 let landingPatternPolygon = null;
 let secondlandingPatternPolygon = null; 
 let thirdLandingPatternLine = null;
+let landingWindDir = null;
 
 
 // Update model run info in menu
@@ -669,6 +670,10 @@ async function fetchWeather(lat, lon, currentTime = null) {
         slider.value = Math.min(newSliderIndex, weatherData.time.length - 1);
         console.log('Slider set to index:', slider.value, 'corresponding to:', weatherData.time[slider.value]);
 
+        // Set landingWindDir to the surface wind direction at the initial slider index
+        landingWindDir = weatherData.wind_direction_10m[slider.value] || null;
+        console.log('Initial landingWindDir set to:', landingWindDir);
+
         // Update UI with the selected time and original requested time
         await updateWeatherDisplay(slider.value, currentTime); // Pass currentTime for range check
         updateLandingPattern();
@@ -722,6 +727,11 @@ async function updateWeatherDisplay(index, originalTime = null) {
         if (slider) slider.value = 0;
         return;
     }
+
+    // Set landingWindDir to the surface wind direction at the current index
+    landingWindDir = weatherData.wind_direction_10m[index] || null;
+    console.log('landingWindDir updated to:', landingWindDir);
+
     const refLevel = document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL';
     const heightUnit = getHeightUnit();
     const windSpeedUnit = getWindSpeedUnit();
@@ -1053,6 +1063,10 @@ function updateLandingPattern() {
     const showLandingPattern = document.getElementById('showLandingPattern').checked;
     const sliderIndex = parseInt(document.getElementById('timeSlider').value) || 0;
 
+    //Canopie constants hard coded for the moment
+    const canopySpeed = 20; // knots
+    const descentRate = 3.5; // m/s
+
     // Remove existing lines if they exist
     if (landingPatternPolygon) {
         landingPatternPolygon.remove();
@@ -1103,20 +1117,24 @@ function updateLandingPattern() {
         return;
     }
 
-    let lengthMetersFirst;
-    if (meanWindSpeedKtFirst < 5) {
-        lengthMetersFirst = 100 * 3; // 300m
-    } else if (meanWindSpeedKtFirst >= 5 && meanWindSpeedKtFirst < 12) {
-        lengthMetersFirst = 100 * 2; // 200m
-    } else if (meanWindSpeedKtFirst >= 12 && meanWindSpeedKtFirst <= 18) {
-        lengthMetersFirst = 100 * 1; // 100m
-    } else {
-        lengthMetersFirst = 50; // 50m
-    }
+    let groundSpeedFirst;
+    let headWindFirst;
+    let windAngleFirst;
+    windAngleFirst = Utils.calculateWindAngle(landingWindDir, meanWindDirFirst);
+    console.log('************Landing wind: ', landingWindDir, 'Mean Wind Final: ', meanWindDirFirst, 'Wind angle Final: ', windAngleFirst);
+    headWindFirst = Utils.calculateWindComponents(meanWindSpeedKtFirst, windAngleFirst);
+    groundSpeedFirst = Utils.calculateGroundSpeed(canopySpeed, headWindFirst.headwind);
 
+    let timeFirst;
+    timeFirst = 100 / descentRate; // 100 m as start height for final
+
+    let lengthMetersFirst;
+    lengthMetersFirst = (groundSpeedFirst * 1.852 / 3.6) * timeFirst;
+    console.log('Length final leg: ', lengthMetersFirst);
+    
     const metersPerDegreeLat = 111000;
     const distanceFirst = lengthMetersFirst / metersPerDegreeLat;
-    const bearingFirst = (meanWindDirFirst + 180) % 360; // Direction wind is blowing TO
+    const bearingFirst = (landingWindDir + 180) % 360; // Direction wind is blowing TO
     const radBearingFirst = bearingFirst * Math.PI / 180;
     const deltaLatFirst = distanceFirst * Math.cos(radBearingFirst);
     const deltaLngFirst = distanceFirst * Math.sin(radBearingFirst) / Math.cos(lat * Math.PI / 180);
@@ -1142,17 +1160,28 @@ function updateLandingPattern() {
 
     const meanWindSecond = Utils.calculateMeanWind(heights, xKomponenteSecond, yKomponenteSecond, lowerLimitSecond, upperLimitSecond);
     const meanWindSpeedKtSecond = meanWindSecond[1];
+    const meanWindDirSecond = meanWindSecond[2];
+    
+    let groundSpeedSecond;
+    let headWindSecond;
+    let crossWindSecond;
+    let windAngleSecond;
+    let windCorrectionAngleSecond;
+    //Wind direction for base 180° versus landing direction
+    windAngleSecond = Utils.calculateWindAngle(((landingWindDir + 90) % 360), meanWindDirSecond);
+    headWindSecond = Utils.calculateWindComponents(meanWindSpeedKtSecond, windAngleSecond);
+    windCorrectionAngleSecond = Utils.calculateWCA(headWindSecond.headwind, canopySpeed);
+    console.log('Wind correction angle base: ', windCorrectionAngleSecond);
+    console.log('***********Base direction: ', ((landingWindDir + 90 + windCorrectionAngleSecond) % 360));
 
-    let angle, lengthMetersSecond;
-    if (meanWindSpeedKtSecond < 5) {
-        angle = 108;
-        lengthMetersSecond = 316;
-    } else if (meanWindSpeedKtSecond >= 5) {
-        angle = 124;
-        lengthMetersSecond = 361;
-    }
+    let timeSecond;
+    timeSecond = 100 / descentRate; // 100 m as start height for final
 
-    const bearingSecond = (bearingFirst + angle) % 360;
+    let lengthMetersSecond;
+    lengthMetersSecond = (canopySpeed * 1.852 / 3.6) * timeSecond;
+    console.log('Length base leg: ', lengthMetersSecond);
+
+    const bearingSecond = (bearingFirst + 90 - windCorrectionAngleSecond) % 360;
     const distanceSecond = lengthMetersSecond / metersPerDegreeLat;
     const radBearingSecond = bearingSecond * Math.PI / 180;
     const deltaLatSecond = distanceSecond * Math.cos(radBearingSecond);
@@ -1181,18 +1210,25 @@ function updateLandingPattern() {
     const meanWindDirThird = meanWindThird[0]; // Direction in degrees
     const meanWindSpeedKtThird = meanWindThird[1]; // Speed in knots
 
-    let lengthMetersThird;
-    if (meanWindSpeedKtThird < 5) {
-        lengthMetersThird = 100 * 3; // 300m
-    } else if (meanWindSpeedKtThird >= 5 && meanWindSpeedKtThird <= 12) {
-        lengthMetersThird = 100 * 4; // 400m
-    } else if (meanWindSpeedKtThird > 12 && meanWindSpeedKtThird <= 18) {
-        lengthMetersThird = 100 * 5; // 500m
-    } else { // > 18 kt
-        lengthMetersThird = 100 * 6; // 600m
-    }
 
-    const bearingThird = (meanWindDirThird) % 360; // Direction wind is blowing TO
+    let groundSpeedThird;
+    let headWindThird;
+    let windAngleThird;
+    //Wind direction for downwind 180° versus landing direction
+    windAngleThird = Utils.calculateWindAngle(((landingWindDir + 180) % 360), meanWindDirThird);
+    headWindThird = Utils.calculateWindComponents(meanWindSpeedKtThird, windAngleThird);
+    // Assumption: canopy speed 20 kt
+    groundSpeedThird = Utils.calculateGroundSpeed(20, headWindThird.headwind);
+    console.log('***********Downwind direction: ', ((landingWindDir + 180) % 360), 'Ground speed Downwind: ', groundSpeedThird);
+
+    let timeThird;
+    timeThird = 100 / descentRate; // 100 m as start height for final
+
+    let lengthMetersThird;
+    lengthMetersThird = (groundSpeedThird * 1.852 / 3.6) * timeThird;
+    console.log('Length downwind leg: ', lengthMetersThird);
+
+    const bearingThird = ((landingWindDir) % 360); // Direction wind is blowing TO
     const distanceThird = lengthMetersThird / metersPerDegreeLat;
     const radBearingThird = bearingThird * Math.PI / 180;
     const deltaLatThird = distanceThird * Math.cos(radBearingThird);
@@ -1211,7 +1247,7 @@ function updateLandingPattern() {
     ).addTo(map);
 
     console.log(`First line: From [${lat}, ${lng}] to [${endLatFirst}, ${endLngFirst}], Mean wind speed 0-100m: ${meanWindSpeedKtFirst.toFixed(1)} kt, Direction: ${meanWindDirFirst.toFixed(1)}°, Length: ${lengthMetersFirst}m`);
-    console.log(`Second line: From [${endLatFirst}, ${endLngFirst}] to [${endLatSecond}, ${endLngSecond}], Mean wind speed 100-200m: ${meanWindSpeedKtSecond.toFixed(1)} kt, Angle: ${angle}°, Length: ${lengthMetersSecond}m`);
+    console.log(`Second line: From [${endLatFirst}, ${endLngFirst}] to [${endLatSecond}, ${endLngSecond}], Mean wind speed 100-200m: ${meanWindSpeedKtSecond.toFixed(1)} kt, Angle: ${windAngleSecond}°, Length: ${lengthMetersSecond}m`);
     console.log(`Third line: From [${endLatSecond}, ${endLngSecond}] to [${endLatThird}, ${endLngThird}], Mean wind speed 200-300m: ${meanWindSpeedKtThird.toFixed(1)} kt, Direction: ${meanWindDirThird.toFixed(1)}°, Length: ${lengthMetersThird}m`);
 
     map.invalidateSize(); // Force map redraw
