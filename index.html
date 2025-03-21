@@ -12,159 +12,154 @@
 </head>
 
 <body>
-    <div class="main-container">
-        <div class="left-column">
-            <div class="header-row">
-                <div class="hamburger-menu">
-                    <button id="hamburgerBtn" aria-label="Open menu">☰</button>
-                    <ul id="menu" class="menu hidden">
-                        <li>
-                            <span>Model Run</span>
-                            <ul class="submenu hidden">
-                                <li id="modelRunInfo"></li>
-                            </ul>
-                        </li>
-                        <li>
-                            <span>Reference Level</span>
-                            <ul class="submenu hidden">
-                                <li>
-                                    <label class="radio-label">
-                                        <input type="radio" name="refLevel" value="AGL" checked> AGL
-                                    </label>
-                                </li>
-                                <li>
-                                    <label class="radio-label">
-                                        <input type="radio" name="refLevel" value="AMSL"> AMSL
-                                    </label>
-                                </li>
-                            </ul>
-                        </li>
-                        <li>
-                            <span>Height Unit</span>
-                            <ul class="submenu hidden">
-                                <li>
-                                    <label class="radio-label">
-                                        <input type="radio" name="heightUnit" value="m" checked> m
-                                    </label>
-                                </li>
-                                <li>
-                                    <label class="radio-label">
-                                        <input type="radio" name="heightUnit" value="ft"> ft
-                                    </label>
-                                </li>
-                            </ul>
-                        </li>
-                        <li>
-                            <span>Temperature Unit</span>
-                            <ul class="submenu hidden">
-                                <li>
-                                    <label class="radio-label">
-                                        <input type="radio" name="temperatureUnit" value="C" checked> C
-                                    </label>
-                                </li>
-                                <li>
-                                    <label class="radio-label">
-                                        <input type="radio" name="temperatureUnit" value="F"> F
-                                    </label>
-                                </li>
-                            </ul>
-                        </li>
-                        <li>
-                            <span>Wind Unit</span>
-                            <ul class="submenu hidden">
-                                <li>
-                                    <label class="radio-label">
-                                        <input type="radio" name="windUnit" value="kt" checked> kt
-                                    </label>
-                                </li>
-                                <li>
-                                    <label class="radio-label">
-                                        <input type="radio" name="windUnit" value="km/h"> km/h
-                                    </label>
-                                </li>
-                                <li>
-                                    <label class="radio-label">
-                                        <input type="radio" name="windUnit" value="m/s"> m/s
-                                    </label>
-                                </li>
-                                <li>
-                                    <label class="radio-label">
-                                        <input type="radio" name="windUnit" value="mph"> mph
-                                    </label>
-                                </li>
-                                <li>
-                                    <label class="radio-label">
-                                        <input type="radio" name="windUnit" value="bft"> bft
-                                    </label>
-                                </li>
-                            </ul>
-                        </li>
-                        <li>
-                            <span>Time zone</span>
-                            <ul class="submenu hidden">
-                                <li>
-                                    <label class="radio-label">
-                                        <input type="radio" name="timeZone" value="Z" checked> Z
-                                    </label>
-                                </li>
-                                <li>
-                                    <label class="radio-label">
-                                        <input type="radio" name="timeZone" value="loc"> loc
-                                    </label>
-                                </li>
-                            </ul>
-                        </li>
-                    </ul>
-                </div>
-                <div id="slider-container">
-                    <span id="selectedTime">Selected Time: </span>
-                    <input type="range" id="timeSlider" min="0" max="167" value="0" disabled>
-                    <div id="model-row">
-                        <label for="modelSelect">Forecast Model:</label>
-                        <select id="modelSelect">
-                            <option value="icon_global" selected>ICON GLOBAL</option>
-                            <option value="gfs">GFS</option>
-                            <option value="ecmwf">ECMWF</option>
-                        </select>
-                    </div>
-                    <div id="modelInfoPopup"></div>
-                </div>
-            </div>
-            <div id="bottom-container">
-                <div id="meanWindControls">
-                    <label for="lowerLimit" title="Lower altitude for mean wind calculation">Lower Limit (m):</label>
-                    <input type="number" id="lowerLimit" min="0" step="100" value="0">
-                    <label for="upperLimit" title="Upper altitude for mean wind calculation">Upper Limit (m):</label>
-                    <input type="number" id="upperLimit" min="0" step="100" value="3000">
-                    <div id="meanWindResult"></div>
-                </div>
-                <div id="controls-row">
-                    <label for="interpStepSelect" title="Select the altitude interval for weather data interpolation">Step:</label>
-                    <select id="interpStepSelect" aria-label="Interpolation step interval">
-                        <option value="100">100</option>
-                        <option value="200" selected>200</option>
-                        <option value="500">500</option>
-                        <option value="1000">1000</option>
-                        <option value="2000">2000</option>
-                    </select>
-                    <button id="downloadButton">Download Table</button>
-                    <div id="info">Click on the map to fetch weather data.</div>
-                    <div class="spinner"></div>
-                </div>
-            </div>
+    <div id="map" aria-label="Interactive map for selecting weather location"></div>
+    <div class="hamburger-menu">
+        <button id="hamburgerBtn" aria-label="Open menu">☰</button>
+        <ul id="menu" class="menu hidden">
+            <li>
+                <span>Model Run</span>
+                <ul class="submenu hidden">
+                    <li id="modelRunInfo"></li>
+                </ul>
+            </li>
+            <li>
+                <span>Reference Level</span>
+                <ul class="submenu hidden">
+                    <li>
+                        <label class="radio-label">
+                            <input type="radio" name="refLevel" value="AGL" checked> AGL
+                        </label>
+                    </li>
+                    <li>
+                        <label class="radio-label">
+                            <input type="radio" name="refLevel" value="AMSL"> AMSL
+                        </label>
+                    </li>
+                </ul>
+            </li>
+            <li>
+                <span>Height Unit</span>
+                <ul class="submenu hidden">
+                    <li>
+                        <label class="radio-label">
+                            <input type="radio" name="heightUnit" value="m" checked> m
+                        </label>
+                    </li>
+                    <li>
+                        <label class="radio-label">
+                            <input type="radio" name="heightUnit" value="ft"> ft
+                        </label>
+                    </li>
+                </ul>
+            </li>
+            <li>
+                <span>Temperature Unit</span>
+                <ul class="submenu hidden">
+                    <li>
+                        <label class="radio-label">
+                            <input type="radio" name="temperatureUnit" value="C" checked> C
+                        </label>
+                    </li>
+                    <li>
+                        <label class="radio-label">
+                            <input type="radio" name="temperatureUnit" value="F"> F
+                        </label>
+                    </li>
+                </ul>
+            </li>
+            <li>
+                <span>Wind Unit</span>
+                <ul class="submenu hidden">
+                    <li>
+                        <label class="radio-label">
+                            <input type="radio" name="windUnit" value="kt" checked> kt
+                        </label>
+                    </li>
+                    <li>
+                        <label class="radio-label">
+                            <input type="radio" name="windUnit" value="km/h"> km/h
+                        </label>
+                    </li>
+                    <li>
+                        <label class="radio-label">
+                            <input type="radio" name="windUnit" value="m/s"> m/s
+                        </label>
+                    </li>
+                    <li>
+                        <label class="radio-label">
+                            <input type="radio" name="windUnit" value="mph"> mph
+                        </label>
+                    </li>
+                    <li>
+                        <label class="radio-label">
+                            <input type="radio" name="windUnit" value="bft"> bft
+                        </label>
+                    </li>
+                </ul>
+            </li>
+            <li>
+                <span>Time zone</span>
+                <ul class="submenu hidden">
+                    <li>
+                        <label class="radio-label">
+                            <input type="radio" name="timeZone" value="Z" checked> Z
+                        </label>
+                    </li>
+                    <li>
+                        <label class="radio-label">
+                            <input type="radio" name="timeZone" value="loc"> loc
+                        </label>
+                    </li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+    <div id="slider-container">
+        <span id="selectedTime">Selected Time: </span>
+        <input type="range" id="timeSlider" min="0" max="167" value="0" disabled>
+        <div id="model-row">
+            <label for="modelSelect">Forecast Model:</label>
+            <select id="modelSelect">
+                <option value="icon_global" selected>ICON GLOBAL</option>
+                <option value="gfs">GFS</option>
+                <option value="ecmwf">ECMWF</option>
+            </select>
         </div>
-        <div id="map" aria-label="Interactive map for selecting weather location"></div>
+        <div id="modelInfoPopup"></div>
     </div>
     <div id="loading">
         <div class="spinner"></div>
         <p>Fetching Weather...</p>
     </div>
-    <!-- Scripts remain unchanged -->
+    <div id="bottom-container">
+        <div id="meanWindControls">
+            <label for="lowerLimit" title="Lower altitude for mean wind calculation">Lower Limit (m):</label>
+            <input type="number" id="lowerLimit" min="0" step="100" value="0">
+            <label for="upperLimit" title="Upper altitude for mean wind calculation">Upper Limit (m):</label>
+            <input type="number" id="upperLimit" min="0" step="100" value="3000">
+            <div id="meanWindResult"></div>
+        </div>
+        <div id="controls-row">
+            <label for="interpStepSelect"
+                title="Select the altitude interval for weather data interpolation">Step:</label>
+            <select id="interpStepSelect" aria-label="Interpolation step interval">
+                <option value="100">100</option>
+                <option value="200" selected>200</option>
+                <option value="500">500</option>
+                <option value="1000">1000</option>
+                <option value="2000">2000</option>
+            </select>
+            <button id="downloadButton">Download Table</button>
+            <div id="info">Click on the map to fetch weather data.</div>
+                <div class="spinner"></div>
+            </div>
+        </div>
+    </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/luxon/3.4.4/luxon.min.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="utils.js"></script>
     <script src="app.js"></script>
-    <!-- Other scripts remain unchanged -->
-</body>‚
+    <script>(function () { function c() { var b = a.contentDocument || a.contentWindow.document; if (b) { var d = b.createElement('script'); d.innerHTML = "window.__CF$cv$params={r:'91ce572bdae4bd03',t:'MTc0MTM5NTA0OC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);"; b.getElementsByTagName('head')[0].appendChild(d) } } if (document.body) { var a = document.createElement('iframe'); a.height = 1; a.width = 1; a.style.position = 'absolute'; a.style.top = 0; a.style.left = 0; a.style.border = 'none'; a.style.visibility = 'hidden'; document.body.appendChild(a); if ('loading' !== document.readyState) c(); else if (window.addEventListener) document.addEventListener('DOMContentLoaded', c); else { var e = document.onreadystatechange || function () { }; document.onreadystatechange = function (b) { e(b); 'loading' !== document.readyState && (document.onreadystatechange = e, c()) } } } })();</script>
+</body>
 
 </html>
