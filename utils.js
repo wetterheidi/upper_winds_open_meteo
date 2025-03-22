@@ -316,7 +316,7 @@ class Utils {
      * Calculate wind correction angle (WCA)
      */
     static calculateWCA(crosswind, trueAirspeed) {
-        const radians = Math.asin(crosswind / trueAirspeed);
+        const radians = Math.abs(Math.asin(crosswind / trueAirspeed));
         const wca = radians * (180 / Math.PI);
         return isNaN(wca) ? 0 : wca; // Negative if wind from left, positive if from right
     }

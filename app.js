@@ -1181,7 +1181,7 @@ function updateLandingPattern() {
     lengthMetersSecond = (canopySpeed * 1.852 / 3.6) * timeSecond;
     console.log('Length base leg: ', lengthMetersSecond);
 
-    const bearingSecond = (bearingFirst + 90 - windCorrectionAngleSecond) % 360;
+    const bearingSecond = (bearingFirst + 90 + windCorrectionAngleSecond) % 360;
     const distanceSecond = lengthMetersSecond / metersPerDegreeLat;
     const radBearingSecond = bearingSecond * Math.PI / 180;
     const deltaLatSecond = distanceSecond * Math.cos(radBearingSecond);
