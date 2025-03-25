@@ -1063,6 +1063,10 @@ function updateLandingPattern() {
     const showLandingPattern = document.getElementById('showLandingPattern').checked;
     const sliderIndex = parseInt(document.getElementById('timeSlider').value) || 0;
     const landingDirection = document.querySelector('input[name="landingDirection"]:checked')?.value || 'LL';
+    const customLandingDirectionInput = document.getElementById('customLandingDirection');
+    const customLandingDir = customLandingDirectionInput && !customLandingDirectionInput.disabled
+        ? parseInt(customLandingDirectionInput.value, 10)
+        : null;
 
     // Canopy constants hard coded for the moment
     const canopySpeed = 20; // knots
@@ -1102,6 +1106,16 @@ function updateLandingPattern() {
     const dirs = interpolatedData.map(d => (typeof d.dir === 'number' && !isNaN(d.dir)) ? parseFloat(d.dir) : 0);
     const spds = interpolatedData.map(d => (typeof d.spd === 'number' && !isNaN(d.spd)) ? Utils.convertWind(parseFloat(d.spd), 'kt', getWindSpeedUnit()) : 0);
 
+    // Use custom direction if provided and valid, otherwise use default landingWindDir
+    const effectiveLandingWindDir = (landingDirection === 'custom' && customLandingDir >= 0 && customLandingDir <= 359)
+        ? customLandingDir
+        : landingWindDir; // Default 10m wind direction
+
+    if (typeof effectiveLandingWindDir === 'undefined' || isNaN(effectiveLandingWindDir)) {
+        console.warn('No valid landing wind direction available');
+        return;
+    }
+
     // --- First Line (Mean Wind 0m–100m AGL) ---
     const lowerLimitFirst = baseHeight; // Surface
     const upperLimitFirst = baseHeight + 100;
@@ -1121,8 +1135,8 @@ function updateLandingPattern() {
     let groundSpeedFirst;
     let headWindFirst;
     let windAngleFirst;
-    windAngleFirst = Utils.calculateWindAngle(landingWindDir, meanWindDirFirst);
-    console.log('************Landing wind: ', landingWindDir, 'Mean Wind Final: ', meanWindDirFirst, 'Wind angle Final: ', windAngleFirst);
+    windAngleFirst = Utils.calculateWindAngle(effectiveLandingWindDir, meanWindDirFirst);
+    console.log('************Landing wind: ', effectiveLandingWindDir, 'Mean Wind Final: ', meanWindDirFirst, 'Wind angle Final: ', windAngleFirst);
     headWindFirst = Utils.calculateWindComponents(meanWindSpeedKtFirst, windAngleFirst);
     groundSpeedFirst = Utils.calculateGroundSpeed(canopySpeed, headWindFirst.headwind);
 
@@ -1135,7 +1149,7 @@ function updateLandingPattern() {
     
     const metersPerDegreeLat = 111000;
     const distanceFirst = lengthMetersFirst / metersPerDegreeLat;
-    const bearingFirst = (landingWindDir + 180) % 360; // Direction wind is blowing TO
+    const bearingFirst = (effectiveLandingWindDir + 180) % 360; // Direction wind is blowing TO
     const radBearingFirst = bearingFirst * Math.PI / 180;
     const deltaLatFirst = distanceFirst * Math.cos(radBearingFirst);
     const deltaLngFirst = distanceFirst * Math.sin(radBearingFirst) / Math.cos(lat * Math.PI / 180);
@@ -1169,7 +1183,7 @@ function updateLandingPattern() {
     let windAngleSecond;
     let windCorrectionAngleSecond;
     // Wind direction for base 180° versus landing direction
-    windAngleSecond = Utils.calculateWindAngle(((landingWindDir + 90) % 360), meanWindDirSecond);
+    windAngleSecond = Utils.calculateWindAngle(((effectiveLandingWindDir + 90) % 360), meanWindDirSecond);
     headWindSecond = Utils.calculateWindComponents(meanWindSpeedKtSecond, windAngleSecond);
     windCorrectionAngleSecond = Utils.calculateWCA(headWindSecond.headwind, canopySpeed);
     console.log('Wind correction angle base: ', windCorrectionAngleSecond);
@@ -1219,11 +1233,11 @@ function updateLandingPattern() {
     let headWindThird;
     let windAngleThird;
     // Wind direction for downwind 180° versus landing direction
-    windAngleThird = Utils.calculateWindAngle(((landingWindDir + 180) % 360), meanWindDirThird);
+    windAngleThird = Utils.calculateWindAngle(((effectiveLandingWindDir + 180) % 360), meanWindDirThird);
     headWindThird = Utils.calculateWindComponents(meanWindSpeedKtThird, windAngleThird);
     // Assumption: canopy speed 20 kt
     groundSpeedThird = Utils.calculateGroundSpeed(20, headWindThird.headwind);
-    console.log('***********Downwind direction: ', ((landingWindDir + 180) % 360), 'Ground speed Downwind: ', groundSpeedThird);
+    console.log('***********Downwind direction: ', ((effectiveLandingWindDir + 180) % 360), 'Ground speed Downwind: ', groundSpeedThird);
 
     let timeThird;
     timeThird = 100 / descentRate; // 100 m as start height for final
@@ -1232,7 +1246,7 @@ function updateLandingPattern() {
     lengthMetersThird = (groundSpeedThird * 1.852 / 3.6) * timeThird;
     console.log('Length downwind leg: ', lengthMetersThird);
 
-    const bearingThird = ((landingWindDir) % 360); // Direction wind is blowing TO
+    const bearingThird = ((effectiveLandingWindDir) % 360); // Direction wind is blowing TO
     const distanceThird = lengthMetersThird / metersPerDegreeLat;
     const radBearingThird = bearingThird * Math.PI / 180;
     const deltaLatThird = distanceThird * Math.cos(radBearingThird);
@@ -1287,6 +1301,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const upperLimitInput = document.getElementById('upperLimit');
     const showLandingPatternCheckbox = document.getElementById('showLandingPattern');
     const submenu = showLandingPatternCheckbox?.closest('li')?.querySelector('.submenu');
+    const customLandingDirectionInput = document.getElementById('customLandingDirection');
 
     console.log('Elements:', { slider, modelSelect, downloadButton, hamburgerBtn, menu, interpStepSelect, refLevelRadios, lowerLimitInput, upperLimitInput, windSpeedUnitRadios });
 
@@ -1499,35 +1514,52 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // LandingPattern event listener
     if (showLandingPatternCheckbox && submenu) {
-        // Set initial visibility based on checkbox state
         submenu.classList.toggle('hidden', !showLandingPatternCheckbox.checked);
 
-        // Add event listener to toggle submenu visibility
         showLandingPatternCheckbox.addEventListener('change', () => {
             submenu.classList.toggle('hidden', !showLandingPatternCheckbox.checked);
             console.log('Landing Pattern checkbox toggled. Show submenu:', showLandingPatternCheckbox.checked);
-
-            // Update the landing pattern when checkbox is checked/unchecked
             if (weatherData && lastLat && lastLng) {
                 updateLandingPattern();
-                recenterMap(); // Ensure the pattern is visible if drawn
+                recenterMap();
             }
         });
     } else {
         console.error('Could not find showLandingPattern checkbox or submenu');
     }
 
-    // Existing radio button event listener (keep this as is)
+    // Handle landing direction radio buttons and custom input
     const landingDirectionRadios = document.querySelectorAll('input[name="landingDirection"]');
     if (landingDirectionRadios.length > 0) {
         landingDirectionRadios.forEach(radio => {
             radio.addEventListener('change', () => {
                 console.log('Landing direction changed:', radio.value);
+                // Enable/disable custom input based on selection
+                if (customLandingDirectionInput) {
+                    customLandingDirectionInput.disabled = radio.value !== 'custom';
+                    if (radio.value === 'custom' && !customLandingDirectionInput.value) {
+                        customLandingDirectionInput.value = landingWindDir || 0; // Default to current wind direction
+                    }
+                }
                 if (weatherData && lastLat && lastLng) {
                     updateLandingPattern();
                     recenterMap();
                 }
             });
+        });
+    }
+
+    // Add event listener for custom direction input
+    if (customLandingDirectionInput) {
+        customLandingDirectionInput.addEventListener('input', () => {
+            const customDir = parseInt(customLandingDirectionInput.value, 10);
+            if (!isNaN(customDir) && customDir >= 0 && customDir <= 359) {
+                console.log('Custom landing direction updated:', customDir);
+                if (weatherData && lastLat && lastLng) {
+                    updateLandingPattern();
+                    recenterMap();
+                }
+            }
         });
     }
 
