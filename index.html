@@ -113,11 +113,18 @@
                 </ul>
             </li>
             <li>
-                <span>Landing Pattern</span>
+                <label class="radio-label">
+                    <input type="checkbox" id="showLandingPattern" name="showLandingPattern"> Landing Pattern
+                </label>
                 <ul class="submenu hidden">
                     <li>
                         <label class="radio-label">
-                            <input type="checkbox" id="showLandingPattern" name="showLandingPattern"> Show
+                            <input type="radio" name="landingDirection" value="LL" checked> LL
+                        </label>
+                    </li>
+                    <li>
+                        <label class="radio-label">
+                            <input type="radio" name="landingDirection" value="RR"> RR
                         </label>
                     </li>
                 </ul>

@@ -1062,8 +1062,9 @@ function downloadTableAsAscii() {
 function updateLandingPattern() {
     const showLandingPattern = document.getElementById('showLandingPattern').checked;
     const sliderIndex = parseInt(document.getElementById('timeSlider').value) || 0;
+    const landingDirection = document.querySelector('input[name="landingDirection"]:checked')?.value || 'LL';
 
-    //Canopie constants hard coded for the moment
+    // Canopy constants hard coded for the moment
     const canopySpeed = 20; // knots
     const descentRate = 3.5; // m/s
 
@@ -1167,12 +1168,11 @@ function updateLandingPattern() {
     let crossWindSecond;
     let windAngleSecond;
     let windCorrectionAngleSecond;
-    //Wind direction for base 180° versus landing direction
+    // Wind direction for base 180° versus landing direction
     windAngleSecond = Utils.calculateWindAngle(((landingWindDir + 90) % 360), meanWindDirSecond);
     headWindSecond = Utils.calculateWindComponents(meanWindSpeedKtSecond, windAngleSecond);
     windCorrectionAngleSecond = Utils.calculateWCA(headWindSecond.headwind, canopySpeed);
     console.log('Wind correction angle base: ', windCorrectionAngleSecond);
-    console.log('***********Base direction: ', ((landingWindDir + 90 + windCorrectionAngleSecond) % 360));
 
     let timeSecond;
     timeSecond = 100 / descentRate; // 100 m as start height for final
@@ -1181,7 +1181,12 @@ function updateLandingPattern() {
     lengthMetersSecond = (canopySpeed * 1.852 / 3.6) * timeSecond;
     console.log('Length base leg: ', lengthMetersSecond);
 
-    const bearingSecond = (bearingFirst + 90 + windCorrectionAngleSecond) % 360;
+    // Adjust bearingSecond based on LL or RR selection
+    const bearingSecond = landingDirection === 'LL' 
+        ? (bearingFirst + 90 + windCorrectionAngleSecond) % 360 
+        : (bearingFirst - 90 - windCorrectionAngleSecond) % 360;
+
+    console.log('***********Base direction: ', bearingSecond);
     const distanceSecond = lengthMetersSecond / metersPerDegreeLat;
     const radBearingSecond = bearingSecond * Math.PI / 180;
     const deltaLatSecond = distanceSecond * Math.cos(radBearingSecond);
@@ -1210,11 +1215,10 @@ function updateLandingPattern() {
     const meanWindDirThird = meanWindThird[0]; // Direction in degrees
     const meanWindSpeedKtThird = meanWindThird[1]; // Speed in knots
 
-
     let groundSpeedThird;
     let headWindThird;
     let windAngleThird;
-    //Wind direction for downwind 180° versus landing direction
+    // Wind direction for downwind 180° versus landing direction
     windAngleThird = Utils.calculateWindAngle(((landingWindDir + 180) % 360), meanWindDirThird);
     headWindThird = Utils.calculateWindComponents(meanWindSpeedKtThird, windAngleThird);
     // Assumption: canopy speed 20 kt
@@ -1281,6 +1285,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const windSpeedUnitRadios = document.querySelectorAll('input[name="windUnit"]'); // Fix to match HTML
     const lowerLimitInput = document.getElementById('lowerLimit');
     const upperLimitInput = document.getElementById('upperLimit');
+    const showLandingPatternCheckbox = document.getElementById('showLandingPattern');
+    const submenu = showLandingPatternCheckbox?.closest('li')?.querySelector('.submenu');
 
     console.log('Elements:', { slider, modelSelect, downloadButton, hamburgerBtn, menu, interpStepSelect, refLevelRadios, lowerLimitInput, upperLimitInput, windSpeedUnitRadios });
 
@@ -1492,14 +1498,36 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // LandingPattern event listener
-    const showLandingPatternCheckbox = document.getElementById('showLandingPattern');
-    if (showLandingPatternCheckbox) {
+    if (showLandingPatternCheckbox && submenu) {
+        // Set initial visibility based on checkbox state
+        submenu.classList.toggle('hidden', !showLandingPatternCheckbox.checked);
+
+        // Add event listener to toggle submenu visibility
         showLandingPatternCheckbox.addEventListener('change', () => {
-            console.log('Show landing pattern toggled:', showLandingPatternCheckbox.checked);
-            updateLandingPattern();
-            if (showLandingPatternCheckbox.checked && weatherData && lastLat && lastLng) {
-                recenterMap(); // Ensure the line is visible
+            submenu.classList.toggle('hidden', !showLandingPatternCheckbox.checked);
+            console.log('Landing Pattern checkbox toggled. Show submenu:', showLandingPatternCheckbox.checked);
+
+            // Update the landing pattern when checkbox is checked/unchecked
+            if (weatherData && lastLat && lastLng) {
+                updateLandingPattern();
+                recenterMap(); // Ensure the pattern is visible if drawn
             }
+        });
+    } else {
+        console.error('Could not find showLandingPattern checkbox or submenu');
+    }
+
+    // Existing radio button event listener (keep this as is)
+    const landingDirectionRadios = document.querySelectorAll('input[name="landingDirection"]');
+    if (landingDirectionRadios.length > 0) {
+        landingDirectionRadios.forEach(radio => {
+            radio.addEventListener('change', () => {
+                console.log('Landing direction changed:', radio.value);
+                if (weatherData && lastLat && lastLng) {
+                    updateLandingPattern();
+                    recenterMap();
+                }
+            });
         });
     }
 
