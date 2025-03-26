@@ -166,6 +166,14 @@ function initMap() {
     // Add layer control
     L.control.layers(baseMaps).addTo(map);
 
+    // Add scale control
+    L.control.scale({
+        position: 'bottomleft', // You can change this to 'topleft', 'topright', 'bottomright'
+        metric: true,          // Show metric units (meters/kilometers)
+        imperial: true,        // Show imperial units (feet/miles)
+        maxWidth: 100          // Maximum width of the scale bar in pixels
+    }).addTo(map);
+
     // Custom icon setup
     const customIcon = L.icon({
         iconUrl: 'favicon.ico',

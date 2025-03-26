@@ -32,6 +32,11 @@ html {
     word-wrap: break-word;
 }
 
+.leaflet-bottom .leaflet-control-scale {
+    margin-bottom: 40px; /* Adjust this value to move it up */
+    margin-left: 10px;  /* Optional: Adjust this to move it right */
+}
+
 .hamburger-menu {
     position: fixed;
     top: 5px;
