@@ -1166,12 +1166,14 @@ function updateLandingPattern() {
         return;
     }
 
-    const finalWindAngle = Utils.calculateWindAngle(effectiveLandingWindDir, finalWindDir);
-    const { headwind } = Utils.calculateWindComponents(finalWindSpeedKt, finalWindAngle);
-    const finalGroundSpeedKt = Utils.calculateGroundSpeed(CANOPY_SPEED_KT, headwind);
-    const finalTime = LEG_HEIGHT_FINAL / DESCENT_RATE_MPS;
+    const finalCourse = (effectiveLandingWindDir +180 ) % 360;
+    const finalWindAngle = Utils.calculateWindAngle(finalCourse, finalWindDir);
+    const { crosswind: finalCrosswind, headwind: finalHeadwind } = Utils.calculateWindComponents(finalWindSpeedKt, finalWindAngle);
+    const finalwca = Utils.calculateWCA(finalCrosswind, CANOPY_SPEED_KT) * (finalCrosswind >= 0 ? 1 : -1);
+    const finalBearing = (finalCourse + finalwca + 360) % 360;
+    const finalTime = (LEG_HEIGHT_BASE - LEG_HEIGHT_FINAL) / DESCENT_RATE_MPS;
+    const finalGroundSpeedKt = CANOPY_SPEED_KT + finalHeadwind;
     const finalLength = finalGroundSpeedKt * 1.852 / 3.6 * finalTime;
-    const finalBearing = (effectiveLandingWindDir + 180) % 360;
     const finalEnd = calculateLegEndpoint(lat, lng, finalBearing, finalGroundSpeedKt, finalTime);
 
     landingPatternPolygon = L.polyline([[lat, lng], finalEnd], {
@@ -1193,9 +1195,9 @@ function updateLandingPattern() {
 
     const baseCourse = landingDirection === 'LL' ? (effectiveLandingWindDir - 90 + 360) % 360 : (effectiveLandingWindDir + 90) % 360;
     const baseWindAngle = Utils.calculateWindAngle(baseCourse, baseWindDir);
-    const { crosswind, headwind: baseHeadwind } = Utils.calculateWindComponents(baseWindSpeedKt, baseWindAngle);
-    const wca = Utils.calculateWCA(crosswind, CANOPY_SPEED_KT) * (crosswind >= 0 ? 1 : -1);
-    const baseBearing = (baseCourse + wca + 360) % 360;
+    const { crosswind: baseCrosswind, headwind: baseHeadwind } = Utils.calculateWindComponents(baseWindSpeedKt, baseWindAngle);
+    const basewca = Utils.calculateWCA(baseCrosswind, CANOPY_SPEED_KT) * (baseCrosswind >= 0 ? 1 : -1);
+    const baseBearing = (baseCourse + basewca + 360) % 360;
     const baseTime = (LEG_HEIGHT_BASE - LEG_HEIGHT_FINAL) / DESCENT_RATE_MPS;
     const baseGroundSpeedKt = Utils.calculateGroundSpeed(CANOPY_SPEED_KT, baseHeadwind);
     const baseLength = baseGroundSpeedKt * 1.852 / 3.6 * baseTime;
@@ -1210,7 +1212,7 @@ function updateLandingPattern() {
 
     // Downwind Leg (200-300m AGL)
     const downwindLimits = [baseHeight + LEG_HEIGHT_BASE, baseHeight + LEG_HEIGHT_DOWNWIND];
-    const downwindMeanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, ...downwindLimits);
+    const downwindMeanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, ...baseLimits);
     const downwindWindDir = downwindMeanWind[0];
     const downwindWindSpeedKt = downwindMeanWind[1];
     if (!Number.isFinite(downwindWindSpeedKt) || !Number.isFinite(downwindWindDir)) {
@@ -1220,11 +1222,13 @@ function updateLandingPattern() {
 
     const downwindCourse = effectiveLandingWindDir;
     const downwindWindAngle = Utils.calculateWindAngle(downwindCourse, downwindWindDir);
-    let { headwind: downwindHeadwind } = Utils.calculateWindComponents(downwindWindSpeedKt, downwindWindAngle);
+    const { crosswind: downwindCrosswind, headwind: downwindHeadwind } = Utils.calculateWindComponents(downwindWindSpeedKt, downwindWindAngle);
+    const downwindwca = Utils.calculateWCA(downwindCrosswind, CANOPY_SPEED_KT) * (downwindCrosswind >= 0 ? 1 : -1);
+    const downwindBearing = (downwindCourse + downwindwca + 360) % 360;
+    const downwindTime = (LEG_HEIGHT_BASE - LEG_HEIGHT_FINAL) / DESCENT_RATE_MPS;
     const downwindGroundSpeedKt = CANOPY_SPEED_KT + downwindHeadwind; // Corrected to use raw headwind
-    const downwindTime = (LEG_HEIGHT_DOWNWIND - LEG_HEIGHT_BASE) / DESCENT_RATE_MPS;
     const downwindLength = downwindGroundSpeedKt * 1.852 / 3.6 * downwindTime;
-    const downwindEnd = calculateLegEndpoint(baseEnd[0], baseEnd[1], downwindCourse, downwindGroundSpeedKt, downwindTime);
+    const downwindEnd = calculateLegEndpoint(baseEnd[0], baseEnd[1], downwindBearing, downwindGroundSpeedKt, downwindTime);
 
     thirdLandingPatternLine = L.polyline([baseEnd, downwindEnd], {
         color: 'red',
@@ -1234,9 +1238,9 @@ function updateLandingPattern() {
     }).addTo(map);
 
     console.log(`Landing Pattern Updated:
-        Final Leg: [${lat.toFixed(4)}, ${lng.toFixed(4)}] to [${finalEnd[0].toFixed(4)}, ${finalEnd[1].toFixed(4)}], Wind: ${finalWindDir.toFixed(1)}° @ ${finalWindSpeedKt.toFixed(1)}kt, GS: ${finalGroundSpeedKt.toFixed(1)}kt, Length: ${finalLength.toFixed(1)}m
-        Base Leg: [${finalEnd[0].toFixed(4)}, ${finalEnd[1].toFixed(4)}] to [${baseEnd[0].toFixed(4)}, ${baseEnd[1].toFixed(4)}], Wind: ${baseWindDir.toFixed(1)}° @ ${baseWindSpeedKt.toFixed(1)}kt, WCA: ${wca.toFixed(1)}°, , Length: ${baseLength.toFixed(1)}m
-        Downwind Leg: [${baseEnd[0].toFixed(4)}, ${baseEnd[1].toFixed(4)}] to [${downwindEnd[0].toFixed(4)}, ${downwindEnd[1].toFixed(4)}], Wind: ${downwindWindDir.toFixed(1)}° @ ${downwindWindSpeedKt.toFixed(1)}kt, GS: ${downwindGroundSpeedKt.toFixed(1)}kt, Length: ${downwindLength.toFixed(1)}m`);
+        Final Leg: [${lat.toFixed(4)}, ${lng.toFixed(4)}] to [${finalEnd[0].toFixed(4)}, ${finalEnd[1].toFixed(4)}], Wind: ${finalWindDir.toFixed(1)}° @ ${finalWindSpeedKt.toFixed(1)}kt, GS: ${finalGroundSpeedKt.toFixed(1)}kt, WCA: ${finalwca.toFixed(1)}°, Length: ${finalLength.toFixed(1)}m
+        Base Leg: [${finalEnd[0].toFixed(4)}, ${finalEnd[1].toFixed(4)}] to [${baseEnd[0].toFixed(4)}, ${baseEnd[1].toFixed(4)}], Wind: ${baseWindDir.toFixed(1)}° @ ${baseWindSpeedKt.toFixed(1)}kt, GS: ${baseGroundSpeedKt.toFixed(1)}kt, WCA: ${basewca.toFixed(1)}° , Length: ${baseLength.toFixed(1)}m
+        Downwind Leg: [${baseEnd[0].toFixed(4)}, ${baseEnd[1].toFixed(4)}] to [${downwindEnd[0].toFixed(4)}, ${downwindEnd[1].toFixed(4)}], Wind: ${downwindWindDir.toFixed(1)}° @ ${downwindWindSpeedKt.toFixed(1)}kt, GS: ${downwindGroundSpeedKt.toFixed(1)}kt, WCA: ${downwindwca.toFixed(1)}°, Length: ${downwindLength.toFixed(1)}m`);
 
     map.fitBounds([[lat, lng], finalEnd, baseEnd, downwindEnd], { padding: [50, 50] });
 }
