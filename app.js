@@ -49,6 +49,10 @@ function getHeightUnit() {
     return document.querySelector('input[name="heightUnit"]:checked')?.value || 'm';
 }
 
+function getCoordinateFormat() {
+    return document.querySelector('input[name="coordFormat"]:checked')?.value || 'Decimal';
+}
+
 function updateHeightUnitLabels() {
     const heightUnit = getHeightUnit();
     const refLevel = document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL';
@@ -93,6 +97,26 @@ function updateWindUnitLabels() {
             }
         }
     }
+}
+
+function updateMarkerPopup(marker, lat, lng, altitude) {
+    console.log('Updating marker popup:', { lat, lng, altitude, format: getCoordinateFormat() });
+    const coordFormat = getCoordinateFormat();
+    const coords = Utils.convertCoords(lat, lng, coordFormat);
+    let popupContent;
+    if (coordFormat === 'MGRS') {
+        popupContent = `MGRS: ${coords.lat}<br>Alt: ${altitude}m`;
+    } else {
+        popupContent = `Lat: ${coords.lat}<br>Lng: ${coords.lng}<br>Alt: ${altitude}m`;
+    }
+    
+    // Check if the marker already has a popup bound; if not, bind one
+    if (!marker.getPopup()) {
+        marker.bindPopup(popupContent);
+    } else {
+        marker.setPopupContent(popupContent);
+    }
+    marker.openPopup();
 }
 
 async function getDisplayTime(utcTimeStr) {
@@ -153,18 +177,14 @@ function initMap() {
         shadowAnchor: [13, 32]
     });
 
-    // Initial marker setup with draggable option
+    // Initial marker setup
     const initialAltitude = 'N/A';
-    const initialPopup = L.popup({ offset: [0, 10] })
-        .setLatLng(defaultCenter)
-        .setContent(`Lat: ${defaultCenter[0].toFixed(4)}<br>Lng: ${defaultCenter[1].toFixed(4)}<br>Alt: ${initialAltitude}`);
     currentMarker = L.marker(defaultCenter, {
         icon: customIcon,
-        draggable: true // Enable dragging
-    })
-        .bindPopup(initialPopup)
-        .addTo(map)
-        .openPopup();
+        draggable: true
+    }).addTo(map);
+    currentMarker.bindPopup(''); // Bind an empty popup
+    updateMarkerPopup(currentMarker, defaultCenter[0], defaultCenter[1], initialAltitude);
 
     // Add dragend event listener
     currentMarker.on('dragend', async (e) => {
@@ -175,9 +195,7 @@ function initMap() {
         lastAltitude = await getAltitude(lastLat, lastLng);
 
         // Update popup content
-        const popupContent = `Lat: ${lastLat.toFixed(4)}<br>Lng: ${lastLng.toFixed(4)}<br>Alt: ${lastAltitude}m`;
-        marker.setPopupContent(popupContent).openPopup();
-
+        updateMarkerPopup(marker, lastLat, lastLng, lastAltitude);
         recenterMap();
 
         // Fetch weather data for new position
@@ -190,6 +208,7 @@ function initMap() {
         } else {
             document.getElementById('info').innerHTML = `No models available.`;
         }
+        console.log('Marker after drag:', currentMarker.getLatLng());
     });
 
     recenterMap();
@@ -206,16 +225,11 @@ function initMap() {
                 lastLng = position.coords.longitude;
                 lastAltitude = await getAltitude(lastLat, lastLng);
 
-                const popup = L.popup({ offset: [0, 10] })
-                    .setLatLng(userCoords)
-                    .setContent(`Lat: ${lastLat.toFixed(4)}<br>Lng: ${lastLng.toFixed(4)}<br>Alt: ${lastAltitude}m`);
                 currentMarker = L.marker(userCoords, {
                     icon: customIcon,
-                    draggable: true // Enable dragging for geolocation marker
-                })
-                    .bindPopup(popup)
-                    .addTo(map)
-                    .openPopup();
+                    draggable: true
+                }).addTo(map);
+                updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
 
                 // Add dragend event for geolocation marker
                 currentMarker.on('dragend', async (e) => {
@@ -225,8 +239,7 @@ function initMap() {
                     lastLng = position.lng;
                     lastAltitude = await getAltitude(lastLat, lastLng);
 
-                    const popupContent = `Lat: ${lastLat.toFixed(4)}<br>Lng: ${lastLng.toFixed(4)}<br>Alt: ${lastAltitude}m`;
-                    marker.setPopupContent(popupContent).openPopup();
+                    updateMarkerPopup(marker, lastLat, lastLng, lastAltitude);
 
                     recenterMap();
 
@@ -260,12 +273,8 @@ function initMap() {
                 lastLat = defaultCenter[0];
                 lastLng = defaultCenter[1];
                 lastAltitude = await getAltitude(lastLat, lastLng);
-                const popup = L.popup({ offset: [0, 10] })
-                    .setLatLng(defaultCenter)
-                    .setContent(`Lat: ${lastLat.toFixed(4)}<br>Lng: ${lastLng.toFixed(4)}<br>Alt: ${lastAltitude}m`);
-                if (currentMarker) {
-                    currentMarker.setPopupContent(popup.getContent()).openPopup();
-                }
+                updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
+            
                 recenterMap();
 
                 document.getElementById('info').innerHTML = `Fetching weather and models...`;
@@ -287,12 +296,7 @@ function initMap() {
         lastLat = defaultCenter[0];
         lastLng = defaultCenter[1];
         lastAltitude = getAltitude(lastLat, lastLng);
-        const popup = L.popup({ offset: [0, 10] })
-            .setLatLng(defaultCenter)
-            .setContent(`Lat: ${lastLat.toFixed(4)}<br>Lng: ${lastLng.toFixed(4)}<br>Alt: ${lastAltitude}m`);
-        if (currentMarker) {
-            currentMarker.setPopupContent(popup.getContent()).openPopup();
-        }
+        updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
         recenterMap();
 
         document.getElementById('info').innerHTML = `Fetching weather and models...`;
@@ -312,20 +316,17 @@ function initMap() {
         lastLng = lng;
         lastAltitude = await getAltitude(lat, lng);
 
+        // Remove existing marker and create a new one
         if (currentMarker) currentMarker.remove();
-
-        const popup = L.popup({ offset: [0, 10] })
-            .setLatLng([lat, lng])
-            .setContent(`Lat: ${lat.toFixed(4)}<br>Lng: ${lng.toFixed(4)}<br>Alt: ${lastAltitude}m`);
         currentMarker = L.marker([lat, lng], {
             icon: customIcon,
-            draggable: true // Enable dragging for click-placed marker
-        })
-            .bindPopup(popup)
-            .addTo(map)
-            .openPopup();
+            draggable: true
+        }).addTo(map);
 
-        // Add dragend event for click-placed marker
+        // Update popup for the new marker
+        updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
+
+        // Add dragend event for the new marker
         currentMarker.on('dragend', async (e) => {
             const marker = e.target;
             const position = marker.getLatLng();
@@ -333,9 +334,7 @@ function initMap() {
             lastLng = position.lng;
             lastAltitude = await getAltitude(lastLat, lastLng);
 
-            const popupContent = `Lat: ${lastLat.toFixed(4)}<br>Lng: ${lastLng.toFixed(4)}<br>Alt: ${lastAltitude}m`;
-            marker.setPopupContent(popupContent).openPopup();
-
+            updateMarkerPopup(marker, lastLat, lastLng, lastAltitude);
             recenterMap();
 
             document.getElementById('info').innerHTML = `Fetching weather and models...`;
@@ -344,6 +343,7 @@ function initMap() {
                 await fetchWeather(lastLat, lastLng);
                 updateModelRunInfo();
                 if (lastAltitude !== 'N/A') calculateMeanWind();
+                updateLandingPattern();
             } else {
                 document.getElementById('info').innerHTML = `No models available.`;
             }
@@ -355,7 +355,9 @@ function initMap() {
         const availableModels = await checkAvailableModels(lat, lng);
         if (availableModels.length > 0) {
             await fetchWeather(lat, lng);
+            updateModelRunInfo();
             if (lastAltitude !== 'N/A') calculateMeanWind();
+            updateLandingPattern();
         } else {
             document.getElementById('info').innerHTML = `No models available.`;
         }
@@ -1626,5 +1628,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 Utils.handleError('Descent rate must be between 1 and 10 m/s.');
             }
         }, 300));
+    }
+
+    const coordFormatRadios = document.querySelectorAll('input[name="coordFormat"]');
+    if (coordFormatRadios.length > 0) {
+        coordFormatRadios.forEach(radio => {
+            radio.addEventListener('change', () => {
+                console.log('Coordinate format changed:', getCoordinateFormat());
+                if (currentMarker && lastLat && lastLng) {
+                    updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
+                }
+            });
+        });
     }
 });

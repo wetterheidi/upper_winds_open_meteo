@@ -349,6 +349,77 @@ class Utils {
         if (log) console.error(message);
         displayError(message);
     }
+
+    static dmsToDecimal(dms) {
+        const parts = dms.match(/(\d+)°\s*(\d+)'\s*(\d+(?:\.\d+)?)"?\s*([NSEW])/i);
+        if (!parts) return null;
+
+        let decimal = parseInt(parts[1]) + parseInt(parts[2]) / 60 + parseFloat(parts[3]) / 3600;
+        if (parts[4].toUpperCase() === 'S' || parts[4].toUpperCase() === 'W') {
+            decimal = -decimal;
+        }
+        return decimal;
+    }
+
+    static decimalToDms(decimal, isLat) {
+        const absolute = Math.abs(decimal);
+        const degrees = Math.floor(absolute);
+        const minutesFloat = (absolute - degrees) * 60;
+        const minutes = Math.floor(minutesFloat);
+        const seconds = ((minutesFloat - minutes) * 60).toFixed(1);
+
+        const direction = isLat
+            ? (decimal >= 0 ? 'N' : 'S')
+            : (decimal >= 0 ? 'E' : 'W');
+
+        return `${degrees}° ${minutes}' ${seconds}" ${direction}`;
+    }
+
+    static decimalToMgrs(lat, lng) {
+        try {
+            return mgrs.forward([lng, lat]); // Note: mgrs.forward takes [lon, lat]
+        } catch (e) {
+            console.error('Error converting to MGRS:', e);
+            return 'Invalid MGRS';
+        }
+    }
+
+    static mgrsToDecimal(mgrsStr) {
+        try {
+            const [lng, lat] = mgrs.toPoint(mgrsStr);
+            return { lat, lng };
+        } catch (e) {
+            console.error('Error converting MGRS to decimal:', e);
+            return null;
+        }
+    }
+
+    static convertCoords(lat, lng, format = 'Decimal') {
+        if (lat === null || lng === null || lat === undefined || lng === undefined) {
+            return { lat: 'N/A', lng: 'N/A' };
+        }
+
+        const result = {
+            Decimal: { lat: lat.toFixed(6), lng: lng.toFixed(6) },
+            DMS: {
+                lat: Utils.decimalToDms(lat, true),
+                lng: Utils.decimalToDms(lng, false)
+            },
+            MGRS: Utils.decimalToMgrs(lat, lng)
+        };
+
+        // Return based on the requested format
+        switch (format) {
+            case 'DMS':
+                return result.DMS;
+            case 'MGRS':
+                return { lat: result.MGRS, lng: result.MGRS }; // MGRS is a single string, duplicated for consistency
+            case 'Decimal':
+            default:
+                return result.Decimal;
+        }
+    }
+
 }
 
 window.Utils = Utils;
