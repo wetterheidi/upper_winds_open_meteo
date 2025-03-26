@@ -1070,9 +1070,9 @@ function updateLandingPattern() {
 
     const CANOPY_SPEED_KT = 20;
     const DESCENT_RATE_MPS = 3.5;
-    const LEG_HEIGHT_FINAL = 100;
-    const LEG_HEIGHT_BASE = 100;
-    const LEG_HEIGHT_DOWNWIND = 100;
+    const LEG_HEIGHT_FINAL = parseInt(document.getElementById('legHeightFinal').value) || 100;
+    const LEG_HEIGHT_BASE = parseInt(document.getElementById('legHeightBase').value) || 100;
+    const LEG_HEIGHT_DOWNWIND = parseInt(document.getElementById('legHeightDownwind').value) || 100;
 
     [landingPatternPolygon, secondlandingPatternPolygon, thirdLandingPatternLine].forEach(layer => {
         if (layer) {
@@ -1242,6 +1242,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const customLandingDirectionInput = document.getElementById('customLandingDirection');
     const showTableCheckbox = document.getElementById('showTableCheckbox');
     const infoElement = document.getElementById('info');
+    const legHeightFinalInput = document.getElementById('legHeightFinal');
+    const legHeightBaseInput = document.getElementById('legHeightBase');
+    const legHeightDownwindInput = document.getElementById('legHeightDownwind');
 
     console.log('Elements:', { slider, modelSelect, downloadButton, hamburgerBtn, menu, interpStepSelect, refLevelRadios, lowerLimitInput, upperLimitInput, windSpeedUnitRadios });
 
@@ -1527,5 +1530,50 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
         observer.observe(infoElement, { childList: true, subtree: true, characterData: true });
+    }
+
+    if (legHeightFinalInput) {
+        legHeightFinalInput.addEventListener('input', debounce(() => {
+            const value = parseInt(legHeightFinalInput.value);
+            if (!isNaN(value) && value >= 50 && value <= 1000) {
+                console.log('Final leg height updated:', value);
+                if (weatherData && lastLat && lastLng) {
+                    updateLandingPattern();
+                    recenterMap();
+                }
+            } else {
+                Utils.handleError('Final leg height must be between 50 and 1000 meters.');
+            }
+        }, 300));
+    }
+    
+    if (legHeightBaseInput) {
+        legHeightBaseInput.addEventListener('input', debounce(() => {
+            const value = parseInt(legHeightBaseInput.value);
+            if (!isNaN(value) && value >= 50 && value <= 1000) {
+                console.log('Base leg height updated:', value);
+                if (weatherData && lastLat && lastLng) {
+                    updateLandingPattern();
+                    recenterMap();
+                }
+            } else {
+                Utils.handleError('Base leg height must be between 50 and 1000 meters.');
+            }
+        }, 300));
+    }
+    
+    if (legHeightDownwindInput) {
+        legHeightDownwindInput.addEventListener('input', debounce(() => {
+            const value = parseInt(legHeightDownwindInput.value);
+            if (!isNaN(value) && value >= 50 && value <= 1000) {
+                console.log('Downwind leg height updated:', value);
+                if (weatherData && lastLat && lastLng) {
+                    updateLandingPattern();
+                    recenterMap();
+                }
+            } else {
+                Utils.handleError('Downwind leg height must be between 50 and 1000 meters.');
+            }
+        }, 300));
     }
 });
