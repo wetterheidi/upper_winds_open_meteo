@@ -1068,8 +1068,8 @@ function updateLandingPattern() {
         ? parseInt(customLandingDirectionInput.value, 10)
         : null;
 
-    const CANOPY_SPEED_KT = 20;
-    const DESCENT_RATE_MPS = 3.5;
+    const CANOPY_SPEED_KT = parseInt(document.getElementById('canopySpeed').value) || 20;
+    const DESCENT_RATE_MPS = parseFloat(document.getElementById('descentRate').value) || 3.5;
     const LEG_HEIGHT_FINAL = parseInt(document.getElementById('legHeightFinal').value) || 100;
     const LEG_HEIGHT_BASE = parseInt(document.getElementById('legHeightBase').value) || 100;
     const LEG_HEIGHT_DOWNWIND = parseInt(document.getElementById('legHeightDownwind').value) || 100;
@@ -1245,6 +1245,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const legHeightFinalInput = document.getElementById('legHeightFinal');
     const legHeightBaseInput = document.getElementById('legHeightBase');
     const legHeightDownwindInput = document.getElementById('legHeightDownwind');
+    const showCanopyParametersCheckbox = document.getElementById('showCanopyParameters');
+    const canopySpeedInput = document.getElementById('canopySpeed');
+    const descentRateInput = document.getElementById('descentRate');
 
     console.log('Elements:', { slider, modelSelect, downloadButton, hamburgerBtn, menu, interpStepSelect, refLevelRadios, lowerLimitInput, upperLimitInput, windSpeedUnitRadios });
 
@@ -1546,7 +1549,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }, 300));
     }
-    
+
     if (legHeightBaseInput) {
         legHeightBaseInput.addEventListener('input', debounce(() => {
             const value = parseInt(legHeightBaseInput.value);
@@ -1561,7 +1564,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }, 300));
     }
-    
+
     if (legHeightDownwindInput) {
         legHeightDownwindInput.addEventListener('input', debounce(() => {
             const value = parseInt(legHeightDownwindInput.value);
@@ -1573,6 +1576,54 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             } else {
                 Utils.handleError('Downwind leg height must be between 50 and 1000 meters.');
+            }
+        }, 300));
+    }
+
+    if (showCanopyParametersCheckbox) {
+        showCanopyParametersCheckbox.addEventListener('change', function () {
+            const submenu = this.parentElement.nextElementSibling;
+            if (this.checked) {
+                submenu.classList.remove('hidden');
+            } else {
+                submenu.classList.add('hidden');
+            }
+        });
+        // Trigger initial state
+        const submenu = showCanopyParametersCheckbox.parentElement.nextElementSibling;
+        if (showCanopyParametersCheckbox.checked) {
+            submenu.classList.remove('hidden');
+        } else {
+            submenu.classList.add('hidden');
+        }
+    }
+
+    if (canopySpeedInput) {
+        canopySpeedInput.addEventListener('input', debounce(() => {
+            const value = parseInt(canopySpeedInput.value);
+            if (!isNaN(value) && value >= 5 && value <= 50) {
+                console.log('Canopy speed updated:', value, 'kt');
+                if (weatherData && lastLat && lastLng) {
+                    updateLandingPattern();
+                    recenterMap();
+                }
+            } else {
+                Utils.handleError('Canopy speed must be between 5 and 50 kt.');
+            }
+        }, 300));
+    }
+    
+    if (descentRateInput) {
+        descentRateInput.addEventListener('input', debounce(() => {
+            const value = parseFloat(descentRateInput.value);
+            if (!isNaN(value) && value >= 1 && value <= 10) {
+                console.log('Descent rate updated:', value, 'm/s');
+                if (weatherData && lastLat && lastLng) {
+                    updateLandingPattern();
+                    recenterMap();
+                }
+            } else {
+                Utils.handleError('Descent rate must be between 1 and 10 m/s.');
             }
         }, 300));
     }
