@@ -9,11 +9,9 @@ html {
 }
 
 #map {
-    height: 30%;
+    height: 70vh; /* Or use flex-grow: 1 if keeping flex layout */
     width: 100%;
-    margin-top: 90px;
-    /* Space for slider-container */
-    flex: 1 0 25%;
+    margin-top: 90px; /* Keep space for slider */
     z-index: 0;
 }
 
@@ -189,6 +187,7 @@ html {
 }
 
 #info {
+    display: none; /* Initially hidden */
     background: rgba(255, 255, 255, 0.95);
     padding: 15px;
     border-radius: 8px;
@@ -202,11 +201,6 @@ html {
     scrollbar-color: #888 #f0f0f0;
     margin-top: 10px;
     z-index: 100;
-    box-sizing: border-box;
-    white-space: pre-wrap;
-    font-family: 'Roboto', sans-serif;
-    font-size: 13px;
-    font-weight: 400;
 }
 
 
@@ -290,6 +284,7 @@ button {
     z-index: 200;
 }
 
+/* Ensure bottom-container adjusts */
 #bottom-container {
     background: #fff;
     padding: 10px;
@@ -300,13 +295,9 @@ button {
     z-index: 100;
     margin-bottom: 10px;
     flex: 0 0 auto;
-    max-height: calc(100vh - 30vh - 100px);
-    overflow-y: auto;
     display: grid;
-    grid-template-rows: auto auto auto;
+    grid-template-rows: auto auto; /* Remove third row if table is hidden */
     gap: 10px;
-    scrollbar-width: thin;
-    scrollbar-color: #ddd #fff;
 }
 
 /* For Chrome, Edge, and Safari */

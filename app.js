@@ -1302,6 +1302,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const showLandingPatternCheckbox = document.getElementById('showLandingPattern');
     const submenu = showLandingPatternCheckbox?.closest('li')?.querySelector('.submenu');
     const customLandingDirectionInput = document.getElementById('customLandingDirection');
+    const showTableCheckbox = document.getElementById('showTableCheckbox');
+    const infoElement = document.getElementById('info');
 
     console.log('Elements:', { slider, modelSelect, downloadButton, hamburgerBtn, menu, interpStepSelect, refLevelRadios, lowerLimitInput, upperLimitInput, windSpeedUnitRadios });
 
@@ -1563,8 +1565,21 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    if (showTableCheckbox && infoElement) {
+        showTableCheckbox.addEventListener('change', () => {
+            const isChecked = showTableCheckbox.checked;
+            console.log('Show Table checkbox toggled:', isChecked);
+            infoElement.style.display = isChecked ? 'block' : 'none';
+            if (isChecked && weatherData && lastLat && lastLng) {
+                updateWeatherDisplay(slider.value || 0); // Refresh table if shown
+            }
+            recenterMap(); // Adjust map after layout change
+        });
+    } else {
+        console.error('Could not find showTableCheckbox or info element');
+    }
+
     // Existing MutationObserver for recentering map (unchanged)
-    const infoElement = document.getElementById('info');
     if (infoElement) {
         const observer = new MutationObserver((mutations) => {
             mutations.forEach((mutation) => {
