@@ -1073,8 +1073,8 @@ function updateLandingPattern() {
     const CANOPY_SPEED_KT = parseInt(document.getElementById('canopySpeed').value) || 20;
     const DESCENT_RATE_MPS = parseFloat(document.getElementById('descentRate').value) || 3.5;
     const LEG_HEIGHT_FINAL = parseInt(document.getElementById('legHeightFinal').value) || 100;
-    const LEG_HEIGHT_BASE = parseInt(document.getElementById('legHeightBase').value) || 100;
-    const LEG_HEIGHT_DOWNWIND = parseInt(document.getElementById('legHeightDownwind').value) || 100;
+    const LEG_HEIGHT_BASE = parseInt(document.getElementById('legHeightBase').value) || 200;
+    const LEG_HEIGHT_DOWNWIND = parseInt(document.getElementById('legHeightDownwind').value) || 300;
 
     [landingPatternPolygon, secondlandingPatternPolygon, thirdLandingPatternLine].forEach(layer => {
         if (layer) {
@@ -1151,7 +1151,7 @@ function updateLandingPattern() {
     }).addTo(map);
 
     // Base Leg (100-200m AGL)
-    const baseLimits = [baseHeight + LEG_HEIGHT_FINAL, baseHeight + LEG_HEIGHT_FINAL + LEG_HEIGHT_BASE];
+    const baseLimits = [baseHeight + LEG_HEIGHT_FINAL, baseHeight + LEG_HEIGHT_BASE];
     const baseMeanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, ...baseLimits);
     const baseWindDir = baseMeanWind[0];
     const baseWindSpeedKt = baseMeanWind[1];
@@ -1178,7 +1178,7 @@ function updateLandingPattern() {
     }).addTo(map);
 
     // Downwind Leg (200-300m AGL)
-    const downwindLimits = [baseHeight + LEG_HEIGHT_FINAL + LEG_HEIGHT_BASE, baseHeight + LEG_HEIGHT_FINAL + LEG_HEIGHT_BASE + LEG_HEIGHT_DOWNWIND];
+    const downwindLimits = [baseHeight + LEG_HEIGHT_BASE, baseHeight + LEG_HEIGHT_DOWNWIND];
     const downwindMeanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, ...downwindLimits);
     const downwindWindDir = downwindMeanWind[0];
     const downwindWindSpeedKt = downwindMeanWind[1];
