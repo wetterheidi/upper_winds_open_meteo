@@ -115,32 +115,40 @@ class Utils {
         return yp;
     }
 
+    static interpolateWindAtAltitude(z, pressureLevels, heights, uComponents, vComponents) {
+        if (pressureLevels.length != heights.length || pressureLevels.length != uComponents.length || pressureLevels.length != vComponents.length) {
+            return { u: 'Invalid input', v: 'Invalid input' };
+        }
+    
+        // Step 1: Find p(z) using log interpolation of p with respect to h
+        const log_pressureLevels = pressureLevels.map(p => Math.log(p));
+        const log_p_z = Utils.LIP(heights, log_pressureLevels, z);
+        if (typeof log_p_z === 'string' && log_p_z.includes('error')) {
+            return { u: 'Interpolation error', v: 'Interpolation error' };
+        }
+        const p_z = Math.exp(log_p_z);
+    
+        // Step 2: Interpolate u and v at p(z) using log(p) interpolation
+        const u_z = Utils.LIP(log_pressureLevels, uComponents, Math.log(p_z));
+        const v_z = Utils.LIP(log_pressureLevels, vComponents, Math.log(p_z));
+        if (typeof u_z === 'string' && u_z.includes('error') || typeof v_z === 'string' && v_z.includes('error')) {
+            return { u: 'Interpolation error', v: 'Interpolation error' };
+        }
+    
+        return { u: u_z, v: v_z };
+    }
+
     // Interpolate pressure based on height and pressure levels
     static interpolatePressure(height, pressureLevels, heights) {
-        for (let i = 0; i < heights.length - 1; i++) {
-            if (height <= heights[i] && height >= heights[i + 1]) {
-                const p1 = pressureLevels[i];
-                const p2 = pressureLevels[i + 1];
-                const h1 = heights[i];
-                const h2 = heights[i + 1];
-                return p1 + (p2 - p1) * (height - h1) / (h2 - h1);
-            }
-        }
-        if (height > heights[0]) {
-            const p1 = pressureLevels[0];
-            const p2 = pressureLevels[1];
-            const h1 = heights[0];
-            const h2 = heights[1];
-            return p1 + (p2 - p1) * (height - h1) / (h2 - h1);
-        }
-        if (height < heights[heights.length - 1]) {
-            const p1 = pressureLevels[pressureLevels.length - 2];
-            const p2 = pressureLevels[pressureLevels.length - 1];
-            const h1 = heights[heights.length - 2];
-            const h2 = heights[heights.length - 1];
-            return p2 + (p1 - p2) * (height - h2) / (h1 - h2);
-        }
-        return '-';
+        if (pressureLevels.length !== heights.length) return 'N/A';
+    
+        // Assume pressureLevels is in descending order (1000 to 200) and heights is ascending
+        const logPressures = pressureLevels.map(p => Math.log(p));
+        const logPressure = Utils.LIP(heights, logPressures, height);
+        if (typeof logPressure === 'string' && logPressure.includes('error')) return 'N/A';
+    
+        const pressure = Math.exp(logPressure);
+        return pressure <= 0 || pressure > 1013 ? 'N/A' : pressure;
     }
 
     // Linear interpolation (LIP)
