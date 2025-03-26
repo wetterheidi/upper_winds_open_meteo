@@ -109,7 +109,7 @@ function updateMarkerPopup(marker, lat, lng, altitude) {
     } else {
         popupContent = `Lat: ${coords.lat}<br>Lng: ${coords.lng}<br>Alt: ${altitude}m`;
     }
-    
+
     // Check if the marker already has a popup bound; if not, bind one
     if (!marker.getPopup()) {
         marker.bindPopup(popupContent);
@@ -274,7 +274,7 @@ function initMap() {
                 lastLng = defaultCenter[1];
                 lastAltitude = await getAltitude(lastLat, lastLng);
                 updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
-            
+
                 recenterMap();
 
                 document.getElementById('info').innerHTML = `Fetching weather and models...`;
@@ -676,6 +676,14 @@ async function fetchWeather(lat, lon, currentTime = null) {
         landingWindDir = weatherData.wind_direction_10m[slider.value] || null;
         console.log('Initial landingWindDir set to:', landingWindDir);
 
+        // Set default values for custom landing direction inputs
+        const customLandingDirectionLLInput = document.getElementById('customLandingDirectionLL');
+        const customLandingDirectionRRInput = document.getElementById('customLandingDirectionRR');
+        if (customLandingDirectionLLInput && customLandingDirectionRRInput && landingWindDir !== null) {
+            customLandingDirectionLLInput.value = Math.round(landingWindDir);
+            customLandingDirectionRRInput.value = Math.round(landingWindDir);
+        }
+
         // Update UI with the selected time and original requested time
         await updateWeatherDisplay(slider.value, currentTime); // Pass currentTime for range check
         updateLandingPattern();
@@ -733,6 +741,14 @@ async function updateWeatherDisplay(index, originalTime = null) {
     // Set landingWindDir to the surface wind direction at the current index
     landingWindDir = weatherData.wind_direction_10m[index] || null;
     console.log('landingWindDir updated to:', landingWindDir);
+
+    // Update custom landing direction inputs with the new surface wind direction
+    const customLandingDirectionLLInput = document.getElementById('customLandingDirectionLL');
+    const customLandingDirectionRRInput = document.getElementById('customLandingDirectionRR');
+    if (customLandingDirectionLLInput && customLandingDirectionRRInput && landingWindDir !== null) {
+        customLandingDirectionLLInput.value = Math.round(landingWindDir);
+        customLandingDirectionRRInput.value = Math.round(landingWindDir);
+    }
 
     const refLevel = document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL';
     const heightUnit = getHeightUnit();
@@ -1065,10 +1081,10 @@ function updateLandingPattern() {
     const showLandingPattern = document.getElementById('showLandingPattern').checked;
     const sliderIndex = parseInt(document.getElementById('timeSlider').value) || 0;
     const landingDirection = document.querySelector('input[name="landingDirection"]:checked')?.value || 'LL';
-    const customLandingDirectionInput = document.getElementById('customLandingDirection');
-    const customLandingDir = customLandingDirectionInput && !customLandingDirectionInput.disabled
-        ? parseInt(customLandingDirectionInput.value, 10)
-        : null;
+    const customLandingDirectionLLInput = document.getElementById('customLandingDirectionLL');
+    const customLandingDirectionRRInput = document.getElementById('customLandingDirectionRR');
+    const customLandingDirLL = customLandingDirectionLLInput ? parseInt(customLandingDirectionLLInput.value, 10) : null;
+    const customLandingDirRR = customLandingDirectionRRInput ? parseInt(customLandingDirectionRRInput.value, 10) : null;
 
     const CANOPY_SPEED_KT = parseInt(document.getElementById('canopySpeed').value) || 20;
     const DESCENT_RATE_MPS = parseFloat(document.getElementById('descentRate').value) || 3.5;
@@ -1076,6 +1092,7 @@ function updateLandingPattern() {
     const LEG_HEIGHT_BASE = parseInt(document.getElementById('legHeightBase').value) || 200;
     const LEG_HEIGHT_DOWNWIND = parseInt(document.getElementById('legHeightDownwind').value) || 300;
 
+    // Remove existing layers
     [landingPatternPolygon, secondlandingPatternPolygon, thirdLandingPatternLine].forEach(layer => {
         if (layer) {
             layer.remove();
@@ -1105,9 +1122,15 @@ function updateLandingPattern() {
     const uComponents = spdsKt.map((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
     const vComponents = spdsKt.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
 
-    const effectiveLandingWindDir = (landingDirection === 'custom' && Number.isFinite(customLandingDir) && customLandingDir >= 0 && customLandingDir <= 359)
-        ? customLandingDir
-        : (Number.isFinite(landingWindDir) ? landingWindDir : dirs[0]);
+    // Determine effective landing direction based on selected pattern and input
+    let effectiveLandingWindDir;
+    if (landingDirection === 'LL' && customLandingDirLL !== null && !isNaN(customLandingDirLL) && customLandingDirLL >= 0 && customLandingDirLL <= 359) {
+        effectiveLandingWindDir = customLandingDirLL;
+    } else if (landingDirection === 'RR' && customLandingDirRR !== null && !isNaN(customLandingDirRR) && customLandingDirRR >= 0 && customLandingDirRR <= 359) {
+        effectiveLandingWindDir = customLandingDirRR;
+    } else {
+        effectiveLandingWindDir = Number.isFinite(landingWindDir) ? landingWindDir : dirs[0]; // Fallback to surface wind
+    }
 
     if (!Number.isFinite(effectiveLandingWindDir)) {
         console.warn('Invalid landing wind direction:', effectiveLandingWindDir);
@@ -1160,15 +1183,14 @@ function updateLandingPattern() {
         return;
     }
 
-    // Fixed base course: LL turns left (-90°), RR turns right (+90°)
     const baseCourse = landingDirection === 'LL' ? (effectiveLandingWindDir - 90 + 360) % 360 : (effectiveLandingWindDir + 90) % 360;
     const baseWindAngle = Utils.calculateWindAngle(baseCourse, baseWindDir);
     const { crosswind, headwind: baseHeadwind } = Utils.calculateWindComponents(baseWindSpeedKt, baseWindAngle);
     const wca = Utils.calculateWCA(crosswind, CANOPY_SPEED_KT) * (crosswind >= 0 ? 1 : -1);
     const baseBearing = (baseCourse + wca + 360) % 360;
-    const baseTime = LEG_HEIGHT_BASE / DESCENT_RATE_MPS;
-    const baseLength = CANOPY_SPEED_KT * 1.852 / 3.6 * baseTime; // ????
-    const baseEnd = calculateLegEndpoint(finalEnd[0], finalEnd[1], baseBearing, CANOPY_SPEED_KT, baseTime);
+    const baseTime = (LEG_HEIGHT_BASE - LEG_HEIGHT_FINAL) / DESCENT_RATE_MPS;
+    const baseGroundSpeedKt = Utils.calculateGroundSpeed(CANOPY_SPEED_KT, baseHeadwind);
+    const baseEnd = calculateLegEndpoint(finalEnd[0], finalEnd[1], baseBearing, baseGroundSpeedKt, baseTime);
 
     secondlandingPatternPolygon = L.polyline([finalEnd, baseEnd], {
         color: 'red',
@@ -1190,11 +1212,9 @@ function updateLandingPattern() {
     const downwindCourse = effectiveLandingWindDir;
     const downwindWindAngle = Utils.calculateWindAngle(downwindCourse, downwindWindDir);
     const { headwind: downwindHeadwind } = Utils.calculateWindComponents(downwindWindSpeedKt, downwindWindAngle);
-    const downwindGroundSpeedKt = CANOPY_SPEED_KT + downwindHeadwind; // Corrected to use raw headwind
-    const downwindBearing = downwindCourse;
-    const downwindTime = LEG_HEIGHT_DOWNWIND / DESCENT_RATE_MPS;
-    const downwindLength = downwindGroundSpeedKt * 1.852 / 3.6 * downwindTime;
-    const downwindEnd = calculateLegEndpoint(baseEnd[0], baseEnd[1], downwindBearing, downwindGroundSpeedKt, downwindTime);
+    const downwindGroundSpeedKt = Utils.calculateGroundSpeed(CANOPY_SPEED_KT, downwindHeadwind);
+    const downwindTime = (LEG_HEIGHT_DOWNWIND - LEG_HEIGHT_BASE) / DESCENT_RATE_MPS;
+    const downwindEnd = calculateLegEndpoint(baseEnd[0], baseEnd[1], downwindCourse, downwindGroundSpeedKt, downwindTime);
 
     thirdLandingPatternLine = L.polyline([baseEnd, downwindEnd], {
         color: 'red',
@@ -1205,8 +1225,8 @@ function updateLandingPattern() {
 
     console.log(`Landing Pattern Updated:
         Final Leg: [${lat.toFixed(4)}, ${lng.toFixed(4)}] to [${finalEnd[0].toFixed(4)}, ${finalEnd[1].toFixed(4)}], Wind: ${finalWindDir.toFixed(1)}° @ ${finalWindSpeedKt.toFixed(1)}kt, GS: ${finalGroundSpeedKt.toFixed(1)}kt, Length: ${finalLength.toFixed(1)}m
-        Base Leg: [${finalEnd[0].toFixed(4)}, ${finalEnd[1].toFixed(4)}] to [${baseEnd[0].toFixed(4)}, ${baseEnd[1].toFixed(4)}], Wind: ${baseWindDir.toFixed(1)}° @ ${baseWindSpeedKt.toFixed(1)}kt, WCA: ${wca.toFixed(1)}°, , Length: ${baseLength.toFixed(1)}m
-        Downwind Leg: [${baseEnd[0].toFixed(4)}, ${baseEnd[1].toFixed(4)}] to [${downwindEnd[0].toFixed(4)}, ${downwindEnd[1].toFixed(4)}], Wind: ${downwindWindDir.toFixed(1)}° @ ${downwindWindSpeedKt.toFixed(1)}kt, GS: ${downwindGroundSpeedKt.toFixed(1)}kt, Length: ${downwindLength.toFixed(1)}m`);
+        Base Leg: [${finalEnd[0].toFixed(4)}, ${finalEnd[1].toFixed(4)}] to [${baseEnd[0].toFixed(4)}, ${baseEnd[1].toFixed(4)}], Wind: ${baseWindDir.toFixed(1)}° @ ${baseWindSpeedKt.toFixed(1)}kt, WCA: ${wca.toFixed(1)}°, GS: ${baseGroundSpeedKt.toFixed(1)}kt
+        Downwind Leg: [${baseEnd[0].toFixed(4)}, ${baseEnd[1].toFixed(4)}] to [${downwindEnd[0].toFixed(4)}, ${downwindEnd[1].toFixed(4)}], Wind: ${downwindWindDir.toFixed(1)}° @ ${downwindWindSpeedKt.toFixed(1)}kt, GS: ${downwindGroundSpeedKt.toFixed(1)}kt`);
 
     map.fitBounds([[lat, lng], finalEnd, baseEnd, downwindEnd], { padding: [50, 50] });
 }
@@ -1241,7 +1261,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const upperLimitInput = document.getElementById('upperLimit');
     const showLandingPatternCheckbox = document.getElementById('showLandingPattern');
     const submenu = showLandingPatternCheckbox?.closest('li')?.querySelector('.submenu');
-    const customLandingDirectionInput = document.getElementById('customLandingDirection');
+    const customLandingDirectionLLInput = document.getElementById('customLandingDirectionLL');
+    const customLandingDirectionRRInput = document.getElementById('customLandingDirectionRR');
     const showTableCheckbox = document.getElementById('showTableCheckbox');
     const infoElement = document.getElementById('info');
     const legHeightFinalInput = document.getElementById('legHeightFinal');
@@ -1482,11 +1503,17 @@ document.addEventListener('DOMContentLoaded', () => {
         landingDirectionRadios.forEach(radio => {
             radio.addEventListener('change', () => {
                 console.log('Landing direction changed:', radio.value);
-                // Enable/disable custom input based on selection
-                if (customLandingDirectionInput) {
-                    customLandingDirectionInput.disabled = radio.value !== 'custom';
-                    if (radio.value === 'custom' && !customLandingDirectionInput.value) {
-                        customLandingDirectionInput.value = landingWindDir || 0; // Default to current wind direction
+                // Enable the corresponding input field, disable the other
+                if (customLandingDirectionLLInput) {
+                    customLandingDirectionLLInput.disabled = radio.value !== 'LL';
+                    if (radio.value === 'LL' && !customLandingDirectionLLInput.value && landingWindDir !== null) {
+                        customLandingDirectionLLInput.value = Math.round(landingWindDir);
+                    }
+                }
+                if (customLandingDirectionRRInput) {
+                    customLandingDirectionRRInput.disabled = radio.value !== 'RR';
+                    if (radio.value === 'RR' && !customLandingDirectionRRInput.value && landingWindDir !== null) {
+                        customLandingDirectionRRInput.value = Math.round(landingWindDir);
                     }
                 }
                 if (weatherData && lastLat && lastLng) {
@@ -1497,18 +1524,35 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Add event listener for custom direction input
-    if (customLandingDirectionInput) {
-        customLandingDirectionInput.addEventListener('input', () => {
-            const customDir = parseInt(customLandingDirectionInput.value, 10);
+    // Add event listeners for custom direction inputs
+    if (customLandingDirectionLLInput) {
+        customLandingDirectionLLInput.addEventListener('input', debounce(() => {
+            const customDir = parseInt(customLandingDirectionLLInput.value, 10);
             if (!isNaN(customDir) && customDir >= 0 && customDir <= 359) {
-                console.log('Custom landing direction updated:', customDir);
-                if (weatherData && lastLat && lastLng) {
+                console.log('Custom landing direction LL updated:', customDir);
+                if (weatherData && lastLat && lastLng && document.querySelector('input[name="landingDirection"]:checked').value === 'LL') {
                     updateLandingPattern();
                     recenterMap();
                 }
+            } else {
+                Utils.handleError('Landing direction must be between 0 and 359°.');
             }
-        });
+        }, 300));
+    }
+
+    if (customLandingDirectionRRInput) {
+        customLandingDirectionRRInput.addEventListener('input', debounce(() => {
+            const customDir = parseInt(customLandingDirectionRRInput.value, 10);
+            if (!isNaN(customDir) && customDir >= 0 && customDir <= 359) {
+                console.log('Custom landing direction RR updated:', customDir);
+                if (weatherData && lastLat && lastLng && document.querySelector('input[name="landingDirection"]:checked').value === 'RR') {
+                    updateLandingPattern();
+                    recenterMap();
+                }
+            } else {
+                Utils.handleError('Landing direction must be between 0 and 359°.');
+            }
+        }, 300));
     }
 
     if (showTableCheckbox && infoElement) {
@@ -1614,7 +1658,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }, 300));
     }
-    
+
     if (descentRateInput) {
         descentRateInput.addEventListener('input', debounce(() => {
             const value = parseFloat(descentRateInput.value);

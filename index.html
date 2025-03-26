@@ -164,17 +164,13 @@
                     <li>
                         <label class="radio-label">
                             <input type="radio" name="landingDirection" value="LL" checked> LL
+                            <input type="number" id="customLandingDirectionLL" min="0" max="359" placeholder="0-359°">
                         </label>
                     </li>
                     <li>
                         <label class="radio-label">
                             <input type="radio" name="landingDirection" value="RR"> RR
-                        </label>
-                    </li>
-                    <li>
-                        <label class="radio-label">
-                            <input type="radio" name="landingDirection" value="custom"> Custom
-                            <input type="number" id="customLandingDirection" min="0" max="359" placeholder="0-359°" disabled>
+                            <input type="number" id="customLandingDirectionRR" min="0" max="359" placeholder="0-359°">
                         </label>
                     </li>
                     <!-- Add new inputs for leg heights -->
