@@ -1591,14 +1591,35 @@ document.addEventListener('DOMContentLoaded', () => {
         observer.observe(infoElement, { childList: true, subtree: true, characterData: true });
     }
 
+    function validateLegHeights(final, base, downwind) {
+        const finalVal = parseInt(final.value) || 100; // Default if invalid
+        const baseVal = parseInt(base.value) || 200;
+        const downwindVal = parseInt(downwind.value) || 300;
+
+        if (baseVal <= finalVal) {
+            Utils.handleError('Base leg height must be greater than final leg height.');
+            return false;
+        }
+        if (downwindVal <= baseVal) {
+            Utils.handleError('Downwind leg height must be greater than base leg height.');
+            return false;
+        }
+        return true;
+    }
+
+    // Final Leg Height Input
     if (legHeightFinalInput) {
         legHeightFinalInput.addEventListener('input', debounce(() => {
             const value = parseInt(legHeightFinalInput.value);
             if (!isNaN(value) && value >= 50 && value <= 1000) {
                 console.log('Final leg height updated:', value);
-                if (weatherData && lastLat && lastLng) {
-                    updateLandingPattern();
-                    recenterMap();
+                if (validateLegHeights(legHeightFinalInput, legHeightBaseInput, legHeightDownwindInput)) {
+                    if (weatherData && lastLat && lastLng) {
+                        updateLandingPattern();
+                        recenterMap();
+                    }
+                } else {
+                    legHeightFinalInput.value = Math.min(legHeightBaseInput.value - 1, 100); // Adjust to valid value
                 }
             } else {
                 Utils.handleError('Final leg height must be between 50 and 1000 meters.');
@@ -1606,35 +1627,80 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 300));
     }
 
+    // Final Leg Height Input
+    if (legHeightFinalInput) {
+        legHeightFinalInput.addEventListener('blur', () => {
+            const value = parseInt(legHeightFinalInput.value);
+            if (!isNaN(value) && value >= 50 && value <= 1000) {
+                console.log('Final leg height blurred:', value);
+                if (validateLegHeights(legHeightFinalInput, legHeightBaseInput, legHeightDownwindInput)) {
+                    if (weatherData && lastLat && lastLng) {
+                        updateLandingPattern();
+                        recenterMap();
+                    }
+                } else {
+                    // Adjust to a valid value less than base
+                    const baseVal = parseInt(legHeightBaseInput.value) || 200;
+                    legHeightFinalInput.value = Math.min(baseVal - 1, 100);
+                    Utils.handleError(`Adjusted final leg height to ${legHeightFinalInput.value} to be less than base.`);
+                }
+            } else {
+                Utils.handleError('Final leg height must be between 50 and 1000 meters.');
+                legHeightFinalInput.value = 100; // Reset to default
+            }
+        });
+    }
+
+    // Base Leg Height Input
     if (legHeightBaseInput) {
-        legHeightBaseInput.addEventListener('input', debounce(() => {
+        legHeightBaseInput.addEventListener('blur', () => {
             const value = parseInt(legHeightBaseInput.value);
             if (!isNaN(value) && value >= 50 && value <= 1000) {
-                console.log('Base leg height updated:', value);
-                if (weatherData && lastLat && lastLng) {
-                    updateLandingPattern();
-                    recenterMap();
+                console.log('Base leg height blurred:', value);
+                if (validateLegHeights(legHeightFinalInput, legHeightBaseInput, legHeightDownwindInput)) {
+                    if (weatherData && lastLat && lastLng) {
+                        updateLandingPattern();
+                        recenterMap();
+                    }
+                } else {
+                    // Adjust to a valid value between final and downwind
+                    const finalVal = parseInt(legHeightFinalInput.value) || 100;
+                    const downwindVal = parseInt(legHeightDownwindInput.value) || 300;
+                    legHeightBaseInput.value = Math.max(finalVal + 1, Math.min(downwindVal - 1, value));
+                    Utils.handleError(`Adjusted base leg height to ${legHeightBaseInput.value} to fit between final and downwind.`);
                 }
             } else {
                 Utils.handleError('Base leg height must be between 50 and 1000 meters.');
+                legHeightBaseInput.value = 200; // Reset to default
             }
-        }, 300));
+        });
     }
 
+    // Downwind Leg Height Input
     if (legHeightDownwindInput) {
-        legHeightDownwindInput.addEventListener('input', debounce(() => {
+        legHeightDownwindInput.addEventListener('blur', () => {
             const value = parseInt(legHeightDownwindInput.value);
             if (!isNaN(value) && value >= 50 && value <= 1000) {
-                console.log('Downwind leg height updated:', value);
-                if (weatherData && lastLat && lastLng) {
-                    updateLandingPattern();
-                    recenterMap();
+                console.log('Downwind leg height blurred:', value);
+                if (validateLegHeights(legHeightFinalInput, legHeightBaseInput, legHeightDownwindInput)) {
+                    if (weatherData && lastLat && lastLng) {
+                        updateLandingPattern();
+                        recenterMap();
+                    }
+                } else {
+                    // Adjust to a valid value greater than base
+                    const baseVal = parseInt(legHeightBaseInput.value) || 200;
+                    legHeightDownwindInput.value = Math.max(baseVal + 1, 300);
+                    Utils.handleError(`Adjusted downwind leg height to ${legHeightDownwindInput.value} to be greater than base.`);
                 }
             } else {
                 Utils.handleError('Downwind leg height must be between 50 and 1000 meters.');
+                legHeightDownwindInput.value = 300; // Reset to default
             }
-        }, 300));
+        });
     }
+
+
 
     if (showCanopyParametersCheckbox) {
         showCanopyParametersCheckbox.addEventListener('change', function () {
