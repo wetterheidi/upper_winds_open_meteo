@@ -17,8 +17,9 @@ A web application to visualize upper-level wind, temperature, and atmospheric da
 
 ## Features
 - **Interactive Map**: 
-  - Built with Leaflet, offering OpenStreetMap and OpenTopoMap base layers.
-  - Click to pin a location and fetch weather data, with a marker showing latitude, longitude, and altitude.
+  - Built with Leaflet, offering multiple base layers: OpenStreetMap, OpenTopoMap, Esri Satellite, Esri Street, and Esri Topo.
+  - Click or drag a marker to pin a location and fetch weather data, displaying latitude, longitude, and altitude in customizable formats (Decimal Degrees, DMS, MGRS).
+  - Includes a scale control (metric and imperial units) in the bottom-left corner.   
 - **Weather Data**: 
   - Fetches hourly upper-level data (wind speed, direction, temperature, humidity) for multiple pressure levels from OpenMeteo.
   - Supports surface data (2m temperature, 10m wind) and pressure levels from 1000 hPa to 200 hPa.
@@ -29,9 +30,16 @@ A web application to visualize upper-level wind, temperature, and atmospheric da
   - Navigate hourly forecasts up to 7 days (or 2 days for ICON D2) with a responsive slider.
 - **Unit Customization**: 
   - Toggle between AGL (Above Ground Level) and AMSL (Above Mean Sea Level) reference levels.
-  - Select height units (m, ft), temperature units (°C, °F), wind speed units (kt, km/h, m/s, mph, bft), and time zones (UTC or local).
+  - Select height units (m, ft), temperature units (°C, °F), wind speed units (kt, km/h, m/s, mph, bft), time zones (UTC or local), and coordinate formats (Decimal, DMS, MGRS).
 - **Mean Wind Calculation**: 
   - Compute average wind speed and direction between user-defined altitude layers, displayed with selected units.
+- **Landing Pattern Visualization**:
+  - Overlay a landing pattern (downwind, base, final legs) on the map, customizable with canopy speed (5-50 kt), descent rate (1-10 m/s), and leg heights (50-1000m AGL).
+  - Supports left (LL) or right (RR) patterns with custom landing direction (0-359°), defaulting to surface wind direction.
+- **Data Table**:
+  - Displays weather data (height, pressure, temperature, dewpoint, wind direction, speed, relative humidity) with adjustable interpolation steps (100m to 2000m).
+  - Wind speed rows are color-coded: low (blue, ≤3 kt), moderate (green, ≤10 kt), high (yellow, ≤16 kt), very high (red, >16 kt).
+  - Toggle visibility with the "Show Wind Table" checkbox.
 - **Data Download**: 
   - Export weather data (height, pressure, temperature, dewpoint, wind direction, wind speed, relative humidity) as an ASCII text file (`.txt`).
 - **Error Handling**: 
@@ -42,6 +50,7 @@ A web application to visualize upper-level wind, temperature, and atmospheric da
 ## Dependencies
 - **Leaflet**: Loaded via CDN (`https://unpkg.com/leaflet@1.9.4/dist/leaflet.js`) for interactive maps.
 - **Luxon**: Loaded via CDN (`https://cdnjs.cloudflare.com/ajax/libs/luxon/3.4.4/luxon.min.js`) for date/time handling.
+- **MGRS**: Loaded via CDN (https://unpkg.com/mgrs@1.0.0/dist/mgrs.js) for Military Grid Reference System coordinate support.
 - **OpenMeteo API**: No API key required, fetches weather data directly.
 - **Roboto Font**: Via Google Fonts CDN for consistent typography.
 - **live-server**: Development dependency for local hosting (`npm install` required).
@@ -63,6 +72,8 @@ A web application to visualize upper-level wind, temperature, and atmospheric da
 - **Mean Wind**: 
   - Set lower and upper altitude limits in the bottom container to calculate mean wind.
   - Results update dynamically with unit or reference level changes.
+- **Landing Pattern**:
+  - Enable "Landing Pattern" in the menu, adjust parameters (canopy speed, descent rate, leg heights), and select direction (LL/RR) to visualize on the map.
 - **Download**: 
   - Click "Download Table" to save the current weather table as a `.txt` file, named with the timestamp and model (e.g., `2025-03-18_1200Z_ICON_GLOBAL_HEIDIS.txt`).
 
@@ -99,6 +110,15 @@ The app leverages the [OpenMeteo API](https://open-meteo.com/) to retrieve weath
   - Enhanced wind speed visualization with color-coded table rows.
   - Added OpenTopoMap as an alternative base layer alongside OpenStreetMap.
   - Optimized responsive design for mobile devices (e.g., adjusted layouts below 768px and 480px).
+- **Release (v1.1.0)**:
+  - Skydiving functionality established.
+- **Enhancements (as of March 26, 2025)**:
+  - Added multiple base layers: Esri Satellite, Street, and Topo alongside OpenStreetMap and OpenTopoMap.
+  - Introduced coordinate format options (Decimal Degrees, DMS, MGRS) for marker popups.
+  - Implemented landing pattern visualization with customizable parameters (canopy speed, descent rate, leg heights).
+  - Enhanced wind table with a "Show Wind Table" toggle and color-coded wind speed rows.
+  - Added scale control to the map for better spatial reference.
+  - Improved time zone handling with local time support for display and model run info.
 
 ## Warning
 Although thoroughly tested, the data is sourced from weather models via OpenMeteo and may contain inaccuracies. Always cross-check with official meteorological sources for critical applications.
