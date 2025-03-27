@@ -1893,7 +1893,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (upperLimitInput) {
         upperLimitInput.addEventListener('input', debounce(() => {
             userSettings.upperLimit = upperLimitInput.value;
-            saveSettings(); s
+            saveSettings(); 
             console.log('Upper limit changed:', upperLimitInput.value);
             if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
                 calculateMeanWind();
