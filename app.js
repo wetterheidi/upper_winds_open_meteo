@@ -376,7 +376,7 @@ function initMap() {
 
 
     // Map click event for placing new marker
-    map.on('click', async (e) => {
+    map.on('dblclick', async (e) => {
         const { lat, lng } = e.latlng;
         lastLat = lat;
         lastLng = lng;
