@@ -360,7 +360,8 @@ function initMap() {
     map.on('mousemove', function (e) {
         const coordFormat = getCoordinateFormat();
         if (coordFormat === 'MGRS') {
-            var mgrs = Utils.decimalToMgrs(e.latlng.lat.toFixed(4), e.latlng.lng.toFixed(4));
+
+            var mgrs = Utils.decimalToMgrs(e.latlng.lat, e.latlng.lng);
             coordsControl.getContainer().innerHTML = `MGRS: ${mgrs}`;
         } else {
             var lat = e.latlng.lat.toFixed(5);
