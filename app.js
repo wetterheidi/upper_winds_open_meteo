@@ -438,6 +438,86 @@ function initMap() {
             document.getElementById('info').innerHTML = `No models available.`;
         }
     });
+
+    let lastTapTime = 0;
+    const tapThreshold = 300; // milliseconds between taps for a double-tap
+    const mapContainer = map.getContainer();
+
+    mapContainer.addEventListener('touchstart', async (e) => {
+        if (e.touches.length !== 1) return; // Only handle single-finger taps
+
+        const currentTime = new Date().getTime();
+        const timeSinceLastTap = currentTime - lastTapTime;
+
+        if (timeSinceLastTap < tapThreshold && timeSinceLastTap > 0) {
+            e.preventDefault(); // Prevent default zoom behavior
+
+            // Convert touch coordinates to map latlng
+            const rect = mapContainer.getBoundingClientRect();
+            const touchX = e.touches[0].clientX - rect.left;
+            const touchY = e.touches[0].clientY - rect.top;
+            const latlng = map.containerPointToLatLng([touchX, touchY]);
+
+            const { lat, lng } = latlng;
+            lastLat = lat;
+            lastLng = lng;
+            lastAltitude = await getAltitude(lat, lng);
+
+            if (currentMarker) currentMarker.remove();
+            currentMarker = L.marker([lat, lng], {
+                icon: customIcon,
+                draggable: true
+            }).addTo(map);
+
+            updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
+
+            currentMarker.on('dragend', async (e) => {
+                const marker = e.target;
+                const position = marker.getLatLng();
+                lastLat = position.lat;
+                lastLng = position.lng;
+                lastAltitude = await getAltitude(lastLat, lastLng);
+
+                updateMarkerPopup(marker, lastLat, lastLng, lastAltitude);
+                recenterMap();
+
+                const slider = document.getElementById('timeSlider');
+                const currentIndex = parseInt(slider.value) || 0;
+                const currentTime = weatherData?.time?.[currentIndex] || null;
+
+                document.getElementById('info').innerHTML = `Fetching weather and models...`;
+                const availableModels = await checkAvailableModels(lastLat, lastLng);
+                if (availableModels.length > 0) {
+                    await fetchWeather(lastLat, lastLng, currentTime);
+                    updateModelRunInfo();
+                    if (lastAltitude !== 'N/A') calculateMeanWind();
+                    updateLandingPattern();
+                } else {
+                    document.getElementById('info').innerHTML = `No models available.`;
+                }
+            });
+
+            recenterMap();
+
+            const slider = document.getElementById('timeSlider');
+            const currentIndex = parseInt(slider.value) || 0;
+            const currentTime = weatherData?.time?.[currentIndex] || null;
+
+            document.getElementById('info').innerHTML = `Fetching weather and models...`;
+            const availableModels = await checkAvailableModels(lat, lng);
+            if (availableModels.length > 0) {
+                await fetchWeather(lat, lng, currentTime);
+                updateModelRunInfo();
+                if (lastAltitude !== 'N/A') calculateMeanWind();
+                updateLandingPattern();
+            } else {
+                document.getElementById('info').innerHTML = `No models available.`;
+            }
+        }
+
+        lastTapTime = currentTime;
+    }, { passive: false }); // Set passive: false to allow preventDefault()
+    
 }
 
 function recenterMap() {
