@@ -1382,7 +1382,7 @@ function updateLandingPattern() {
     const baseWindAngle = Utils.calculateWindAngle(baseCourse, baseWindDir);
     const { crosswind: baseCrosswind, headwind: baseHeadwind } = Utils.calculateWindComponents(baseWindSpeedKt, baseWindAngle);
     const baseWca = Utils.calculateWCA(baseCrosswind, CANOPY_SPEED_KT) * (baseCrosswind >= 0 ? 1 : -1);
-    const baseBearing = (baseCourse - baseWca + 180) % 360;
+    const baseBearing = (baseCourse + 180) % 360;
     const baseTime = (LEG_HEIGHT_BASE - LEG_HEIGHT_FINAL) / DESCENT_RATE_MPS;
     const baseGroundSpeedKt = CANOPY_SPEED_KT + baseHeadwind;
     const baseLength = baseGroundSpeedKt * 1.852 / 3.6 * baseTime;
