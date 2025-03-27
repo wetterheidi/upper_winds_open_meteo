@@ -8,7 +8,9 @@ let lastModelRun = null;
 let landingPatternPolygon = null;
 let secondlandingPatternPolygon = null;
 let thirdLandingPatternLine = null;
-let landingArrow = null;
+let finalArrow = null;
+let baseArrow = null;
+let downwindArrow = null;
 let landingWindDir = null;
 
 
@@ -1171,7 +1173,7 @@ function updateLandingPattern() {
     const LEG_HEIGHT_DOWNWIND = parseInt(document.getElementById('legHeightDownwind').value) || 300;
 
     // Remove existing layers
-    [landingPatternPolygon, secondlandingPatternPolygon, thirdLandingPatternLine, landingArrow].forEach(layer => {
+    [landingPatternPolygon, secondlandingPatternPolygon, thirdLandingPatternLine, finalArrow, baseArrow, downwindArrow].forEach(layer => {
         if (layer) {
             layer.remove();
             layer = null;
@@ -1236,6 +1238,17 @@ function updateLandingPattern() {
         return;
     }
 
+    let finalArrowColor = null;
+    if (finalWindSpeedKt <= 3) {
+        finalArrowColor = 'lightblue';
+    } else if (finalWindSpeedKt <= 10) {
+        finalArrowColor = 'lightgreen';
+    } else if (finalWindSpeedKt <= 16) {
+        finalArrowColor = '#f5f34f';
+    } else {
+        finalArrowColor = '#ffcccc';
+    }
+
     const finalWindAngle = Utils.calculateWindAngle(effectiveLandingWindDir, finalWindDir);
     const { headwind } = Utils.calculateWindComponents(finalWindSpeedKt, finalWindAngle);
     const finalGroundSpeedKt = Utils.calculateGroundSpeed(CANOPY_SPEED_KT, headwind);
@@ -1251,27 +1264,27 @@ function updateLandingPattern() {
         dashArray: '5, 10'
     }).addTo(map);
 
-    // Add a fat light green arrow in the middle of the final leg pointing to landing direction
-    const midLat = (lat + finalEnd[0]) / 2;
-    const midLng = (lng + finalEnd[1]) / 2;
-    const arrowBearing = effectiveLandingWindDir - 90; // Points toward landing direction
+    // Add a fat blue arrow in the middle of the final leg pointing to landing direction
+    const finalMidLat = (lat + finalEnd[0]) / 2;
+    const finalMidLng = (lng + finalEnd[1]) / 2;
+    const finalArrowBearing = (finalWindDir -90 + 180) % 360; // Points in direction of the mean wind at final
 
     // Create a custom arrow icon using Leaflet’s DivIcon
-    const arrowIcon = L.divIcon({
+    const finalArrowIcon = L.divIcon({
         className: 'custom-arrow',
         html: `
-        <svg width="40" height="20" viewBox="0 0 40 20" style="transform: rotate(${arrowBearing}deg); transform-origin: center;">
-            <line x1="0" y1="10" x2="30" y2="10" stroke="lightgreen" stroke-width="4" />
-            <polygon points="30,5 40,10 30,15" fill="lightgreen" />
+        <svg width="40" height="20" viewBox="0 0 40 20" style="transform: rotate(${finalArrowBearing}deg); transform-origin: center;">
+            <line x1="0" y1="10" x2="30" y2="10" stroke=${finalArrowColor} stroke-width="4" />
+            <polygon points="30,5 40,10 30,15" fill=${finalArrowColor} />
         </svg>`,
         iconSize: [30, 30], // Size of the arrow
         iconAnchor: [15, 15] // Center the arrow
     });
 
     // Place the arrow at the midpoint
-    landingArrow = L.marker([midLat, midLng], {
-        icon: arrowIcon,
-        rotationAngle: arrowBearing, // This ensures proper rotation if using a marker
+    finalArrow = L.marker([finalMidLat, finalMidLng], {
+        icon: finalArrowIcon,
+        rotationAngle: finalArrowBearing, // This ensures proper rotation if using a marker
         rotationOrigin: 'center center'
     }).addTo(map);
 
@@ -1283,6 +1296,17 @@ function updateLandingPattern() {
     if (!Number.isFinite(baseWindSpeedKt) || !Number.isFinite(baseWindDir)) {
         console.warn('Invalid mean wind for base leg:', baseMeanWind);
         return;
+    }
+
+    let baseArrowColor = null;
+    if (baseWindSpeedKt <= 3) {
+        baseArrowColor = 'lightblue';
+    } else if (baseWindSpeedKt <= 10) {
+        baseArrowColor = 'lightgreen';
+    } else if (baseWindSpeedKt <= 16) {
+        baseArrowColor = '#f5f34f';
+    } else {
+        baseArrowColor = '#ffcccc';
     }
 
     const baseCourse = landingDirection === 'LL' ? (effectiveLandingWindDir - 90 + 360) % 360 : (effectiveLandingWindDir + 90) % 360;
@@ -1302,6 +1326,30 @@ function updateLandingPattern() {
         dashArray: '5, 10'
     }).addTo(map);
 
+    // Add a fat blue arrow in the middle of the base leg pointing to landing direction
+    const baseMidLat = (finalEnd[0] + baseEnd[0]) / 2;
+    const baseMidLng = (finalEnd[1] + baseEnd[1]) / 2;
+    const baseArrowBearing = (baseWindDir -90 + 180) % 360; // Points in direction of the mean wind at base
+
+    // Create a custom arrow icon using Leaflet’s DivIcon
+    const baseArrowIcon = L.divIcon({
+        className: 'custom-arrow',
+        html: `
+        <svg width="40" height="20" viewBox="0 0 40 20" style="transform: rotate(${baseArrowBearing}deg); transform-origin: center;">
+            <line x1="0" y1="10" x2="30" y2="10" stroke=${baseArrowColor} stroke-width="4" />
+            <polygon points="30,5 40,10 30,15" fill=${baseArrowColor} />
+        </svg>`,
+        iconSize: [30, 30], // Size of the arrow
+        iconAnchor: [15, 15] // Center the arrow
+    });
+
+    // Place the arrow at the midpoint
+    baseArrow = L.marker([baseMidLat, baseMidLng], {
+        icon: baseArrowIcon,
+        rotationAngle: baseArrowBearing, // This ensures proper rotation if using a marker
+        rotationOrigin: 'center center'
+    }).addTo(map);
+
     // Downwind Leg (200-300m AGL)
     const downwindLimits = [baseHeight + LEG_HEIGHT_BASE, baseHeight + LEG_HEIGHT_DOWNWIND];
     const downwindMeanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, ...downwindLimits);
@@ -1312,6 +1360,16 @@ function updateLandingPattern() {
         return;
     }
 
+    let downwindArrowColor = null;
+    if (downwindWindSpeedKt <= 3) {
+        downwindArrowColor = 'lightblue';
+    } else if (downwindWindSpeedKt <= 10) {
+        downwindArrowColor = 'lightgreen';
+    } else if (downwindWindSpeedKt <= 16) {
+        downwindArrowColor = '#f5f34f';
+    } else {
+        downwindArrowColor = '#ffcccc';
+    }
     const downwindCourse = effectiveLandingWindDir;
     const downwindWindAngle = Utils.calculateWindAngle(downwindCourse, downwindWindDir);
     let { headwind: downwindHeadwind } = Utils.calculateWindComponents(downwindWindSpeedKt, downwindWindAngle);
@@ -1325,6 +1383,30 @@ function updateLandingPattern() {
         weight: 3,
         opacity: 0.8,
         dashArray: '5, 10'
+    }).addTo(map);
+
+    // Add a fat blue arrow in the middle of the downwind leg pointing to landing direction
+    const downwindMidLat = (baseEnd[0] + downwindEnd[0]) / 2;
+    const downwindMidLng = (baseEnd[1] + downwindEnd[1]) / 2;
+    const downwindArrowBearing = (downwindWindDir -90 + 180) % 360; // Points in direction of the mean wind at downwind
+
+    // Create a custom arrow icon using Leaflet’s DivIcon
+    const downwindArrowIcon = L.divIcon({
+        className: 'custom-arrow',
+        html: `
+        <svg width="40" height="20" viewBox="0 0 40 20" style="transform: rotate(${downwindArrowBearing}deg); transform-origin: center;">
+            <line x1="0" y1="10" x2="30" y2="10" stroke=${downwindArrowColor} stroke-width="4" />
+            <polygon points="30,5 40,10 30,15" fill=${downwindArrowColor} />
+        </svg>`,
+        iconSize: [30, 30], // Size of the arrow
+        iconAnchor: [15, 15] // Center the arrow
+    });
+
+    // Place the arrow at the midpoint
+    downwindArrow = L.marker([downwindMidLat, downwindMidLng], {
+        icon: downwindArrowIcon,
+        rotationAngle: downwindArrowBearing, // This ensures proper rotation if using a marker
+        rotationOrigin: 'center center'
     }).addTo(map);
 
     console.log(`Landing Pattern Updated:
