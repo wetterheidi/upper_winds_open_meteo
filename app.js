@@ -177,6 +177,23 @@ function initMap() {
         maxWidth: 100          // Maximum width of the scale bar in pixels
     }).addTo(map);
 
+    // Add Leaflet.PolylineMeasure control
+    const polylineMeasure = L.control.polylineMeasure({
+        position: 'topleft', // Position on the map
+        unit: 'kilometres', // Default unit (can be 'metres', 'kilometres', 'miles', 'nauticalmiles')
+        showBearings: true, // Display bearings between points
+        clearMeasurementsOnStop: false, // Keep measurements after stopping
+        showClearControl: true, // Show a button to clear all measurements
+        showUnitControl: true, // Allow switching units
+        tooltipTextFinish: 'Click to finish the line<br>',
+        tooltipTextDelete: 'Shift-click to delete point',
+        tooltipTextMove: 'Drag to move point<br>',
+        tooltipTextResume: 'Click to resume line<br>',
+        tooltipTextAdd: 'Click to add point<br>',
+        measureControlTitleOn: 'Start measuring distance and bearing',
+        measureControlTitleOff: 'Stop measuring'
+    }).addTo(map);
+
     // Custom icon setup
     const customIcon = L.icon({
         iconUrl: 'favicon.ico',
@@ -326,7 +343,7 @@ function initMap() {
         },
         onAdd: function (map) {
             var container = L.DomUtil.create('div', 'leaflet-control-coordinates');
-            container.style.background = 'rgba(255, 255, 255, 0.6)';
+            container.style.background = 'rgba(255, 255, 255, 0.8)';
             container.style.padding = '5px';
             container.style.borderRadius = '4px';
             container.style.boxShadow = '0 2px 5px rgba(0, 0, 0, 0.2)';
@@ -343,10 +360,7 @@ function initMap() {
     map.on('mousemove', function (e) {
         const coordFormat = getCoordinateFormat();
         if (coordFormat === 'MGRS') {
-            // Ensure numeric input by parsing the strings from toFixed
-            const lat = parseFloat(e.latlng.lat.toFixed(4));
-            const lng = parseFloat(e.latlng.lng.toFixed(4));
-            var mgrs = Utils.decimalToMgrs(lat, lng);
+            var mgrs = Utils.decimalToMgrs(e.latlng.lat.toFixed(4), e.latlng.lng.toFixed(4));
             coordsControl.getContainer().innerHTML = `MGRS: ${mgrs}`;
         } else {
             var lat = e.latlng.lat.toFixed(5);
@@ -1956,6 +1970,38 @@ document.addEventListener('DOMContentLoaded', () => {
                     updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
                 }
             });
+        });
+    }
+
+    const toggleMeasureCheckbox = document.getElementById('toggleMeasure');
+    let polylineMeasureControl = null; // To store the control instance
+
+    if (toggleMeasureCheckbox) {
+        // Initialize the control but don’t add it yet
+        polylineMeasureControl = L.control.polylineMeasure({
+            position: 'topleft',
+            unit: 'kilometres',
+            showBearings: true,
+            clearMeasurementsOnStop: false,
+            showClearControl: true,
+            showUnitControl: true,
+            tooltipTextFinish: 'Click to finish the line<br>',
+            tooltipTextDelete: 'Shift-click to delete point',
+            tooltipTextMove: 'Drag to move point<br>',
+            tooltipTextResume: 'Click to resume line<br>',
+            tooltipTextAdd: 'Click to add point<br>',
+            measureControlTitleOn: 'Start measuring distance and bearing',
+            measureControlTitleOff: 'Stop measuring'
+        });
+
+        toggleMeasureCheckbox.addEventListener('change', () => {
+            if (toggleMeasureCheckbox.checked) {
+                polylineMeasureControl.addTo(map);
+                console.log('Measurement tool enabled');
+            } else {
+                polylineMeasureControl.remove();
+                console.log('Measurement tool disabled');
+            }
         });
     }
 });
