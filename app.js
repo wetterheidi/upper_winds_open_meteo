@@ -8,6 +8,7 @@ let lastModelRun = null;
 let landingPatternPolygon = null;
 let secondlandingPatternPolygon = null;
 let thirdLandingPatternLine = null;
+let landingArrow = null;
 let landingWindDir = null;
 
 
@@ -891,10 +892,10 @@ function interpolateWeatherData(index) {
     const pressureHeights = dataPoints.map(p => p.height); // Ascending order
 
     // Prepare wind components for all pressure levels
-    const uComponents = dataPoints.map(p => 
+    const uComponents = dataPoints.map(p =>
         p.spdKt === 'N/A' || p.dir === 'N/A' ? 'N/A' : -p.spdKt * Math.sin(p.dir * Math.PI / 180)
     );
-    const vComponents = dataPoints.map(p => 
+    const vComponents = dataPoints.map(p =>
         p.spdKt === 'N/A' || p.dir === 'N/A' ? 'N/A' : -p.spdKt * Math.cos(p.dir * Math.PI / 180)
     );
 
@@ -950,7 +951,7 @@ function interpolateWeatherData(index) {
     }
 
     return interpolated;
-}function interpolateWeatherData(index) {
+} function interpolateWeatherData(index) {
     if (!weatherData || !weatherData.time || lastAltitude === 'N/A') return [];
 
     const heightUnit = getHeightUnit();
@@ -1004,10 +1005,10 @@ function interpolateWeatherData(index) {
     const pressureHeights = dataPoints.map(p => p.height); // Ascending order
 
     // Prepare wind components for all pressure levels
-    const uComponents = dataPoints.map(p => 
+    const uComponents = dataPoints.map(p =>
         p.spdKt === 'N/A' || p.dir === 'N/A' ? 'N/A' : -p.spdKt * Math.sin(p.dir * Math.PI / 180)
     );
-    const vComponents = dataPoints.map(p => 
+    const vComponents = dataPoints.map(p =>
         p.spdKt === 'N/A' || p.dir === 'N/A' ? 'N/A' : -p.spdKt * Math.cos(p.dir * Math.PI / 180)
     );
 
@@ -1224,7 +1225,7 @@ function updateLandingPattern() {
     const LEG_HEIGHT_DOWNWIND = parseInt(document.getElementById('legHeightDownwind').value) || 300;
 
     // Remove existing layers
-    [landingPatternPolygon, secondlandingPatternPolygon, thirdLandingPatternLine].forEach(layer => {
+    [landingPatternPolygon, secondlandingPatternPolygon, thirdLandingPatternLine, landingArrow].forEach(layer => {
         if (layer) {
             layer.remove();
             layer = null;
@@ -1302,6 +1303,26 @@ function updateLandingPattern() {
         weight: 3,
         opacity: 0.8,
         dashArray: '5, 10'
+    }).addTo(map);
+
+    // Add a fat light green arrow in the middle of the final leg pointing to landing direction
+    const midLat = (lat + finalEnd[0]) / 2;
+    const midLng = (lng + finalEnd[1]) / 2;
+    const arrowBearing = effectiveLandingWindDir; // Points toward landing direction
+
+    // Create a custom arrow icon using Leaflet’s DivIcon
+    const arrowIcon = L.divIcon({
+        className: 'custom-arrow',
+        html: `<div style="width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent; border-bottom: 30px solid lightgreen; transform: rotate(${arrowBearing}deg); transform-origin: center;"></div>`,
+        iconSize: [30, 30], // Size of the arrow
+        iconAnchor: [15, 15] // Center the arrow
+    });
+
+    // Place the arrow at the midpoint
+    landingArrow = L.marker([midLat, midLng], {
+        icon: arrowIcon,
+        rotationAngle: arrowBearing, // This ensures proper rotation if using a marker
+        rotationOrigin: 'center center'
     }).addTo(map);
 
     // Base Leg (100-200m AGL)
