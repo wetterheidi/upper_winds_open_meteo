@@ -1036,7 +1036,7 @@ function calculateMeanWind() {
     let upperLimitInput = parseFloat(document.getElementById('upperLimit').value);
     const refLevel = document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL';
     const heightUnit = getHeightUnit();
-    const windSpeedUnit = getWindSpeedUnit(); // Add wind speed unit
+    const windSpeedUnit = getWindSpeedUnit();
     const baseHeight = Math.round(lastAltitude);
 
     if (!weatherData || lastAltitude === 'N/A') {
@@ -1044,36 +1044,25 @@ function calculateMeanWind() {
         return;
     }
 
-    // Convert inputs to meters for internal calculation
+    // Convert inputs to meters
     lowerLimitInput = heightUnit === 'ft' ? lowerLimitInput / 3.28084 : lowerLimitInput;
     upperLimitInput = heightUnit === 'ft' ? upperLimitInput / 3.28084 : upperLimitInput;
+
+    const lowerLimit = refLevel === 'AGL' ? lowerLimitInput + baseHeight : lowerLimitInput;
+    const upperLimit = refLevel === 'AGL' ? upperLimitInput + baseHeight : upperLimitInput;
 
     if (isNaN(lowerLimitInput) || isNaN(upperLimitInput) || lowerLimitInput >= upperLimitInput) {
         Utils.handleError('Invalid layer limits. Ensure Lower < Upper and both are numbers.');
         return;
     }
 
-    if ((refLevel === 'AMSL') && lowerLimitInput < baseHeight) {
-        Utils.handleError(`Lower limit adjusted to terrain altitude (${baseHeight} m ${refLevel}) as it cannot be below ground level in ${refLevel} mode.`);
-        lowerLimitInput = baseHeight;
-        document.getElementById('lowerLimit').value = Utils.convertHeight(lowerLimitInput, heightUnit);
-    }
+    // Use raw heights and speeds in knots
+    const heights = interpolatedData.map(d => d.height); // Actual height in meters
+    const dirs = interpolatedData.map(d => parseFloat(d.dir) || 0);
+    const spdsKt = interpolatedData.map(d => Utils.convertWind(parseFloat(d.spd) || 0, 'kt', windSpeedUnit)); // Ensure knots
 
-    const lowerLimit = refLevel === 'AGL' ? lowerLimitInput + baseHeight : lowerLimitInput;
-    const upperLimit = refLevel === 'AGL' ? upperLimitInput + baseHeight : upperLimitInput;
-
-    // Check if interpolatedData is valid
-    if (!interpolatedData || interpolatedData.length === 0) {
-        Utils.handleError('No valid weather data available to calculate mean wind.');
-        return;
-    }
-
-    const heights = interpolatedData.map(d => refLevel === 'AGL' ? d.displayHeight + baseHeight : d.displayHeight);
-    const dirs = interpolatedData.map(d => (typeof d.dir === 'number' && !isNaN(d.dir)) ? parseFloat(d.dir) : 0);
-    const spds = interpolatedData.map(d => (typeof d.spd === 'number' && !isNaN(d.spd)) ? parseFloat(d.spd) : 0);
-
-    const xKomponente = spds.map((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
-    const yKomponente = spds.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
+    const xKomponente = spdsKt.map((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
+    const yKomponente = spdsKt.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
 
     const meanWind = Utils.calculateMeanWind(heights, xKomponente, yKomponente, lowerLimit, upperLimit);
     const [dir, spd] = meanWind;
@@ -1081,17 +1070,11 @@ function calculateMeanWind() {
     const roundedDir = Utils.roundToTens(dir);
     const displayLower = Math.round(Utils.convertHeight(lowerLimitInput, heightUnit));
     const displayUpper = Math.round(Utils.convertHeight(upperLimitInput, heightUnit));
-    const displaySpd = Utils.convertWind(spd, windSpeedUnit);
+    const displaySpd = Utils.convertWind(spd, windSpeedUnit, 'kt');
     const formattedSpd = displaySpd === 'N/A' ? 'N/A' : (windSpeedUnit === 'bft' ? Math.round(displaySpd) : displaySpd.toFixed(1));
     const result = `Mean wind (${displayLower}-${displayUpper} ${heightUnit} ${refLevel}): ${roundedDir}° ${formattedSpd} ${windSpeedUnit}`;
-    const meanWindResult = document.getElementById('meanWindResult');
-    if (meanWindResult) {
-        meanWindResult.innerHTML = result;
-        console.log('Calculated Mean Wind:', result, 'u:', meanWind[2], 'v:', meanWind[3], 'Adjusted Limits:', { lowerLimit, upperLimit });
-        updateWindUnitLabels(); // Ensure consistent formatting with unit changes
-    } else {
-        console.error('Mean wind result element not found');
-    }
+    document.getElementById('meanWindResult').innerHTML = result;
+    console.log('Calculated Mean Wind:', result, 'u:', meanWind[2], 'v:', meanWind[3]);
 }
 
 function downloadTableAsAscii() {
