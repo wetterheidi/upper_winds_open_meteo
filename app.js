@@ -13,6 +13,38 @@ let baseArrow = null;
 let downwindArrow = null;
 let landingWindDir = null;
 
+// Default settings object
+const defaultSettings = {
+    model: 'icon_global',
+    refLevel: 'AGL',
+    heightUnit: 'm',
+    temperatureUnit: 'C',
+    windUnit: 'kt',
+    timeZone: 'Z',
+    coordFormat: 'Decimal',
+    showTable: false,
+    showCanopyParameters: false,
+    canopySpeed: 20,
+    descentRate: 3.5,
+    showLandingPattern: false,
+    landingDirection: 'LL',
+    customLandingDirectionLL: '',
+    customLandingDirectionRR: '',
+    legHeightDownwind: 300,
+    legHeightBase: 200,
+    legHeightFinal: 100,
+    interpStep: '200',
+    lowerLimit: 0,
+    upperLimit: 3000
+};
+
+// Load settings from localStorage or use defaults
+let userSettings = JSON.parse(localStorage.getItem('upperWindsSettings')) || { ...defaultSettings };
+
+// Function to save settings to localStorage
+function saveSettings() {
+    localStorage.setItem('upperWindsSettings', JSON.stringify(userSettings));
+}
 
 // Update model run info in menu
 function updateModelRunInfo() {
@@ -517,7 +549,7 @@ function initMap() {
 
         lastTapTime = currentTime;
     }, { passive: false }); // Set passive: false to allow preventDefault()
-    
+
 }
 
 function recenterMap() {
@@ -1388,7 +1420,7 @@ function updateLandingPattern() {
     const finalCourse = (effectiveLandingWindDir + 180) % 360;
     const finalWindAngle = Utils.calculateWindAngle(effectiveLandingWindDir, finalWindDir);
     const { crosswind: finalCrosswind, headwind: finalHeadwind } = Utils.calculateWindComponents(finalWindSpeedKt, finalWindAngle);
-    const finalWca = Utils.calculateWCA(finalCrosswind, CANOPY_SPEED_KT) * (finalCrosswind >= 0 ? 1 : -1);    
+    const finalWca = Utils.calculateWCA(finalCrosswind, CANOPY_SPEED_KT) * (finalCrosswind >= 0 ? 1 : -1);
     const finalGroundSpeedKt = Utils.calculateGroundSpeed(CANOPY_SPEED_KT, finalHeadwind);
     const finalTime = LEG_HEIGHT_FINAL / DESCENT_RATE_MPS;
     const finalLength = finalGroundSpeedKt * 1.852 / 3.6 * finalTime;
@@ -1580,6 +1612,38 @@ function displayError(message) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Apply saved settings to UI elements
+    document.getElementById('modelSelect').value = userSettings.model;
+    document.querySelector(`input[name="refLevel"][value="${userSettings.refLevel}"]`).checked = true;
+    document.querySelector(`input[name="heightUnit"][value="${userSettings.heightUnit}"]`).checked = true;
+    document.querySelector(`input[name="temperatureUnit"][value="${userSettings.temperatureUnit}"]`).checked = true;
+    document.querySelector(`input[name="windUnit"][value="${userSettings.windUnit}"]`).checked = true;
+    document.querySelector(`input[name="timeZone"][value="${userSettings.timeZone}"]`).checked = true;
+    document.querySelector(`input[name="coordFormat"][value="${userSettings.coordFormat}"]`).checked = true;
+    document.getElementById('showTableCheckbox').checked = userSettings.showTable;
+    document.getElementById('showCanopyParameters').checked = userSettings.showCanopyParameters;
+    document.getElementById('canopySpeed').value = userSettings.canopySpeed;
+    document.getElementById('descentRate').value = userSettings.descentRate;
+    document.getElementById('showLandingPattern').checked = userSettings.showLandingPattern;
+    document.querySelector(`input[name="landingDirection"][value="${userSettings.landingDirection}"]`).checked = true;
+    document.getElementById('customLandingDirectionLL').value = userSettings.customLandingDirectionLL;
+    document.getElementById('customLandingDirectionRR').value = userSettings.customLandingDirectionRR;
+    document.getElementById('legHeightDownwind').value = userSettings.legHeightDownwind;
+    document.getElementById('legHeightBase').value = userSettings.legHeightBase;
+    document.getElementById('legHeightFinal').value = userSettings.legHeightFinal;
+    document.getElementById('interpStepSelect').value = userSettings.interpStep;
+    document.getElementById('lowerLimit').value = userSettings.lowerLimit;
+    document.getElementById('upperLimit').value = userSettings.upperLimit;
+
+    // Initialize UI states based on settings
+    document.getElementById('info').style.display = userSettings.showTable ? 'block' : 'none';
+    const canopySubmenu = document.getElementById('showCanopyParameters').closest('li').querySelector('.submenu');
+    if (canopySubmenu) canopySubmenu.classList.toggle('hidden', !userSettings.showCanopyParameters);
+    const landingSubmenu = document.getElementById('showLandingPattern').closest('li').querySelector('.submenu');
+    if (landingSubmenu) landingSubmenu.classList.toggle('hidden', !userSettings.showLandingPattern);
+    document.getElementById('customLandingDirectionLL').disabled = userSettings.landingDirection !== 'LL';
+    document.getElementById('customLandingDirectionRR').disabled = userSettings.landingDirection !== 'RR';
+
     console.log('DOM fully loaded, initializing map...');
     initMap();
 
@@ -1654,6 +1718,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Existing modelSelect event listener (unchanged)
     if (modelSelect) {
         modelSelect.addEventListener('change', () => {
+            userSettings.model = modelSelect.value;
+            saveSettings();
             if (lastLat && lastLng) {
                 const slider = document.getElementById('timeSlider');
                 const currentIndex = parseInt(slider.value) || 0;
@@ -1703,12 +1769,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Existing refLevelRadios event listener (unchanged)
+    // Reference Level Radios
     if (refLevelRadios.length > 0) {
         refLevelRadios.forEach(radio => {
             radio.addEventListener('change', () => {
-                const selectedValue = document.querySelector('input[name="refLevel"]:checked').value;
-                console.log('Ref level changed:', selectedValue);
+                userSettings.refLevel = document.querySelector('input[name="refLevel"]:checked').value;
+                saveSettings();
                 updateReferenceLabels();
                 if (weatherData && lastLat && lastLng) {
                     updateWeatherDisplay(slider.value || 0);
@@ -1716,18 +1782,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         });
-        const initialValue = document.querySelector('input[name="refLevel"]:checked').value;
-        console.log('Initial refLevel:', initialValue);
-        updateReferenceLabels(); // Initial label setup
-        if (weatherData && lastLat && lastLng) {
-            updateWeatherDisplay(0); // Initial table display
-        }
     }
 
     // Existing heightUnitRadios event listener (unchanged)
     if (heightUnitRadios.length > 0) {
         heightUnitRadios.forEach(radio => {
             radio.addEventListener('change', () => {
+                userSettings.refLevel = document.querySelector('input[name="heightUnit"]:checked').value;
+                saveSettings();
                 console.log('Height unit changed:', getHeightUnit());
                 updateHeightUnitLabels();
                 if (weatherData && lastLat && lastLng) {
@@ -1743,6 +1805,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (temperatureUnitRadios.length > 0) {
         temperatureUnitRadios.forEach(radio => {
             radio.addEventListener('change', () => {
+                userSettings.refLevel = document.querySelector('input[name="temperatureUnit"]:checked').value;
+                saveSettings();
                 console.log('Temperature unit changed:', getTemperatureUnit());
                 if (weatherData && lastLat && lastLng) {
                     updateWeatherDisplay(slider.value || 0);
@@ -1756,6 +1820,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (windSpeedUnitRadios.length > 0) {
         windSpeedUnitRadios.forEach(radio => {
             radio.addEventListener('change', () => {
+                userSettings.refLevel = document.querySelector('input[name="windUnit"]:checked').value;
+                saveSettings();
                 console.log('Wind speed unit changed:', getWindSpeedUnit());
                 if (weatherData && lastLat && lastLng) {
                     updateWeatherDisplay(slider.value || 0);
@@ -1772,6 +1838,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (timeZoneRadios.length > 0) {
         timeZoneRadios.forEach(radio => {
             radio.addEventListener('change', async () => { // Make this async
+                userSettings.timeZone = document.querySelector('input[name="timeZone"]:checked').value;
+                saveSettings();
                 console.log('Time zone changed:', radio.value);
                 if (weatherData && lastLat && lastLng) {
                     await updateWeatherDisplay(slider.value || 0); // Await here
@@ -1783,6 +1851,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Existing interpStepSelect event listener (unchanged)
     if (interpStepSelect) {
         interpStepSelect.addEventListener('change', () => {
+            userSettings.interpStep = interpStepSelect.value;
+            saveSettings();
             console.log('Interpolation step changed:', interpStepSelect.value);
             if (weatherData && lastLat && lastLng) {
                 updateWeatherDisplay(slider.value || 0);
@@ -1796,6 +1866,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Existing lowerLimitInput event listener (unchanged)
     if (lowerLimitInput) {
         lowerLimitInput.addEventListener('input', debounce(() => {
+            userSettings.lowerLimit = lowerLimitInput.value;
+            saveSettings();
             console.log('Lower limit changed:', lowerLimitInput.value);
             if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
                 calculateMeanWind();
@@ -1808,6 +1880,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Existing upperLimitInput event listener (unchanged)
     if (upperLimitInput) {
         upperLimitInput.addEventListener('input', debounce(() => {
+            userSettings.upperLimit = upperLimitInput.value;
+            saveSettings();s
             console.log('Upper limit changed:', upperLimitInput.value);
             if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
                 calculateMeanWind();
@@ -1819,11 +1893,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // LandingPattern event listener
     if (showLandingPatternCheckbox && submenu) {
-        submenu.classList.toggle('hidden', !showLandingPatternCheckbox.checked);
-
         showLandingPatternCheckbox.addEventListener('change', () => {
-            submenu.classList.toggle('hidden', !showLandingPatternCheckbox.checked);
-            console.log('Landing Pattern checkbox toggled. Show submenu:', showLandingPatternCheckbox.checked);
+            userSettings.showLandingPattern = showLandingPatternCheckbox.checked;
+            saveSettings();
+            submenu.classList.toggle('hidden', !userSettings.showLandingPattern);
             if (weatherData && lastLat && lastLng) {
                 updateLandingPattern();
                 recenterMap();
@@ -1838,6 +1911,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (landingDirectionRadios.length > 0) {
         landingDirectionRadios.forEach(radio => {
             radio.addEventListener('change', () => {
+                userSettings.landingDirection = radio.value;
+                saveSettings();
                 console.log('Landing direction changed:', radio.value);
                 // Enable the corresponding input field, disable the other
                 if (customLandingDirectionLLInput) {
@@ -1860,12 +1935,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Add event listeners for custom direction inputs
+    // Custom Landing Direction LL Input
     if (customLandingDirectionLLInput) {
         customLandingDirectionLLInput.addEventListener('input', debounce(() => {
             const customDir = parseInt(customLandingDirectionLLInput.value, 10);
             if (!isNaN(customDir) && customDir >= 0 && customDir <= 359) {
-                console.log('Custom landing direction LL updated:', customDir);
+                userSettings.customLandingDirectionLL = customDir;
+                saveSettings();
                 if (weatherData && lastLat && lastLng && document.querySelector('input[name="landingDirection"]:checked').value === 'LL') {
                     updateLandingPattern();
                     recenterMap();
@@ -1880,6 +1956,8 @@ document.addEventListener('DOMContentLoaded', () => {
         customLandingDirectionRRInput.addEventListener('input', debounce(() => {
             const customDir = parseInt(customLandingDirectionRRInput.value, 10);
             if (!isNaN(customDir) && customDir >= 0 && customDir <= 359) {
+                userSettings.customLandingDirectionRR = customDir;
+                saveSettings();
                 console.log('Custom landing direction RR updated:', customDir);
                 if (weatherData && lastLat && lastLng && document.querySelector('input[name="landingDirection"]:checked').value === 'RR') {
                     updateLandingPattern();
@@ -1893,13 +1971,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (showTableCheckbox && infoElement) {
         showTableCheckbox.addEventListener('change', () => {
-            const isChecked = showTableCheckbox.checked;
-            console.log('Show Table checkbox toggled:', isChecked);
-            infoElement.style.display = isChecked ? 'block' : 'none';
-            if (isChecked && weatherData && lastLat && lastLng) {
-                updateWeatherDisplay(slider.value || 0); // Refresh table if shown
+            userSettings.showTable = showTableCheckbox.checked;
+            saveSettings();
+            infoElement.style.display = userSettings.showTable ? 'block' : 'none';
+            if (userSettings.showTable && weatherData && lastLat && lastLng) {
+                updateWeatherDisplay(slider.value || 0);
             }
-            recenterMap(); // Adjust map after layout change
+            recenterMap();
         });
     } else {
         console.error('Could not find showTableCheckbox or info element');
@@ -1936,6 +2014,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Final Leg Height Input
     if (legHeightFinalInput) {
         legHeightFinalInput.addEventListener('blur', () => {
+            userSettings.legHeightFinal = legHeightFinalInput.value;
+            saveSettings();
             const value = parseInt(legHeightFinalInput.value);
             if (!isNaN(value) && value >= 50 && value <= 1000) {
                 console.log('Final leg height blurred:', value);
@@ -1960,6 +2040,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Base Leg Height Input
     if (legHeightBaseInput) {
         legHeightBaseInput.addEventListener('blur', () => {
+            userSettings.legHeightBase = legHeightBaseInput.value;
+            saveSettings();
             const value = parseInt(legHeightBaseInput.value);
             if (!isNaN(value) && value >= 50 && value <= 1000) {
                 console.log('Base leg height blurred:', value);
@@ -1985,6 +2067,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Downwind Leg Height Input
     if (legHeightDownwindInput) {
         legHeightDownwindInput.addEventListener('blur', () => {
+            userSettings.legHeightDownwind = legHeightDownwindInput.value;
+            saveSettings();
             const value = parseInt(legHeightDownwindInput.value);
             if (!isNaN(value) && value >= 50 && value <= 1000) {
                 console.log('Downwind leg height blurred:', value);
@@ -2010,6 +2094,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (showCanopyParametersCheckbox) {
         showCanopyParametersCheckbox.addEventListener('change', function () {
+            userSettings.showCanopyParameters = this.checked;
+            saveSettings();
             const submenu = this.parentElement.nextElementSibling;
             if (this.checked) {
                 submenu.classList.remove('hidden');
@@ -2028,6 +2114,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (canopySpeedInput) {
         canopySpeedInput.addEventListener('input', debounce(() => {
+            userSettings.canopySpeed = canopySpeedInput.value;
+            saveSettings();
             const value = parseInt(canopySpeedInput.value);
             if (!isNaN(value) && value >= 5 && value <= 50) {
                 console.log('Canopy speed updated:', value, 'kt');
@@ -2043,6 +2131,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (descentRateInput) {
         descentRateInput.addEventListener('input', debounce(() => {
+            userSettings.descentRate = descentRateInput.value;
+            saveSettings();
             const value = parseFloat(descentRateInput.value);
             if (!isNaN(value) && value >= 1 && value <= 10) {
                 console.log('Descent rate updated:', value, 'm/s');
@@ -2060,6 +2150,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (coordFormatRadios.length > 0) {
         coordFormatRadios.forEach(radio => {
             radio.addEventListener('change', () => {
+                userSettings.coordFormat = document.querySelector('input[name="coordFormat"]:checked').value;
+                saveSettings();
                 console.log('Coordinate format changed:', getCoordinateFormat());
                 if (currentMarker && lastLat && lastLng) {
                     updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
@@ -2099,4 +2191,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+    const resetButton = document.createElement('button');
+    resetButton.textContent = 'Reset Settings';
+    resetButton.style.margin = '10px';
+    document.getElementById('bottom-container').appendChild(resetButton);
+    resetButton.addEventListener('click', () => {
+        userSettings = { ...defaultSettings };
+        saveSettings();
+        location.reload(); // Reload to apply defaults
+    });
 });
