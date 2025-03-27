@@ -984,7 +984,7 @@ function calculateMeanWind() {
     const roundedDir = Utils.roundToTens(dir);
     const displayLower = Math.round(Utils.convertHeight(lowerLimitInput, heightUnit));
     const displayUpper = Math.round(Utils.convertHeight(upperLimitInput, heightUnit));
-    const displaySpd = Utils.convertWind(spd, windSpeedUnit);
+    const displaySpd = Utils.convertWind(spd, windSpeedUnit, 'kt');
     const formattedSpd = displaySpd === 'N/A' ? 'N/A' : (windSpeedUnit === 'bft' ? Math.round(displaySpd) : displaySpd.toFixed(1));
     const result = `Mean wind (${displayLower}-${displayUpper} ${heightUnit} ${refLevel}): ${roundedDir}° ${formattedSpd} ${windSpeedUnit}`;
     document.getElementById('meanWindResult').innerHTML = result;
