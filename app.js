@@ -1304,9 +1304,11 @@ function updateLandingPattern() {
         finalArrowColor = '#ffcccc';
     }
 
+    const finalCourse = (effectiveLandingWindDir + 180) % 360;
     const finalWindAngle = Utils.calculateWindAngle(effectiveLandingWindDir, finalWindDir);
-    const { headwind } = Utils.calculateWindComponents(finalWindSpeedKt, finalWindAngle);
-    const finalGroundSpeedKt = Utils.calculateGroundSpeed(CANOPY_SPEED_KT, headwind);
+    const { crosswind: finalCrosswind, headwind: finalHeadwind } = Utils.calculateWindComponents(finalWindSpeedKt, finalWindAngle);
+    const finalWca = Utils.calculateWCA(finalCrosswind, CANOPY_SPEED_KT) * (finalCrosswind >= 0 ? 1 : -1);    
+    const finalGroundSpeedKt = Utils.calculateGroundSpeed(CANOPY_SPEED_KT, finalHeadwind);
     const finalTime = LEG_HEIGHT_FINAL / DESCENT_RATE_MPS;
     const finalLength = finalGroundSpeedKt * 1.852 / 3.6 * finalTime;
     const finalBearing = (effectiveLandingWindDir + 180) % 360;
@@ -1364,13 +1366,24 @@ function updateLandingPattern() {
         baseArrowColor = '#ffcccc';
     }
 
-    const baseCourse = landingDirection === 'LL' ? (effectiveLandingWindDir - 90 + 360) % 360 : (effectiveLandingWindDir + 90) % 360;
+    console.log('********* Landing Direction: ', landingDirection, 'Effective Landing Wind Dir:', effectiveLandingWindDir);
+    let baseHeading = 0;
+    if (landingDirection === 'LL') {
+        baseHeading = (effectiveLandingWindDir + 90) % 360;
+        console.log('Base Heading:', baseHeading);
+    } else if (landingDirection === 'RR') {
+        baseHeading = (effectiveLandingWindDir - 90 + 360) % 360;
+        console.log('Base Heading:', baseHeading);
+    }
+
+    const baseCourse = Utils.calculateCourseFromHeading(baseHeading, baseWindDir, baseWindSpeedKt, CANOPY_SPEED_KT).trueCourse;
+    console.log('Base Course:', baseCourse);
     const baseWindAngle = Utils.calculateWindAngle(baseCourse, baseWindDir);
-    const { crosswind, headwind: baseHeadwind } = Utils.calculateWindComponents(baseWindSpeedKt, baseWindAngle);
-    const wca = Utils.calculateWCA(crosswind, CANOPY_SPEED_KT) * (crosswind >= 0 ? 1 : -1);
-    const baseBearing = (baseCourse + wca + 360) % 360;
+    const { crosswind: baseCrosswind, headwind: baseHeadwind } = Utils.calculateWindComponents(baseWindSpeedKt, baseWindAngle);
+    const baseWca = Utils.calculateWCA(baseCrosswind, CANOPY_SPEED_KT) * (baseCrosswind >= 0 ? 1 : -1);
+    const baseBearing = (baseCourse - baseWca + 180) % 360;
     const baseTime = (LEG_HEIGHT_BASE - LEG_HEIGHT_FINAL) / DESCENT_RATE_MPS;
-    const baseGroundSpeedKt = Utils.calculateGroundSpeed(CANOPY_SPEED_KT, baseHeadwind);
+    const baseGroundSpeedKt = CANOPY_SPEED_KT + baseHeadwind;
     const baseLength = baseGroundSpeedKt * 1.852 / 3.6 * baseTime;
     const baseEnd = calculateLegEndpoint(finalEnd[0], finalEnd[1], baseBearing, baseGroundSpeedKt, baseTime);
 
@@ -1427,7 +1440,8 @@ function updateLandingPattern() {
     }
     const downwindCourse = effectiveLandingWindDir;
     const downwindWindAngle = Utils.calculateWindAngle(downwindCourse, downwindWindDir);
-    let { headwind: downwindHeadwind } = Utils.calculateWindComponents(downwindWindSpeedKt, downwindWindAngle);
+    const { crosswind: downwindCrosswind, headwind: downwindHeadwind } = Utils.calculateWindComponents(downwindWindSpeedKt, downwindWindAngle);
+    const downwindWca = Utils.calculateWCA(downwindCrosswind, CANOPY_SPEED_KT) * (downwindCrosswind >= 0 ? 1 : -1);
     const downwindGroundSpeedKt = CANOPY_SPEED_KT + downwindHeadwind; // Corrected to use raw headwind
     const downwindTime = (LEG_HEIGHT_DOWNWIND - LEG_HEIGHT_BASE) / DESCENT_RATE_MPS;
     const downwindLength = downwindGroundSpeedKt * 1.852 / 3.6 * downwindTime;
@@ -1465,9 +1479,9 @@ function updateLandingPattern() {
     }).addTo(map);
 
     console.log(`Landing Pattern Updated:
-        Final Leg: [${lat.toFixed(4)}, ${lng.toFixed(4)}] to [${finalEnd[0].toFixed(4)}, ${finalEnd[1].toFixed(4)}], Wind: ${finalWindDir.toFixed(1)}° @ ${finalWindSpeedKt.toFixed(1)}kt, GS: ${finalGroundSpeedKt.toFixed(1)}kt, Length: ${finalLength.toFixed(1)}m
-        Base Leg: [${finalEnd[0].toFixed(4)}, ${finalEnd[1].toFixed(4)}] to [${baseEnd[0].toFixed(4)}, ${baseEnd[1].toFixed(4)}], Wind: ${baseWindDir.toFixed(1)}° @ ${baseWindSpeedKt.toFixed(1)}kt, WCA: ${wca.toFixed(1)}°, , Length: ${baseLength.toFixed(1)}m
-        Downwind Leg: [${baseEnd[0].toFixed(4)}, ${baseEnd[1].toFixed(4)}] to [${downwindEnd[0].toFixed(4)}, ${downwindEnd[1].toFixed(4)}], Wind: ${downwindWindDir.toFixed(1)}° @ ${downwindWindSpeedKt.toFixed(1)}kt, GS: ${downwindGroundSpeedKt.toFixed(1)}kt, Length: ${downwindLength.toFixed(1)}m`);
+        Final Leg: Wind: ${finalWindDir.toFixed(1)}° @ ${finalWindSpeedKt.toFixed(1)}kt, Course: ${finalCourse.toFixed(1)}°, WCA: ${finalWca.toFixed(1)}°, GS: ${finalGroundSpeedKt.toFixed(1)}kt, HW: ${finalHeadwind.toFixed(1)}kt, Length: ${finalLength.toFixed(1)}m
+        Base Leg: Wind: ${baseWindDir.toFixed(1)}° @ ${baseWindSpeedKt.toFixed(1)}kt, Course: ${baseCourse.toFixed(1)}°, WCA: ${baseWca.toFixed(1)}°, GS: ${baseGroundSpeedKt.toFixed(1)}kt, HW: ${baseHeadwind.toFixed(1)}kt, Length: ${baseLength.toFixed(1)}m
+        Downwind Leg: Wind: ${downwindWindDir.toFixed(1)}° @ ${downwindWindSpeedKt.toFixed(1)}kt, Course: ${downwindCourse.toFixed(1)}°, WCA: ${downwindWca.toFixed(1)}°, GS: ${downwindGroundSpeedKt.toFixed(1)}kt, HW: ${downwindHeadwind.toFixed(1)}kt, Length: ${downwindLength.toFixed(1)}m`);
 
     map.fitBounds([[lat, lng], finalEnd, baseEnd, downwindEnd], { padding: [50, 50] });
 }

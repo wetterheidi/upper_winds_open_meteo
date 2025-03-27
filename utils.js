@@ -336,6 +336,43 @@ class Utils {
         return trueAirspeed - headwind;
     }
 
+    static calculateCourseFromHeading(trueHeading, windDirection, windSpeed, trueAirspeed) {
+        // Wind angle relative to heading
+        const windAngle = Utils.calculateWindAngle(trueHeading, windDirection);
+        const { crosswind, headwind } = Utils.calculateWindComponents(windSpeed, windAngle);
+    
+        // TAS vector
+        const tasU = trueAirspeed * Math.sin(trueHeading * Math.PI / 180);
+        const tasV = trueAirspeed * Math.cos(trueHeading * Math.PI / 180);
+    
+        // Wind vector (direction wind is going *to*)
+        const windTo = (windDirection + 180) % 360;
+        const windU = windSpeed * Math.sin(windTo * Math.PI / 180);
+        const windV = windSpeed * Math.cos(windTo * Math.PI / 180);
+    
+        // Ground speed vector
+        const gsU = tasU + windU;
+        const gsV = tasV + windV;
+    
+        // True Course
+        const trueCourse = Math.atan2(gsU, gsV) * (180 / Math.PI);
+        const normalizedCourse = Utils.normalizeAngle(trueCourse);
+    
+        // Ground Speed
+        const groundSpeed = Math.sqrt(gsU * gsU + gsV * gsV);
+    
+        // WCA (for reference)
+        const wca = Utils.calculateWCA(crosswind, trueAirspeed) * (crosswind < 0 ? -1 : 1);
+    
+        return {
+            trueCourse: Number(normalizedCourse.toFixed(2)),
+            groundSpeed: Number(groundSpeed.toFixed(2)),
+            wca: Number(wca.toFixed(2)),
+            crosswind: Number(crosswind.toFixed(2)),
+            headwind: Number(headwind.toFixed(2))
+        };
+    }
+
     /**
      * Main function to calculate flight parameters
      */
