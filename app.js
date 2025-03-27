@@ -1308,12 +1308,16 @@ function updateLandingPattern() {
     // Add a fat light green arrow in the middle of the final leg pointing to landing direction
     const midLat = (lat + finalEnd[0]) / 2;
     const midLng = (lng + finalEnd[1]) / 2;
-    const arrowBearing = effectiveLandingWindDir; // Points toward landing direction
+    const arrowBearing = effectiveLandingWindDir - 90; // Points toward landing direction
 
     // Create a custom arrow icon using Leaflet’s DivIcon
     const arrowIcon = L.divIcon({
         className: 'custom-arrow',
-        html: `<div style="width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent; border-bottom: 30px solid lightgreen; transform: rotate(${arrowBearing}deg); transform-origin: center;"></div>`,
+        html: `
+        <svg width="40" height="20" viewBox="0 0 40 20" style="transform: rotate(${arrowBearing}deg); transform-origin: center;">
+            <line x1="0" y1="10" x2="30" y2="10" stroke="lightgreen" stroke-width="4" />
+            <polygon points="30,5 40,10 30,15" fill="lightgreen" />
+        </svg>`,
         iconSize: [30, 30], // Size of the arrow
         iconAnchor: [15, 15] // Center the arrow
     });
@@ -1740,35 +1744,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const baseVal = parseInt(base.value) || 200;
         const downwindVal = parseInt(downwind.value) || 300;
 
-        if (baseVal <= finalVal) {
-            Utils.handleError('Base leg height must be greater than final leg height.');
+        if (baseVal <= finalVal && baseVal >= downwindVal) {
+            Utils.handleError('Base leg must start higher than final leg and lower than downwind leg.');
             return false;
         }
         if (downwindVal <= baseVal) {
-            Utils.handleError('Downwind leg height must be greater than base leg height.');
+            Utils.handleError('Downwind leg must start than base leg.');
             return false;
         }
         return true;
-    }
-
-    // Final Leg Height Input
-    if (legHeightFinalInput) {
-        legHeightFinalInput.addEventListener('input', debounce(() => {
-            const value = parseInt(legHeightFinalInput.value);
-            if (!isNaN(value) && value >= 50 && value <= 1000) {
-                console.log('Final leg height updated:', value);
-                if (validateLegHeights(legHeightFinalInput, legHeightBaseInput, legHeightDownwindInput)) {
-                    if (weatherData && lastLat && lastLng) {
-                        updateLandingPattern();
-                        recenterMap();
-                    }
-                } else {
-                    legHeightFinalInput.value = Math.min(legHeightBaseInput.value - 1, 100); // Adjust to valid value
-                }
-            } else {
-                Utils.handleError('Final leg height must be between 50 and 1000 meters.');
-            }
-        }, 300));
     }
 
     // Final Leg Height Input
