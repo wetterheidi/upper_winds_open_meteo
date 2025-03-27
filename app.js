@@ -1218,11 +1218,23 @@ function calculateMeanWind() {
     lowerLimitInput = heightUnit === 'ft' ? lowerLimitInput / 3.28084 : lowerLimitInput;
     upperLimitInput = heightUnit === 'ft' ? upperLimitInput / 3.28084 : upperLimitInput;
 
+    if ((refLevel === 'AMSL') && lowerLimitInput < baseHeight) {
+        Utils.handleError(`Lower limit adjusted to terrain altitude (${baseHeight} m ${refLevel}) as it cannot be below ground level in ${refLevel} mode.`);
+        lowerLimitInput = baseHeight;
+        document.getElementById('lowerLimit').value = Utils.convertHeight(lowerLimitInput, heightUnit);
+    }
+
     const lowerLimit = refLevel === 'AGL' ? lowerLimitInput + baseHeight : lowerLimitInput;
     const upperLimit = refLevel === 'AGL' ? upperLimitInput + baseHeight : upperLimitInput;
 
     if (isNaN(lowerLimitInput) || isNaN(upperLimitInput) || lowerLimitInput >= upperLimitInput) {
         Utils.handleError('Invalid layer limits. Ensure Lower < Upper and both are numbers.');
+        return;
+    }
+
+    // Check if interpolatedData is valid
+    if (!interpolatedData || interpolatedData.length === 0) {
+        Utils.handleError('No valid weather data available to calculate mean wind.');
         return;
     }
 
@@ -1881,7 +1893,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (upperLimitInput) {
         upperLimitInput.addEventListener('input', debounce(() => {
             userSettings.upperLimit = upperLimitInput.value;
-            saveSettings();s
+            saveSettings(); s
             console.log('Upper limit changed:', upperLimitInput.value);
             if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
                 calculateMeanWind();
