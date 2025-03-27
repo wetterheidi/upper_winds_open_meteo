@@ -8,6 +8,7 @@ let lastModelRun = null;
 let landingPatternPolygon = null;
 let secondlandingPatternPolygon = null;
 let thirdLandingPatternLine = null;
+let landingArrow = null;
 let landingWindDir = null;
 
 
@@ -1101,7 +1102,7 @@ function updateLandingPattern() {
     const LEG_HEIGHT_DOWNWIND = parseInt(document.getElementById('legHeightDownwind').value) || 300;
 
     // Remove existing layers
-    [landingPatternPolygon, secondlandingPatternPolygon, thirdLandingPatternLine].forEach(layer => {
+    [landingPatternPolygon, secondlandingPatternPolygon, thirdLandingPatternLine, landingArrow].forEach(layer => {
         if (layer) {
             layer.remove();
             layer = null;
@@ -1181,6 +1182,29 @@ function updateLandingPattern() {
         weight: 3,
         opacity: 0.8,
         dashArray: '5, 10'
+    }).addTo(map);
+
+    // Add a fat light green arrow in the middle of the final leg pointing to landing direction
+    const midLat = (lat + finalEnd[0]) / 2;
+    const midLng = (lng + finalEnd[1]) / 2;
+    const arrowBearing = effectiveLandingWindDir -90; // Points toward landing direction
+
+    // Create a custom arrow icon using Leaflet’s DivIcon
+    const arrowIcon = L.divIcon({
+        className: 'custom-arrow',
+        html: `
+        <svg width="40" height="20" viewBox="0 0 40 20" style="transform: rotate(${arrowBearing}deg); transform-origin: center;">
+            <line x1="0" y1="10" x2="30" y2="10" stroke="lightgreen" stroke-width="4" />
+            <polygon points="30,5 40,10 30,15" fill="lightgreen" />
+        </svg>
+    `,        iconAnchor: [15, 15] // Center the arrow
+    });
+
+    // Place the arrow at the midpoint
+    landingArrow = L.marker([midLat, midLng], {
+        icon: arrowIcon,
+        rotationAngle: arrowBearing, // This ensures proper rotation if using a marker
+        rotationOrigin: 'center center'
     }).addTo(map);
 
     // Base Leg (100-200m AGL)
