@@ -319,6 +319,47 @@ function initMap() {
             document.getElementById('info').innerHTML = `No models available.`;
         }
     }
+    // Create a custom Leaflet control
+    L.Control.Coordinates = L.Control.extend({
+        options: {
+            position: 'bottomleft' // Places it in the bottom-left corner
+        },
+        onAdd: function (map) {
+            var container = L.DomUtil.create('div', 'leaflet-control-coordinates');
+            container.style.background = 'rgba(255, 255, 255, 0.6)';
+            container.style.padding = '5px';
+            container.style.borderRadius = '4px';
+            container.style.boxShadow = '0 2px 5px rgba(0, 0, 0, 0.2)';
+            container.innerHTML = 'Move mouse over map';
+            return container;
+        }
+    });
+
+    // Add the control to the map
+    var coordsControl = new L.Control.Coordinates();
+    coordsControl.addTo(map);
+
+    // Update coordinates on mousemove
+    map.on('mousemove', function (e) {
+        const coordFormat = getCoordinateFormat();
+        if (coordFormat === 'MGRS') {
+            // Ensure numeric input by parsing the strings from toFixed
+            const lat = parseFloat(e.latlng.lat.toFixed(4));
+            const lng = parseFloat(e.latlng.lng.toFixed(4));
+            var mgrs = Utils.decimalToMgrs(lat, lng);
+            coordsControl.getContainer().innerHTML = `MGRS: ${mgrs}`;
+        } else {
+            var lat = e.latlng.lat.toFixed(5);
+            var lng = e.latlng.lng.toFixed(5);
+            coordsControl.getContainer().innerHTML = `Lat: ${lat}, Lng: ${lng}`;
+        }
+    });
+
+    // Reset text on mouseout
+    map.on('mouseout', function () {
+        coordsControl.getContainer().innerHTML = 'Move mouse over map';
+    });
+
 
     // Map click event for placing new marker
     map.on('click', async (e) => {
@@ -326,17 +367,17 @@ function initMap() {
         lastLat = lat;
         lastLng = lng;
         lastAltitude = await getAltitude(lat, lng);
-    
+
         // Remove existing marker and create a new one
         if (currentMarker) currentMarker.remove();
         currentMarker = L.marker([lat, lng], {
             icon: customIcon,
             draggable: true
         }).addTo(map);
-    
+
         // Update popup for the new marker
         updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
-    
+
         // Add dragend event for the new marker
         currentMarker.on('dragend', async (e) => {
             const marker = e.target;
@@ -344,14 +385,14 @@ function initMap() {
             lastLat = position.lat;
             lastLng = position.lng;
             lastAltitude = await getAltitude(lastLat, lastLng);
-    
+
             updateMarkerPopup(marker, lastLat, lastLng, lastAltitude);
             recenterMap();
-    
+
             const slider = document.getElementById('timeSlider');
             const currentIndex = parseInt(slider.value) || 0;
             const currentTime = weatherData?.time?.[currentIndex] || null;
-    
+
             document.getElementById('info').innerHTML = `Fetching weather and models...`;
             const availableModels = await checkAvailableModels(lastLat, lastLng);
             if (availableModels.length > 0) {
@@ -363,14 +404,14 @@ function initMap() {
                 document.getElementById('info').innerHTML = `No models available.`;
             }
         });
-    
+
         recenterMap();
-    
+
         // Preserve the current slider time before fetching new data
         const slider = document.getElementById('timeSlider');
         const currentIndex = parseInt(slider.value) || 0;
         const currentTime = weatherData?.time?.[currentIndex] || null;
-    
+
         document.getElementById('info').innerHTML = `Fetching weather and models...`;
         const availableModels = await checkAvailableModels(lat, lng);
         if (availableModels.length > 0) {
@@ -1267,7 +1308,7 @@ function updateLandingPattern() {
     // Add a fat blue arrow in the middle of the final leg pointing to landing direction
     const finalMidLat = (lat + finalEnd[0]) / 2;
     const finalMidLng = (lng + finalEnd[1]) / 2;
-    const finalArrowBearing = (finalWindDir -90 + 180) % 360; // Points in direction of the mean wind at final
+    const finalArrowBearing = (finalWindDir - 90 + 180) % 360; // Points in direction of the mean wind at final
 
     // Create a custom arrow icon using Leaflet’s DivIcon
     const finalArrowIcon = L.divIcon({
@@ -1329,7 +1370,7 @@ function updateLandingPattern() {
     // Add a fat blue arrow in the middle of the base leg pointing to landing direction
     const baseMidLat = (finalEnd[0] + baseEnd[0]) / 2;
     const baseMidLng = (finalEnd[1] + baseEnd[1]) / 2;
-    const baseArrowBearing = (baseWindDir -90 + 180) % 360; // Points in direction of the mean wind at base
+    const baseArrowBearing = (baseWindDir - 90 + 180) % 360; // Points in direction of the mean wind at base
 
     // Create a custom arrow icon using Leaflet’s DivIcon
     const baseArrowIcon = L.divIcon({
@@ -1388,7 +1429,7 @@ function updateLandingPattern() {
     // Add a fat blue arrow in the middle of the downwind leg pointing to landing direction
     const downwindMidLat = (baseEnd[0] + downwindEnd[0]) / 2;
     const downwindMidLng = (baseEnd[1] + downwindEnd[1]) / 2;
-    const downwindArrowBearing = (downwindWindDir -90 + 180) % 360; // Points in direction of the mean wind at downwind
+    const downwindArrowBearing = (downwindWindDir - 90 + 180) % 360; // Points in direction of the mean wind at downwind
 
     // Create a custom arrow icon using Leaflet’s DivIcon
     const downwindArrowIcon = L.divIcon({
