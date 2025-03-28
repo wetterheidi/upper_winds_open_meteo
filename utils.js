@@ -25,7 +25,7 @@ class Utils {
         if (isNaN(numericValue)) {
             return 'N/A';
         }
-        return toUnit === 'ft' ? value * 3.28084 : value; // m to ft or unchanged if m
+        return toUnit === 'ft' ? (value * 3.28084).toFixed(0) : value; // m to ft or unchanged if m
     }
 
     static convertWind(value, toUnit, fromUnit = 'km/h') {

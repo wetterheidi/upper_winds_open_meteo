@@ -1715,20 +1715,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Existing hamburger menu event listeners (unchanged)
     if (hamburgerBtn && menu) {
+        // Toggle main menu
         hamburgerBtn.addEventListener('click', () => menu.classList.toggle('hidden'));
-        const menuItems = menu.querySelectorAll('li > span');
+    
+        // Select all <span> elements with a following submenu
+        const menuItems = menu.querySelectorAll('span');
         menuItems.forEach(item => {
             item.addEventListener('click', (e) => {
                 const submenu = item.nextElementSibling;
                 if (submenu && submenu.classList.contains('submenu')) {
                     submenu.classList.toggle('hidden');
+                    // Close other submenus, but not ancestors of the current submenu
                     menu.querySelectorAll('.submenu').forEach(other => {
-                        if (other !== submenu && !other.classList.contains('hidden')) other.classList.add('hidden');
+                        const isAncestor = other.contains(item); // Check if 'other' is an ancestor of the clicked <span>
+                        if (other !== submenu && !isAncestor && !other.classList.contains('hidden')) {
+                            other.classList.add('hidden');
+                        }
                     });
                 }
                 e.stopPropagation();
             });
         });
+    
+        // Close all submenus when clicking outside
         document.addEventListener('click', (e) => {
             if (!menu.contains(e.target) && !hamburgerBtn.contains(e.target)) {
                 menu.querySelectorAll('.submenu').forEach(submenu => submenu.classList.add('hidden'));

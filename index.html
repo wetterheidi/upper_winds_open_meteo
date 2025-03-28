@@ -29,117 +29,122 @@
                 </label>
             </li>
             <li>
-                <span>Reference Level</span>
+                <span>Settings</span>
                 <ul class="submenu hidden">
                     <li>
-                        <label class="radio-label">
-                            <input type="radio" name="refLevel" value="AGL" checked> AGL
-                        </label>
+                        <span>Reference Level</span>
+                        <ul class="submenu hidden">
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="refLevel" value="AGL" checked> AGL
+                                </label>
+                            </li>
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="refLevel" value="AMSL"> AMSL
+                                </label>
+                            </li>
+                        </ul>
                     </li>
                     <li>
-                        <label class="radio-label">
-                            <input type="radio" name="refLevel" value="AMSL"> AMSL
-                        </label>
+                        <span>Height Unit</span>
+                        <ul class="submenu hidden">
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="heightUnit" value="m" checked> m
+                                </label>
+                            </li>
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="heightUnit" value="ft"> ft
+                                </label>
+                            </li>
+                        </ul>
+                    </li>
+                    <li>
+                        <span>Temperature Unit</span>
+                        <ul class="submenu hidden">
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="temperatureUnit" value="C" checked> C
+                                </label>
+                            </li>
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="temperatureUnit" value="F"> F
+                                </label>
+                            </li>
+                        </ul>
+                    </li>
+                    <li>
+                        <span>Wind Unit</span>
+                        <ul class="submenu hidden">
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="windUnit" value="kt" checked> kt
+                                </label>
+                            </li>
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="windUnit" value="km/h"> km/h
+                                </label>
+                            </li>
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="windUnit" value="m/s"> m/s
+                                </label>
+                            </li>
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="windUnit" value="mph"> mph
+                                </label>
+                            </li>
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="windUnit" value="bft"> bft
+                                </label>
+                            </li>
+                        </ul>
+                    </li>
+                    <li>
+                        <span>Time Zone</span>
+                        <ul class="submenu hidden">
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="timeZone" value="Z" checked> Z
+                                </label>
+                            </li>
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="timeZone" value="loc"> loc
+                                </label>
+                            </li>
+                        </ul>
+                    </li>
+                    <li>
+                        <span>Coordinate Format</span>
+                        <ul class="submenu hidden">
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="coordFormat" value="Decimal" checked> Decimal Degrees
+                                </label>
+                            </li>
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="coordFormat" value="DMS"> Degrees Minutes Seconds
+                                </label>
+                            </li>
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="coordFormat" value="MGRS"> MGRS
+                                </label>
+                            </li>
+                        </ul>
                     </li>
                 </ul>
             </li>
             <li>
-                <span>Height Unit</span>
-                <ul class="submenu hidden">
-                    <li>
-                        <label class="radio-label">
-                            <input type="radio" name="heightUnit" value="m" checked> m
-                        </label>
-                    </li>
-                    <li>
-                        <label class="radio-label">
-                            <input type="radio" name="heightUnit" value="ft"> ft
-                        </label>
-                    </li>
-                </ul>
-            </li>
-            <li>
-                <span>Temperature Unit</span>
-                <ul class="submenu hidden">
-                    <li>
-                        <label class="radio-label">
-                            <input type="radio" name="temperatureUnit" value="C" checked> C
-                        </label>
-                    </li>
-                    <li>
-                        <label class="radio-label">
-                            <input type="radio" name="temperatureUnit" value="F"> F
-                        </label>
-                    </li>
-                </ul>
-            </li>
-            <li>
-                <span>Wind Unit</span>
-                <ul class="submenu hidden">
-                    <li>
-                        <label class="radio-label">
-                            <input type="radio" name="windUnit" value="kt" checked> kt
-                        </label>
-                    </li>
-                    <li>
-                        <label class="radio-label">
-                            <input type="radio" name="windUnit" value="km/h"> km/h
-                        </label>
-                    </li>
-                    <li>
-                        <label class="radio-label">
-                            <input type="radio" name="windUnit" value="m/s"> m/s
-                        </label>
-                    </li>
-                    <li>
-                        <label class="radio-label">
-                            <input type="radio" name="windUnit" value="mph"> mph
-                        </label>
-                    </li>
-                    <li>
-                        <label class="radio-label">
-                            <input type="radio" name="windUnit" value="bft"> bft
-                        </label>
-                    </li>
-                </ul>
-            </li>
-            <li>
-                <span>Time zone</span>
-                <ul class="submenu hidden">
-                    <li>
-                        <label class="radio-label">
-                            <input type="radio" name="timeZone" value="Z" checked> Z
-                        </label>
-                    </li>
-                    <li>
-                        <label class="radio-label">
-                            <input type="radio" name="timeZone" value="loc"> loc
-                        </label>
-                    </li>
-                </ul>
-            </li>
-            <li>
-                <span>Coordinate Format</span>
-                <ul class="submenu hidden">
-                    <li>
-                        <label class="radio-label">
-                            <input type="radio" name="coordFormat" value="Decimal" checked> Decimal Degrees
-                        </label>
-                    </li>
-                    <li>
-                        <label class="radio-label">
-                            <input type="radio" name="coordFormat" value="DMS"> Degrees Minutes Seconds
-                        </label>
-                    </li>
-                    <li>
-                        <label class="radio-label">
-                            <input type="radio" name="coordFormat" value="MGRS"> MGRS
-                        </label>
-                    </li>
-                </ul>
-            </li>
-            <li>
-                <span> Canopy Parameters </span>
+                <span>Canopy Parameters</span>
                 <ul class="submenu hidden">
                     <li>
                         <label class="radio-label">
@@ -174,7 +179,6 @@
                             <label>°</label>
                         </label>
                     </li>
-                    <!-- Add new inputs for leg heights -->
                     <li>
                         <label class="radio-label">
                             Start Downwind Leg at m AGL:
