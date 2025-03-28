@@ -577,7 +577,7 @@ async function fetchWeather(lat, lon, currentTime = null) {
             'icon_eu': 'dwd_icon_eu',
             'icon_d2': 'dwd_icon_d2',
             'ecmwf_ifs025': 'ecmwf_ifs025',
-            'ecmwf_aifs025': 'ecmwf_aifs025_single',
+            'ecmwf_aifs025': 'ecmwf_aifs025_single', // Note: should this be 'ecmwf_aifs025'?
             'gfs_seamless': 'ncep_gfs013',
             'gfs_global': 'ncep_gfs025',
             'gfs_hrrr': 'ncep_hrrr_conus',
@@ -588,9 +588,15 @@ async function fetchWeather(lat, lon, currentTime = null) {
         const model = modelMap[modelSelect.value] || modelSelect.value;
 
         // Fetch model run time
+        console.log('Fetching meta for model:', model);
         const metaResponse = await fetch(`https://api.open-meteo.com/data/${model}/static/meta.json`);
-        if (!metaResponse.ok) throw new Error(`Meta fetch failed: ${metaResponse.status}`);
+        if (!metaResponse.ok) {
+            const errorText = await metaResponse.text();
+            console.error('Meta fetch failed:', metaResponse.status, errorText);
+            throw new Error(`Meta fetch failed: ${metaResponse.status} - ${errorText}`);
+        }
         const metaData = await metaResponse.json();
+        console.log('Meta data:', metaData);
 
         const runDate = new Date(metaData.last_run_initialisation_time * 1000);
         const utcNow = new Date(Date.UTC(
@@ -662,11 +668,20 @@ async function fetchWeather(lat, lon, currentTime = null) {
 
         if (!response.ok) {
             const errorText = await response.text();
+            console.error('Weather fetch failed:', response.status, errorText);
             throw new Error(`HTTP error! Status: ${response.status} - ${errorText}`);
         }
 
         const data = await response.json();
         console.log('Raw API Response:', data);
+        console.log('Raw ECMWF API Response:', data.hourly);
+
+        // Check if hourly data exists
+        if (!data.hourly || !data.hourly.time) {
+            console.error('No hourly data in response:', data);
+            throw new Error('No hourly data returned from API');
+        }
+
         const targetIndex = 0;
         const firstTime = data.hourly.time[targetIndex];
         console.log(`Using first available time (UTC): ${firstTime} at index: ${targetIndex}`);
@@ -678,7 +693,9 @@ async function fetchWeather(lat, lon, currentTime = null) {
         for (let i = data.hourly.time.length - 1; i >= 0; i--) {
             const surfaceValid = criticalSurfaceVars.every(variable => {
                 const value = data.hourly[variable]?.[i];
-                return value !== null && value !== undefined && !isNaN(value);
+                const isValid = value !== null && value !== undefined && !isNaN(value);
+                if (!isValid) console.log(`Missing or invalid ${variable} at index ${i} for ${modelSelect.value}`);
+                return isValid;
             });
             if (!surfaceValid) {
                 lastValidIndex = i - 1;
@@ -770,11 +787,13 @@ async function fetchWeather(lat, lon, currentTime = null) {
         } || {};
 
         // Validate UTC
-        if (weatherData.time && weatherData.time.length > 0 && !weatherData.time[0].endsWith('Z')) {
+        /*if (weatherData.time && weatherData.time.length > 0 && !weatherData.time[0].endsWith('Z')) {
             console.warn('Weather data time not in UTC format:', weatherData.time[0]);
-        }
+        }*/
+        console.log('weatherData.wind_speed_1000hPa:', weatherData.wind_speed_1000hPa);
+        console.log('weatherData.wind_direction_1000hPa:', weatherData.wind_direction_1000hPa);
         console.log('WeatherData times (UTC):', weatherData.time.slice(0, 5));
-
+        console.log('Processed weatherData:', weatherData);
         // Log the filtered weatherData (unchanged logging code omitted for brevity)
 
         const slider = document.getElementById('timeSlider');
@@ -865,6 +884,8 @@ async function fetchWeather(lat, lon, currentTime = null) {
         weatherData = weatherData || {};
         document.getElementById('loading').style.display = 'none';
         console.error("Weather fetch error:", error);
+        console.error("Weather fetch error for ECMWF:", error);
+        Utils.handleError(`Could not load ECMWF weather data: ${error.message}`);
         Utils.handleError(`Could not load weather data: ${error.message}`);
         throw error;
     }
@@ -1020,9 +1041,13 @@ function interpolateWeatherData(index) {
         return [{ ...surfaceData, pressure: 'N/A', dew }];
     }
 
-    // Pressure interpolation setup
-    const pressureLevels = levels.map(l => parseInt(l.replace('hPa', ''))); // [200, 250, ..., 1000]
-    const pressureHeights = dataPoints.map(p => p.height); // Ascending order
+    // Pressure interpolation setup: Use only levels with valid data
+    const pressureLevels = dataPoints.map(p => parseInt(p.level.replace('hPa', ''))).reverse(); // e.g., [1000, 925, 850, 700, ...]
+    const pressureHeights = dataPoints.map(p => p.height); // Ascending order, matches pressureLevels
+
+    // Log for debugging
+    console.log('Pressure levels used:', pressureLevels);
+    console.log('Pressure heights used:', pressureHeights);
 
     // Prepare wind components for all pressure levels
     const uComponents = dataPoints.map(p =>
@@ -1082,124 +1107,12 @@ function interpolateWeatherData(index) {
             rh: rh ?? 'N/A'
         });
     }
-
-    return interpolated;
-} function interpolateWeatherData(index) {
-    if (!weatherData || !weatherData.time || lastAltitude === 'N/A') return [];
-
-    const heightUnit = getHeightUnit();
-    const temperatureUnit = getTemperatureUnit();
-    const windSpeedUnit = getWindSpeedUnit();
-    let step = parseInt(document.getElementById('interpStepSelect').value) || 200;
-    step = heightUnit === 'ft' ? step / 3.28084 : step;
-
-    const refLevel = document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL';
-    const baseHeight = Math.round(lastAltitude);
-    const surfaceHeight = refLevel === 'AGL' ? 0 : baseHeight;
-
-    // Surface data
-    const surfaceData = {
-        displayHeight: surfaceHeight,
-        height: baseHeight,
-        temp: weatherData.temperature_2m?.[index] ?? 'N/A',
-        rh: weatherData.relative_humidity_2m?.[index] ?? 'N/A',
-        dir: weatherData.wind_direction_10m?.[index] ?? 'N/A',
-        spd: Utils.convertWind(weatherData.wind_speed_10m?.[index], windSpeedUnit, 'km/h') ?? 'N/A',
-        spdKt: Utils.convertWind(weatherData.wind_speed_10m?.[index], 'kt', 'km/h') ?? 'N/A'
-    };
-
-    // Pre-filter valid pressure level data points
-    const levels = ['200hPa', '250hPa', '300hPa', '400hPa', '500hPa', '600hPa', '700hPa', '800hPa', '850hPa', '900hPa', '925hPa', '950hPa', '1000hPa'];
-    const dataPoints = levels
-        .map(level => {
-            const levelKey = level.replace(' ', '');
-            const gh = weatherData[`geopotential_height_${levelKey}`]?.[index];
-            if (gh === undefined || gh === null || isNaN(gh)) return null;
-            return {
-                level,
-                height: Math.round(gh),
-                temp: weatherData[`temperature_${levelKey}`]?.[index] ?? 'N/A',
-                rh: weatherData[`relative_humidity_${levelKey}`]?.[index] ?? 'N/A',
-                dir: weatherData[`wind_direction_${levelKey}`]?.[index] ?? 'N/A',
-                spd: Utils.convertWind(weatherData[`wind_speed_${levelKey}`]?.[index], windSpeedUnit, 'km/h') ?? 'N/A',
-                spdKt: Utils.convertWind(weatherData[`wind_speed_${levelKey}`]?.[index], 'kt', 'km/h') ?? 'N/A'
-            };
-        })
-        .filter(point => point !== null)
-        .sort((a, b) => a.height - b.height); // Ascending order
-
-    if (!dataPoints.length) {
-        const dew = Utils.calculateDewpoint(surfaceData.temp, surfaceData.rh) ?? 'N/A';
-        return [{ ...surfaceData, pressure: 'N/A', dew }];
-    }
-
-    // Pressure interpolation setup
-    const pressureLevels = levels.map(l => parseInt(l.replace('hPa', ''))).reverse(); // [1000, 950, ..., 200]
-    const pressureHeights = dataPoints.map(p => p.height); // Ascending order
-
-    // Prepare wind components for all pressure levels
-    const uComponents = dataPoints.map(p =>
-        p.spdKt === 'N/A' || p.dir === 'N/A' ? 'N/A' : -p.spdKt * Math.sin(p.dir * Math.PI / 180)
-    );
-    const vComponents = dataPoints.map(p =>
-        p.spdKt === 'N/A' || p.dir === 'N/A' ? 'N/A' : -p.spdKt * Math.cos(p.dir * Math.PI / 180)
-    );
-
-    // Start with surface data
-    const dewSurface = Utils.calculateDewpoint(surfaceData.temp, surfaceData.rh) ?? 'N/A';
-    const pressureSurface = Utils.interpolatePressure(surfaceData.height, pressureLevels, pressureHeights);
-    const interpolated = [{
-        ...surfaceData,
-        pressure: pressureSurface === 'N/A' ? 'N/A' : pressureSurface,
-        dew: dewSurface
-    }];
-
-    // Interpolate between valid points
-    const maxHeight = dataPoints[dataPoints.length - 1].height;
-    const heightRange = refLevel === 'AGL' ? maxHeight - baseHeight : maxHeight;
-
-    for (let hp = surfaceHeight + step; hp <= heightRange; hp += step) {
-        const actualHp = refLevel === 'AGL' ? hp + baseHeight : hp;
-        const lower = dataPoints.filter(p => p.height <= actualHp).pop();
-        const upper = dataPoints.find(p => p.height > actualHp);
-        if (!lower || !upper) continue;
-
-        // Temperature and humidity remain with Gaussian interpolation
-        const temp = Utils.gaussianInterpolation(lower.temp, upper.temp, lower.height, upper.height, actualHp);
-        const rh = Math.max(0, Math.min(100, Utils.gaussianInterpolation(lower.rh, upper.rh, lower.height, upper.height, actualHp)));
-
-        // Wind interpolation using interpolateWindAtAltitude
-        const wind = Utils.interpolateWindAtAltitude(actualHp, pressureLevels, pressureHeights, uComponents, vComponents);
-        let spdKt, spd, dir;
-        if (wind.u === 'Invalid input' || wind.v === 'Invalid input' || wind.u === 'Interpolation error' || wind.v === 'Interpolation error') {
-            spdKt = 'N/A';
-            spd = 'N/A';
-            dir = 'N/A';
-        } else {
-            spdKt = Utils.windSpeed(wind.u, wind.v);
-            spd = Utils.convertWind(spdKt, windSpeedUnit, 'kt');
-            dir = Utils.windDirection(wind.u, wind.v);
-        }
-
-        const dew = Utils.calculateDewpoint(temp, rh);
-        const pressure = Utils.interpolatePressure(actualHp, pressureLevels, pressureHeights);
-
-        interpolated.push({
-            height: actualHp,
-            displayHeight: refLevel === 'AGL' ? hp : actualHp,
-            pressure: pressure === 'N/A' ? 'N/A' : pressure,
-            temp: temp ?? 'N/A',
-            dew: dew ?? 'N/A',
-            dir: dir ?? 'N/A',
-            spd: spd ?? 'N/A',
-            rh: rh ?? 'N/A'
-        });
-    }
-
+    console.log('Interpolated result:', interpolated);
     return interpolated;
 }
 
 function calculateMeanWind() {
+    console.log('Calculating mean wind with model:', document.getElementById('modelSelect').value, 'weatherData:', weatherData);
     const index = document.getElementById('timeSlider').value || 0;
     const interpolatedData = interpolateWeatherData(index);
     let lowerLimitInput = parseFloat(document.getElementById('lowerLimit').value) || 0;
@@ -1625,26 +1538,26 @@ function displayError(message) {
 
 document.addEventListener('DOMContentLoaded', () => {
 
-     // Check if element exists 
-     const modelSelect = document.getElementById('modelSelect');
-     if (modelSelect) {
-         modelSelect.value = userSettings.model;
-     }
- 
-     // Sichere Aktualisierung der Radio Buttons
-     function setRadioValue(name, value) {
-         const radio = document.querySelector(`input[name="${name}"][value="${value}"]`);
-         if (radio) {
-             radio.checked = true;
-         } else {
-             console.warn(`Radio button ${name} with value ${value} not found`);
-         }
-     }
+    // Check if element exists 
+    const modelSelect = document.getElementById('modelSelect');
+    if (modelSelect) {
+        modelSelect.value = userSettings.model;
+    }
 
-     // Aktualisiere Radio Buttons sicher
+    // Sichere Aktualisierung der Radio Buttons
+    function setRadioValue(name, value) {
+        const radio = document.querySelector(`input[name="${name}"][value="${value}"]`);
+        if (radio) {
+            radio.checked = true;
+        } else {
+            console.warn(`Radio button ${name} with value ${value} not found`);
+        }
+    }
+
+    // Aktualisiere Radio Buttons sicher
     setRadioValue('refLevel', userSettings.refLevel);
     setRadioValue('heightUnit', userSettings.heightUnit);
-    setRadioValue('temperatureUnit', userSettings.temperatureUnit); 
+    setRadioValue('temperatureUnit', userSettings.temperatureUnit);
     setRadioValue('windUnit', userSettings.windUnit);
     setRadioValue('timeZone', userSettings.timeZone);
     setRadioValue('coordFormat', userSettings.coordFormat);
@@ -1665,7 +1578,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'lowerLimit': userSettings.lowerLimit,
         'upperLimit': userSettings.upperLimit
     };
-    
+
     Object.entries(elements).forEach(([id, value]) => {
         const element = document.getElementById(id);
         if (element) {
@@ -1774,10 +1687,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const currentTime = weatherData?.time?.[currentIndex] || null;
                 console.log('Model change triggered - new model:', modelSelect.value, 'currentTime:', currentTime);
                 document.getElementById('info').innerHTML = `Fetching weather with ${modelSelect.value}...`;
-                
+
                 // Await the fetchWeather call to ensure weatherData is updated
                 await fetchWeather(lastLat, lastLng, currentTime);
-                
+
                 console.log('Model fetch completed - new weatherData:', weatherData);
                 updateModelRunInfo();
                 await updateWeatherDisplay(slider.value); // Await to ensure display updates with new data
@@ -1936,7 +1849,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (upperLimitInput) {
         upperLimitInput.addEventListener('input', debounce(() => {
             userSettings.upperLimit = upperLimitInput.value;
-            saveSettings(); 
+            saveSettings();
             console.log('Upper limit changed:', upperLimitInput.value);
             if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
                 calculateMeanWind();

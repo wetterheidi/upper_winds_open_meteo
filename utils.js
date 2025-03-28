@@ -266,8 +266,8 @@ class Utils {
             if (!response.ok) throw new Error(`Open-Meteo fetch failed: ${response.status}`);
             const data = await response.json();
             const locationData = {
-                timezone: data.timezone || 'UTC', // Fallback to UTC
-                timezone_abbreviation: data.timezone_abbreviation || 'UTC', // Fallback to UTC
+                timezone: data.timezone || 'GMT', // Fallback to UTC
+                timezone_abbreviation: data.timezone_abbreviation || 'GMT', // Fallback to UTC
                 elevation: data.elevation !== undefined ? data.elevation : 'N/A'
             };
             Utils.locationCache.set(cacheKey, locationData);
