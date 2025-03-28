@@ -1767,21 +1767,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Existing modelSelect event listener (unchanged)
     if (modelSelect) {
-        modelSelect.addEventListener('change', () => {
-            userSettings.model = modelSelect.value;
-            saveSettings();
+        modelSelect.addEventListener('change', async () => { // Add async here
             if (lastLat && lastLng) {
                 const slider = document.getElementById('timeSlider');
                 const currentIndex = parseInt(slider.value) || 0;
                 const currentTime = weatherData?.time?.[currentIndex] || null;
                 console.log('Model change triggered - new model:', modelSelect.value, 'currentTime:', currentTime);
                 document.getElementById('info').innerHTML = `Fetching weather with ${modelSelect.value}...`;
-                fetchWeather(lastLat, lastLng, currentTime);
+                
+                // Await the fetchWeather call to ensure weatherData is updated
+                await fetchWeather(lastLat, lastLng, currentTime);
+                
                 console.log('Model fetch completed - new weatherData:', weatherData);
                 updateModelRunInfo();
-                updateWeatherDisplay(slider.value);
+                await updateWeatherDisplay(slider.value); // Await to ensure display updates with new data
                 updateReferenceLabels();
-                if (lastLat && lastLng && lastAltitude !== 'N/A') calculateMeanWind();
+                if (lastLat && lastLng && lastAltitude !== 'N/A') {
+                    calculateMeanWind(); // Now runs with the updated weatherData
+                }
+                userSettings.model = modelSelect.value;
+                saveSettings();
             } else {
                 Utils.handleError('Please select a position on the map first.');
             }
