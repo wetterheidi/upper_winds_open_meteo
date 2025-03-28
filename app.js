@@ -23,7 +23,7 @@ const defaultSettings = {
     timeZone: 'Z',
     coordFormat: 'Decimal',
     showTable: false,
-    showCanopyParameters: false,
+    //showCanopyParameters: false,
     canopySpeed: 20,
     descentRate: 3.5,
     showLandingPattern: false,
@@ -1624,43 +1624,81 @@ function displayError(message) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Apply saved settings to UI elements
-    document.getElementById('modelSelect').value = userSettings.model;
-    document.querySelector(`input[name="refLevel"][value="${userSettings.refLevel}"]`).checked = true;
-    document.querySelector(`input[name="heightUnit"][value="${userSettings.heightUnit}"]`).checked = true;
-    document.querySelector(`input[name="temperatureUnit"][value="${userSettings.temperatureUnit}"]`).checked = true;
-    document.querySelector(`input[name="windUnit"][value="${userSettings.windUnit}"]`).checked = true;
-    document.querySelector(`input[name="timeZone"][value="${userSettings.timeZone}"]`).checked = true;
-    document.querySelector(`input[name="coordFormat"][value="${userSettings.coordFormat}"]`).checked = true;
-    document.getElementById('showTableCheckbox').checked = userSettings.showTable;
-    document.getElementById('showCanopyParameters').checked = userSettings.showCanopyParameters;
-    document.getElementById('canopySpeed').value = userSettings.canopySpeed;
-    document.getElementById('descentRate').value = userSettings.descentRate;
-    document.getElementById('showLandingPattern').checked = userSettings.showLandingPattern;
-    document.querySelector(`input[name="landingDirection"][value="${userSettings.landingDirection}"]`).checked = true;
-    document.getElementById('customLandingDirectionLL').value = userSettings.customLandingDirectionLL;
-    document.getElementById('customLandingDirectionRR').value = userSettings.customLandingDirectionRR;
-    document.getElementById('legHeightDownwind').value = userSettings.legHeightDownwind;
-    document.getElementById('legHeightBase').value = userSettings.legHeightBase;
-    document.getElementById('legHeightFinal').value = userSettings.legHeightFinal;
-    document.getElementById('interpStepSelect').value = userSettings.interpStep;
-    document.getElementById('lowerLimit').value = userSettings.lowerLimit;
-    document.getElementById('upperLimit').value = userSettings.upperLimit;
 
-    // Initialize UI states based on settings
-    document.getElementById('info').style.display = userSettings.showTable ? 'block' : 'none';
-    const canopySubmenu = document.getElementById('showCanopyParameters').closest('li').querySelector('.submenu');
-    if (canopySubmenu) canopySubmenu.classList.toggle('hidden', !userSettings.showCanopyParameters);
-    const landingSubmenu = document.getElementById('showLandingPattern').closest('li').querySelector('.submenu');
-    if (landingSubmenu) landingSubmenu.classList.toggle('hidden', !userSettings.showLandingPattern);
-    document.getElementById('customLandingDirectionLL').disabled = userSettings.landingDirection !== 'LL';
-    document.getElementById('customLandingDirectionRR').disabled = userSettings.landingDirection !== 'RR';
+     // Check if element exists 
+     const modelSelect = document.getElementById('modelSelect');
+     if (modelSelect) {
+         modelSelect.value = userSettings.model;
+     }
+ 
+     // Sichere Aktualisierung der Radio Buttons
+     function setRadioValue(name, value) {
+         const radio = document.querySelector(`input[name="${name}"][value="${value}"]`);
+         if (radio) {
+             radio.checked = true;
+         } else {
+             console.warn(`Radio button ${name} with value ${value} not found`);
+         }
+     }
+
+     // Aktualisiere Radio Buttons sicher
+    setRadioValue('refLevel', userSettings.refLevel);
+    setRadioValue('heightUnit', userSettings.heightUnit);
+    setRadioValue('temperatureUnit', userSettings.temperatureUnit); 
+    setRadioValue('windUnit', userSettings.windUnit);
+    setRadioValue('timeZone', userSettings.timeZone);
+    setRadioValue('coordFormat', userSettings.coordFormat);
+    setRadioValue('landingDirection', userSettings.landingDirection);
+
+    // Sichere Aktualisierung der anderen Elemente
+    const elements = {
+        'showTableCheckbox': userSettings.showTable,
+        'canopySpeed': userSettings.canopySpeed,
+        'descentRate': userSettings.descentRate,
+        'showLandingPattern': userSettings.showLandingPattern,
+        'customLandingDirectionLL': userSettings.customLandingDirectionLL,
+        'customLandingDirectionRR': userSettings.customLandingDirectionRR,
+        'legHeightDownwind': userSettings.legHeightDownwind,
+        'legHeightBase': userSettings.legHeightBase,
+        'legHeightFinal': userSettings.legHeightFinal,
+        'interpStepSelect': userSettings.interpStep,
+        'lowerLimit': userSettings.lowerLimit,
+        'upperLimit': userSettings.upperLimit
+    };
+    
+    Object.entries(elements).forEach(([id, value]) => {
+        const element = document.getElementById(id);
+        if (element) {
+            if (typeof value === 'boolean') {
+                element.checked = value;
+            } else {
+                element.value = value;
+            }
+        } else {
+            console.warn(`Element with id ${id} not found`);
+        }
+    });
+
+    // UI Status basierend auf Einstellungen initialisieren
+    const info = document.getElementById('info');
+    if (info) {
+        info.style.display = userSettings.showTable ? 'block' : 'none';
+    }
+
+    const landingSubmenu = document.getElementById('showLandingPattern')?.closest('li')?.querySelector('.submenu');
+    if (landingSubmenu) {
+        landingSubmenu.classList.toggle('hidden', !userSettings.showLandingPattern);
+    }
+
+    const customLL = document.getElementById('customLandingDirectionLL');
+    const customRR = document.getElementById('customLandingDirectionRR');
+    if (customLL) customLL.disabled = userSettings.landingDirection !== 'LL';
+    if (customRR) customRR.disabled = userSettings.landingDirection !== 'RR';
 
     console.log('DOM fully loaded, initializing map...');
     initMap();
 
     const slider = document.getElementById('timeSlider');
-    const modelSelect = document.getElementById('modelSelect');
     const downloadButton = document.getElementById('downloadButton');
     const hamburgerBtn = document.getElementById('hamburgerBtn');
     const menu = document.getElementById('menu');
@@ -1680,7 +1718,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const legHeightFinalInput = document.getElementById('legHeightFinal');
     const legHeightBaseInput = document.getElementById('legHeightBase');
     const legHeightDownwindInput = document.getElementById('legHeightDownwind');
-    const showCanopyParametersCheckbox = document.getElementById('showCanopyParameters');
+    //const showCanopyParametersCheckbox = document.getElementById('showCanopyParameters');
     const canopySpeedInput = document.getElementById('canopySpeed');
     const descentRateInput = document.getElementById('descentRate');
 
@@ -2100,28 +2138,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 legHeightDownwindInput.value = 300; // Reset to default
             }
         });
-    }
-
-
-
-    if (showCanopyParametersCheckbox) {
-        showCanopyParametersCheckbox.addEventListener('change', function () {
-            userSettings.showCanopyParameters = this.checked;
-            saveSettings();
-            const submenu = this.parentElement.nextElementSibling;
-            if (this.checked) {
-                submenu.classList.remove('hidden');
-            } else {
-                submenu.classList.add('hidden');
-            }
-        });
-        // Trigger initial state
-        const submenu = showCanopyParametersCheckbox.parentElement.nextElementSibling;
-        if (showCanopyParametersCheckbox.checked) {
-            submenu.classList.remove('hidden');
-        } else {
-            submenu.classList.add('hidden');
-        }
     }
 
     if (canopySpeedInput) {
