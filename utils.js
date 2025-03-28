@@ -140,16 +140,24 @@ class Utils {
 
     // Interpolate pressure based on height and pressure levels
     static interpolatePressure(height, pressureLevels, heights) {
-        if (pressureLevels.length !== heights.length) return 'N/A';
+        if (!pressureLevels || !heights || pressureLevels.length !== heights.length || pressureLevels.length < 2) {
+            return 'N/A';
+        }
     
-        // Assume pressureLevels is in descending order (1000 to 200) and heights is ascending
-        const logPressures = pressureLevels.map(p => Math.log(p));
-        const logPressure = Utils.LIP(heights, logPressures, height);
-        if (typeof logPressure === 'string' && logPressure.includes('error')) return 'N/A';
+        // Assume pressures and heights are already paired correctly (heights ascending, pressures ascending)
+        if (height < heights[0] || height > heights[heights.length - 1]) {
+            return 'N/A'; // No extrapolation
+        }
     
-        const pressure = Math.exp(logPressure);
-        return pressure <= 0 || pressure > 1013 ? 'N/A' : pressure;
-    }
+        for (let i = 0; i < heights.length - 1; i++) {
+            if (height >= heights[i] && height <= heights[i + 1]) {
+                const h0 = heights[i], h1 = heights[i + 1];
+                const p0 = pressureLevels[i], p1 = pressureLevels[i + 1];
+                return p0 + (p1 - p0) * (height - h0) / (h1 - h0);
+            }
+        }
+        return 'N/A';
+    };
 
     // Linear interpolation (LIP)
     static LIP(xVector, yVector, xValue) {

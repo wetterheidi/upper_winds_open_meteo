@@ -40,6 +40,7 @@ const defaultSettings = {
 
 // Load settings from localStorage or use defaults
 let userSettings = JSON.parse(localStorage.getItem('upperWindsSettings')) || { ...defaultSettings };
+console.log(userSettings);
 
 // Function to save settings to localStorage
 function saveSettings() {
@@ -1042,12 +1043,12 @@ function interpolateWeatherData(index) {
     }
 
     // Pressure interpolation setup: Use only levels with valid data
-    const pressureLevels = dataPoints.map(p => parseInt(p.level.replace('hPa', ''))).reverse(); // e.g., [1000, 925, 850, 700, ...]
-    const pressureHeights = dataPoints.map(p => p.height); // Ascending order, matches pressureLevels
+    const pressureLevels = dataPoints.map(p => parseInt(p.level.replace('hPa', ''))); // Ascending: [200, 250, ..., 1000]
+    const pressureHeights = dataPoints.map(p => p.height); // Ascending: [11720, 10323, ..., 141]
 
     // Log for debugging
-    console.log('Pressure levels used:', pressureLevels);
-    console.log('Pressure heights used:', pressureHeights);
+    console.log('Pressure levels:', pressureLevels);
+    console.log('Pressure heights:', pressureHeights);
 
     // Prepare wind components for all pressure levels
     const uComponents = dataPoints.map(p =>
@@ -1062,7 +1063,7 @@ function interpolateWeatherData(index) {
     const pressureSurface = Utils.interpolatePressure(surfaceData.height, pressureLevels, pressureHeights);
     const interpolated = [{
         ...surfaceData,
-        pressure: pressureSurface === 'N/A' ? 'N/A' : pressureSurface,
+        pressure: pressureSurface === 'N/A' ? 'N/A' : pressureSurface.toFixed(1),
         dew: dewSurface
     }];
 
@@ -1076,11 +1077,9 @@ function interpolateWeatherData(index) {
         const upper = dataPoints.find(p => p.height > actualHp);
         if (!lower || !upper) continue;
 
-        // Temperature and humidity remain with Gaussian interpolation
         const temp = Utils.gaussianInterpolation(lower.temp, upper.temp, lower.height, upper.height, actualHp);
         const rh = Math.max(0, Math.min(100, Utils.gaussianInterpolation(lower.rh, upper.rh, lower.height, upper.height, actualHp)));
 
-        // Wind interpolation using interpolateWindAtAltitude
         const wind = Utils.interpolateWindAtAltitude(actualHp, pressureLevels, pressureHeights, uComponents, vComponents);
         let spdKt, spd, dir;
         if (wind.u === 'Invalid input' || wind.v === 'Invalid input' || wind.u === 'Interpolation error' || wind.v === 'Interpolation error') {
@@ -1099,7 +1098,7 @@ function interpolateWeatherData(index) {
         interpolated.push({
             height: actualHp,
             displayHeight: refLevel === 'AGL' ? hp : actualHp,
-            pressure: pressure === 'N/A' ? 'N/A' : pressure,
+            pressure: pressure === 'N/A' ? 'N/A' : pressure.toFixed(1),
             temp: temp ?? 'N/A',
             dew: dew ?? 'N/A',
             dir: dir ?? 'N/A',
