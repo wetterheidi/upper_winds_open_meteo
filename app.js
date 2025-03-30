@@ -1188,47 +1188,49 @@ function downloadTableAsAscii(format = 'default') {
     const time = Utils.formatTime(weatherData.time[index]).replace(' ', '_');
     const filename = `${time}_${model}_${format.toUpperCase()}.txt`;
 
-    let content = '';
-    let blobType = 'text/plain';
-
-    // Define fixed format configurations
+    // Define format configurations
     const formats = {
-        /*'heidis': { // Matches "HEIDIS" from radio button (case-insensitive handling)
-           generateContent: generateDefaultContent,
-           heightUnit: getHeightUnit(),
-           temperatureUnit: getTemperatureUnit(),
-           windSpeedUnit: getWindSpeedUnit(),
-           refLevel: document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL'
-       },
-      'atak': { // Placeholder for ATAK format
-           generateContent: generateAtakContent, // Define this function
-           heightUnit: 'ft',
-           windSpeedUnit: 'km/h',
-           refLevel: 'AGL',
-           steps: [100, 200, 300, 400, 500, 600, 700]
-       },*/
-        'windwatch': { // Placeholder for Windwatch format
-            generateContent: generateWindwatchContent, // Define this function
+        'heidis': {
+            generateContent: generateHeidisContent,
+            heightUnit: 'm',
+            temperatureUnit: '°C',
+            windSpeedUnit: 'm/s',
+            refLevel: 'AGL',
+            step: 100
+        },
+        'atak': {
+            generateContent: generateAtakContent,
+            heightUnit: 'ft',
+            windSpeedUnit: 'kt',
+            refLevel: 'AGL',
+            step: 1000
+        },
+        'windwatch': {
+            generateContent: generateWindwatchContent,
             heightUnit: 'ft',
             windSpeedUnit: 'km/h',
             refLevel: 'AGL',
-            step:'100',
-            model: model // Pass the selected model
+            step: 100,
+            model: model // Include model for header
         },
         'customized': {
             generateContent: generateCustomizedContent,
             heightUnit: getHeightUnit(),
-            temperatureUnit: getTemperatureUnit().replace('°', '') === 'F' ? '°F' : '°C', // Fix here
+            temperatureUnit: getTemperatureUnit() === 'C' ? '°C' : '°F',
             windSpeedUnit: getWindSpeedUnit(),
-            refLevel: document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL'
+            refLevel: document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL',
+            step: parseInt(document.getElementById('interpStepSelect')?.value) || 200
         }
     };
 
-    const selectedFormat = formats[format.toLowerCase()] || formats['heidis'];
-    console.log('Download Config:', selectedFormat); // Debug config
-    content = selectedFormat.generateContent(index, selectedFormat);
+    const selectedFormat = formats[format.toLowerCase()] || formats['customized']; // Default to 'customized' if invalid
+    console.log('Download Config:', selectedFormat);
 
-    if (!content) return;
+    const content = selectedFormat.generateContent(index, selectedFormat);
+    if (!content) {
+        Utils.handleError(`Failed to generate content for format: ${format}`);
+        return;
+    }
 
     const blob = new Blob([content], { type: 'text/plain' });
     const url = window.URL.createObjectURL(blob);
@@ -1241,46 +1243,119 @@ function downloadTableAsAscii(format = 'default') {
     window.URL.revokeObjectURL(url);
 }
 
-// Generate content for Windwatch format
+function generateHeidisContent(index, config) {
+    const { heightUnit, temperatureUnit, windSpeedUnit, refLevel, step } = config;
+    let content = `Height[${heightUnit}]  Pressure[hPa]  Temperature[${temperatureUnit}]  Dewpoint[${temperatureUnit}]  Wind direction[°]  Wind speed[${windSpeedUnit}]\n`;
+
+    const elevation = lastAltitude !== 'N/A' ? lastAltitude : 0; // Fallback to 0 if elevation unavailable
+    const surfaceData = Utils.getSurfaceData(index, heightUnit, temperatureUnit, windSpeedUnit);
+    const interpolatedData = interpolateWeatherData(index);
+    if (!interpolatedData || interpolatedData.length === 0) return '';
+
+    // Determine max height from raw data
+    const pressureLevels = ['1000hPa', '950hPa', '925hPa', '900hPa', '850hPa', '800hPa', '700hPa', '600hPa', '500hPa', '400hPa', '300hPa', '250hPa', '200hPa'];
+    let maxRawHeight = 0;
+    pressureLevels.forEach(level => {
+        const height = weatherData[`geopotential_height_${level}`]?.[index];
+        if (height !== undefined && height > maxRawHeight) maxRawHeight = height;
+    });
+
+    // Surface data
+    let surfaceHeight = refLevel === 'AGL' ? 0 : elevation;
+    content += Utils.formatLine(surfaceData, surfaceHeight);
+
+    // Interpolated data with fixed step
+    for (let h = step; h <= maxRawHeight; h += step) {
+        const dataAtHeight = interpolatedData.find(d => Math.round(d.height) === h) || interpolateAtHeight(h, interpolatedData);
+        if (dataAtHeight) {
+            const formattedData = Utils.formatInterpolatedData(dataAtHeight, heightUnit, temperatureUnit, windSpeedUnit);
+            content += Utils.formatLine(formattedData, h);
+        }
+    }
+
+    return content;
+}
+
+// Generate content for ATAK format
+function generateAtakContent(index, config) {
+    const { heightUnit, windSpeedUnit, refLevel, step } = config;
+    let content = `Alt\tDir\tSpd\n${heightUnit}${refLevel}\n`;
+
+    const elevation = lastAltitude !== 'N/A' ? lastAltitude : 0;
+    const surfaceData = Utils.getSurfaceData(index, heightUnit, '°C', windSpeedUnit); // Temperature not included
+    const interpolatedData = interpolateWeatherData(index);
+    if (!interpolatedData || interpolatedData.length === 0) return '';
+
+    // Determine max height from raw data (converted to feet)
+    const pressureLevels = ['1000hPa', '950hPa', '925hPa', '900hPa', '850hPa', '800hPa', '700hPa', '600hPa', '500hPa', '400hPa', '300hPa', '250hPa', '200hPa'];
+    let maxRawHeightFt = 0;
+    pressureLevels.forEach(level => {
+        const heightM = weatherData[`geopotential_height_${level}`]?.[index];
+        if (heightM !== undefined) {
+            const heightFt = Utils.convertHeight(heightM, 'ft');
+            if (heightFt > maxRawHeightFt) maxRawHeightFt = heightFt;
+        }
+    });
+
+    // Surface data
+    let surfaceHeight = refLevel === 'AGL' ? 0 : Utils.convertHeight(elevation, 'ft');
+    content += `${Math.round(surfaceHeight)}\t${Math.round(surfaceData.dir)}\t${surfaceData.spd.toFixed(1)}\n`;
+
+    // Interpolated data with fixed step
+    for (let h = step; h <= maxRawHeightFt; h += step) {
+        const hMeters = Utils.convertHeight(h, 'm', 'ft'); // Convert step height to meters for interpolation
+        const dataAtHeight = interpolatedData.find(d => Math.round(d.height) === Math.round(hMeters)) || interpolateAtHeight(hMeters, interpolatedData);
+        if (dataAtHeight) {
+            const formattedData = Utils.formatInterpolatedData(dataAtHeight, heightUnit, '°C', windSpeedUnit);
+            content += `${Math.round(h)}\t${Math.round(formattedData.dir)}\t${formattedData.spd.toFixed(1)}\n`;
+        }
+    }
+
+    return content;
+}
+
+// Generate content for Windwatch format (already close to your example)
 function generateWindwatchContent(index, config) {
     const { model, heightUnit, windSpeedUnit, refLevel, step } = config;
 
-    // Header setup
     const dateTime = luxon.DateTime.fromISO(weatherData.time[index], { zone: 'UTC' })
-        .toFormat('MM/dd/yy HH:00:00'); // MM/DD/YY HH:00:00
-    const elevationMeters = weatherData.elevation !== undefined ? weatherData.elevation : lastAltitude || 0;
-    const groundLevelFeet = Utils.convertHeight(elevationMeters, 'ft'); // Convert to feet
+        .toFormat('MM/dd/yy HH:mm:ss');
+    const elevationMeters = lastAltitude !== 'N/A' ? lastAltitude : 0;
+    const groundLevelFeet = Utils.convertHeight(elevationMeters, 'ft');
 
     let content = `Version 1.0,  ID = 99999999\n`;
     content += `${dateTime},  Ground Level: ${groundLevelFeet}  ft\n`;
     content += `Windsond ${model}\n\n`;
-    content += `AGL [ft]     Wind [°] Speed [km/h]\n`;
+    content += `AGL [${heightUnit}]     Wind [°] Speed [${windSpeedUnit}]\n`;
+
+    const surfaceData = Utils.getSurfaceData(index, heightUnit, '°C', windSpeedUnit);
+    const interpolatedData = interpolateWeatherData(index);
+    if (!interpolatedData || interpolatedData.length === 0) return '';
+
+    // Determine max height from raw data (converted to feet)
+    const pressureLevels = ['1000hPa', '950hPa', '925hPa', '900hPa', '850hPa', '800hPa', '700hPa', '600hPa', '500hPa', '400hPa', '300hPa', '250hPa', '200hPa'];
+    let maxRawHeightFt = 0;
+    pressureLevels.forEach(level => {
+        const heightM = weatherData[`geopotential_height_${level}`]?.[index];
+        if (heightM !== undefined) {
+            const heightFt = Utils.convertHeight(heightM, 'ft');
+            if (heightFt > maxRawHeightFt) maxRawHeightFt = heightFt;
+        }
+    });
 
     // Surface data
-    const surfaceData = Utils.getSurfaceData(index, heightUnit, windSpeedUnit);
+    content += Utils.formatLineWindwatch(surfaceData, 0);
 
-    // Determine surface height based on refLevel
-    let surfaceHeight = 0;
-    if (refLevel === 'AMSL') {
-        const elevation = weatherData.elevation !== undefined ? weatherData.elevation : lastAltitude || 0;
-        surfaceHeight = Utils.convertHeight(elevation, heightUnit);
+    // Interpolated data with fixed step
+    for (let h = step; h <= maxRawHeightFt; h += step) {
+        const hMeters = Utils.convertHeight(h, 'm', 'ft');
+        const dataAtHeight = interpolatedData.find(d => Math.round(d.height) === Math.round(hMeters)) || interpolateAtHeight(hMeters, interpolatedData);
+        if (dataAtHeight) {
+            const formattedData = Utils.formatInterpolatedDataWindwatch(dataAtHeight, windSpeedUnit);
+            content += Utils.formatLineWindwatch(formattedData, h);
+        }
     }
-    content += Utils.formatLineWindwatch(surfaceData, Math.round(surfaceHeight));
 
-    // Interpolated data, skipping surface height
-    const interpolatedData = interpolateWeatherData(index);
-    if (interpolatedData) {
-        interpolatedData.forEach(data => {
-            const displayHeightAdjusted = Math.round(Utils.convertHeight(data.displayHeight, heightUnit));
-            if (displayHeightAdjusted !== Math.round(surfaceHeight)) {
-                const formattedData = {
-                    ...Utils.formatInterpolatedDataWindwatch(data, heightUnit, windSpeedUnit),
-                    pressure: parseFloat(data.pressure) || 'N/A'
-                };
-                content += Utils.formatLineWindwatch(formattedData, displayHeightAdjusted);
-            }
-        });
-    }
     return content;
 }
 
@@ -1317,6 +1392,31 @@ function generateCustomizedContent(index, config) {
         });
     }
     return content;
+}
+
+// Helper function to interpolate at a specific height if not found
+function interpolateAtHeight(height, interpolatedData) {
+    const heights = interpolatedData.map(d => d.height);
+    if (height < heights[0] || height > heights[heights.length - 1]) return null;
+
+    for (let i = 0; i < heights.length - 1; i++) {
+        if (height >= heights[i] && height <= heights[i + 1]) {
+            const h0 = heights[i], h1 = heights[i + 1];
+            const d0 = interpolatedData[i], d1 = interpolatedData[i + 1];
+            const fraction = (height - h0) / (h1 - h0);
+            return {
+                height: height,
+                displayHeight: height,
+                pressure: d0.pressure + (d1.pressure - d0.pressure) * fraction,
+                temp: d0.temp + (d1.temp - d0.temp) * fraction,
+                dew: d0.dew + (d1.dew - d0.dew) * fraction,
+                dir: Utils.normalizeAngle(d0.dir + (Utils.normalizeAngle(d1.dir - d0.dir)) * fraction),
+                spd: d0.spd + (d1.spd - d0.spd) * fraction,
+                rh: d0.rh + (d1.rh - d0.rh) * fraction
+            };
+        }
+    }
+    return null;
 }
 
 function updateLandingPattern() {

@@ -518,11 +518,10 @@ class Utils {
 
     static formatLineWindwatch(data, height) {
         const { dir, spd } = data;
-        const formattedSpd = spd === 'N/A' || typeof spd !== 'number' ? 'N/A' : spd.toFixed(1);
-        const formattedDir = dir === 'N/A' || typeof dir !== 'number' ? 'N/A' : Math.round(dir);
-        // Handle string or number pressure
-        return `${height} ${formattedDir} ${formattedSpd}\n`;
-    }
+        const formattedSpd = spd === 'N/A' || !Number.isFinite(spd) ? 'N/A' : spd.toFixed(1);
+        const formattedDir = dir === 'N/A' || !Number.isFinite(dir) ? 'N/A' : dir.toFixed(1);
+        return `${height.toString().padStart(7)}\t${formattedDir.padStart(6)}\t${formattedSpd.padStart(6)}\n`;
+    };
 
     static formatInterpolatedData(data, heightUnit, temperatureUnit, windSpeedUnit) {
         return {
