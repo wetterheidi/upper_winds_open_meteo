@@ -22,6 +22,7 @@ const defaultSettings = {
     windUnit: 'kt',
     timeZone: 'Z',
     coordFormat: 'Decimal',
+    downloadFormat: 'HEIDIS',
     showTable: false,
     //showCanopyParameters: false,
     canopySpeed: 20,
@@ -87,6 +88,10 @@ function getHeightUnit() {
 
 function getCoordinateFormat() {
     return document.querySelector('input[name="coordFormat"]:checked')?.value || 'Decimal';
+}
+
+function getDownloadFormat() {
+    return document.querySelector('input[name="downloadFormat"]:checked')?.value || 'HEIDIS';
 }
 
 function updateHeightUnitLabels() {
@@ -954,7 +959,7 @@ async function updateWeatherDisplay(index, originalTime = null) {
 
 async function checkAvailableModels(lat, lon) {
     const modelList = [
-       'icon_seamless', 'icon_global', 'icon_eu', 'icon_d2', 'ecmwf_ifs025', 'ecmwf_aifs025_single', 'gfs_seamless', 'gfs_global', 'gfs_hrrr', 'arome_france', 'gem_hrdps_continental', 'gem_regional'
+        'icon_seamless', 'icon_global', 'icon_eu', 'icon_d2', 'ecmwf_ifs025', 'ecmwf_aifs025_single', 'gfs_seamless', 'gfs_global', 'gfs_hrrr', 'arome_france', 'gem_hrdps_continental', 'gem_regional'
     ];
 
     let availableModels = [];
@@ -1172,7 +1177,7 @@ function calculateMeanWind() {
     console.log('Calculated Mean Wind:', result, 'u:', meanWind[2], 'v:', meanWind[3]);
 }
 
-function downloadTableAsAscii() {
+function downloadTableAsAscii(format = 'default') {
     if (!weatherData || !weatherData.time) {
         Utils.handleError('No weather data available to download.');
         return;
@@ -1181,62 +1186,49 @@ function downloadTableAsAscii() {
     const index = document.getElementById('timeSlider').value || 0;
     const model = document.getElementById('modelSelect').value.toUpperCase();
     const time = Utils.formatTime(weatherData.time[index]).replace(' ', '_');
-    //Activate next line to use local time for the file name!!!
-    //const time = getDisplayTime(weatherData.time[index]).replace(' ', '_').replace(/[^\w-]/g, ''); // Clean for filename
-    const filename = `${time}_${model}_HEIDIS.txt`;
-    const heightUnit = getHeightUnit();
-    const temperatureUnit = getTemperatureUnit();
-    const windSpeedUnit = getWindSpeedUnit();
-    const refLevel = document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL';
-    const heightHeader = refLevel === 'AGL' ? `h(${heightUnit}AGL)` : `h(${heightUnit}AMSL)`;
-    const temperatureHeader = temperatureUnit === 'C' ? '°C' : '°F';
-    const windSpeedHeader = windSpeedUnit;
-    let content = `${heightHeader} p(hPa) T(${temperatureHeader}) Dew(${temperatureHeader}) Dir(°) Spd(${windSpeedHeader}) RH(%)\n`;
+    const filename = `${time}_${model}_${format.toUpperCase()}.txt`;
 
-    const baseHeight = Math.round(lastAltitude);
-    const surfaceHeight = refLevel === 'AGL' ? 0 : baseHeight;
-    const surfaceTemp = weatherData.temperature_2m?.[index];
-    const surfaceRH = weatherData.relative_humidity_2m?.[index];
-    const surfaceSpd = weatherData.wind_speed_10m?.[index]; // Raw km/h
-    const surfaceDir = weatherData.wind_direction_10m?.[index];
-    const surfaceDew = Utils.calculateDewpoint(surfaceTemp, surfaceRH);
-    const pressureLevels = ['1000hPa', '950hPa', '925hPa', '900hPa', '850hPa', '800hPa', '700hPa', '600hPa', '500hPa', '400hPa', '300hPa', '250hPa', '200hPa'];
-    const availablePressure = pressureLevels.find(level => weatherData[`geopotential_height_${level}`]?.[index] !== undefined);
-    const surfacePressure = availablePressure ? Utils.interpolatePressure(baseHeight,
-        pressureLevels.map(l => parseInt(l)),
-        pressureLevels.map(l => weatherData[`geopotential_height_${l}`]?.[index]).filter(h => h !== undefined)) : 'N/A';
+    let content = '';
+    let blobType = 'text/plain';
 
-    const displaySurfaceHeight = Math.round(Utils.convertHeight(surfaceHeight, heightUnit));
-    const displaySurfaceTemp = Utils.convertTemperature(surfaceTemp, temperatureUnit);
-    const displaySurfaceDew = Utils.convertTemperature(surfaceDew, temperatureUnit);
-    const displaySurfaceSpd = Utils.convertWind(surfaceSpd, windSpeedUnit, 'km/h'); // Convert from km/h
-    const formattedSurfaceTemp = displaySurfaceTemp === 'N/A' ? 'N/A' : displaySurfaceTemp.toFixed(1);
-    const formattedSurfaceDew = displaySurfaceDew === 'N/A' ? 'N/A' : displaySurfaceDew.toFixed(1);
-    const formattedSurfaceSpd = displaySurfaceSpd === 'N/A' ? 'N/A' : (windSpeedUnit === 'bft' ? Math.round(displaySurfaceSpd) : displaySurfaceSpd.toFixed(1));
-    const formattedSurfaceDir = surfaceDir === 'N/A' || surfaceDir === undefined ? 'N/A' : Math.round(surfaceDir);
-    const formattedSurfaceRH = surfaceRH === 'N/A' || surfaceRH === undefined ? 'N/A' : Math.round(surfaceRH);
-    content += `${displaySurfaceHeight} ${surfacePressure === 'N/A' ? 'N/A' : surfacePressure.toFixed(1)} ${formattedSurfaceTemp} ${formattedSurfaceDew} ${formattedSurfaceDir} ${formattedSurfaceSpd} ${formattedSurfaceRH}\n`;
-
-    const interpolatedData = interpolateWeatherData(index);
-    if (!interpolatedData || interpolatedData.length === 0) {
-        Utils.handleError('No interpolated data available to download.');
-        return;
-    }
-
-    interpolatedData.forEach(data => {
-        if (data.displayHeight !== surfaceHeight) {
-            const displayHeight = Math.round(Utils.convertHeight(data.displayHeight, heightUnit));
-            const displayTemperature = Utils.convertTemperature(data.temp, temperatureUnit);
-            const displayDew = Utils.convertTemperature(data.dew, temperatureUnit);
-            const displaySpd = data.spd; // Already in selected unit from interpolateWeatherData
-            const formattedTemp = displayTemperature === 'N/A' ? 'N/A' : displayTemperature.toFixed(1);
-            const formattedDew = displayDew === 'N/A' ? 'N/A' : displayDew.toFixed(1);
-            const formattedSpd = displaySpd === 'N/A' ? 'N/A' : (windSpeedUnit === 'bft' ? Math.round(displaySpd) : displaySpd.toFixed(1));
-            const formattedDir = data.dir === 'N/A' ? 'N/A' : Math.round(data.dir);
-            const formattedRH = data.rh === 'N/A' ? 'N/A' : Math.round(data.rh);
-            content += `${displayHeight} ${data.pressure} ${formattedTemp} ${formattedDew} ${formattedDir} ${formattedSpd} ${formattedRH}\n`;
+    // Define fixed format configurations
+    const formats = {
+        /*'heidis': { // Matches "HEIDIS" from radio button (case-insensitive handling)
+           generateContent: generateDefaultContent,
+           heightUnit: getHeightUnit(),
+           temperatureUnit: getTemperatureUnit(),
+           windSpeedUnit: getWindSpeedUnit(),
+           refLevel: document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL'
+       },
+      'atak': { // Placeholder for ATAK format
+           generateContent: generateAtakContent, // Define this function
+           heightUnit: 'ft',
+           windSpeedUnit: 'km/h',
+           refLevel: 'AGL',
+           steps: [100, 200, 300, 400, 500, 600, 700]
+       },*/
+        'windwatch': { // Placeholder for Windwatch format
+            generateContent: generateWindwatchContent, // Define this function
+            heightUnit: 'ft',
+            windSpeedUnit: 'km/h',
+            refLevel: 'AGL',
+            step:'100',
+            model: model // Pass the selected model
+        },
+        'customized': {
+            generateContent: generateCustomizedContent,
+            heightUnit: getHeightUnit(),
+            temperatureUnit: getTemperatureUnit().replace('°', '') === 'F' ? '°F' : '°C', // Fix here
+            windSpeedUnit: getWindSpeedUnit(),
+            refLevel: document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL'
         }
-    });
+    };
+
+    const selectedFormat = formats[format.toLowerCase()] || formats['heidis'];
+    console.log('Download Config:', selectedFormat); // Debug config
+    content = selectedFormat.generateContent(index, selectedFormat);
+
+    if (!content) return;
 
     const blob = new Blob([content], { type: 'text/plain' });
     const url = window.URL.createObjectURL(blob);
@@ -1249,6 +1241,83 @@ function downloadTableAsAscii() {
     window.URL.revokeObjectURL(url);
 }
 
+// Generate content for Windwatch format
+function generateWindwatchContent(index, config) {
+    const { model, heightUnit, windSpeedUnit, refLevel, step } = config;
+
+    // Header setup
+    const dateTime = luxon.DateTime.fromISO(weatherData.time[index], { zone: 'UTC' })
+        .toFormat('MM/dd/yy HH:00:00'); // MM/DD/YY HH:00:00
+    const elevationMeters = weatherData.elevation !== undefined ? weatherData.elevation : lastAltitude || 0;
+    const groundLevelFeet = Utils.convertHeight(elevationMeters, 'ft'); // Convert to feet
+
+    let content = `Version 1.0,  ID = 99999999\n`;
+    content += `${dateTime},  Ground Level: ${groundLevelFeet}  ft\n`;
+    content += `Windsond ${model}\n\n`;
+    content += `AGL [ft]     Wind [°] Speed [km/h]\n`;
+
+    // Surface data
+    const surfaceData = Utils.getSurfaceData(index, heightUnit, windSpeedUnit);
+
+    // Determine surface height based on refLevel
+    let surfaceHeight = 0;
+    if (refLevel === 'AMSL') {
+        const elevation = weatherData.elevation !== undefined ? weatherData.elevation : lastAltitude || 0;
+        surfaceHeight = Utils.convertHeight(elevation, heightUnit);
+    }
+    content += Utils.formatLineWindwatch(surfaceData, Math.round(surfaceHeight));
+
+    // Interpolated data, skipping surface height
+    const interpolatedData = interpolateWeatherData(index);
+    if (interpolatedData) {
+        interpolatedData.forEach(data => {
+            const displayHeightAdjusted = Math.round(Utils.convertHeight(data.displayHeight, heightUnit));
+            if (displayHeightAdjusted !== Math.round(surfaceHeight)) {
+                const formattedData = {
+                    ...Utils.formatInterpolatedDataWindwatch(data, heightUnit, windSpeedUnit),
+                    pressure: parseFloat(data.pressure) || 'N/A'
+                };
+                content += Utils.formatLineWindwatch(formattedData, displayHeightAdjusted);
+            }
+        });
+    }
+    return content;
+}
+
+// Customized format
+function generateCustomizedContent(index, config) {
+    const { heightUnit, windSpeedUnit, temperatureUnit, refLevel } = config;
+    console.log('Download - Temperature Unit:', temperatureUnit); // Debug log
+    let content = `Custom [${heightUnit}${refLevel}] p[hPa] T[${temperatureUnit}] Dew[${temperatureUnit}] Dir[deg] Speed[${windSpeedUnit}] RH[%]\n`;
+
+    // Surface data
+    const surfaceData = Utils.getSurfaceData(index, heightUnit, temperatureUnit, windSpeedUnit);
+
+    // Determine surface height based on refLevel
+    let surfaceHeight = 0;
+    if (refLevel === 'AMSL') {
+        const elevation = weatherData.elevation !== undefined ? weatherData.elevation : lastAltitude || 0;
+        surfaceHeight = Utils.convertHeight(elevation, heightUnit);
+    }
+    content += Utils.formatLine(surfaceData, Math.round(surfaceHeight));
+
+    // Interpolated data, skipping surface height
+    const interpolatedData = interpolateWeatherData(index);
+    if (interpolatedData) {
+        interpolatedData.forEach(data => {
+            const displayHeightAdjusted = Math.round(Utils.convertHeight(data.displayHeight, heightUnit));
+            if (displayHeightAdjusted !== Math.round(surfaceHeight)) {
+                const formattedData = {
+                    ...Utils.formatInterpolatedData(data, heightUnit, temperatureUnit, windSpeedUnit),
+                    pressure: parseFloat(data.pressure) || 'N/A'
+                };
+                console.log('Interpolated Temp:', formattedData.temp, 'Dew:', formattedData.dew); // Debug interpolated conversion
+                content += Utils.formatLine(formattedData, displayHeightAdjusted);
+            }
+        });
+    }
+    return content;
+}
 
 function updateLandingPattern() {
     const showLandingPattern = document.getElementById('showLandingPattern').checked;
@@ -1561,6 +1630,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setRadioValue('windUnit', userSettings.windUnit);
     setRadioValue('timeZone', userSettings.timeZone);
     setRadioValue('coordFormat', userSettings.coordFormat);
+    setRadioValue('downloadFormat', userSettings.downloadFormat);
     setRadioValue('landingDirection', userSettings.landingDirection);
 
     // Sichere Aktualisierung der anderen Elemente
@@ -1706,11 +1776,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Existing downloadButton event listener (unchanged)
     if (downloadButton) {
         downloadButton.addEventListener('click', () => {
             console.log('Download button clicked!');
-            downloadTableAsAscii();
+            const selectedFormat = document.querySelector('input[name="downloadFormat"]:checked').value || 'HEIDIS';
+            console.log('Selected format:', selectedFormat);
+            downloadTableAsAscii(selectedFormat.toLowerCase());
         });
     }
 
@@ -1718,7 +1789,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (hamburgerBtn && menu) {
         // Toggle main menu
         hamburgerBtn.addEventListener('click', () => menu.classList.toggle('hidden'));
-    
+
         // Select all <span> elements with a following submenu
         const menuItems = menu.querySelectorAll('span');
         menuItems.forEach(item => {
@@ -1737,7 +1808,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 e.stopPropagation();
             });
         });
-    
+
         // Close all submenus when clicking outside
         document.addEventListener('click', (e) => {
             if (!menu.contains(e.target) && !hamburgerBtn.contains(e.target)) {
@@ -1780,15 +1851,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Existing temperatureUnitRadios event listener (unchanged)
     if (temperatureUnitRadios.length > 0) {
-        temperatureUnitRadios.forEach(radio => {
+        tempUnitRadios.forEach(radio => {
             radio.addEventListener('change', () => {
-                userSettings.refLevel = document.querySelector('input[name="temperatureUnit"]:checked').value;
+                userSettings.temperatureUnit = radio.value; // Should set '°C' or '°F'
                 saveSettings();
-                console.log('Temperature unit changed:', getTemperatureUnit());
-                if (weatherData && lastLat && lastLng) {
-                    updateWeatherDisplay(slider.value || 0);
-                    if (lastAltitude !== 'N/A') calculateMeanWind();
-                }
+                console.log('Temp Unit Changed:', userSettings.temperatureUnit);
             });
         });
     }
@@ -2111,6 +2178,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (currentMarker && lastLat && lastLng) {
                     updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
                 }
+            });
+        });
+    }
+
+    const downloadFormatRadios = document.querySelectorAll('input[name="downloadFormat"]');
+    if (downloadFormatRadios.length > 0) {
+        downloadFormatRadios.forEach(radio => {
+            radio.addEventListener('change', () => {
+                userSettings.downloadFormat = document.querySelector('input[name="downloadFormat"]:checked').value;
+                saveSettings();
+                console.log('Download format changed:', getDownloadFormat());
             });
         });
     }

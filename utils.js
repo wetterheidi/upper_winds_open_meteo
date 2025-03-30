@@ -119,7 +119,7 @@ class Utils {
         if (pressureLevels.length != heights.length || pressureLevels.length != uComponents.length || pressureLevels.length != vComponents.length) {
             return { u: 'Invalid input', v: 'Invalid input' };
         }
-    
+
         // Step 1: Find p(z) using log interpolation of p with respect to h
         const log_pressureLevels = pressureLevels.map(p => Math.log(p));
         const log_p_z = Utils.LIP(heights, log_pressureLevels, z);
@@ -127,14 +127,14 @@ class Utils {
             return { u: 'Interpolation error', v: 'Interpolation error' };
         }
         const p_z = Math.exp(log_p_z);
-    
+
         // Step 2: Interpolate u and v at p(z) using log(p) interpolation
         const u_z = Utils.LIP(log_pressureLevels, uComponents, Math.log(p_z));
         const v_z = Utils.LIP(log_pressureLevels, vComponents, Math.log(p_z));
         if (typeof u_z === 'string' && u_z.includes('error') || typeof v_z === 'string' && v_z.includes('error')) {
             return { u: 'Interpolation error', v: 'Interpolation error' };
         }
-    
+
         return { u: u_z, v: v_z };
     }
 
@@ -143,12 +143,12 @@ class Utils {
         if (!pressureLevels || !heights || pressureLevels.length !== heights.length || pressureLevels.length < 2) {
             return 'N/A';
         }
-    
+
         // Assume pressures and heights are already paired correctly (heights ascending, pressures ascending)
         if (height < heights[0] || height > heights[heights.length - 1]) {
             return 'N/A'; // No extrapolation
         }
-    
+
         for (let i = 0; i < heights.length - 1; i++) {
             if (height >= heights[i] && height <= heights[i + 1]) {
                 const h0 = heights[i], h1 = heights[i + 1];
@@ -348,30 +348,30 @@ class Utils {
         // Wind angle relative to heading
         const windAngle = Utils.calculateWindAngle(trueHeading, windDirection);
         const { crosswind, headwind } = Utils.calculateWindComponents(windSpeed, windAngle);
-    
+
         // TAS vector
         const tasU = trueAirspeed * Math.sin(trueHeading * Math.PI / 180);
         const tasV = trueAirspeed * Math.cos(trueHeading * Math.PI / 180);
-    
+
         // Wind vector (direction wind is going *to*)
         const windTo = (windDirection + 180) % 360;
         const windU = windSpeed * Math.sin(windTo * Math.PI / 180);
         const windV = windSpeed * Math.cos(windTo * Math.PI / 180);
-    
+
         // Ground speed vector
         const gsU = tasU + windU;
         const gsV = tasV + windV;
-    
+
         // True Course
         const trueCourse = Math.atan2(gsU, gsV) * (180 / Math.PI);
         const normalizedCourse = Utils.normalizeAngle(trueCourse);
-    
+
         // Ground Speed
         const groundSpeed = Math.sqrt(gsU * gsU + gsV * gsV);
-    
+
         // WCA (for reference)
         const wca = Utils.calculateWCA(crosswind, trueAirspeed) * (crosswind < 0 ? -1 : 1);
-    
+
         return {
             trueCourse: Number(normalizedCourse.toFixed(2)),
             groundSpeed: Number(groundSpeed.toFixed(2)),
@@ -471,6 +471,78 @@ class Utils {
             default:
                 return result.Decimal;
         }
+    }
+
+    // Functions to supply different download formats
+    // Helper to get surface data
+    static getSurfaceData(index, heightUnit, temperatureUnit, windSpeedUnit) {
+        const surfaceTemp = weatherData.temperature_2m?.[index]; // Likely in °C
+        const surfaceRH = weatherData.relative_humidity_2m?.[index];
+        const surfaceSpd = weatherData.wind_speed_10m?.[index]; // Raw km/h
+        const surfaceDir = weatherData.wind_direction_10m?.[index];
+        const surfaceDew = Utils.calculateDewpoint(surfaceTemp, surfaceRH);
+    
+        return {
+            height: 0,
+            pressure: Utils.calculateSurfacePressure(index),
+            temp: Utils.convertTemperature(surfaceTemp, temperatureUnit),
+            dew: Utils.convertTemperature(surfaceDew, temperatureUnit),
+            dir: surfaceDir,
+            spd: Utils.convertWind(surfaceSpd, windSpeedUnit, 'km/h'),
+            rh: surfaceRH
+        };
+    }
+
+    // Placeholder for surface pressure calculation (simplified)
+    static calculateSurfacePressure(index) {
+        const pressureLevels = ['1000hPa', '950hPa', '925hPa', '900hPa', '850hPa', '800hPa', '700hPa', '600hPa', '500hPa', '400hPa', '300hPa', '250hPa', '200hPa'];
+        const availablePressure = pressureLevels.find(level => weatherData[`geopotential_height_${level}`]?.[index] !== undefined);
+        return availablePressure ? Utils.interpolatePressure(lastAltitude,
+            pressureLevels.map(l => parseInt(l)),
+            pressureLevels.map(l => weatherData[`geopotential_height_${l}`]?.[index]).filter(h => h !== undefined)) : 'N/A';
+    }
+
+    // Helper to format a line
+    static formatLine(data, height) {
+        const { pressure, temp, dew, dir, spd, rh } = data;
+        const formattedTemp = temp === 'N/A' || typeof temp !== 'number' ? 'N/A' : temp.toFixed(1);
+        const formattedDew = dew === 'N/A' || typeof dew !== 'number' ? 'N/A' : dew.toFixed(1);
+        const formattedSpd = spd === 'N/A' || typeof spd !== 'number' ? 'N/A' : spd.toFixed(1);
+        const formattedDir = dir === 'N/A' || typeof dir !== 'number' ? 'N/A' : Math.round(dir);
+        const formattedRH = rh === 'N/A' || typeof rh !== 'number' ? 'N/A' : Math.round(rh);
+        // Handle string or number pressure
+        const numericPressure = typeof pressure === 'string' ? parseFloat(pressure) : pressure;
+        const formattedPressure = isNaN(numericPressure) ? 'N/A' : numericPressure.toFixed(1);
+        return `${height} ${formattedPressure} ${formattedTemp} ${formattedDew} ${formattedDir} ${formattedSpd} ${formattedRH}\n`;
+    }
+
+    static formatLineWindwatch(data, height) {
+        const { dir, spd } = data;
+        const formattedSpd = spd === 'N/A' || typeof spd !== 'number' ? 'N/A' : spd.toFixed(1);
+        const formattedDir = dir === 'N/A' || typeof dir !== 'number' ? 'N/A' : Math.round(dir);
+        // Handle string or number pressure
+        return `${height} ${formattedDir} ${formattedSpd}\n`;
+    }
+
+    static formatInterpolatedData(data, heightUnit, temperatureUnit, windSpeedUnit) {
+        return {
+            height: Math.round(Utils.convertHeight(data.displayHeight, heightUnit)),
+            pressure: typeof data.pressure === 'string' ? parseFloat(data.pressure) : data.pressure || 'N/A',
+            temp: Utils.convertTemperature(data.temp, temperatureUnit),
+            dew: Utils.convertTemperature(data.dew, temperatureUnit),
+            dir: data.dir,
+            spd: windSpeedUnit === 'kt' ? data.spd : Utils.convertWind(data.spd, windSpeedUnit, 'kt'),
+            rh: data.rh
+        };
+    }
+
+    static formatInterpolatedDataWindwatch(data, windSpeedUnit) {
+        return {
+            height: Math.round(Utils.convertHeight(data.displayHeight, 'ft')),
+            dir: data.dir,
+            spd: Math.round(Utils.convertWind(data.spd, 'km/h')),
+            //spd:  data.spd,
+        };
     }
 
 }
