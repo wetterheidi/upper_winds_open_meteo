@@ -168,9 +168,10 @@ async function getDisplayTime(utcTimeStr) {
 function initMap() {
     const defaultCenter = [48.0179, 11.1923];
     const defaultZoom = 10;
-
+    
     map = L.map('map');
     map.setView(defaultCenter, defaultZoom);
+    map.zoomControl.setPosition('topright');
 
     // Define base layers
     const baseMaps = {
@@ -212,7 +213,7 @@ function initMap() {
 
     // Add Leaflet.PolylineMeasure control
     const polylineMeasure = L.control.polylineMeasure({
-        position: 'topleft', // Position on the map
+        position: 'topright', // Position on the map
         unit: 'kilometres', // Default unit (can be 'metres', 'kilometres', 'miles', 'nauticalmiles')
         showBearings: true, // Display bearings between points
         clearMeasurementsOnStop: false, // Keep measurements after stopping
@@ -2121,7 +2122,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (toggleMeasureCheckbox) {
         // Initialize the control but don’t add it yet
         polylineMeasureControl = L.control.polylineMeasure({
-            position: 'topleft',
+            position: 'topright',
             unit: 'kilometres',
             showBearings: true,
             clearMeasurementsOnStop: false,
