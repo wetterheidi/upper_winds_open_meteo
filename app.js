@@ -1183,32 +1183,48 @@ function calculateMeanWind() {
     console.log('Calculated Mean Wind:', result, 'u:', meanWind[2], 'v:', meanWind[3]);
 }
 
-function downloadTableAsAscii() {
+function downloadTableAsAscii(format) {
     if (!weatherData || !weatherData.time) {
         Utils.handleError('No weather data available to download.');
         return;
     }
 
+    const downloadFormat = getDownloadFormat();
     const index = document.getElementById('timeSlider').value || 0;
     const model = document.getElementById('modelSelect').value.toUpperCase();
     const time = Utils.formatTime(weatherData.time[index]).replace(' ', '_');
-    //Activate next line to use local time for the file name!!!
-    //const time = getDisplayTime(weatherData.time[index]).replace(' ', '_').replace(/[^\w-]/g, ''); // Clean for filename
-    const filename = `${time}_${model}_HEIDIS.txt`;
+    const filename = `${time}_${model}_${downloadFormat}.txt`;
     const heightUnit = getHeightUnit();
     const temperatureUnit = getTemperatureUnit();
     const windSpeedUnit = getWindSpeedUnit();
+    const elevation = getHeightUnit() === 'm' ? (lastAltitude * 3.28084).toFixed(0) : lastAltitude;
     const refLevel = document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL';
-    const heightHeader = refLevel === 'AGL' ? `h(${heightUnit}AGL)` : `h(${heightUnit}AMSL)`;
-    const temperatureHeader = temperatureUnit === 'C' ? '°C' : '°F';
-    const windSpeedHeader = windSpeedUnit;
-    let content = `${heightHeader} p(hPa) T(${temperatureHeader}) Dew(${temperatureHeader}) Dir(°) Spd(${windSpeedHeader}) RH(%)\n`;
+
+    let content = '';
+    //let separator = '\t'; // Default separator for alt_dir_spd format
+    let separator = ' '; // Default separator "space"
+
+    if (format === 'ATAK') {
+        content = `Alt Dir Spd\n${heightUnit}${refLevel}\n`; // Fixed header
+    } else if (format === 'Windwatch') {
+        content = `Version 1.0, ID = 9999999999\n${time}, Ground Level: ${elevation} ft\nWindsond ${model}\n AGL[ft] Wind[°] Speed[km/h]\n`; // Fixed header
+    } else if (format === 'HEIDIS') {
+        const heightHeader = refLevel === 'AGL' ? `h(${heightUnit}AGL)` : `h(${heightUnit}AMSL)`;
+        const temperatureHeader = temperatureUnit === 'C' ? '°C' : '°F';
+        const windSpeedHeader = windSpeedUnit;
+        content = `${heightHeader} p(hPa) T(${temperatureHeader}) Dew(${temperatureHeader}) Dir(°) Spd(${windSpeedHeader}) RH(%)`;
+    } else if (format === 'Customized') {
+        const heightHeader = refLevel === 'AGL' ? `h(${heightUnit}AGL)` : `h(${heightUnit}AMSL)`;
+        const temperatureHeader = temperatureUnit === 'C' ? '°C' : '°F';
+        const windSpeedHeader = windSpeedUnit;
+        content = `${heightHeader} p(hPa) T(${temperatureHeader}) Dew(${temperatureHeader}) Dir(°) Spd(${windSpeedHeader}) RH(%)`;
+    }
 
     const baseHeight = Math.round(lastAltitude);
     const surfaceHeight = refLevel === 'AGL' ? 0 : baseHeight;
     const surfaceTemp = weatherData.temperature_2m?.[index];
     const surfaceRH = weatherData.relative_humidity_2m?.[index];
-    const surfaceSpd = weatherData.wind_speed_10m?.[index]; // Raw km/h
+    const surfaceSpd = weatherData.wind_speed_10m?.[index];
     const surfaceDir = weatherData.wind_direction_10m?.[index];
     const surfaceDew = Utils.calculateDewpoint(surfaceTemp, surfaceRH);
     const pressureLevels = ['1000hPa', '950hPa', '925hPa', '900hPa', '850hPa', '800hPa', '700hPa', '600hPa', '500hPa', '400hPa', '300hPa', '250hPa', '200hPa'];
@@ -1220,13 +1236,23 @@ function downloadTableAsAscii() {
     const displaySurfaceHeight = Math.round(Utils.convertHeight(surfaceHeight, heightUnit));
     const displaySurfaceTemp = Utils.convertTemperature(surfaceTemp, temperatureUnit);
     const displaySurfaceDew = Utils.convertTemperature(surfaceDew, temperatureUnit);
-    const displaySurfaceSpd = Utils.convertWind(surfaceSpd, windSpeedUnit, 'km/h'); // Convert from km/h
+    const displaySurfaceSpd = Utils.convertWind(surfaceSpd, windSpeedUnit, 'km/h');
     const formattedSurfaceTemp = displaySurfaceTemp === 'N/A' ? 'N/A' : displaySurfaceTemp.toFixed(1);
     const formattedSurfaceDew = displaySurfaceDew === 'N/A' ? 'N/A' : displaySurfaceDew.toFixed(1);
     const formattedSurfaceSpd = displaySurfaceSpd === 'N/A' ? 'N/A' : (windSpeedUnit === 'bft' ? Math.round(displaySurfaceSpd) : displaySurfaceSpd.toFixed(1));
     const formattedSurfaceDir = surfaceDir === 'N/A' || surfaceDir === undefined ? 'N/A' : Math.round(surfaceDir);
     const formattedSurfaceRH = surfaceRH === 'N/A' || surfaceRH === undefined ? 'N/A' : Math.round(surfaceRH);
-    content += `${displaySurfaceHeight} ${surfacePressure === 'N/A' ? 'N/A' : surfacePressure.toFixed(1)} ${formattedSurfaceTemp} ${formattedSurfaceDew} ${formattedSurfaceDir} ${formattedSurfaceSpd} ${formattedSurfaceRH}\n`;
+
+    if (format === 'ATAK') {
+        content += `${displaySurfaceHeight}${separator}${formattedSurfaceDir}${separator}${formattedSurfaceSpd}\n`;
+    } else if (format === 'Windwatch') {
+        content += `${displaySurfaceHeight}${separator}${formattedSurfaceDir}${separator}${formattedSurfaceSpd}\n`;
+    } else if (format === 'HEIDIS') {
+        content += `\n${displaySurfaceHeight}${separator}${surfacePressure === 'N/A' ? 'N/A' : surfacePressure.toFixed(1)}${separator}${formattedSurfaceTemp}${separator}${formattedSurfaceDew}${separator}${formattedSurfaceDir}${separator}${formattedSurfaceSpd}${separator}${formattedSurfaceRH}\n`;
+    } else if (format === 'Customized') {
+        content += `\n${displaySurfaceHeight}${separator}${surfacePressure === 'N/A' ? 'N/A' : surfacePressure.toFixed(1)}${separator}${formattedSurfaceTemp}${separator}${formattedSurfaceDew}${separator}${formattedSurfaceDir}${separator}${formattedSurfaceSpd}${separator}${formattedSurfaceRH}\n`;
+    }
+
 
     const interpolatedData = interpolateWeatherData(index);
     if (!interpolatedData || interpolatedData.length === 0) {
@@ -1239,13 +1265,22 @@ function downloadTableAsAscii() {
             const displayHeight = Math.round(Utils.convertHeight(data.displayHeight, heightUnit));
             const displayTemperature = Utils.convertTemperature(data.temp, temperatureUnit);
             const displayDew = Utils.convertTemperature(data.dew, temperatureUnit);
-            const displaySpd = data.spd; // Already in selected unit from interpolateWeatherData
+            const displaySpd = data.spd;
             const formattedTemp = displayTemperature === 'N/A' ? 'N/A' : displayTemperature.toFixed(1);
             const formattedDew = displayDew === 'N/A' ? 'N/A' : displayDew.toFixed(1);
             const formattedSpd = displaySpd === 'N/A' ? 'N/A' : (windSpeedUnit === 'bft' ? Math.round(displaySpd) : displaySpd.toFixed(1));
             const formattedDir = data.dir === 'N/A' ? 'N/A' : Math.round(data.dir);
             const formattedRH = data.rh === 'N/A' ? 'N/A' : Math.round(data.rh);
-            content += `${displayHeight} ${data.pressure} ${formattedTemp} ${formattedDew} ${formattedDir} ${formattedSpd} ${formattedRH}\n`;
+
+            if (format === 'ATAK') {
+                content += `${displayHeight}${separator}${formattedDir}${separator}${formattedSpd}\n`;
+            } else if (format === 'Windwatch') {
+                content += `${displayHeight}${separator}${formattedDir}${separator}${formattedSpd}\n`;
+            } else if (format === 'HEIDIS') {
+                content += `${displayHeight}${separator}${data.pressure}${separator}${formattedTemp}${separator}${formattedDew}${separator}${formattedDir}${separator}${formattedSpd}${separator}${formattedRH}\n`;
+            } else if (format === 'Customized') {
+                content += `${displayHeight}${separator}${data.pressure}${separator}${formattedTemp}${separator}${formattedDew}${separator}${formattedDir}${separator}${formattedSpd}${separator}${formattedRH}\n`;
+            }
         }
     });
 
@@ -1726,7 +1761,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (downloadButton) {
         downloadButton.addEventListener('click', () => {
             console.log('Download button clicked!');
-            downloadTableAsAscii();
+            const downloadFormat = getDownloadFormat();
+            downloadTableAsAscii(downloadFormat);
         });
     }
 
@@ -2132,15 +2168,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const downloadFormatRadios = document.querySelectorAll('input[name="downloadFormat"]');
-                    if (downloadFormatRadios.length > 0) {
-                        downloadFormatRadios.forEach(radio => {
-                            radio.addEventListener('change', () => {
-                                userSettings.downloadFormat = document.querySelector('input[name="downloadFormat"]:checked').value;
-                                saveSettings();
-                                console.log('Download format changed:', getDownloadFormat());
-                            });
-                        });
-                    }
+    if (downloadFormatRadios.length > 0) {
+        downloadFormatRadios.forEach(radio => {
+            radio.addEventListener('change', () => {
+                userSettings.downloadFormat = document.querySelector('input[name="downloadFormat"]:checked').value;
+                saveSettings();
+                console.log('Download format changed:', getDownloadFormat());
+            });
+        });
+    }
 
     const toggleMeasureCheckbox = document.getElementById('toggleMeasure');
     let polylineMeasureControl = null; // To store the control instance
