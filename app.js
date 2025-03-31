@@ -168,10 +168,12 @@ async function getDisplayTime(utcTimeStr) {
 function initMap() {
     const defaultCenter = [48.0179, 11.1923];
     const defaultZoom = 10;
-    
-    map = L.map('map');
-    map.setView(defaultCenter, defaultZoom);
-    map.zoomControl.setPosition('topright');
+
+    map = L.map('map', {
+        center: defaultCenter,
+        zoom: defaultZoom,
+        zoomControl: false // Disable default zoom control
+    });
 
     // Define base layers
     const baseMaps = {
@@ -200,25 +202,20 @@ function initMap() {
     // Add default layer (e.g., OpenTopoMap)
     baseMaps["Esri Street"].addTo(map);
 
-    // Add layer control
-    L.control.layers(baseMaps).addTo(map);
+    // 1. Map tiles (layer control)
+    L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
 
-    // Add scale control
-    L.control.scale({
-        position: 'bottomleft', // You can change this to 'topleft', 'topright', 'bottomright'
-        metric: true,          // Show metric units (meters/kilometers)
-        imperial: true,        // Show imperial units (feet/miles)
-        maxWidth: 100          // Maximum width of the scale bar in pixels
-    }).addTo(map);
+    // 2. Zoom control
+    L.control.zoom({ position: 'topright' }).addTo(map);
 
-    // Add Leaflet.PolylineMeasure control
-    const polylineMeasure = L.control.polylineMeasure({
-        position: 'topright', // Position on the map
-        unit: 'kilometres', // Default unit (can be 'metres', 'kilometres', 'miles', 'nauticalmiles')
-        showBearings: true, // Display bearings between points
-        clearMeasurementsOnStop: false, // Keep measurements after stopping
-        showClearControl: true, // Show a button to clear all measurements
-        showUnitControl: true, // Allow switching units
+    // 3. Polyline measure control
+    L.control.polylineMeasure({
+        position: 'topright',
+        unit: 'kilometres',
+        showBearings: true,
+        clearMeasurementsOnStop: false,
+        showClearControl: true,
+        showUnitControl: true,
         tooltipTextFinish: 'Click to finish the line<br>',
         tooltipTextDelete: 'Shift-click to delete point',
         tooltipTextMove: 'Drag to move point<br>',
@@ -226,6 +223,14 @@ function initMap() {
         tooltipTextAdd: 'Click to add point<br>',
         measureControlTitleOn: 'Start measuring distance and bearing',
         measureControlTitleOff: 'Stop measuring'
+    }).addTo(map);
+
+    // Add scale control
+    L.control.scale({
+        position: 'bottomleft', // You can change this to 'topleft', 'topright', 'bottomright'
+        metric: true,          // Show metric units (meters/kilometers)
+        imperial: true,        // Show imperial units (feet/miles)
+        maxWidth: 100          // Maximum width of the scale bar in pixels
     }).addTo(map);
 
     // Custom icon setup
@@ -955,7 +960,7 @@ async function updateWeatherDisplay(index, originalTime = null) {
 
 async function checkAvailableModels(lat, lon) {
     const modelList = [
-       'icon_seamless', 'icon_global', 'icon_eu', 'icon_d2', 'ecmwf_ifs025', 'ecmwf_aifs025_single', 'gfs_seamless', 'gfs_global', 'gfs_hrrr', 'arome_france', 'gem_hrdps_continental', 'gem_regional'
+        'icon_seamless', 'icon_global', 'icon_eu', 'icon_d2', 'ecmwf_ifs025', 'ecmwf_aifs025_single', 'gfs_seamless', 'gfs_global', 'gfs_hrrr', 'arome_france', 'gem_hrdps_continental', 'gem_regional'
     ];
 
     let availableModels = [];
@@ -1424,7 +1429,7 @@ function updateLandingPattern() {
     const baseTime = (LEG_HEIGHT_BASE - LEG_HEIGHT_FINAL) / DESCENT_RATE_MPS;
     const baseGroundSpeedKt = CANOPY_SPEED_KT + baseHeadwind;
     if (baseGroundSpeedKt < 0) {
-        baseBearing= (baseBearing + 180) % 360; // Reverse the course
+        baseBearing = (baseBearing + 180) % 360; // Reverse the course
         console.log('Base ground speed is negative:', baseGroundSpeedKt, 'New course:', baseBearing);
     }
     const baseLength = baseGroundSpeedKt * 1.852 / 3.6 * baseTime;
@@ -1723,7 +1728,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (hamburgerBtn && menu) {
         // Toggle main menu
         hamburgerBtn.addEventListener('click', () => menu.classList.toggle('hidden'));
-    
+
         // Select all <span> elements with a following submenu
         const menuItems = menu.querySelectorAll('span');
         menuItems.forEach(item => {
@@ -1742,7 +1747,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 e.stopPropagation();
             });
         });
-    
+
         // Close all submenus when clicking outside
         document.addEventListener('click', (e) => {
             if (!menu.contains(e.target) && !hamburgerBtn.contains(e.target)) {
