@@ -1193,42 +1193,105 @@ function downloadTableAsAscii(format) {
         return;
     }
 
-    const downloadFormat = getDownloadFormat();
     const index = document.getElementById('timeSlider').value || 0;
     const model = document.getElementById('modelSelect').value.toUpperCase();
     const time = Utils.formatTime(weatherData.time[index]).replace(' ', '_');
-    const filename = `${time}_${model}_${downloadFormat}.txt`;
+    const filename = `${time}_${model}_${format}.txt`;
+
+    // Define format-specific required settings
+    const formatRequirements = {
+        'ATAK': {
+            interpStep: 1000,
+            heightUnit: 'ft',
+            refLevel: 'AGL',
+            windUnit: 'kt'
+        },
+        'Windwatch': {
+            interpStep: 100,
+            heightUnit: 'ft',
+            refLevel: 'AGL',
+            windUnit: 'km/h'
+        },
+        'HEIDIS': {
+            interpStep: 100,
+            heightUnit: 'm',
+            refLevel: 'AGL',
+            temperatureUnit: 'C',
+            windUnit: 'm/s'
+        },
+        'Customized': {} // No strict requirements, use current settings
+    };
+
+    // Store original settings
+    const originalSettings = {
+        interpStep: getInterpolationStep(),
+        heightUnit: getHeightUnit(),
+        refLevel: document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL',
+        windUnit: getWindSpeedUnit(),
+        temperatureUnit: getTemperatureUnit()
+    };
+
+    // Get current settings
+    let currentSettings = { ...originalSettings };
+
+    // Check and adjust settings if format has specific requirements
+    const requiredSettings = formatRequirements[format];
+    if (requiredSettings && Object.keys(requiredSettings).length > 0) {
+        let settingsAdjusted = false;
+
+        // Check each required setting and adjust if necessary
+        for (const [key, requiredValue] of Object.entries(requiredSettings)) {
+            if (currentSettings[key] !== requiredValue) {
+                settingsAdjusted = true;
+                switch (key) {
+                    case 'interpStep':
+                        document.getElementById('interpStepSelect').value = requiredValue;
+                        userSettings.interpStep = requiredValue;
+                        break;
+                    case 'heightUnit':
+                        document.querySelector(`input[name="heightUnit"][value="${requiredValue}"]`).checked = true;
+                        userSettings.heightUnit = requiredValue;
+                        break;
+                    case 'refLevel':
+                        document.querySelector(`input[name="refLevel"][value="${requiredValue}"]`).checked = true;
+                        userSettings.refLevel = requiredValue;
+                        break;
+                    case 'windUnit':
+                        document.querySelector(`input[name="windUnit"][value="${requiredValue}"]`).checked = true;
+                        userSettings.windUnit = requiredValue;
+                        break;
+                    case 'temperatureUnit':
+                        document.querySelector(`input[name="temperatureUnit"][value="${requiredValue}"]`).checked = true;
+                        userSettings.temperatureUnit = requiredValue;
+                        break;
+                }
+                currentSettings[key] = requiredValue;
+            }
+        }
+
+        if (settingsAdjusted) {
+            saveSettings();
+            console.log(`Adjusted settings for ${format} compatibility:`, requiredSettings);
+            updateHeightUnitLabels(); // Update UI labels if heightUnit changes
+            updateWindUnitLabels();   // Update UI labels if windUnit changes
+            updateReferenceLabels();  // Update UI labels if refLevel changes
+        }
+    }
+
+    // Prepare content based on format
+    let content = '';
+    let separator = ' '; // Default separator "space"
     const heightUnit = getHeightUnit();
     const temperatureUnit = getTemperatureUnit();
     const windSpeedUnit = getWindSpeedUnit();
-    const elevation = getHeightUnit() === 'm' ? (lastAltitude * 3.28084).toFixed(0) : lastAltitude;
     const refLevel = document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL';
-    const step = getInterpolationStep();
-
-    let content = '';
-    //let separator = '\t'; // Default separator for alt_dir_spd format
-    let separator = ' '; // Default separator "space"
 
     if (format === 'ATAK') {
-        if (step != 1000 || heightUnit != 'ft' || refLevel != 'AGL' || windSpeedUnit != 'kt') { // Using || as per your intent
-            const errorMessage = 'ATAK format requires step size of 1000, reference level of AGL, height unit of ft and wind speed of kt. Adjust settings before Download!';
-            Utils.handleError(errorMessage);
-            return;
-        }
-        content = `Alt Dir Spd\n${heightUnit}${refLevel}\n`; // Fixed header
+        content = `Alt Dir Spd\n${heightUnit}${refLevel}\n`;
     } else if (format === 'Windwatch') {
-        if (step != 100 || heightUnit != 'ft' || windSpeedUnit != 'km/h' || refLevel != 'AGL') { // Using || as per your intent
-            const errorMessage = 'Windwatch format requires step size of 100, height unit of ft, reference level of AGL and wind speed of km/h. Adjust settings before Download!';
-            Utils.handleError(errorMessage);
-            return;
-        }
-        content = `Version 1.0, ID = 9999999999\n${time}, Ground Level: ${elevation} ft\nWindsond ${model}\n AGL[ft] Wind[°] Speed[km/h]\n`; // Fixed header
+        const elevation = heightUnit === 'ft' ? Math.round(lastAltitude * 3.28084) : Math.round(lastAltitude);
+        content = `Version 1.0, ID = 9999999999\n${time}, Ground Level: ${elevation} ft\nWindsond ${model}\n AGL[ft] Wind[°] Speed[km/h]\n`;
     } else if (format === 'HEIDIS') {
-        if (heightUnit != 'm' || refLevel != 'AGL' || windSpeedUnit != 'm/s'  || temperatureUnit != '°C') { // Using || as per your intent
-            const errorMessage = 'HEIDIS format requires step height unit of m, reference level of AGL, temperature unit of °C and wind speed of m/s. Adjust settings before Download!';
-            Utils.handleError(errorMessage);
-            return;
-        }
         const heightHeader = refLevel === 'AGL' ? `h(${heightUnit}AGL)` : `h(${heightUnit}AMSL)`;
         const temperatureHeader = temperatureUnit === 'C' ? '°C' : '°F';
         const windSpeedHeader = windSpeedUnit;
@@ -1240,6 +1303,7 @@ function downloadTableAsAscii(format) {
         content = `${heightHeader} p(hPa) T(${temperatureHeader}) Dew(${temperatureHeader}) Dir(°) Spd(${windSpeedHeader}) RH(%)`;
     }
 
+    // Generate surface data
     const baseHeight = Math.round(lastAltitude);
     const surfaceHeight = refLevel === 'AGL' ? 0 : baseHeight;
     const surfaceTemp = weatherData.temperature_2m?.[index];
@@ -1273,7 +1337,7 @@ function downloadTableAsAscii(format) {
         content += `\n${displaySurfaceHeight}${separator}${surfacePressure === 'N/A' ? 'N/A' : surfacePressure.toFixed(1)}${separator}${formattedSurfaceTemp}${separator}${formattedSurfaceDew}${separator}${formattedSurfaceDir}${separator}${formattedSurfaceSpd}${separator}${formattedSurfaceRH}\n`;
     }
 
-
+    // Generate interpolated data
     const interpolatedData = interpolateWeatherData(index);
     if (!interpolatedData || interpolatedData.length === 0) {
         Utils.handleError('No interpolated data available to download.');
@@ -1285,7 +1349,7 @@ function downloadTableAsAscii(format) {
             const displayHeight = Math.round(Utils.convertHeight(data.displayHeight, heightUnit));
             const displayTemperature = Utils.convertTemperature(data.temp, temperatureUnit);
             const displayDew = Utils.convertTemperature(data.dew, temperatureUnit);
-            const displaySpd = data.spd;
+            const displaySpd = Utils.convertWind(data.spd, windSpeedUnit, getWindSpeedUnit()); // Use current windUnit
             const formattedTemp = displayTemperature === 'N/A' ? 'N/A' : displayTemperature.toFixed(1);
             const formattedDew = displayDew === 'N/A' ? 'N/A' : displayDew.toFixed(1);
             const formattedSpd = displaySpd === 'N/A' ? 'N/A' : (windSpeedUnit === 'bft' ? Math.round(displaySpd) : displaySpd.toFixed(1));
@@ -1304,6 +1368,7 @@ function downloadTableAsAscii(format) {
         }
     });
 
+    // Create and trigger the download
     const blob = new Blob([content], { type: 'text/plain' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -1313,6 +1378,22 @@ function downloadTableAsAscii(format) {
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
+
+    // Optionally revert settings (commented out to persist changes in UI)
+    document.getElementById('interpStepSelect').value = originalSettings.interpStep;
+    document.querySelector(`input[name="heightUnit"][value="${originalSettings.heightUnit}"]`).checked = true;
+    document.querySelector(`input[name="refLevel"][value="${originalSettings.refLevel}"]`).checked = true;
+    document.querySelector(`input[name="windUnit"][value="${originalSettings.windUnit}"]`).checked = true;
+    document.querySelector(`input[name="temperatureUnit"][value="${originalSettings.temperatureUnit}"]`).checked = true;
+    userSettings.interpStep = originalSettings.interpStep;
+    userSettings.heightUnit = originalSettings.heightUnit;
+    userSettings.refLevel = originalSettings.refLevel;
+    userSettings.windUnit = originalSettings.windUnit;
+    userSettings.temperatureUnit = originalSettings.temperatureUnit;
+    saveSettings();
+    updateHeightUnitLabels();
+    updateWindUnitLabels();
+    updateReferenceLabels();
 }
 
 
