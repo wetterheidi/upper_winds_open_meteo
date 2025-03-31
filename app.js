@@ -22,6 +22,7 @@ const defaultSettings = {
     windUnit: 'kt',
     timeZone: 'Z',
     coordFormat: 'Decimal',
+    downloadFormat: 'HEIDIS',
     showTable: false,
     //showCanopyParameters: false,
     canopySpeed: 20,
@@ -87,6 +88,10 @@ function getHeightUnit() {
 
 function getCoordinateFormat() {
     return document.querySelector('input[name="coordFormat"]:checked')?.value || 'Decimal';
+}
+
+function getDownloadFormat() {
+    return document.querySelector('input[name="downloadFormat"]:checked')?.value || 'HEIDIS';
 }
 
 function updateHeightUnitLabels() {
@@ -1571,6 +1576,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setRadioValue('windUnit', userSettings.windUnit);
     setRadioValue('timeZone', userSettings.timeZone);
     setRadioValue('coordFormat', userSettings.coordFormat);
+    setRadioValue('downloadFormat', userSettings.downloadFormat);
     setRadioValue('landingDirection', userSettings.landingDirection);
 
     // Sichere Aktualisierung der anderen Elemente
@@ -2124,6 +2130,17 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
     }
+
+    const downloadFormatRadios = document.querySelectorAll('input[name="downloadFormat"]');
+                    if (downloadFormatRadios.length > 0) {
+                        downloadFormatRadios.forEach(radio => {
+                            radio.addEventListener('change', () => {
+                                userSettings.downloadFormat = document.querySelector('input[name="downloadFormat"]:checked').value;
+                                saveSettings();
+                                console.log('Download format changed:', getDownloadFormat());
+                            });
+                        });
+                    }
 
     const toggleMeasureCheckbox = document.getElementById('toggleMeasure');
     let polylineMeasureControl = null; // To store the control instance
