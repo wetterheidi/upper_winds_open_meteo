@@ -1210,15 +1210,25 @@ function downloadTableAsAscii(format) {
     let separator = ' '; // Default separator "space"
 
     if (format === 'ATAK') {
-        if (step != 1000 || heightUnit != 'ft') { // Using || as per your intent
-            const errorMessage = 'ATAK format requires step size of 1000 and height unit of ft. Adjust settings before Download!';
+        if (step != 1000 || heightUnit != 'ft' || refLevel != 'AGL' || windSpeedUnit != 'kt') { // Using || as per your intent
+            const errorMessage = 'ATAK format requires step size of 1000, reference level of AGL, height unit of ft and wind speed of kt. Adjust settings before Download!';
             Utils.handleError(errorMessage);
             return;
         }
         content = `Alt Dir Spd\n${heightUnit}${refLevel}\n`; // Fixed header
     } else if (format === 'Windwatch') {
+        if (step != 100 || heightUnit != 'ft' || windSpeedUnit != 'km/h' || refLevel != 'AGL') { // Using || as per your intent
+            const errorMessage = 'Windwatch format requires step size of 100, height unit of ft, reference level of AGL and wind speed of km/h. Adjust settings before Download!';
+            Utils.handleError(errorMessage);
+            return;
+        }
         content = `Version 1.0, ID = 9999999999\n${time}, Ground Level: ${elevation} ft\nWindsond ${model}\n AGL[ft] Wind[°] Speed[km/h]\n`; // Fixed header
     } else if (format === 'HEIDIS') {
+        if (heightUnit != 'm' || refLevel != 'AGL' || windSpeedUnit != 'm/s'  || temperatureUnit != '°C') { // Using || as per your intent
+            const errorMessage = 'HEIDIS format requires step height unit of m, reference level of AGL, temperature unit of °C and wind speed of m/s. Adjust settings before Download!';
+            Utils.handleError(errorMessage);
+            return;
+        }
         const heightHeader = refLevel === 'AGL' ? `h(${heightUnit}AGL)` : `h(${heightUnit}AMSL)`;
         const temperatureHeader = temperatureUnit === 'C' ? '°C' : '°F';
         const windSpeedHeader = windSpeedUnit;
