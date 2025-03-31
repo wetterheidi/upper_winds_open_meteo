@@ -878,7 +878,7 @@ async function fetchWeather(lat, lon, currentTime = null) {
                 console.error(`UI mismatch or invalid time: Displayed ${displayedTime} but expected ${expectedTime}, forcing correction`);
                 const validIndex = Math.min(slider.value, weatherData.time.length - 1);
                 slider.value = validIndex >= 0 ? validIndex : 0;
-                updateWeatherDisplay(sliver.value, currentTime);
+                updateWeatherDisplay(slider.value, currentTime);
                 document.getElementById('selectedTime').innerHTML = `Selected Time: ${weatherData.time[slider.value].replace('T', ' ').slice(0, -3)}Z`;
                 document.getElementById('info').innerHTML = '';
                 updateWeatherDisplay(slider.value, currentTime);
