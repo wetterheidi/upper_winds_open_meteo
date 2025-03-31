@@ -94,6 +94,10 @@ function getDownloadFormat() {
     return document.querySelector('input[name="downloadFormat"]:checked')?.value || 'HEIDIS';
 }
 
+function getInterpolationStep() {
+    return parseInt(document.getElementById('interpStepSelect').value) || 200;
+}
+
 function updateHeightUnitLabels() {
     const heightUnit = getHeightUnit();
     const refLevel = document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL';
@@ -1199,12 +1203,18 @@ function downloadTableAsAscii(format) {
     const windSpeedUnit = getWindSpeedUnit();
     const elevation = getHeightUnit() === 'm' ? (lastAltitude * 3.28084).toFixed(0) : lastAltitude;
     const refLevel = document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL';
+    const step = getInterpolationStep();
 
     let content = '';
     //let separator = '\t'; // Default separator for alt_dir_spd format
     let separator = ' '; // Default separator "space"
 
     if (format === 'ATAK') {
+        if (step != 1000 || heightUnit != 'ft') { // Using || as per your intent
+            const errorMessage = 'ATAK format requires step size of 1000 and height unit of ft. Adjust settings before Download!';
+            Utils.handleError(errorMessage);
+            return;
+        }
         content = `Alt Dir Spd\n${heightUnit}${refLevel}\n`; // Fixed header
     } else if (format === 'Windwatch') {
         content = `Version 1.0, ID = 9999999999\n${time}, Ground Level: ${elevation} ft\nWindsond ${model}\n AGL[ft] Wind[°] Speed[km/h]\n`; // Fixed header
@@ -1575,15 +1585,38 @@ function updateLandingPattern() {
 }
 
 function displayError(message) {
+    console.log('displayError called with:', message);
     let errorElement = document.getElementById('error-message');
     if (!errorElement) {
         errorElement = document.createElement('div');
         errorElement.id = 'error-message';
+        errorElement.style.position = 'fixed';
+        errorElement.style.top = '0';
+        errorElement.style.left = '0';
+        errorElement.style.width = '100%';
+        errorElement.style.backgroundColor = ' #ffcccc';
+        errorElement.style.borderRadius = '0 0 5px 5px';
+        errorElement.style.color = '#000000';
+        errorElement.style.padding = '10px';
+        errorElement.style.zIndex = '9999';
+        errorElement.style.display = 'block'; // Set initially
         document.body.appendChild(errorElement);
+        console.log('New error element created and appended');
     }
     errorElement.textContent = message;
-    errorElement.style.display = 'block';
-    setTimeout(() => errorElement.style.display = 'none', 5000);
+    errorElement.style.display = 'block'; // Ensure it’s visible
+    console.log('Error element state:', {
+        display: errorElement.style.display,
+        text: errorElement.textContent,
+        position: errorElement.style.position,
+        zIndex: errorElement.style.zIndex
+    });
+    // Reset any existing timeout and set a new one
+    clearTimeout(window.errorTimeout); // Prevent overlap from multiple calls
+    window.errorTimeout = setTimeout(() => {
+        errorElement.style.display = 'none';
+        console.log('Error hidden after 5s');
+    }, 5000);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
