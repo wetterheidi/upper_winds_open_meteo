@@ -12,6 +12,7 @@ let finalArrow = null;
 let baseArrow = null;
 let downwindArrow = null;
 let landingWindDir = null;
+let coordFormatSelect, coordInputs, moveMarkerBtn;
 
 // Default settings object
 const defaultSettings = {
@@ -2297,15 +2298,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 300));
     }
 
+    // Update coordFormatRadios listener to refresh inputs
     const coordFormatRadios = document.querySelectorAll('input[name="coordFormat"]');
     if (coordFormatRadios.length > 0) {
         coordFormatRadios.forEach(radio => {
             radio.addEventListener('change', () => {
                 userSettings.coordFormat = document.querySelector('input[name="coordFormat"]:checked').value;
                 saveSettings();
-                console.log('Coordinate format changed:', getCoordinateFormat());
+                console.log('Coordinate format changed to:', userSettings.coordFormat);
+                updateCoordInputs(userSettings.coordFormat); // Refresh input fields
                 if (currentMarker && lastLat && lastLng) {
-                    updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
+                    updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude); // Update popup
                 }
             });
         });
@@ -2362,4 +2365,147 @@ document.addEventListener('DOMContentLoaded', () => {
         saveSettings();
         location.reload(); // Reload to apply defaults
     });
+    const coordInputs = document.getElementById('coordInputs');
+    const moveMarkerBtn = document.getElementById('moveMarkerBtn');
+
+    // Function to update input fields based on format
+    function updateCoordInputs(format) {
+        coordInputs.innerHTML = ''; // Clear existing inputs
+        if (format === 'Decimal') {
+            coordInputs.innerHTML = `
+                <label>Latitude: <input type="number" id="latDec" step="any" placeholder="e.g., 48.0179"></label>
+                <label>Longitude: <input type="number" id="lngDec" step="any" placeholder="e.g., 11.1923"></label>
+            `;
+        } else if (format === 'DMS') {
+            coordInputs.innerHTML = `
+                <label>Lat: 
+                    <input type="number" id="latDeg" min="0" max="90" placeholder="Deg">°
+                    <input type="number" id="latMin" min="0" max="59" placeholder="Min">'
+                    <input type="number" id="latSec" min="0" max="59.999" step="0.001" placeholder="Sec">"
+                    <select id="latDir"><option value="N">N</option><option value="S">S</option></select>
+                </label>
+                <label>Lng: 
+                    <input type="number" id="lngDeg" min="0" max="180" placeholder="Deg">°
+                    <input type="number" id="lngMin" min="0" max="59" placeholder="Min">'
+                    <input type="number" id="lngSec" min="0" max="59.999" step="0.001" placeholder="Sec">"
+                    <select id="lngDir"><option value="E">E</option><option value="W">W</option></select>
+                </label>
+            `;
+        } else if (format === 'MGRS') {
+            coordInputs.innerHTML = `
+                <label>MGRS: <input type="text" id="mgrsCoord" placeholder="e.g., 32UPU12345678"></label>
+            `;
+        }
+        console.log(`Coordinate inputs updated to ${format}`);
+    }
+
+    // Function to parse coordinates based on user format
+    function parseCoordinates() {
+        let lat, lng;
+
+        if (userSettings.coordFormat === 'Decimal') {
+            lat = parseFloat(document.getElementById('latDec')?.value);
+            lng = parseFloat(document.getElementById('lngDec')?.value);
+            if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+                throw new Error('Invalid Decimal Degrees coordinates');
+            }
+        } else if (userSettings.coordFormat === 'DMS') {
+            const latDeg = parseInt(document.getElementById('latDeg')?.value) || 0;
+            const latMin = parseInt(document.getElementById('latMin')?.value) || 0;
+            const latSec = parseFloat(document.getElementById('latSec')?.value) || 0;
+            const latDir = document.getElementById('latDir')?.value;
+            const lngDeg = parseInt(document.getElementById('lngDeg')?.value) || 0;
+            const lngMin = parseInt(document.getElementById('lngMin')?.value) || 0;
+            const lngSec = parseFloat(document.getElementById('lngSec')?.value) || 0;
+            const lngDir = document.getElementById('lngDir')?.value;
+        
+            const latDmsString = `${latDeg}°${latMin}'${latSec}"${latDir}`;
+            const lngDmsString = `${lngDeg}°${lngMin}'${lngSec}"${lngDir}`;
+        
+            lat = Utils.dmsToDecimal(latDmsString);
+            lng = Utils.dmsToDecimal(lngDmsString);
+        
+            if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+                throw new Error('Invalid DMS coordinates');
+            }
+        } else if (userSettings.coordFormat === 'MGRS') {
+            const mgrsInput = document.getElementById('mgrsCoord')?.value.trim();
+            if (!mgrsInput) {
+                throw new Error('MGRS coordinate cannot be empty');
+            }
+
+            console.log('Attempting to parse MGRS:', mgrsInput);
+
+            if (!/^[0-6][0-9][A-HJ-NP-Z][A-HJ-NP-Z]{2}[0-9]+$/.test(mgrsInput)) {
+                throw new Error('MGRS format invalid. Example: 32UPU12345678 (zone, band, square, easting/northing)');
+            }
+
+            try {
+                if (typeof mgrs === 'undefined') {
+                    throw new Error('MGRS library not loaded. Check script inclusion.');
+                }
+
+                console.log('Calling mgrs.toPoint with:', mgrsInput);
+                [lng, lat] = mgrs.toPoint(mgrsInput);
+                console.log(`Parsed MGRS ${mgrsInput} to Lat: ${lat}, Lng: ${lng}`);
+
+                if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+                    throw new Error('Parsed MGRS coordinates out of valid range');
+                }
+            } catch (e) {
+                console.error('MGRS parsing failed:', e.message, 'Input:', mgrsInput);
+                throw new Error(`Invalid MGRS format: ${e.message}`);
+            }
+        }
+        return [lat, lng];
+    }
+
+    // Initialize inputs based on user setting
+    updateCoordInputs(userSettings.coordFormat);
+
+    // Event listener for moving the marker
+    if (moveMarkerBtn) {
+        moveMarkerBtn.addEventListener('click', async () => {
+            try {
+                const [lat, lng] = parseCoordinates();
+                lastLat = lat;
+                lastLng = lng;
+                lastAltitude = await getAltitude(lat, lng);
+
+                if (currentMarker) {
+                    currentMarker.setLatLng([lat, lng]);
+                } else {
+                    currentMarker = L.marker([lat, lng], {
+                        icon: L.icon({
+                            iconUrl: 'favicon.ico',
+                            iconSize: [32, 32],
+                            iconAnchor: [16, 32],
+                            popupAnchor: [0, -32],
+                            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+                            shadowSize: [41, 41],
+                            shadowAnchor: [13, 32]
+                        }),
+                        draggable: true
+                    }).addTo(map);
+                }
+
+                updateMarkerPopup(currentMarker, lat, lng, lastAltitude);
+                recenterMap();
+
+                document.getElementById('info').innerHTML = `Fetching weather and models...`;
+                const availableModels = await checkAvailableModels(lat, lng);
+                if (availableModels.length > 0) {
+                    await fetchWeather(lat, lng);
+                    updateModelRunInfo();
+                    if (lastAltitude !== 'N/A') calculateMeanWind();
+                    updateLandingPattern();
+                } else {
+                    document.getElementById('info').innerHTML = `No models available.`;
+                }
+            } catch (error) {
+                Utils.handleError(error.message);
+            }
+        });
+    }
+
 });

@@ -637,6 +637,24 @@ input[type="number"]:focus {
     display: none;
 }
 
+#coord-input-container {
+    font-family: 'Roboto', sans-serif;
+}
+
+#moveMarkerBtn {
+    margin-top: 10px;
+    padding: 5px 10px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+#moveMarkerBtn:hover {
+    background-color: #0056b3;
+}
+
 @keyframes spin {
     0% {
         transform: rotate(0deg);
