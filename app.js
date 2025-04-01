@@ -2365,6 +2365,7 @@ document.addEventListener('DOMContentLoaded', () => {
         saveSettings();
         location.reload(); // Reload to apply defaults
     });
+
     const coordInputs = document.getElementById('coordInputs');
     const moveMarkerBtn = document.getElementById('moveMarkerBtn');
 
@@ -2418,13 +2419,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const lngMin = parseInt(document.getElementById('lngMin')?.value) || 0;
             const lngSec = parseFloat(document.getElementById('lngSec')?.value) || 0;
             const lngDir = document.getElementById('lngDir')?.value;
-        
-            const latDmsString = `${latDeg}°${latMin}'${latSec}"${latDir}`;
-            const lngDmsString = `${lngDeg}°${lngMin}'${lngSec}"${lngDir}`;
-        
-            lat = Utils.dmsToDecimal(latDmsString);
-            lng = Utils.dmsToDecimal(lngDmsString);
-        
+
+            lat = Utils.dmsToDecimal(latDeg, latMin, latSec, latDir);
+            lng = Utils.dmsToDecimal(lngDeg, lngMin, lngSec, lngDir);
+
             if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
                 throw new Error('Invalid DMS coordinates');
             }

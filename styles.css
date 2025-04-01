@@ -9,9 +9,11 @@ html {
 }
 
 #map {
-    height: 70vh; /* Or use flex-grow: 1 if keeping flex layout */
+    height: 70vh;
+    /* Or use flex-grow: 1 if keeping flex layout */
     width: 100%;
-    margin-top: 90px; /* Keep space for slider */
+    margin-top: 90px;
+    /* Keep space for slider */
     z-index: 0;
 }
 
@@ -33,8 +35,10 @@ html {
 }
 
 .leaflet-bottom .leaflet-control-scale {
-    margin-bottom: 40px; /* Adjust this value to move it up */
-    margin-left: 10px;  /* Optional: Adjust this to move it right */
+    margin-bottom: 40px;
+    /* Adjust this value to move it up */
+    margin-left: 10px;
+    /* Optional: Adjust this to move it right */
 }
 
 .hamburger-menu {
@@ -71,8 +75,10 @@ html {
     min-width: 200px;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
     z-index: 300;
-    border-radius: 8px; /* Add rounded corners */
-    overflow: hidden; /* Ensure child elements respect the rounded boundary */
+    border-radius: 8px;
+    /* Add rounded corners */
+    overflow: hidden;
+    /* Ensure child elements respect the rounded boundary */
 }
 
 .menu li {
@@ -104,11 +110,13 @@ html {
 }
 
 .submenu:not(.hidden) {
-    display: block; /* Or your preferred style, e.g., 'list-item' */
+    display: block;
+    /* Or your preferred style, e.g., 'list-item' */
 }
 
 .submenu li {
-    padding: 8px 10px; /* Adjusted padding for radio buttons */
+    padding: 8px 10px;
+    /* Adjusted padding for radio buttons */
     border-bottom: 1px solid #eee;
     font-size: 13px;
 }
@@ -132,11 +140,14 @@ html {
 }
 
 .submenu input[type="radio"] {
-    appearance: none; /* Remove default styling */
+    appearance: none;
+    /* Remove default styling */
     width: 16px;
     height: 16px;
-    border: 2px solid #4da8da; /* Match button color */
-    border-radius: 50%; /* Circular radio buttons */
+    border: 2px solid #4da8da;
+    /* Match button color */
+    border-radius: 50%;
+    /* Circular radio buttons */
     margin-right: 8px;
     background-color: #fff;
     cursor: pointer;
@@ -156,7 +167,8 @@ html {
 }
 
 .submenu input[type="radio"]:hover:not(:checked) {
-    background: #e6f0fa; /* Light hover effect */
+    background: #e6f0fa;
+    /* Light hover effect */
 }
 
 .submenu input[type="radio"]:focus {
@@ -182,7 +194,8 @@ html {
 }
 
 .submenu input[type="number"] {
-    width: 60px; /* Match the customLandingDirection width */
+    width: 60px;
+    /* Match the customLandingDirection width */
     padding: 2px;
     margin-left: 5px;
     border: 1px solid #ccc;
@@ -200,8 +213,10 @@ html {
 .submenu li label {
     display: flex;
     align-items: center;
-    gap: 5px; /* Space between radio button, label text, and input */
-    white-space: nowrap; /* Prevent wrapping *
+    gap: 5px;
+    /* Space between radio button, label text, and input */
+    white-space: nowrap;
+    /* Prevent wrapping *
 }
 
 #customLandingDirection {
@@ -214,7 +229,8 @@ html {
 }
 
 #info {
-    display: none; /* Initially hidden */
+    display: none;
+    /* Initially hidden */
     background: rgba(255, 255, 255, 0.95);
     padding: 15px;
     border-radius: 8px;
@@ -323,7 +339,8 @@ button {
     margin-bottom: 10px;
     flex: 0 0 auto;
     display: grid;
-    grid-template-rows: auto auto; /* Remove third row if table is hidden */
+    grid-template-rows: auto auto;
+    /* Remove third row if table is hidden */
     gap: 10px;
 }
 
@@ -373,7 +390,8 @@ button {
     background-color: #f0f8ff;
 }
 
-#meanWindControls, #controls-row {
+#meanWindControls,
+#controls-row {
     display: grid;
     grid-template-columns: var(--grid-columns);
     align-items: center;
@@ -417,7 +435,8 @@ button {
 }
 
 #controls-row button {
-    grid-column: 5 / 6; /* Desktop default */
+    grid-column: 5 / 6;
+    /* Desktop default */
     width: auto;
     min-width: 100px;
     padding: 6px 10px;
@@ -467,7 +486,8 @@ button {
     width: var(--input-width);
     padding: 6px;
     box-sizing: border-box;
-    margin-right: 5px; /* Add spacing to the right of the select */
+    margin-right: 5px;
+    /* Add spacing to the right of the select */
 }
 
 #meanWindResult {
@@ -637,23 +657,48 @@ input[type="number"]:focus {
     display: none;
 }
 
-#coord-input-container {
-    font-family: 'Roboto', sans-serif;
+* Base styling for all coordinate inputs */
+#coordInputs label {
+    display: block; /* Stack labels vertically */
+    margin: 5px 0; /* Space between latitude and longitude */
+}
+
+/* Default inline behavior for DMS */
+#coordInputs label input, #coordInputs label select {
+    display: inline-block;
+    margin-right: 1px; /* Space between fields */
+    vertical-align: middle; /* Align inputs with text */
+}
+
+/* Specific widths by input type */
+#latDec, #lngDec { /* Decimal format */
+    width: 120px; /* Wider for decimal numbers */
+}
+
+#latDeg, #latMin, #lngDeg, #lngMin { /* DMS degrees and minutes */
+    width: 50px; /* Narrow for integer values */
+}
+
+#latSec, #lngSec { /* DMS seconds */
+    width: 60px; /* Slightly wider for decimals */
+}
+
+#latDir, #lngDir { /* DMS direction dropdowns */
+    width: 50px; /* Narrow for N/S/E/W */
+}
+
+#mgrsCoord { /* MGRS format */
+    width: 100%; /* Full width of submenu for long string */
+    width: 120px; /* Cap for readability */
 }
 
 #moveMarkerBtn {
-    margin-top: 10px;
-    padding: 5px 10px;
-    background-color: #007bff;
-    color: white;
-    border: none;
-    border-radius: 3px;
-    cursor: pointer;
+    display: block;
+    /* Ensure button takes full width or adjust as needed */
+    margin-top: 5px;
 }
 
-#moveMarkerBtn:hover {
-    background-color: #0056b3;
-}
+
 
 @keyframes spin {
     0% {
@@ -671,7 +716,8 @@ input[type="number"]:focus {
     width: 16px;
     height: 16px;
     border: 2px solid #4da8da;
-    border-radius: 4px; /* Square for checkbox */
+    border-radius: 4px;
+    /* Square for checkbox */
     margin-right: 8px;
     background-color: #fff;
     cursor: pointer;
@@ -715,6 +761,7 @@ input[type="number"]:focus {
     :root {
         --grid-columns: var(--label-width) var(--input-width) var(--label-width) var(--input-width);
     }
+
     body {
         flex-direction: column;
     }
@@ -750,7 +797,8 @@ input[type="number"]:focus {
         font-size: 13px;
     }
 
-    #meanWindControls, #controls-row {
+    #meanWindControls,
+    #controls-row {
         grid-template-rows: auto auto;
     }
 
@@ -769,9 +817,10 @@ input[type="number"]:focus {
     }
 
     #controls-row select {
-        margin-right: 5px; /* Ensure space before button */
+        margin-right: 5px;
+        /* Ensure space before button */
     }
-    
+
     #model-row {
         flex-wrap: wrap;
     }
@@ -787,6 +836,7 @@ input[type="number"]:focus {
         --input-width: 60px;
         --grid-columns: var(--label-width) var(--input-width) auto;
     }
+
     #slider-container {
         top: 35px;
         /* Increased to clear hamburger menu and its potential dropdown */
@@ -807,7 +857,8 @@ input[type="number"]:focus {
         left: 5px;
         min-width: 120px;
         top: 30px;
-        border-radius: 8px; /* Maintain rounded corners */
+        border-radius: 8px;
+        /* Maintain rounded corners */
     }
 
     .submenu {
@@ -815,7 +866,8 @@ input[type="number"]:focus {
     }
 
     .submenu li {
-        padding: 6px 8px; /* Slightly tighter for small screens */
+        padding: 6px 8px;
+        /* Slightly tighter for small screens */
     }
 
     .submenu input[type="radio"] {
@@ -834,8 +886,10 @@ input[type="number"]:focus {
     }
 
     #controls-row {
-        grid-template-columns: 100px 60px auto; /* Simplified for small screens, remove 1fr */
-        grid-template-rows: auto auto; /* Allow wrapping if needed */
+        grid-template-columns: 100px 60px auto;
+        /* Simplified for small screens, remove 1fr */
+        grid-template-rows: auto auto;
+        /* Allow wrapping if needed */
     }
 
     #controls-row label {
@@ -860,7 +914,8 @@ input[type="number"]:focus {
     /* If info or other elements follow, ensure they adjust */
     #bottom-container #info {
         grid-column: 1 / -1;
-        grid-row: 2; /* Moves below controls */
+        grid-row: 2;
+        /* Moves below controls */
     }
 }
 
@@ -878,11 +933,13 @@ input[type="number"]:focus {
     #info th,
     #info td {
         font-size: 13px;
-        padding: 4px 2px; /* Reduce padding for compactness */
+        padding: 4px 2px;
+        /* Reduce padding for compactness */
     }
 
     #info table {
-        font-size: 12px; /* Slightly smaller text */
+        font-size: 12px;
+        /* Slightly smaller text */
         width: 100%;
     }
 
@@ -911,20 +968,28 @@ input[type="number"]:focus {
 
     #bottom-container {
         display: grid;
-        grid-template-rows: auto auto; /* Ensure two distinct rows */
+        grid-template-rows: auto auto;
+        /* Ensure two distinct rows */
         gap: 5px;
-        padding: 5px; /* Reduce padding */
-        max-height: calc(100vh - 90px); /* Account for map and slider */
+        padding: 5px;
+        /* Reduce padding */
+        max-height: calc(100vh - 90px);
+        /* Account for map and slider */
         overflow-y: auto;
     }
 
     #bottom-container #info {
-        grid-column: 1 / -1; /* Full width */
-        grid-row: 2; /* Second row, below controls */
-        max-height: 40vh; /* Limit height to prevent overlap */
+        grid-column: 1 / -1;
+        /* Full width */
+        grid-row: 2;
+        /* Second row, below controls */
+        max-height: 40vh;
+        /* Limit height to prevent overlap */
         overflow-y: auto;
-        z-index: 100; /* Below controls */
-        margin-top: 5px; /* Space from button */
+        z-index: 100;
+        /* Below controls */
+        margin-top: 5px;
+        /* Space from button */
     }
 }
 
@@ -996,19 +1061,23 @@ input[type="number"]:focus {
 
 /* Enhanced wind speed styles */
 #info table tr.wind-low {
-    border: 2px solid lightblue !important; /* Keep for debugging */
+    border: 2px solid lightblue !important;
+    /* Keep for debugging */
 }
 
 #info table tr.wind-moderate {
-    border: 2px solid lightgreen !important; /* Keep for debugging */
+    border: 2px solid lightgreen !important;
+    /* Keep for debugging */
 }
 
 #info table tr.wind-high {
-    border: 2px solid #f5f34f !important; /* Keep for debugging */
+    border: 2px solid #f5f34f !important;
+    /* Keep for debugging */
 }
 
 #info table tr.wind-very-high {
-    border: 2px solid #ffcccc !important; /* Keep for debugging */
+    border: 2px solid #ffcccc !important;
+    /* Keep for debugging */
 }
 
 @media (max-width: 600px) {
@@ -1055,14 +1124,48 @@ input[type="number"]:focus {
     font-family: Roboto, sans-serif;
 }
 
+#latDec,
+#lngDec {
+    width: 100px;
+}
+
+#mgrsCoord {
+    max-width: 150px;
+}
+
+#latDeg,
+#latMin,
+#lngDeg,
+#lngMin {
+    width: 40px;
+}
+
+#latSec,
+#lngSec {
+    width: 50px;
+}
+
 /* Spin animation */
 @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
 }
 
 @keyframes pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.1); }
-    100% { transform: scale(1); }
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.1);
+    }
+
+    100% {
+        transform: scale(1);
+    }
 }
