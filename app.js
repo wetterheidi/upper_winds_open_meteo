@@ -684,7 +684,7 @@ async function fetchWeather(lat, lon, currentTime = null) {
         const endDateStr = `${endYear}-${endMonth}-${endDay}`;
 
         const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
-            `&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,` +
+            `&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,` +
             `temperature_1000hPa,relative_humidity_1000hPa,wind_speed_1000hPa,wind_direction_1000hPa,geopotential_height_1000hPa,` +
             `temperature_950hPa,relative_humidity_950hPa,wind_speed_950hPa,wind_direction_950hPa,geopotential_height_950hPa,` +
             `temperature_925hPa,relative_humidity_925hPa,wind_speed_925hPa,wind_direction_925hPa,geopotential_height_925hPa,` +
@@ -756,6 +756,7 @@ async function fetchWeather(lat, lon, currentTime = null) {
             relative_humidity_2m: data.hourly.relative_humidity_2m?.slice(targetIndex, lastValidIndex + 1) || [],
             wind_speed_10m: data.hourly.wind_speed_10m?.slice(targetIndex, lastValidIndex + 1) || [],
             wind_direction_10m: data.hourly.wind_direction_10m?.slice(targetIndex, lastValidIndex + 1) || [],
+            wind_gusts_10m: data.hourly.wind_gusts_10m?.slice(targetIndex, lastValidIndex + 1) || [],
             temperature_1000hPa: data.hourly.temperature_1000hPa?.slice(targetIndex, lastValidIndex + 1) || [],
             relative_humidity_1000hPa: data.hourly.relative_humidity_1000hPa?.slice(targetIndex, lastValidIndex + 1) || [],
             wind_speed_1000hPa: data.hourly.wind_speed_1000hPa?.slice(targetIndex, lastValidIndex + 1) || [],
@@ -959,7 +960,7 @@ async function updateWeatherDisplay(index, originalTime = null) {
 
     let output = `<table>`;
     output += `<tr><th>Height (${heightUnit} ${refLevel})</th><th>Dir (deg)</th><th>Spd (${windSpeedUnit})</th><th>T (${temperatureUnit === 'C' ? '°C' : '°F'})</th></tr>`;
-    interpolatedData.forEach(data => {
+    interpolatedData.forEach((data, idx) => {
         const spd = parseFloat(data.spd);
         let rowClass = '';
         if (windSpeedUnit === 'bft') {
@@ -977,8 +978,19 @@ async function updateWeatherDisplay(index, originalTime = null) {
         }
         const displayHeight = Utils.convertHeight(data.displayHeight, heightUnit);
         const displayTemp = Utils.convertTemperature(data.temp, temperatureUnit === 'C' ? '°C' : '°F');
-        const formattedTemp = displayTemp === 'N/A' ? 'N/A' : displayTemp.toFixed(1);
-        const formattedWind = data.spd === 'N/A' ? 'N/A' : (windSpeedUnit === 'bft' ? Math.round(data.spd) : data.spd.toFixed(1));
+        const formattedTemp = displayTemp === 'N/A' ? 'N/A' : displayTemp.toFixed(0);
+
+        let formattedWind;
+        if (idx === 0 && data.gust !== undefined && Number.isFinite(data.gust)) {
+            // Surface row: include gusts if available
+            const spdValue = windSpeedUnit === 'bft' ? Math.round(spd) : spd.toFixed(0);
+            const gustValue = windSpeedUnit === 'bft' ? Math.round(data.gust) : data.gust.toFixed(0);
+            formattedWind = `${spdValue} G ${gustValue}`;
+        } else {
+            // Other rows: only wind speed
+            formattedWind = data.spd === 'N/A' ? 'N/A' : (windSpeedUnit === 'bft' ? Math.round(data.spd) : data.spd.toFixed(0));
+        }
+
         output += `<tr class="${rowClass}"><td>${Math.round(displayHeight)}</td><td>${Utils.roundToTens(data.dir)}</td><td>${formattedWind}</td><td>${formattedTemp}</td></tr>`;
     });
     output += `</table>`;
@@ -1050,7 +1062,9 @@ function interpolateWeatherData(index) {
         rh: weatherData.relative_humidity_2m?.[index] ?? 'N/A',
         dir: weatherData.wind_direction_10m?.[index] ?? 'N/A',
         spd: Utils.convertWind(weatherData.wind_speed_10m?.[index], windSpeedUnit, 'km/h') ?? 'N/A',
-        spdKt: Utils.convertWind(weatherData.wind_speed_10m?.[index], 'kt', 'km/h') ?? 'N/A'
+        spdKt: Utils.convertWind(weatherData.wind_speed_10m?.[index], 'kt', 'km/h') ?? 'N/A',
+        gust: Utils.convertWind(weatherData.wind_gusts_10m?.[index], windSpeedUnit, 'km/h') ?? 'N/A',
+        gustKt: Utils.convertWind(weatherData.wind_gusts_10m?.[index], 'kt', 'km/h') ?? 'N/A'
     };
 
     // Pre-filter valid pressure level data points
