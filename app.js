@@ -36,7 +36,8 @@ const defaultSettings = {
     legHeightFinal: 100,
     interpStep: '200',
     lowerLimit: 0,
-    upperLimit: 3000
+    upperLimit: 3000,
+    baseMaps: 'Esri Street'
 };
 
 // Load settings from localStorage or use defaults
@@ -208,11 +209,29 @@ function initMap() {
         })
     };
 
-    // Add default layer (e.g., OpenTopoMap)
-    baseMaps["Esri Street"].addTo(map);
+    const selectedBaseMap = userSettings.baseMap in baseMaps ? userSettings.baseMap : "Esri Street";
+    const fallbackBaseMap = "OpenStreetMap"; // Fallback
 
+    const layer = baseMaps[selectedBaseMap];
+    layer.on('tileerror', () => {
+        console.warn(`${selectedBaseMap} tiles failed to load, switching to ${fallbackBaseMap}`);
+        if (map.hasLayer(layer)) {
+            map.removeLayer(layer);
+            baseMaps[fallbackBaseMap].addTo(map);
+            userSettings.baseMap = fallbackBaseMap; // save Fallback 
+            saveSettings();
+        }
+    });
+
+    layer.addTo(map);
     // 1. Map tiles (layer control)
     L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
+
+    map.on('baselayerchange', function (e) {
+        userSettings.baseMap = e.name;
+        saveSettings();
+        console.log(`Base map changed to: ${e.name}`);
+    });
 
     // 2. Zoom control
     L.control.zoom({ position: 'topright' }).addTo(map);
@@ -1783,6 +1802,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (customLL) customLL.disabled = userSettings.landingDirection !== 'LL';
     if (customRR) customRR.disabled = userSettings.landingDirection !== 'RR';
 
+    console.log('Loaded userSettings.baseMap:', userSettings.baseMap);
     console.log('DOM fully loaded, initializing map...');
     initMap();
 
