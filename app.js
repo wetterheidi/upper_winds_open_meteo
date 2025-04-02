@@ -214,6 +214,10 @@ function initMap() {
         })
     };
 
+    // Add Open-Meteo attribution to the map
+    const openMeteoAttribution = 'Weather data by <a href="https://open-meteo.com">Open-Meteo</a>';
+    map.attributionControl.addAttribution(openMeteoAttribution);
+
     const selectedBaseMap = userSettings.baseMap in baseMaps ? userSettings.baseMap : "Esri Street";
     const fallbackBaseMap = "OpenStreetMap"; // Fallback
 
