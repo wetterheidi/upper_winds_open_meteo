@@ -150,6 +150,75 @@ function updateWindUnitLabels() {
     }
 }
 
+function generateWindBarb(direction, speedKt) {
+    // Convert speed to knots if not already (assuming speedKt is in knots)
+    const speed = Math.round(speedKt);
+
+    // SVG dimensions
+    const width = 40;
+    const height = 40;
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const staffLength = 20;
+
+    // Determine hemisphere based on latitude (lastLat)
+    const isNorthernHemisphere = typeof lastLat === 'number' && !isNaN(lastLat) ? lastLat >= 0 : true;
+    const barbSide = isNorthernHemisphere ? -1 : 1; // -1 for left (Northern), 1 for right (Southern)
+
+    // Calculate barb components
+    let flags = Math.floor(speed / 50); // 50 kt flags
+    let remaining = speed % 50;
+    let fullBarbs = Math.floor(remaining / 10); // 10 kt full barbs
+    let halfBarbs = Math.floor((remaining % 10) / 5); // 5 kt half barbs
+
+    // Adjust for small speeds
+    if (speed < 5) {
+        fullBarbs = 0;
+        halfBarbs = 0;
+    } else if (speed < 10 && halfBarbs > 0) {
+        halfBarbs = 1; // Ensure at least one half barb for 5-9 kt
+    }
+
+    // Start SVG
+    let svg = `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`;
+
+    // Rotate based on wind direction (wind *from* direction)
+    const rotation = direction + 180; // Staff points toward wind source (tip at origin)
+    svg += `<g transform="translate(${centerX}, ${centerY}) rotate(${rotation})">`;
+
+    // Draw the staff (vertical line, base at bottom, tip at top toward the source)
+    svg += `<line x1="0" y1="${staffLength / 2}" x2="0" y2="${-staffLength / 2}" stroke="black" stroke-width="1"/>`;
+
+    // Draw barbs on the appropriate side, at the base of the staff
+    let yPos = staffLength / 2; // Start at the base (wind blowing toward this end)
+    const barbSpacing = 4;
+
+    // Flags (50 kt) - Triangle pointing to the correct side
+    for (let i = 0; i < flags; i++) {
+        svg += `<polygon points="0,${yPos} ${10 * barbSide},${yPos - 5} ${10 * barbSide},${yPos + 5}" fill="black"/>`;
+        yPos -= barbSpacing + 5; // Move up the staff (toward the tip)
+    }
+
+    // Full barbs (10 kt) - Straight to the correct side (perpendicular)
+    for (let i = 0; i < fullBarbs; i++) {
+        svg += `<line x1="0" y1="${yPos}" x2="${10 * barbSide}" y2="${yPos}" stroke="black" stroke-width="1"/>`;
+        yPos -= barbSpacing;
+    }
+
+    // Half barbs (5 kt) - Straight to the correct side (perpendicular)
+    if (halfBarbs > 0) {
+        svg += `<line x1="0" y1="${yPos}" x2="${5 * barbSide}" y2="${yPos}" stroke="black" stroke-width="1"/>`;
+    }
+
+    // Circle for calm winds (< 5 kt)
+    if (speed < 5) {
+        svg += `<circle cx="0" cy="0" r="3" fill="none" stroke="black" stroke-width="1"/>`;
+    }
+
+    svg += `</g></svg>`;
+    return svg;
+}
+
 function updateMarkerPopup(marker, lat, lng, altitude) {
     console.log('Updating marker popup:', { lat, lng, altitude, format: getCoordinateFormat() });
     const coordFormat = getCoordinateFormat();
@@ -967,8 +1036,7 @@ async function updateWeatherDisplay(index, originalTime = null) {
     const interpolatedData = interpolateWeatherData(index);
 
     let output = `<table>`;
-    output += `<tr><th>Height (${heightUnit} ${refLevel})</th><th>Dir (deg)</th><th>Spd (${windSpeedUnit})</th><th>T (${temperatureUnit === 'C' ? '°C' : '°F'})</th></tr>`;
-    interpolatedData.forEach((data, idx) => {
+    output += `<tr><th>Height (${heightUnit} ${refLevel})</th><th>Dir (deg)</th><th>Spd (${windSpeedUnit})</th><th>Wind</th><th>T (${temperatureUnit === 'C' ? '°C' : '°F'})</th></tr>`; interpolatedData.forEach((data, idx) => {
         const spd = parseFloat(data.spd);
         let rowClass = '';
         if (windSpeedUnit === 'bft') {
@@ -987,19 +1055,20 @@ async function updateWeatherDisplay(index, originalTime = null) {
         const displayHeight = Utils.convertHeight(data.displayHeight, heightUnit);
         const displayTemp = Utils.convertTemperature(data.temp, temperatureUnit === 'C' ? '°C' : '°F');
         const formattedTemp = displayTemp === 'N/A' ? 'N/A' : displayTemp.toFixed(0);
-
         let formattedWind;
         if (idx === 0 && data.gust !== undefined && Number.isFinite(data.gust)) {
-            // Surface row: include gusts if available
             const spdValue = windSpeedUnit === 'bft' ? Math.round(spd) : spd.toFixed(0);
             const gustValue = windSpeedUnit === 'bft' ? Math.round(data.gust) : data.gust.toFixed(0);
             formattedWind = `${spdValue} G ${gustValue}`;
         } else {
-            // Other rows: only wind speed
             formattedWind = data.spd === 'N/A' ? 'N/A' : (windSpeedUnit === 'bft' ? Math.round(data.spd) : data.spd.toFixed(0));
         }
 
-        output += `<tr class="${rowClass}"><td>${Math.round(displayHeight)}</td><td>${Utils.roundToTens(data.dir)}</td><td>${formattedWind}</td><td>${formattedTemp}</td></tr>`;
+        // Convert speed to knots for wind barbs
+        const speedKt = Math.round(Utils.convertWind(spd, 'kt', windSpeedUnit) / 5) * 5;
+        const windBarbSvg = data.dir === 'N/A' || isNaN(speedKt) ? 'N/A' : generateWindBarb(data.dir, speedKt);
+
+        output += `<tr class="${rowClass}"><td>${Math.round(displayHeight)}</td><td>${Utils.roundToTens(data.dir)}</td><td>${formattedWind}</td><td>${windBarbSvg}</td><td>${formattedTemp}</td></tr>`;
     });
     output += `</table>`;
     document.getElementById('info').innerHTML = output;
