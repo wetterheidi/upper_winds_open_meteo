@@ -119,7 +119,7 @@ class Utils {
         if (pressureLevels.length != heights.length || pressureLevels.length != uComponents.length || pressureLevels.length != vComponents.length) {
             return { u: 'Invalid input', v: 'Invalid input' };
         }
-    
+
         // Step 1: Find p(z) using log interpolation of p with respect to h
         const log_pressureLevels = pressureLevels.map(p => Math.log(p));
         const log_p_z = Utils.LIP(heights, log_pressureLevels, z);
@@ -127,14 +127,14 @@ class Utils {
             return { u: 'Interpolation error', v: 'Interpolation error' };
         }
         const p_z = Math.exp(log_p_z);
-    
+
         // Step 2: Interpolate u and v at p(z) using log(p) interpolation
         const u_z = Utils.LIP(log_pressureLevels, uComponents, Math.log(p_z));
         const v_z = Utils.LIP(log_pressureLevels, vComponents, Math.log(p_z));
         if (typeof u_z === 'string' && u_z.includes('error') || typeof v_z === 'string' && v_z.includes('error')) {
             return { u: 'Interpolation error', v: 'Interpolation error' };
         }
-    
+
         return { u: u_z, v: v_z };
     }
 
@@ -143,12 +143,12 @@ class Utils {
         if (!pressureLevels || !heights || pressureLevels.length !== heights.length || pressureLevels.length < 2) {
             return 'N/A';
         }
-    
+
         // Assume pressures and heights are already paired correctly (heights ascending, pressures ascending)
         if (height < heights[0] || height > heights[heights.length - 1]) {
             return 'N/A'; // No extrapolation
         }
-    
+
         for (let i = 0; i < heights.length - 1; i++) {
             if (height >= heights[i] && height <= heights[i + 1]) {
                 const h0 = heights[i], h1 = heights[i + 1];
@@ -348,30 +348,30 @@ class Utils {
         // Wind angle relative to heading
         const windAngle = Utils.calculateWindAngle(trueHeading, windDirection);
         const { crosswind, headwind } = Utils.calculateWindComponents(windSpeed, windAngle);
-    
+
         // TAS vector
         const tasU = trueAirspeed * Math.sin(trueHeading * Math.PI / 180);
         const tasV = trueAirspeed * Math.cos(trueHeading * Math.PI / 180);
-    
+
         // Wind vector (direction wind is going *to*)
         const windTo = (windDirection + 180) % 360;
         const windU = windSpeed * Math.sin(windTo * Math.PI / 180);
         const windV = windSpeed * Math.cos(windTo * Math.PI / 180);
-    
+
         // Ground speed vector
         const gsU = tasU + windU;
         const gsV = tasV + windV;
-    
+
         // True Course
         const trueCourse = Math.atan2(gsU, gsV) * (180 / Math.PI);
         const normalizedCourse = Utils.normalizeAngle(trueCourse);
-    
+
         // Ground Speed
         const groundSpeed = Math.sqrt(gsU * gsU + gsV * gsV);
-    
+
         // WCA (for reference)
         const wca = Utils.calculateWCA(crosswind, trueAirspeed) * (crosswind < 0 ? -1 : 1);
-    
+
         return {
             trueCourse: Number(normalizedCourse.toFixed(2)),
             groundSpeed: Number(groundSpeed.toFixed(2)),
@@ -471,6 +471,83 @@ class Utils {
             default:
                 return result.Decimal;
         }
+    }
+
+    // Calculation of the maximum possible glide distance for canopy flight without tailwind
+    static jumparea(flugRichtung) {
+        // Decompose average wind during glide into components
+        let xKompWind, yKompWind;
+        let xKompCanopy, yKompCanopy;
+        let jumpareaResult = new Array(3);
+        let meanWindDir, meanWindSpeed;
+        // All speeds in m/s!
+
+        try {
+            windeiKoordinate[0] = 0;
+            windeiKoordinate[1] = 0;
+            windeiKoordinate[2] = 0;
+
+            // Determine average wind and decompose into components
+            // Note: mittelwind function is assumed to be defined elsewhere
+            meanWindDir = Utils.calculateMeanWind(heights, xComponents, yComponents, legHeightDownwind, 1000)[0];
+            meanWindSpeed = Utils.calculateMeanWind(heights, xComponents, yComponents, legHeightDownwind, 1000)[1];
+
+            let time = (1000 - legHeightDownwind) / descentRate; // Time in seconds
+
+            xKompWind = Math.cos((270 - meanWindDir) / 180 * Math.PI) * meanWindSpeed;
+            yKompWind = Math.sin((270 - meanWindDir) / 180 * Math.PI) * meanWindSpeed;
+
+            // Decompose True Air Speed of the canopy into components
+            xKompCanopy = Math.cos((90 - flugRichtung) / 180 * Math.PI) * canopySpeed;
+            yKompCanopy = Math.sin((90 - flugRichtung) / 180 * Math.PI) * canopySpeed;
+
+            let xKompGroundSpeed;
+            let yKompGroundSpeed;
+
+            // Calculate groundspeed
+            xKompGroundSpeed = xKompCanopy + xKompWind;
+            yKompGroundSpeed = yKompCanopy + yKompWind;
+
+            // Calculate distances in North and East directions 
+            // (negative because we calculate backwards from landing point)
+            let distanceNS = -xKompGroundSpeed * time;
+            let distanceEW = -yKompGroundSpeed * time;
+
+            // Note: positionBerechnen function is assumed to be defined elsewhere
+            jumpareaResult[0] = Utils.calculatePosition(lastLat, lastLng,
+                distanceNS, distanceEW)[0];
+            jumpareaResult[1] = Utils.calculatePosition(lastLat, lastLng,
+                distanceNS, distanceEW)[1];
+            jumpareaResult[2] = Math.sqrt(Math.pow(distanceNS, 2) + Math.pow(distanceEW, 2));
+
+            return jumpareaResult;
+
+        } catch (ex) {
+            console.error(ex.message);
+            return jumpareaResult;
+        }
+    }
+
+    static calculatePosition(startLat, startLon, distanceNS, distanceEW) {
+        // Earth's radius in meters (approximate) approximation for short distances. Better would be the haversine formula
+        const earthRadius = 6378137;
+    
+        // Convert degrees to radians
+        const latRad = startLat * Math.PI / 180;
+    
+        // Calculate angular distances
+        const deltaLat = distanceNS / earthRadius;
+        const deltaLon = distanceEW / (earthRadius * Math.cos(latRad));
+    
+        // Calculate new coordinates in radians
+        const newLatRad = latRad + deltaLat;
+        const newLonRad = (startLon * Math.PI / 180) + deltaLon;
+    
+        // Convert back to degrees
+        const newLat = newLatRad * 180 / Math.PI;
+        const newLon = newLonRad * 180 / Math.PI;
+    
+        return [newLat, newLon];
     }
 
 }

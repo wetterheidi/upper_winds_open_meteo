@@ -13,6 +13,10 @@ let baseArrow = null;
 let downwindArrow = null;
 let landingWindDir = null;
 let coordFormatSelect, coordInputs, moveMarkerBtn;
+let jumpCircle = null;
+
+//CONSTANTS FOR TESTING
+const OPENING_ALTITUDE = 1200; // Opening altitude in meters
 
 // Default settings object
 const defaultSettings = {
@@ -82,6 +86,33 @@ function updateReferenceLabels() {
         const updatedText = currentText.replace(/\((\d+)-(\d+) m [A-Za-z]+\)/, `($1-$2 m ${refLevel})`);
         meanWindResult.innerHTML = updatedText;
     }
+}
+
+function calculateJump() {
+    const heightDistance = OPENING_ALTITUDE - legHeightDownwind;
+    const flyTime = heightDistance / descentRate;
+    const horizontalCanopyDistance = flyTime * canopySpeed; //radius for jump circle!
+    //Shifting the jump circle respecting the mean wind
+    const flyMeanWind = calculateMeanWind();
+    const centerDisplacement = flyMeanWind * flyTime;
+    const displacementDirection = calculateMeanWindDirection();
+}
+
+function updateJumpCircle(lat, lng) {
+    // Remove existing circle if it exists
+    if (jumpCircle) {
+        jumpCircle.remove();
+    }
+
+    // Create new circle
+    jumpCircle = L.circle([lat, lng], {
+        radius: 3000, // 3 km in meters
+        color: 'blue', // Outline color
+        fillColor: 'blue', // Fill color
+        fillOpacity: 0.2, // Transparency (0 = fully transparent, 1 = fully opaque)
+        weight: 1, // Outline thickness
+        opacity: 0.5 // Outline opacity
+    }).addTo(map);
 }
 
 function getTemperatureUnit() {
@@ -358,6 +389,7 @@ function initMap() {
     }).addTo(map);
     currentMarker.bindPopup(''); // Bind an empty popup
     updateMarkerPopup(currentMarker, defaultCenter[0], defaultCenter[1], initialAltitude);
+    updateJumpCircle(defaultCenter[0], defaultCenter[1]);
 
     // Add dragend event listener
     currentMarker.on('dragend', async (e) => {
@@ -369,6 +401,7 @@ function initMap() {
 
         // Update popup content
         updateMarkerPopup(marker, lastLat, lastLng, lastAltitude);
+        updateJumpCircle(lastLat, lastLng); // Add this line
         recenterMap();
 
         // Fetch weather data for new position
@@ -403,6 +436,7 @@ function initMap() {
                     draggable: true
                 }).addTo(map);
                 updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
+                updateJumpCircle(lastLat, lastLng); // Add this line
 
                 // Add dragend event for geolocation marker
                 currentMarker.on('dragend', async (e) => {
@@ -537,6 +571,7 @@ function initMap() {
 
         // Update popup for the new marker
         updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
+        updateJumpCircle(lastLat, lastLng); // Add this line
 
         // Add dragend event for the new marker
         currentMarker.on('dragend', async (e) => {
@@ -615,6 +650,7 @@ function initMap() {
             }).addTo(map);
 
             updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
+            updateJumpCircle(lastLat, lastLng); // Add this line
 
             currentMarker.on('dragend', async (e) => {
                 const marker = e.target;
@@ -2579,6 +2615,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 updateMarkerPopup(currentMarker, lat, lng, lastAltitude);
+                updateJumpCircle(lastLat, lastLng); // Add this line
                 recenterMap();
 
                 document.getElementById('info').innerHTML = `Fetching weather and models...`;
