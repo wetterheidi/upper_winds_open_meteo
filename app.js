@@ -14,6 +14,7 @@ let downwindArrow = null;
 let landingWindDir = null;
 let coordFormatSelect, coordInputs, moveMarkerBtn;
 let jumpCircle = null;
+let marker = null;
 
 //CONSTANTS FOR TESTING
 const OPENING_ALTITUDE = 1200; // Opening altitude in meters
@@ -42,7 +43,9 @@ const defaultSettings = {
     interpStep: '200',
     lowerLimit: 0,
     upperLimit: 3000,
-    baseMaps: 'Esri Street'
+    baseMaps: 'Esri Street',
+    calculateJump: false,      // New setting for checkbox
+    openingAltitude: 1200,      // New setting for opening altitude
 };
 
 // Load settings from localStorage or use defaults
@@ -89,30 +92,122 @@ function updateReferenceLabels() {
 }
 
 function calculateJump() {
-    const heightDistance = OPENING_ALTITUDE - legHeightDownwind;
-    const flyTime = heightDistance / descentRate;
-    const horizontalCanopyDistance = flyTime * canopySpeed; //radius for jump circle!
-    //Shifting the jump circle respecting the mean wind
-    const flyMeanWind = calculateMeanWind();
-    const centerDisplacement = flyMeanWind * flyTime;
-    const displacementDirection = calculateMeanWindDirection();
-}
+    // Get values from user inputs
+    const openingAltitude = parseInt(document.getElementById('openingAltitude')?.value) || 1200;
+    const legHeightDownwind = parseInt(document.getElementById('legHeightDownwind')?.value) || 300;
+    const descentRate = parseFloat(document.getElementById('descentRate')?.value) || 3.5;
+    const canopySpeed = parseFloat(document.getElementById('canopySpeed')?.value) || 20;
 
-function updateJumpCircle(lat, lng) {
-    // Remove existing circle if it exists
-    if (jumpCircle) {
-        jumpCircle.remove();
+    // Convert canopy speed from knots to m/s (1 kt = 0.514444 m/s)
+    const canopySpeedMps = canopySpeed * 0.514444;
+
+    // Calculate basic jump parameters
+    const heightDistance = openingAltitude - legHeightDownwind;
+    const flyTime = heightDistance / descentRate;
+    const horizontalCanopyDistance = flyTime * canopySpeedMps; // Radius in meters
+
+    // Calculate mean wind between openingAltitude and legHeightDownwind
+    const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
+    const interpolatedData = interpolateWeatherData(sliderIndex);
+
+    if (!interpolatedData || interpolatedData.length === 0) {
+        console.warn('No interpolated weather data available for mean wind calculation');
+        return null;
     }
 
-    // Create new circle
-    jumpCircle = L.circle([lat, lng], {
-        radius: 3000, // 3 km in meters
-        color: 'blue', // Outline color
-        fillColor: 'blue', // Fill color
-        fillOpacity: 0.2, // Transparency (0 = fully transparent, 1 = fully opaque)
-        weight: 1, // Outline thickness
-        opacity: 0.5 // Outline opacity
+    // Filter data between legHeightDownwind and openingAltitude (AGL)
+    const baseHeight = Math.round(lastAltitude);
+    const lowerLimit = baseHeight + legHeightDownwind;
+    const upperLimit = baseHeight + openingAltitude;
+
+    const heights = interpolatedData.map(d => d.height);
+    const dirs = interpolatedData.map(d => Number.isFinite(d.dir) ? parseFloat(d.dir) : 0);
+    const spdsMps = interpolatedData.map(d => {
+        const spd = Number.isFinite(d.spd) ? parseFloat(d.spd) : 0;
+        return Utils.convertWind(spd, 'm/s', getWindSpeedUnit());
+    });
+
+    // Calculate U and V components (in m/s, wind FROM direction)
+    const uComponents = spdsMps.map((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
+    const vComponents = spdsMps.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
+
+    // Calculate mean wind speed and direction between limits
+    const meanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, lowerLimit, upperLimit);
+    const meanWindDirection = meanWind[0]; // in degrees
+    const meanWindSpeedMps = meanWind[1]; // in m/s
+
+    // Calculate displacement due to mean wind
+    const centerDisplacement = meanWindSpeedMps * flyTime; // in meters
+    const displacementDirection = meanWindDirection; // in degrees (wind FROM direction)
+
+    // Log results for verification
+    console.log('Jump Calculation Results:');
+    console.log(`- Opening Altitude: ${openingAltitude} m`);
+    console.log(`- Height Distance: ${heightDistance} m`);
+    console.log(`- Fly Time: ${flyTime.toFixed(2)} s`);
+    console.log(`- Canopy Speed: ${canopySpeedMps.toFixed(2)} m/s`);
+    console.log(`- Horizontal Canopy Distance (radius): ${horizontalCanopyDistance.toFixed(2)} m`);
+    console.log(`- Mean Wind Speed (between ${legHeightDownwind}m and ${openingAltitude}m): ${meanWindSpeedMps.toFixed(2)} m/s`);
+    console.log(`- Mean Wind Direction: ${meanWindDirection.toFixed(1)}°`);
+    console.log(`- Center Displacement: ${centerDisplacement.toFixed(2)} m`);
+    console.log(`- Displacement Direction: ${displacementDirection.toFixed(1)}°`);
+
+    // Update or create the jump circle
+    updateJumpCircle(lastLat, lastLng, horizontalCanopyDistance, centerDisplacement, displacementDirection);
+
+    return { radius: horizontalCanopyDistance, displacement: centerDisplacement, direction: displacementDirection };
+}
+
+function updateJumpCircle(lat, lng, radius, displacement, direction) {
+    if (!map || !lat || !lng) {
+        console.warn('Map or coordinates not available to update jump circle');
+        return;
+    }
+
+    // Calculate new center based on displacement and direction
+    const newCenter = calculateNewCenter(lat, lng, displacement, direction);
+
+    // Remove existing jump circle if it exists
+    if (jumpCircle) {
+        map.removeLayer(jumpCircle);
+    }
+
+    // Create new jump circle at the displaced center
+    jumpCircle = L.circle(newCenter, {
+        radius: radius, // in meters
+        color: 'blue',
+        fillColor: 'blue',
+        fillOpacity: 0.2,
+        weight: 2
     }).addTo(map);
+
+    // Ensure the marker stays at the original position
+    if (!marker) {
+        marker = L.marker([lat, lng]).addTo(map);
+    }
+}
+
+function calculateNewCenter(lat, lng, distance, bearing) {
+    const R = 6371000; // Earth's radius in meters
+    const lat1 = lat * Math.PI / 180; // Convert to radians
+    const lng1 = lng * Math.PI / 180;
+    const bearingRad = bearing * Math.PI / 180; // Wind FROM direction
+
+    const delta = distance / R; // Angular distance
+
+    const lat2 = Math.asin(Math.sin(lat1) * Math.cos(delta) +
+                          Math.cos(lat1) * Math.sin(delta) * Math.cos(bearingRad));
+    const lng2 = lng1 + Math.atan2(Math.sin(bearingRad) * Math.sin(delta) * Math.cos(lat1),
+                                  Math.cos(delta) - Math.sin(lat1) * Math.sin(lat2));
+
+    // Convert back to degrees
+    const newLat = lat2 * 180 / Math.PI;
+    const newLng = lng2 * 180 / Math.PI;
+
+    // Normalize longitude to [-180, 180]
+    const normalizedLng = ((newLng + 540) % 360) - 180;
+
+    return [newLat, normalizedLng];
 }
 
 function getTemperatureUnit() {
@@ -389,8 +484,9 @@ function initMap() {
     }).addTo(map);
     currentMarker.bindPopup(''); // Bind an empty popup
     updateMarkerPopup(currentMarker, defaultCenter[0], defaultCenter[1], initialAltitude);
-    updateJumpCircle(defaultCenter[0], defaultCenter[1]);
-
+    if (userSettings.calculateJump) {
+        calculateJump();
+    }
     // Add dragend event listener
     currentMarker.on('dragend', async (e) => {
         const marker = e.target;
@@ -401,7 +497,9 @@ function initMap() {
 
         // Update popup content
         updateMarkerPopup(marker, lastLat, lastLng, lastAltitude);
-        updateJumpCircle(lastLat, lastLng); // Add this line
+        if (userSettings.calculateJump) {
+            calculateJump();
+        }
         recenterMap();
 
         // Fetch weather data for new position
@@ -436,8 +534,9 @@ function initMap() {
                     draggable: true
                 }).addTo(map);
                 updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
-                updateJumpCircle(lastLat, lastLng); // Add this line
-
+                if (userSettings.calculateJump) {
+                    calculateJump();
+                }
                 // Add dragend event for geolocation marker
                 currentMarker.on('dragend', async (e) => {
                     const marker = e.target;
@@ -447,7 +546,9 @@ function initMap() {
                     lastAltitude = await getAltitude(lastLat, lastLng);
 
                     updateMarkerPopup(marker, lastLat, lastLng, lastAltitude);
-
+                    if (userSettings.calculateJump) {
+                        calculateJump();
+                    }
                     recenterMap();
 
                     document.getElementById('info').innerHTML = `Fetching weather and models...`;
@@ -571,8 +672,9 @@ function initMap() {
 
         // Update popup for the new marker
         updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
-        updateJumpCircle(lastLat, lastLng); // Add this line
-
+        if (userSettings.calculateJump) {
+            calculateJump();
+        }
         // Add dragend event for the new marker
         currentMarker.on('dragend', async (e) => {
             const marker = e.target;
@@ -582,6 +684,9 @@ function initMap() {
             lastAltitude = await getAltitude(lastLat, lastLng);
 
             updateMarkerPopup(marker, lastLat, lastLng, lastAltitude);
+            if (userSettings.calculateJump) {
+                calculateJump();
+            }
             recenterMap();
 
             const slider = document.getElementById('timeSlider');
@@ -650,8 +755,9 @@ function initMap() {
             }).addTo(map);
 
             updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
-            updateJumpCircle(lastLat, lastLng); // Add this line
-
+            if (userSettings.calculateJump) {
+                calculateJump();
+            }
             currentMarker.on('dragend', async (e) => {
                 const marker = e.target;
                 const position = marker.getLatLng();
@@ -660,6 +766,9 @@ function initMap() {
                 lastAltitude = await getAltitude(lastLat, lastLng);
 
                 updateMarkerPopup(marker, lastLat, lastLng, lastAltitude);
+                if (userSettings.calculateJump) {
+                    calculateJump();
+                }
                 recenterMap();
 
                 const slider = document.getElementById('timeSlider');
@@ -1898,7 +2007,9 @@ document.addEventListener('DOMContentLoaded', () => {
         'legHeightFinal': userSettings.legHeightFinal,
         'interpStepSelect': userSettings.interpStep,
         'lowerLimit': userSettings.lowerLimit,
-        'upperLimit': userSettings.upperLimit
+        'upperLimit': userSettings.upperLimit,
+        'calculateJumpCheckbox': userSettings.calculateJump, // New
+        'openingAltitude': userSettings.openingAltitude     // New
     };
 
     Object.entries(elements).forEach(([id, value]) => {
@@ -1923,6 +2034,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const landingSubmenu = document.getElementById('showLandingPattern')?.closest('li')?.querySelector('.submenu');
     if (landingSubmenu) {
         landingSubmenu.classList.toggle('hidden', !userSettings.showLandingPattern);
+    }
+    // Initialize UI status
+    const calculateJumpSubmenu = document.getElementById('calculateJumpCheckbox')?.closest('li')?.querySelector('.submenu');
+    if (calculateJumpSubmenu) {
+        calculateJumpSubmenu.classList.toggle('hidden', !userSettings.calculateJump);
     }
 
     const customLL = document.getElementById('customLandingDirectionLL');
@@ -1973,32 +2089,60 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    // Existing slider event listener (unchanged)
+    // Existing slider event listener (updated)
     if (slider) {
         const debouncedUpdate = debounce(async (e) => {
             const index = parseInt(e.target.value);
             console.log('Slider input triggered - index:', index);
             if (weatherData && index >= 0 && index < weatherData.time.length) {
-                await updateWeatherDisplay(index); // Await here
-                if (lastLat && lastLng && lastAltitude !== 'N/A') calculateMeanWind();
+                await updateWeatherDisplay(index); // Update weather display
+                if (lastLat && lastLng && lastAltitude !== 'N/A') {
+                    calculateMeanWind(); // Update mean wind
+                    if (userSettings.calculateJump) {
+                        calculateJump(); // Recalculate jump if enabled
+                    }
+                }
             } else {
                 slider.value = 0;
-                await updateWeatherDisplay(0); // Await here
+                await updateWeatherDisplay(0); // Reset to 0 if invalid
+                if (lastLat && lastLng && lastAltitude !== 'N/A') {
+                    calculateMeanWind();
+                    if (userSettings.calculateJump) {
+                        calculateJump();
+                    }
+                }
             }
         }, 100);
 
         slider.addEventListener('input', debouncedUpdate);
+
         slider.addEventListener('change', async (e) => {
             const index = parseInt(e.target.value);
             console.log('Slider change triggered - index:', index);
             if (weatherData && index >= 0 && index < weatherData.time.length) {
-                await updateWeatherDisplay(index); // Await here
-                if (lastLat && lastLng && lastAltitude !== 'N/A') calculateMeanWind();
+                await updateWeatherDisplay(index); // Update weather display
+                if (lastLat && lastLng && lastAltitude !== 'N/A') {
+                    calculateMeanWind(); // Update mean wind
+                    if (userSettings.calculateJump) {
+                        calculateJump(); // Recalculate jump if enabled
+                    }
+                }
             } else {
                 slider.value = 0;
-                await updateWeatherDisplay(0); // Await here
+                await updateWeatherDisplay(0); // Reset to 0 if invalid
+                if (lastLat && lastLng && lastAltitude !== 'N/A') {
+                    calculateMeanWind();
+                    if (userSettings.calculateJump) {
+                        calculateJump();
+                    }
+                }
             }
         });
+    }
+
+    // Initial jump calculation if enabled and data is available
+    if (userSettings.calculateJump && weatherData && lastLat && lastLng) {
+        calculateJump();
     }
 
     // Existing modelSelect event listener (unchanged)
@@ -2266,6 +2410,44 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             } else {
                 Utils.handleError('Landing direction must be between 0 and 359°.');
+            }
+        }, 300));
+    }
+
+    const calculateJumpCheckbox = document.getElementById('calculateJumpCheckbox');
+    const openingAltitudeInput = document.getElementById('openingAltitude');
+
+    // Calculate Jump Checkbox
+    if (calculateJumpCheckbox && calculateJumpSubmenu) {
+        calculateJumpCheckbox.addEventListener('change', () => {
+            userSettings.calculateJump = calculateJumpCheckbox.checked;
+            saveSettings();
+            calculateJumpSubmenu.classList.toggle('hidden', !userSettings.calculateJump);
+            if (userSettings.calculateJump && weatherData && lastLat && lastLng) {
+                calculateJump();
+            } else if (!userSettings.calculateJump && jumpCircle) {
+                map.removeLayer(jumpCircle);
+                jumpCircle = null; // Clear the circle when unchecked
+            }
+        });
+    }
+
+    // Opening Altitude Input
+    if (openingAltitudeInput) {
+        openingAltitudeInput.addEventListener('change', debounce(() => {
+            const value = parseInt(openingAltitudeInput.value);
+            if (!isNaN(value) && value >= 500 && value <= 5000) {
+                userSettings.openingAltitude = value;
+                saveSettings();
+                console.log('Opening altitude updated:', value, 'm');
+                if (userSettings.calculateJump && weatherData && lastLat && lastLng) {
+                    calculateJump();
+                }
+            } else {
+                Utils.handleError('Opening altitude must be between 500 and 5000 meters.');
+                openingAltitudeInput.value = 1200;
+                userSettings.openingAltitude = 1200;
+                saveSettings();
             }
         }, 300));
     }
@@ -2615,7 +2797,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 updateMarkerPopup(currentMarker, lat, lng, lastAltitude);
-                updateJumpCircle(lastLat, lastLng); // Add this line
+                if (userSettings.calculateJump) {
+                    calculateJump();
+                }
                 recenterMap();
 
                 document.getElementById('info').innerHTML = `Fetching weather and models...`;
