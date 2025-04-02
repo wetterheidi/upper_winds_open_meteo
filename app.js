@@ -178,12 +178,43 @@ function updateJumpCircle(lat, lng, radius, displacement, direction) {
         color: 'blue',
         fillColor: 'blue',
         fillOpacity: 0.2,
-        weight: 2
+        weight: 1
     }).addTo(map);
 
-    // Ensure the marker stays at the original position
-    if (!marker) {
-        marker = L.marker([lat, lng]).addTo(map);
+    // Ensure currentMarker exists and is at the original position
+    if (!currentMarker) {
+        const customIcon = L.icon({
+            iconUrl: 'favicon.ico',
+            iconSize: [32, 32],
+            iconAnchor: [16, 32],
+            popupAnchor: [0, -32],
+            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+            shadowSize: [41, 41],
+            shadowAnchor: [13, 32]
+        });
+        currentMarker = L.marker([lat, lng], {
+            icon: customIcon,
+            draggable: true
+        }).addTo(map);
+        updateMarkerPopup(currentMarker, lat, lng, lastAltitude);
+        // Add dragend event listener
+        currentMarker.on('dragend', async (e) => {
+            const marker = e.target;
+            const position = marker.getLatLng();
+            lastLat = position.lat;
+            lastLng = position.lng;
+            lastAltitude = await getAltitude(lastLat, lastLng);
+            updateMarkerPopup(marker, lastLat, lastLng, lastAltitude);
+            if (userSettings.calculateJump) {
+                calculateJump();
+            }
+            recenterMap();
+            await fetchWeather(lastLat, lastLng);
+            updateModelRunInfo();
+            if (lastAltitude !== 'N/A') calculateMeanWind();
+        });
+    } else {
+        currentMarker.setLatLng([lat, lng]); // Ensure it’s at the correct position
     }
 }
 
@@ -2008,7 +2039,6 @@ document.addEventListener('DOMContentLoaded', () => {
         'interpStepSelect': userSettings.interpStep,
         'lowerLimit': userSettings.lowerLimit,
         'upperLimit': userSettings.upperLimit,
-        'calculateJumpCheckbox': userSettings.calculateJump, // New
         'openingAltitude': userSettings.openingAltitude     // New
     };
 
