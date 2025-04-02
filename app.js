@@ -52,21 +52,25 @@ function saveSettings() {
 
 // Update model run info in menu
 function updateModelRunInfo() {
-    const modelRunInfo = document.getElementById('modelRunInfo');
+    const modelLabel = document.getElementById('modelLabel'); // Target the label
     const modelSelect = document.getElementById('modelSelect');
-    if (modelRunInfo && lastModelRun) {
+    if (modelLabel && lastModelRun) {
         const model = modelSelect.value;
-        modelRunInfo.innerHTML = `Model: ${model.replace('_', ' ').toUpperCase()}<br> Run: ${lastModelRun}`;
+        const titleContent = `Model: ${model.replace('_', ' ').toUpperCase()}\nRun: ${lastModelRun}`; // Use \n for line break in title
+        modelLabel.title = titleContent; // Set the title attribute
     }
-    // Activate this to switch to local time for model run info and modify function to async function
-    /*if (modelRunInfo && lastModelRun) {
+    // Optional: If you want to use local time, uncomment and adjust as async
+    /*
+    if (modelLabel && lastModelRun) {
         const model = modelSelect.value;
         const timeZone = document.querySelector('input[name="timeZone"]:checked')?.value || 'Z';
         const displayTime = timeZone === 'Z' || !lastLat || !lastLng
             ? lastModelRun
             : await Utils.formatLocalTime(lastModelRun.replace(' ', 'T') + ':00Z', lastLat, lastLng);
-        modelRunInfo.innerHTML = `Model: ${model.replace('_', ' ').toUpperCase()}<br> Run: ${displayTime}`;
-    }*/
+        const titleContent = `Model: ${model.replace('_', ' ').toUpperCase()}\nRun: ${displayTime}`;
+        modelLabel.title = titleContent;
+    }
+    */
 }
 
 function updateReferenceLabels() {

@@ -18,12 +18,6 @@
         <button id="hamburgerBtn" aria-label="Open menu">☰</button>
         <ul id="menu" class="menu hidden">
             <li>
-                <span>Model Run</span>
-                <ul class="submenu hidden">
-                    <li id="modelRunInfo"></li>
-                </ul>
-            </li>
-            <li>
                 <label class="radio-label">
                     <input type="checkbox" id="showTableCheckbox" name="showTable"> Show Wind Table
                 </label>
@@ -241,7 +235,7 @@
         <span id="selectedTime">Selected Time: </span>
         <input type="range" id="timeSlider" min="0" max="167" value="0" disabled>
         <div id="model-row">
-            <label for="modelSelect">Forecast Model:</label>
+            <label id="modelLabel" for="modelSelect" title="Model Run">Forecast Model:</label>
             <select id="modelSelect">
                 <option value="icon_global" selected>ICON GLOBAL</option>
                 <option value="gfs">GFS</option>
