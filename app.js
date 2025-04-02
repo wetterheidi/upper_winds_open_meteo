@@ -193,9 +193,9 @@ function generateWindBarb(direction, speedKt) {
     let yPos = staffLength / 2; // Start at the base (wind blowing toward this end)
     const barbSpacing = 4;
 
-    // Flags (50 kt) - Triangle pointing to the correct side
+    // Flags (50 kt) - Triangle with side attached to staff, pointing to the correct side
     for (let i = 0; i < flags; i++) {
-        svg += `<polygon points="0,${yPos} ${10 * barbSide},${yPos - 5} ${10 * barbSide},${yPos + 5}" fill="black"/>`;
+        svg += `<polygon points="0,${yPos - 5} 0,${yPos + 5} ${10 * barbSide},${yPos}" fill="black"/>`;
         yPos -= barbSpacing + 5; // Move up the staff (toward the tip)
     }
 
