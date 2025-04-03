@@ -95,6 +95,7 @@ function updateReferenceLabels() {
 
 function calculateJump() {
     // Get values from user inputs
+    const exitAltitude = parseInt(document.getElementById('exitAltitude')?.value) || 3000; // New
     const openingAltitude = parseInt(document.getElementById('openingAltitude')?.value) || 1200;
     const legHeightDownwind = parseInt(document.getElementById('legHeightDownwind')?.value) || 300;
     const descentRate = parseFloat(document.getElementById('descentRate')?.value) || 3.5;
@@ -102,6 +103,10 @@ function calculateJump() {
 
     // Convert canopy speed from knots to m/s (1 kt = 0.514444 m/s)
     const canopySpeedMps = canopySpeed * 0.514444;
+
+    // Freefall phase (exitAltitude to openingAltitude) - Assuming freefall descent rate ~50 m/s
+    const freefallHeight = exitAltitude - openingAltitude;
+    const freefallTime = freefallHeight / 50; // Rough estimate, adjust as needed
 
     // Calculate parameters for blue circle (opening altitude to downwind leg)
     const heightDistance = openingAltitude - 200 - legHeightDownwind;
@@ -152,6 +157,7 @@ function calculateJump() {
 
     // Log results for verification
     console.log('Jump Calculation Results:');
+    console.log(`- Freefall: ${freefallHeight}m, ${freefallTime.toFixed(2)}s`);
     console.log(`- Opening Altitude: ${openingAltitude} m`);
     console.log(`- Blue Circle (to Downwind): Height Distance: ${heightDistance} m, Fly Time: ${flyTime.toFixed(2)} s, Radius: ${horizontalCanopyDistance.toFixed(2)} m, Displacement: ${centerDisplacement.toFixed(2)} m`);
     console.log(`- Red Circle (Full Descent): Height Distance: ${heightDistanceFull} m, Fly Time: ${flyTimeFull.toFixed(2)} s, Radius: ${horizontalCanopyDistanceFull.toFixed(2)} m, Displacement: ${centerDisplacementFull.toFixed(2)} m`);
@@ -2533,7 +2539,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }, 300));
     }
-    
+
     // Opening Altitude Input
     if (openingAltitudeInput) {
         openingAltitudeInput.addEventListener('change', debounce(() => {
