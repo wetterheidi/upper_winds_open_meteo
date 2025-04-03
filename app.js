@@ -2038,24 +2038,32 @@ function displayError(message) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Initialize settings and UI
+    initializeSettings();
+    initializeUIElements();
+    initializeMap();
 
-    // Check if element exists 
-    const modelSelect = document.getElementById('modelSelect');
-    if (modelSelect) {
-        modelSelect.value = userSettings.model;
-    }
+    // Setup event listeners
+    setupSliderEvents();
+    setupModelSelectEvents();
+    setupDownloadEvents();
+    setupMenuEvents();
+    setupRadioEvents();
+    setupInputEvents();
+    setupCheckboxEvents();
+    setupCoordinateEvents();
+    setupResetButton();
+});
 
-    // Sichere Aktualisierung der Radio Buttons
-    function setRadioValue(name, value) {
-        const radio = document.querySelector(`input[name="${name}"][value="${value}"]`);
-        if (radio) {
-            radio.checked = true;
-        } else {
-            console.warn(`Radio button ${name} with value ${value} not found`);
-        }
-    }
+// Initialize settings
+function initializeSettings() {
+    userSettings = JSON.parse(localStorage.getItem('upperWindsSettings')) || { ...defaultSettings };
+    console.log('Loaded userSettings:', userSettings);
+}
 
-    // Aktualisiere Radio Buttons sicher
+// Initialize UI elements based on user settings
+function initializeUIElements() {
+    setElementValue('modelSelect', userSettings.model);
     setRadioValue('refLevel', userSettings.refLevel);
     setRadioValue('heightUnit', userSettings.heightUnit);
     setRadioValue('temperatureUnit', userSettings.temperatureUnit);
@@ -2064,211 +2072,146 @@ document.addEventListener('DOMContentLoaded', () => {
     setRadioValue('coordFormat', userSettings.coordFormat);
     setRadioValue('downloadFormat', userSettings.downloadFormat);
     setRadioValue('landingDirection', userSettings.landingDirection);
+    setInputValue('canopySpeed', userSettings.canopySpeed);
+    setInputValue('descentRate', userSettings.descentRate);
+    setInputValue('legHeightDownwind', userSettings.legHeightDownwind);
+    setInputValue('legHeightBase', userSettings.legHeightBase);
+    setInputValue('legHeightFinal', userSettings.legHeightFinal);
+    setInputValue('customLandingDirectionLL', userSettings.customLandingDirectionLL);
+    setInputValue('customLandingDirectionRR', userSettings.customLandingDirectionRR);
+    setInputValue('lowerLimit', userSettings.lowerLimit);
+    setInputValue('upperLimit', userSettings.upperLimit);
+    setInputValue('openingAltitude', userSettings.openingAltitude);
+    setInputValue('exitAltitude', userSettings.exitAltitude);
+    setInputValue('interpStepSelect', userSettings.interpStep);
+    setCheckboxValue('showTableCheckbox', userSettings.showTable);
+    setCheckboxValue('calculateJumpCheckbox', userSettings.calculateJump);
+    setCheckboxValue('showLandingPattern', userSettings.showLandingPattern);
 
-    // Sichere Aktualisierung der anderen Elemente
-    const elements = {
-        'showTableCheckbox': userSettings.showTable,
-        'canopySpeed': userSettings.canopySpeed,
-        'descentRate': userSettings.descentRate,
-        'showLandingPattern': userSettings.showLandingPattern,
-        'customLandingDirectionLL': userSettings.customLandingDirectionLL,
-        'customLandingDirectionRR': userSettings.customLandingDirectionRR,
-        'legHeightDownwind': userSettings.legHeightDownwind,
-        'legHeightBase': userSettings.legHeightBase,
-        'legHeightFinal': userSettings.legHeightFinal,
-        'interpStepSelect': userSettings.interpStep,
-        'lowerLimit': userSettings.lowerLimit,
-        'upperLimit': userSettings.upperLimit,
-        'openingAltitude': userSettings.openingAltitude,     // New
-        'exitAltitude': userSettings.exitAltitude // New
-    };
+    updateUIState();
+}
 
-    Object.entries(elements).forEach(([id, value]) => {
-        const element = document.getElementById(id);
-        if (element) {
-            if (typeof value === 'boolean') {
-                element.checked = value;
-            } else {
-                element.value = value;
-            }
-        } else {
-            console.warn(`Element with id ${id} not found`);
-        }
-    });
+function setElementValue(id, value) {
+    const element = document.getElementById(id);
+    if (element) element.value = value;
+    else console.warn(`Element ${id} not found`);
+}
 
-    // UI Status basierend auf Einstellungen initialisieren
+function setRadioValue(name, value) {
+    const radio = document.querySelector(`input[name="${name}"][value="${value}"]`);
+    if (radio) radio.checked = true;
+    else console.warn(`Radio ${name} with value ${value} not found`);
+}
+
+function setInputValue(id, value) {
+    const element = document.getElementById(id);
+    if (element) element.value = value;
+}
+
+function setCheckboxValue(id, value) {
+    const element = document.getElementById(id);
+    if (element) element.checked = value;
+}
+
+function updateUIState() {
     const info = document.getElementById('info');
-    if (info) {
-        info.style.display = userSettings.showTable ? 'block' : 'none';
-    }
-
-    const landingSubmenu = document.getElementById('showLandingPattern')?.closest('li')?.querySelector('.submenu');
-    if (landingSubmenu) {
-        landingSubmenu.classList.toggle('hidden', !userSettings.showLandingPattern);
-    }
-    // Initialize UI status
-    const calculateJumpSubmenu = document.getElementById('calculateJumpCheckbox')?.closest('li')?.querySelector('.submenu');
-    if (calculateJumpSubmenu) {
-        calculateJumpSubmenu.classList.toggle('hidden', !userSettings.calculateJump);
-    }
-
+    if (info) info.style.display = userSettings.showTable ? 'block' : 'none';
     const customLL = document.getElementById('customLandingDirectionLL');
     const customRR = document.getElementById('customLandingDirectionRR');
     if (customLL) customLL.disabled = userSettings.landingDirection !== 'LL';
     if (customRR) customRR.disabled = userSettings.landingDirection !== 'RR';
+    updateHeightUnitLabels();
+    updateWindUnitLabels();
+}
 
-    console.log('Loaded userSettings.baseMap:', userSettings.baseMap);
-    console.log('DOM fully loaded, initializing map...');
+function toggleSubmenu(id, isVisible) {
+    const checkbox = document.getElementById(id);
+    const submenu = checkbox?.closest('li')?.querySelector('.submenu');
+    if (submenu) submenu.classList.toggle('hidden', !isVisible);
+}
+
+// Initialize map
+function initializeMap() {
+    console.log('Initializing map...');
     initMap();
+}
 
+// Handle slider-specific logic
+function setupSliderEvents() {
     const slider = document.getElementById('timeSlider');
-    const downloadButton = document.getElementById('downloadButton');
-    const hamburgerBtn = document.getElementById('hamburgerBtn');
-    const menu = document.getElementById('menu');
-    const interpStepSelect = document.getElementById('interpStepSelect');
-    const refLevelRadios = document.querySelectorAll('input[name="refLevel"]');
-    const heightUnitRadios = document.querySelectorAll('input[name="heightUnit"]');
-    const temperatureUnitRadios = document.querySelectorAll('input[name="temperatureUnit"]');
-    const windSpeedUnitRadios = document.querySelectorAll('input[name="windUnit"]'); // Fix to match HTML
-    const lowerLimitInput = document.getElementById('lowerLimit');
-    const upperLimitInput = document.getElementById('upperLimit');
-    const showLandingPatternCheckbox = document.getElementById('showLandingPattern');
-    const submenu = showLandingPatternCheckbox?.closest('li')?.querySelector('.submenu');
-    const customLandingDirectionLLInput = document.getElementById('customLandingDirectionLL');
-    const customLandingDirectionRRInput = document.getElementById('customLandingDirectionRR');
-    const showTableCheckbox = document.getElementById('showTableCheckbox');
-    const infoElement = document.getElementById('info');
-    const legHeightFinalInput = document.getElementById('legHeightFinal');
-    const legHeightBaseInput = document.getElementById('legHeightBase');
-    const legHeightDownwindInput = document.getElementById('legHeightDownwind');
-    //const showCanopyParametersCheckbox = document.getElementById('showCanopyParameters');
-    const canopySpeedInput = document.getElementById('canopySpeed');
-    const descentRateInput = document.getElementById('descentRate');
-    const exitAltitudeInput = document.getElementById('exitAltitude'); // New
-
-    console.log('Elements:', { slider, modelSelect, downloadButton, hamburgerBtn, menu, interpStepSelect, refLevelRadios, lowerLimitInput, upperLimitInput, windSpeedUnitRadios });
-
-    if (!slider) Utils.handleError('Slider element missing. Check HTML.');
+    if (!slider) return Utils.handleError('Slider element missing.');
 
     slider.value = 0;
     slider.setAttribute('autocomplete', 'off');
 
-    function debounce(func, wait) {
-        let timeout;
-        return function (...args) {
-            clearTimeout(timeout);
-            timeout = setTimeout(() => func.apply(this, args), wait);
-        };
-    }
-
-    // Existing slider event listener (updated)
-    if (slider) {
-        const debouncedUpdate = debounce(async (e) => {
-            const index = parseInt(e.target.value);
-            console.log('Slider input triggered - index:', index);
-            if (weatherData && index >= 0 && index < weatherData.time.length) {
-                await updateWeatherDisplay(index); // Update weather display
-                if (lastLat && lastLng && lastAltitude !== 'N/A') {
-                    calculateMeanWind(); // Update mean wind
-                    if (userSettings.calculateJump) {
-                        calculateJump(); // Recalculate jump if enabled
-                    }
-                }
-            } else {
-                slider.value = 0;
-                await updateWeatherDisplay(0); // Reset to 0 if invalid
-                if (lastLat && lastLng && lastAltitude !== 'N/A') {
-                    calculateMeanWind();
-                    if (userSettings.calculateJump) {
-                        calculateJump();
-                    }
-                }
+    const debouncedUpdate = debounce(async (index) => {
+        if (weatherData && index >= 0 && index < weatherData.time.length) {
+            await updateWeatherDisplay(index);
+            if (lastLat && lastLng && lastAltitude !== 'N/A') {
+                calculateMeanWind();
+                if (userSettings.calculateJump) calculateJump();
             }
-        }, 100);
-
-        slider.addEventListener('input', debouncedUpdate);
-
-        slider.addEventListener('change', async (e) => {
-            const index = parseInt(e.target.value);
-            console.log('Slider change triggered - index:', index);
-            if (weatherData && index >= 0 && index < weatherData.time.length) {
-                await updateWeatherDisplay(index); // Update weather display
-                if (lastLat && lastLng && lastAltitude !== 'N/A') {
-                    calculateMeanWind(); // Update mean wind
-                    if (userSettings.calculateJump) {
-                        calculateJump(); // Recalculate jump if enabled
-                    }
-                }
-            } else {
-                slider.value = 0;
-                await updateWeatherDisplay(0); // Reset to 0 if invalid
-                if (lastLat && lastLng && lastAltitude !== 'N/A') {
-                    calculateMeanWind();
-                    if (userSettings.calculateJump) {
-                        calculateJump();
-                    }
-                }
+        } else {
+            slider.value = 0;
+            await updateWeatherDisplay(0);
+            if (lastLat && lastLng && lastAltitude !== 'N/A') {
+                calculateMeanWind();
+                if (userSettings.calculateJump) calculateJump();
             }
-        });
-    }
+        }
+    }, 100);
 
-    // Initial jump calculation if enabled and data is available
-    if (userSettings.calculateJump && weatherData && lastLat && lastLng) {
-        calculateJump();
-    }
+    slider.addEventListener('input', (e) => debouncedUpdate(parseInt(e.target.value)));
+    slider.addEventListener('change', (e) => debouncedUpdate(parseInt(e.target.value)));
+}
 
-    // Existing modelSelect event listener (unchanged)
-    if (modelSelect) {
-        modelSelect.addEventListener('change', async () => { // Add async here
-            if (lastLat && lastLng) {
-                const slider = document.getElementById('timeSlider');
-                const currentIndex = parseInt(slider.value) || 0;
-                const currentTime = weatherData?.time?.[currentIndex] || null;
-                console.log('Model change triggered - new model:', modelSelect.value, 'currentTime:', currentTime);
-                document.getElementById('info').innerHTML = `Fetching weather with ${modelSelect.value}...`;
+// Setup model select events
+function setupModelSelectEvents() {
+    const modelSelect = document.getElementById('modelSelect');
+    if (!modelSelect) return;
+    modelSelect.addEventListener('change', async () => {
+        if (lastLat && lastLng) {
+            const currentIndex = getSliderValue();
+            const currentTime = weatherData?.time?.[currentIndex] || null;
+            document.getElementById('info').innerHTML = `Fetching weather with ${modelSelect.value}...`;
+            await fetchWeather(lastLat, lastLng, currentTime);
+            updateModelRunInfo();
+            await updateWeatherDisplay(currentIndex);
+            updateReferenceLabels();
+            if (lastAltitude !== 'N/A') calculateMeanWind();
+            userSettings.model = modelSelect.value;
+            saveSettings();
+        } else {
+            Utils.handleError('Please select a position on the map first.');
+        }
+    });
+}
 
-                // Await the fetchWeather call to ensure weatherData is updated
-                await fetchWeather(lastLat, lastLng, currentTime);
-
-                console.log('Model fetch completed - new weatherData:', weatherData);
-                updateModelRunInfo();
-                await updateWeatherDisplay(slider.value); // Await to ensure display updates with new data
-                updateReferenceLabels();
-                if (lastLat && lastLng && lastAltitude !== 'N/A') {
-                    calculateMeanWind(); // Now runs with the updated weatherData
-                }
-                userSettings.model = modelSelect.value;
-                saveSettings();
-            } else {
-                Utils.handleError('Please select a position on the map first.');
-            }
-        });
-    }
-
-    // Existing downloadButton event listener (unchanged)
+// Setup download events
+function setupDownloadEvents() {
+    const downloadButton = document.getElementById('downloadButton');
     if (downloadButton) {
         downloadButton.addEventListener('click', () => {
-            console.log('Download button clicked!');
             const downloadFormat = getDownloadFormat();
             downloadTableAsAscii(downloadFormat);
         });
     }
+}
 
-    // Existing hamburger menu event listeners (unchanged)
+// Setup menu events
+function setupMenuEvents() {
+    const hamburgerBtn = document.getElementById('hamburgerBtn');
+    const menu = document.getElementById('menu');
     if (hamburgerBtn && menu) {
-        // Toggle main menu
         hamburgerBtn.addEventListener('click', () => menu.classList.toggle('hidden'));
-
-        // Select all <span> elements with a following submenu
         const menuItems = menu.querySelectorAll('span');
         menuItems.forEach(item => {
             item.addEventListener('click', (e) => {
                 const submenu = item.nextElementSibling;
                 if (submenu && submenu.classList.contains('submenu')) {
                     submenu.classList.toggle('hidden');
-                    // Close other submenus, but not ancestors of the current submenu
                     menu.querySelectorAll('.submenu').forEach(other => {
-                        const isAncestor = other.contains(item); // Check if 'other' is an ancestor of the clicked <span>
+                        const isAncestor = other.contains(item);
                         if (other !== submenu && !isAncestor && !other.classList.contains('hidden')) {
                             other.classList.add('hidden');
                         }
@@ -2277,611 +2220,338 @@ document.addEventListener('DOMContentLoaded', () => {
                 e.stopPropagation();
             });
         });
-
-        // Close all submenus when clicking outside
         document.addEventListener('click', (e) => {
             if (!menu.contains(e.target) && !hamburgerBtn.contains(e.target)) {
                 menu.querySelectorAll('.submenu').forEach(submenu => submenu.classList.add('hidden'));
             }
         });
     }
+}
 
-    // Reference Level Radios
-    if (refLevelRadios.length > 0) {
-        refLevelRadios.forEach(radio => {
-            radio.addEventListener('change', () => {
-                userSettings.refLevel = document.querySelector('input[name="refLevel"]:checked').value;
+// Setup radio events
+function setupRadioEvents() {
+    setupRadioGroup('refLevel', () => {
+        updateReferenceLabels();
+        if (weatherData && lastLat && lastLng) {
+            updateWeatherDisplay(getSliderValue());
+            if (lastAltitude !== 'N/A') calculateMeanWind();
+        }
+    });
+    setupRadioGroup('heightUnit', () => {
+        updateHeightUnitLabels();
+        if (weatherData && lastLat && lastLng) {
+            updateWeatherDisplay(getSliderValue());
+            if (lastAltitude !== 'N/A') calculateMeanWind();
+        }
+    });
+    setupRadioGroup('temperatureUnit', () => {
+        if (weatherData && lastLat && lastLng) {
+            updateWeatherDisplay(getSliderValue());
+            if (lastAltitude !== 'N/A') calculateMeanWind();
+        }
+    });
+    setupRadioGroup('windUnit', () => {
+        updateWindUnitLabels();
+        if (weatherData && lastLat && lastLng) {
+            updateWeatherDisplay(getSliderValue());
+            if (lastAltitude !== 'N/A') calculateMeanWind();
+        }
+    });
+    setupRadioGroup('timeZone', async () => {
+        if (weatherData && lastLat && lastLng) {
+            await updateWeatherDisplay(getSliderValue());
+            updateModelRunInfo();
+        }
+    });
+    setupRadioGroup('coordFormat', () => {
+        updateCoordInputs(userSettings.coordFormat);
+        if (currentMarker && lastLat && lastLng) {
+            updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
+        }
+    });
+    setupRadioGroup('downloadFormat', () => {
+        console.log('Download format changed:', getDownloadFormat());
+    });
+    setupRadioGroup('landingDirection', () => {
+        const customLL = document.getElementById('customLandingDirectionLL');
+        const customRR = document.getElementById('customLandingDirectionRR');
+        const landingDirection = userSettings.landingDirection;
+        if (customLL) {
+            customLL.disabled = landingDirection !== 'LL';
+            if (landingDirection === 'LL' && !customLL.value && landingWindDir !== null) {
+                customLL.value = Math.round(landingWindDir);
+                userSettings.customLandingDirectionLL = parseInt(customLL.value);
                 saveSettings();
-                updateReferenceLabels();
-                if (weatherData && lastLat && lastLng) {
-                    updateWeatherDisplay(slider.value || 0);
-                    if (lastAltitude !== 'N/A') calculateMeanWind();
-                }
-            });
-        });
-    }
-
-    // Existing heightUnitRadios event listener (unchanged)
-    if (heightUnitRadios.length > 0) {
-        heightUnitRadios.forEach(radio => {
-            radio.addEventListener('change', () => {
-                userSettings.refLevel = document.querySelector('input[name="heightUnit"]:checked').value;
-                saveSettings();
-                console.log('Height unit changed:', getHeightUnit());
-                updateHeightUnitLabels();
-                if (weatherData && lastLat && lastLng) {
-                    updateWeatherDisplay(slider.value || 0);
-                    if (lastAltitude !== 'N/A') calculateMeanWind();
-                }
-            });
-        });
-        updateHeightUnitLabels(); // Initial setup
-    }
-
-    // Existing temperatureUnitRadios event listener (unchanged)
-    if (temperatureUnitRadios.length > 0) {
-        temperatureUnitRadios.forEach(radio => {
-            radio.addEventListener('change', () => {
-                userSettings.refLevel = document.querySelector('input[name="temperatureUnit"]:checked').value;
-                saveSettings();
-                console.log('Temperature unit changed:', getTemperatureUnit());
-                if (weatherData && lastLat && lastLng) {
-                    updateWeatherDisplay(slider.value || 0);
-                    if (lastAltitude !== 'N/A') calculateMeanWind();
-                }
-            });
-        });
-    }
-
-    // Add windSpeedUnitRadios event listener
-    if (windSpeedUnitRadios.length > 0) {
-        windSpeedUnitRadios.forEach(radio => {
-            radio.addEventListener('change', () => {
-                userSettings.refLevel = document.querySelector('input[name="windUnit"]:checked').value;
-                saveSettings();
-                console.log('Wind speed unit changed:', getWindSpeedUnit());
-                if (weatherData && lastLat && lastLng) {
-                    updateWeatherDisplay(slider.value || 0);
-                    if (lastAltitude !== 'N/A') calculateMeanWind();
-                    updateWindUnitLabels();
-                }
-            });
-        });
-        updateWindUnitLabels(); // Initial setup
-    }
-
-    //Add time zone listener
-    const timeZoneRadios = document.querySelectorAll('input[name="timeZone"]');
-    if (timeZoneRadios.length > 0) {
-        timeZoneRadios.forEach(radio => {
-            radio.addEventListener('change', async () => { // Make this async
-                userSettings.timeZone = document.querySelector('input[name="timeZone"]:checked').value;
-                saveSettings();
-                console.log('Time zone changed:', radio.value);
-                if (weatherData && lastLat && lastLng) {
-                    await updateWeatherDisplay(slider.value || 0); // Await here
-                    updateModelRunInfo(); // Already async
-                }
-            });
-        });
-    }
-    // Existing interpStepSelect event listener (unchanged)
-    if (interpStepSelect) {
-        interpStepSelect.addEventListener('change', () => {
-            userSettings.interpStep = interpStepSelect.value;
-            saveSettings();
-            console.log('Interpolation step changed:', interpStepSelect.value);
-            if (weatherData && lastLat && lastLng) {
-                updateWeatherDisplay(slider.value || 0);
-                if (lastAltitude !== 'N/A') calculateMeanWind();
-            } else {
-                Utils.handleError('Please select a position and fetch weather data first.');
             }
+        }
+        if (customRR) {
+            customRR.disabled = landingDirection !== 'RR';
+            if (landingDirection === 'RR' && !customRR.value && landingWindDir !== null) {
+                customRR.value = Math.round(landingWindDir);
+                userSettings.customLandingDirectionRR = parseInt(customRR.value);
+                saveSettings();
+            }
+        }
+        if (weatherData && lastLat && lastLng) {
+            updateLandingPattern();
+            recenterMap();
+        }
+    });
+}
+
+function setupRadioGroup(name, callback) {
+    const radios = document.querySelectorAll(`input[name="${name}"]`);
+    radios.forEach(radio => {
+        radio.addEventListener('change', () => {
+            userSettings[name] = document.querySelector(`input[name="${name}"]:checked`).value;
+            saveSettings();
+            console.log(`${name} changed to:`, userSettings[name]);
+            callback();
         });
-    }
+    });
+}
 
-    // Existing lowerLimitInput event listener (unchanged)
-    if (lowerLimitInput) {
-        lowerLimitInput.addEventListener('input', debounce(() => {
-            userSettings.lowerLimit = lowerLimitInput.value;
-            saveSettings();
-            console.log('Lower limit changed:', lowerLimitInput.value);
-            if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
-                calculateMeanWind();
-            } else {
-                Utils.handleError('Please select a position and fetch weather data first.');
-            }
-        }, 300));
-    }
+function getSliderValue() {
+    return parseInt(document.getElementById('timeSlider')?.value) || 0;
+}
 
-    // Existing upperLimitInput event listener (unchanged)
-    if (upperLimitInput) {
-        upperLimitInput.addEventListener('input', debounce(() => {
-            userSettings.upperLimit = upperLimitInput.value;
-            saveSettings();
-            console.log('Upper limit changed:', upperLimitInput.value);
-            if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') {
-                calculateMeanWind();
-            } else {
-                Utils.handleError('Please select a position and fetch weather data first.');
-            }
-        }, 300));
-    }
+function getDownloadFormat() {
+    return document.querySelector('input[name="downloadFormat"]:checked')?.value || 'csv';
+}
 
-    // LandingPattern event listener
-    if (showLandingPatternCheckbox && submenu) {
-        showLandingPatternCheckbox.addEventListener('change', () => {
-            userSettings.showLandingPattern = showLandingPatternCheckbox.checked;
+// Setup input events
+function setupInputEvents() {
+    setupInput('lowerLimit', 'input', 300, (value) => {
+        if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') calculateMeanWind();
+    });
+    setupInput('upperLimit', 'input', 300, (value) => {
+        if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') calculateMeanWind();
+    });
+    setupInput('openingAltitude', 'change', 300, (value) => {
+        if (!isNaN(value) && value >= 500 && value <= 5000) {
+            if (userSettings.calculateJump && weatherData && lastLat && lastLng) calculateJump();
+        } else {
+            Utils.handleError('Opening altitude must be between 500 and 5000 meters.');
+            setInputValue('openingAltitude', 1200);
+            userSettings.openingAltitude = 1200;
             saveSettings();
-            submenu.classList.toggle('hidden', !userSettings.showLandingPattern);
-            if (weatherData && lastLat && lastLng) {
+        }
+    });
+    setupInput('exitAltitude', 'change', 300, (value) => {
+        if (!isNaN(value) && value >= 500 && value <= 15000) {
+            if (userSettings.calculateJump && weatherData && lastLat && lastLng) calculateJump();
+        } else {
+            Utils.handleError('Exit altitude must be between 500 and 15000 meters.');
+            setInputValue('exitAltitude', 3000);
+            userSettings.exitAltitude = 3000;
+            saveSettings();
+        }
+    });
+    setupInput('canopySpeed', 'change', 300, (value) => {
+        if (!isNaN(value) && value >= 5 && value <= 50) {
+            if (weatherData && lastLat && lastLng) updateLandingPattern();
+        } else {
+            Utils.handleError('Canopy speed must be between 5 and 50 kt.');
+            setInputValue('canopySpeed', 20);
+            userSettings.canopySpeed = 20;
+            saveSettings();
+        }
+    });
+    setupInput('descentRate', 'change', 300, (value) => {
+        if (!isNaN(value) && value >= 1 && value <= 10) {
+            if (weatherData && lastLat && lastLng) updateLandingPattern();
+        } else {
+            Utils.handleError('Descent rate must be between 1 and 10 m/s.');
+            setInputValue('descentRate', 3);
+            userSettings.descentRate = 3;
+            saveSettings();
+        }
+    });
+    setupInput('interpStepSelect', 'change', 300, (value) => {
+        if (weatherData && lastLat && lastLng) {
+            updateWeatherDisplay(getSliderValue());
+            if (lastAltitude !== 'N/A') calculateMeanWind();
+        }
+    });
+    setupLegHeightInput('legHeightFinal', 100);
+    setupLegHeightInput('legHeightBase', 200);
+    setupLegHeightInput('legHeightDownwind', 300);
+    setupInput('customLandingDirectionLL', 'change', 300, (value) => {
+        const customDir = parseInt(value, 10);
+        if (!isNaN(customDir) && customDir >= 0 && customDir <= 359) {
+            if (userSettings.landingDirection === 'LL' && weatherData && lastLat && lastLng) {
                 updateLandingPattern();
                 recenterMap();
             }
-        });
-    } else {
-        console.error('Could not find showLandingPattern checkbox or submenu');
-    }
-
-    // Handle landing direction radio buttons and custom input
-    const landingDirectionRadios = document.querySelectorAll('input[name="landingDirection"]');
-    if (landingDirectionRadios.length > 0) {
-        landingDirectionRadios.forEach(radio => {
-            radio.addEventListener('change', () => {
-                userSettings.landingDirection = radio.value;
-                saveSettings();
-                console.log('Landing direction changed:', radio.value);
-                // Enable the corresponding input field, disable the other
-                if (customLandingDirectionLLInput) {
-                    customLandingDirectionLLInput.disabled = radio.value !== 'LL';
-                    if (radio.value === 'LL' && !customLandingDirectionLLInput.value && landingWindDir !== null) {
-                        customLandingDirectionLLInput.value = Math.round(landingWindDir);
-                    }
-                }
-                if (customLandingDirectionRRInput) {
-                    customLandingDirectionRRInput.disabled = radio.value !== 'RR';
-                    if (radio.value === 'RR' && !customLandingDirectionRRInput.value && landingWindDir !== null) {
-                        customLandingDirectionRRInput.value = Math.round(landingWindDir);
-                    }
-                }
-                if (weatherData && lastLat && lastLng) {
-                    updateLandingPattern();
-                    recenterMap();
-                }
-            });
-        });
-    }
-
-    // Custom Landing Direction LL Input
-    if (customLandingDirectionLLInput) {
-        customLandingDirectionLLInput.addEventListener('input', debounce(() => {
-            const customDir = parseInt(customLandingDirectionLLInput.value, 10);
-            if (!isNaN(customDir) && customDir >= 0 && customDir <= 359) {
-                userSettings.customLandingDirectionLL = customDir;
-                saveSettings();
-                if (weatherData && lastLat && lastLng && document.querySelector('input[name="landingDirection"]:checked').value === 'LL') {
-                    updateLandingPattern();
-                    recenterMap();
-                }
-            } else {
-                Utils.handleError('Landing direction must be between 0 and 359°.');
-            }
-        }, 300));
-    }
-
-    if (customLandingDirectionRRInput) {
-        customLandingDirectionRRInput.addEventListener('input', debounce(() => {
-            const customDir = parseInt(customLandingDirectionRRInput.value, 10);
-            if (!isNaN(customDir) && customDir >= 0 && customDir <= 359) {
-                userSettings.customLandingDirectionRR = customDir;
-                saveSettings();
-                console.log('Custom landing direction RR updated:', customDir);
-                if (weatherData && lastLat && lastLng && document.querySelector('input[name="landingDirection"]:checked').value === 'RR') {
-                    updateLandingPattern();
-                    recenterMap();
-                }
-            } else {
-                Utils.handleError('Landing direction must be between 0 and 359°.');
-            }
-        }, 300));
-    }
-
-    const calculateJumpCheckbox = document.getElementById('calculateJumpCheckbox');
-    if (calculateJumpCheckbox && calculateJumpSubmenu) {
-        // Set initial state based on userSettings.calculateJump (default is false)
-        calculateJumpSubmenu.classList.toggle('hidden', !userSettings.calculateJump); // Hide if unchecked
-    }
-    const openingAltitudeInput = document.getElementById('openingAltitude');
-
-    // Calculate Jump Checkbox
-    if (calculateJumpCheckbox && calculateJumpSubmenu) {
-        calculateJumpCheckbox.addEventListener('change', () => {
-            userSettings.calculateJump = calculateJumpCheckbox.checked;
-            saveSettings(); // Persist the setting
-            // Explicitly show/hide submenu based on checkbox state
-            if (userSettings.calculateJump) {
-                calculateJumpSubmenu.classList.remove('hidden'); // Show submenu when checked
-            } else {
-                calculateJumpSubmenu.classList.add('hidden'); // Hide submenu when unchecked
-            }
-            // Handle jump calculation or cleanup
-            if (userSettings.calculateJump && weatherData && lastLat && lastLng) {
-                calculateJump();
-            } else {
-                if (jumpCircle) {
-                    map.removeLayer(jumpCircle);
-                    jumpCircle = null; // Clear blue circle
-                }
-                if (jumpCircleFull) {
-                    map.removeLayer(jumpCircleFull);
-                    jumpCircleFull = null; // Clear red circle
-                }
-            }
-        });
-    }
-
-    // New Exit Altitude Input event listener
-    if (exitAltitudeInput) {
-        exitAltitudeInput.addEventListener('change', debounce(() => {
-            const value = parseInt(exitAltitudeInput.value);
-            if (!isNaN(value) && value >= 500 && value <= 15000) {
-                userSettings.exitAltitude = value;
-                saveSettings();
-                console.log('Exit altitude updated:', value, 'm');
-                if (userSettings.calculateJump && weatherData && lastLat && lastLng) {
-                    calculateJump(); // Recalculate jump if enabled
-                }
-            } else {
-                Utils.handleError('Exit altitude must be between 500 and 15000 meters.');
-                exitAltitudeInput.value = 3000; // Reset to default
-                userSettings.exitAltitude = 3000;
-                saveSettings();
-            }
-        }, 300));
-    }
-
-    // Opening Altitude Input
-    if (openingAltitudeInput) {
-        openingAltitudeInput.addEventListener('change', debounce(() => {
-            const value = parseInt(openingAltitudeInput.value);
-            if (!isNaN(value) && value >= 500 && value <= 5000) {
-                userSettings.openingAltitude = value;
-                saveSettings();
-                console.log('Opening altitude updated:', value, 'm');
-                if (userSettings.calculateJump && weatherData && lastLat && lastLng) {
-                    calculateJump();
-                }
-            } else {
-                Utils.handleError('Opening altitude must be between 500 and 5000 meters.');
-                openingAltitudeInput.value = 1200;
-                userSettings.openingAltitude = 1200;
-                saveSettings();
-            }
-        }, 300));
-    }
-
-    if (showTableCheckbox && infoElement) {
-        showTableCheckbox.addEventListener('change', () => {
-            userSettings.showTable = showTableCheckbox.checked;
+        } else {
+            Utils.handleError('Landing direction must be between 0 and 359°.');
+            setInputValue('customLandingDirectionLL', landingWindDir || 0);
+            userSettings.customLandingDirectionLL = landingWindDir || 0;
             saveSettings();
-            infoElement.style.display = userSettings.showTable ? 'block' : 'none';
-            if (userSettings.showTable && weatherData && lastLat && lastLng) {
-                updateWeatherDisplay(slider.value || 0);
-            }
-            recenterMap();
-        });
-    } else {
-        console.error('Could not find showTableCheckbox or info element');
-    }
-
-    // Existing MutationObserver for recentering map (unchanged)
-    if (infoElement) {
-        const observer = new MutationObserver((mutations) => {
-            mutations.forEach((mutation) => {
-                if (mutation.type === 'childList' || mutation.type === 'characterData') {
-                    setTimeout(recenterMap, 100);
-                }
-            });
-        });
-        observer.observe(infoElement, { childList: true, subtree: true, characterData: true });
-    }
-
-    function validateLegHeights(final, base, downwind) {
-        const finalVal = parseInt(final.value) || 100; // Default if invalid
-        const baseVal = parseInt(base.value) || 200;
-        const downwindVal = parseInt(downwind.value) || 300;
-
-        if (baseVal <= finalVal && baseVal >= downwindVal) {
-            Utils.handleError('Base leg must start higher than final leg and lower than downwind leg.');
-            return false;
         }
-        if (downwindVal <= baseVal) {
-            Utils.handleError('Downwind leg must start than base leg.');
-            return false;
+    });
+    setupInput('customLandingDirectionRR', 'change', 300, (value) => {
+        const customDir = parseInt(value, 10);
+        if (!isNaN(customDir) && customDir >= 0 && customDir <= 359) {
+            if (userSettings.landingDirection === 'RR' && weatherData && lastLat && lastLng) {
+                updateLandingPattern();
+                recenterMap();
+            }
+        } else {
+            Utils.handleError('Landing direction must be between 0 and 359°.');
+            setInputValue('customLandingDirectionRR', landingWindDir || 0);
+            userSettings.customLandingDirectionRR = landingWindDir || 0;
+            saveSettings();
         }
-        return true;
-    }
+    });
+}
 
-    // Final Leg Height Input
-    if (legHeightFinalInput) {
-        legHeightFinalInput.addEventListener('blur', () => {
-            userSettings.legHeightFinal = legHeightFinalInput.value;
-            saveSettings();
-            const value = parseInt(legHeightFinalInput.value);
-            if (!isNaN(value) && value >= 50 && value <= 1000) {
-                console.log('Final leg height blurred:', value);
-                if (validateLegHeights(legHeightFinalInput, legHeightBaseInput, legHeightDownwindInput)) {
-                    if (weatherData && lastLat && lastLng) {
-                        updateLandingPattern();
-                        recenterMap();
-                    }
-                } else {
-                    // Adjust to a valid value less than base
-                    const baseVal = parseInt(legHeightBaseInput.value) || 200;
-                    legHeightFinalInput.value = Math.min(baseVal - 1, 100);
-                    Utils.handleError(`Adjusted final leg height to ${legHeightFinalInput.value} to be less than base.`);
-                }
-            } else {
-                Utils.handleError('Final leg height must be between 50 and 1000 meters.');
-                legHeightFinalInput.value = 100; // Reset to default
-            }
-        });
-    }
-
-    // Base Leg Height Input
-    if (legHeightBaseInput) {
-        legHeightBaseInput.addEventListener('blur', () => {
-            userSettings.legHeightBase = legHeightBaseInput.value;
-            saveSettings();
-            const value = parseInt(legHeightBaseInput.value);
-            if (!isNaN(value) && value >= 50 && value <= 1000) {
-                console.log('Base leg height blurred:', value);
-                if (validateLegHeights(legHeightFinalInput, legHeightBaseInput, legHeightDownwindInput)) {
-                    if (weatherData && lastLat && lastLng) {
-                        updateLandingPattern();
-                        recenterMap();
-                    }
-                } else {
-                    // Adjust to a valid value between final and downwind
-                    const finalVal = parseInt(legHeightFinalInput.value) || 100;
-                    const downwindVal = parseInt(legHeightDownwindInput.value) || 300;
-                    legHeightBaseInput.value = Math.max(finalVal + 1, Math.min(downwindVal - 1, value));
-                    Utils.handleError(`Adjusted base leg height to ${legHeightBaseInput.value} to fit between final and downwind.`);
-                }
-            } else {
-                Utils.handleError('Base leg height must be between 50 and 1000 meters.');
-                legHeightBaseInput.value = 200; // Reset to default
-            }
-        });
-    }
-
-    // Downwind Leg Height Input
-    if (legHeightDownwindInput) {
-        legHeightDownwindInput.addEventListener('blur', () => {
-            userSettings.legHeightDownwind = legHeightDownwindInput.value;
-            saveSettings();
-            const value = parseInt(legHeightDownwindInput.value);
-            if (!isNaN(value) && value >= 50 && value <= 1000) {
-                console.log('Downwind leg height blurred:', value);
-                if (validateLegHeights(legHeightFinalInput, legHeightBaseInput, legHeightDownwindInput)) {
-                    if (weatherData && lastLat && lastLng) {
-                        updateLandingPattern();
-                        if (userSettings.calculateJump && weatherData && lastLat && lastLng) {
-                            calculateJump();
-                        }
-                        recenterMap();
-                    }
-                } else {
-                    // Adjust to a valid value greater than base
-                    const baseVal = parseInt(legHeightBaseInput.value) || 200;
-                    legHeightDownwindInput.value = Math.max(baseVal + 1, 300);
-                    Utils.handleError(`Adjusted downwind leg height to ${legHeightDownwindInput.value} to be greater than base.`);
-                }
-            } else {
-                Utils.handleError('Downwind leg height must be between 50 and 1000 meters.');
-                legHeightDownwindInput.value = 300; // Reset to default
-            }
-        });
-    }
-
-    if (canopySpeedInput) {
-        canopySpeedInput.addEventListener('input', debounce(() => {
-            userSettings.canopySpeed = canopySpeedInput.value;
-            saveSettings();
-            const value = parseInt(canopySpeedInput.value);
-            if (!isNaN(value) && value >= 5 && value <= 50) {
-                console.log('Canopy speed updated:', value, 'kt');
-                if (weatherData && lastLat && lastLng) {
-                    updateLandingPattern();
-                    recenterMap();
-                }
-            } else {
-                Utils.handleError('Canopy speed must be between 5 and 50 kt.');
-            }
-        }, 300));
-    }
-
-    if (descentRateInput) {
-        descentRateInput.addEventListener('input', debounce(() => {
-            userSettings.descentRate = descentRateInput.value;
-            saveSettings();
-            const value = parseFloat(descentRateInput.value);
-            if (!isNaN(value) && value >= 1 && value <= 10) {
-                console.log('Descent rate updated:', value, 'm/s');
-                if (weatherData && lastLat && lastLng) {
-                    updateLandingPattern();
-                    recenterMap();
-                }
-            } else {
-                Utils.handleError('Descent rate must be between 1 and 10 m/s.');
-            }
-        }, 300));
-    }
-
-    // Update coordFormatRadios listener to refresh inputs
-    const coordFormatRadios = document.querySelectorAll('input[name="coordFormat"]');
-    if (coordFormatRadios.length > 0) {
-        coordFormatRadios.forEach(radio => {
-            radio.addEventListener('change', () => {
-                userSettings.coordFormat = document.querySelector('input[name="coordFormat"]:checked').value;
-                saveSettings();
-                console.log('Coordinate format changed to:', userSettings.coordFormat);
-                updateCoordInputs(userSettings.coordFormat); // Refresh input fields
-                if (currentMarker && lastLat && lastLng) {
-                    updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude); // Update popup
-                }
-            });
-        });
-    }
-
-    const downloadFormatRadios = document.querySelectorAll('input[name="downloadFormat"]');
-    if (downloadFormatRadios.length > 0) {
-        downloadFormatRadios.forEach(radio => {
-            radio.addEventListener('change', () => {
-                userSettings.downloadFormat = document.querySelector('input[name="downloadFormat"]:checked').value;
-                saveSettings();
-                console.log('Download format changed:', getDownloadFormat());
-            });
-        });
-    }
-
-    const toggleMeasureCheckbox = document.getElementById('toggleMeasure');
-    let polylineMeasureControl = null; // To store the control instance
-
-    if (toggleMeasureCheckbox) {
-        // Initialize the control but don’t add it yet
-        polylineMeasureControl = L.control.polylineMeasure({
-            position: 'topright',
-            unit: 'kilometres',
-            showBearings: true,
-            clearMeasurementsOnStop: false,
-            showClearControl: true,
-            showUnitControl: true,
-            tooltipTextFinish: 'Click to finish the line<br>',
-            tooltipTextDelete: 'Shift-click to delete point',
-            tooltipTextMove: 'Drag to move point<br>',
-            tooltipTextResume: 'Click to resume line<br>',
-            tooltipTextAdd: 'Click to add point<br>',
-            measureControlTitleOn: 'Start measuring distance and bearing',
-            measureControlTitleOff: 'Stop measuring'
-        });
-
-        toggleMeasureCheckbox.addEventListener('change', () => {
-            if (toggleMeasureCheckbox.checked) {
-                polylineMeasureControl.addTo(map);
-                console.log('Measurement tool enabled');
-            } else {
-                polylineMeasureControl.remove();
-                console.log('Measurement tool disabled');
-            }
-        });
-    }
-    const resetButton = document.createElement('button');
-    resetButton.textContent = 'Reset Settings';
-    resetButton.style.margin = '10px';
-    document.getElementById('bottom-container').appendChild(resetButton);
-    resetButton.addEventListener('click', () => {
-        userSettings = { ...defaultSettings };
+function setupInput(id, eventType, debounceTime, callback) {
+    const input = document.getElementById(id);
+    if (!input) return;
+    input.addEventListener(eventType, debounce(() => {
+        const value = input.type === 'number' ? parseFloat(input.value) : input.value;
+        userSettings[id] = value;
         saveSettings();
-        location.reload(); // Reload to apply defaults
+        console.log(`${id} changed to:`, value);
+        callback(value);
+    }, debounceTime));
+}
+
+function validateLegHeights(final, base, downwind) {
+    const finalVal = parseInt(final.value) || 100;
+    const baseVal = parseInt(base.value) || 200;
+    const downwindVal = parseInt(downwind.value) || 300;
+
+    if (baseVal <= finalVal) {
+        Utils.handleError('Base leg must start higher than final leg.');
+        return false;
+    }
+    if (downwindVal <= baseVal) {
+        Utils.handleError('Downwind leg must start higher than base leg.');
+        return false;
+    }
+    return true;
+}
+
+function setupLegHeightInput(id, defaultValue) {
+    const input = document.getElementById(id);
+    if (!input) return;
+    input.addEventListener('blur', () => {
+        const value = parseInt(input.value) || defaultValue;
+        userSettings[id] = value;
+        saveSettings();
+        const finalInput = document.getElementById('legHeightFinal');
+        const baseInput = document.getElementById('legHeightBase');
+        const downwindInput = document.getElementById('legHeightDownwind');
+        if (!isNaN(value) && value >= 50 && value <= 1000 && validateLegHeights(finalInput, baseInput, downwindInput)) {
+            if (weatherData && lastLat && lastLng) {
+                updateLandingPattern();
+                if (id === 'legHeightDownwind' && userSettings.calculateJump) calculateJump();
+                recenterMap();
+            }
+        } else {
+            let adjustedValue = defaultValue;
+            const finalVal = parseInt(finalInput?.value) || 100;
+            const baseVal = parseInt(baseInput?.value) || 200;
+            const downwindVal = parseInt(downwindInput?.value) || 300;
+            if (id === 'legHeightFinal') adjustedValue = Math.min(baseVal - 1, 100);
+            if (id === 'legHeightBase') adjustedValue = Math.max(finalVal + 1, Math.min(downwindVal - 1, 200));
+            if (id === 'legHeightDownwind') adjustedValue = Math.max(baseVal + 1, 300);
+            input.value = adjustedValue;
+            userSettings[id] = adjustedValue;
+            saveSettings();
+            Utils.handleError(`Adjusted ${id} to ${adjustedValue} to maintain valid leg order.`);
+        }
+    });
+}
+
+// Setup checkbox events
+function setupCheckboxEvents() {
+    setupCheckbox('showTableCheckbox', 'showTable', () => {
+        const info = document.getElementById('info');
+        if (info) info.style.display = userSettings.showTable ? 'block' : 'none';
+        if (userSettings.showTable && weatherData && lastLat && lastLng) {
+            updateWeatherDisplay(getSliderValue());
+        }
+        recenterMap();
     });
 
+    setupCheckbox('calculateJumpCheckbox', 'calculateJump', () => {
+        console.log('calculateJumpCheckbox callback triggered, current checked:', document.getElementById('calculateJumpCheckbox').checked);
+        console.log('userSettings.calculateJump before toggle:', userSettings.calculateJump);
+        toggleSubmenu('calculateJumpCheckbox', userSettings.calculateJump);
+        console.log('userSettings.calculateJump after toggle:', userSettings.calculateJump);
+        if (userSettings.calculateJump) {
+            if (weatherData && lastLat && lastLng) {
+                console.log('Calling calculateJump with:', { weatherData, lastLat, lastLng });
+                calculateJump();
+            } else {
+                console.warn('Cannot calculate jump: Missing data', { weatherData: !!weatherData, lastLat, lastLng });
+                Utils.handleError('Please click the map to set a location first.');
+            }
+        } else {
+            console.log('Clearing jump circles');
+            clearJumpCircles();
+        }
+    });
+
+    setupCheckbox('showLandingPattern', 'showLandingPattern', () => {
+        toggleSubmenu('showLandingPattern', userSettings.showLandingPattern);
+        if (userSettings.showLandingPattern && weatherData && lastLat && lastLng) {
+            updateLandingPattern();
+            recenterMap();
+        }
+    });
+}
+
+function setupCheckbox(id, settingsKey, callback) {
+    const checkbox = document.getElementById(id);
+    if (!checkbox) {
+        console.warn(`Checkbox with ID "${id}" not found`);
+        return;
+    }
+    checkbox.addEventListener('change', () => {
+        const newValue = checkbox.checked;
+        console.log(`${id} changed to:`, newValue);
+        userSettings[settingsKey] = newValue; // Use settingsKey instead of id
+        saveSettings();
+        callback();
+    });
+}
+
+function toggleSubmenu(id, isVisible) {
+    const checkbox = document.getElementById(id);
+    const submenu = checkbox?.parentElement.nextElementSibling;
+    if (submenu) {
+        submenu.classList.toggle('hidden', !isVisible);
+        console.log('Submenu visibility:', !submenu.classList.contains('hidden'));
+    } else {
+        console.warn(`Submenu for ${id} not found`);
+    }
+}
+
+function clearJumpCircles() {
+    if (jumpCircle) {
+        map.removeLayer(jumpCircle);
+        jumpCircle = null;
+    }
+    if (jumpCircleFull) {
+        map.removeLayer(jumpCircleFull);
+        jumpCircleFull = null;
+    }
+}
+
+// Setup coordinate events
+function setupCoordinateEvents() {
     const coordInputs = document.getElementById('coordInputs');
+    if (coordInputs) {
+        updateCoordInputs(userSettings.coordFormat);
+    } else {
+        console.warn('Coordinate inputs container (#coordInputs) not found');
+    }
+
     const moveMarkerBtn = document.getElementById('moveMarkerBtn');
-
-    // Function to update input fields based on format
-    function updateCoordInputs(format) {
-        coordInputs.innerHTML = ''; // Clear existing inputs
-        if (format === 'Decimal') {
-            coordInputs.innerHTML = `
-                <label>Latitude: <input type="number" id="latDec" step="any" placeholder="e.g., 48.0179"></label>
-                <label>Longitude: <input type="number" id="lngDec" step="any" placeholder="e.g., 11.1923"></label>
-            `;
-        } else if (format === 'DMS') {
-            coordInputs.innerHTML = `
-                <label>Lat: 
-                    <input type="number" id="latDeg" min="0" max="90" placeholder="Deg">°
-                    <input type="number" id="latMin" min="0" max="59" placeholder="Min">'
-                    <input type="number" id="latSec" min="0" max="59.999" step="0.001" placeholder="Sec">"
-                    <select id="latDir"><option value="N">N</option><option value="S">S</option></select>
-                </label>
-                <label>Lng: 
-                    <input type="number" id="lngDeg" min="0" max="180" placeholder="Deg">°
-                    <input type="number" id="lngMin" min="0" max="59" placeholder="Min">'
-                    <input type="number" id="lngSec" min="0" max="59.999" step="0.001" placeholder="Sec">"
-                    <select id="lngDir"><option value="E">E</option><option value="W">W</option></select>
-                </label>
-            `;
-        } else if (format === 'MGRS') {
-            coordInputs.innerHTML = `
-                <label>MGRS: <input type="text" id="mgrsCoord" placeholder="e.g., 32UPU12345678"></label>
-            `;
-        }
-        console.log(`Coordinate inputs updated to ${format}`);
-    }
-
-    // Function to parse coordinates based on user format
-    function parseCoordinates() {
-        let lat, lng;
-
-        if (userSettings.coordFormat === 'Decimal') {
-            lat = parseFloat(document.getElementById('latDec')?.value);
-            lng = parseFloat(document.getElementById('lngDec')?.value);
-            if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-                throw new Error('Invalid Decimal Degrees coordinates');
-            }
-        } else if (userSettings.coordFormat === 'DMS') {
-            const latDeg = parseInt(document.getElementById('latDeg')?.value) || 0;
-            const latMin = parseInt(document.getElementById('latMin')?.value) || 0;
-            const latSec = parseFloat(document.getElementById('latSec')?.value) || 0;
-            const latDir = document.getElementById('latDir')?.value;
-            const lngDeg = parseInt(document.getElementById('lngDeg')?.value) || 0;
-            const lngMin = parseInt(document.getElementById('lngMin')?.value) || 0;
-            const lngSec = parseFloat(document.getElementById('lngSec')?.value) || 0;
-            const lngDir = document.getElementById('lngDir')?.value;
-
-            lat = Utils.dmsToDecimal(latDeg, latMin, latSec, latDir);
-            lng = Utils.dmsToDecimal(lngDeg, lngMin, lngSec, lngDir);
-
-            if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-                throw new Error('Invalid DMS coordinates');
-            }
-        } else if (userSettings.coordFormat === 'MGRS') {
-            const mgrsInput = document.getElementById('mgrsCoord')?.value.trim();
-            if (!mgrsInput) {
-                throw new Error('MGRS coordinate cannot be empty');
-            }
-
-            console.log('Attempting to parse MGRS:', mgrsInput);
-
-            if (!/^[0-6][0-9][A-HJ-NP-Z][A-HJ-NP-Z]{2}[0-9]+$/.test(mgrsInput)) {
-                throw new Error('MGRS format invalid. Example: 32UPU12345678 (zone, band, square, easting/northing)');
-            }
-
-            try {
-                if (typeof mgrs === 'undefined') {
-                    throw new Error('MGRS library not loaded. Check script inclusion.');
-                }
-
-                console.log('Calling mgrs.toPoint with:', mgrsInput);
-                [lng, lat] = mgrs.toPoint(mgrsInput);
-                console.log(`Parsed MGRS ${mgrsInput} to Lat: ${lat}, Lng: ${lng}`);
-
-                if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-                    throw new Error('Parsed MGRS coordinates out of valid range');
-                }
-            } catch (e) {
-                console.error('MGRS parsing failed:', e.message, 'Input:', mgrsInput);
-                throw new Error(`Invalid MGRS format: ${e.message}`);
-            }
-        }
-        return [lat, lng];
-    }
-
-    // Initialize inputs based on user setting
-    updateCoordInputs(userSettings.coordFormat);
-
-    // Event listener for moving the marker
     if (moveMarkerBtn) {
         moveMarkerBtn.addEventListener('click', async () => {
             try {
@@ -2928,5 +2598,116 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+}
 
-});
+function updateCoordInputs(format) {
+    const coordInputs = document.getElementById('coordInputs');
+    if (!coordInputs) return;
+
+    coordInputs.innerHTML = ''; // Clear existing inputs
+    if (format === 'Decimal') {
+        coordInputs.innerHTML = `
+            <label>Latitude: <input type="number" id="latDec" step="any" placeholder="e.g., 48.0179"></label>
+            <label>Longitude: <input type="number" id="lngDec" step="any" placeholder="e.g., 11.1923"></label>
+        `;
+    } else if (format === 'DMS') {
+        coordInputs.innerHTML = `
+            <label>Lat: 
+                <input type="number" id="latDeg" min="0" max="90" placeholder="Deg">°
+                <input type="number" id="latMin" min="0" max="59" placeholder="Min">'
+                <input type="number" id="latSec" min="0" max="59.999" step="0.001" placeholder="Sec">"
+                <select id="latDir"><option value="N">N</option><option value="S">S</option></select>
+            </label>
+            <label>Lng: 
+                <input type="number" id="lngDeg" min="0" max="180" placeholder="Deg">°
+                <input type="number" id="lngMin" min="0" max="59" placeholder="Min">'
+                <input type="number" id="lngSec" min="0" max="59.999" step="0.001" placeholder="Sec">"
+                <select id="lngDir"><option value="E">E</option><option value="W">W</option></select>
+            </label>
+        `;
+    } else if (format === 'MGRS') {
+        coordInputs.innerHTML = `
+            <label>MGRS: <input type="text" id="mgrsCoord" placeholder="e.g., 32UPU12345678"></label>
+        `;
+    }
+    console.log(`Coordinate inputs updated to ${format}`);
+}
+
+function parseCoordinates() {
+    let lat, lng;
+
+    if (userSettings.coordFormat === 'Decimal') {
+        lat = parseFloat(document.getElementById('latDec')?.value);
+        lng = parseFloat(document.getElementById('lngDec')?.value);
+        if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+            throw new Error('Invalid Decimal Degrees coordinates');
+        }
+    } else if (userSettings.coordFormat === 'DMS') {
+        const latDeg = parseInt(document.getElementById('latDeg')?.value) || 0;
+        const latMin = parseInt(document.getElementById('latMin')?.value) || 0;
+        const latSec = parseFloat(document.getElementById('latSec')?.value) || 0;
+        const latDir = document.getElementById('latDir')?.value;
+        const lngDeg = parseInt(document.getElementById('lngDeg')?.value) || 0;
+        const lngMin = parseInt(document.getElementById('lngMin')?.value) || 0;
+        const lngSec = parseFloat(document.getElementById('lngSec')?.value) || 0;
+        const lngDir = document.getElementById('lngDir')?.value;
+
+        lat = Utils.dmsToDecimal(latDeg, latMin, latSec, latDir);
+        lng = Utils.dmsToDecimal(lngDeg, lngMin, lngSec, lngDir);
+
+        if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+            throw new Error('Invalid DMS coordinates');
+        }
+    } else if (userSettings.coordFormat === 'MGRS') {
+        const mgrsInput = document.getElementById('mgrsCoord')?.value.trim();
+        if (!mgrsInput) {
+            throw new Error('MGRS coordinate cannot be empty');
+        }
+
+        console.log('Attempting to parse MGRS:', mgrsInput);
+
+        if (!/^[0-6][0-9][A-HJ-NP-Z][A-HJ-NP-Z]{2}[0-9]+$/.test(mgrsInput)) {
+            throw new Error('MGRS format invalid. Example: 32UPU12345678 (zone, band, square, easting/northing)');
+        }
+
+        try {
+            if (typeof mgrs === 'undefined') {
+                throw new Error('MGRS library not loaded. Check script inclusion.');
+            }
+
+            console.log('Calling mgrs.toPoint with:', mgrsInput);
+            [lng, lat] = mgrs.toPoint(mgrsInput);
+            console.log(`Parsed MGRS ${mgrsInput} to Lat: ${lat}, Lng: ${lng}`);
+
+            if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+                throw new Error('Parsed MGRS coordinates out of valid range');
+            }
+        } catch (e) {
+            console.error('MGRS parsing failed:', e.message, 'Input:', mgrsInput);
+            throw new Error(`Invalid MGRS format: ${e.message}`);
+        }
+    }
+    return [lat, lng];
+}
+
+// Setup reset button
+function setupResetButton() {
+    const resetButton = document.createElement('button');
+    resetButton.textContent = 'Reset Settings';
+    resetButton.style.margin = '10px';
+    document.getElementById('bottom-container').appendChild(resetButton);
+    resetButton.addEventListener('click', () => {
+        userSettings = { ...defaultSettings };
+        saveSettings();
+        location.reload();
+    });
+}
+
+// Placeholder for debounce (implement this if not already defined)
+function debounce(func, wait) {
+    let timeout;
+    return function (...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+    };
+}
