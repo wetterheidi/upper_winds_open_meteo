@@ -403,12 +403,18 @@ class Utils {
         displayError(message);
     }
 
-    static dmsToDecimal(dms) {
-        const parts = dms.match(/(\d+)°\s*(\d+)'\s*(\d+(?:\.\d+)?)"?\s*([NSEW])/i);
-        if (!parts) return null;
-
-        let decimal = parseInt(parts[1]) + parseInt(parts[2]) / 60 + parseFloat(parts[3]) / 3600;
-        if (parts[4].toUpperCase() === 'S' || parts[4].toUpperCase() === 'W') {
+    static dmsToDecimal(degrees, minutes, seconds, direction) {
+        // Validate inputs
+        if (typeof degrees !== 'number' || isNaN(degrees) ||
+            typeof minutes !== 'number' || isNaN(minutes) ||
+            typeof seconds !== 'number' || isNaN(seconds) ||
+            typeof direction !== 'string' || !['N', 'S', 'E', 'W'].includes(direction.toUpperCase())) {
+            throw new Error('Invalid DMS input: degrees, minutes, seconds must be numbers, and direction must be N, S, E, or W');
+        }
+    
+        // Calculate decimal degrees
+        let decimal = degrees + (minutes / 60) + (seconds / 3600);
+        if (direction.toUpperCase() === 'S' || direction.toUpperCase() === 'W') {
             decimal = -decimal;
         }
         return decimal;

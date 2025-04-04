@@ -12,13 +12,10 @@ let finalArrow = null;
 let baseArrow = null;
 let downwindArrow = null;
 let landingWindDir = null;
-let coordFormatSelect, coordInputs, moveMarkerBtn;
+let coordInputs;
 let jumpCircle = null;
 let jumpCircleFull = null; // New red circle for full descent
 let marker = null;
-
-//CONSTANTS FOR TESTING
-const OPENING_ALTITUDE = 1200; // Opening altitude in meters
 
 // Default settings object
 const defaultSettings = {
@@ -212,6 +209,9 @@ function updateJumpCircle(lat, lng, radius, radiusFull, displacement, displaceme
         map.removeLayer(jumpCircleFull);
     }
 
+    currentMarker.setLatLng([lat, lng]);
+    updateMarkerPopup(currentMarker, lat, lng, lastAltitude);
+
     // Create new red jump circle (full descent from opening altitude)
     jumpCircleFull = L.circle(newCenterRed, {
         radius: radiusFull, // in meters (red circle)
@@ -220,42 +220,6 @@ function updateJumpCircle(lat, lng, radius, radiusFull, displacement, displaceme
         fillOpacity: 0.2,
         weight: 2
     }).addTo(map);
-
-    // Ensure currentMarker exists and is at the original position
-    if (!currentMarker) {
-        const customIcon = L.icon({
-            iconUrl: 'favicon.ico',
-            iconSize: [32, 32],
-            iconAnchor: [16, 32],
-            popupAnchor: [0, -32],
-            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-            shadowSize: [41, 41],
-            shadowAnchor: [13, 32]
-        });
-        currentMarker = L.marker([lat, lng], {
-            icon: customIcon,
-            draggable: true
-        }).addTo(map);
-        updateMarkerPopup(currentMarker, lat, lng, lastAltitude);
-        // Add dragend event listener
-        currentMarker.on('dragend', async (e) => {
-            const marker = e.target;
-            const position = marker.getLatLng();
-            lastLat = position.lat;
-            lastLng = position.lng;
-            lastAltitude = await getAltitude(lastLat, lastLng);
-            updateMarkerPopup(marker, lastLat, lastLng, lastAltitude);
-            if (userSettings.calculateJump) {
-                calculateJump();
-            }
-            recenterMap();
-            await fetchWeather(lastLat, lastLng);
-            updateModelRunInfo();
-            if (lastAltitude !== 'N/A') calculateMeanWind();
-        });
-    } else {
-        currentMarker.setLatLng([lat, lng]); // Ensure it’s at the correct position
-    }
 }
 
 function calculateNewCenter(lat, lng, distance, bearing) {
@@ -291,10 +255,6 @@ function getHeightUnit() {
 
 function getCoordinateFormat() {
     return document.querySelector('input[name="coordFormat"]:checked')?.value || 'Decimal';
-}
-
-function getDownloadFormat() {
-    return document.querySelector('input[name="downloadFormat"]:checked')?.value || 'HEIDIS';
 }
 
 function getInterpolationStep() {
@@ -416,6 +376,49 @@ function generateWindBarb(direction, speedKt) {
     return svg;
 }
 
+function createCustomMarker(lat, lng) {
+    const customIcon = L.icon({
+        iconUrl: 'favicon.ico',
+        iconSize: [32, 32],
+        iconAnchor: [16, 32],
+        popupAnchor: [0, -32],
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+        shadowSize: [41, 41],
+        shadowAnchor: [13, 32]
+    });
+    return L.marker([lat, lng], {
+        icon: customIcon,
+        draggable: true
+    });
+}
+
+function attachMarkerDragend(marker) {
+    marker.on('dragend', async (e) => {
+        const position = marker.getLatLng();
+        lastLat = position.lat;
+        lastLng = position.lng;
+        lastAltitude = await getAltitude(lastLat, lastLng);
+        updateMarkerPopup(marker, lastLat, lastLng, lastAltitude);
+        if (userSettings.calculateJump) calculateJump();
+        recenterMap();
+
+        const slider = document.getElementById('timeSlider');
+        const currentIndex = parseInt(slider.value) || 0;
+        const currentTime = weatherData?.time?.[currentIndex] || null;
+
+        document.getElementById('info').innerHTML = `Fetching weather and models...`;
+        const availableModels = await checkAvailableModels(lastLat, lastLng);
+        if (availableModels.length > 0) {
+            await fetchWeather(lastLat, lastLng, currentTime);
+            updateModelRunInfo();
+            if (lastAltitude !== 'N/A') calculateMeanWind();
+            updateLandingPattern();
+        } else {
+            document.getElementById('info').innerHTML = `No models available.`;
+        }
+    });
+}
+
 function updateMarkerPopup(marker, lat, lng, altitude) {
     console.log('Updating marker popup:', { lat, lng, altitude, format: getCoordinateFormat() });
     const coordFormat = getCoordinateFormat();
@@ -426,7 +429,6 @@ function updateMarkerPopup(marker, lat, lng, altitude) {
     } else {
         popupContent = `Lat: ${coords.lat}<br>Lng: ${coords.lng}<br>Alt: ${altitude}m`;
     }
-
     // Check if the marker already has a popup bound; if not, bind one
     if (!marker.getPopup()) {
         marker.bindPopup(popupContent);
@@ -442,6 +444,19 @@ async function getDisplayTime(utcTimeStr) {
         return Utils.formatTime(utcTimeStr); // Synchronous
     } else {
         return await Utils.formatLocalTime(utcTimeStr, lastLat, lastLng); // Async
+    }
+}
+
+async function fetchWeatherForLocation(lat, lng, currentTime = null) {
+    document.getElementById('info').innerHTML = `Fetching weather and models...`;
+    const availableModels = await checkAvailableModels(lat, lng);
+    if (availableModels.length > 0) {
+        await fetchWeather(lat, lng, currentTime);
+        updateModelRunInfo();
+        if (lastAltitude !== 'N/A') calculateMeanWind();
+        updateLandingPattern();
+    } else {
+        document.getElementById('info').innerHTML = `No models available.`;
     }
 }
 
@@ -536,55 +551,15 @@ function initMap() {
         maxWidth: 100          // Maximum width of the scale bar in pixels
     }).addTo(map);
 
-    // Custom icon setup
-    const customIcon = L.icon({
-        iconUrl: 'favicon.ico',
-        iconSize: [32, 32],
-        iconAnchor: [16, 32],
-        popupAnchor: [0, -32],
-        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-        shadowSize: [41, 41],
-        shadowAnchor: [13, 32]
-    });
-
     // Initial marker setup
     const initialAltitude = 'N/A';
-    currentMarker = L.marker(defaultCenter, {
-        icon: customIcon,
-        draggable: true
-    }).addTo(map);
+    currentMarker = createCustomMarker(defaultCenter[0], defaultCenter[1]).addTo(map);
+    attachMarkerDragend(currentMarker);
     currentMarker.bindPopup(''); // Bind an empty popup
     updateMarkerPopup(currentMarker, defaultCenter[0], defaultCenter[1], initialAltitude);
     if (userSettings.calculateJump) {
         calculateJump();
     }
-    // Add dragend event listener
-    currentMarker.on('dragend', async (e) => {
-        const marker = e.target;
-        const position = marker.getLatLng();
-        lastLat = position.lat;
-        lastLng = position.lng;
-        lastAltitude = await getAltitude(lastLat, lastLng);
-
-        // Update popup content
-        updateMarkerPopup(marker, lastLat, lastLng, lastAltitude);
-        if (userSettings.calculateJump) {
-            calculateJump();
-        }
-        recenterMap();
-
-        // Fetch weather data for new position
-        document.getElementById('info').innerHTML = `Fetching weather and models...`;
-        const availableModels = await checkAvailableModels(lastLat, lastLng);
-        if (availableModels.length > 0) {
-            await fetchWeather(lastLat, lastLng);
-            updateModelRunInfo();
-            if (lastAltitude !== 'N/A') calculateMeanWind();
-        } else {
-            document.getElementById('info').innerHTML = `No models available.`;
-        }
-        console.log('Marker after drag:', currentMarker.getLatLng());
-    });
 
     recenterMap();
 
@@ -600,51 +575,17 @@ function initMap() {
                 lastLng = position.coords.longitude;
                 lastAltitude = await getAltitude(lastLat, lastLng);
 
-                currentMarker = L.marker(userCoords, {
-                    icon: customIcon,
-                    draggable: true
-                }).addTo(map);
+                currentMarker = createCustomMarker(lastLat, lastLat).addTo(map);
+                attachMarkerDragend(currentMarker);
                 updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
                 if (userSettings.calculateJump) {
                     calculateJump();
                 }
-                // Add dragend event for geolocation marker
-                currentMarker.on('dragend', async (e) => {
-                    const marker = e.target;
-                    const position = marker.getLatLng();
-                    lastLat = position.lat;
-                    lastLng = position.lng;
-                    lastAltitude = await getAltitude(lastLat, lastLng);
-
-                    updateMarkerPopup(marker, lastLat, lastLng, lastAltitude);
-                    if (userSettings.calculateJump) {
-                        calculateJump();
-                    }
-                    recenterMap();
-
-                    document.getElementById('info').innerHTML = `Fetching weather and models...`;
-                    const availableModels = await checkAvailableModels(lastLat, lastLng);
-                    if (availableModels.length > 0) {
-                        await fetchWeather(lastLat, lastLng);
-                        updateModelRunInfo();
-                        if (lastAltitude !== 'N/A') calculateMeanWind();
-                        updateLandingPattern();
-                    } else {
-                        document.getElementById('info').innerHTML = `No models available.`;
-                    }
-                });
 
                 recenterMap();
 
-                document.getElementById('info').innerHTML = `Fetching weather and models...`;
-                const availableModels = await checkAvailableModels(lastLat, lastLng);
-                if (availableModels.length > 0) {
-                    await fetchWeather(lastLat, lastLng);
-                    updateModelRunInfo();
-                    if (weatherData && lastAltitude !== 'N/A') calculateMeanWind();
-                } else {
-                    document.getElementById('info').innerHTML = `No models available.`;
-                }
+                // In initMap() (geolocation success):
+            await fetchWeatherForLocation(lastLat, lastLng);
             },
             async (error) => {
                 console.warn(`Geolocation error: ${error.message}`);
@@ -655,17 +596,7 @@ function initMap() {
                 updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
 
                 recenterMap();
-
-                document.getElementById('info').innerHTML = `Fetching weather and models...`;
-                const availableModels = await checkAvailableModels(lastLat, lastLng);
-                if (availableModels.length > 0) {
-                    await fetchWeather(lastLat, lastLng);
-                    updateModelRunInfo();
-                    await updateWeatherDisplay(0);
-                    if (lastAltitude !== 'N/A') calculateMeanWind();
-                } else {
-                    document.getElementById('info').innerHTML = `No models available.`;
-                }
+                await fetchWeatherForLocation(lat, lng);
             },
             { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
@@ -677,15 +608,7 @@ function initMap() {
         lastAltitude = getAltitude(lastLat, lastLng);
         updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
         recenterMap();
-
-        document.getElementById('info').innerHTML = `Fetching weather and models...`;
-        const availableModels = checkAvailableModels(lastLat, lastLng);
-        if (availableModels.length > 0) {
-            fetchWeather(lastLat, lastLng);
-            if (lastAltitude !== 'N/A') calculateMeanWind();
-        } else {
-            document.getElementById('info').innerHTML = `No models available.`;
-        }
+        fetchWeatherForLocation(lat, lng);
     }
     // Create a custom Leaflet control
     L.Control.Coordinates = L.Control.extend({
@@ -736,63 +659,20 @@ function initMap() {
 
         // Remove existing marker and create a new one
         if (currentMarker) currentMarker.remove();
-        currentMarker = L.marker([lat, lng], {
-            icon: customIcon,
-            draggable: true
-        }).addTo(map);
+        currentMarker = createCustomMarker(lat, lng).addTo(map);
+        attachMarkerDragend(currentMarker);
 
         // Update popup for the new marker
         updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
         if (userSettings.calculateJump) {
             calculateJump();
         }
-        // Add dragend event for the new marker
-        currentMarker.on('dragend', async (e) => {
-            const marker = e.target;
-            const position = marker.getLatLng();
-            lastLat = position.lat;
-            lastLng = position.lng;
-            lastAltitude = await getAltitude(lastLat, lastLng);
-
-            updateMarkerPopup(marker, lastLat, lastLng, lastAltitude);
-            if (userSettings.calculateJump) {
-                calculateJump();
-            }
-            recenterMap();
-
-            const slider = document.getElementById('timeSlider');
-            const currentIndex = parseInt(slider.value) || 0;
-            const currentTime = weatherData?.time?.[currentIndex] || null;
-
-            document.getElementById('info').innerHTML = `Fetching weather and models...`;
-            const availableModels = await checkAvailableModels(lastLat, lastLng);
-            if (availableModels.length > 0) {
-                await fetchWeather(lastLat, lastLng, currentTime);
-                updateModelRunInfo();
-                if (lastAltitude !== 'N/A') calculateMeanWind();
-                updateLandingPattern();
-            } else {
-                document.getElementById('info').innerHTML = `No models available.`;
-            }
-        });
 
         recenterMap();
 
         // Preserve the current slider time before fetching new data
-        const slider = document.getElementById('timeSlider');
-        const currentIndex = parseInt(slider.value) || 0;
-        const currentTime = weatherData?.time?.[currentIndex] || null;
-
-        document.getElementById('info').innerHTML = `Fetching weather and models...`;
-        const availableModels = await checkAvailableModels(lat, lng);
-        if (availableModels.length > 0) {
-            await fetchWeather(lat, lng, currentTime); // Pass the current time
-            updateModelRunInfo();
-            if (lastAltitude !== 'N/A') calculateMeanWind();
-            updateLandingPattern();
-        } else {
-            document.getElementById('info').innerHTML = `No models available.`;
-        }
+        const currentTime = weatherData?.time?.[parseInt(document.getElementById('timeSlider').value) || 0] || null;
+        await fetchWeatherForLocation(lat, lng, currentTime);
     });
 
     let lastTapTime = 0;
@@ -820,60 +700,20 @@ function initMap() {
             lastAltitude = await getAltitude(lat, lng);
 
             if (currentMarker) currentMarker.remove();
-            currentMarker = L.marker([lat, lng], {
-                icon: customIcon,
-                draggable: true
-            }).addTo(map);
+            currentMarker = createCustomMarker(lat, lng).addTo(map);
+            attachMarkerDragend(currentMarker);
 
             updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
             if (userSettings.calculateJump) {
                 calculateJump();
             }
-            currentMarker.on('dragend', async (e) => {
-                const marker = e.target;
-                const position = marker.getLatLng();
-                lastLat = position.lat;
-                lastLng = position.lng;
-                lastAltitude = await getAltitude(lastLat, lastLng);
-
-                updateMarkerPopup(marker, lastLat, lastLng, lastAltitude);
-                if (userSettings.calculateJump) {
-                    calculateJump();
-                }
-                recenterMap();
-
-                const slider = document.getElementById('timeSlider');
-                const currentIndex = parseInt(slider.value) || 0;
-                const currentTime = weatherData?.time?.[currentIndex] || null;
-
-                document.getElementById('info').innerHTML = `Fetching weather and models...`;
-                const availableModels = await checkAvailableModels(lastLat, lastLng);
-                if (availableModels.length > 0) {
-                    await fetchWeather(lastLat, lastLng, currentTime);
-                    updateModelRunInfo();
-                    if (lastAltitude !== 'N/A') calculateMeanWind();
-                    updateLandingPattern();
-                } else {
-                    document.getElementById('info').innerHTML = `No models available.`;
-                }
-            });
 
             recenterMap();
 
             const slider = document.getElementById('timeSlider');
             const currentIndex = parseInt(slider.value) || 0;
             const currentTime = weatherData?.time?.[currentIndex] || null;
-
-            document.getElementById('info').innerHTML = `Fetching weather and models...`;
-            const availableModels = await checkAvailableModels(lat, lng);
-            if (availableModels.length > 0) {
-                await fetchWeather(lat, lng, currentTime);
-                updateModelRunInfo();
-                if (lastAltitude !== 'N/A') calculateMeanWind();
-                updateLandingPattern();
-            } else {
-                document.getElementById('info').innerHTML = `No models available.`;
-            }
+            await fetchWeatherForLocation(lat, lng);
         }
 
         lastTapTime = currentTime;
@@ -2124,12 +1964,6 @@ function updateUIState() {
     updateWindUnitLabels();
 }
 
-function toggleSubmenu(id, isVisible) {
-    const checkbox = document.getElementById(id);
-    const submenu = checkbox?.closest('li')?.querySelector('.submenu');
-    if (submenu) submenu.classList.toggle('hidden', !isVisible);
-}
-
 // Initialize map
 function initializeMap() {
     console.log('Initializing map...');
@@ -2563,18 +2397,7 @@ function setupCoordinateEvents() {
                 if (currentMarker) {
                     currentMarker.setLatLng([lat, lng]);
                 } else {
-                    currentMarker = L.marker([lat, lng], {
-                        icon: L.icon({
-                            iconUrl: 'favicon.ico',
-                            iconSize: [32, 32],
-                            iconAnchor: [16, 32],
-                            popupAnchor: [0, -32],
-                            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-                            shadowSize: [41, 41],
-                            shadowAnchor: [13, 32]
-                        }),
-                        draggable: true
-                    }).addTo(map);
+                    currentMarker = createCustomMarker(lat, lng).addTo(map);
                 }
 
                 updateMarkerPopup(currentMarker, lat, lng, lastAltitude);
@@ -2582,17 +2405,7 @@ function setupCoordinateEvents() {
                     calculateJump();
                 }
                 recenterMap();
-
-                document.getElementById('info').innerHTML = `Fetching weather and models...`;
-                const availableModels = await checkAvailableModels(lat, lng);
-                if (availableModels.length > 0) {
-                    await fetchWeather(lat, lng);
-                    updateModelRunInfo();
-                    if (lastAltitude !== 'N/A') calculateMeanWind();
-                    updateLandingPattern();
-                } else {
-                    document.getElementById('info').innerHTML = `No models available.`;
-                }
+                await fetchWeatherForLocation(lat, lng);
             } catch (error) {
                 Utils.handleError(error.message);
             }
