@@ -12,11 +12,15 @@ let finalArrow = null;
 let baseArrow = null;
 let downwindArrow = null;
 let landingWindDir = null;
-let coordInputs;
 let jumpCircle = null;
 let jumpCircleFull = null; // New red circle for full descent
-let marker = null;
 
+const getTemperatureUnit = () => getSettingValue('temperatureUnit', 'radio', 'C');
+const getHeightUnit = () => getSettingValue('heightUnit', 'radio', 'm');
+const getWindSpeedUnit = () => getSettingValue('windUnit', 'radio', 'kt');
+const getCoordinateFormat = () => getSettingValue('coordFormat', 'radio', 'Decimal');
+const getInterpolationStep = () => getSettingValue('interpStepSelect', 'select', 200);
+const getDownloadFormat = () => getSettingValue('downloadFormat', 'radio', 'csv');
 // Default settings object
 const defaultSettings = {
     model: 'icon_global',
@@ -245,20 +249,10 @@ function calculateNewCenter(lat, lng, distance, bearing) {
     return [newLat, normalizedLng];
 }
 
-function getTemperatureUnit() {
-    return document.querySelector('input[name="temperatureUnit"]:checked')?.value || 'C';
-}
-
-function getHeightUnit() {
-    return document.querySelector('input[name="heightUnit"]:checked')?.value || 'm';
-}
-
-function getCoordinateFormat() {
-    return document.querySelector('input[name="coordFormat"]:checked')?.value || 'Decimal';
-}
-
-function getInterpolationStep() {
-    return parseInt(document.getElementById('interpStepSelect').value) || 200;
+function getSettingValue(name, type = 'radio', defaultValue) {
+    const selector = type === 'radio' ? `input[name="${name}"]:checked` : `#${name}`;
+    const element = document.querySelector(selector);
+    return element ? (type === 'select' ? parseInt(element.value) || defaultValue : element.value) : defaultValue;
 }
 
 function updateHeightUnitLabels() {
@@ -283,10 +277,6 @@ function updateHeightUnitLabels() {
     const upperLabel = document.querySelector('label[for="upperLimit"]');
     lowerLabel.textContent = `Lower Limit (${heightUnit}):`;
     upperLabel.textContent = `Upper Limit (${heightUnit}):`;
-}
-
-function getWindSpeedUnit() {
-    return document.querySelector('input[name="windUnit"]:checked')?.value || 'kt';
 }
 
 function updateWindUnitLabels() {
@@ -447,6 +437,17 @@ async function getDisplayTime(utcTimeStr) {
     }
 }
 
+async function updateAllDisplays() {
+    const sliderIndex = getSliderValue();
+    if (weatherData && lastLat && lastLng) {
+        await updateWeatherDisplay(sliderIndex);
+        if (lastAltitude !== 'N/A') calculateMeanWind();
+        if (userSettings.showLandingPattern) updateLandingPattern();
+        if (userSettings.calculateJump) calculateJump();
+        recenterMap();
+    }
+}
+
 async function fetchWeatherForLocation(lat, lng, currentTime = null) {
     document.getElementById('info').innerHTML = `Fetching weather and models...`;
     const availableModels = await checkAvailableModels(lat, lng);
@@ -585,7 +586,7 @@ function initMap() {
                 recenterMap();
 
                 // In initMap() (geolocation success):
-            await fetchWeatherForLocation(lastLat, lastLng);
+                await fetchWeatherForLocation(lastLat, lastLng);
             },
             async (error) => {
                 console.warn(`Geolocation error: ${error.message}`);
@@ -596,7 +597,7 @@ function initMap() {
                 updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
 
                 recenterMap();
-                await fetchWeatherForLocation(lat, lng);
+                await fetchWeatherForLocation(lastLat, lastLng);
             },
             { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
@@ -608,7 +609,7 @@ function initMap() {
         lastAltitude = getAltitude(lastLat, lastLng);
         updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
         recenterMap();
-        fetchWeatherForLocation(lat, lng);
+        fetchWeatherForLocation(lastLat, lastLng);
     }
     // Create a custom Leaflet control
     L.Control.Coordinates = L.Control.extend({
@@ -713,7 +714,7 @@ function initMap() {
             const slider = document.getElementById('timeSlider');
             const currentIndex = parseInt(slider.value) || 0;
             const currentTime = weatherData?.time?.[currentIndex] || null;
-            await fetchWeatherForLocation(lat, lng);
+            await fetchWeatherForLocation(lastLat, lastLng);
         }
 
         lastTapTime = currentTime;
@@ -1563,6 +1564,23 @@ function downloadTableAsAscii(format) {
     updateReferenceLabels();
 }
 
+function createArrowIcon(midLat, midLng, bearing, color) {
+    const arrowIcon = L.divIcon({
+        className: 'custom-arrow',
+        html: `
+            <svg width="40" height="20" viewBox="0 0 40 20" style="transform: rotate(${bearing}deg); transform-origin: center;">
+                <line x1="0" y1="10" x2="30" y2="10" stroke="${color}" stroke-width="4" />
+                <polygon points="30,5 40,10 30,15" fill="${color}" />
+            </svg>`,
+        iconSize: [30, 30],
+        iconAnchor: [15, 15]
+    });
+    return L.marker([midLat, midLng], {
+        icon: arrowIcon,
+        rotationAngle: bearing,
+        rotationOrigin: 'center center'
+    }).addTo(map);
+}
 
 function updateLandingPattern() {
     const showLandingPattern = document.getElementById('showLandingPattern').checked;
@@ -1679,23 +1697,7 @@ function updateLandingPattern() {
     const finalArrowBearing = (finalWindDir - 90 + 180) % 360; // Points in direction of the mean wind at final
 
     // Create a custom arrow icon using Leaflet’s DivIcon
-    const finalArrowIcon = L.divIcon({
-        className: 'custom-arrow',
-        html: `
-        <svg width="40" height="20" viewBox="0 0 40 20" style="transform: rotate(${finalArrowBearing}deg); transform-origin: center;">
-            <line x1="0" y1="10" x2="30" y2="10" stroke=${finalArrowColor} stroke-width="4" />
-            <polygon points="30,5 40,10 30,15" fill=${finalArrowColor} />
-        </svg>`,
-        iconSize: [30, 30], // Size of the arrow
-        iconAnchor: [15, 15] // Center the arrow
-    });
-
-    // Place the arrow at the midpoint
-    finalArrow = L.marker([finalMidLat, finalMidLng], {
-        icon: finalArrowIcon,
-        rotationAngle: finalArrowBearing, // This ensures proper rotation if using a marker
-        rotationOrigin: 'center center'
-    }).addTo(map);
+    finalArrow = createArrowIcon(finalMidLat, finalMidLng, finalArrowBearing, finalArrowColor);
 
     // Base Leg (100-200m AGL)
     const baseLimits = [baseHeight + LEG_HEIGHT_FINAL, baseHeight + LEG_HEIGHT_BASE];
@@ -1755,24 +1757,7 @@ function updateLandingPattern() {
     const baseMidLng = (finalEnd[1] + baseEnd[1]) / 2;
     const baseArrowBearing = (baseWindDir - 90 + 180) % 360; // Points in direction of the mean wind at base
 
-    // Create a custom arrow icon using Leaflet’s DivIcon
-    const baseArrowIcon = L.divIcon({
-        className: 'custom-arrow',
-        html: `
-        <svg width="40" height="20" viewBox="0 0 40 20" style="transform: rotate(${baseArrowBearing}deg); transform-origin: center;">
-            <line x1="0" y1="10" x2="30" y2="10" stroke=${baseArrowColor} stroke-width="4" />
-            <polygon points="30,5 40,10 30,15" fill=${baseArrowColor} />
-        </svg>`,
-        iconSize: [30, 30], // Size of the arrow
-        iconAnchor: [15, 15] // Center the arrow
-    });
-
-    // Place the arrow at the midpoint
-    baseArrow = L.marker([baseMidLat, baseMidLng], {
-        icon: baseArrowIcon,
-        rotationAngle: baseArrowBearing, // This ensures proper rotation if using a marker
-        rotationOrigin: 'center center'
-    }).addTo(map);
+    baseArrow = createArrowIcon(baseMidLat, baseMidLng, baseArrowBearing, baseArrowColor);
 
     // Downwind Leg (200-300m AGL)
     const downwindLimits = [baseHeight + LEG_HEIGHT_BASE, baseHeight + LEG_HEIGHT_DOWNWIND];
@@ -1816,23 +1801,7 @@ function updateLandingPattern() {
     const downwindArrowBearing = (downwindWindDir - 90 + 180) % 360; // Points in direction of the mean wind at downwind
 
     // Create a custom arrow icon using Leaflet’s DivIcon
-    const downwindArrowIcon = L.divIcon({
-        className: 'custom-arrow',
-        html: `
-        <svg width="40" height="20" viewBox="0 0 40 20" style="transform: rotate(${downwindArrowBearing}deg); transform-origin: center;">
-            <line x1="0" y1="10" x2="30" y2="10" stroke=${downwindArrowColor} stroke-width="4" />
-            <polygon points="30,5 40,10 30,15" fill=${downwindArrowColor} />
-        </svg>`,
-        iconSize: [30, 30], // Size of the arrow
-        iconAnchor: [15, 15] // Center the arrow
-    });
-
-    // Place the arrow at the midpoint
-    downwindArrow = L.marker([downwindMidLat, downwindMidLng], {
-        icon: downwindArrowIcon,
-        rotationAngle: downwindArrowBearing, // This ensures proper rotation if using a marker
-        rotationOrigin: 'center center'
-    }).addTo(map);
+    downwindArrow = createArrowIcon(downwindMidLat, downwindMidLng, downwindArrowBearing, downwindArrowColor);
 
     console.log(`Landing Pattern Updated:
         Final Leg: Wind: ${finalWindDir.toFixed(1)}° @ ${finalWindSpeedKt.toFixed(1)}kt, Course: ${finalCourse.toFixed(1)}°, WCA: ${finalWca.toFixed(1)}°, GS: ${finalGroundSpeedKt.toFixed(1)}kt, HW: ${finalHeadwind.toFixed(1)}kt, Length: ${finalLength.toFixed(1)}m
@@ -1876,7 +1845,7 @@ function displayError(message) {
         console.log('Error hidden after 5s');
     }, 5000);
 }
-
+// ********** Event listener section **********
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize settings and UI
     initializeSettings();
@@ -2066,36 +2035,21 @@ function setupMenuEvents() {
 function setupRadioEvents() {
     setupRadioGroup('refLevel', () => {
         updateReferenceLabels();
-        if (weatherData && lastLat && lastLng) {
-            updateWeatherDisplay(getSliderValue());
-            if (lastAltitude !== 'N/A') calculateMeanWind();
-        }
+        updateAllDisplays();
     });
     setupRadioGroup('heightUnit', () => {
         updateHeightUnitLabels();
-        if (weatherData && lastLat && lastLng) {
-            updateWeatherDisplay(getSliderValue());
-            if (lastAltitude !== 'N/A') calculateMeanWind();
-        }
+        updateAllDisplays();
     });
     setupRadioGroup('temperatureUnit', () => {
-        if (weatherData && lastLat && lastLng) {
-            updateWeatherDisplay(getSliderValue());
-            if (lastAltitude !== 'N/A') calculateMeanWind();
-        }
+        updateAllDisplays();
     });
     setupRadioGroup('windUnit', () => {
         updateWindUnitLabels();
-        if (weatherData && lastLat && lastLng) {
-            updateWeatherDisplay(getSliderValue());
-            if (lastAltitude !== 'N/A') calculateMeanWind();
-        }
+        updateAllDisplays();
     });
     setupRadioGroup('timeZone', async () => {
-        if (weatherData && lastLat && lastLng) {
-            await updateWeatherDisplay(getSliderValue());
-            updateModelRunInfo();
-        }
+        updateAllDisplays();
     });
     setupRadioGroup('coordFormat', () => {
         updateCoordInputs(userSettings.coordFormat);
@@ -2126,10 +2080,7 @@ function setupRadioEvents() {
                 saveSettings();
             }
         }
-        if (weatherData && lastLat && lastLng) {
-            updateLandingPattern();
-            recenterMap();
-        }
+        updateAllDisplays();
     });
 }
 
@@ -2147,10 +2098,6 @@ function setupRadioGroup(name, callback) {
 
 function getSliderValue() {
     return parseInt(document.getElementById('timeSlider')?.value) || 0;
-}
-
-function getDownloadFormat() {
-    return document.querySelector('input[name="downloadFormat"]:checked')?.value || 'csv';
 }
 
 // Setup input events
@@ -2183,7 +2130,7 @@ function setupInputEvents() {
     });
     setupInput('canopySpeed', 'change', 300, (value) => {
         if (!isNaN(value) && value >= 5 && value <= 50) {
-            if (weatherData && lastLat && lastLng) updateLandingPattern();
+            updateAllDisplays();
         } else {
             Utils.handleError('Canopy speed must be between 5 and 50 kt.');
             setInputValue('canopySpeed', 20);
@@ -2193,7 +2140,7 @@ function setupInputEvents() {
     });
     setupInput('descentRate', 'change', 300, (value) => {
         if (!isNaN(value) && value >= 1 && value <= 10) {
-            if (weatherData && lastLat && lastLng) updateLandingPattern();
+            updateAllDisplays();
         } else {
             Utils.handleError('Descent rate must be between 1 and 10 m/s.');
             setInputValue('descentRate', 3);
@@ -2202,10 +2149,7 @@ function setupInputEvents() {
         }
     });
     setupInput('interpStepSelect', 'change', 300, (value) => {
-        if (weatherData && lastLat && lastLng) {
-            updateWeatherDisplay(getSliderValue());
-            if (lastAltitude !== 'N/A') calculateMeanWind();
-        }
+        updateAllDisplays();
     });
     setupLegHeightInput('legHeightFinal', 100);
     setupLegHeightInput('legHeightBase', 200);
@@ -2279,11 +2223,8 @@ function setupLegHeightInput(id, defaultValue) {
         const baseInput = document.getElementById('legHeightBase');
         const downwindInput = document.getElementById('legHeightDownwind');
         if (!isNaN(value) && value >= 50 && value <= 1000 && validateLegHeights(finalInput, baseInput, downwindInput)) {
-            if (weatherData && lastLat && lastLng) {
-                updateLandingPattern();
-                if (id === 'legHeightDownwind' && userSettings.calculateJump) calculateJump();
-                recenterMap();
-            }
+            updateAllDisplays();
+            weatherData && lastLat && lastLng && id === 'legHeightDownwind' && userSettings.calculateJump && calculateJump();
         } else {
             let adjustedValue = defaultValue;
             const finalVal = parseInt(finalInput?.value) || 100;
@@ -2317,13 +2258,7 @@ function setupCheckboxEvents() {
         toggleSubmenu('calculateJumpCheckbox', userSettings.calculateJump);
         console.log('userSettings.calculateJump after toggle:', userSettings.calculateJump);
         if (userSettings.calculateJump) {
-            if (weatherData && lastLat && lastLng) {
-                console.log('Calling calculateJump with:', { weatherData, lastLat, lastLng });
-                calculateJump();
-            } else {
-                console.warn('Cannot calculate jump: Missing data', { weatherData: !!weatherData, lastLat, lastLng });
-                Utils.handleError('Please click the map to set a location first.');
-            }
+            updateAllDisplays();
         } else {
             console.log('Clearing jump circles');
             clearJumpCircles();
