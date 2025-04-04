@@ -110,42 +110,36 @@ function updateReferenceLabels() {
 }
 
 function calculateJump() {
-    // Get values from user inputs
-    const exitAltitude = parseInt(document.getElementById('exitAltitude')?.value) || 3000; // New
+    console.log('Starting calculateJump...');
+    const exitAltitude = parseInt(document.getElementById('exitAltitude')?.value) || 3000;
     const openingAltitude = parseInt(document.getElementById('openingAltitude')?.value) || 1200;
     const legHeightDownwind = parseInt(document.getElementById('legHeightDownwind')?.value) || 300;
     const descentRate = parseFloat(document.getElementById('descentRate')?.value) || 3.5;
     const canopySpeed = parseFloat(document.getElementById('canopySpeed')?.value) || 20;
 
-    // Convert canopy speed from knots to m/s (1 kt = 0.514444 m/s)
     const canopySpeedMps = canopySpeed * 0.514444;
-
-    // Freefall phase (exitAltitude to openingAltitude) - Assuming freefall descent rate ~50 m/s
-    const freefallHeight = exitAltitude - openingAltitude;
-    const freefallTime = freefallHeight / 50; // Rough estimate, adjust as needed
-
-    // Calculate parameters for blue circle (opening altitude to downwind leg)
     const heightDistance = openingAltitude - 200 - legHeightDownwind;
     const flyTime = heightDistance / descentRate;
-    const horizontalCanopyDistance = flyTime * canopySpeedMps; // Radius in meters (blue circle)
-
-    // Calculate parameters for red circle (full descent from opening altitude)
-    const heightDistanceFull = openingAltitude - 200; // Full descent
+    const horizontalCanopyDistance = flyTime * canopySpeedMps;
+    const heightDistanceFull = openingAltitude - 200;
     const flyTimeFull = heightDistanceFull / descentRate;
-    const horizontalCanopyDistanceFull = flyTimeFull * canopySpeedMps; // Radius in meters (red circle)
+    const horizontalCanopyDistanceFull = flyTimeFull * canopySpeedMps;
 
-    // Calculate mean wind between openingAltitude and ground (0m AGL)
+    if (horizontalCanopyDistance <= 0 || horizontalCanopyDistanceFull <= 0) {
+        console.warn('Invalid radii:', { horizontalCanopyDistance, horizontalCanopyDistanceFull });
+        return null;
+    }
+
     const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
     const interpolatedData = interpolateWeatherData(sliderIndex);
 
     if (!interpolatedData || interpolatedData.length === 0) {
-        console.warn('No interpolated weather data available for mean wind calculation');
+        console.warn('No interpolated weather data available');
         return null;
     }
 
-    // Filter data between 0m and openingAltitude (AGL)
     const baseHeight = Math.round(lastAltitude);
-    const lowerLimit = baseHeight; // Ground level
+    const lowerLimit = baseHeight;
     const upperLimit = baseHeight + openingAltitude;
 
     const heights = interpolatedData.map(d => d.height);
@@ -155,41 +149,60 @@ function calculateJump() {
         return Utils.convertWind(spd, 'm/s', getWindSpeedUnit());
     });
 
-    // Calculate U and V components (in m/s, wind FROM direction)
     const uComponents = spdsMps.map((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
     const vComponents = spdsMps.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
 
-    // Calculate mean wind speed and direction between limits
     const meanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, lowerLimit, upperLimit);
-    const meanWindDirection = meanWind[0]; // in degrees
-    const meanWindSpeedMps = meanWind[1]; // in m/s
+    const meanWindDirection = meanWind[0];
+    const meanWindSpeedMps = meanWind[1];
 
-    // Calculate displacement for blue circle (opening altitude to downwind leg)
-    const centerDisplacement = meanWindSpeedMps * flyTime; // Displacement for blue circle
-    const displacementDirection = meanWindDirection; // Same direction for both
+    const centerDisplacement = meanWindSpeedMps * flyTime;
+    const centerDisplacementFull = meanWindSpeedMps * flyTimeFull;
+    const displacementDirection = meanWindDirection;
 
-    // Calculate displacement for red circle (full descent)
-    const centerDisplacementFull = meanWindSpeedMps * flyTimeFull; // Displacement for red circle
+    if (!Number.isFinite(lastLat) || !Number.isFinite(lastLng)) {
+        console.error('Invalid lastLat or lastLng:', { lastLat, lastLng });
+        return null;
+    }
 
-    // Log results for verification
-    console.log('Jump Calculation Results:');
-    console.log(`- Freefall: ${freefallHeight}m, ${freefallTime.toFixed(2)}s`);
-    console.log(`- Opening Altitude: ${openingAltitude} m`);
-    console.log(`- Blue Circle (to Downwind): Height Distance: ${heightDistance} m, Fly Time: ${flyTime.toFixed(2)} s, Radius: ${horizontalCanopyDistance.toFixed(2)} m, Displacement: ${centerDisplacement.toFixed(2)} m`);
-    console.log(`- Red Circle (Full Descent): Height Distance: ${heightDistanceFull} m, Fly Time: ${flyTimeFull.toFixed(2)} s, Radius: ${horizontalCanopyDistanceFull.toFixed(2)} m, Displacement: ${centerDisplacementFull.toFixed(2)} m`);
-    console.log(`- Canopy Speed: ${canopySpeedMps.toFixed(2)} m/s`);
-    console.log(`- Mean Wind Speed (0-${openingAltitude}m): ${meanWindSpeedMps.toFixed(2)} m/s`);
-    console.log(`- Mean Wind Direction: ${meanWindDirection.toFixed(1)}°`);
+    // Ensure landing pattern is calculated if enabled
+    if (userSettings.showLandingPattern) {
+        console.log('Updating landing pattern to get downwind end...');
+        updateLandingPattern();
+    } else {
+        console.log('Landing pattern not enabled; blue circle will use lastLat, lastLng');
+    }
 
-    // Update or create both jump circles with separate displacements
-    updateJumpCircle(lastLat, lastLng, horizontalCanopyDistance, horizontalCanopyDistanceFull, centerDisplacement, centerDisplacementFull, displacementDirection);
+    // Get downwind end coordinates with robust fallback
+    let downwindLat, downwindLng;
+    if (thirdLandingPatternLine && thirdLandingPatternLine.getLatLngs && thirdLandingPatternLine.getLatLngs().length > 1) {
+        const downwindEnd = thirdLandingPatternLine.getLatLngs()[1];
+        downwindLat = downwindEnd[0];
+        downwindLng = downwindEnd[1];
+        console.log('Downwind end from landing pattern:', { downwindLat, downwindLng });
+    } else {
+        downwindLat = lastLat;
+        downwindLng = lastLng;
+        console.warn('thirdLandingPatternLine not available, using lastLat, lastLng for blue circle:', { downwindLat, downwindLng });
+    }
 
-    // Ensure currentMarker is at the correct position
+    // Final validation
+    if (!Number.isFinite(downwindLat) || !Number.isFinite(downwindLng)) {
+        console.error('Downwind coordinates invalid, using lastLat, lastLng as fallback');
+        downwindLat = lastLat;
+        downwindLng = lastLng;
+    }
+
+    console.log('Calling updateJumpCircle with:', { downwindLat, downwindLng, lastLat, lastLng, horizontalCanopyDistance, horizontalCanopyDistanceFull, centerDisplacement, centerDisplacementFull, displacementDirection });
+    updateJumpCircle(downwindLat, downwindLng, lastLat, lastLng, horizontalCanopyDistance, horizontalCanopyDistanceFull, centerDisplacement, centerDisplacementFull, displacementDirection);
+
     if (currentMarker) {
         currentMarker.setLatLng([lastLat, lastLng]);
         updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
     }
 
+    map.fitBounds([[downwindLat, downwindLng], [lastLat, lastLng]]);
+    console.log('calculateJump completed');
     return {
         radius: horizontalCanopyDistance,
         radiusFull: horizontalCanopyDistanceFull,
@@ -199,46 +212,50 @@ function calculateJump() {
     };
 }
 
-function updateJumpCircle(lat, lng, radius, radiusFull, displacement, displacementFull, direction) {
-    if (!map || !lat || !lng) {
+function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, displacement, displacementFull, direction) {
+    console.log('updateJumpCircle called with:', { blueLat, blueLng, redLat, redLng, radius, radiusFull, displacement, displacementFull, direction });
+    if (!map || !blueLat || !blueLng || !redLat || !redLng) {
         console.warn('Map or coordinates not available to update jump circles');
         return;
     }
 
-    // Calculate new centers based on displacements and direction
-    const newCenterBlue = calculateNewCenter(lat, lng, displacement, direction); // Blue circle center
-    const newCenterRed = calculateNewCenter(lat, lng, displacementFull, direction); // Red circle center
+    const newCenterBlue = calculateNewCenter(blueLat, blueLng, displacement, direction);
+    const newCenterRed = calculateNewCenter(redLat, redLng, displacementFull, direction);
+    console.log('New centers:', { blue: newCenterBlue, red: newCenterRed });
 
-    // Remove existing blue jump circle if it exists
     if (jumpCircle) {
+        console.log('Removing existing blue jump circle');
         map.removeLayer(jumpCircle);
     }
 
-    // Create new blue jump circle (opening altitude to downwind leg)
+    console.log('Creating new blue jump circle at:', newCenterBlue, 'with radius:', radius);
     jumpCircle = L.circle(newCenterBlue, {
-        radius: radius, // in meters (blue circle)
+        radius: radius,
         color: 'blue',
         fillColor: 'blue',
         fillOpacity: 0.2,
         weight: 2
     }).addTo(map);
 
-    // Remove existing red jump circle if it exists
     if (jumpCircleFull) {
+        console.log('Removing existing red jump circle');
         map.removeLayer(jumpCircleFull);
     }
 
-    currentMarker.setLatLng([lat, lng]);
-    updateMarkerPopup(currentMarker, lat, lng, lastAltitude);
-
-    // Create new red jump circle (full descent from opening altitude)
+    console.log('Creating new red jump circle at:', newCenterRed, 'with radius:', radiusFull);
     jumpCircleFull = L.circle(newCenterRed, {
-        radius: radiusFull, // in meters (red circle)
+        radius: radiusFull,
         color: 'red',
         fillColor: 'red',
         fillOpacity: 0.2,
         weight: 2
     }).addTo(map);
+
+    if (currentMarker) {
+        currentMarker.setLatLng([lastLat, lastLng]);
+        updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
+    }
+    console.log('updateJumpCircle completed');
 }
 
 function calculateNewCenter(lat, lng, distance, bearing) {
