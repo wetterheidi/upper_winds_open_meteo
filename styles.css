@@ -708,7 +708,48 @@ input[type="number"]:focus {
     margin-top: 5px;
 }
 
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 10000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
 
+.modal-content {
+    background: white;
+    padding: 20px;
+    border-radius: 5px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    text-align: center;
+    width: 300px;
+}
+
+.modal-buttons {
+    margin-top: 15px;
+}
+
+.modal-buttons button {
+    margin: 0 10px;
+    padding: 5px 15px;
+}
+
+input[type="checkbox"] {
+    transition: opacity 0.3s ease;
+}
+
+input[type="checkbox"][style*="opacity: 0.5"] {
+    cursor: not-allowed;
+}
+
+input[type="checkbox"][style*="opacity: 1"] {
+    cursor: pointer;
+}
 
 @keyframes spin {
     0% {

@@ -50,14 +50,29 @@ const defaultSettings = {
     openingAltitude: 1200,      // New setting for opening altitude
     exitAltitude: 3000 // New default for Exit Altitude
 };
+const FEATURE_PASSWORD = "skydiver2025"; // Hardcoded password (change as needed)
+let isLandingPatternUnlocked = false;   // Track unlock state during session
+let isCalculateJumpUnlocked = false;    // Track unlock state during session
 
-// Load settings from localStorage or use defaults
+// Load settings and unlock status from localStorage
 let userSettings = JSON.parse(localStorage.getItem('upperWindsSettings')) || { ...defaultSettings };
-console.log(userSettings);
+const unlockedFeatures = JSON.parse(localStorage.getItem('unlockedFeatures')) || {};
+isLandingPatternUnlocked = unlockedFeatures.landingPattern || false;
+isCalculateJumpUnlocked = unlockedFeatures.calculateJump || false;
+console.log('Initial unlock status:', { isLandingPatternUnlocked, isCalculateJumpUnlocked });
+
+function saveUnlockStatus() {
+    const unlockedFeatures = {
+        landingPattern: isLandingPatternUnlocked,
+        calculateJump: isCalculateJumpUnlocked
+    };
+    localStorage.setItem('unlockedFeatures', JSON.stringify(unlockedFeatures));
+}
 
 // Function to save settings to localStorage
 function saveSettings() {
     localStorage.setItem('upperWindsSettings', JSON.stringify(userSettings));
+    saveUnlockStatus();
 }
 
 // Update model run info in menu
@@ -576,7 +591,7 @@ function initMap() {
                 lastLng = position.coords.longitude;
                 lastAltitude = await getAltitude(lastLat, lastLng);
 
-                currentMarker = createCustomMarker(lastLat, lastLat).addTo(map);
+                currentMarker = createCustomMarker(lastLat, lastLng).addTo(map);
                 attachMarkerDragend(currentMarker);
                 updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
                 if (userSettings.calculateJump) {
@@ -1845,6 +1860,71 @@ function displayError(message) {
         console.log('Error hidden after 5s');
     }, 5000);
 }
+
+function showPasswordModal(feature, onSuccess, onCancel) {
+    const modal = document.getElementById('passwordModal');
+    const input = document.getElementById('passwordInput');
+    const error = document.getElementById('passwordError');
+    const submitBtn = document.getElementById('passwordSubmit');
+    const cancelBtn = document.getElementById('passwordCancel');
+    const header = document.getElementById('modalHeader');
+    const message = document.getElementById('modalMessage');
+
+    if (!modal || !input || !submitBtn || !cancelBtn || !header || !message) {
+        console.error('Modal elements not found');
+        return;
+    }
+
+    const featureName = feature === 'landingPattern' ? 'Landing Pattern' : 'Calculate Jump';
+    header.textContent = `${featureName} Access`;
+    message.textContent = `Please enter the password to enable ${featureName.toLowerCase()}:`;
+
+    input.value = '';
+    error.style.display = 'none';
+    modal.style.display = 'flex';
+
+    const submitHandler = () => {
+        if (input.value === FEATURE_PASSWORD) {
+            modal.style.display = 'none';
+            if (feature === 'landingPattern') {
+                isLandingPatternUnlocked = true;
+                const checkbox = document.getElementById('showLandingPattern');
+                if (checkbox) {
+                    checkbox.style.opacity = '1'; // Visual feedback
+                    checkbox.title = ''; // Clear tooltip
+                }
+            }
+            if (feature === 'calculateJump') {
+                isCalculateJumpUnlocked = true;
+                const checkbox = document.getElementById('calculateJumpCheckbox');
+                if (checkbox) {
+                    checkbox.style.opacity = '1'; // Visual feedback
+                    checkbox.title = ''; // Clear tooltip
+                }
+            }
+            localStorage.setItem('unlockedFeatures', JSON.stringify({
+                landingPattern: isLandingPatternUnlocked,
+                calculateJump: isCalculateJumpUnlocked
+            }));
+            console.log('Feature unlocked and saved:', feature);
+            onSuccess();
+        } else {
+            error.style.display = 'block';
+        }
+    };
+
+    submitBtn.onclick = submitHandler;
+    input.onkeypress = (e) => { if (e.key === 'Enter') submitHandler(); };
+    cancelBtn.onclick = () => {
+        modal.style.display = 'none';
+        onCancel();
+    };
+}
+
+function isFeatureUnlocked(feature) {
+    return feature === 'landingPattern' ? isLandingPatternUnlocked : isCalculateJumpUnlocked;
+}
+
 // ********** Event listener section **********
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize settings and UI
@@ -1896,6 +1976,18 @@ function initializeUIElements() {
     setCheckboxValue('showTableCheckbox', userSettings.showTable);
     setCheckboxValue('calculateJumpCheckbox', userSettings.calculateJump);
     setCheckboxValue('showLandingPattern', userSettings.showLandingPattern);
+
+    // Set initial tooltip and style for locked state
+    const landingPatternCheckbox = document.getElementById('showLandingPattern');
+    const calculateJumpCheckbox = document.getElementById('calculateJumpCheckbox');
+    if (landingPatternCheckbox) {
+        landingPatternCheckbox.title = isLandingPatternUnlocked ? '' : 'Password required to enable';
+        landingPatternCheckbox.style.opacity = isLandingPatternUnlocked ? '1' : '0.5'; // Visual cue
+    }
+    if (calculateJumpCheckbox) {
+        calculateJumpCheckbox.title = isCalculateJumpUnlocked ? '' : 'Password required to enable';
+        calculateJumpCheckbox.style.opacity = isCalculateJumpUnlocked ? '1' : '0.5'; // Visual cue
+    }
 
     updateUIState();
 }
@@ -2252,28 +2344,110 @@ function setupCheckboxEvents() {
         recenterMap();
     });
 
-    setupCheckbox('calculateJumpCheckbox', 'calculateJump', () => {
-        console.log('calculateJumpCheckbox callback triggered, current checked:', document.getElementById('calculateJumpCheckbox').checked);
-        console.log('userSettings.calculateJump before toggle:', userSettings.calculateJump);
-        toggleSubmenu('calculateJumpCheckbox', userSettings.calculateJump);
-        console.log('userSettings.calculateJump after toggle:', userSettings.calculateJump);
-        if (userSettings.calculateJump) {
-            updateAllDisplays();
-        } else {
+    setupCheckbox('calculateJumpCheckbox', 'calculateJump', (checkbox) => {
+        const enableFeature = () => {
+            toggleSubmenu('calculateJumpCheckbox', true);
+            console.log('Calculate Jump enabled');
+            if (weatherData && lastLat && lastLng) {
+                console.log('Calling calculateJump with:', { weatherData, lastLat, lastLng });
+                calculateJump();
+            } else {
+                console.warn('Cannot calculate jump: Missing data', { weatherData: !!weatherData, lastLat, lastLng });
+                Utils.handleError('Please click the map to set a location first.');
+            }
+        };
+
+        const disableFeature = () => {
+            userSettings.calculateJump = false;
+            checkbox.checked = false;
+            saveSettings();
+            toggleSubmenu('calculateJumpCheckbox', false);
             console.log('Clearing jump circles');
-            clearJumpCircles();
+            clearJumpCircles(); // Only clears jump circles
+        };
+
+        if (checkbox.checked) {
+            if (isFeatureUnlocked('calculateJump')) {
+                userSettings.calculateJump = true;
+                saveSettings();
+                enableFeature();
+            } else {
+                showPasswordModal('calculateJump', () => {
+                    userSettings.calculateJump = true;
+                    saveSettings();
+                    enableFeature();
+                }, () => {
+                    disableFeature();
+                });
+            }
+        } else {
+            disableFeature();
         }
     });
 
-    setupCheckbox('showLandingPattern', 'showLandingPattern', () => {
-        toggleSubmenu('showLandingPattern', userSettings.showLandingPattern);
-        if (userSettings.showLandingPattern && weatherData && lastLat && lastLng) {
-            updateLandingPattern();
-            recenterMap();
+    setupCheckbox('showLandingPattern', 'showLandingPattern', (checkbox) => {
+        const enableFeature = () => {
+            toggleSubmenu('showLandingPattern', true);
+            if (weatherData && lastLat && lastLng) {
+                updateLandingPattern();
+                recenterMap();
+            }
+        };
+
+        const disableFeature = () => {
+            userSettings.showLandingPattern = false;
+            checkbox.checked = false;
+            saveSettings();
+            toggleSubmenu('showLandingPattern', false);
+            console.log('Clearing landing pattern');
+            // Clear landing pattern layers using global variables
+            if (landingPatternPolygon) {
+                map.removeLayer(landingPatternPolygon);
+                landingPatternPolygon = null;
+            }
+            if (secondlandingPatternPolygon) {
+                map.removeLayer(secondlandingPatternPolygon);
+                secondlandingPatternPolygon = null;
+            }
+            if (thirdLandingPatternLine) {
+                map.removeLayer(thirdLandingPatternLine);
+                thirdLandingPatternLine = null;
+            }
+            if (finalArrow) {
+                map.removeLayer(finalArrow);
+                finalArrow = null;
+            }
+            if (baseArrow) {
+                map.removeLayer(baseArrow);
+                baseArrow = null;
+            }
+            if (downwindArrow) {
+                map.removeLayer(downwindArrow);
+                downwindArrow = null;
+            }
+        };
+
+        if (checkbox.checked) {
+            if (isFeatureUnlocked('landingPattern')) {
+                userSettings.showLandingPattern = true;
+                saveSettings();
+                enableFeature();
+            } else {
+                showPasswordModal('landingPattern', () => {
+                    userSettings.showLandingPattern = true;
+                    saveSettings();
+                    enableFeature();
+                }, () => {
+                    disableFeature();
+                });
+            }
+        } else {
+            disableFeature();
         }
     });
 }
 
+// Modified setupCheckbox to pass the checkbox element
 function setupCheckbox(id, settingsKey, callback) {
     const checkbox = document.getElementById(id);
     if (!checkbox) {
@@ -2281,11 +2455,8 @@ function setupCheckbox(id, settingsKey, callback) {
         return;
     }
     checkbox.addEventListener('change', () => {
-        const newValue = checkbox.checked;
-        console.log(`${id} changed to:`, newValue);
-        userSettings[settingsKey] = newValue; // Use settingsKey instead of id
-        saveSettings();
-        callback();
+        console.log(`${id} changed to:`, checkbox.checked);
+        callback(checkbox);
     });
 }
 
@@ -2446,7 +2617,14 @@ function setupResetButton() {
     document.getElementById('bottom-container').appendChild(resetButton);
     resetButton.addEventListener('click', () => {
         userSettings = { ...defaultSettings };
-        saveSettings();
+        isLandingPatternUnlocked = false;
+        isCalculateJumpUnlocked = false;
+        localStorage.setItem('upperWindsSettings', JSON.stringify(userSettings));
+        localStorage.setItem('unlockedFeatures', JSON.stringify({
+            landingPattern: false,
+            calculateJump: false
+        }));
+        console.log('Settings and unlock status reset');
         location.reload();
     });
 }

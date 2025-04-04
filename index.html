@@ -291,6 +291,18 @@
         </div>
     </div>
     </div>
+    <div id="passwordModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3 id="modalHeader">Restricted Feature</h3>
+            <p id="modalMessage">Please enter the password to enable this feature:</p>
+            <input type="password" id="passwordInput" placeholder="Password">
+            <div class="modal-buttons">
+                <button id="passwordSubmit">Submit</button>
+                <button id="passwordCancel">Cancel</button>
+            </div>
+            <p id="passwordError" style="color: red; display: none;">Incorrect password!</p>
+        </div>
+    </div>
 
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
