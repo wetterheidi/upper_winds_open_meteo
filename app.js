@@ -71,8 +71,12 @@ function saveUnlockStatus() {
 
 // Function to save settings to localStorage
 function saveSettings() {
-    localStorage.setItem('upperWindsSettings', JSON.stringify(userSettings));
-    saveUnlockStatus();
+    try {
+        localStorage.setItem('upperWindsSettings', JSON.stringify(userSettings));
+        saveUnlockStatus();
+    } catch (error) {
+        console.warn('Failed to save settings to localStorage:', error);
+    }
 }
 
 // Update model run info in menu
@@ -2284,13 +2288,33 @@ function setupLegHeightInput(id, defaultValue) {
 
 // Setup checkbox events
 function setupCheckboxEvents() {
-    setupCheckbox('showTableCheckbox', 'showTable', () => {
-        const info = document.getElementById('info');
-        if (info) info.style.display = userSettings.showTable ? 'block' : 'none';
-        if (userSettings.showTable && weatherData && lastLat && lastLng) {
-            updateWeatherDisplay(getSliderValue());
+    setupCheckbox('showTableCheckbox', 'showTable', (checkbox) => {
+        try {
+            console.log('Checkbox changed, checked:', checkbox.checked);
+            userSettings.showTable = checkbox.checked;
+            console.log('Before saveSettings');
+            saveSettings();
+            console.log('After saveSettings, userSettings.showTable:', userSettings.showTable);
+    
+            const info = document.getElementById('info');
+            if (info) {
+                console.log('Info found, setting display');
+                info.style.display = userSettings.showTable ? 'block' : 'none';
+                void info.offsetHeight;
+                console.log('Info display set to:', info.style.display);
+            } else {
+                console.warn('Info element not found');
+            }
+    
+            if (userSettings.showTable && weatherData && lastLat && lastLng) {
+                console.log('Calling updateWeatherDisplay');
+                updateWeatherDisplay(getSliderValue());
+            }
+            recenterMap();
+            console.log('Handler completed');
+        } catch (error) {
+            console.error('Error in checkbox handler:', error);
         }
-        recenterMap();
     });
 
     setupCheckbox('calculateJumpCheckbox', 'calculateJump', (checkbox) => {
@@ -2403,6 +2427,8 @@ function setupCheckbox(id, settingsKey, callback) {
         console.warn(`Checkbox with ID "${id}" not found`);
         return;
     }
+    checkbox.checked = userSettings[settingsKey]; // Set initial state
+    callback(checkbox); // Run callback with initial state
     checkbox.addEventListener('change', () => {
         console.log(`${id} changed to:`, checkbox.checked);
         callback(checkbox);
