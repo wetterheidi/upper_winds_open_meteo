@@ -1090,7 +1090,7 @@ async function updateWeatherDisplay(index, originalTime = null) {
 
         const convertedSpd = Utils.convertWind(spd, windSpeedUnit, 'km/h');
         let formattedWind;
-        console.log('Debug: displayHeight:', displayHeight, 'wind_gusts_10m:', weatherData.wind_gusts_10m[index]);
+        //console.log('Debug: displayHeight:', displayHeight, 'wind_gusts_10m:', weatherData.wind_gusts_10m[index]);
         const surfaceDisplayHeight = refLevel === 'AMSL' ? (heightUnit === 'ft' ? Math.round(surfaceHeight * 3.28084) : surfaceHeight) : 0;
         if (Math.round(displayHeight) === surfaceDisplayHeight && weatherData.wind_gusts_10m[index] !== undefined && Number.isFinite(weatherData.wind_gusts_10m[index])) {
             const gustSpd = weatherData.wind_gusts_10m[index]; // Gusts in km/h
@@ -1165,13 +1165,13 @@ function interpolateWeatherData(sliderIndex) {
     const interpStep = parseInt(getInterpolationStep()) || 100; // Step size in user's unit (m or ft)
     const heightUnit = getHeightUnit();
 
-    // Define pressure levels from surface to 200 hPa
+    // Define pressure levels from 1000 hPa to 200 hPa
     const pressureLevels = [1000, 950, 925, 900, 850, 800, 700, 600, 500, 400, 300, 250, 200];
-    const heightData = pressureLevels.map(hPa => weatherData[`geopotential_height_${hPa}hPa`][sliderIndex]).filter(h => h !== null && h !== undefined);
-    const tempData = pressureLevels.map(hPa => weatherData[`temperature_${hPa}hPa`][sliderIndex]);
-    const rhData = pressureLevels.map(hPa => weatherData[`relative_humidity_${hPa}hPa`][sliderIndex]);
-    const spdData = pressureLevels.map(hPa => weatherData[`wind_speed_${hPa}hPa`][sliderIndex]);
-    const dirData = pressureLevels.map(hPa => weatherData[`wind_direction_${hPa}hPa`][sliderIndex]);
+    let heightData = pressureLevels.map(hPa => weatherData[`geopotential_height_${hPa}hPa`][sliderIndex]).filter(h => h !== null && h !== undefined);
+    let tempData = pressureLevels.map(hPa => weatherData[`temperature_${hPa}hPa`][sliderIndex]);
+    let rhData = pressureLevels.map(hPa => weatherData[`relative_humidity_${hPa}hPa`][sliderIndex]);
+    let spdData = pressureLevels.map(hPa => weatherData[`wind_speed_${hPa}hPa`][sliderIndex]);
+    let dirData = pressureLevels.map(hPa => weatherData[`wind_direction_${hPa}hPa`][sliderIndex]);
 
     if (heightData.length < 2) {
         console.warn('Insufficient pressure level data for interpolation');
@@ -1184,9 +1184,60 @@ function interpolateWeatherData(sliderIndex) {
         return [];
     }
 
-    // Calculate wind components
-    const uComponents = spdData.map((spd, i) => -spd * Math.sin(dirData[i] * Math.PI / 180));
-    const vComponents = spdData.map((spd, i) => -spd * Math.cos(dirData[i] * Math.PI / 180));
+    // Calculate initial wind components at pressure levels
+    let uComponents = spdData.map((spd, i) => -spd * Math.sin(dirData[i] * Math.PI / 180));
+    let vComponents = spdData.map((spd, i) => -spd * Math.cos(dirData[i] * Math.PI / 180));
+
+    // Add surface and intermediate points if surfacePressure > 1000 hPa
+    const h1000 = weatherData.geopotential_height_1000hPa[sliderIndex];
+    if (surfacePressure > 1000 && Number.isFinite(h1000) && h1000 > baseHeight) {
+        const stepsBetween = Math.floor((h1000 - baseHeight) / interpStep);
+
+        // Surface wind components
+        const uSurface = -weatherData.wind_speed_10m[sliderIndex] * Math.sin(weatherData.wind_direction_10m[sliderIndex] * Math.PI / 180);
+        const vSurface = -weatherData.wind_speed_10m[sliderIndex] * Math.cos(weatherData.wind_direction_10m[sliderIndex] * Math.PI / 180);
+        const u1000 = uComponents[0]; // First element corresponds to 1000 hPa
+        const v1000 = vComponents[0];
+
+        // Add intermediate points with logarithmic interpolation of u and v
+        for (let i = stepsBetween - 1; i >= 1; i--) {
+            const h = baseHeight + i * interpStep;
+            if (h >= h1000) continue;
+            const fraction = (h - baseHeight) / (h1000 - baseHeight);
+            const logPSurface = Math.log(surfacePressure);
+            const logP1000 = Math.log(1000);
+            const logP = logPSurface + fraction * (logP1000 - logPSurface);
+            const p = Math.exp(logP);
+
+            // Logarithmic interpolation of wind components
+            const logHeight = Math.log(h - baseHeight + 1); // +1 to avoid log(0)
+            const logH0 = Math.log(1); // Surface relative height
+            const logH1 = Math.log(h1000 - baseHeight);
+            const u = Utils.LIP([logH0, logH1], [uSurface, u1000], logHeight);
+            const v = Utils.LIP([logH0, logH1], [vSurface, v1000], logHeight);
+            const spd = Utils.windSpeed(u, v);
+            const dir = Utils.windDirection(u, v);
+
+            heightData.unshift(h);
+            pressureLevels.unshift(p);
+            tempData.unshift(Utils.LIP([baseHeight, h1000], [weatherData.temperature_2m[sliderIndex], weatherData.temperature_1000hPa[sliderIndex]], h));
+            rhData.unshift(Utils.LIP([baseHeight, h1000], [weatherData.relative_humidity_2m[sliderIndex], weatherData.relative_humidity_1000hPa[sliderIndex]], h));
+            spdData.unshift(spd);
+            dirData.unshift(dir);
+            uComponents.unshift(u);
+            vComponents.unshift(v);
+        }
+
+        // Add surface data
+        heightData.unshift(baseHeight);
+        pressureLevels.unshift(surfacePressure);
+        tempData.unshift(weatherData.temperature_2m[sliderIndex]);
+        rhData.unshift(weatherData.relative_humidity_2m[sliderIndex]);
+        spdData.unshift(weatherData.wind_speed_10m[sliderIndex]);
+        dirData.unshift(weatherData.wind_direction_10m[sliderIndex]);
+        uComponents.unshift(uSurface);
+        vComponents.unshift(vSurface);
+    }
 
     // Determine the maximum height (200 hPa level, relative to AGL)
     const maxPressureIndex = pressureLevels.indexOf(200);
