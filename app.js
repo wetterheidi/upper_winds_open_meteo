@@ -603,6 +603,24 @@ function initMap() {
     }
     recenterMap();
 
+    // Helper function to handle initial fetch
+    async function fetchInitialWeather(lat, lng) {
+        // ... (existing code)
+        const lastFullHourUTC = getLastFullHourUTC();
+        console.log('initMap: Last full hour UTC:', lastFullHourUTC.toISOString());
+        let initialTime;
+        if (userSettings.timeZone === 'Z') {
+            initialTime = lastFullHourUTC.toISOString().replace(':00.000Z', 'Z');
+        } else {
+            const localTimeStr = await Utils.formatLocalTime(lastFullHourUTC.toISOString(), lastLat, lastLng);
+            console.log('initMap: Local time string:', localTimeStr);
+            const localDate = new Date(`${localTimeStr}:00Z`);
+            initialTime = new Date(localDate.getTime() - (2 * 60 * 60 * 1000)).toISOString().replace(':00.000Z', 'Z');
+        }
+        console.log('initMap: initialTime:', initialTime);
+        await fetchWeatherForLocation(lat, lng, initialTime, true);
+    }
+
     // Geolocation handling
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
@@ -623,8 +641,12 @@ function initMap() {
                 }
                 recenterMap();
 
-                // Initial fetch with isInitialLoad = true
-                await fetchWeatherForLocation(lastLat, lastLng, null, true);
+                // Calculate the last full hour for initial fetch
+                const lastFullHourUTC = getLastFullHourUTC();
+                const initialTime = userSettings.timeZone === 'Z'
+                    ? lastFullHourUTC.toISOString().replace(':00.000Z', 'Z')
+                    : await Utils.formatLocalTime(lastFullHourUTC.toISOString(), lastLat, lastLng);
+                await fetchWeatherForLocation(lastLat, lastLng, initialTime, true);
             },
             async (error) => {
                 console.warn(`Geolocation error: ${error.message}`);
@@ -634,8 +656,13 @@ function initMap() {
                 lastAltitude = await getAltitude(lastLat, lastLng);
                 updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
                 recenterMap();
-                // Initial fetch with isInitialLoad = true
-                await fetchWeatherForLocation(lastLat, lastLng, null, true);
+
+                // Calculate the last full hour for initial fetch
+                const lastFullHourUTC = getLastFullHourUTC();
+                const initialTime = userSettings.timeZone === 'Z'
+                    ? lastFullHourUTC.toISOString().replace(':00.000Z', 'Z')
+                    : await Utils.formatLocalTime(lastFullHourUTC.toISOString(), lastLat, lastLng);
+                await fetchWeatherForLocation(lastLat, lastLng, initialTime, true);
             },
             { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
@@ -644,11 +671,18 @@ function initMap() {
         Utils.handleError('Geolocation not supported. Using default location.');
         lastLat = defaultCenter[0];
         lastLng = defaultCenter[1];
-        lastAltitude =  getAltitude(lastLat, lastLng);
+        lastAltitude = getAltitude(lastLat, lastLng);
         updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
         recenterMap();
-        // Initial fetch with isInitialLoad = true
-         fetchWeatherForLocation(lastLat, lastLng, null, true);
+
+        // Calculate the last full hour for initial fetch
+        const lastFullHourUTC = getLastFullHourUTC();
+        console.log('initMap: Last full hour UTC:', lastFullHourUTC.toISOString());
+        const initialTime = userSettings.timeZone === 'Z'
+            ? lastFullHourUTC.toISOString().replace(':00.000Z', 'Z')
+            : Utils.formatLocalTime(lastFullHourUTC.toISOString(), lastLat, lastLng);
+        console.log('initMap: initialTime:', initialTime);
+        fetchWeatherForLocation(lastLat, lastLng, initialTime, true);
     }
 
     // Coordinate control (unchanged)
@@ -869,7 +903,7 @@ async function fetchWeather(lat, lon, currentTime = null) {
         }
 
         const targetIndex = 0;
-        const lastValidIndex = data.hourly.time.length - 1; // Simplified for brevity; add truncation logic if needed
+        const lastValidIndex = data.hourly.time.length - 1;
 
         weatherData = {
             time: data.hourly.time.slice(targetIndex, lastValidIndex + 1),
@@ -961,22 +995,41 @@ async function fetchWeather(lat, lon, currentTime = null) {
             slider.style.cursor = 'pointer';
         }
 
-        // Set slider to closest time if currentTime is provided
+        // Set slider to closest time based on currentTime (last full hour)
+        console.log('fetchWeather: currentTime received:', currentTime);
+        // After setting weatherData
+        console.log('Luxon available:', typeof luxon !== 'undefined' ? luxon.VERSION : 'Not loaded');
+        let initialIndex = 0;
         if (currentTime && weatherData.time.length > 0) {
-            const currentTimestamp = new Date(currentTime).getTime();
+            const targetDate = luxon.DateTime.fromISO(currentTime, { zone: 'utc' });
+            console.log('fetchWeather: targetDate (ISO):', targetDate.toISO());
+            console.log('fetchWeather: targetDate (UTC hours):', targetDate.hour);
+            const targetTimestamp = targetDate.toMillis();
+            console.log('fetchWeather: targetTimestamp:', targetTimestamp);
             let minDiff = Infinity;
             weatherData.time.forEach((time, index) => {
-                const timeTimestamp = new Date(time).getTime();
-                const diff = Math.abs(timeTimestamp - currentTimestamp);
+                const timeTimestamp = luxon.DateTime.fromISO(time, { zone: 'utc' }).toMillis(); // Use Luxon here too for consistency
+                const diff = Math.abs(timeTimestamp - targetTimestamp);
+                console.log(`fetchWeather: Comparing ${time} (${timeTimestamp}) with target (${targetTimestamp}), diff: ${diff}`);
                 if (diff < minDiff) {
                     minDiff = diff;
-                    slider.value = index;
+                    initialIndex = index;
                 }
             });
+            slider.value = initialIndex;
+            console.log(`fetchWeather: Slider set to index ${initialIndex} for time ${weatherData.time[initialIndex]}`);
+        } else {
+            slider.value = 0;
+            console.log('fetchWeather: No currentTime provided, slider set to 0');
         }
-
-        await updateWeatherDisplay(parseInt(slider.value) || 0);
+        await updateWeatherDisplay(initialIndex);
         document.getElementById('loading').style.display = 'none';
+
+        // Reattach slider event listener after initial set
+        slider.oninput = function () {
+            console.log('Slider oninput triggered, new value:', this.value);
+            updateWeatherDisplay(this.value);
+        };
     } catch (error) {
         document.getElementById('loading').style.display = 'none';
         Utils.handleError(`Failed to fetch weather data: ${error.message}`);
@@ -2217,7 +2270,7 @@ function setupCheckboxEvents() {
             console.log('Before saveSettings');
             saveSettings();
             console.log('After saveSettings, userSettings.showTable:', userSettings.showTable);
-    
+
             const info = document.getElementById('info');
             if (info) {
                 console.log('Info found, setting display');
@@ -2227,7 +2280,7 @@ function setupCheckboxEvents() {
             } else {
                 console.warn('Info element not found');
             }
-    
+
             if (userSettings.showTable && weatherData && lastLat && lastLng) {
                 console.log('Calling updateWeatherDisplay');
                 updateWeatherDisplay(getSliderValue());
