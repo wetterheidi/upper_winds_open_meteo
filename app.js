@@ -1063,6 +1063,7 @@ async function updateWeatherDisplay(index, originalTime = null) {
     const temperatureUnit = getTemperatureUnit();
     const time = await getDisplayTime(weatherData.time[index]);
     const interpolatedData = interpolateWeatherData(index);
+    const surfaceHeight = refLevel === 'AMSL' && lastAltitude !== 'N/A' ? Math.round(lastAltitude) : 0; // Surface height in meters
 
     let output = `<table>`;
     output += `<tr><th>Height (${heightUnit} ${refLevel})</th><th>Dir (deg)</th><th>Spd (${windSpeedUnit})</th><th>Wind</th><th>T (${temperatureUnit === 'C' ? '°C' : '°F'})</th></tr>`;
@@ -1082,17 +1083,16 @@ async function updateWeatherDisplay(index, originalTime = null) {
             else if (spdInKt <= 16) rowClass = 'wind-high';
             else rowClass = 'wind-very-high';
         }
-        // Adjust height for AMSL by adding lastAltitude (in meters), then convert to user unit
-        const baseHeight = refLevel === 'AMSL' && lastAltitude !== 'N/A' ? data.displayHeight + lastAltitude : data.displayHeight;
-        const displayHeight = Utils.convertHeight(baseHeight, heightUnit);
+        // Adjust display height for AMSL by adding surface height in user's unit
+        const displayHeight = refLevel === 'AMSL' ? data.displayHeight + (heightUnit === 'ft' ? Math.round(surfaceHeight * 3.28084) : surfaceHeight) : data.displayHeight;
         const displayTemp = Utils.convertTemperature(data.temp, temperatureUnit === 'C' ? '°C' : '°F');
         const formattedTemp = displayTemp === 'N/A' ? 'N/A' : displayTemp.toFixed(0);
 
-        // Convert wind speed and gusts from km/h to the user's selected unit
         const convertedSpd = Utils.convertWind(spd, windSpeedUnit, 'km/h');
         let formattedWind;
         console.log('Debug: displayHeight:', displayHeight, 'wind_gusts_10m:', weatherData.wind_gusts_10m[index]);
-        if (Math.round(displayHeight) === 0 && weatherData.wind_gusts_10m[index] !== undefined && Number.isFinite(weatherData.wind_gusts_10m[index])) {
+        const surfaceDisplayHeight = refLevel === 'AMSL' ? (heightUnit === 'ft' ? Math.round(surfaceHeight * 3.28084) : surfaceHeight) : 0;
+        if (Math.round(displayHeight) === surfaceDisplayHeight && weatherData.wind_gusts_10m[index] !== undefined && Number.isFinite(weatherData.wind_gusts_10m[index])) {
             const gustSpd = weatherData.wind_gusts_10m[index]; // Gusts in km/h
             const convertedGust = Utils.convertWind(gustSpd, windSpeedUnit, 'km/h');
             const spdValue = windSpeedUnit === 'bft' ? Math.round(convertedSpd) : convertedSpd.toFixed(0);
@@ -1102,7 +1102,6 @@ async function updateWeatherDisplay(index, originalTime = null) {
             formattedWind = convertedSpd === 'N/A' ? 'N/A' : (windSpeedUnit === 'bft' ? Math.round(convertedSpd) : convertedSpd.toFixed(0));
         }
 
-        // Convert speed to knots for wind barbs
         const speedKt = Math.round(Utils.convertWind(spd, 'kt', 'km/h') / 5) * 5;
         const windBarbSvg = data.dir === 'N/A' || isNaN(speedKt) ? 'N/A' : generateWindBarb(data.dir, speedKt);
 
@@ -1162,8 +1161,8 @@ function interpolateWeatherData(sliderIndex) {
         return [];
     }
 
-    const baseHeight = Math.round(lastAltitude); // Elevation from Open-Meteo
-    const interpStep = parseInt(getInterpolationStep()) || 100; // Default to 100 m (adjustable)
+    const baseHeight = Math.round(lastAltitude); // Elevation from Open-Meteo in meters
+    const interpStep = parseInt(getInterpolationStep()) || 100; // Step size in user's unit (m or ft)
     const heightUnit = getHeightUnit();
 
     // Define pressure levels from surface to 200 hPa
@@ -1191,24 +1190,31 @@ function interpolateWeatherData(sliderIndex) {
 
     // Determine the maximum height (200 hPa level, relative to AGL)
     const maxPressureIndex = pressureLevels.indexOf(200);
-    const maxHeightASL = heightData[maxPressureIndex]; // Absolute height at 200 hPa
-    const maxHeightAGL = maxHeightASL - baseHeight; // Convert to AGL
+    const maxHeightASL = heightData[maxPressureIndex]; // Absolute height at 200 hPa in meters
+    const maxHeightAGL = maxHeightASL - baseHeight; // Convert to AGL in meters
     if (maxHeightAGL <= 0 || isNaN(maxHeightAGL)) {
         console.warn('Invalid max height at 200 hPa:', { maxHeightASL, baseHeight });
         return [];
     }
 
+    // Convert maxHeightAGL to user's unit for step calculation
+    const maxHeightInUnit = heightUnit === 'ft' ? maxHeightAGL * 3.28084 : maxHeightAGL;
+    const steps = Math.floor(maxHeightInUnit / interpStep);
+    const heightsInUnit = Array.from({ length: steps + 1 }, (_, i) => i * interpStep); // Heights in user's unit
+
     console.log('Interpolating up to 200 hPa:', { maxHeightAGL, interpStep });
 
     const interpolatedData = [];
-    for (let h = 0; h <= maxHeightAGL; h += interpStep) {
-        const heightAGL = baseHeight + h; // Absolute height (ASL)
-        let dataPoint;
+    heightsInUnit.forEach(height => {
+        // Convert height from user's unit to meters for interpolation
+        const heightAGLInMeters = heightUnit === 'ft' ? height / 3.28084 : height;
+        const heightASLInMeters = baseHeight + heightAGLInMeters; // Absolute height (ASL) in meters
 
-        if (h === 0) {
-            // Surface data at 0 m AGL
+        let dataPoint;
+        if (heightAGLInMeters === 0) {
+            // Surface data at 0 in user's unit
             dataPoint = {
-                height: heightAGL,
+                height: heightASLInMeters,
                 pressure: surfacePressure,
                 temp: weatherData.temperature_2m[sliderIndex],
                 rh: weatherData.relative_humidity_2m[sliderIndex],
@@ -1218,16 +1224,16 @@ function interpolateWeatherData(sliderIndex) {
             };
         } else {
             // Interpolate at higher altitudes
-            const pressure = Utils.interpolatePressure(heightAGL, pressureLevels, heightData);
-            const windComponents = Utils.interpolateWindAtAltitude(heightAGL, pressureLevels, heightData, uComponents, vComponents);
+            const pressure = Utils.interpolatePressure(heightASLInMeters, pressureLevels, heightData);
+            const windComponents = Utils.interpolateWindAtAltitude(heightASLInMeters, pressureLevels, heightData, uComponents, vComponents);
             const spd = Utils.windSpeed(windComponents.u, windComponents.v);
             const dir = Utils.windDirection(windComponents.u, windComponents.v);
-            const temp = Utils.LIP(heightData, tempData, heightAGL);
-            const rh = Utils.LIP(heightData, rhData, heightAGL);
+            const temp = Utils.LIP(heightData, tempData, heightASLInMeters);
+            const rh = Utils.LIP(heightData, rhData, heightASLInMeters);
             const dew = Utils.calculateDewpoint(temp, rh);
 
             dataPoint = {
-                height: heightAGL,
+                height: heightASLInMeters,
                 pressure: pressure === 'N/A' ? 'N/A' : Number(pressure.toFixed(1)),
                 temp: Number(temp.toFixed(1)),
                 rh: Number(rh.toFixed(0)),
@@ -1237,9 +1243,9 @@ function interpolateWeatherData(sliderIndex) {
             };
         }
 
-        dataPoint.displayHeight = h; // Height AGL for display
+        dataPoint.displayHeight = height; // Height in user's unit for display
         interpolatedData.push(dataPoint);
-    }
+    });
 
     console.log('Interpolated data length:', interpolatedData.length, 'Max height:', interpolatedData[interpolatedData.length - 1].displayHeight);
     return interpolatedData;
