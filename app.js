@@ -1010,7 +1010,7 @@ async function fetchWeather(lat, lon, currentTime = null) {
             weatherData.time.forEach((time, index) => {
                 const timeTimestamp = luxon.DateTime.fromISO(time, { zone: 'utc' }).toMillis(); // Use Luxon here too for consistency
                 const diff = Math.abs(timeTimestamp - targetTimestamp);
-                console.log(`fetchWeather: Comparing ${time} (${timeTimestamp}) with target (${targetTimestamp}), diff: ${diff}`);
+                //console.log(`fetchWeather: Comparing ${time} (${timeTimestamp}) with target (${targetTimestamp}), diff: ${diff}`);
                 if (diff < minDiff) {
                     minDiff = diff;
                     initialIndex = index;
@@ -1043,16 +1043,13 @@ async function updateWeatherDisplay(index, originalTime = null) {
         document.getElementById('info').innerHTML = 'No weather data available';
         document.getElementById('selectedTime').innerHTML = 'Selected Time: ';
         const slider = document.getElementById('timeSlider');
-        console.log(`Slider value after update: ${slider.value}`);
         if (slider) slider.value = 0;
         return;
     }
 
-    // Set landingWindDir to the surface wind direction at the current index
     landingWindDir = weatherData.wind_direction_10m[index] || null;
     console.log('landingWindDir updated to:', landingWindDir);
 
-    // Update custom landing direction inputs with the new surface wind direction
     const customLandingDirectionLLInput = document.getElementById('customLandingDirectionLL');
     const customLandingDirectionRRInput = document.getElementById('customLandingDirectionRR');
     if (customLandingDirectionLLInput && customLandingDirectionRRInput && landingWindDir !== null) {
@@ -1064,12 +1061,13 @@ async function updateWeatherDisplay(index, originalTime = null) {
     const heightUnit = getHeightUnit();
     const windSpeedUnit = getWindSpeedUnit();
     const temperatureUnit = getTemperatureUnit();
-    const time = await getDisplayTime(weatherData.time[index]); // Await is fine here because function is async
+    const time = await getDisplayTime(weatherData.time[index]);
     const interpolatedData = interpolateWeatherData(index);
 
     let output = `<table>`;
-    output += `<tr><th>Height (${heightUnit} ${refLevel})</th><th>Dir (deg)</th><th>Spd (${windSpeedUnit})</th><th>Wind</th><th>T (${temperatureUnit === 'C' ? '°C' : '°F'})</th></tr>`; interpolatedData.forEach((data, idx) => {
-        const spd = parseFloat(data.spd);
+    output += `<tr><th>Height (${heightUnit} ${refLevel})</th><th>Dir (deg)</th><th>Spd (${windSpeedUnit})</th><th>Wind</th><th>T (${temperatureUnit === 'C' ? '°C' : '°F'})</th></tr>`;
+    interpolatedData.forEach((data, idx) => {
+        const spd = parseFloat(data.spd); // spd is in km/h from Open-Meteo
         let rowClass = '';
         if (windSpeedUnit === 'bft') {
             const bft = Math.round(spd);
@@ -1078,7 +1076,7 @@ async function updateWeatherDisplay(index, originalTime = null) {
             else if (bft <= 4) rowClass = 'wind-high';
             else rowClass = 'wind-very-high';
         } else {
-            const spdInKt = Utils.convertWind(spd, 'kt', windSpeedUnit);
+            const spdInKt = Utils.convertWind(spd, 'kt', 'km/h');
             if (spdInKt <= 3) rowClass = 'wind-low';
             else if (spdInKt <= 10) rowClass = 'wind-moderate';
             else if (spdInKt <= 16) rowClass = 'wind-high';
@@ -1087,17 +1085,23 @@ async function updateWeatherDisplay(index, originalTime = null) {
         const displayHeight = Utils.convertHeight(data.displayHeight, heightUnit);
         const displayTemp = Utils.convertTemperature(data.temp, temperatureUnit === 'C' ? '°C' : '°F');
         const formattedTemp = displayTemp === 'N/A' ? 'N/A' : displayTemp.toFixed(0);
+
+        // Convert wind speed and gusts from km/h to the user's selected unit
+        const convertedSpd = Utils.convertWind(spd, windSpeedUnit, 'km/h');
         let formattedWind;
-        if (idx === 0 && data.gust !== undefined && Number.isFinite(data.gust)) {
-            const spdValue = windSpeedUnit === 'bft' ? Math.round(spd) : spd.toFixed(0);
-            const gustValue = windSpeedUnit === 'bft' ? Math.round(data.gust) : data.gust.toFixed(0);
+        //console.log('Debug: displayHeight:', displayHeight, 'wind_gusts_10m:', weatherData.wind_gusts_10m[index]); // Debug log
+        if (Math.round(displayHeight) === 0 && weatherData.wind_gusts_10m[index] !== undefined && Number.isFinite(weatherData.wind_gusts_10m[index])) {
+            const gustSpd = weatherData.wind_gusts_10m[index]; // Gusts in km/h
+            const convertedGust = Utils.convertWind(gustSpd, windSpeedUnit, 'km/h');
+            const spdValue = windSpeedUnit === 'bft' ? Math.round(convertedSpd) : convertedSpd.toFixed(0);
+            const gustValue = windSpeedUnit === 'bft' ? Math.round(convertedGust) : convertedGust.toFixed(0);
             formattedWind = `${spdValue} G ${gustValue}`;
         } else {
-            formattedWind = data.spd === 'N/A' ? 'N/A' : (windSpeedUnit === 'bft' ? Math.round(data.spd) : data.spd.toFixed(0));
+            formattedWind = convertedSpd === 'N/A' ? 'N/A' : (windSpeedUnit === 'bft' ? Math.round(convertedSpd) : convertedSpd.toFixed(0));
         }
 
         // Convert speed to knots for wind barbs
-        const speedKt = Math.round(Utils.convertWind(spd, 'kt', windSpeedUnit) / 5) * 5;
+        const speedKt = Math.round(Utils.convertWind(spd, 'kt', 'km/h') / 5) * 5;
         const windBarbSvg = data.dir === 'N/A' || isNaN(speedKt) ? 'N/A' : generateWindBarb(data.dir, speedKt);
 
         output += `<tr class="${rowClass}"><td>${Math.round(displayHeight)}</td><td>${Utils.roundToTens(data.dir)}</td><td>${formattedWind}</td><td>${windBarbSvg}</td><td>${formattedTemp}</td></tr>`;
