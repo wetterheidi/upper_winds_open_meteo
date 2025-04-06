@@ -121,7 +121,7 @@ function calculateJump() {
     const descentRate = parseFloat(document.getElementById('descentRate')?.value) || 3.5;
     const canopySpeed = parseFloat(document.getElementById('canopySpeed')?.value) || 20;
 
-    const canopySpeedMps = canopySpeed * 0.514444;
+    const canopySpeedMps = canopySpeed * 0.514444; // Convert kt to m/s
     const heightDistance = openingAltitude - 200 - legHeightDownwind;
     const flyTime = heightDistance / descentRate;
     const horizontalCanopyDistance = flyTime * canopySpeedMps;
@@ -142,9 +142,11 @@ function calculateJump() {
         return null;
     }
 
-    const baseHeight = Math.round(lastAltitude);
-    const lowerLimit = baseHeight;
-    const upperLimit = baseHeight + openingAltitude;
+    const elevation = Math.round(lastAltitude);
+    const lowerLimitFull = elevation;
+    const upperLimitFull = elevation + openingAltitude;
+    const lowerLimit = elevation + legHeightDownwind;
+    const upperLimit = elevation + openingAltitude;
 
     const heights = interpolatedData.map(d => d.height);
     const dirs = interpolatedData.map(d => Number.isFinite(d.dir) ? parseFloat(d.dir) : 0);
@@ -159,10 +161,14 @@ function calculateJump() {
     const meanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, lowerLimit, upperLimit);
     const meanWindDirection = meanWind[0];
     const meanWindSpeedMps = meanWind[1];
+    const meanWindFull = Utils.calculateMeanWind(heights, uComponents, vComponents, lowerLimitFull, upperLimitFull);
+    const meanWindDirectionFull = meanWindFull[0];
+    const meanWindSpeedMpsFull = meanWindFull[1];
 
     const centerDisplacement = meanWindSpeedMps * flyTime;
-    const centerDisplacementFull = meanWindSpeedMps * flyTimeFull;
+    const centerDisplacementFull = meanWindSpeedMpsFull * flyTimeFull;
     const displacementDirection = meanWindDirection;
+    const displacementDirectionFull = meanWindDirectionFull;
 
     if (!Number.isFinite(lastLat) || !Number.isFinite(lastLng)) {
         console.error('Invalid lastLat or lastLng:', { lastLat, lastLng });
@@ -179,26 +185,29 @@ function calculateJump() {
 
     // Get downwind end coordinates with robust fallback
     let downwindLat, downwindLng;
-    if (thirdLandingPatternLine && thirdLandingPatternLine.getLatLngs && thirdLandingPatternLine.getLatLngs().length > 1) {
-        const downwindEnd = thirdLandingPatternLine.getLatLngs()[1];
-        downwindLat = downwindEnd[0];
-        downwindLng = downwindEnd[1];
-        console.log('Downwind end from landing pattern:', { downwindLat, downwindLng });
+    if (thirdLandingPatternLine && typeof thirdLandingPatternLine.getLatLngs === 'function') {
+        const latLngs = thirdLandingPatternLine.getLatLngs();
+        if (latLngs && latLngs.length > 1) {
+            const downwindEnd = latLngs[1]; // Second point is downwind end
+            downwindLat = downwindEnd.lat;  // Access .lat property
+            downwindLng = downwindEnd.lng;  // Access .lng property
+            console.log('Downwind end from landing pattern:', { downwindLat, downwindLng });
+        } else {
+            console.warn('thirdLandingPatternLine has insufficient points:', latLngs);
+        }
     } else {
-        downwindLat = lastLat;
-        downwindLng = lastLng;
-        console.warn('thirdLandingPatternLine not available, using lastLat, lastLng for blue circle:', { downwindLat, downwindLng });
+        console.warn('thirdLandingPatternLine is not properly defined or lacks getLatLngs:', thirdLandingPatternLine);
     }
 
-    // Final validation
+    // Fallback to lastLat, lastLng if downwind coordinates are invalid
     if (!Number.isFinite(downwindLat) || !Number.isFinite(downwindLng)) {
-        console.error('Downwind coordinates invalid, using lastLat, lastLng as fallback');
+        console.warn('Downwind coordinates invalid, using lastLat, lastLng as fallback');
         downwindLat = lastLat;
         downwindLng = lastLng;
     }
 
-    console.log('Calling updateJumpCircle with:', { downwindLat, downwindLng, lastLat, lastLng, horizontalCanopyDistance, horizontalCanopyDistanceFull, centerDisplacement, centerDisplacementFull, displacementDirection });
-    updateJumpCircle(downwindLat, downwindLng, lastLat, lastLng, horizontalCanopyDistance, horizontalCanopyDistanceFull, centerDisplacement, centerDisplacementFull, displacementDirection);
+    console.log('Calling updateJumpCircle with:', { downwindLat, downwindLng, lastLat, lastLng, horizontalCanopyDistance, horizontalCanopyDistanceFull, centerDisplacement, centerDisplacementFull, displacementDirection, displacementDirectionFull });
+    updateJumpCircle(downwindLat, downwindLng, lastLat, lastLng, horizontalCanopyDistance, horizontalCanopyDistanceFull, centerDisplacement, centerDisplacementFull, displacementDirection, displacementDirectionFull);
 
     if (currentMarker) {
         currentMarker.setLatLng([lastLat, lastLng]);
@@ -212,19 +221,20 @@ function calculateJump() {
         radiusFull: horizontalCanopyDistanceFull,
         displacement: centerDisplacement,
         displacementFull: centerDisplacementFull,
-        direction: displacementDirection
+        direction: displacementDirection,
+        directionFull: displacementDirectionFull
     };
 }
 
-function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, displacement, displacementFull, direction) {
-    console.log('updateJumpCircle called with:', { blueLat, blueLng, redLat, redLng, radius, radiusFull, displacement, displacementFull, direction });
+function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, displacement, displacementFull, direction, directionFull) {
+    console.log('updateJumpCircle called with:', { blueLat, blueLng, redLat, redLng, radius, radiusFull, displacement, displacementFull, direction, directionFull });
     if (!map || !blueLat || !blueLng || !redLat || !redLng) {
         console.warn('Map or coordinates not available to update jump circles');
         return;
     }
 
     const newCenterBlue = calculateNewCenter(blueLat, blueLng, displacement, direction);
-    const newCenterRed = calculateNewCenter(redLat, redLng, displacementFull, direction);
+    const newCenterRed = calculateNewCenter(redLat, redLng, displacementFull, directionFull);
     console.log('New centers:', { blue: newCenterBlue, red: newCenterRed });
 
     if (jumpCircle) {
@@ -1813,6 +1823,7 @@ function updateLandingPattern() {
         Base Leg: Wind: ${baseWindDir.toFixed(1)}° @ ${baseWindSpeedKt.toFixed(1)}kt, Course: ${baseCourse.toFixed(1)}°, WCA: ${baseWca.toFixed(1)}°, GS: ${baseGroundSpeedKt.toFixed(1)}kt, HW: ${baseHeadwind.toFixed(1)}kt, Length: ${baseLength.toFixed(1)}m
         Downwind Leg: Wind: ${downwindWindDir.toFixed(1)}° @ ${downwindWindSpeedKt.toFixed(1)}kt, Course: ${downwindCourse.toFixed(1)}°, WCA: ${downwindWca.toFixed(1)}°, GS: ${downwindGroundSpeedKt.toFixed(1)}kt, HW: ${downwindHeadwind.toFixed(1)}kt, Length: ${downwindLength.toFixed(1)}m`);
 
+    console.log('Coordinates downwind end: ', downwindEnd[0], downwindEnd[1]);
     map.fitBounds([[lat, lng], finalEnd, baseEnd, downwindEnd], { padding: [50, 50] });
 }
 
