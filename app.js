@@ -1082,14 +1082,16 @@ async function updateWeatherDisplay(index, originalTime = null) {
             else if (spdInKt <= 16) rowClass = 'wind-high';
             else rowClass = 'wind-very-high';
         }
-        const displayHeight = Utils.convertHeight(data.displayHeight, heightUnit);
+        // Adjust height for AMSL by adding lastAltitude (in meters), then convert to user unit
+        const baseHeight = refLevel === 'AMSL' && lastAltitude !== 'N/A' ? data.displayHeight + lastAltitude : data.displayHeight;
+        const displayHeight = Utils.convertHeight(baseHeight, heightUnit);
         const displayTemp = Utils.convertTemperature(data.temp, temperatureUnit === 'C' ? '°C' : '°F');
         const formattedTemp = displayTemp === 'N/A' ? 'N/A' : displayTemp.toFixed(0);
 
         // Convert wind speed and gusts from km/h to the user's selected unit
         const convertedSpd = Utils.convertWind(spd, windSpeedUnit, 'km/h');
         let formattedWind;
-        //console.log('Debug: displayHeight:', displayHeight, 'wind_gusts_10m:', weatherData.wind_gusts_10m[index]); // Debug log
+        console.log('Debug: displayHeight:', displayHeight, 'wind_gusts_10m:', weatherData.wind_gusts_10m[index]);
         if (Math.round(displayHeight) === 0 && weatherData.wind_gusts_10m[index] !== undefined && Number.isFinite(weatherData.wind_gusts_10m[index])) {
             const gustSpd = weatherData.wind_gusts_10m[index]; // Gusts in km/h
             const convertedGust = Utils.convertWind(gustSpd, windSpeedUnit, 'km/h');
