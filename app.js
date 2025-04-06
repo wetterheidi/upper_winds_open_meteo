@@ -146,14 +146,11 @@ function calculateJump() {
     const lowerLimitFull = elevation;
     const upperLimitFull = elevation + openingAltitude - 200;
     const lowerLimit = elevation + legHeightDownwind;
-    const upperLimit = elevation + openingAltitude -200;
+    const upperLimit = elevation + openingAltitude - 200;
 
     const heights = interpolatedData.map(d => d.height);
     const dirs = interpolatedData.map(d => Number.isFinite(d.dir) ? parseFloat(d.dir) : 0);
-    const spdsMps = interpolatedData.map(d => {
-        const spd = Number.isFinite(d.spd) ? parseFloat(d.spd) : 0;
-        return Utils.convertWind(spd, 'm/s', getWindSpeedUnit());
-    });
+    const spdsMps = interpolatedData.map(d => Utils.convertWind(parseFloat(d.spd) || 0, 'm/s', 'km/h')); // Convert km/h to m/s
 
     const uComponents = spdsMps.map((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
     const vComponents = spdsMps.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
@@ -161,9 +158,12 @@ function calculateJump() {
     const meanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, lowerLimit, upperLimit);
     const meanWindDirection = meanWind[0];
     const meanWindSpeedMps = meanWind[1];
+    console.log('Mean wind blue: ', meanWindDirection.toFixed(1), meanWindSpeedMps.toFixed(1), 'm/s');
     const meanWindFull = Utils.calculateMeanWind(heights, uComponents, vComponents, lowerLimitFull, upperLimitFull);
     const meanWindDirectionFull = meanWindFull[0];
     const meanWindSpeedMpsFull = meanWindFull[1];
+    console.log('Mean wind red: ', meanWindDirectionFull.toFixed(1), meanWindSpeedMpsFull.toFixed(1), 'm/s');
+
 
     const centerDisplacement = meanWindSpeedMps * flyTime;
     const centerDisplacementFull = meanWindSpeedMpsFull * flyTimeFull;
@@ -214,8 +214,10 @@ function calculateJump() {
         updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
     }
 
-    map.fitBounds([[downwindLat, downwindLng], [lastLat, lastLng]]);
+    //map.fitBounds([[downwindLat, downwindLng], [lastLat, lastLng]]);
     console.log('calculateJump completed');
+    //Calculation of jump run track for testing
+    jumpRunTrack();
     return {
         radius: horizontalCanopyDistance,
         radiusFull: horizontalCanopyDistanceFull,
@@ -1353,12 +1355,12 @@ function calculateMeanWind() {
     }
 
     // Use raw heights and speeds in knots
-    const heights = interpolatedData.map(d => d.height); // Actual height in meters
+    const heights = interpolatedData.map(d => d.height);
     const dirs = interpolatedData.map(d => parseFloat(d.dir) || 0);
-    const spdsKt = interpolatedData.map(d => Utils.convertWind(parseFloat(d.spd) || 0, 'kt', windSpeedUnit)); // Ensure knots
+    const spds = interpolatedData.map(d => Utils.convertWind(parseFloat(d.spd) || 0, windSpeedUnit, 'km/h')); // Fixed order
 
-    const xKomponente = spdsKt.map((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
-    const yKomponente = spdsKt.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
+    const xKomponente = spds.map((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
+    const yKomponente = spds.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
 
     const meanWind = Utils.calculateMeanWind(heights, xKomponente, yKomponente, lowerLimit, upperLimit);
     const [dir, spd] = meanWind;
@@ -1367,8 +1369,8 @@ function calculateMeanWind() {
     const displayLower = Math.round(Utils.convertHeight(lowerLimitInput, heightUnit));
     const displayUpper = Math.round(Utils.convertHeight(upperLimitInput, heightUnit));
     const displaySpd = Utils.convertWind(spd, windSpeedUnit, 'kt');
-    const formattedSpd = displaySpd === 'N/A' ? 'N/A' : (windSpeedUnit === 'bft' ? Math.round(displaySpd) : displaySpd.toFixed(1));
-    const result = `Mean wind (${displayLower}-${displayUpper} ${heightUnit} ${refLevel}): ${roundedDir}° ${formattedSpd} ${windSpeedUnit}`;
+    const formattedSpd = Number.isFinite(spd) ? (windSpeedUnit === 'bft' ? Math.round(spd) : spd.toFixed(1)) : 'N/A';
+    const result = `Mean wind (${displayLower}-${displayUpper} ${heightUnit} ${refLevel}): ${Utils.roundToTens(dir)}° ${formattedSpd} ${windSpeedUnit}`;
     document.getElementById('meanWindResult').innerHTML = result;
     console.log('Calculated Mean Wind:', result, 'u:', meanWind[2], 'v:', meanWind[3]);
 }
@@ -1636,9 +1638,12 @@ function updateLandingPattern() {
         return;
     }
 
+    // Convert wind speeds from km/h (Open-Meteo) to kt explicitly
     const heights = interpolatedData.map(d => d.height);
     const dirs = interpolatedData.map(d => Number.isFinite(d.dir) ? parseFloat(d.dir) : 0);
-    const spdsKt = interpolatedData.map(d => Number.isFinite(d.spd) ? Utils.convertWind(parseFloat(d.spd), 'kt', getWindSpeedUnit()) : 0);
+    const spdsKt = interpolatedData.map(d => Utils.convertWind(parseFloat(d.spd) || 0, 'kt', 'km/h')); // km/h to kt
+
+    // Calculate U and V components in kt
     const uComponents = spdsKt.map((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
     const vComponents = spdsKt.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
 
@@ -1824,7 +1829,7 @@ function updateLandingPattern() {
         Downwind Leg: Wind: ${downwindWindDir.toFixed(1)}° @ ${downwindWindSpeedKt.toFixed(1)}kt, Course: ${downwindCourse.toFixed(1)}°, WCA: ${downwindWca.toFixed(1)}°, GS: ${downwindGroundSpeedKt.toFixed(1)}kt, HW: ${downwindHeadwind.toFixed(1)}kt, Length: ${downwindLength.toFixed(1)}m`);
 
     console.log('Coordinates downwind end: ', downwindEnd[0], downwindEnd[1]);
-    map.fitBounds([[lat, lng], finalEnd, baseEnd, downwindEnd], { padding: [50, 50] });
+    //map.fitBounds([[lat, lng], finalEnd, baseEnd, downwindEnd], { padding: [50, 50] });
 }
 
 function displayError(message) {
@@ -1924,6 +1929,65 @@ function showPasswordModal(feature, onSuccess, onCancel) {
 
 function isFeatureUnlocked(feature) {
     return feature === 'landingPattern' ? isLandingPatternUnlocked : isCalculateJumpUnlocked;
+}
+
+function jumpRunTrack() {
+    console.log('Starting jumpRunTrack...');
+
+    // Get exit altitude from user input or default
+    const exitAltitude = parseInt(document.getElementById('exitAltitude')?.value) || userSettings.exitAltitude || 3000;
+    const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
+
+    // Ensure necessary data is available
+    if (!weatherData || !lastLat || !lastLng || lastAltitude === null || lastAltitude === 'N/A') {
+        console.warn('Cannot calculate jump run track: missing weather data, coordinates, or altitude');
+        return null;
+    }
+
+    // Interpolate weather data for the current time slider position
+    const interpolatedData = interpolateWeatherData(sliderIndex);
+    if (!interpolatedData || interpolatedData.length === 0) {
+        console.warn('No interpolated weather data available');
+        return null;
+    }
+
+    // Extract heights, directions, and speeds
+    const elevation = Math.round(lastAltitude);
+    const lowerLimit = elevation; // Surface
+    const upperLimit = elevation + exitAltitude; // Exit altitude
+
+    const heights = interpolatedData.map(d => d.height);
+    const dirs = interpolatedData.map(d => Number.isFinite(d.dir) ? parseFloat(d.dir) : 0);
+    const spdsMps = interpolatedData.map(d => {
+        const spd = Number.isFinite(d.spd) ? parseFloat(d.spd) : 0;
+        return Utils.convertWind(spd, 'm/s', getWindSpeedUnit()); // Convert to user-selected wind unit
+    });
+
+    // Calculate U and V components
+    const uComponents = spdsMps.map((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
+    const vComponents = spdsMps.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
+
+    // Calculate mean wind between surface and exit altitude
+    const meanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, lowerLimit, upperLimit);
+    const meanWindDirection = meanWind[0]; // Direction in degrees
+    const meanWindSpeed = meanWind[1]; // Speed in user-selected unit (e.g., kt)
+
+    if (!Number.isFinite(meanWindDirection) || !Number.isFinite(meanWindSpeed)) {
+        console.warn('Invalid mean wind calculation:', meanWind);
+        return null;
+    }
+
+    // Jump run track is the direction of the mean wind
+    const jumpRunTrackDirection = Math.round(meanWindDirection);
+
+    // Log the result
+    console.log(`Jump Run Track: ${jumpRunTrackDirection}° (Mean wind: ${meanWindDirection.toFixed(1)}° @ ${meanWindSpeed.toFixed(1)} ${getWindSpeedUnit()})`);
+
+    return {
+        direction: jumpRunTrackDirection,
+        meanWindDirection: meanWindDirection,
+        meanWindSpeed: meanWindSpeed
+    };
 }
 
 // ********** Event listener section **********
@@ -2196,10 +2260,10 @@ function getSliderValue() {
 
 // Setup input events
 function setupInputEvents() {
-    setupInput('lowerLimit', 'input', 300, (value) => {
+    setupInput('lowerLimit', 'change', 300, (value) => {
         if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') calculateMeanWind();
     });
-    setupInput('upperLimit', 'input', 300, (value) => {
+    setupInput('upperLimit', 'change', 300, (value) => {
         if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') calculateMeanWind();
     });
     setupInput('openingAltitude', 'change', 300, (value) => {

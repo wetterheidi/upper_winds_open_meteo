@@ -478,18 +478,6 @@ class Utils {
                 return result.Decimal;
         }
     }
-
-    //Just for testing. To be changed later to u,v interpolation
-    static interpolateDirection (dir1, dir2, fraction){
-        let diff = dir2 - dir1;
-        if (diff > 180) diff -= 360;
-        if (diff < -180) diff += 360;
-        let interpolated = dir1 + diff * fraction;
-        if (interpolated < 0) interpolated += 360;
-        if (interpolated >= 360) interpolated -= 360;
-        return interpolated;
-    }
-
 }
 
 window.Utils = Utils;
