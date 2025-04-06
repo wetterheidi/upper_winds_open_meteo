@@ -144,9 +144,9 @@ function calculateJump() {
 
     const elevation = Math.round(lastAltitude);
     const lowerLimitFull = elevation;
-    const upperLimitFull = elevation + openingAltitude;
+    const upperLimitFull = elevation + openingAltitude - 200;
     const lowerLimit = elevation + legHeightDownwind;
-    const upperLimit = elevation + openingAltitude;
+    const upperLimit = elevation + openingAltitude -200;
 
     const heights = interpolatedData.map(d => d.height);
     const dirs = interpolatedData.map(d => Number.isFinite(d.dir) ? parseFloat(d.dir) : 0);
