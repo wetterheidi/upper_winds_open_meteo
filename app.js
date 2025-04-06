@@ -2370,12 +2370,14 @@ function setupCheckboxEvents() {
         const enableFeature = () => {
             toggleSubmenu('calculateJumpCheckbox', true);
             console.log('Calculate Jump enabled');
-            if (weatherData && lastLat && lastLng) {
+            if (weatherData && lastLat !== null && lastLng !== null) {
                 console.log('Calling calculateJump with:', { weatherData, lastLat, lastLng });
                 calculateJump();
             } else {
-                console.warn('Cannot calculate jump: Missing data', { weatherData: !!weatherData, lastLat, lastLng });
-                Utils.handleError('Please click the map to set a location first.');
+                console.warn('Cannot calculate jump yet: Missing data', { weatherData: !!weatherData, lastLat, lastLng });
+                if (!checkbox.dataset.initialLoad) {
+                    Utils.handleError('Please click the map to set a location first.');
+                }
             }
         };
 
@@ -2385,8 +2387,17 @@ function setupCheckboxEvents() {
             saveSettings();
             toggleSubmenu('calculateJumpCheckbox', false);
             console.log('Clearing jump circles');
-            clearJumpCircles(); // Only clears jump circles
+            clearJumpCircles();
         };
+
+        // Mark as initial load to suppress error and uncheck the checkbox
+        if (!checkbox.dataset.initialLoad) {
+            checkbox.dataset.initialLoad = 'true';
+            checkbox.checked = false; // Uncheck the checkbox on initial load
+            userSettings.calculateJump = false; // Sync settings to reflect unchecked state
+            saveSettings(); // Save the updated settings
+            return; // Skip initial callback
+        }
 
         if (checkbox.checked) {
             if (isFeatureUnlocked('calculateJump')) {
