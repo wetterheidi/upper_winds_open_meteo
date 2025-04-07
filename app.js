@@ -14,6 +14,7 @@ let downwindArrow = null;
 let landingWindDir = null;
 let jumpCircle = null;
 let jumpCircleFull = null; // New red circle for full descent
+let jumpRunTrackLayer = null;
 
 const getTemperatureUnit = () => getSettingValue('temperatureUnit', 'radio', 'C');
 const getHeightUnit = () => getSettingValue('heightUnit', 'radio', 'm');
@@ -48,7 +49,8 @@ const defaultSettings = {
     baseMaps: 'Esri Street',
     calculateJump: false,      // New setting for checkbox
     openingAltitude: 1200,      // New setting for opening altitude
-    exitAltitude: 3000 // New default for Exit Altitude
+    exitAltitude: 3000, // New default for Exit Altitude
+    showJumpRunTrack: false, // New setting for jump run track
 };
 const FEATURE_PASSWORD = "skydiver2025"; // Hardcoded password (change as needed)
 let isLandingPatternUnlocked = false;   // Track unlock state during session
@@ -205,6 +207,7 @@ function calculateJump() {
 
     //map.fitBounds([[downwindLat, downwindLng], [lastLat, lastLng]]);
     console.log('calculateJump completed');
+    updateJumpRunTrack(); // Add this line before jumpRunTrack()
     jumpRunTrack(); // For testing
     return {
         radius: horizontalCanopyDistance,
@@ -578,7 +581,10 @@ async function updateAllDisplays() {
         await updateWeatherDisplay(sliderIndex);
         if (lastAltitude !== 'N/A') calculateMeanWind();
         if (userSettings.showLandingPattern) updateLandingPattern();
-        if (userSettings.calculateJump) calculateJump();
+        if (userSettings.calculateJump) {
+            calculateJump();
+            if (userSettings.showJumpRunTrack) updateJumpRunTrack();
+        }
         recenterMap();
     }
 }
@@ -1906,6 +1912,107 @@ function updateLandingPattern() {
     //map.fitBounds([[lat, lng], finalEnd, baseEnd, downwindEnd], { padding: [50, 50] });
 }
 
+function updateJumpRunTrack() {
+    if (jumpRunTrackLayer) {
+        map.removeLayer(jumpRunTrackLayer);
+        jumpRunTrackLayer = null;
+    }
+
+    if (!userSettings.calculateJump || !lastLat || !lastLng || !weatherData) {
+        console.log('Jump run track not updated: missing data or feature disabled');
+        return;
+    }
+
+    const trackData = jumpRunTrack();
+    if (!trackData || !Number.isFinite(trackData.direction)) {
+        console.warn('Invalid jump run track data:', trackData);
+        return;
+    }
+
+    const direction = trackData.direction;
+
+    const directionSpan = document.getElementById('jumpRunTrackDirection');
+    if (directionSpan) {
+        directionSpan.textContent = `${Math.round(direction)}°`;
+    }
+
+    if (!userSettings.showJumpRunTrack) {
+        console.log('Jump run track calculated but not displayed (checkbox unchecked)');
+        return;
+    }
+
+    const trackLengthMeters = 3000;
+    const halfLengthMeters = trackLengthMeters / 2;
+    const earthRadius = 6371000;
+    const lat1 = lastLat * Math.PI / 180;
+    const lng1 = lastLng * Math.PI / 180;
+    const bearingRad = direction * Math.PI / 180;
+
+    // End point (forward)
+    const deltaForward = halfLengthMeters / earthRadius;
+    let lat2 = Math.asin(
+        Math.sin(lat1) * Math.cos(deltaForward) +
+        Math.cos(lat1) * Math.sin(deltaForward) * Math.cos(bearingRad)
+    );
+    let lng2 =
+        lng1 +
+        Math.atan2(
+            Math.sin(bearingRad) * Math.sin(deltaForward) * Math.cos(lat1),
+            Math.cos(deltaForward) - Math.sin(lat1) * Math.sin(lat2)
+        );
+    lat2 = lat2 * 180 / Math.PI;
+    lng2 = ((lng2 * 180 / Math.PI + 540) % 360) - 180;
+
+    // Start point (backward)
+    const bearingOppositeRad = ((direction + 180) % 360) * Math.PI / 180;
+    const deltaBackward = halfLengthMeters / earthRadius;
+    let lat0 = Math.asin(
+        Math.sin(lat1) * Math.cos(deltaBackward) +
+        Math.cos(lat1) * Math.sin(deltaBackward) * Math.cos(bearingOppositeRad)
+    );
+    let lng0 =
+        lng1 +
+        Math.atan2(
+            Math.sin(bearingOppositeRad) * Math.sin(deltaBackward) * Math.cos(lat1),
+            Math.cos(deltaBackward) - Math.sin(lat1) * Math.sin(lat0)
+        );
+    lat0 = lat0 * 180 / Math.PI;
+    lng0 = ((lng0 * 180 / Math.PI + 540) % 360) - 180;
+
+    const trackPoints = [[lat0, lng0], [lat2, lng2]];
+
+    console.log('Track points:', { start: [lat0, lng0], end: [lat2, lng2], direction });
+
+    const polyline = L.polyline(trackPoints, {
+        color: 'orange',
+        weight: 5,
+        opacity: 0.8,
+    });
+
+    const arrowIcon = L.divIcon({
+        className: 'jump-run-arrow',
+        html: `
+            <svg width="30" height="30" viewBox="0 0 30 30">
+                <polygon points="5,20 15,5 25,20" fill="orange" stroke="orange" stroke-width="1" transform="rotate(${direction}, 15, 15)"/>
+            </svg>`,
+        iconSize: [30, 30],
+        iconAnchor: [15, 15],
+    });
+
+    const arrowMarker = L.marker([lat2, lng2], {
+        icon: arrowIcon,
+    });
+
+    jumpRunTrackLayer = L.layerGroup([polyline, arrowMarker]).addTo(map);
+
+    polyline.bindPopup(
+        `Jump Run Track: ${Math.round(direction)}°<br>` +
+        `Mean Wind: ${trackData.meanWindSpeed.toFixed(1)} ${getWindSpeedUnit()} from ${Math.round(trackData.meanWindDirection)}°`
+    );
+
+    console.log('Jump run track updated:', { direction, start: [lat0, lng0], end: [lat2, lng2] });
+}
+
 function displayError(message) {
     console.log('displayError called with:', message);
     let errorElement = document.getElementById('error-message');
@@ -2115,6 +2222,7 @@ function initializeUIElements() {
     setCheckboxValue('showTableCheckbox', userSettings.showTable);
     setCheckboxValue('calculateJumpCheckbox', userSettings.calculateJump);
     setCheckboxValue('showLandingPattern', userSettings.showLandingPattern);
+    setCheckboxValue('showJumpRunTrack', userSettings.showJumpRunTrack);
 
     // Set initial tooltip and style for locked state
     const landingPatternCheckbox = document.getElementById('showLandingPattern');
@@ -2127,7 +2235,8 @@ function initializeUIElements() {
         calculateJumpCheckbox.title = isCalculateJumpUnlocked ? '' : 'Password required to enable';
         calculateJumpCheckbox.style.opacity = isCalculateJumpUnlocked ? '1' : '0.5'; // Visual cue
     }
-
+    const directionSpan = document.getElementById('jumpRunTrackDirection');
+    if (directionSpan) directionSpan.textContent = '-'; // Initial placeholder
     updateUIState();
 }
 
@@ -2614,6 +2723,18 @@ function setupCheckboxEvents() {
             }
         } else {
             disableFeature();
+        }
+    });
+    setupCheckbox('showJumpRunTrack', 'showJumpRunTrack', (checkbox) => {
+        userSettings.showJumpRunTrack = checkbox.checked;
+        saveSettings();
+        if (checkbox.checked && userSettings.calculateJump) {
+            updateJumpRunTrack();
+        } else {
+            if (jumpRunTrackLayer) {
+                map.removeLayer(jumpRunTrackLayer);
+                jumpRunTrackLayer = null;
+            }
         }
     });
 }
