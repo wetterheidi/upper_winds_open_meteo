@@ -1930,6 +1930,7 @@ function updateJumpRunTrack() {
     }
 
     const direction = trackData.direction;
+    const offset = parseInt(document.getElementById('jumpRunTrackOffset')?.value) || 0;
 
     if (!userSettings.showJumpRunTrack) {
         console.log('Jump run track calculated but not displayed (checkbox unchecked)');
@@ -1939,42 +1940,68 @@ function updateJumpRunTrack() {
     const trackLengthMeters = 3000;
     const halfLengthMeters = trackLengthMeters / 2;
     const earthRadius = 6371000;
-    const lat1 = lastLat * Math.PI / 180;
-    const lng1 = lastLng * Math.PI / 180;
+    let centerLat = lastLat * Math.PI / 180;
+    let centerLng = lastLng * Math.PI / 180;
+
+    // Berechne den Offset-Winkel (90° links oder rechts von der Richtung)
+    const offsetDirectionRad = offset > 0 
+        ? (direction + 90) * Math.PI / 180  // Linksverschiebung
+        : (direction - 90 + 360) * Math.PI / 180; // Rechtsverschiebung, +360 für Normalisierung
+    const offsetDistance = Math.abs(offset) / earthRadius;
+
+    // Verschiebe den Mittelpunkt basierend auf dem Offset
+    if (offset !== 0) {
+        const newCenterLat = Math.asin(
+            Math.sin(centerLat) * Math.cos(offsetDistance) +
+            Math.cos(centerLat) * Math.sin(offsetDistance) * Math.cos(offsetDirectionRad)
+        );
+        const newCenterLng = centerLng + Math.atan2(
+            Math.sin(offsetDirectionRad) * Math.sin(offsetDistance) * Math.cos(centerLat),
+            Math.cos(offsetDistance) - Math.sin(centerLat) * Math.sin(newCenterLat)
+        );
+        centerLat = newCenterLat;
+        centerLng = newCenterLng;
+    }
+
+    // Berechne die Endpunkte des Tracks von der verschobenen Mitte aus
     const bearingRad = direction * Math.PI / 180;
 
+    // Endpunkt (vorwärts)
     const deltaForward = halfLengthMeters / earthRadius;
     let lat2 = Math.asin(
-        Math.sin(lat1) * Math.cos(deltaForward) +
-        Math.cos(lat1) * Math.sin(deltaForward) * Math.cos(bearingRad)
+        Math.sin(centerLat) * Math.cos(deltaForward) +
+        Math.cos(centerLat) * Math.sin(deltaForward) * Math.cos(bearingRad)
     );
-    let lng2 =
-        lng1 +
-        Math.atan2(
-            Math.sin(bearingRad) * Math.sin(deltaForward) * Math.cos(lat1),
-            Math.cos(deltaForward) - Math.sin(lat1) * Math.sin(lat2)
-        );
+    let lng2 = centerLng + Math.atan2(
+        Math.sin(bearingRad) * Math.sin(deltaForward) * Math.cos(centerLat),
+        Math.cos(deltaForward) - Math.sin(centerLat) * Math.sin(lat2)
+    );
     lat2 = lat2 * 180 / Math.PI;
     lng2 = ((lng2 * 180 / Math.PI + 540) % 360) - 180;
 
+    // Startpunkt (rückwärts)
     const bearingOppositeRad = ((direction + 180) % 360) * Math.PI / 180;
     const deltaBackward = halfLengthMeters / earthRadius;
     let lat0 = Math.asin(
-        Math.sin(lat1) * Math.cos(deltaBackward) +
-        Math.cos(lat1) * Math.sin(deltaBackward) * Math.cos(bearingOppositeRad)
+        Math.sin(centerLat) * Math.cos(deltaBackward) +
+        Math.cos(centerLat) * Math.sin(deltaBackward) * Math.cos(bearingOppositeRad)
     );
-    let lng0 =
-        lng1 +
-        Math.atan2(
-            Math.sin(bearingOppositeRad) * Math.sin(deltaBackward) * Math.cos(lat1),
-            Math.cos(deltaBackward) - Math.sin(lat1) * Math.sin(lat0)
-        );
+    let lng0 = centerLng + Math.atan2(
+        Math.sin(bearingOppositeRad) * Math.sin(deltaBackward) * Math.cos(centerLat),
+        Math.cos(deltaBackward) - Math.sin(centerLat) * Math.sin(lat0)
+    );
     lat0 = lat0 * 180 / Math.PI;
     lng0 = ((lng0 * 180 / Math.PI + 540) % 360) - 180;
 
     const trackPoints = [[lat0, lng0], [lat2, lng2]];
 
-    console.log('Track points:', { start: [lat0, lng0], end: [lat2, lng2], direction });
+    console.log('Track points with offset:', { 
+        offset: offset, 
+        center: [centerLat * 180 / Math.PI, centerLng * 180 / Math.PI], 
+        start: [lat0, lng0], 
+        end: [lat2, lng2], 
+        direction 
+    });
 
     const polyline = L.polyline(trackPoints, {
         color: 'orange',
@@ -2000,10 +2027,11 @@ function updateJumpRunTrack() {
 
     polyline.bindPopup(
         `Jump Run Track: ${Math.round(direction)}°<br>` +
+        `Offset: ${offset} m<br>` +
         `Mean Wind: ${trackData.meanWindSpeed.toFixed(1)} ${getWindSpeedUnit()} from ${Math.round(trackData.meanWindDirection)}°`
     );
 
-    console.log('Jump run track updated:', { direction, start: [lat0, lng0], end: [lat2, lng2] });
+    console.log('Jump run track updated:', { direction, offset, start: [lat0, lng0], end: [lat2, lng2] });
 }
 
 function displayError(message) {
@@ -2539,6 +2567,27 @@ function setupInputEvents() {
                 directionInput.value = trackData.direction;
             }
             userSettings.jumpRunTrackDirection = '';
+            saveSettings();
+            if (userSettings.calculateJump && userSettings.showJumpRunTrack) {
+                updateJumpRunTrack();
+            }
+        }
+    });
+    setupInput('jumpRunTrackOffset', 'blur', 0, (value) => {
+        const offset = parseInt(value, 10);
+        if (!isNaN(offset) && offset >= -5000 && offset <= 5000 && offset % 100 === 0) {
+            userSettings.jumpRunTrackOffset = offset;
+            saveSettings();
+            if (userSettings.calculateJump && userSettings.showJumpRunTrack && weatherData && lastLat && lastLng) {
+                updateJumpRunTrack();
+            }
+        } else {
+            Utils.handleError('Offset must be between -5000 and 5000 in steps of 100.');
+            const offsetInput = document.getElementById('jumpRunTrackOffset');
+            if (offsetInput) {
+                offsetInput.value = 0;
+            }
+            userSettings.jumpRunTrackOffset = 0;
             saveSettings();
             if (userSettings.calculateJump && userSettings.showJumpRunTrack) {
                 updateJumpRunTrack();
