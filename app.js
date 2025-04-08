@@ -1909,7 +1909,15 @@ function updateLandingPattern() {
         Base Leg: Wind: ${baseWindDir.toFixed(1)}° @ ${baseWindSpeedKt.toFixed(1)}kt, Course: ${baseCourse.toFixed(1)}°, WCA: ${baseWca.toFixed(1)}°, GS: ${baseGroundSpeedKt.toFixed(1)}kt, HW: ${baseHeadwind.toFixed(1)}kt, Length: ${baseLength.toFixed(1)}m
         Downwind Leg: Wind: ${downwindWindDir.toFixed(1)}° @ ${downwindWindSpeedKt.toFixed(1)}kt, Course: ${downwindCourse.toFixed(1)}°, WCA: ${downwindWca.toFixed(1)}°, GS: ${downwindGroundSpeedKt.toFixed(1)}kt, HW: ${downwindHeadwind.toFixed(1)}kt, Length: ${downwindLength.toFixed(1)}m`);
 
-    console.log('Coordinates downwind end: ', downwindEnd[0], downwindEnd[1]);
+        // Logs für Feldversuch Bobby
+    const selectedTime = weatherData.time[sliderIndex]; // Zeit aus den Wetterdaten basierend auf dem Slider-Index
+    console.log('+++++++++ Koordinaten Pattern:', selectedTime);
+    console.log('Coordinates DIP: ', lat, lng, 'Altitude DIP:', baseHeight);
+    console.log('Coordinates final end: ', finalEnd[0], finalEnd[1], 'Leg Height:', baseHeight + LEG_HEIGHT_FINAL);
+    console.log('Coordinates base end: ', baseEnd[0], baseEnd[1], 'Leg Height:', baseHeight + LEG_HEIGHT_BASE);
+    console.log('Coordinates downwind end: ', downwindEnd[0], downwindEnd[1], 'Leg Height:', baseHeight + LEG_HEIGHT_DOWNWIND);
+
+
     //map.fitBounds([[lat, lng], finalEnd, baseEnd, downwindEnd], { padding: [50, 50] });
 }
 
@@ -1945,7 +1953,7 @@ function updateJumpRunTrack() {
     let centerLng = lastLng * Math.PI / 180;
 
     // Berechne den Offset-Winkel (90° links oder rechts von der Richtung)
-    const offsetDirectionRad = offset > 0 
+    const offsetDirectionRad = offset > 0
         ? (direction + 90) * Math.PI / 180  // Linksverschiebung
         : (direction - 90 + 360) * Math.PI / 180; // Rechtsverschiebung, +360 für Normalisierung
     const offsetDistance = Math.abs(offset) / earthRadius;
@@ -1996,12 +2004,12 @@ function updateJumpRunTrack() {
 
     const trackPoints = [[lat0, lng0], [lat2, lng2]];
 
-    console.log('Track points with offset:', { 
-        offset: offset, 
-        center: [centerLat * 180 / Math.PI, centerLng * 180 / Math.PI], 
-        start: [lat0, lng0], 
-        end: [lat2, lng2], 
-        direction 
+    console.log('Track points with offset:', {
+        offset: offset,
+        center: [centerLat * 180 / Math.PI, centerLng * 180 / Math.PI],
+        start: [lat0, lng0],
+        end: [lat2, lng2],
+        direction
     });
 
     const polyline = L.polyline(trackPoints, {
