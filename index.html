@@ -247,8 +247,10 @@
                         </label>
                     </li>
                     <li>
-                        <label class="radio-label" id="jumpRunTrackLabel">
-                            <input type="checkbox" id="showJumpRunTrack" /> Show Jump Run Track: <span id="jumpRunTrackDirection">-</span>
+                        <label class="radio-label">
+                            <input type="checkbox" id="showJumpRunTrack" /> Show Jump Run Track:
+                            <input type="number" id="jumpRunTrackDirection" min="0" max="359" step="1" placeholder="Calculated" style="width: 60px;">
+                            <label>°</label>
                         </label>
                     </li>
                 </ul>

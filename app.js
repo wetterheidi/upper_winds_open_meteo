@@ -1931,11 +1931,6 @@ function updateJumpRunTrack() {
 
     const direction = trackData.direction;
 
-    const directionSpan = document.getElementById('jumpRunTrackDirection');
-    if (directionSpan) {
-        directionSpan.textContent = `${Math.round(direction)}°`;
-    }
-
     if (!userSettings.showJumpRunTrack) {
         console.log('Jump run track calculated but not displayed (checkbox unchecked)');
         return;
@@ -1948,7 +1943,6 @@ function updateJumpRunTrack() {
     const lng1 = lastLng * Math.PI / 180;
     const bearingRad = direction * Math.PI / 180;
 
-    // End point (forward)
     const deltaForward = halfLengthMeters / earthRadius;
     let lat2 = Math.asin(
         Math.sin(lat1) * Math.cos(deltaForward) +
@@ -1963,7 +1957,6 @@ function updateJumpRunTrack() {
     lat2 = lat2 * 180 / Math.PI;
     lng2 = ((lng2 * 180 / Math.PI + 540) % 360) - 180;
 
-    // Start point (backward)
     const bearingOppositeRad = ((direction + 180) % 360) * Math.PI / 180;
     const deltaBackward = halfLengthMeters / earthRadius;
     let lat0 = Math.asin(
@@ -2115,53 +2108,60 @@ function isFeatureUnlocked(feature) {
 function jumpRunTrack() {
     console.log('Starting jumpRunTrack...');
 
-    // Get exit altitude from user input or default
     const exitAltitude = parseInt(document.getElementById('exitAltitude')?.value) || userSettings.exitAltitude || 3000;
+    const customDirection = parseInt(document.getElementById('jumpRunTrackDirection')?.value, 10);
     const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
 
-    // Ensure necessary data is available
     if (!weatherData || !lastLat || !lastLng || lastAltitude === null || lastAltitude === 'N/A') {
         console.warn('Cannot calculate jump run track: missing weather data, coordinates, or altitude');
         return null;
     }
 
-    // Interpolate weather data for the current time slider position
     const interpolatedData = interpolateWeatherData(sliderIndex);
     if (!interpolatedData || interpolatedData.length === 0) {
         console.warn('No interpolated weather data available');
         return null;
     }
 
-    // Extract heights, directions, and speeds
     const elevation = Math.round(lastAltitude);
-    const lowerLimit = elevation; // Surface
-    const upperLimit = elevation + exitAltitude; // Exit altitude
+    const lowerLimit = elevation;
+    const upperLimit = elevation + exitAltitude;
 
     const heights = interpolatedData.map(d => d.height);
     const dirs = interpolatedData.map(d => Number.isFinite(d.dir) ? parseFloat(d.dir) : 0);
     const spdsMps = interpolatedData.map(d => {
         const spd = Number.isFinite(d.spd) ? parseFloat(d.spd) : 0;
-        return Utils.convertWind(spd, 'm/s', getWindSpeedUnit()); // Convert to user-selected wind unit
+        return Utils.convertWind(spd, 'm/s', getWindSpeedUnit());
     });
 
-    // Calculate U and V components
     const uComponents = spdsMps.map((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
     const vComponents = spdsMps.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
 
-    // Calculate mean wind between surface and exit altitude
     const meanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, lowerLimit, upperLimit);
-    const meanWindDirection = meanWind[0]; // Direction in degrees
-    const meanWindSpeed = meanWind[1]; // Speed in user-selected unit (e.g., kt)
+    const meanWindDirection = meanWind[0];
+    const meanWindSpeed = meanWind[1];
 
     if (!Number.isFinite(meanWindDirection) || !Number.isFinite(meanWindSpeed)) {
         console.warn('Invalid mean wind calculation:', meanWind);
         return null;
     }
 
-    // Jump run track is the direction of the mean wind
-    const jumpRunTrackDirection = Math.round(meanWindDirection);
+    // Verwende benutzerdefinierte Richtung, falls gültig, sonst die berechnete
+    let jumpRunTrackDirection;
+    if (!isNaN(customDirection) && customDirection >= 0 && customDirection <= 359) {
+        jumpRunTrackDirection = customDirection;
+        console.log(`Using custom jump run direction: ${jumpRunTrackDirection}°`);
+    } else {
+        jumpRunTrackDirection = Math.round(meanWindDirection);
+        console.log(`Using calculated jump run direction: ${jumpRunTrackDirection}°`);
+    }
 
-    // Log the result
+    // Setze den berechneten Wert ins Feld, falls es leer ist oder ungültig war
+    const directionInput = document.getElementById('jumpRunTrackDirection');
+    if (!directionInput.value || isNaN(customDirection) || customDirection < 0 || customDirection > 359) {
+        directionInput.value = jumpRunTrackDirection;
+    }
+
     console.log(`Jump Run Track: ${jumpRunTrackDirection}° (Mean wind: ${meanWindDirection.toFixed(1)}° @ ${meanWindSpeed.toFixed(1)} ${getWindSpeedUnit()})`);
 
     return {
@@ -2523,6 +2523,28 @@ function setupInputEvents() {
             saveSettings();
         }
     });
+    setupInput('jumpRunTrackDirection', 'blur', 0, (value) => {
+        const customDir = parseInt(value, 10);
+        if (!isNaN(customDir) && customDir >= 0 && customDir <= 359) {
+            userSettings.jumpRunTrackDirection = customDir;
+            saveSettings();
+            if (userSettings.calculateJump && userSettings.showJumpRunTrack && weatherData && lastLat && lastLng) {
+                updateJumpRunTrack();
+            }
+        } else {
+            Utils.handleError('Jump run direction must be between 0 and 359°.');
+            const trackData = jumpRunTrack();
+            const directionInput = document.getElementById('jumpRunTrackDirection');
+            if (trackData && directionInput) {
+                directionInput.value = trackData.direction;
+            }
+            userSettings.jumpRunTrackDirection = '';
+            saveSettings();
+            if (userSettings.calculateJump && userSettings.showJumpRunTrack) {
+                updateJumpRunTrack();
+            }
+        }
+    });
 }
 
 function setupInput(id, eventType, debounceTime, callback) {
@@ -2734,6 +2756,12 @@ function setupCheckboxEvents() {
             if (jumpRunTrackLayer) {
                 map.removeLayer(jumpRunTrackLayer);
                 jumpRunTrackLayer = null;
+            }
+            // Setze das Eingabefeld zurück auf den berechneten Wert, wenn deaktiviert
+            const directionInput = document.getElementById('jumpRunTrackDirection');
+            if (directionInput && weatherData && lastLat && lastLng) {
+                const trackData = jumpRunTrack();
+                if (trackData) directionInput.value = trackData.direction;
             }
         }
     });
