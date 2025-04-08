@@ -1755,6 +1755,7 @@ function updateLandingPattern() {
 
     // Final Leg (0-100m AGL)
     const finalLimits = [baseHeight, baseHeight + LEG_HEIGHT_FINAL];
+    console.log('Final limits:', finalLimits);
     const finalMeanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, ...finalLimits);
     const finalWindDir = finalMeanWind[0];
     const finalWindSpeedKt = finalMeanWind[1];
@@ -2137,6 +2138,7 @@ function jumpRunTrack() {
     console.log('Starting jumpRunTrack...');
 
     const exitAltitude = parseInt(document.getElementById('exitAltitude')?.value) || userSettings.exitAltitude || 3000;
+    const openingAltitude = parseInt(document.getElementById('openingAltitude')?.value) || userSettings.openingAltitude || 1000;
     const customDirection = parseInt(document.getElementById('jumpRunTrackDirection')?.value, 10);
     const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
 
@@ -2153,7 +2155,8 @@ function jumpRunTrack() {
 
     const elevation = Math.round(lastAltitude);
     const lowerLimit = elevation;
-    const upperLimit = elevation + exitAltitude;
+    const upperLimit = elevation + openingAltitude;
+    console.log('Jump run track limits:', lowerLimit, upperLimit);
 
     const heights = interpolatedData.map(d => d.height);
     const dirs = interpolatedData.map(d => Number.isFinite(d.dir) ? parseFloat(d.dir) : 0);
