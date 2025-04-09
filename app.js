@@ -239,11 +239,12 @@ function calculateLandingPatternCoords(lat, lng, interpolatedData, sliderIndex) 
     const vComponents = spdsKt.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
 
     let effectiveLandingWindDir;
-    if (landingDirection === 'LL' && customLandingDirLL !== null && !isNaN(customLandingDirLL) && customLandingDirLL >= 0 && customLandingDirLL <= 359) {
+    if (landingDirection === 'LL' && Number.isFinite(customLandingDirLL) && customLandingDirLL >= 0 && customLandingDirLL <= 359) {
         effectiveLandingWindDir = customLandingDirLL;
-    } else if (landingDirection === 'RR' && customLandingDirRR !== null && !isNaN(customLandingDirRR) && customLandingDirRR >= 0 && customLandingDirRR <= 359) {
+    } else if (landingDirection === 'RR' && Number.isFinite(customLandingDirRR) && customLandingDirRR >= 0 && customLandingDirRR <= 359) {
         effectiveLandingWindDir = customLandingDirRR;
     } else {
+        // Only use calculated wind direction if no valid custom direction exists
         effectiveLandingWindDir = Number.isFinite(landingWindDir) ? landingWindDir : dirs[0];
     }
 
@@ -1729,12 +1730,12 @@ function updateLandingPattern() {
 
     // Determine effective landing direction based on selected pattern and input
     let effectiveLandingWindDir;
-    if (landingDirection === 'LL' && customLandingDirLL !== null && !isNaN(customLandingDirLL) && customLandingDirLL >= 0 && customLandingDirLL <= 359) {
+    if (landingDirection === 'LL' && Number.isFinite(customLandingDirLL) && customLandingDirLL >= 0 && customLandingDirLL <= 359) {
         effectiveLandingWindDir = customLandingDirLL;
-    } else if (landingDirection === 'RR' && customLandingDirRR !== null && !isNaN(customLandingDirRR) && customLandingDirRR >= 0 && customLandingDirRR <= 359) {
+    } else if (landingDirection === 'RR' && Number.isFinite(customLandingDirRR) && customLandingDirRR >= 0 && customLandingDirRR <= 359) {
         effectiveLandingWindDir = customLandingDirRR;
     } else {
-        effectiveLandingWindDir = Number.isFinite(landingWindDir) ? landingWindDir : dirs[0]; // Fallback to surface wind
+        effectiveLandingWindDir = Number.isFinite(landingWindDir) ? landingWindDir : dirs[0];
     }
 
     if (!Number.isFinite(effectiveLandingWindDir)) {
@@ -1909,7 +1910,7 @@ function updateLandingPattern() {
         Base Leg: Wind: ${baseWindDir.toFixed(1)}° @ ${baseWindSpeedKt.toFixed(1)}kt, Course: ${baseCourse.toFixed(1)}°, WCA: ${baseWca.toFixed(1)}°, GS: ${baseGroundSpeedKt.toFixed(1)}kt, HW: ${baseHeadwind.toFixed(1)}kt, Length: ${baseLength.toFixed(1)}m
         Downwind Leg: Wind: ${downwindWindDir.toFixed(1)}° @ ${downwindWindSpeedKt.toFixed(1)}kt, Course: ${downwindCourse.toFixed(1)}°, WCA: ${downwindWca.toFixed(1)}°, GS: ${downwindGroundSpeedKt.toFixed(1)}kt, HW: ${downwindHeadwind.toFixed(1)}kt, Length: ${downwindLength.toFixed(1)}m`);
 
-        // Logs für Feldversuch Bobby
+    // Logs für Feldversuch Bobby
     const selectedTime = weatherData.time[sliderIndex]; // Zeit aus den Wetterdaten basierend auf dem Slider-Index
     console.log('+++++++++ Koordinaten Pattern:', selectedTime);
     console.log('Coordinates DIP: ', lat, lng, 'Altitude DIP:', baseHeight);
@@ -2263,6 +2264,16 @@ function initializeUIElements() {
     setCheckboxValue('showLandingPattern', userSettings.showLandingPattern);
     setCheckboxValue('showJumpRunTrack', userSettings.showJumpRunTrack);
 
+    // Ensure UI reflects the stored custom direction without overwriting
+    const customLL = document.getElementById('customLandingDirectionLL');
+    const customRR = document.getElementById('customLandingDirectionRR');
+    if (customLL && userSettings.customLandingDirectionLL !== '' && !isNaN(userSettings.customLandingDirectionLL)) {
+        customLL.value = userSettings.customLandingDirectionLL;
+    }
+    if (customRR && userSettings.customLandingDirectionRR !== '' && !isNaN(userSettings.customLandingDirectionRR)) {
+        customRR.value = userSettings.customLandingDirectionRR;
+    }
+
     // Set initial tooltip and style for locked state
     const landingPatternCheckbox = document.getElementById('showLandingPattern');
     const calculateJumpCheckbox = document.getElementById('calculateJumpCheckbox');
@@ -2471,6 +2482,29 @@ function setupRadioGroup(name, callback) {
             userSettings[name] = document.querySelector(`input[name="${name}"]:checked`).value;
             saveSettings();
             console.log(`${name} changed to:`, userSettings[name]);
+            
+            // Only for landingDirection, handle custom inputs
+            if (name === 'landingDirection') {
+                const customLL = document.getElementById('customLandingDirectionLL');
+                const customRR = document.getElementById('customLandingDirectionRR');
+                const landingDirection = userSettings.landingDirection;
+
+                if (customLL) customLL.disabled = landingDirection !== 'LL';
+                if (customRR) customRR.disabled = landingDirection !== 'RR';
+
+                // Do NOT overwrite custom direction with calculated value here
+                // Only set it if the field is empty AND no stored value exists
+                if (landingDirection === 'LL' && customLL && !customLL.value && userSettings.customLandingDirectionLL === '') {
+                    customLL.value = Math.round(landingWindDir || 0);
+                    userSettings.customLandingDirectionLL = parseInt(customLL.value);
+                    saveSettings();
+                }
+                if (landingDirection === 'RR' && customRR && !customRR.value && userSettings.customLandingDirectionRR === '') {
+                    customRR.value = Math.round(landingWindDir || 0);
+                    userSettings.customLandingDirectionRR = parseInt(customRR.value);
+                    saveSettings();
+                }
+            }
             callback();
         });
     });
@@ -2537,29 +2571,30 @@ function setupInputEvents() {
     setupInput('customLandingDirectionLL', 'change', 300, (value) => {
         const customDir = parseInt(value, 10);
         if (!isNaN(customDir) && customDir >= 0 && customDir <= 359) {
+            userSettings.customLandingDirectionLL = customDir; // Store user input
+            saveSettings();
             if (userSettings.landingDirection === 'LL' && weatherData && lastLat && lastLng) {
                 updateLandingPattern();
                 recenterMap();
             }
         } else {
             Utils.handleError('Landing direction must be between 0 and 359°.');
-            setInputValue('customLandingDirectionLL', landingWindDir || 0);
-            userSettings.customLandingDirectionLL = landingWindDir || 0;
-            saveSettings();
+            setInputValue('customLandingDirectionLL', userSettings.customLandingDirectionLL || 0);
         }
     });
+
     setupInput('customLandingDirectionRR', 'change', 300, (value) => {
         const customDir = parseInt(value, 10);
         if (!isNaN(customDir) && customDir >= 0 && customDir <= 359) {
+            userSettings.customLandingDirectionRR = customDir; // Store user input
+            saveSettings();
             if (userSettings.landingDirection === 'RR' && weatherData && lastLat && lastLng) {
                 updateLandingPattern();
                 recenterMap();
             }
         } else {
             Utils.handleError('Landing direction must be between 0 and 359°.');
-            setInputValue('customLandingDirectionRR', landingWindDir || 0);
-            userSettings.customLandingDirectionRR = landingWindDir || 0;
-            saveSettings();
+            setInputValue('customLandingDirectionRR', userSettings.customLandingDirectionRR || 0);
         }
     });
     setupInput('jumpRunTrackDirection', 'blur', 0, (value) => {
