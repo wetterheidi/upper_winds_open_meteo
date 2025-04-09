@@ -285,7 +285,7 @@ function calculateLandingPatternCoords(lat, lng, interpolatedData, sliderIndex) 
     const baseCourse = Utils.calculateCourseFromHeading(baseHeading, baseWindDir, baseWindSpeedKt, CANOPY_SPEED_KT).trueCourse;
     const baseWindAngle = Utils.calculateWindAngle(baseCourse, baseWindDir);
     const { crosswind: baseCrosswind, headwind: baseHeadwind } = Utils.calculateWindComponents(baseWindSpeedKt, baseWindAngle);
-    const baseGroundSpeedKt = CANOPY_SPEED_KT + baseHeadwind;
+    const baseGroundSpeedKt = CANOPY_SPEED_KT - baseHeadwind;
     const baseTime = (LEG_HEIGHT_BASE - LEG_HEIGHT_FINAL) / DESCENT_RATE_MPS;
     let baseBearing = (baseCourse + 180) % 360;
     if (baseGroundSpeedKt < 0) baseBearing = (baseBearing + 180) % 360;
@@ -1839,7 +1839,7 @@ function updateLandingPattern() {
     const baseWca = Utils.calculateWCA(baseCrosswind, CANOPY_SPEED_KT) * (baseCrosswind >= 0 ? 1 : -1);
     let baseBearing = (baseCourse + 180) % 360;
     const baseTime = (LEG_HEIGHT_BASE - LEG_HEIGHT_FINAL) / DESCENT_RATE_MPS;
-    const baseGroundSpeedKt = CANOPY_SPEED_KT + baseHeadwind;
+    const baseGroundSpeedKt = CANOPY_SPEED_KT - baseHeadwind;
     if (baseGroundSpeedKt < 0) {
         baseBearing = (baseBearing + 180) % 360; // Reverse the course
         console.log('Base ground speed is negative:', baseGroundSpeedKt, 'New course:', baseBearing);
