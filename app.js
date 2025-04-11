@@ -52,6 +52,10 @@ const defaultSettings = {
     exitAltitude: 3000, // New default for Exit Altitude
     showJumpRunTrack: false, // New setting for jump run track
 };
+
+const minZoom = 10; // Placeholder, adjust as needed
+const maxZoom = 14; // Placeholder, adjust as needed
+
 const FEATURE_PASSWORD = "skydiver2025"; // Hardcoded password (change as needed)
 let isLandingPatternUnlocked = false;   // Track unlock state during session
 let isCalculateJumpUnlocked = false;    // Track unlock state during session
@@ -287,6 +291,8 @@ function calculateJump() {
     const flyTimeFull = heightDistanceFull / descentRate;
     const horizontalCanopyDistanceFull = flyTimeFull * canopySpeedMps;
 
+    console.log('Jump inputs:', { exitAltitude, openingAltitude, legHeightDownwind, descentRate, canopySpeed, sliderIndex, lastLat, lastLng, lastAltitude });
+
     // Free fall phase
     const freeFallResult = calculateFreeFall(weatherData, exitAltitude, openingAltitude, sliderIndex, lastLat, lastLng, lastAltitude);
     console.log('Freefall calculated');
@@ -369,17 +375,18 @@ function calculateJump() {
         updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
     }
 
-    //map.fitBounds([[downwindLat, downwindLng], [lastLat, lastLng]]);
+    updateJumpRunTrack();
+    jumpRunTrack();
+
     console.log('calculateJump completed');
-    updateJumpRunTrack(); // Add this line before jumpRunTrack()
-    jumpRunTrack(); // For testing
     return {
         radius: horizontalCanopyDistance,
         radiusFull: horizontalCanopyDistanceFull,
         displacement: centerDisplacement,
         displacementFull: centerDisplacementFull,
-        direction: displacementDirection,
-        directionFull: displacementDirectionFull
+        direction: meanWindDirection,
+        directionFull: meanWindDirectionFull,
+        freeFall: freeFallResult
     };
 }
 
@@ -472,42 +479,64 @@ function calculateLandingPatternCoords(lat, lng, interpolatedData, sliderIndex) 
 
 function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, displacement, displacementFull, direction, directionFull) {
     console.log('updateJumpCircle called with:', { blueLat, blueLng, redLat, redLng, radius, radiusFull, displacement, displacementFull, direction, directionFull });
-    if (!map || !blueLat || !blueLng || !redLat || !redLng) {
-        console.warn('Map or coordinates not available to update jump circles');
+    if (!map) {
+        console.warn('Map not available to update jump circles');
         return;
     }
 
-    const newCenterBlue = calculateNewCenter(blueLat, blueLng, displacement, direction);
-    const newCenterRed = calculateNewCenter(redLat, redLng, displacementFull, directionFull);
-    console.log('New centers:', { blue: newCenterBlue, red: newCenterRed });
+    const currentZoom = map.getZoom();
+    const isVisible = currentZoom >= minZoom && currentZoom <= maxZoom;
+    console.log('Zoom check:', { currentZoom, minZoom, maxZoom, isVisible });
 
-    if (jumpCircle) {
+    if (jumpCircle && map.hasLayer(jumpCircle)) {
         console.log('Removing existing blue jump circle');
         map.removeLayer(jumpCircle);
     }
-
-    console.log('Creating new blue jump circle at:', newCenterBlue, 'with radius:', radius);
-    jumpCircle = L.circle(newCenterBlue, {
-        radius: radius,
-        color: 'blue',
-        fillColor: 'blue',
-        fillOpacity: 0.2,
-        weight: 2
-    }).addTo(map);
-
-    if (jumpCircleFull) {
+    if (jumpCircleFull && map.hasLayer(jumpCircleFull)) {
         console.log('Removing existing red jump circle');
         map.removeLayer(jumpCircleFull);
     }
 
-    console.log('Creating new red jump circle at:', newCenterRed, 'with radius:', radiusFull);
-    jumpCircleFull = L.circle(newCenterRed, {
-        radius: radiusFull,
-        color: 'red',
-        fillColor: 'red',
-        fillOpacity: 0.2,
-        weight: 2
-    }).addTo(map);
+    if (isVisible && Number.isFinite(blueLat) && Number.isFinite(blueLng) && Number.isFinite(redLat) && Number.isFinite(redLng)) {
+        const newCenterBlue = calculateNewCenter(blueLat, blueLng, displacement, direction);
+        const newCenterRed = calculateNewCenter(redLat, redLng, displacementFull, directionFull);
+        console.log('New centers calculated:', { blue: newCenterBlue, red: newCenterRed });
+
+        if (!Number.isFinite(newCenterBlue[0]) || !Number.isFinite(newCenterBlue[1]) || !Number.isFinite(newCenterRed[0]) || !Number.isFinite(newCenterRed[1])) {
+            console.warn('Invalid center coordinates:', { newCenterBlue, newCenterRed });
+            return;
+        }
+
+        if (!Number.isFinite(radius) || radius <= 0 || !Number.isFinite(radiusFull) || radiusFull <= 0) {
+            console.warn('Invalid radius values:', { radius, radiusFull });
+            return;
+        }
+
+        jumpCircle = L.circle(newCenterBlue, {
+            radius: radius,
+            color: 'blue',
+            fillColor: 'blue',
+            fillOpacity: 0.2,
+            weight: 2
+        });
+        jumpCircleFull = L.circle(newCenterRed, {
+            radius: radiusFull,
+            color: 'red',
+            fillColor: 'red',
+            fillOpacity: 0.2,
+            weight: 2
+        });
+
+        jumpCircle.addTo(map);
+        jumpCircleFull.addTo(map);
+        console.log('Jump circles added at zoom:', currentZoom, 'Layers on map:', map.hasLayer(jumpCircle), map.hasLayer(jumpCircleFull));
+        map.invalidateSize(); // Force refresh
+        console.log('Map bounds after adding circles:', map.getBounds());
+    } else {
+        console.log('Jump circles not displayed - zoom:', currentZoom, 'visible:', isVisible, 'coords valid:', Number.isFinite(blueLat) && Number.isFinite(blueLng) && Number.isFinite(redLat) && Number.isFinite(redLng));
+        jumpCircle = null;
+        jumpCircleFull = null;
+    }
 
     if (currentMarker) {
         currentMarker.setLatLng([lastLat, lastLng]);
@@ -997,6 +1026,52 @@ function initMap() {
         const currentTime = weatherData?.time?.[currentIndex] || null;
         await fetchWeatherForLocation(lat, lng, currentTime); // No isInitialLoad here
     });
+
+    map.on('zoomend', () => {
+        const currentZoom = map.getZoom();
+        console.log('Zoom level changed to:', currentZoom);
+    
+        if (userSettings.calculateJump) {
+            console.log('Recalculating jump for zoom:', currentZoom);
+            const jumpResult = calculateJump();
+            console.log('Jump result:', jumpResult);
+            if (jumpResult) {
+                console.log('Calling updateJumpCircle with:', {
+                    blueLat: jumpResult.radius ? lastLat : 0, // Use lastLat for blue circle
+                    blueLng: jumpResult.radius ? lastLng : 0, // Use lastLng for blue circle
+                    redLat: jumpResult.freeFall.path[jumpResult.freeFall.path.length - 1].latLng[0],
+                    redLng: jumpResult.freeFall.path[jumpResult.freeFall.path.length - 1].latLng[1],
+                    radius: jumpResult.radius,
+                    radiusFull: jumpResult.radiusFull,
+                    displacement: jumpResult.displacement,
+                    displacementFull: jumpResult.displacementFull,
+                    direction: jumpResult.direction,
+                    directionFull: jumpResult.directionFull
+                });
+                updateJumpCircle(
+                    jumpResult.radius ? lastLat : 0, // Adjusted to use lastLat/lastLng
+                    jumpResult.radius ? lastLng : 0,
+                    jumpResult.freeFall.path[jumpResult.freeFall.path.length - 1].latLng[0],
+                    jumpResult.freeFall.path[jumpResult.freeFall.path.length - 1].latLng[1],
+                    jumpResult.radius,
+                    jumpResult.radiusFull,
+                    jumpResult.displacement,
+                    jumpResult.displacementFull,
+                    jumpResult.direction,
+                    jumpResult.directionFull
+                );
+            } else {
+                console.warn('calculateJump returned null, cannot update jump circles');
+            }
+        }
+    
+        if (userSettings.showJumpRunTrack) {
+            updateJumpRunTrack();
+        }
+    });
+
+    // Log initial zoom to confirm map setup
+    console.log('Initial zoom level:', map.getZoom());
 
     let lastTapTime = 0;
     const tapThreshold = 300;
@@ -2087,9 +2162,17 @@ function updateLandingPattern() {
 }
 
 function updateJumpRunTrack() {
-    if (jumpRunTrackLayer) {
+    if (!map) {
+        console.warn('Map not available to update jump run track');
+        return;
+    }
+
+    const currentZoom = map.getZoom();
+    const isVisible = currentZoom >= minZoom && currentZoom <= maxZoom;
+
+    if (jumpRunTrackLayer && map.hasLayer(jumpRunTrackLayer)) {
+        console.log('Removing existing jump run track');
         map.removeLayer(jumpRunTrackLayer);
-        jumpRunTrackLayer = null;
     }
 
     if (!userSettings.calculateJump || !lastLat || !lastLng || !weatherData) {
@@ -2103,13 +2186,14 @@ function updateJumpRunTrack() {
         return;
     }
 
-    const direction = trackData.direction;
-    const offset = parseInt(document.getElementById('jumpRunTrackOffset')?.value) || 0;
-
-    if (!userSettings.showJumpRunTrack) {
-        console.log('Jump run track calculated but not displayed (checkbox unchecked)');
+    if (!userSettings.showJumpRunTrack || !isVisible) {
+        console.log('Jump run track not displayed - zoom:', currentZoom, 'visible:', isVisible);
+        jumpRunTrackLayer = null;
         return;
     }
+
+    const direction = trackData.direction;
+    const offset = parseInt(document.getElementById('jumpRunTrackOffset')?.value) || 0;
 
     const trackLengthMeters = 3000;
     const halfLengthMeters = trackLengthMeters / 2;
@@ -2117,65 +2201,33 @@ function updateJumpRunTrack() {
     let centerLat = lastLat * Math.PI / 180;
     let centerLng = lastLng * Math.PI / 180;
 
-    // Berechne den Offset-Winkel (90° links oder rechts von der Richtung)
-    const offsetDirectionRad = offset > 0
-        ? (direction + 90) * Math.PI / 180  // Linksverschiebung
-        : (direction - 90 + 360) * Math.PI / 180; // Rechtsverschiebung, +360 für Normalisierung
+    const offsetDirectionRad = offset > 0 ? (direction + 90) * Math.PI / 180 : (direction - 90 + 360) * Math.PI / 180;
     const offsetDistance = Math.abs(offset) / earthRadius;
 
-    // Verschiebe den Mittelpunkt basierend auf dem Offset
     if (offset !== 0) {
-        const newCenterLat = Math.asin(
-            Math.sin(centerLat) * Math.cos(offsetDistance) +
-            Math.cos(centerLat) * Math.sin(offsetDistance) * Math.cos(offsetDirectionRad)
-        );
-        const newCenterLng = centerLng + Math.atan2(
-            Math.sin(offsetDirectionRad) * Math.sin(offsetDistance) * Math.cos(centerLat),
-            Math.cos(offsetDistance) - Math.sin(centerLat) * Math.sin(newCenterLat)
-        );
+        const newCenterLat = Math.asin(Math.sin(centerLat) * Math.cos(offsetDistance) + Math.cos(centerLat) * Math.sin(offsetDistance) * Math.cos(offsetDirectionRad));
+        const newCenterLng = centerLng + Math.atan2(Math.sin(offsetDirectionRad) * Math.sin(offsetDistance) * Math.cos(centerLat), Math.cos(offsetDistance) - Math.sin(centerLat) * Math.sin(newCenterLat));
         centerLat = newCenterLat;
         centerLng = newCenterLng;
     }
 
-    // Berechne die Endpunkte des Tracks von der verschobenen Mitte aus
     const bearingRad = direction * Math.PI / 180;
-
-    // Endpunkt (vorwärts)
     const deltaForward = halfLengthMeters / earthRadius;
-    let lat2 = Math.asin(
-        Math.sin(centerLat) * Math.cos(deltaForward) +
-        Math.cos(centerLat) * Math.sin(deltaForward) * Math.cos(bearingRad)
-    );
-    let lng2 = centerLng + Math.atan2(
-        Math.sin(bearingRad) * Math.sin(deltaForward) * Math.cos(centerLat),
-        Math.cos(deltaForward) - Math.sin(centerLat) * Math.sin(lat2)
-    );
+    let lat2 = Math.asin(Math.sin(centerLat) * Math.cos(deltaForward) + Math.cos(centerLat) * Math.sin(deltaForward) * Math.cos(bearingRad));
+    let lng2 = centerLng + Math.atan2(Math.sin(bearingRad) * Math.sin(deltaForward) * Math.cos(centerLat), Math.cos(deltaForward) - Math.sin(centerLat) * Math.sin(lat2));
     lat2 = lat2 * 180 / Math.PI;
     lng2 = ((lng2 * 180 / Math.PI + 540) % 360) - 180;
 
-    // Startpunkt (rückwärts)
     const bearingOppositeRad = ((direction + 180) % 360) * Math.PI / 180;
     const deltaBackward = halfLengthMeters / earthRadius;
-    let lat0 = Math.asin(
-        Math.sin(centerLat) * Math.cos(deltaBackward) +
-        Math.cos(centerLat) * Math.sin(deltaBackward) * Math.cos(bearingOppositeRad)
-    );
-    let lng0 = centerLng + Math.atan2(
-        Math.sin(bearingOppositeRad) * Math.sin(deltaBackward) * Math.cos(centerLat),
-        Math.cos(deltaBackward) - Math.sin(centerLat) * Math.sin(lat0)
-    );
+    let lat0 = Math.asin(Math.sin(centerLat) * Math.cos(deltaBackward) + Math.cos(centerLat) * Math.sin(deltaBackward) * Math.cos(bearingOppositeRad));
+    let lng0 = centerLng + Math.atan2(Math.sin(bearingOppositeRad) * Math.sin(deltaBackward) * Math.cos(centerLat), Math.cos(deltaBackward) - Math.sin(centerLat) * Math.sin(lat0));
     lat0 = lat0 * 180 / Math.PI;
     lng0 = ((lng0 * 180 / Math.PI + 540) % 360) - 180;
 
     const trackPoints = [[lat0, lng0], [lat2, lng2]];
 
-    console.log('Track points with offset:', {
-        offset: offset,
-        center: [centerLat * 180 / Math.PI, centerLng * 180 / Math.PI],
-        start: [lat0, lng0],
-        end: [lat2, lng2],
-        direction
-    });
+    console.log('Track points with offset:', { offset, center: [centerLat * 180 / Math.PI, centerLng * 180 / Math.PI], start: [lat0, lng0], end: [lat2, lng2], direction });
 
     const polyline = L.polyline(trackPoints, {
         color: 'orange',
@@ -2185,27 +2237,16 @@ function updateJumpRunTrack() {
 
     const arrowIcon = L.divIcon({
         className: 'jump-run-arrow',
-        html: `
-            <svg width="30" height="30" viewBox="0 0 30 30">
-                <polygon points="5,20 15,5 25,20" fill="orange" stroke="orange" stroke-width="1" transform="rotate(${direction}, 15, 15)"/>
-            </svg>`,
+        html: `<svg width="30" height="30" viewBox="0 0 30 30"><polygon points="5,20 15,5 25,20" fill="orange" stroke="orange" stroke-width="1" transform="rotate(${direction}, 15, 15)"/></svg>`,
         iconSize: [30, 30],
         iconAnchor: [15, 15],
     });
 
-    const arrowMarker = L.marker([lat2, lng2], {
-        icon: arrowIcon,
-    });
+    const arrowMarker = L.marker([lat2, lng2], { icon: arrowIcon });
 
-    jumpRunTrackLayer = L.layerGroup([polyline, arrowMarker]).addTo(map);
-
-    polyline.bindPopup(
-        `Jump Run Track: ${Math.round(direction)}°<br>` +
-        `Offset: ${offset} m<br>` +
-        `Mean Wind: ${trackData.meanWindSpeed.toFixed(1)} ${getWindSpeedUnit()} from ${Math.round(trackData.meanWindDirection)}°`
-    );
-
-    console.log('Jump run track updated:', { direction, offset, start: [lat0, lng0], end: [lat2, lng2] });
+    jumpRunTrackLayer = L.layerGroup([polyline, arrowMarker]);
+    jumpRunTrackLayer.addTo(map);
+    console.log('Jump run track added at zoom:', currentZoom, 'Layer on map:', map.hasLayer(jumpRunTrackLayer));
 }
 
 function displayError(message) {
