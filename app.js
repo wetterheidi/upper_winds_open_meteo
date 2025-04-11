@@ -53,8 +53,9 @@ const defaultSettings = {
     showJumpRunTrack: false, // New setting for jump run track
 };
 
-const minZoom = 10; // Placeholder, adjust as needed
+const minZoom = 11; // Placeholder, adjust as needed
 const maxZoom = 14; // Placeholder, adjust as needed
+const landingPatternMinZoom = 14; // New constant for landing pattern
 
 const FEATURE_PASSWORD = "skydiver2025"; // Hardcoded password (change as needed)
 let isLandingPatternUnlocked = false;   // Track unlock state during session
@@ -1037,8 +1038,8 @@ function initMap() {
             console.log('Jump result:', jumpResult);
             if (jumpResult) {
                 console.log('Calling updateJumpCircle with:', {
-                    blueLat: jumpResult.radius ? lastLat : 0, // Use lastLat for blue circle
-                    blueLng: jumpResult.radius ? lastLng : 0, // Use lastLng for blue circle
+                    blueLat: jumpResult.radius ? lastLat : 0,
+                    blueLng: jumpResult.radius ? lastLng : 0,
                     redLat: jumpResult.freeFall.path[jumpResult.freeFall.path.length - 1].latLng[0],
                     redLng: jumpResult.freeFall.path[jumpResult.freeFall.path.length - 1].latLng[1],
                     radius: jumpResult.radius,
@@ -1049,7 +1050,7 @@ function initMap() {
                     directionFull: jumpResult.directionFull
                 });
                 updateJumpCircle(
-                    jumpResult.radius ? lastLat : 0, // Adjusted to use lastLat/lastLng
+                    jumpResult.radius ? lastLat : 0,
                     jumpResult.radius ? lastLng : 0,
                     jumpResult.freeFall.path[jumpResult.freeFall.path.length - 1].latLng[0],
                     jumpResult.freeFall.path[jumpResult.freeFall.path.length - 1].latLng[1],
@@ -1067,6 +1068,11 @@ function initMap() {
     
         if (userSettings.showJumpRunTrack) {
             updateJumpRunTrack();
+        }
+    
+        if (userSettings.showLandingPattern) {
+            console.log('Updating landing pattern for zoom:', currentZoom);
+            updateLandingPattern();
         }
     });
 
@@ -1920,54 +1926,98 @@ function createArrowIcon(midLat, midLng, bearing, color) {
 }
 
 function updateLandingPattern() {
-    const showLandingPattern = document.getElementById('showLandingPattern').checked;
-    const sliderIndex = parseInt(document.getElementById('timeSlider').value) || 0;
-    const landingDirection = document.querySelector('input[name="landingDirection"]:checked')?.value || 'LL';
-    const customLandingDirectionLLInput = document.getElementById('customLandingDirectionLL');
-    const customLandingDirectionRRInput = document.getElementById('customLandingDirectionRR');
-    const customLandingDirLL = customLandingDirectionLLInput ? parseInt(customLandingDirectionLLInput.value, 10) : null;
-    const customLandingDirRR = customLandingDirectionRRInput ? parseInt(customLandingDirectionRRInput.value, 10) : null;
-
-    const CANOPY_SPEED_KT = parseInt(document.getElementById('canopySpeed').value) || 20;
-    const DESCENT_RATE_MPS = parseFloat(document.getElementById('descentRate').value) || 3.5;
-    const LEG_HEIGHT_FINAL = parseInt(document.getElementById('legHeightFinal').value) || 100;
-    const LEG_HEIGHT_BASE = parseInt(document.getElementById('legHeightBase').value) || 200;
-    const LEG_HEIGHT_DOWNWIND = parseInt(document.getElementById('legHeightDownwind').value) || 300;
-
-    // Remove existing layers
-    [landingPatternPolygon, secondlandingPatternPolygon, thirdLandingPatternLine, finalArrow, baseArrow, downwindArrow].forEach(layer => {
-        if (layer) {
-            layer.remove();
-            layer = null;
+    console.log('updateLandingPattern called');
+    if (!map || !userSettings.showLandingPattern || !weatherData || !lastLat || !lastLng || lastAltitude === null || lastAltitude === 'N/A') {
+        console.log('Landing pattern not updated: missing data or feature disabled');
+        // Clear existing layers
+        if (landingPatternPolygon) {
+            map.removeLayer(landingPatternPolygon);
+            landingPatternPolygon = null;
         }
-    });
-
-    if (!showLandingPattern || !weatherData || !weatherData.time || !currentMarker || sliderIndex >= weatherData.time.length) {
-        console.log('Landing pattern not updated: missing data or not enabled');
+        if (secondlandingPatternPolygon) {
+            map.removeLayer(secondlandingPatternPolygon);
+            secondlandingPatternPolygon = null;
+        }
+        if (thirdLandingPatternLine) {
+            map.removeLayer(thirdLandingPatternLine);
+            thirdLandingPatternLine = null;
+        }
+        if (finalArrow) {
+            map.removeLayer(finalArrow);
+            finalArrow = null;
+        }
+        if (baseArrow) {
+            map.removeLayer(baseArrow);
+            baseArrow = null;
+        }
+        if (downwindArrow) {
+            map.removeLayer(downwindArrow);
+            downwindArrow = null;
+        }
         return;
     }
 
-    const markerLatLng = currentMarker.getLatLng();
-    const lat = markerLatLng.lat;
-    const lng = markerLatLng.lng;
+    const currentZoom = map.getZoom();
+    const isVisible = currentZoom >= landingPatternMinZoom;
+    console.log('Landing pattern zoom check:', { currentZoom, landingPatternMinZoom, isVisible });
+
+    // Clear existing layers to prevent duplicates
+    if (landingPatternPolygon) {
+        map.removeLayer(landingPatternPolygon);
+        landingPatternPolygon = null;
+    }
+    if (secondlandingPatternPolygon) {
+        map.removeLayer(secondlandingPatternPolygon);
+        secondlandingPatternPolygon = null;
+    }
+    if (thirdLandingPatternLine) {
+        map.removeLayer(thirdLandingPatternLine);
+        thirdLandingPatternLine = null;
+    }
+    if (finalArrow) {
+        map.removeLayer(finalArrow);
+        finalArrow = null;
+    }
+    if (baseArrow) {
+        map.removeLayer(baseArrow);
+        baseArrow = null;
+    }
+    if (downwindArrow) {
+        map.removeLayer(downwindArrow);
+        downwindArrow = null;
+    }
+
+    if (!isVisible) {
+        console.log('Landing pattern not displayed - zoom too low:', currentZoom);
+        return;
+    }
+
+    const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
+    const CANOPY_SPEED_KT = parseInt(document.getElementById('canopySpeed')?.value) || userSettings.canopySpeed || 20;
+    const DESCENT_RATE_MPS = parseFloat(document.getElementById('descentRate')?.value) || userSettings.descentRate || 3.5;
+    const LEG_HEIGHT_FINAL = parseInt(document.getElementById('legHeightFinal')?.value) || userSettings.legHeightFinal || 100;
+    const LEG_HEIGHT_BASE = parseInt(document.getElementById('legHeightBase')?.value) || userSettings.legHeightBase || 200;
+    const LEG_HEIGHT_DOWNWIND = parseInt(document.getElementById('legHeightDownwind')?.value) || userSettings.legHeightDownwind || 300;
     const baseHeight = Math.round(lastAltitude);
+    const lat = lastLat;
+    const lng = lastLng;
+
+    const landingDirection = document.querySelector('input[name="landingDirection"]:checked')?.value || userSettings.landingDirection || 'LL';
+    const customLandingDirLL = parseInt(document.getElementById('customLandingDirectionLL')?.value, 10);
+    const customLandingDirRR = parseInt(document.getElementById('customLandingDirectionRR')?.value, 10);
 
     const interpolatedData = interpolateWeatherData(sliderIndex);
     if (!interpolatedData || interpolatedData.length === 0) {
-        console.warn('No interpolated data available for landing pattern calculation');
+        console.warn('No interpolated weather data available');
         return;
     }
 
-    // Convert wind speeds from km/h (Open-Meteo) to kt explicitly
     const heights = interpolatedData.map(d => d.height);
     const dirs = interpolatedData.map(d => Number.isFinite(d.dir) ? parseFloat(d.dir) : 0);
     const spdsKt = interpolatedData.map(d => Utils.convertWind(parseFloat(d.spd) || 0, 'kt', 'km/h')); // km/h to kt
-
-    // Calculate U and V components in kt
     const uComponents = spdsKt.map((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
     const vComponents = spdsKt.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
 
-    // Determine effective landing direction based on selected pattern and input
     let effectiveLandingWindDir;
     if (landingDirection === 'LL' && Number.isFinite(customLandingDirLL) && customLandingDirLL >= 0 && customLandingDirLL <= 359) {
         effectiveLandingWindDir = customLandingDirLL;
@@ -1983,7 +2033,7 @@ function updateLandingPattern() {
     }
 
     const calculateLegEndpoint = (startLat, startLng, bearing, groundSpeedKt, timeSec) => {
-        const speedMps = groundSpeedKt * 1.852 / 3.6;
+        const speedMps = groundSpeedKt * 0.514444; // kt to m/s
         const lengthMeters = speedMps * timeSec;
         const metersPerDegreeLat = 111000;
         const distanceDeg = lengthMeters / metersPerDegreeLat;
@@ -1993,16 +2043,19 @@ function updateLandingPattern() {
         return [startLat + deltaLat, startLng + deltaLng];
     };
 
-    // Final Leg (0-100m AGL)
+    // Final Leg
     const finalLimits = [baseHeight, baseHeight + LEG_HEIGHT_FINAL];
-    console.log('Final limits:', finalLimits);
     const finalMeanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, ...finalLimits);
     const finalWindDir = finalMeanWind[0];
     const finalWindSpeedKt = finalMeanWind[1];
-    if (!Number.isFinite(finalWindSpeedKt) || !Number.isFinite(finalWindDir)) {
-        console.warn('Invalid mean wind for final leg:', finalMeanWind);
-        return;
-    }
+    const finalCourse = (effectiveLandingWindDir + 180) % 360;
+    const finalWindAngle = Utils.calculateWindAngle(effectiveLandingWindDir, finalWindDir);
+    const { crosswind: finalCrosswind, headwind: finalHeadwind } = Utils.calculateWindComponents(finalWindSpeedKt, finalWindAngle);
+    const finalWca = Utils.calculateWCA(finalCrosswind, CANOPY_SPEED_KT) * (finalCrosswind >= 0 ? 1 : -1);
+    const finalGroundSpeedKt = Utils.calculateGroundSpeed(CANOPY_SPEED_KT, finalHeadwind);
+    const finalTime = LEG_HEIGHT_FINAL / DESCENT_RATE_MPS;
+    const finalLength = finalGroundSpeedKt * 1.852 / 3.6 * finalTime;
+    const finalEnd = calculateLegEndpoint(lat, lng, finalCourse, finalGroundSpeedKt, finalTime);
 
     let finalArrowColor = null;
     if (finalWindSpeedKt <= 3) {
@@ -2015,16 +2068,6 @@ function updateLandingPattern() {
         finalArrowColor = '#ffcccc';
     }
 
-    const finalCourse = (effectiveLandingWindDir + 180) % 360;
-    const finalWindAngle = Utils.calculateWindAngle(effectiveLandingWindDir, finalWindDir);
-    const { crosswind: finalCrosswind, headwind: finalHeadwind } = Utils.calculateWindComponents(finalWindSpeedKt, finalWindAngle);
-    const finalWca = Utils.calculateWCA(finalCrosswind, CANOPY_SPEED_KT) * (finalCrosswind >= 0 ? 1 : -1);
-    const finalGroundSpeedKt = Utils.calculateGroundSpeed(CANOPY_SPEED_KT, finalHeadwind);
-    const finalTime = LEG_HEIGHT_FINAL / DESCENT_RATE_MPS;
-    const finalLength = finalGroundSpeedKt * 1.852 / 3.6 * finalTime;
-    const finalBearing = (effectiveLandingWindDir + 180) % 360;
-    const finalEnd = calculateLegEndpoint(lat, lng, finalBearing, finalGroundSpeedKt, finalTime);
-
     landingPatternPolygon = L.polyline([[lat, lng], finalEnd], {
         color: 'red',
         weight: 3,
@@ -2032,23 +2075,27 @@ function updateLandingPattern() {
         dashArray: '5, 10'
     }).addTo(map);
 
-    // Add a fat blue arrow in the middle of the final leg pointing to landing direction
     const finalMidLat = (lat + finalEnd[0]) / 2;
     const finalMidLng = (lng + finalEnd[1]) / 2;
-    const finalArrowBearing = (finalWindDir - 90 + 180) % 360; // Points in direction of the mean wind at final
-
-    // Create a custom arrow icon using Leaflet’s DivIcon
+    const finalArrowBearing = (finalWindDir - 90 + 180) % 360;
     finalArrow = createArrowIcon(finalMidLat, finalMidLng, finalArrowBearing, finalArrowColor);
 
-    // Base Leg (100-200m AGL)
+    // Base Leg
     const baseLimits = [baseHeight + LEG_HEIGHT_FINAL, baseHeight + LEG_HEIGHT_BASE];
     const baseMeanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, ...baseLimits);
     const baseWindDir = baseMeanWind[0];
     const baseWindSpeedKt = baseMeanWind[1];
-    if (!Number.isFinite(baseWindSpeedKt) || !Number.isFinite(baseWindDir)) {
-        console.warn('Invalid mean wind for base leg:', baseMeanWind);
-        return;
-    }
+    const baseHeading = landingDirection === 'LL' ? (effectiveLandingWindDir + 90) % 360 : (effectiveLandingWindDir - 90 + 360) % 360;
+    const baseCourse = Utils.calculateCourseFromHeading(baseHeading, baseWindDir, baseWindSpeedKt, CANOPY_SPEED_KT).trueCourse;
+    const baseWindAngle = Utils.calculateWindAngle(baseCourse, baseWindDir);
+    const { crosswind: baseCrosswind, headwind: baseHeadwind } = Utils.calculateWindComponents(baseWindSpeedKt, baseWindAngle);
+    const baseWca = Utils.calculateWCA(baseCrosswind, CANOPY_SPEED_KT) * (baseCrosswind >= 0 ? 1 : -1);
+    const baseGroundSpeedKt = CANOPY_SPEED_KT - baseHeadwind;
+    const baseTime = (LEG_HEIGHT_BASE - LEG_HEIGHT_FINAL) / DESCENT_RATE_MPS;
+    let baseBearing = (baseCourse + 180) % 360;
+    if (baseGroundSpeedKt < 0) baseBearing = (baseBearing + 180) % 360;
+    const baseLength = Math.abs(baseGroundSpeedKt) * 1.852 / 3.6 * baseTime;
+    const baseEnd = calculateLegEndpoint(finalEnd[0], finalEnd[1], baseBearing, Math.abs(baseGroundSpeedKt), baseTime);
 
     let baseArrowColor = null;
     if (baseWindSpeedKt <= 3) {
@@ -2061,31 +2108,6 @@ function updateLandingPattern() {
         baseArrowColor = '#ffcccc';
     }
 
-    console.log('********* Landing Direction: ', landingDirection, 'Effective Landing Wind Dir:', effectiveLandingWindDir);
-    let baseHeading = 0;
-    if (landingDirection === 'LL') {
-        baseHeading = (effectiveLandingWindDir + 90) % 360;
-        console.log('Base Heading:', baseHeading);
-    } else if (landingDirection === 'RR') {
-        baseHeading = (effectiveLandingWindDir - 90 + 360) % 360;
-        console.log('Base Heading:', baseHeading);
-    }
-
-    const baseCourse = Utils.calculateCourseFromHeading(baseHeading, baseWindDir, baseWindSpeedKt, CANOPY_SPEED_KT).trueCourse;
-    console.log('Base Course:', baseCourse);
-    const baseWindAngle = Utils.calculateWindAngle(baseCourse, baseWindDir);
-    const { crosswind: baseCrosswind, headwind: baseHeadwind } = Utils.calculateWindComponents(baseWindSpeedKt, baseWindAngle);
-    const baseWca = Utils.calculateWCA(baseCrosswind, CANOPY_SPEED_KT) * (baseCrosswind >= 0 ? 1 : -1);
-    let baseBearing = (baseCourse + 180) % 360;
-    const baseTime = (LEG_HEIGHT_BASE - LEG_HEIGHT_FINAL) / DESCENT_RATE_MPS;
-    const baseGroundSpeedKt = CANOPY_SPEED_KT - baseHeadwind;
-    if (baseGroundSpeedKt < 0) {
-        baseBearing = (baseBearing + 180) % 360; // Reverse the course
-        console.log('Base ground speed is negative:', baseGroundSpeedKt, 'New course:', baseBearing);
-    }
-    const baseLength = baseGroundSpeedKt * 1.852 / 3.6 * baseTime;
-    const baseEnd = calculateLegEndpoint(finalEnd[0], finalEnd[1], baseBearing, baseGroundSpeedKt, baseTime);
-
     secondlandingPatternPolygon = L.polyline([finalEnd, baseEnd], {
         color: 'red',
         weight: 3,
@@ -2093,14 +2115,12 @@ function updateLandingPattern() {
         dashArray: '5, 10'
     }).addTo(map);
 
-    // Add a fat blue arrow in the middle of the base leg pointing to landing direction
     const baseMidLat = (finalEnd[0] + baseEnd[0]) / 2;
     const baseMidLng = (finalEnd[1] + baseEnd[1]) / 2;
-    const baseArrowBearing = (baseWindDir - 90 + 180) % 360; // Points in direction of the mean wind at base
-
+    const baseArrowBearing = (baseWindDir - 90 + 180) % 360;
     baseArrow = createArrowIcon(baseMidLat, baseMidLng, baseArrowBearing, baseArrowColor);
 
-    // Downwind Leg (200-300m AGL)
+    // Downwind Leg
     const downwindLimits = [baseHeight + LEG_HEIGHT_BASE, baseHeight + LEG_HEIGHT_DOWNWIND];
     const downwindMeanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, ...downwindLimits);
     const downwindWindDir = downwindMeanWind[0];
@@ -2124,7 +2144,7 @@ function updateLandingPattern() {
     const downwindWindAngle = Utils.calculateWindAngle(downwindCourse, downwindWindDir);
     const { crosswind: downwindCrosswind, headwind: downwindHeadwind } = Utils.calculateWindComponents(downwindWindSpeedKt, downwindWindAngle);
     const downwindWca = Utils.calculateWCA(downwindCrosswind, CANOPY_SPEED_KT) * (downwindCrosswind >= 0 ? 1 : -1);
-    const downwindGroundSpeedKt = CANOPY_SPEED_KT + downwindHeadwind; // Corrected to use raw headwind
+    const downwindGroundSpeedKt = CANOPY_SPEED_KT + downwindHeadwind;
     const downwindTime = (LEG_HEIGHT_DOWNWIND - LEG_HEIGHT_BASE) / DESCENT_RATE_MPS;
     const downwindLength = downwindGroundSpeedKt * 1.852 / 3.6 * downwindTime;
     const downwindEnd = calculateLegEndpoint(baseEnd[0], baseEnd[1], downwindCourse, downwindGroundSpeedKt, downwindTime);
@@ -2136,12 +2156,9 @@ function updateLandingPattern() {
         dashArray: '5, 10'
     }).addTo(map);
 
-    // Add a fat blue arrow in the middle of the downwind leg pointing to landing direction
     const downwindMidLat = (baseEnd[0] + downwindEnd[0]) / 2;
     const downwindMidLng = (baseEnd[1] + downwindEnd[1]) / 2;
-    const downwindArrowBearing = (downwindWindDir - 90 + 180) % 360; // Points in direction of the mean wind at downwind
-
-    // Create a custom arrow icon using Leaflet’s DivIcon
+    const downwindArrowBearing = (downwindWindDir - 90 + 180) % 360;
     downwindArrow = createArrowIcon(downwindMidLat, downwindMidLng, downwindArrowBearing, downwindArrowColor);
 
     console.log(`Landing Pattern Updated:
@@ -2149,16 +2166,12 @@ function updateLandingPattern() {
         Base Leg: Wind: ${baseWindDir.toFixed(1)}° @ ${baseWindSpeedKt.toFixed(1)}kt, Course: ${baseCourse.toFixed(1)}°, WCA: ${baseWca.toFixed(1)}°, GS: ${baseGroundSpeedKt.toFixed(1)}kt, HW: ${baseHeadwind.toFixed(1)}kt, Length: ${baseLength.toFixed(1)}m
         Downwind Leg: Wind: ${downwindWindDir.toFixed(1)}° @ ${downwindWindSpeedKt.toFixed(1)}kt, Course: ${downwindCourse.toFixed(1)}°, WCA: ${downwindWca.toFixed(1)}°, GS: ${downwindGroundSpeedKt.toFixed(1)}kt, HW: ${downwindHeadwind.toFixed(1)}kt, Length: ${downwindLength.toFixed(1)}m`);
 
-    // Logs für Feldversuch Bobby
-    const selectedTime = weatherData.time[sliderIndex]; // Zeit aus den Wetterdaten basierend auf dem Slider-Index
+    const selectedTime = weatherData.time[sliderIndex];
     console.log('+++++++++ Koordinaten Pattern:', selectedTime);
     console.log('Coordinates DIP: ', lat, lng, 'Altitude DIP:', baseHeight);
     console.log('Coordinates final end: ', finalEnd[0], finalEnd[1], 'Leg Height:', baseHeight + LEG_HEIGHT_FINAL);
     console.log('Coordinates base end: ', baseEnd[0], baseEnd[1], 'Leg Height:', baseHeight + LEG_HEIGHT_BASE);
     console.log('Coordinates downwind end: ', downwindEnd[0], downwindEnd[1], 'Leg Height:', baseHeight + LEG_HEIGHT_DOWNWIND);
-
-
-    //map.fitBounds([[lat, lng], finalEnd, baseEnd, downwindEnd], { padding: [50, 50] });
 }
 
 function updateJumpRunTrack() {
@@ -2951,12 +2964,35 @@ function setupCheckboxEvents() {
         };
 
         const disableFeature = () => {
-            userSettings.calculateJump = false;
+            userSettings.showLandingPattern = false;
             checkbox.checked = false;
             saveSettings();
-            toggleSubmenu('calculateJumpCheckbox', false);
-            console.log('Clearing jump circles');
-            clearJumpCircles();
+            toggleSubmenu('showLandingPattern', false);
+            console.log('Clearing landing pattern');
+            if (landingPatternPolygon) {
+                map.removeLayer(landingPatternPolygon);
+                landingPatternPolygon = null;
+            }
+            if (secondlandingPatternPolygon) {
+                map.removeLayer(secondlandingPatternPolygon);
+                secondlandingPatternPolygon = null;
+            }
+            if (thirdLandingPatternLine) {
+                map.removeLayer(thirdLandingPatternLine);
+                thirdLandingPatternLine = null;
+            }
+            if (finalArrow) {
+                map.removeLayer(finalArrow);
+                finalArrow = null;
+            }
+            if (baseArrow) {
+                map.removeLayer(baseArrow);
+                baseArrow = null;
+            }
+            if (downwindArrow) {
+                map.removeLayer(downwindArrow);
+                downwindArrow = null;
+            }
         };
 
         // Mark as initial load to suppress error and uncheck the checkbox
