@@ -115,8 +115,164 @@ function updateReferenceLabels() {
     }
 }
 
+function calculateFreeFall(weatherData, exitAltitude, openingAltitude, sliderIndex, startLat, startLng, elevation) {
+    console.log('Starting calculateFreeFall...', { exitAltitude, openingAltitude, sliderIndex });
+
+    if (!weatherData || !weatherData.time || !weatherData.surface_pressure) {
+        console.warn('Invalid weather data provided');
+        return null;
+    }
+    if (!Number.isFinite(startLat) || !Number.isFinite(startLng) || !Number.isFinite(elevation)) {
+        console.warn('Invalid coordinates or elevation');
+        return null;
+    }
+
+    const mass = 80;
+    const g = 9.81;
+    const Rl = 287.102;
+    const cdHorizontal = 1;
+    const areaHorizontal = 0.5;
+    const cdVertical = 1;
+    const areaVertical = 0.5;
+    const dt = 0.5;
+
+    const hStart = elevation + exitAltitude;
+    const hStop = elevation + openingAltitude;
+    const jumpRunData = jumpRunTrack();
+    const jumpRunDirection = jumpRunData ? jumpRunData.direction : 0;
+    const aircraftSpeedKt = 90;
+    const aircraftSpeedMps = aircraftSpeedKt * 0.514444;
+    const vxInitial = Math.cos((jumpRunDirection) * Math.PI / 180) * aircraftSpeedMps;
+    const vyInitial = Math.sin((jumpRunDirection) * Math.PI / 180) * aircraftSpeedMps;
+
+    console.log('Free fall initial values: ', aircraftSpeedKt, ' kt ', jumpRunDirection, '°');
+    console.log('Free fall initial velocity: ', { vxInitial, vyInitial });
+
+    const interpolatedData = interpolateWeatherData(sliderIndex);
+    if (!interpolatedData || interpolatedData.length === 0) {
+        console.warn('No interpolated weather data available');
+        return null;
+    }
+    const heights = interpolatedData.map(d => d.height);
+    const windDirs = interpolatedData.map(d => Number.isFinite(d.dir) ? parseFloat(d.dir) : 0);
+    const windSpdsMps = interpolatedData.map(d => Utils.convertWind(parseFloat(d.spd) || 0, 'm/s', 'km/h'));
+    const tempsC = interpolatedData.map(d => d.temp);
+
+    const trajectory = [{
+        time: 0,
+        height: hStart,
+        vz: 0,
+        vxGround: vxInitial,
+        vyGround: vyInitial,
+        x: 0,
+        y: 0
+    }];
+
+    const surfacePressure = weatherData.surface_pressure[sliderIndex] || 1013.25;
+    const surfaceTempC = weatherData.temperature_2m[sliderIndex] || 15;
+    const surfaceTempK = surfaceTempC + 273.15;
+    let rho = (surfacePressure * 100) / (Rl * surfaceTempK);
+
+    let current = trajectory[0];
+    while (current.height > hStop) {
+        const windDir = Utils.LIP(heights, windDirs, current.height);
+        const windSpd = Utils.LIP(heights, windSpdsMps, current.height);
+        const tempC = Utils.LIP(heights, tempsC, current.height);
+        const tempK = tempC + 273.15;
+        rho = (surfacePressure * 100 * Math.exp(-g * (current.height - elevation) / (Rl * tempK))) / (Rl * tempK);
+
+        // Wind direction is "from," displacement is "to" (add 180°)
+        const windDirTo = (windDir + 180) % 360;
+        const vxWind = windSpd * Math.cos(windDirTo * Math.PI / 180); // Displacement direction
+        const vyWind = windSpd * Math.sin(windDirTo * Math.PI / 180);
+
+        const vxAir = current.vxGround - vxWind;
+        const vyAir = current.vyGround - vyWind;
+        const vAirMag = Math.sqrt(vxAir * vxAir + vyAir * vyAir);
+
+        const bv = 0.5 * cdVertical * areaVertical * rho / mass;
+        const bh = 0.5 * cdHorizontal * areaHorizontal * rho / mass;
+
+        const az = -g - bv * current.vz * Math.abs(current.vz);
+        const ax = -bh * vAirMag * vxAir;
+        const ay = -bh * vAirMag * vyAir;
+
+        let nextHeight = current.height + current.vz * dt;
+        let nextVz = current.vz + az * dt;
+        let nextTime = current.time + dt;
+
+        if (nextHeight <= hStop) {
+            const fraction = (current.height - hStop) / (current.height - nextHeight);
+            nextTime = current.time + dt * fraction;
+            nextHeight = hStop;
+            nextVz = current.vz + az * dt * fraction;
+        }
+
+        const next = {
+            time: nextTime,
+            height: nextHeight,
+            vz: nextVz,
+            vxGround: vxInitial === 0 ? vxWind : current.vxGround + ax * dt,
+            vyGround: vyInitial === 0 ? vyWind : current.vyGround + ay * dt,
+            x: current.x + (vxInitial === 0 ? vxWind : current.vxGround) * dt,
+            y: current.y + (vyInitial === 0 ? vyWind : current.vyGround) * dt
+        };
+
+        trajectory.push(next);
+        current = next;
+
+        if (next.height === hStop) break;
+    }
+
+    const final = trajectory[trajectory.length - 1];
+    const distance = Math.sqrt(final.x * final.x + final.y * final.y);
+    const directionRad = Math.atan2(final.y, final.x);
+    let directionDeg = directionRad * 180 / Math.PI;
+    directionDeg = (directionDeg + 360) % 360;
+
+    console.log(`Free fall from exit to opening: ${Math.round(directionDeg)}° ${Math.round(distance)} m, vz: ${final.vz.toFixed(2)} m/s`);
+    console.log('Elevation used:', elevation);
+
+    const result = {
+        time: final.time,
+        height: final.height,
+        vz: final.vz,
+        xDisplacement: final.x,
+        yDisplacement: final.y,
+        path: trajectory.map(point => ({
+            latLng: calculateNewCenter(startLat, startLng, Math.sqrt(point.x * point.x + point.y * point.y), Math.atan2(point.y, point.x) * 180 / Math.PI),
+            height: point.height,
+            time: point.time,
+            vz: point.vz
+        }))
+    };
+
+    console.log('Free fall result:', result);
+    return result;
+}
+
+// Visualize the free fall path
+function visualizeFreeFallPath(path) {
+    if (!map || !userSettings.calculateJump) return;
+
+    const latLngs = path.map(point => point.latLng);
+    const freeFallPolyline = L.polyline(latLngs, {
+        color: 'purple',
+        weight: 3,
+        opacity: 0.7,
+        dashArray: '10, 10'
+    }).addTo(map);
+
+    freeFallPolyline.bindPopup(`Free Fall Path<br>Duration: ${path[path.length - 1].time.toFixed(1)}s<br>Distance: ${Math.sqrt(path[path.length - 1].latLng[0] ** 2 + path[path.length - 1].latLng[1] ** 2).toFixed(1)}m`);
+}
+
 function calculateJump() {
     console.log('Starting calculateJump...');
+    if (!weatherData || !weatherData.time || !weatherData.surface_pressure) {
+        console.warn('Weather data not available');
+        return null;
+    }
+    const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
     const exitAltitude = parseInt(document.getElementById('exitAltitude')?.value) || 3000;
     const openingAltitude = parseInt(document.getElementById('openingAltitude')?.value) || 1200;
     const legHeightDownwind = parseInt(document.getElementById('legHeightDownwind')?.value) || 300;
@@ -131,12 +287,20 @@ function calculateJump() {
     const flyTimeFull = heightDistanceFull / descentRate;
     const horizontalCanopyDistanceFull = flyTimeFull * canopySpeedMps;
 
+    // Free fall phase
+    const freeFallResult = calculateFreeFall(weatherData, exitAltitude, openingAltitude, sliderIndex, lastLat, lastLng, lastAltitude);
+    console.log('Freefall calculated');
+    if (!freeFallResult) {
+        console.warn('Free fall calculation failed');
+        return null;
+    }
+    //visualizeFreeFallPath(freeFallResult.path);
+
     if (horizontalCanopyDistance <= 0 || horizontalCanopyDistanceFull <= 0) {
         console.warn('Invalid radii:', { horizontalCanopyDistance, horizontalCanopyDistanceFull });
         return null;
     }
 
-    const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
     const interpolatedData = interpolateWeatherData(sliderIndex);
 
     if (!interpolatedData || interpolatedData.length === 0) {
