@@ -1936,22 +1936,35 @@ function downloadTableAsAscii(format) {
     updateReferenceLabels();
 }
 
-function createArrowIcon(midLat, midLng, bearing, color) {
-    const arrowIcon = L.divIcon({
-        className: 'custom-arrow',
+function createArrowIcon(lat, lng, bearing, color) {
+    // Normalize bearing to 0-360
+    const normalizedBearing = (bearing + 360) % 360;
+
+    // Use the original SVG shape
+    const arrowSvg = `
+        <svg width="40" height="20" viewBox="0 0 40 20" xmlns="http://www.w3.org/2000/svg">
+            <line x1="0" y1="10" x2="30" y2="10" stroke="${color}" stroke-width="4" />
+            <polygon points="30,5 40,10 30,15" fill="${color}" />
+        </svg>
+    `;
+
+    // Wrap SVG in a div with CSS rotation
+    return L.divIcon({
         html: `
-            <svg width="40" height="20" viewBox="0 0 40 20" style="transform: rotate(${bearing}deg); transform-origin: center;">
-                <line x1="0" y1="10" x2="30" y2="10" stroke="${color}" stroke-width="4" />
-                <polygon points="30,5 40,10 30,15" fill="${color}" />
-            </svg>`,
-        iconSize: [30, 30],
-        iconAnchor: [15, 15]
+            <div style="
+                transform: rotate(${normalizedBearing}deg);
+                transform-origin: center center;
+                width: 40px;
+                height: 20px;
+            ">
+                ${arrowSvg}
+            </div>
+        `,
+        className: 'wind-arrow-icon', // Avoid Leaflet default styles
+        iconSize: [40, 20], // Match SVG dimensions
+        iconAnchor: [20, 10], // Center of the icon (half of width and height)
+        popupAnchor: [0, -10] // Adjust if popups are needed
     });
-    return L.marker([midLat, midLng], {
-        icon: arrowIcon,
-        rotationAngle: bearing,
-        rotationOrigin: 'center center'
-    }).addTo(map);
 }
 
 function updateLandingPattern() {
@@ -2138,8 +2151,9 @@ function updateLandingPattern() {
     const finalMidLng = (lng + finalEnd[1]) / 2;
     const finalArrowBearing = (finalWindDir - 90 + 180) % 360; // Points in direction of the mean wind at final
 
-    // Create a custom arrow icon using Leaflet’s DivIcon
-    finalArrow = createArrowIcon(finalMidLat, finalMidLng, finalArrowBearing, finalArrowColor);
+    finalArrow = L.marker([finalMidLat, finalMidLng], {
+        icon: createArrowIcon(finalMidLat, finalMidLng, finalArrowBearing, finalArrowColor)
+    }).addTo(map);
 
     // Base Leg (100-200m AGL)
     const baseLimits = [baseHeight + LEG_HEIGHT_FINAL, baseHeight + LEG_HEIGHT_BASE];
@@ -2199,7 +2213,9 @@ function updateLandingPattern() {
     const baseMidLng = (finalEnd[1] + baseEnd[1]) / 2;
     const baseArrowBearing = (baseWindDir - 90 + 180) % 360; // Points in direction of the mean wind at base
 
-    baseArrow = createArrowIcon(baseMidLat, baseMidLng, baseArrowBearing, baseArrowColor);
+    baseArrow = L.marker([baseMidLat, baseMidLng], {
+        icon: createArrowIcon(baseMidLat, baseMidLng, baseArrowBearing, baseArrowColor)
+    }).addTo(map);
 
     // Downwind Leg (200-300m AGL)
     const downwindLimits = [baseHeight + LEG_HEIGHT_BASE, baseHeight + LEG_HEIGHT_DOWNWIND];
@@ -2243,7 +2259,9 @@ function updateLandingPattern() {
     const downwindArrowBearing = (downwindWindDir - 90 + 180) % 360; // Points in direction of the mean wind at downwind
 
     // Create a custom arrow icon using Leaflet’s DivIcon
-    downwindArrow = createArrowIcon(downwindMidLat, downwindMidLng, downwindArrowBearing, downwindArrowColor);
+    downwindArrow = L.marker([downwindMidLat, downwindMidLng], {
+        icon: createArrowIcon(downwindMidLat, downwindMidLng, downwindArrowBearing, downwindArrowColor)
+    }).addTo(map);
 
     console.log(`Landing Pattern Updated:
         Final Leg: Wind: ${finalWindDir.toFixed(1)}° @ ${finalWindSpeedKt.toFixed(1)}kt, Course: ${finalCourse.toFixed(1)}°, WCA: ${finalWca.toFixed(1)}°, GS: ${finalGroundSpeedKt.toFixed(1)}kt, HW: ${finalHeadwind.toFixed(1)}kt, Length: ${finalLength.toFixed(1)}m
