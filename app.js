@@ -2299,22 +2299,27 @@ function updateJumpRunTrack() {
 
     const trackPoints = [[lat0, lng0], [lat2, lng2]];
 
-    console.log('Track points with offset:', { offset, center: [centerLat * 180 / Math.PI, centerLng * 180 / Math.PI], start: [lat0, lng0], end: [lat2, lng2], direction });
-
     const polyline = L.polyline(trackPoints, {
-        color: 'orange',
-        weight: 5,
-        opacity: 0.8,
+        color: 'black',
+        weight: 3,
+        opacity: 0.5,
+        dashArray: '5, 10',
     });
 
-    const arrowIcon = L.divIcon({
-        className: 'jump-run-arrow',
-        html: `<svg width="30" height="30" viewBox="0 0 30 30"><polygon points="5,20 15,5 25,20" fill="orange" stroke="orange" stroke-width="1" transform="rotate(${direction}, 15, 15)"/></svg>`,
-        iconSize: [30, 30],
-        iconAnchor: [15, 15],
+    // Use a plane icon instead of a triangle
+    const planeIcon = L.icon({
+        iconUrl: 'airplane.png', // Path to your plane icon
+        iconSize: [30, 30], // Size of the icon
+        iconAnchor: [15, 15], // Center of the icon (adjust if needed)
+        className: 'jump-run-plane', // Optional CSS class for styling
+        opacity: 0.5,
     });
 
-    const arrowMarker = L.marker([lat2, lng2], { icon: arrowIcon });
+    const arrowMarker = L.marker([lat2, lng2], {
+        icon: planeIcon,
+        rotationAngle: direction, // Rotate the icon to match the jump run direction
+        rotationOrigin: 'center center' // Ensure rotation is around the center
+    });
 
     jumpRunTrackLayer = L.layerGroup([polyline, arrowMarker]);
     jumpRunTrackLayer.addTo(map);
