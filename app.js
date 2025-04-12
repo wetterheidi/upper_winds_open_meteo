@@ -2347,19 +2347,19 @@ function updateJumpRunTrack() {
     const trackPoints = [[lat0, lng0], [lat2, lng2]];
 
     const polyline = L.polyline(trackPoints, {
-        color: 'black',
+        color: 'orange',
         weight: 3,
-        opacity: 0.5,
+        opacity: 1,
         dashArray: '5, 10',
     });
 
     // Use a plane icon instead of a triangle
     const planeIcon = L.icon({
-        iconUrl: 'airplane.png', // Path to your plane icon
+        iconUrl: 'airplane_orange.png', // Path to your plane icon
         iconSize: [30, 30], // Size of the icon
         iconAnchor: [15, 15], // Center of the icon (adjust if needed)
         className: 'jump-run-plane', // Optional CSS class for styling
-        opacity: 0.5,
+        opacity: 1,
     });
 
     const arrowMarker = L.marker([lat2, lng2], {
