@@ -1,6 +1,6 @@
 # Upper Winds - OpenMeteo
 
-A web application to visualize upper-level wind, temperature, and atmospheric data using Leaflet maps and the OpenMeteo API.
+A web application for visualizing upper-level wind, temperature, and atmospheric data using interactive Leaflet maps, powered by the OpenMeteo API. Includes advanced skydiving features for landing pattern visualization and jump trajectory calculations.
 
 ## Setup
 1. **Clone the Repository**: 
@@ -19,28 +19,34 @@ A web application to visualize upper-level wind, temperature, and atmospheric da
 - **Interactive Map**: 
   - Built with Leaflet, featuring base layers: OpenStreetMap, OpenTopoMap, Esri Satellite, Esri Street, and Esri Topo.
   - Double-click or drag a marker to pin a location and fetch weather data, displaying coordinates (Decimal Degrees, DMS, MGRS) and altitude.
-  - Includes scale control (metric/imperial) in the bottom-left corner and a mouse-over coordinate display.
+  - Features a scale control (metric/imperial), a measurement tool for distance/bearing, and mouse-over coordinate display in the bottom-left corner.
 - **Coordinate Input**: 
-  - Enter coordinates via a menu to reposition the marker (supports Decimal, DMS, MGRS formats).
-  - Styled inputs adapt to format: compact DMS fields, wider Decimal fields, and full-width MGRS input.
+  - Enter coordinates via the "Coordinate Input" menu to reposition the marker (Decimal, DMS, MGRS formats).
+  - Adaptive input styling: compact DMS fields, wider Decimal fields, full-width MGRS input.
 - **Weather Data**: 
-  - Hourly upper-level data (wind speed, direction, temperature, humidity) from OpenMeteo for surface (2m, 10m) and pressure levels (1000 hPa to 200 hPa).
+  - Hourly upper-level data from OpenMeteo, including wind speed, direction, temperature, humidity, and pressure levels (1000 hPa to 200 hPa).
+  - Surface data at 2m and 10m for precise low-altitude analysis.
 - **Model Selection**: 
-  - Choose forecast models (e.g., ICON GLOBAL, GFS, ECMWF) via dropdown; last run time shown in "Model Run" submenu.
+  - Select forecast models (ICON GLOBAL, GFS, ECMWF) via a dropdown; view the latest model run time in the "Forecast Model" label tooltip.
 - **Time Slider**: 
-  - Navigate hourly forecasts (up to 7 days, or 2 days for ICON D2) with a responsive slider.
+  - Browse hourly forecasts (up to 7 days, or 2 days for ICON D2) with a responsive slider.
 - **Unit Customization**: 
-  - Toggle AGL/AMSL reference levels, height units (m/ft), temperature (°C/°F), wind speed (kt/km/h/m/s/mph/bft), time zones (UTC/local), and coordinate formats.
+  - Switch between AGL/AMSL, height units (m/ft), temperature (°C/°F), wind speed (kt/km/h/m/s/mph/bft), time zones (UTC/local), and coordinate formats.
 - **Mean Wind Calculation**: 
-  - Compute average wind speed and direction between user-defined altitude layers, updated with unit changes.
+  - Compute average wind speed and direction for user-specified altitude layers, updating dynamically with unit changes.
 - **Landing Pattern Visualization**: 
-  - Overlay a customizable landing pattern (downwind, base, final legs) with canopy speed (5-50 kt), descent rate (1-10 m/s), and leg heights (50-1000m AGL).
-  - Supports left (LL) or right (RR) patterns with custom direction (0-359°), defaulting to surface wind.
+  - Display customizable skydiving landing patterns (downwind, base, final legs) with configurable canopy speed (5-50 kt), descent rate (1-10 m/s), and leg heights (50-1000m AGL).
+  - Supports left (LL) or right (RR) patterns with custom direction inputs (0-359°), defaulting to surface wind direction.
+  - Includes wind arrows with tool tips to display the exact direction and speed.
+- **Jump Calculation**: 
+  - Calculate skydiving jump trajectories, including free-fall and canopy phases, using exit altitude (500-15000m), opening altitude (500-10000m), and weather data.
+  - Visualizes jump circles: blue (canopy glide), red (full descent), green/light green (exit areas), and jump run tracks with customizable direction and offset.
 - **Data Table**: 
-  - Toggleable table (via "Show Wind Table") showing height, pressure, temperature, dewpoint, wind direction/speed, and humidity.
-  - Adjustable interpolation steps (100m to 2000m); wind speed rows color-coded: low (blue, ≤3 kt), moderate (green, ≤10 kt), high (yellow, ≤16 kt), very high (red, >16 kt).
+  - Toggleable wind table showing height, pressure, temperature, dewpoint, wind direction/speed, and humidity.
+  - Adjustable interpolation steps (100m to 2000m); wind speeds color-coded: low (blue, ≤3 kt), moderate (green, ≤10 kt), high (yellow, ≤16 kt), very high (red, >16 kt).
+  - Includes wind barbs, adjusted for northern/southern hemispheres.
 - **Data Download**: 
-  - Export weather data as ASCII `.txt` (e.g., `2025-04-01_1200Z_ICON_GLOBAL_HEIDIS.txt`).
+  - Export weather data as ASCII text in formats like HEIDIS, ATAK, Windwatch, or Customized (e.g., 2025-04-01_1200Z_ICON_GLOBAL_HEIDIS.txt).
 - **Error Handling**: 
   - Errors display in a light red banner at the top, auto-hiding after 5 seconds.
 - **Responsive Design**: 
@@ -48,6 +54,7 @@ A web application to visualize upper-level wind, temperature, and atmospheric da
 
 ## Dependencies
 - **Leaflet**: Via CDN (`https://unpkg.com/leaflet@1.9.4/dist/leaflet.js`) for maps.
+-**Leaflet Plugins**: RotatedMarker, PolylineMeasure for enhanced functionality.
 - **Luxon**: Via CDN (`https://cdnjs.cloudflare.com/ajax/libs/luxon/3.4.4/luxon.min.js`) for date/time handling.
 - **MGRS**: Via CDN (`https://unpkg.com/mgrs@1.0.0/dist/mgrs.js`) for MGRS coordinate support.
 - **OpenMeteo API**: Free, no key required.
@@ -56,20 +63,20 @@ A web application to visualize upper-level wind, temperature, and atmospheric da
 
 ## Usage
 - **Map Interaction**: 
-  - Double-click to set a marker, drag to adjust, and fetch weather data; popup shows coordinates and altitude.
-  - Measure distances and directions with the measurement tool on the top right corner of the map
+  - Double-click to place a marker, drag to adjust, or click to toggle the popup with coordinates and altitude.
+  - Use the top-right measurement tool for distances and bearings.
 - **Coordinate Input**: 
-  - Use the "Coordinate Input" menu to enter coordinates (Decimal, DMS, MGRS) and move the marker with the "Move Marker" button.
+  - Open the "Coordinate Input" menu, enter coordinates, and click "Move Marker" to update the location.
 - **Model Selection**: 
-  - Switch models via "Forecast Model" dropdown; check "Model Run" for run time.
+  - Choose a model from the dropdown; hover over "Forecast Model" for the latest run time.
 - **Time Navigation**: 
-  - Use the slider to browse hourly forecasts; disabled if only one time step exists.
+  - Use the time slider to explore forecasts; disabled for single time steps.
 - **Weather Display**: 
-  - View data in a table; adjust units and interpolation in the menu.
+  - Enable the wind table with "Show Wind Table" and customize units/interpolation in the settings menu.
 - **Mean Wind**: 
-  - Set altitude limits in the bottom container for mean wind calculation.
-- **Landing Pattern**: 
-  - Enable via menu, tweak parameters, and visualize on the map.
+  - Adjust altitude limits in the bottom container to calculate mean wind.
+- **Skydiving Features**: 
+  - Configure canopy speed, descent rate, leg heights, exit/opening altitudes, and visualize patterns, jump circles, or jump run tracks.
 - **Download**: 
   - Click "Download Table" to save the current table as a text file.
 
@@ -95,6 +102,14 @@ Leverages [OpenMeteo API](https://open-meteo.com/) for:
   - Added scale control and mouse-over coordinate display.
   - Optimized time zone handling and UI responsiveness.
   - Refined coordinate input styling: compact DMS fields, wider Decimal fields, full-width MGRS input.
+- **v1.3.0 (April 12, 2025)**:
+  - Added password protection for landing pattern and jump calculation features.
+ - Enhanced jump calculations with free-fall trajectories, canopy glide circles (blue/red), and exit areas (green/light green).
+  - Implemented jump run tracks with customizable direction, offset, and plane icon visualization.
+  - Improved wind barbs with hemisphere-specific rendering.
+  - Upgraded coordinate inputs with dynamic styling for Decimal, DMS, and MGRS.
+  - Added a reset button to clear settings and unlock states.
+  - Optimized error handling, UI responsiveness, and localStorage persistence.
 
 ## Warning
-Data is sourced from OpenMeteo weather models and may contain inaccuracies. Cross-check with official sources for critical use.
+Data is sourced from OpenMeteo and may contain inaccuracies. Always verify with official meteorological sources for critical applications, especially skydiving or aviation.
