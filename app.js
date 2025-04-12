@@ -498,136 +498,6 @@ function calculateLandingPatternCoords(lat, lng, interpolatedData, sliderIndex) 
     return { downwindLat: downwindEnd[0], downwindLng: downwindEnd[1] };
 }
 
-function updateJumpCircleOLD(blueLat, blueLng, redLat, redLng, radius, radiusFull, displacement, displacementFull, direction, directionFull, freeFallDirection, freeFallDistance) {
-    console.log('updateJumpCircle called with:', { blueLat, blueLng, redLat, redLng, radius, radiusFull, displacement, displacementFull, direction, directionFull, freeFallDirection, freeFallDistance });
-    if (!map) {
-        console.warn('Map not available to update jump circles');
-        return;
-    }
-
-    const currentZoom = map.getZoom();
-    const isVisible = currentZoom >= minZoom && currentZoom <= maxZoom;
-    console.log('Zoom check:', { currentZoom, minZoom, maxZoom, isVisible });
-
-    // Remove existing circles
-    if (jumpCircle && map.hasLayer(jumpCircle)) {
-        console.log('Removing existing blue jump circle');
-        map.removeLayer(jumpCircle);
-    }
-    if (jumpCircleFull && map.hasLayer(jumpCircleFull)) {
-        console.log('Removing existing red jump circle');
-        map.removeLayer(jumpCircleFull);
-    }
-    if (jumpCircleGreen && map.hasLayer(jumpCircleGreen)) {
-        console.log('Removing existing green jump circle');
-        map.removeLayer(jumpCircleGreen);
-    }
-    if (jumpCircleGreenLight && map.hasLayer(jumpCircleGreenLight)) {
-        console.log('Removing existing light green jump circle');
-        map.removeLayer(jumpCircleGreenLight);
-    }
-
-    if (isVisible && Number.isFinite(blueLat) && Number.isFinite(blueLng) && Number.isFinite(redLat) && Number.isFinite(redLng)) {
-        const newCenterBlue = calculateNewCenter(blueLat, blueLng, displacement, direction);
-        const newCenterRed = calculateNewCenter(redLat, redLng, displacementFull, directionFull);
-        console.log('New centers calculated:', { blue: newCenterBlue, red: newCenterRed });
-
-        if (!Number.isFinite(newCenterBlue[0]) || !Number.isFinite(newCenterBlue[1]) || !Number.isFinite(newCenterRed[0]) || !Number.isFinite(newCenterRed[1])) {
-            console.warn('Invalid center coordinates:', { newCenterBlue, newCenterRed });
-            return;
-        }
-
-        if (!Number.isFinite(radius) || radius <= 0 || !Number.isFinite(radiusFull) || radiusFull <= 0) {
-            console.warn('Invalid radius values:', { radius, radiusFull });
-            return;
-        }
-
-        // Blue circle
-        jumpCircle = L.circle(newCenterBlue, {
-            radius: radius,
-            color: 'blue',
-            fillColor: 'blue',
-            fillOpacity: 0.2,
-            weight: 2
-        });
-
-        // Red circle
-        jumpCircleFull = L.circle(newCenterRed, {
-            radius: radiusFull,
-            color: 'red',
-            fillColor: 'red',
-            fillOpacity: 0.2,
-            weight: 2
-        });
-
-        // Add blue and red circles to map
-        jumpCircle.addTo(map);
-        jumpCircleFull.addTo(map);
-
-        // Green circles (only if showExitArea is true)
-        if (userSettings.showExitArea) {
-            // First green circle (same as red circle radius)
-            let jumpCircleGreenCenter = newCenterRed; // Default to red center
-            if (Number.isFinite(freeFallDirection) && Number.isFinite(freeFallDistance)) {
-                const greenShiftDirection = (freeFallDirection + 180) % 360; // Opposite direction
-                jumpCircleGreenCenter = calculateNewCenter(newCenterRed[0], newCenterRed[1], freeFallDistance, greenShiftDirection);
-                console.log('Green circle center calculated:', { center: jumpCircleGreenCenter, shiftDirection: greenShiftDirection, shiftDistance: freeFallDistance });
-            } else {
-                console.warn('Free fall direction or distance not provided, using red circle center:', { freeFallDirection, freeFallDistance });
-            }
-
-            jumpCircleGreen = L.circle(jumpCircleGreenCenter, {
-                radius: radiusFull, // Same as red circle
-                color: 'green',
-                fillColor: 'none', // No fill
-                fillOpacity: 0,
-                weight: 2
-            });
-
-            // Light green circle (same as blue circle radius)
-            let jumpCircleGreenLightCenter = newCenterBlue; // Default to blue center
-            if (Number.isFinite(freeFallDirection) && Number.isFinite(freeFallDistance)) {
-                const greenLightShiftDirection = (freeFallDirection + 180) % 360; // Opposite direction
-                jumpCircleGreenLightCenter = calculateNewCenter(newCenterBlue[0], newCenterBlue[1], freeFallDistance, greenLightShiftDirection);
-                console.log('Light green circle center calculated:', { center: jumpCircleGreenLightCenter, shiftDirection: greenLightShiftDirection, shiftDistance: freeFallDistance });
-            } else {
-                console.warn('Free fall direction or distance not provided, using blue circle center for light green:', { freeFallDirection, freeFallDistance });
-            }
-
-            jumpCircleGreenLight = L.circle(jumpCircleGreenLightCenter, {
-                radius: radius, // Same as blue circle
-                color: 'lightgreen',
-                fillColor: 'none',
-                fillOpacity: 0,
-                weight: 2
-            });
-
-            // Add green circles to map
-            jumpCircleGreen.addTo(map);
-            jumpCircleGreenLight.addTo(map);
-        } else {
-            jumpCircleGreen = null;
-            jumpCircleGreenLight = null;
-        }
-
-        console.log('Jump circles added at zoom:', currentZoom, 'Layers on map:', map.hasLayer(jumpCircle), map.hasLayer(jumpCircleFull), map.hasLayer(jumpCircleGreen), map.hasLayer(jumpCircleGreenLight));
-        map.invalidateSize(); // Force refresh
-        console.log('Map bounds after adding circles:', map.getBounds());
-    } else {
-        console.log('Jump circles not displayed - zoom:', currentZoom, 'visible:', isVisible, 'coords valid:', Number.isFinite(blueLat) && Number.isFinite(blueLng) && Number.isFinite(redLat) && Number.isFinite(redLng));
-        jumpCircle = null;
-        jumpCircleFull = null;
-        jumpCircleGreen = null;
-        jumpCircleGreenLight = null;
-    }
-
-    if (currentMarker) {
-        currentMarker.setLatLng([lastLat, lastLng]);
-        updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
-    }
-    console.log('updateJumpCircle completed');
-}
-
 function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, displacement, displacementFull, direction, directionFull, freeFallDirection, freeFallDistance) {
     console.log('updateJumpCircle called with:', { blueLat, blueLng, redLat, redLng, radius, radiusFull, displacement, displacementFull, direction, directionFull, freeFallDirection, freeFallDistance, zoom: map.getZoom() });
     if (!map) {
@@ -1392,7 +1262,7 @@ async function getAltitude(lat, lng) {
     return elevation !== 'N/A' ? elevation : 'N/A';
 }
 
-async function fetchWeather(lat, lon, currentTime = null) {
+async function fetchWeatherOLD(lat, lon, currentTime = null) {
     try {
         document.getElementById('loading').style.display = 'block';
         const modelSelect = document.getElementById('modelSelect');
@@ -1614,6 +1484,272 @@ async function fetchWeather(lat, lon, currentTime = null) {
             slider.value = 0;
             console.log('fetchWeather: No currentTime provided, slider set to 0');
         }
+        await updateWeatherDisplay(initialIndex);
+        document.getElementById('loading').style.display = 'none';
+
+        // Reattach slider event listener after initial set
+        slider.oninput = function () {
+            console.log('Slider oninput triggered, new value:', this.value);
+            updateWeatherDisplay(this.value);
+        };
+    } catch (error) {
+        document.getElementById('loading').style.display = 'none';
+        Utils.handleError(`Failed to fetch weather data: ${error.message}`);
+    }
+}
+
+async function fetchWeather(lat, lon, currentTime = null) {
+    try {
+        document.getElementById('loading').style.display = 'block';
+        const modelSelect = document.getElementById('modelSelect');
+        const modelMap = {
+            'icon_seamless': 'dwd_icon',
+            'icon_global': 'dwd_icon',
+            'icon_eu': 'dwd_icon_eu',
+            'icon_d2': 'dwd_icon_d2',
+            'ecmwf_ifs025': 'ecmwf_ifs025',
+            'ecmwf_aifs025': 'ecmwf_aifs025_single',
+            'gfs_seamless': 'ncep_gfs013',
+            'gfs_global': 'ncep_gfs025',
+            'gfs_hrrr': 'ncep_hrrr_conus',
+            'arome_france': 'meteofrance_arome_france0025',
+            'gem_hrdps_continental': 'cmc_gem_hrdps',
+            'gem_regional': 'cmc_gem_rdps'
+        };
+        const model = modelMap[modelSelect.value] || modelSelect.value;
+
+        // Fetch model run time
+        console.log('Fetching meta for model:', model);
+        const metaResponse = await fetch(`https://api.open-meteo.com/data/${model}/static/meta.json`);
+        if (!metaResponse.ok) {
+            const errorText = await metaResponse.text();
+            throw new Error(`Meta fetch failed: ${metaResponse.status} - ${errorText}`);
+        }
+        const metaData = await metaResponse.json();
+        const runDate = new Date(metaData.last_run_initialisation_time * 1000);
+        const utcNow = new Date(Date.UTC(
+            new Date().getUTCFullYear(),
+            new Date().getUTCMonth(),
+            new Date().getUTCDate(),
+            new Date().getUTCHours(),
+            new Date().getUTCSeconds()
+        ));
+        const year = runDate.getUTCFullYear();
+        const month = String(runDate.getUTCMonth() + 1).padStart(2, '0');
+        const day = String(runDate.getUTCDate()).padStart(2, '0');
+        const hour = String(runDate.getUTCHours()).padStart(2, '0');
+        const minute = String(runDate.getUTCMinutes()).padStart(2, '0');
+        lastModelRun = `${year}-${month}-${day} ${hour}${minute}Z`;
+
+        let newHour = (runDate.getUTCHours() + 6) % 24;
+        let newDay = runDate.getUTCDate() + Math.floor((runDate.getUTCHours() + 6) / 24);
+        let newMonth = runDate.getUTCMonth();
+        let newYear = runDate.getUTCFullYear();
+        if (newDay > new Date(newYear, newMonth + 1, 0).getUTCDate()) {
+            newDay = 1;
+            newMonth = (newMonth + 1) % 12;
+            if (newMonth === 0) newYear++;
+        }
+        let startDate = new Date(Date.UTC(newYear, newMonth, newDay, newHour));
+        if (startDate > utcNow) {
+            startDate = utcNow;
+        }
+        const startYear = startDate.getUTCFullYear();
+        const startMonth = String(startDate.getUTCMonth() + 1).padStart(2, '0');
+        const startDay = String(startDate.getUTCDate()).padStart(2, '0');
+        const startDateStr = `${startYear}-${startMonth}-${startDay}`;
+
+        const endDate = new Date(Date.UTC(
+            startDate.getUTCFullYear(),
+            startDate.getUTCMonth(),
+            startDate.getUTCDate() + (modelSelect.value === 'icon_d2' ? 2 : 7)
+        ));
+        const endYear = endDate.getUTCFullYear();
+        const endMonth = String(endDate.getUTCMonth() + 1).padStart(2, '0');
+        const endDay = String(endDate.getUTCDate()).padStart(2, '0');
+        const endDateStr = `${endYear}-${endMonth}-${endDay}`;
+
+
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+            `&hourly=surface_pressure,temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,` +
+            `temperature_1000hPa,relative_humidity_1000hPa,wind_speed_1000hPa,wind_direction_1000hPa,geopotential_height_1000hPa,` +
+            `temperature_950hPa,relative_humidity_950hPa,wind_speed_950hPa,wind_direction_950hPa,geopotential_height_950hPa,` +
+            `temperature_925hPa,relative_humidity_925hPa,wind_speed_925hPa,wind_direction_925hPa,geopotential_height_925hPa,` +
+            `temperature_900hPa,relative_humidity_900hPa,wind_speed_900hPa,wind_direction_900hPa,geopotential_height_900hPa,` +
+            `temperature_850hPa,relative_humidity_850hPa,wind_speed_850hPa,wind_direction_850hPa,geopotential_height_850hPa,` +
+            `temperature_800hPa,relative_humidity_800hPa,wind_speed_800hPa,wind_direction_800hPa,geopotential_height_800hPa,` +
+            `temperature_700hPa,relative_humidity_700hPa,wind_speed_700hPa,wind_direction_700hPa,geopotential_height_700hPa,` +
+            `temperature_600hPa,relative_humidity_600hPa,wind_speed_600hPa,wind_direction_600hPa,geopotential_height_600hPa,` +
+            `temperature_500hPa,relative_humidity_500hPa,wind_speed_500hPa,wind_direction_500hPa,geopotential_height_500hPa,` +
+            `temperature_400hPa,relative_humidity_400hPa,wind_speed_400hPa,wind_direction_400hPa,geopotential_height_400hPa,` +
+            `temperature_300hPa,relative_humidity_300hPa,wind_speed_300hPa,wind_direction_300hPa,geopotential_height_300hPa,` +
+            `temperature_250hPa,relative_humidity_250hPa,wind_speed_250hPa,wind_direction_250hPa,geopotential_height_250hPa,` +
+            `temperature_200hPa,relative_humidity_200hPa,wind_speed_200hPa,wind_direction_200hPa,geopotential_height_200hPa` +
+            `&models=${modelSelect.value}&start_date=${startDateStr}&end_date=${endDateStr}`;
+
+        console.log('Fetching weather from:', url);
+        const response = await fetch(url);
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`HTTP error! Status: ${response.status} - ${errorText}`);
+        }
+
+        const data = await response.json();
+
+        if (!data.hourly || !data.hourly.time) {
+            throw new Error('No hourly data returned from API');
+        }
+
+        const lastValidIndex = data.hourly.time.length - 1;
+
+        weatherData = {
+            time: data.hourly.time.slice(0, lastValidIndex + 1),
+            surface_pressure: data.hourly.surface_pressure?.slice(0, lastValidIndex + 1) || [],
+            temperature_2m: data.hourly.temperature_2m?.slice(0, lastValidIndex + 1) || [],
+            relative_humidity_2m: data.hourly.relative_humidity_2m?.slice(0, lastValidIndex + 1) || [],
+            wind_speed_10m: data.hourly.wind_speed_10m?.slice(0, lastValidIndex + 1) || [],
+            wind_direction_10m: data.hourly.wind_direction_10m?.slice(0, lastValidIndex + 1) || [],
+            wind_gusts_10m: data.hourly.wind_gusts_10m?.slice(0, lastValidIndex + 1) || [],
+            temperature_1000hPa: data.hourly.temperature_1000hPa?.slice(0, lastValidIndex + 1) || [],
+            relative_humidity_1000hPa: data.hourly.relative_humidity_1000hPa?.slice(0, lastValidIndex + 1) || [],
+            wind_speed_1000hPa: data.hourly.wind_speed_1000hPa?.slice(0, lastValidIndex + 1) || [],
+            wind_direction_1000hPa: data.hourly.wind_direction_1000hPa?.slice(0, lastValidIndex + 1) || [],
+            geopotential_height_1000hPa: data.hourly.geopotential_height_1000hPa?.slice(0, lastValidIndex + 1) || [],
+            temperature_950hPa: data.hourly.temperature_950hPa?.slice(0, lastValidIndex + 1) || [],
+            relative_humidity_950hPa: data.hourly.relative_humidity_950hPa?.slice(0, lastValidIndex + 1) || [],
+            wind_speed_950hPa: data.hourly.wind_speed_950hPa?.slice(0, lastValidIndex + 1) || [],
+            wind_direction_950hPa: data.hourly.wind_direction_950hPa?.slice(0, lastValidIndex + 1) || [],
+            geopotential_height_950hPa: data.hourly.geopotential_height_950hPa?.slice(0, lastValidIndex + 1) || [],
+            temperature_925hPa: data.hourly.temperature_925hPa?.slice(0, lastValidIndex + 1) || [],
+            relative_humidity_925hPa: data.hourly.relative_humidity_925hPa?.slice(0, lastValidIndex + 1) || [],
+            wind_speed_925hPa: data.hourly.wind_speed_925hPa?.slice(0, lastValidIndex + 1) || [],
+            wind_direction_925hPa: data.hourly.wind_direction_925hPa?.slice(0, lastValidIndex + 1) || [],
+            geopotential_height_925hPa: data.hourly.geopotential_height_925hPa?.slice(0, lastValidIndex + 1) || [],
+            temperature_900hPa: data.hourly.temperature_900hPa?.slice(0, lastValidIndex + 1) || [],
+            relative_humidity_900hPa: data.hourly.relative_humidity_900hPa?.slice(0, lastValidIndex + 1) || [],
+            wind_speed_900hPa: data.hourly.wind_speed_900hPa?.slice(0, lastValidIndex + 1) || [],
+            wind_direction_900hPa: data.hourly.wind_direction_900hPa?.slice(0, lastValidIndex + 1) || [],
+            geopotential_height_900hPa: data.hourly.geopotential_height_900hPa?.slice(0, lastValidIndex + 1) || [],
+            temperature_850hPa: data.hourly.temperature_850hPa?.slice(0, lastValidIndex + 1) || [],
+            relative_humidity_850hPa: data.hourly.relative_humidity_850hPa?.slice(0, lastValidIndex + 1) || [],
+            wind_speed_850hPa: data.hourly.wind_speed_850hPa?.slice(0, lastValidIndex + 1) || [],
+            wind_direction_850hPa: data.hourly.wind_direction_850hPa?.slice(0, lastValidIndex + 1) || [],
+            geopotential_height_850hPa: data.hourly.geopotential_height_850hPa?.slice(0, lastValidIndex + 1) || [],
+            temperature_800hPa: data.hourly.temperature_800hPa?.slice(0, lastValidIndex + 1) || [],
+            relative_humidity_800hPa: data.hourly.relative_humidity_800hPa?.slice(0, lastValidIndex + 1) || [],
+            wind_speed_800hPa: data.hourly.wind_speed_800hPa?.slice(0, lastValidIndex + 1) || [],
+            wind_direction_800hPa: data.hourly.wind_direction_800hPa?.slice(0, lastValidIndex + 1) || [],
+            geopotential_height_800hPa: data.hourly.geopotential_height_800hPa?.slice(0, lastValidIndex + 1) || [],
+            temperature_700hPa: data.hourly.temperature_700hPa?.slice(0, lastValidIndex + 1) || [],
+            relative_humidity_700hPa: data.hourly.relative_humidity_700hPa?.slice(0, lastValidIndex + 1) || [],
+            wind_speed_700hPa: data.hourly.wind_speed_700hPa?.slice(0, lastValidIndex + 1) || [],
+            wind_direction_700hPa: data.hourly.wind_direction_700hPa?.slice(0, lastValidIndex + 1) || [],
+            geopotential_height_700hPa: data.hourly.geopotential_height_700hPa?.slice(0, lastValidIndex + 1) || [],
+            temperature_600hPa: data.hourly.temperature_600hPa?.slice(0, lastValidIndex + 1) || [],
+            relative_humidity_600hPa: data.hourly.relative_humidity_600hPa?.slice(0, lastValidIndex + 1) || [],
+            wind_speed_600hPa: data.hourly.wind_speed_600hPa?.slice(0, lastValidIndex + 1) || [],
+            wind_direction_600hPa: data.hourly.wind_direction_600hPa?.slice(0, lastValidIndex + 1) || [],
+            geopotential_height_600hPa: data.hourly.geopotential_height_600hPa?.slice(0, lastValidIndex + 1) || [],
+            temperature_500hPa: data.hourly.temperature_500hPa?.slice(0, lastValidIndex + 1) || [],
+            relative_humidity_500hPa: data.hourly.relative_humidity_500hPa?.slice(0, lastValidIndex + 1) || [],
+            wind_speed_500hPa: data.hourly.wind_speed_500hPa?.slice(0, lastValidIndex + 1) || [],
+            wind_direction_500hPa: data.hourly.wind_direction_500hPa?.slice(0, lastValidIndex + 1) || [],
+            geopotential_height_500hPa: data.hourly.geopotential_height_500hPa?.slice(0, lastValidIndex + 1) || [],
+            temperature_400hPa: data.hourly.temperature_400hPa?.slice(0, lastValidIndex + 1) || [],
+            relative_humidity_400hPa: data.hourly.relative_humidity_400hPa?.slice(0, lastValidIndex + 1) || [],
+            wind_speed_400hPa: data.hourly.wind_speed_400hPa?.slice(0, lastValidIndex + 1) || [],
+            wind_direction_400hPa: data.hourly.wind_direction_400hPa?.slice(0, lastValidIndex + 1) || [],
+            geopotential_height_400hPa: data.hourly.geopotential_height_400hPa?.slice(0, lastValidIndex + 1) || [],
+            temperature_300hPa: data.hourly.temperature_300hPa?.slice(0, lastValidIndex + 1) || [],
+            relative_humidity_300hPa: data.hourly.relative_humidity_300hPa?.slice(0, lastValidIndex + 1) || [],
+            wind_speed_300hPa: data.hourly.wind_speed_300hPa?.slice(0, lastValidIndex + 1) || [],
+            wind_direction_300hPa: data.hourly.wind_direction_300hPa?.slice(0, lastValidIndex + 1) || [],
+            geopotential_height_300hPa: data.hourly.geopotential_height_300hPa?.slice(0, lastValidIndex + 1) || [],
+            temperature_250hPa: data.hourly.temperature_250hPa?.slice(0, lastValidIndex + 1) || [],
+            relative_humidity_250hPa: data.hourly.relative_humidity_250hPa?.slice(0, lastValidIndex + 1) || [],
+            wind_speed_250hPa: data.hourly.wind_speed_250hPa?.slice(0, lastValidIndex + 1) || [],
+            wind_direction_250hPa: data.hourly.wind_direction_250hPa?.slice(0, lastValidIndex + 1) || [],
+            geopotential_height_250hPa: data.hourly.geopotential_height_250hPa?.slice(0, lastValidIndex + 1) || [],
+            temperature_200hPa: data.hourly.temperature_200hPa?.slice(0, lastValidIndex + 1) || [],
+            relative_humidity_200hPa: data.hourly.relative_humidity_200hPa?.slice(0, lastValidIndex + 1) || [],
+            wind_speed_200hPa: data.hourly.wind_speed_200hPa?.slice(0, lastValidIndex + 1) || [],
+            wind_direction_200hPa: data.hourly.wind_direction_200hPa?.slice(0, lastValidIndex + 1) || [],
+            geopotential_height_200hPa: data.hourly.geopotential_height_200hPa?.slice(0, lastValidIndex + 1) || []
+        };
+
+        const slider = document.getElementById('timeSlider');
+        slider.min = 0;
+        slider.max = weatherData.time.length - 1;
+
+        if (weatherData.time.length <= 1) {
+            slider.disabled = true;
+            slider.style.opacity = '0.5';
+            slider.style.cursor = 'not-allowed';
+            document.getElementById('info').innerHTML += '<br><strong>Note:</strong> Only one forecast time available.';
+        } else {
+            slider.disabled = false;
+            slider.style.opacity = '1';
+            slider.style.cursor = 'pointer';
+        }
+
+        // Set slider to closest time based on currentTime
+        console.log('fetchWeather: currentTime received:', currentTime);
+        console.log('Luxon available:', typeof luxon !== 'undefined' ? luxon.VERSION : 'Not loaded');
+        let initialIndex = 0;
+        if (currentTime && weatherData.time.length > 0) {
+            let targetDate = null;
+            // Handle "YYYY-MM-DD HHMM GMT+2" format
+            if (typeof currentTime === 'string' && currentTime.includes('GMT')) {
+                const match = currentTime.match(/^(\d{4}-\d{2}-\d{2})\s(\d{4})\sGMT([+-]\d{1,2})$/);
+                if (match) {
+                    const [, dateStr, timeStr, offset] = match;
+                    const formattedTime = `${timeStr.slice(0, 2)}:${timeStr.slice(2, 4)}`;
+                    // Parse offset number and pad to two digits
+                    const offsetNum = parseInt(offset);
+                    const formattedOffset = `${offsetNum >= 0 ? '+' : '-'}${Math.abs(offsetNum).toString().padStart(2, '0')}:00`;
+                    const isoString = `${dateStr}T${formattedTime}:00${formattedOffset}`;
+                    targetDate = luxon.DateTime.fromISO(isoString);
+                    console.log('fetchWeather: Parsed ISO string:', isoString);
+                } else {
+                    console.warn('fetchWeather: Invalid currentTime format:', currentTime);
+                }
+            } else {
+                // Try standard ISO format
+                targetDate = luxon.DateTime.fromISO(currentTime, { zone: 'utc' });
+            }
+            console.log('fetchWeather: targetDate (ISO):', targetDate && targetDate.isValid ? targetDate.toISO() : null);
+            if (targetDate && targetDate.isValid) {
+                const targetTimestamp = targetDate.toMillis();
+                console.log('fetchWeather: targetTimestamp:', targetTimestamp);
+                let minDiff = Infinity;
+                weatherData.time.forEach((time, index) => {
+                    const timeTimestamp = luxon.DateTime.fromISO(time, { zone: 'utc' }).toMillis();
+                    const diff = Math.abs(timeTimestamp - targetTimestamp);
+                    if (diff < minDiff) {
+                        minDiff = diff;
+                        initialIndex = index;
+                    }
+                });
+                console.log(`fetchWeather: Slider set to index ${initialIndex} for time ${weatherData.time[initialIndex]}`);
+            } else {
+                console.warn('fetchWeather: Failed to parse currentTime, defaulting to index 0');
+            }
+        } else {
+            // Default to closest current or future time
+            const now = luxon.DateTime.utc();
+            console.log('fetchWeather: No currentTime provided, using current UTC time:', now.toISO());
+            let minDiff = Infinity;
+            weatherData.time.forEach((time, index) => {
+                const timeTimestamp = luxon.DateTime.fromISO(time, { zone: 'utc' }).toMillis();
+                const diff = Math.abs(timeTimestamp - now.toMillis());
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    initialIndex = index;
+                }
+            });
+            console.log(`fetchWeather: Slider set to index ${initialIndex} for time ${weatherData.time[initialIndex]}`);
+        }
+        slider.value = initialIndex;
         await updateWeatherDisplay(initialIndex);
         document.getElementById('loading').style.display = 'none';
 
@@ -2890,17 +3026,6 @@ function setInputValue(id, value) {
 function setCheckboxValue(id, value) {
     const element = document.getElementById(id);
     if (element) element.checked = value;
-}
-
-function updateUIStateOLD() {
-    const info = document.getElementById('info');
-    if (info) info.style.display = userSettings.showTable ? 'block' : 'none';
-    const customLL = document.getElementById('customLandingDirectionLL');
-    const customRR = document.getElementById('customLandingDirectionRR');
-    if (customLL) customLL.disabled = userSettings.landingDirection !== 'LL';
-    if (customRR) customRR.disabled = userSettings.landingDirection !== 'RR';
-    updateHeightUnitLabels();
-    updateWindUnitLabels();
 }
 
 function updateUIState() {
