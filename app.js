@@ -520,6 +520,10 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
         console.log('Removing existing green jump circle');
         map.removeLayer(jumpCircleGreen);
     }
+    if (jumpCircleGreenLight && map.hasLayer(jumpCircleGreenLight)) {
+        console.log('Removing existing light green jump circle');
+        map.removeLayer(jumpCircleGreenLight);
+    }
 
     if (isVisible && Number.isFinite(blueLat) && Number.isFinite(blueLng) && Number.isFinite(redLat) && Number.isFinite(redLng)) {
         const newCenterBlue = calculateNewCenter(blueLat, blueLng, displacement, direction);
@@ -554,7 +558,7 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
             weight: 2
         });
 
-        // Green circle (new)
+        // First green circle (same as red circle radius)
         let jumpCircleGreenCenter = newCenterRed; // Default to red center
         if (Number.isFinite(freeFallDirection) && Number.isFinite(freeFallDistance)) {
             const greenShiftDirection = (freeFallDirection + 180) % 360; // Opposite direction
@@ -572,11 +576,30 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
             weight: 2
         });
 
+        // Light green circle (new, same as blue circle radius)
+        let jumpCircleGreenLightCenter = newCenterBlue; // Default to blue center
+        if (Number.isFinite(freeFallDirection) && Number.isFinite(freeFallDistance)) {
+            const greenLightShiftDirection = (freeFallDirection + 180) % 360; // Opposite direction
+            jumpCircleGreenLightCenter = calculateNewCenter(newCenterBlue[0], newCenterBlue[1], freeFallDistance, greenLightShiftDirection);
+            console.log('Light green circle center calculated:', { center: jumpCircleGreenLightCenter, shiftDirection: greenLightShiftDirection, shiftDistance: freeFallDistance });
+        } else {
+            console.warn('Free fall direction or distance not provided, using blue circle center for light green:', { freeFallDirection, freeFallDistance });
+        }
+
+        jumpCircleGreenLight = L.circle(jumpCircleGreenLightCenter, {
+            radius: radius, // Same as blue circle
+            color: 'lightgreen', // Lighter green color
+            fillColor: 'none', // No fill
+            fillOpacity: 0,
+            weight: 2
+        });
+
         // Add circles to map
         jumpCircle.addTo(map);
         jumpCircleFull.addTo(map);
         jumpCircleGreen.addTo(map);
-        console.log('Jump circles added at zoom:', currentZoom, 'Layers on map:', map.hasLayer(jumpCircle), map.hasLayer(jumpCircleFull), map.hasLayer(jumpCircleGreen));
+        jumpCircleGreenLight.addTo(map);
+        console.log('Jump circles added at zoom:', currentZoom, 'Layers on map:', map.hasLayer(jumpCircle), map.hasLayer(jumpCircleFull), map.hasLayer(jumpCircleGreen), map.hasLayer(jumpCircleGreenLight));
         map.invalidateSize(); // Force refresh
         console.log('Map bounds after adding circles:', map.getBounds());
     } else {
@@ -584,6 +607,7 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
         jumpCircle = null;
         jumpCircleFull = null;
         jumpCircleGreen = null;
+        jumpCircleGreenLight = null;
     }
 
     if (currentMarker) {
