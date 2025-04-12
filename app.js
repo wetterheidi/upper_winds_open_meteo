@@ -14,6 +14,8 @@ let downwindArrow = null;
 let landingWindDir = null;
 let jumpCircle = null;
 let jumpCircleFull = null; // New red circle for full descent
+let jumpCircleGreen = null; // New green circle
+let jumpCircleGreenLight = null; // New light green circle (blue circle radius)
 let jumpRunTrackLayer = null;
 
 const getTemperatureUnit = () => getSettingValue('temperatureUnit', 'radio', 'C');
@@ -249,7 +251,9 @@ function calculateFreeFall(weatherData, exitAltitude, openingAltitude, sliderInd
             height: point.height,
             time: point.time,
             vz: point.vz
-        }))
+        })),
+        directionDeg: directionDeg, // Include direction
+        distance: distance // Include distance
     };
 
     console.log('Free fall result:', result);
@@ -301,7 +305,6 @@ function calculateJump() {
         console.warn('Free fall calculation failed');
         return null;
     }
-    //visualizeFreeFallPath(freeFallResult.path);
 
     if (horizontalCanopyDistance <= 0 || horizontalCanopyDistanceFull <= 0) {
         console.warn('Invalid radii:', { horizontalCanopyDistance, horizontalCanopyDistanceFull });
@@ -356,7 +359,7 @@ function calculateJump() {
 
     if (userSettings.showLandingPattern) {
         console.log('Displaying landing pattern...');
-        updateLandingPattern(); // Updates visual layers
+        updateLandingPattern();
     } else {
         console.log('Landing pattern not displayed; blue circle still uses downwind end');
     }
@@ -368,8 +371,21 @@ function calculateJump() {
         downwindLng = lastLng;
     }
 
-    console.log('Calling updateJumpCircle with:', { downwindLat, downwindLng, lastLat, lastLng, horizontalCanopyDistance, horizontalCanopyDistanceFull, centerDisplacement, centerDisplacementFull, displacementDirection, displacementDirectionFull });
-    updateJumpCircle(downwindLat, downwindLng, lastLat, lastLng, horizontalCanopyDistance, horizontalCanopyDistanceFull, centerDisplacement, centerDisplacementFull, displacementDirection, displacementDirectionFull);
+    console.log('Calling updateJumpCircle with:', { downwindLat, downwindLng, lastLat, lastLng, horizontalCanopyDistance, horizontalCanopyDistanceFull, centerDisplacement, centerDisplacementFull, displacementDirection, displacementDirectionFull, freeFallDirection: freeFallResult.directionDeg, freeFallDistance: freeFallResult.distance });
+    updateJumpCircle(
+        downwindLat,
+        downwindLng,
+        lastLat,
+        lastLng,
+        horizontalCanopyDistance,
+        horizontalCanopyDistanceFull,
+        centerDisplacement,
+        centerDisplacementFull,
+        displacementDirection,
+        displacementDirectionFull,
+        freeFallResult.directionDeg, // Pass direction
+        freeFallResult.distance // Pass distance
+    );
 
     if (currentMarker) {
         currentMarker.setLatLng([lastLat, lastLng]);
@@ -387,7 +403,9 @@ function calculateJump() {
         displacementFull: centerDisplacementFull,
         direction: meanWindDirection,
         directionFull: meanWindDirectionFull,
-        freeFall: freeFallResult
+        freeFall: freeFallResult,
+        freeFallDirection: freeFallResult.directionDeg, // Ensure included
+        freeFallDistance: freeFallResult.distance // Ensure included
     };
 }
 
@@ -478,8 +496,8 @@ function calculateLandingPatternCoords(lat, lng, interpolatedData, sliderIndex) 
     return { downwindLat: downwindEnd[0], downwindLng: downwindEnd[1] };
 }
 
-function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, displacement, displacementFull, direction, directionFull) {
-    console.log('updateJumpCircle called with:', { blueLat, blueLng, redLat, redLng, radius, radiusFull, displacement, displacementFull, direction, directionFull });
+function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, displacement, displacementFull, direction, directionFull, freeFallDirection, freeFallDistance) {
+    console.log('updateJumpCircle called with:', { blueLat, blueLng, redLat, redLng, radius, radiusFull, displacement, displacementFull, direction, directionFull, freeFallDirection, freeFallDistance });
     if (!map) {
         console.warn('Map not available to update jump circles');
         return;
@@ -489,6 +507,7 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
     const isVisible = currentZoom >= minZoom && currentZoom <= maxZoom;
     console.log('Zoom check:', { currentZoom, minZoom, maxZoom, isVisible });
 
+    // Remove existing circles
     if (jumpCircle && map.hasLayer(jumpCircle)) {
         console.log('Removing existing blue jump circle');
         map.removeLayer(jumpCircle);
@@ -496,6 +515,10 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
     if (jumpCircleFull && map.hasLayer(jumpCircleFull)) {
         console.log('Removing existing red jump circle');
         map.removeLayer(jumpCircleFull);
+    }
+    if (jumpCircleGreen && map.hasLayer(jumpCircleGreen)) {
+        console.log('Removing existing green jump circle');
+        map.removeLayer(jumpCircleGreen);
     }
 
     if (isVisible && Number.isFinite(blueLat) && Number.isFinite(blueLng) && Number.isFinite(redLat) && Number.isFinite(redLng)) {
@@ -513,6 +536,7 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
             return;
         }
 
+        // Blue circle
         jumpCircle = L.circle(newCenterBlue, {
             radius: radius,
             color: 'blue',
@@ -520,6 +544,8 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
             fillOpacity: 0.2,
             weight: 2
         });
+
+        // Red circle
         jumpCircleFull = L.circle(newCenterRed, {
             radius: radiusFull,
             color: 'red',
@@ -528,15 +554,36 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
             weight: 2
         });
 
+        // Green circle (new)
+        let jumpCircleGreenCenter = newCenterRed; // Default to red center
+        if (Number.isFinite(freeFallDirection) && Number.isFinite(freeFallDistance)) {
+            const greenShiftDirection = (freeFallDirection + 180) % 360; // Opposite direction
+            jumpCircleGreenCenter = calculateNewCenter(newCenterRed[0], newCenterRed[1], freeFallDistance, greenShiftDirection);
+            console.log('Green circle center calculated:', { center: jumpCircleGreenCenter, shiftDirection: greenShiftDirection, shiftDistance: freeFallDistance });
+        } else {
+            console.warn('Free fall direction or distance not provided, using red circle center:', { freeFallDirection, freeFallDistance });
+        }
+
+        jumpCircleGreen = L.circle(jumpCircleGreenCenter, {
+            radius: radiusFull, // Same as red circle
+            color: 'green',
+            fillColor: 'none', // No fill
+            fillOpacity: 0,
+            weight: 2
+        });
+
+        // Add circles to map
         jumpCircle.addTo(map);
         jumpCircleFull.addTo(map);
-        console.log('Jump circles added at zoom:', currentZoom, 'Layers on map:', map.hasLayer(jumpCircle), map.hasLayer(jumpCircleFull));
+        jumpCircleGreen.addTo(map);
+        console.log('Jump circles added at zoom:', currentZoom, 'Layers on map:', map.hasLayer(jumpCircle), map.hasLayer(jumpCircleFull), map.hasLayer(jumpCircleGreen));
         map.invalidateSize(); // Force refresh
         console.log('Map bounds after adding circles:', map.getBounds());
     } else {
         console.log('Jump circles not displayed - zoom:', currentZoom, 'visible:', isVisible, 'coords valid:', Number.isFinite(blueLat) && Number.isFinite(blueLng) && Number.isFinite(redLat) && Number.isFinite(redLng));
         jumpCircle = null;
         jumpCircleFull = null;
+        jumpCircleGreen = null;
     }
 
     if (currentMarker) {
@@ -1047,7 +1094,7 @@ function initMap() {
     map.on('zoomend', () => {
         const currentZoom = map.getZoom();
         console.log('Zoom level changed to:', currentZoom);
-
+    
         if (userSettings.calculateJump) {
             console.log('Recalculating jump for zoom:', currentZoom);
             const jumpResult = calculateJump();
@@ -1063,7 +1110,9 @@ function initMap() {
                     displacement: jumpResult.displacement,
                     displacementFull: jumpResult.displacementFull,
                     direction: jumpResult.direction,
-                    directionFull: jumpResult.directionFull
+                    directionFull: jumpResult.directionFull,
+                    freeFallDirection: jumpResult.freeFallDirection,
+                    freeFallDistance: jumpResult.freeFallDistance
                 });
                 updateJumpCircle(
                     jumpResult.radius ? lastLat : 0,
@@ -1075,22 +1124,24 @@ function initMap() {
                     jumpResult.displacement,
                     jumpResult.displacementFull,
                     jumpResult.direction,
-                    jumpResult.directionFull
+                    jumpResult.directionFull,
+                    jumpResult.freeFallDirection, // Pass direction
+                    jumpResult.freeFallDistance // Pass distance
                 );
             } else {
                 console.warn('calculateJump returned null, cannot update jump circles');
             }
         }
-
+    
         if (userSettings.showJumpRunTrack) {
             updateJumpRunTrack();
         }
-
+    
         if (userSettings.showLandingPattern) {
             console.log('Updating landing pattern for zoom:', currentZoom);
             updateLandingPattern();
         }
-
+    
         // Update marker position without opening popup
         if (currentMarker && lastLat && lastLng) {
             currentMarker.setLatLng([lastLat, lastLng]);
