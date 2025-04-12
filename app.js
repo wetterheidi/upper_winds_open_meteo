@@ -639,7 +639,7 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
     const isVisible = currentZoom >= minZoom && currentZoom <= maxZoom;
     console.log('Zoom check:', { currentZoom, minZoom, maxZoom, isVisible });
 
-    // Remove existing circles safely
+    // Remove existing blue and red circles safely
     const removeLayer = (layer, name) => {
         if (layer && typeof layer === 'object' && '_leaflet_id' in layer && map.hasLayer(layer)) {
             console.log(`Removing existing ${name} circle`);
@@ -648,14 +648,18 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
     };
     removeLayer(jumpCircle, 'blue jump');
     removeLayer(jumpCircleFull, 'red jump');
-    removeLayer(jumpCircleGreen, 'green jump');
-    removeLayer(jumpCircleGreenLight, 'light green jump');
 
-    // Reset layer variables
+    // Only remove green circles if showExitArea is false or calculateJump is true
+    if (!userSettings.showExitArea || userSettings.calculateJump) {
+        removeLayer(jumpCircleGreen, 'green jump');
+        removeLayer(jumpCircleGreenLight, 'light green jump');
+        jumpCircleGreen = null;
+        jumpCircleGreenLight = null;
+    }
+
+    // Reset blue and red circle variables
     jumpCircle = null;
     jumpCircleFull = null;
-    jumpCircleGreen = null;
-    jumpCircleGreenLight = null;
 
     if (isVisible && Number.isFinite(blueLat) && Number.isFinite(blueLng) && Number.isFinite(redLat) && Number.isFinite(redLng)) {
         const newCenterBlue = calculateNewCenter(blueLat, blueLng, displacement, direction);
@@ -745,9 +749,13 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
             green: !!jumpCircleGreen && map.hasLayer(jumpCircleGreen),
             greenLight: !!jumpCircleGreenLight && map.hasLayer(jumpCircleGreenLight)
         });
-        // Removed map.invalidateSize() to prevent rendering issues
     } else {
-        console.log('Jump circles not displayed - zoom:', currentZoom, 'visible:', isVisible, 'coords valid:', Number.isFinite(blueLat) && Number.isFinite(blueLng) && Number.isFinite(redLat) && Number.isFinite(redLng));
+        console.log('Jump circles not displayed - zoom:', currentZoom, 'visible:', isVisible, 'coords valid:', Number.isFinite(blueLat) && Number.isFinite(blueLng) && Number.isFinite(redLat) && Number.isFinite(redLng), 'calculateJump:', userSettings.calculateJump);
+        // Preserve green circles if showExitArea is true
+        if (!userSettings.showExitArea) {
+            jumpCircleGreen = null;
+            jumpCircleGreenLight = null;
+        }
     }
 
     if (currentMarker) {
@@ -3491,6 +3499,8 @@ function clearJumpCircles() {
         map.removeLayer(jumpCircleFull);
         jumpCircleFull = null;
     }
+   // Only clear green circles if showExitArea is false
+   if (!userSettings.showExitArea) {
     if (jumpCircleGreen) {
         map.removeLayer(jumpCircleGreen);
         jumpCircleGreen = null;
@@ -3499,6 +3509,7 @@ function clearJumpCircles() {
         map.removeLayer(jumpCircleGreenLight);
         jumpCircleGreenLight = null;
     }
+}
 }
 
 // Setup coordinate events
