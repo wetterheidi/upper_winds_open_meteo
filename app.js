@@ -53,6 +53,7 @@ const defaultSettings = {
     openingAltitude: 1200,      // New setting for opening altitude
     exitAltitude: 3000, // New default for Exit Altitude
     showJumpRunTrack: false, // New setting for jump run track
+    showExitArea: false // New setting for green circles
 };
 
 const minZoom = 11; // Placeholder, adjust as needed
@@ -296,6 +297,7 @@ function calculateJump() {
     const flyTimeFull = heightDistanceFull / descentRate;
     const horizontalCanopyDistanceFull = flyTimeFull * canopySpeedMps;
 
+    console.log('Calculated radii:', { horizontalCanopyDistance, horizontalCanopyDistanceFull });
     console.log('Jump inputs:', { exitAltitude, openingAltitude, legHeightDownwind, descentRate, canopySpeed, sliderIndex, lastLat, lastLng, lastAltitude });
 
     // Free fall phase
@@ -496,7 +498,7 @@ function calculateLandingPatternCoords(lat, lng, interpolatedData, sliderIndex) 
     return { downwindLat: downwindEnd[0], downwindLng: downwindEnd[1] };
 }
 
-function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, displacement, displacementFull, direction, directionFull, freeFallDirection, freeFallDistance) {
+function updateJumpCircleOLD(blueLat, blueLng, redLat, redLng, radius, radiusFull, displacement, displacementFull, direction, directionFull, freeFallDirection, freeFallDistance) {
     console.log('updateJumpCircle called with:', { blueLat, blueLng, redLat, redLng, radius, radiusFull, displacement, displacementFull, direction, directionFull, freeFallDirection, freeFallDistance });
     if (!map) {
         console.warn('Map not available to update jump circles');
@@ -558,47 +560,56 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
             weight: 2
         });
 
-        // First green circle (same as red circle radius)
-        let jumpCircleGreenCenter = newCenterRed; // Default to red center
-        if (Number.isFinite(freeFallDirection) && Number.isFinite(freeFallDistance)) {
-            const greenShiftDirection = (freeFallDirection + 180) % 360; // Opposite direction
-            jumpCircleGreenCenter = calculateNewCenter(newCenterRed[0], newCenterRed[1], freeFallDistance, greenShiftDirection);
-            console.log('Green circle center calculated:', { center: jumpCircleGreenCenter, shiftDirection: greenShiftDirection, shiftDistance: freeFallDistance });
-        } else {
-            console.warn('Free fall direction or distance not provided, using red circle center:', { freeFallDirection, freeFallDistance });
-        }
-
-        jumpCircleGreen = L.circle(jumpCircleGreenCenter, {
-            radius: radiusFull, // Same as red circle
-            color: 'green',
-            fillColor: 'none', // No fill
-            fillOpacity: 0,
-            weight: 2
-        });
-
-        // Light green circle (new, same as blue circle radius)
-        let jumpCircleGreenLightCenter = newCenterBlue; // Default to blue center
-        if (Number.isFinite(freeFallDirection) && Number.isFinite(freeFallDistance)) {
-            const greenLightShiftDirection = (freeFallDirection + 180) % 360; // Opposite direction
-            jumpCircleGreenLightCenter = calculateNewCenter(newCenterBlue[0], newCenterBlue[1], freeFallDistance, greenLightShiftDirection);
-            console.log('Light green circle center calculated:', { center: jumpCircleGreenLightCenter, shiftDirection: greenLightShiftDirection, shiftDistance: freeFallDistance });
-        } else {
-            console.warn('Free fall direction or distance not provided, using blue circle center for light green:', { freeFallDirection, freeFallDistance });
-        }
-
-        jumpCircleGreenLight = L.circle(jumpCircleGreenLightCenter, {
-            radius: radius, // Same as blue circle
-            color: 'lightgreen', // Lighter green color
-            fillColor: 'none', // No fill
-            fillOpacity: 0,
-            weight: 2
-        });
-
-        // Add circles to map
+        // Add blue and red circles to map
         jumpCircle.addTo(map);
         jumpCircleFull.addTo(map);
-        jumpCircleGreen.addTo(map);
-        jumpCircleGreenLight.addTo(map);
+
+        // Green circles (only if showExitArea is true)
+        if (userSettings.showExitArea) {
+            // First green circle (same as red circle radius)
+            let jumpCircleGreenCenter = newCenterRed; // Default to red center
+            if (Number.isFinite(freeFallDirection) && Number.isFinite(freeFallDistance)) {
+                const greenShiftDirection = (freeFallDirection + 180) % 360; // Opposite direction
+                jumpCircleGreenCenter = calculateNewCenter(newCenterRed[0], newCenterRed[1], freeFallDistance, greenShiftDirection);
+                console.log('Green circle center calculated:', { center: jumpCircleGreenCenter, shiftDirection: greenShiftDirection, shiftDistance: freeFallDistance });
+            } else {
+                console.warn('Free fall direction or distance not provided, using red circle center:', { freeFallDirection, freeFallDistance });
+            }
+
+            jumpCircleGreen = L.circle(jumpCircleGreenCenter, {
+                radius: radiusFull, // Same as red circle
+                color: 'green',
+                fillColor: 'none', // No fill
+                fillOpacity: 0,
+                weight: 2
+            });
+
+            // Light green circle (same as blue circle radius)
+            let jumpCircleGreenLightCenter = newCenterBlue; // Default to blue center
+            if (Number.isFinite(freeFallDirection) && Number.isFinite(freeFallDistance)) {
+                const greenLightShiftDirection = (freeFallDirection + 180) % 360; // Opposite direction
+                jumpCircleGreenLightCenter = calculateNewCenter(newCenterBlue[0], newCenterBlue[1], freeFallDistance, greenLightShiftDirection);
+                console.log('Light green circle center calculated:', { center: jumpCircleGreenLightCenter, shiftDirection: greenLightShiftDirection, shiftDistance: freeFallDistance });
+            } else {
+                console.warn('Free fall direction or distance not provided, using blue circle center for light green:', { freeFallDirection, freeFallDistance });
+            }
+
+            jumpCircleGreenLight = L.circle(jumpCircleGreenLightCenter, {
+                radius: radius, // Same as blue circle
+                color: 'lightgreen',
+                fillColor: 'none',
+                fillOpacity: 0,
+                weight: 2
+            });
+
+            // Add green circles to map
+            jumpCircleGreen.addTo(map);
+            jumpCircleGreenLight.addTo(map);
+        } else {
+            jumpCircleGreen = null;
+            jumpCircleGreenLight = null;
+        }
+
         console.log('Jump circles added at zoom:', currentZoom, 'Layers on map:', map.hasLayer(jumpCircle), map.hasLayer(jumpCircleFull), map.hasLayer(jumpCircleGreen), map.hasLayer(jumpCircleGreenLight));
         map.invalidateSize(); // Force refresh
         console.log('Map bounds after adding circles:', map.getBounds());
@@ -608,6 +619,135 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
         jumpCircleFull = null;
         jumpCircleGreen = null;
         jumpCircleGreenLight = null;
+    }
+
+    if (currentMarker) {
+        currentMarker.setLatLng([lastLat, lastLng]);
+        updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
+    }
+    console.log('updateJumpCircle completed');
+}
+
+function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, displacement, displacementFull, direction, directionFull, freeFallDirection, freeFallDistance) {
+    console.log('updateJumpCircle called with:', { blueLat, blueLng, redLat, redLng, radius, radiusFull, displacement, displacementFull, direction, directionFull, freeFallDirection, freeFallDistance, zoom: map.getZoom() });
+    if (!map) {
+        console.warn('Map not available to update jump circles');
+        return;
+    }
+
+    const currentZoom = map.getZoom();
+    const isVisible = currentZoom >= minZoom && currentZoom <= maxZoom;
+    console.log('Zoom check:', { currentZoom, minZoom, maxZoom, isVisible });
+
+    // Remove existing circles safely
+    const removeLayer = (layer, name) => {
+        if (layer && typeof layer === 'object' && '_leaflet_id' in layer && map.hasLayer(layer)) {
+            console.log(`Removing existing ${name} circle`);
+            map.removeLayer(layer);
+        }
+    };
+    removeLayer(jumpCircle, 'blue jump');
+    removeLayer(jumpCircleFull, 'red jump');
+    removeLayer(jumpCircleGreen, 'green jump');
+    removeLayer(jumpCircleGreenLight, 'light green jump');
+
+    // Reset layer variables
+    jumpCircle = null;
+    jumpCircleFull = null;
+    jumpCircleGreen = null;
+    jumpCircleGreenLight = null;
+
+    if (isVisible && Number.isFinite(blueLat) && Number.isFinite(blueLng) && Number.isFinite(redLat) && Number.isFinite(redLng)) {
+        const newCenterBlue = calculateNewCenter(blueLat, blueLng, displacement, direction);
+        const newCenterRed = calculateNewCenter(redLat, redLng, displacementFull, directionFull);
+        console.log('New centers calculated:', { blue: newCenterBlue, red: newCenterRed });
+
+        if (!Number.isFinite(newCenterBlue[0]) || !Number.isFinite(newCenterBlue[1]) || !Number.isFinite(newCenterRed[0]) || !Number.isFinite(newCenterRed[1])) {
+            console.warn('Invalid center coordinates:', { newCenterBlue, newCenterRed });
+            return;
+        }
+
+        if (!Number.isFinite(radius) || radius <= 0 || !Number.isFinite(radiusFull) || radiusFull <= 0) {
+            console.warn('Invalid radius values:', { radius, radiusFull });
+            return;
+        }
+
+        console.log('Creating circles with radii:', { blueRadius: radius, redRadius: radiusFull, greenRadius: userSettings.showExitArea ? radiusFull : null, greenLightRadius: userSettings.showExitArea ? radius : null });
+
+        // Blue circle
+        jumpCircle = L.circle(newCenterBlue, {
+            radius: radius,
+            color: 'blue',
+            fillColor: 'blue',
+            fillOpacity: 0.2,
+            weight: 2
+        });
+
+        // Red circle
+        jumpCircleFull = L.circle(newCenterRed, {
+            radius: radiusFull,
+            color: 'red',
+            fillColor: 'red',
+            fillOpacity: 0.2,
+            weight: 2
+        });
+
+        // Add blue and red circles to map
+        jumpCircle.addTo(map);
+        jumpCircleFull.addTo(map);
+
+        // Green circles (only if showExitArea is true)
+        if (userSettings.showExitArea) {
+            // First green circle (same as red circle radius)
+            let jumpCircleGreenCenter = newCenterRed;
+            if (Number.isFinite(freeFallDirection) && Number.isFinite(freeFallDistance)) {
+                const greenShiftDirection = (freeFallDirection + 180) % 360;
+                jumpCircleGreenCenter = calculateNewCenter(newCenterRed[0], newCenterRed[1], freeFallDistance, greenShiftDirection);
+                console.log('Green circle center calculated:', { center: jumpCircleGreenCenter, shiftDirection: greenShiftDirection, shiftDistance: freeFallDistance });
+            } else {
+                console.warn('Free fall direction or distance not provided, using red circle center:', { freeFallDirection, freeFallDistance });
+            }
+
+            jumpCircleGreen = L.circle(jumpCircleGreenCenter, {
+                radius: radiusFull,
+                color: 'green',
+                fillColor: 'none',
+                fillOpacity: 0,
+                weight: 2
+            });
+
+            // Light green circle (same as blue circle radius)
+            let jumpCircleGreenLightCenter = newCenterBlue;
+            if (Number.isFinite(freeFallDirection) && Number.isFinite(freeFallDistance)) {
+                const greenLightShiftDirection = (freeFallDirection + 180) % 360;
+                jumpCircleGreenLightCenter = calculateNewCenter(newCenterBlue[0], newCenterBlue[1], freeFallDistance, greenLightShiftDirection);
+                console.log('Light green circle center calculated:', { center: jumpCircleGreenLightCenter, shiftDirection: greenLightShiftDirection, shiftDistance: freeFallDistance });
+            } else {
+                console.warn('Free fall direction or distance not provided, using blue circle center for light green:', { freeFallDirection, freeFallDistance });
+            }
+
+            jumpCircleGreenLight = L.circle(jumpCircleGreenLightCenter, {
+                radius: radius,
+                color: 'lightgreen',
+                fillColor: 'none',
+                fillOpacity: 0,
+                weight: 2
+            });
+
+            // Add green circles to map
+            jumpCircleGreen.addTo(map);
+            jumpCircleGreenLight.addTo(map);
+        }
+
+        console.log('Jump circles added at zoom:', currentZoom, 'Layers on map:', {
+            blue: !!jumpCircle && map.hasLayer(jumpCircle),
+            red: !!jumpCircleFull && map.hasLayer(jumpCircleFull),
+            green: !!jumpCircleGreen && map.hasLayer(jumpCircleGreen),
+            greenLight: !!jumpCircleGreenLight && map.hasLayer(jumpCircleGreenLight)
+        });
+        // Removed map.invalidateSize() to prevent rendering issues
+    } else {
+        console.log('Jump circles not displayed - zoom:', currentZoom, 'visible:', isVisible, 'coords valid:', Number.isFinite(blueLat) && Number.isFinite(blueLng) && Number.isFinite(redLat) && Number.isFinite(redLng));
     }
 
     if (currentMarker) {
@@ -1119,7 +1259,7 @@ function initMap() {
         const currentZoom = map.getZoom();
         console.log('Zoom level changed to:', currentZoom);
     
-        if (userSettings.calculateJump) {
+        if (userSettings.calculateJump && weatherData && lastLat && lastLng) {
             console.log('Recalculating jump for zoom:', currentZoom);
             const jumpResult = calculateJump();
             console.log('Jump result:', jumpResult);
@@ -1136,7 +1276,8 @@ function initMap() {
                     direction: jumpResult.direction,
                     directionFull: jumpResult.directionFull,
                     freeFallDirection: jumpResult.freeFallDirection,
-                    freeFallDistance: jumpResult.freeFallDistance
+                    freeFallDistance: jumpResult.freeFallDistance,
+                    zoom: currentZoom
                 });
                 updateJumpCircle(
                     jumpResult.radius ? lastLat : 0,
@@ -1149,15 +1290,17 @@ function initMap() {
                     jumpResult.displacementFull,
                     jumpResult.direction,
                     jumpResult.directionFull,
-                    jumpResult.freeFallDirection, // Pass direction
-                    jumpResult.freeFallDistance // Pass distance
+                    jumpResult.freeFallDirection,
+                    jumpResult.freeFallDistance
                 );
             } else {
-                console.warn('calculateJump returned null, cannot update jump circles');
+                console.warn('calculateJump returned null, clearing jump circles');
+                clearJumpCircles();
             }
         }
     
         if (userSettings.showJumpRunTrack) {
+            console.log('Updating jump run track for zoom:', currentZoom);
             updateJumpRunTrack();
         }
     
@@ -1166,10 +1309,9 @@ function initMap() {
             updateLandingPattern();
         }
     
-        // Update marker position without opening popup
         if (currentMarker && lastLat && lastLng) {
             currentMarker.setLatLng([lastLat, lastLng]);
-            updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, false); // Do not open popup
+            updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, false);
         }
     });
 
@@ -2692,6 +2834,7 @@ function initializeUIElements() {
     setCheckboxValue('calculateJumpCheckbox', userSettings.calculateJump);
     setCheckboxValue('showLandingPattern', userSettings.showLandingPattern);
     setCheckboxValue('showJumpRunTrack', userSettings.showJumpRunTrack);
+    setCheckboxValue('showExitAreaCheckbox', userSettings.showExitArea); // New checkbox
 
     // Ensure UI reflects the stored custom direction without overwriting
     const customLL = document.getElementById('customLandingDirectionLL');
@@ -2741,13 +2884,28 @@ function setCheckboxValue(id, value) {
     if (element) element.checked = value;
 }
 
-function updateUIState() {
+function updateUIStateOLD() {
     const info = document.getElementById('info');
     if (info) info.style.display = userSettings.showTable ? 'block' : 'none';
     const customLL = document.getElementById('customLandingDirectionLL');
     const customRR = document.getElementById('customLandingDirectionRR');
     if (customLL) customLL.disabled = userSettings.landingDirection !== 'LL';
     if (customRR) customRR.disabled = userSettings.landingDirection !== 'RR';
+    updateHeightUnitLabels();
+    updateWindUnitLabels();
+}
+
+function updateUIState() {
+    const info = document.getElementById('info');
+    if (info) info.style.display = userSettings.showTable ? 'block' : 'none';
+    const customLL = document.getElementById('customLandingDirectionLL');
+    const customRR = document.getElementById('customLandingDirectionRR');
+    const showJumpRunTrackCheckbox = document.getElementById('showJumpRunTrack');
+    const showExitAreaCheckbox = document.getElementById('showExitAreaCheckbox');
+    if (customLL) customLL.disabled = userSettings.landingDirection !== 'LL';
+    if (customRR) customRR.disabled = userSettings.landingDirection !== 'RR';
+    if (showJumpRunTrackCheckbox) showJumpRunTrackCheckbox.disabled = !userSettings.calculateJump;
+    if (showExitAreaCheckbox) showExitAreaCheckbox.disabled = !userSettings.calculateJump; // Disable unless calculateJump is on
     updateHeightUnitLabels();
     updateWindUnitLabels();
 }
@@ -3183,13 +3341,12 @@ function setupCheckboxEvents() {
             clearJumpCircles();
         };
 
-        // Mark as initial load to suppress error and uncheck the checkbox
         if (!checkbox.dataset.initialLoad) {
             checkbox.dataset.initialLoad = 'true';
-            checkbox.checked = false; // Uncheck the checkbox on initial load
-            userSettings.calculateJump = false; // Sync settings to reflect unchecked state
-            saveSettings(); // Save the updated settings
-            return; // Skip initial callback
+            checkbox.checked = false;
+            userSettings.calculateJump = false;
+            saveSettings();
+            return;
         }
 
         if (checkbox.checked) {
@@ -3270,6 +3427,7 @@ function setupCheckboxEvents() {
             disableFeature();
         }
     });
+
     setupCheckbox('showJumpRunTrack', 'showJumpRunTrack', (checkbox) => {
         userSettings.showJumpRunTrack = checkbox.checked;
         saveSettings();
@@ -3280,12 +3438,20 @@ function setupCheckboxEvents() {
                 map.removeLayer(jumpRunTrackLayer);
                 jumpRunTrackLayer = null;
             }
-            // Setze das Eingabefeld zurück auf den berechneten Wert, wenn deaktiviert
             const directionInput = document.getElementById('jumpRunTrackDirection');
             if (directionInput && weatherData && lastLat && lastLng) {
                 const trackData = jumpRunTrack();
                 if (trackData) directionInput.value = trackData.direction;
             }
+        }
+    });
+
+    setupCheckbox('showExitAreaCheckbox', 'showExitArea', (checkbox) => {
+        userSettings.showExitArea = checkbox.checked;
+        saveSettings();
+        console.log('Show Exit Area set to:', userSettings.showExitArea);
+        if (userSettings.calculateJump && weatherData && lastLat && lastLng) {
+            calculateJump(); // Recalculate to update green circle visibility
         }
     });
 }
@@ -3324,6 +3490,14 @@ function clearJumpCircles() {
     if (jumpCircleFull) {
         map.removeLayer(jumpCircleFull);
         jumpCircleFull = null;
+    }
+    if (jumpCircleGreen) {
+        map.removeLayer(jumpCircleGreen);
+        jumpCircleGreen = null;
+    }
+    if (jumpCircleGreenLight) {
+        map.removeLayer(jumpCircleGreenLight);
+        jumpCircleGreenLight = null;
     }
 }
 
