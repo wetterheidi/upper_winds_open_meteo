@@ -787,6 +787,16 @@ input[type="checkbox"][style*="opacity: 1"] {
     cursor: pointer;
 }
 
+.wind-tooltip {
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    border: none;
+    border-radius: 3px;
+    padding: 5px;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
 @keyframes spin {
     0% {
         transform: rotate(0deg);

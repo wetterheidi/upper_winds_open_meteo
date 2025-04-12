@@ -893,8 +893,8 @@ function initMap() {
     }
     recenterMap();
 
-     // Helper function to handle initial fetch
-     async function fetchInitialWeather(lat, lng) {
+    // Helper function to handle initial fetch
+    async function fetchInitialWeather(lat, lng) {
         const lastFullHourUTC = getLastFullHourUTC();
         console.log('initMap: Last full hour UTC:', lastFullHourUTC.toISOString());
         let initialTime;
@@ -1107,23 +1107,23 @@ function initMap() {
 
     mapContainer.addEventListener('touchstart', async (e) => {
         if (e.touches.length !== 1) return;
-    
+
         const currentTime = new Date().getTime();
         const timeSinceLastTap = currentTime - lastTapTime;
-    
+
         if (timeSinceLastTap < tapThreshold && timeSinceLastTap > 0) {
             e.preventDefault();
-    
+
             const rect = mapContainer.getBoundingClientRect();
             const touchX = e.touches[0].clientX - rect.left;
             const touchY = e.touches[0].clientY - rect.top;
             const latlng = map.containerPointToLatLng([touchX, touchY]);
-    
+
             const { lat, lng } = latlng;
             lastLat = lat;
             lastLng = lng;
             lastAltitude = await getAltitude(lat, lng);
-    
+
             if (currentMarker) currentMarker.remove();
             currentMarker = createCustomMarker(lat, lng).addTo(map);
             attachMarkerDragend(currentMarker);
@@ -1134,19 +1134,19 @@ function initMap() {
                     updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, true);
                 }
             });
-    
+
             updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, true); // Open popup on touch
             if (userSettings.calculateJump) {
                 calculateJump();
             }
             recenterMap();
-    
+
             const slider = document.getElementById('timeSlider');
             const currentIndex = parseInt(slider.value) || 0;
             const currentTime = weatherData?.time?.[currentIndex] || null;
             await fetchWeatherForLocation(lastLat, lastLng, currentTime);
         }
-    
+
         lastTapTime = currentTime;
     }, { passive: false });
 }
@@ -2096,6 +2096,16 @@ function updateLandingPattern() {
         return;
     }
 
+    // Helper function to convert wind speed to user-selected unit
+    function formatWindSpeed(speedKt) {
+        const unit = getWindSpeedUnit();
+        const convertedSpeed = Utils.convertWind(speedKt, unit, 'kt');
+        if (unit === 'bft') {
+            return Math.round(convertedSpeed); // Beaufort scale is integer
+        }
+        return convertedSpeed.toFixed(1); // Other units to one decimal
+    }
+
     const calculateLegEndpoint = (startLat, startLng, bearing, groundSpeedKt, timeSec) => {
         const speedMps = groundSpeedKt * 1.852 / 3.6;
         const lengthMeters = speedMps * timeSec;
@@ -2154,6 +2164,11 @@ function updateLandingPattern() {
     finalArrow = L.marker([finalMidLat, finalMidLng], {
         icon: createArrowIcon(finalMidLat, finalMidLng, finalArrowBearing, finalArrowColor)
     }).addTo(map);
+    finalArrow.bindTooltip(`${Math.round(finalWindDir)}° ${formatWindSpeed(finalWindSpeedKt)}${getWindSpeedUnit()}`, {
+        offset: [10, 0], // Slight offset to avoid overlap
+        direction: 'right',
+        className: 'wind-tooltip'
+    });
 
     // Base Leg (100-200m AGL)
     const baseLimits = [baseHeight + LEG_HEIGHT_FINAL, baseHeight + LEG_HEIGHT_BASE];
@@ -2216,6 +2231,11 @@ function updateLandingPattern() {
     baseArrow = L.marker([baseMidLat, baseMidLng], {
         icon: createArrowIcon(baseMidLat, baseMidLng, baseArrowBearing, baseArrowColor)
     }).addTo(map);
+    baseArrow.bindTooltip(`${Math.round(baseWindDir)}° ${formatWindSpeed(baseWindSpeedKt)}${getWindSpeedUnit()}`, {
+        offset: [10, 0],
+        direction: 'right',
+        className: 'wind-tooltip'
+    });
 
     // Downwind Leg (200-300m AGL)
     const downwindLimits = [baseHeight + LEG_HEIGHT_BASE, baseHeight + LEG_HEIGHT_DOWNWIND];
@@ -2262,6 +2282,11 @@ function updateLandingPattern() {
     downwindArrow = L.marker([downwindMidLat, downwindMidLng], {
         icon: createArrowIcon(downwindMidLat, downwindMidLng, downwindArrowBearing, downwindArrowColor)
     }).addTo(map);
+    downwindArrow.bindTooltip(`${Math.round(downwindWindDir)}° ${formatWindSpeed(downwindWindSpeedKt)}${getWindSpeedUnit()}`, {
+        offset: [10, 0],
+        direction: 'right',
+        className: 'wind-tooltip'
+    });
 
     console.log(`Landing Pattern Updated:
         Final Leg: Wind: ${finalWindDir.toFixed(1)}° @ ${finalWindSpeedKt.toFixed(1)}kt, Course: ${finalCourse.toFixed(1)}°, WCA: ${finalWca.toFixed(1)}°, GS: ${finalGroundSpeedKt.toFixed(1)}kt, HW: ${finalHeadwind.toFixed(1)}kt, Length: ${finalLength.toFixed(1)}m
@@ -2811,7 +2836,7 @@ function setupRadioGroup(name, callback) {
             userSettings[name] = document.querySelector(`input[name="${name}"]:checked`).value;
             saveSettings();
             console.log(`${name} changed to:`, userSettings[name]);
-            
+
             // Only for landingDirection, handle custom inputs
             if (name === 'landingDirection') {
                 const customLL = document.getElementById('customLandingDirectionLL');
@@ -3244,7 +3269,7 @@ function setupCoordinateEvents() {
                 lastLat = lat;
                 lastLng = lng;
                 lastAltitude = await getAltitude(lat, lng);
-        
+
                 if (currentMarker) {
                     currentMarker.setLatLng([lat, lng]);
                 } else {
@@ -3257,7 +3282,7 @@ function setupCoordinateEvents() {
                         }
                     });
                 }
-        
+
                 updateMarkerPopup(currentMarker, lat, lng, lastAltitude, true); // Open popup on move
                 if (userSettings.calculateJump) {
                     calculateJump();
