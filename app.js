@@ -3229,26 +3229,32 @@ function setupMenuEvents() {
     const hamburgerBtn = document.getElementById('hamburgerBtn');
     const menu = document.getElementById('menu');
     if (hamburgerBtn && menu) {
-        // Toggle menu visibility on hamburger button click
+        // Toggle main menu visibility only on hamburger button click
         hamburgerBtn.addEventListener('click', () => {
             const isHidden = menu.classList.contains('hidden');
             menu.classList.toggle('hidden', !isHidden);
-            console.log('Menu toggled:', isHidden ? 'shown' : 'hidden');
+            console.log('Main menu toggled:', isHidden ? 'shown' : 'hidden');
         });
 
-        // Handle submenu toggling when clicking menu items
-        const menuItems = menu.querySelectorAll('span');
+        // Handle submenu toggling for all menu items with a span
+        const menuItems = menu.querySelectorAll('li span');
         menuItems.forEach(item => {
             item.addEventListener('click', (e) => {
+                // Find the submenu directly following the span
                 const submenu = item.nextElementSibling;
                 if (submenu && submenu.classList.contains('submenu')) {
-                    console.log('Clicked item:', item.textContent);
-                    console.log('Submenu found:', submenu);
+                    console.log('Clicked menu item:', item.textContent);
                     const isSubmenuHidden = submenu.classList.contains('hidden');
-                    console.log('Before toggle - Submenu hidden:', isSubmenuHidden);
-                    // Close other submenus...
+                    // Close other submenus at the same level to prevent overlap
+                    const parentUl = item.closest('ul');
+                    parentUl.querySelectorAll('.submenu').forEach(otherSubmenu => {
+                        if (otherSubmenu !== submenu) {
+                            otherSubmenu.classList.add('hidden');
+                        }
+                    });
+                    // Toggle the clicked submenu
                     submenu.classList.toggle('hidden', !isSubmenuHidden);
-                    console.log('After toggle - Submenu hidden:', submenu.classList.contains('hidden'));
+                    console.log('Submenu toggled:', isSubmenuHidden ? 'shown' : 'hidden');
                 } else {
                     console.log('No submenu for item:', item.textContent);
                 }
@@ -3256,17 +3262,9 @@ function setupMenuEvents() {
             });
         });
 
-        // Prevent clicks within the menu from closing it
+        // Prevent clicks within the menu from propagating to the document
         menu.addEventListener('click', (e) => {
             e.stopPropagation();
-        });
-
-        // Close main menu when clicking outside, but preserve Calculate Jump submenu
-        document.addEventListener('click', (e) => {
-            if (!menu.contains(e.target) && !hamburgerBtn.contains(e.target) && !menu.classList.contains('hidden')) {
-                menu.classList.add('hidden');
-                console.log('Main menu closed due to outside click');
-            }
         });
     } else {
         console.warn('Hamburger button or menu not found');
