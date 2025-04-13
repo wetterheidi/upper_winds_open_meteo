@@ -319,7 +319,8 @@ function initMap() {
     map = L.map('map', {
         center: defaultCenter,
         zoom: defaultZoom,
-        zoomControl: false
+        zoomControl: false,
+        doubleClickZoom: false // Disable double-click zoom globally
     });
 
     // Base layers setup (unchanged)
@@ -530,6 +531,7 @@ function initMap() {
         lastLng = lng;
         lastAltitude = await getAltitude(lat, lng);
         console.log('Map double-clicked, moving marker to:', { lat, lng });
+    
         if (currentMarker) currentMarker.remove();
         currentMarker = createCustomMarker(lat, lng).addTo(map);
         attachMarkerDragend(currentMarker);
@@ -540,17 +542,27 @@ function initMap() {
                 updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, true);
             }
         });
+    
         updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, true);
-        resetJumpRunDirection(true);
+        resetJumpRunDirection(false); // Do NOT update JRT yet
         if (userSettings.calculateJump) {
             console.log('Recalculating jump for marker click');
             calculateJump();
         }
         recenterMap();
+    
         const slider = document.getElementById('timeSlider');
         const currentIndex = parseInt(slider.value) || 0;
         const currentTime = weatherData?.time?.[currentIndex] || null;
+        
+        // Fetch weather data first
         await fetchWeatherForLocation(lat, lng, currentTime);
+        
+        // Now update JRT with new weather data
+        if (userSettings.showJumpRunTrack) {
+            console.log('Updating JRT after weather fetch for double-click');
+            updateJumpRunTrack();
+        }
     });
 
 
