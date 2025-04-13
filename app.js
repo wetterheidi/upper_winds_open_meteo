@@ -2938,24 +2938,31 @@ function setupMenuEvents() {
             item.addEventListener('click', (e) => {
                 const submenu = item.nextElementSibling;
                 if (submenu && submenu.classList.contains('submenu')) {
+                    console.log('Clicked item:', item.textContent);
+                    console.log('Submenu found:', submenu);
                     const isSubmenuHidden = submenu.classList.contains('hidden');
-                    // Close all other submenus
-                    menu.querySelectorAll('.submenu').forEach(other => {
-                        if (other !== submenu && !other.classList.contains('hidden')) {
-                            other.classList.add('hidden');
-                        }
-                    });
-                    // Toggle the clicked submenu
+                    console.log('Before toggle - Submenu hidden:', isSubmenuHidden);
+                    // Close other submenus...
                     submenu.classList.toggle('hidden', !isSubmenuHidden);
-                    console.log('Submenu toggled:', item.textContent, isSubmenuHidden ? 'shown' : 'hidden');
+                    console.log('After toggle - Submenu hidden:', submenu.classList.contains('hidden'));
+                } else {
+                    console.log('No submenu for item:', item.textContent);
                 }
-                e.stopPropagation(); // Prevent event bubbling to document
+                e.stopPropagation();
             });
         });
 
         // Prevent clicks within the menu from closing it
         menu.addEventListener('click', (e) => {
             e.stopPropagation();
+        });
+
+        // Close main menu when clicking outside, but preserve Calculate Jump submenu
+        document.addEventListener('click', (e) => {
+            if (!menu.contains(e.target) && !hamburgerBtn.contains(e.target) && !menu.classList.contains('hidden')) {
+                menu.classList.add('hidden');
+                console.log('Main menu closed due to outside click');
+            }
         });
     } else {
         console.warn('Hamburger button or menu not found');
