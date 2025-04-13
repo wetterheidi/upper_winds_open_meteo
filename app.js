@@ -1,3 +1,7 @@
+
+// == Project: Skydiving Weather and Jump Planner ==
+// == Constants and Global Variables ==
+const FEATURE_PASSWORD = "skydiver2025"; // Hardcoded password (change as needed)
 let map;
 let weatherData = null;
 let lastLat = null;
@@ -17,6 +21,16 @@ let jumpCircleFull = null; // New red circle for full descent
 let jumpCircleGreen = null; // New green circle
 let jumpCircleGreenLight = null; // New light green circle (blue circle radius)
 let jumpRunTrackLayer = null;
+const minZoom = 11; // Placeholder, adjust as needed
+const maxZoom = 14; // Placeholder, adjust as needed
+const landingPatternMinZoom = 14; // New constant for landing pattern
+let isLandingPatternUnlocked = false;   // Track unlock state during session
+let isCalculateJumpUnlocked = false;    // Track unlock state during session
+let userSettings = JSON.parse(localStorage.getItem('upperWindsSettings')) || { ...defaultSettings };
+const unlockedFeatures = JSON.parse(localStorage.getItem('unlockedFeatures')) || {};
+isLandingPatternUnlocked = unlockedFeatures.landingPattern || false;
+isCalculateJumpUnlocked = unlockedFeatures.calculateJump || false;
+console.log('Initial unlock status:', { isLandingPatternUnlocked, isCalculateJumpUnlocked });
 
 const getTemperatureUnit = () => getSettingValue('temperatureUnit', 'radio', 'C');
 const getHeightUnit = () => getSettingValue('heightUnit', 'radio', 'm');
@@ -57,30 +71,12 @@ const defaultSettings = {
     showExitArea: false // New setting for green circles
 };
 
-const minZoom = 11; // Placeholder, adjust as needed
-const maxZoom = 14; // Placeholder, adjust as needed
-const landingPatternMinZoom = 14; // New constant for landing pattern
-
-const FEATURE_PASSWORD = "skydiver2025"; // Hardcoded password (change as needed)
-let isLandingPatternUnlocked = false;   // Track unlock state during session
-let isCalculateJumpUnlocked = false;    // Track unlock state during session
-
-// Load settings and unlock status from localStorage
-let userSettings = JSON.parse(localStorage.getItem('upperWindsSettings')) || { ...defaultSettings };
-const unlockedFeatures = JSON.parse(localStorage.getItem('unlockedFeatures')) || {};
-isLandingPatternUnlocked = unlockedFeatures.landingPattern || false;
-isCalculateJumpUnlocked = unlockedFeatures.calculateJump || false;
-console.log('Initial unlock status:', { isLandingPatternUnlocked, isCalculateJumpUnlocked });
-
-function saveUnlockStatus() {
-    const unlockedFeatures = {
-        landingPattern: isLandingPatternUnlocked,
-        calculateJump: isCalculateJumpUnlocked
-    };
-    localStorage.setItem('unlockedFeatures', JSON.stringify(unlockedFeatures));
+// == Settings Management ==
+function getSettingValue(name, type = 'radio', defaultValue) {
+    const selector = type === 'radio' ? `input[name="${name}"]:checked` : `#${name}`;
+    const element = document.querySelector(selector);
+    return element ? (type === 'select' ? parseInt(element.value) || defaultValue : element.value) : defaultValue;
 }
-
-// Function to save settings to localStorage
 function saveSettings() {
     try {
         localStorage.setItem('upperWindsSettings', JSON.stringify(userSettings));
@@ -89,594 +85,17 @@ function saveSettings() {
         console.warn('Failed to save settings to localStorage:', error);
     }
 }
-
-// Update model run info in menu
-function updateModelRunInfo() {
-    const modelLabel = document.getElementById('modelLabel'); // Target the label
-    const modelSelect = document.getElementById('modelSelect');
-    if (modelLabel && lastModelRun) {
-        const model = modelSelect.value;
-        const titleContent = `Model: ${model.replace('_', ' ').toUpperCase()}\nRun: ${lastModelRun}`; // Use \n for line break in title
-        modelLabel.title = titleContent; // Set the title attribute
-    }
-    // Optional: If you want to use local time, uncomment and adjust as async
-    /*
-    if (modelLabel && lastModelRun) {
-        const model = modelSelect.value;
-        const timeZone = document.querySelector('input[name="timeZone"]:checked')?.value || 'Z';
-        const displayTime = timeZone === 'Z' || !lastLat || !lastLng
-            ? lastModelRun
-            : await Utils.formatLocalTime(lastModelRun.replace(' ', 'T') + ':00Z', lastLat, lastLng);
-        const titleContent = `Model: ${model.replace('_', ' ').toUpperCase()}\nRun: ${displayTime}`;
-        modelLabel.title = titleContent;
-    }
-    */
-}
-
-function updateReferenceLabels() {
-    const refLevel = document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL';
-    console.log('Updating labels to refLevel:', refLevel);
-    const meanWindResult = document.getElementById('meanWindResult');
-    if (meanWindResult && meanWindResult.innerHTML) {
-        const currentText = meanWindResult.innerHTML;
-        const updatedText = currentText.replace(/\((\d+)-(\d+) m [A-Za-z]+\)/, `($1-$2 m ${refLevel})`);
-        meanWindResult.innerHTML = updatedText;
-    }
-}
-
-function calculateFreeFall(weatherData, exitAltitude, openingAltitude, sliderIndex, startLat, startLng, elevation) {
-    console.log('Starting calculateFreeFall...', { exitAltitude, openingAltitude, sliderIndex });
-
-    if (!weatherData || !weatherData.time || !weatherData.surface_pressure) {
-        console.warn('Invalid weather data provided');
-        return null;
-    }
-    if (!Number.isFinite(startLat) || !Number.isFinite(startLng) || !Number.isFinite(elevation)) {
-        console.warn('Invalid coordinates or elevation');
-        return null;
-    }
-
-    const mass = 80;
-    const g = 9.81;
-    const Rl = 287.102;
-    const cdHorizontal = 1;
-    const areaHorizontal = 0.5;
-    const cdVertical = 1;
-    const areaVertical = 0.5;
-    const dt = 0.5;
-
-    const hStart = elevation + exitAltitude;
-    const hStop = elevation + openingAltitude;
-    const jumpRunData = jumpRunTrack();
-    const jumpRunDirection = jumpRunData ? jumpRunData.direction : 0;
-    const aircraftSpeedKt = 90;
-    const aircraftSpeedMps = aircraftSpeedKt * 0.514444;
-    const vxInitial = Math.cos((jumpRunDirection) * Math.PI / 180) * aircraftSpeedMps;
-    const vyInitial = Math.sin((jumpRunDirection) * Math.PI / 180) * aircraftSpeedMps;
-
-    console.log('Free fall initial values: ', aircraftSpeedKt, ' kt ', jumpRunDirection, '°');
-    console.log('Free fall initial velocity: ', { vxInitial, vyInitial });
-
-    const interpolatedData = interpolateWeatherData(sliderIndex);
-    if (!interpolatedData || interpolatedData.length === 0) {
-        console.warn('No interpolated weather data available');
-        return null;
-    }
-    const heights = interpolatedData.map(d => d.height);
-    const windDirs = interpolatedData.map(d => Number.isFinite(d.dir) ? parseFloat(d.dir) : 0);
-    const windSpdsMps = interpolatedData.map(d => Utils.convertWind(parseFloat(d.spd) || 0, 'm/s', 'km/h'));
-    const tempsC = interpolatedData.map(d => d.temp);
-
-    const trajectory = [{
-        time: 0,
-        height: hStart,
-        vz: 0,
-        vxGround: vxInitial,
-        vyGround: vyInitial,
-        x: 0,
-        y: 0
-    }];
-
-    const surfacePressure = weatherData.surface_pressure[sliderIndex] || 1013.25;
-    const surfaceTempC = weatherData.temperature_2m[sliderIndex] || 15;
-    const surfaceTempK = surfaceTempC + 273.15;
-    let rho = (surfacePressure * 100) / (Rl * surfaceTempK);
-
-    let current = trajectory[0];
-    while (current.height > hStop) {
-        const windDir = Utils.LIP(heights, windDirs, current.height);
-        const windSpd = Utils.LIP(heights, windSpdsMps, current.height);
-        const tempC = Utils.LIP(heights, tempsC, current.height);
-        const tempK = tempC + 273.15;
-        rho = (surfacePressure * 100 * Math.exp(-g * (current.height - elevation) / (Rl * tempK))) / (Rl * tempK);
-
-        // Wind direction is "from," displacement is "to" (add 180°)
-        const windDirTo = (windDir + 180) % 360;
-        const vxWind = windSpd * Math.cos(windDirTo * Math.PI / 180); // Displacement direction
-        const vyWind = windSpd * Math.sin(windDirTo * Math.PI / 180);
-
-        const vxAir = current.vxGround - vxWind;
-        const vyAir = current.vyGround - vyWind;
-        const vAirMag = Math.sqrt(vxAir * vxAir + vyAir * vyAir);
-
-        const bv = 0.5 * cdVertical * areaVertical * rho / mass;
-        const bh = 0.5 * cdHorizontal * areaHorizontal * rho / mass;
-
-        const az = -g - bv * current.vz * Math.abs(current.vz);
-        const ax = -bh * vAirMag * vxAir;
-        const ay = -bh * vAirMag * vyAir;
-
-        let nextHeight = current.height + current.vz * dt;
-        let nextVz = current.vz + az * dt;
-        let nextTime = current.time + dt;
-
-        if (nextHeight <= hStop) {
-            const fraction = (current.height - hStop) / (current.height - nextHeight);
-            nextTime = current.time + dt * fraction;
-            nextHeight = hStop;
-            nextVz = current.vz + az * dt * fraction;
-        }
-
-        const next = {
-            time: nextTime,
-            height: nextHeight,
-            vz: nextVz,
-            vxGround: vxInitial === 0 ? vxWind : current.vxGround + ax * dt,
-            vyGround: vyInitial === 0 ? vyWind : current.vyGround + ay * dt,
-            x: current.x + (vxInitial === 0 ? vxWind : current.vxGround) * dt,
-            y: current.y + (vyInitial === 0 ? vyWind : current.vyGround) * dt
-        };
-
-        trajectory.push(next);
-        current = next;
-
-        if (next.height === hStop) break;
-    }
-
-    const final = trajectory[trajectory.length - 1];
-    const distance = Math.sqrt(final.x * final.x + final.y * final.y);
-    const directionRad = Math.atan2(final.y, final.x);
-    let directionDeg = directionRad * 180 / Math.PI;
-    directionDeg = (directionDeg + 360) % 360;
-
-    console.log(`Free fall from exit to opening: ${Math.round(directionDeg)}° ${Math.round(distance)} m, vz: ${final.vz.toFixed(2)} m/s`);
-    console.log('Elevation used:', elevation);
-
-    const result = {
-        time: final.time,
-        height: final.height,
-        vz: final.vz,
-        xDisplacement: final.x,
-        yDisplacement: final.y,
-        path: trajectory.map(point => ({
-            latLng: calculateNewCenter(startLat, startLng, Math.sqrt(point.x * point.x + point.y * point.y), Math.atan2(point.y, point.x) * 180 / Math.PI),
-            height: point.height,
-            time: point.time,
-            vz: point.vz
-        })),
-        directionDeg: directionDeg, // Include direction
-        distance: distance // Include distance
+function saveUnlockStatus() {
+    const unlockedFeatures = {
+        landingPattern: isLandingPatternUnlocked,
+        calculateJump: isCalculateJumpUnlocked
     };
-
-    console.log('Free fall result:', result);
-    return result;
+    localStorage.setItem('unlockedFeatures', JSON.stringify(unlockedFeatures));
 }
-
-// Visualize the free fall path
-function visualizeFreeFallPath(path) {
-    if (!map || !userSettings.calculateJump) return;
-
-    const latLngs = path.map(point => point.latLng);
-    const freeFallPolyline = L.polyline(latLngs, {
-        color: 'purple',
-        weight: 3,
-        opacity: 0.7,
-        dashArray: '10, 10'
-    }).addTo(map);
-
-    freeFallPolyline.bindPopup(`Free Fall Path<br>Duration: ${path[path.length - 1].time.toFixed(1)}s<br>Distance: ${Math.sqrt(path[path.length - 1].latLng[0] ** 2 + path[path.length - 1].latLng[1] ** 2).toFixed(1)}m`);
+function initializeSettings() {
+    userSettings = JSON.parse(localStorage.getItem('upperWindsSettings')) || { ...defaultSettings };
+    console.log('Loaded userSettings:', userSettings);
 }
-
-function calculateJump() {
-    console.log('Starting calculateJump...');
-    if (!weatherData || !weatherData.time || !weatherData.surface_pressure) {
-        console.warn('Weather data not available');
-        return null;
-    }
-    const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
-    const exitAltitude = parseInt(document.getElementById('exitAltitude')?.value) || 3000;
-    const openingAltitude = parseInt(document.getElementById('openingAltitude')?.value) || 1200;
-    const legHeightDownwind = parseInt(document.getElementById('legHeightDownwind')?.value) || 300;
-    const descentRate = parseFloat(document.getElementById('descentRate')?.value) || 3.5;
-    const canopySpeed = parseFloat(document.getElementById('canopySpeed')?.value) || 20;
-
-    const canopySpeedMps = canopySpeed * 0.514444; // Convert kt to m/s
-    const heightDistance = openingAltitude - 200 - legHeightDownwind;
-    const flyTime = heightDistance / descentRate;
-    const horizontalCanopyDistance = flyTime * canopySpeedMps;
-    const heightDistanceFull = openingAltitude - 200;
-    const flyTimeFull = heightDistanceFull / descentRate;
-    const horizontalCanopyDistanceFull = flyTimeFull * canopySpeedMps;
-
-    console.log('Calculated radii:', { horizontalCanopyDistance, horizontalCanopyDistanceFull });
-    console.log('Jump inputs:', { exitAltitude, openingAltitude, legHeightDownwind, descentRate, canopySpeed, sliderIndex, lastLat, lastLng, lastAltitude });
-
-    // Free fall phase
-    const freeFallResult = calculateFreeFall(weatherData, exitAltitude, openingAltitude, sliderIndex, lastLat, lastLng, lastAltitude);
-    console.log('Freefall calculated');
-    if (!freeFallResult) {
-        console.warn('Free fall calculation failed');
-        return null;
-    }
-
-    if (horizontalCanopyDistance <= 0 || horizontalCanopyDistanceFull <= 0) {
-        console.warn('Invalid radii:', { horizontalCanopyDistance, horizontalCanopyDistanceFull });
-        return null;
-    }
-
-    const interpolatedData = interpolateWeatherData(sliderIndex);
-
-    if (!interpolatedData || interpolatedData.length === 0) {
-        console.warn('No interpolated weather data available');
-        return null;
-    }
-
-    const elevation = Math.round(lastAltitude);
-    const lowerLimitFull = elevation;
-    const upperLimitFull = elevation + openingAltitude - 200;
-    const lowerLimit = elevation + legHeightDownwind;
-    const upperLimit = elevation + openingAltitude - 200;
-
-    const heights = interpolatedData.map(d => d.height);
-    const dirs = interpolatedData.map(d => Number.isFinite(d.dir) ? parseFloat(d.dir) : 0);
-    const spdsMps = interpolatedData.map(d => Utils.convertWind(parseFloat(d.spd) || 0, 'm/s', 'km/h')); // km/h to m/s
-
-    const uComponents = spdsMps.map((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
-    const vComponents = spdsMps.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
-
-    const meanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, lowerLimit, upperLimit);
-    const meanWindDirection = meanWind[0];
-    const meanWindSpeedMps = meanWind[1];
-    console.log('Mean wind blue: ', meanWindDirection.toFixed(1), meanWindSpeedMps.toFixed(1), 'm/s');
-
-    const meanWindFull = Utils.calculateMeanWind(heights, uComponents, vComponents, lowerLimitFull, upperLimitFull);
-    const meanWindDirectionFull = meanWindFull[0];
-    const meanWindSpeedMpsFull = meanWindFull[1];
-    console.log('Mean wind red: ', meanWindDirectionFull.toFixed(1), meanWindSpeedMpsFull.toFixed(1), 'm/s');
-
-    const centerDisplacement = meanWindSpeedMps * flyTime;
-    const centerDisplacementFull = meanWindSpeedMpsFull * flyTimeFull;
-    const displacementDirection = meanWindDirection;
-    const displacementDirectionFull = meanWindDirectionFull;
-
-    if (!Number.isFinite(lastLat) || !Number.isFinite(lastLng)) {
-        console.error('Invalid lastLat or lastLng:', { lastLat, lastLng });
-        return null;
-    }
-
-    // Always calculate landing pattern coordinates, but only display if enabled
-    console.log('Calculating landing pattern coordinates...');
-    const landingPatternCoords = calculateLandingPatternCoords(lastLat, lastLng, interpolatedData, sliderIndex);
-    let downwindLat = landingPatternCoords.downwindLat;
-    let downwindLng = landingPatternCoords.downwindLng;
-
-    if (userSettings.showLandingPattern) {
-        console.log('Displaying landing pattern...');
-        updateLandingPattern();
-    } else {
-        console.log('Landing pattern not displayed; blue circle still uses downwind end');
-    }
-
-    // Fallback if downwind coordinates are invalid
-    if (!Number.isFinite(downwindLat) || !Number.isFinite(downwindLng)) {
-        console.warn('Downwind coordinates invalid, using lastLat, lastLng as fallback');
-        downwindLat = lastLat;
-        downwindLng = lastLng;
-    }
-
-    console.log('Calling updateJumpCircle with:', { downwindLat, downwindLng, lastLat, lastLng, horizontalCanopyDistance, horizontalCanopyDistanceFull, centerDisplacement, centerDisplacementFull, displacementDirection, displacementDirectionFull, freeFallDirection: freeFallResult.directionDeg, freeFallDistance: freeFallResult.distance });
-    updateJumpCircle(
-        downwindLat,
-        downwindLng,
-        lastLat,
-        lastLng,
-        horizontalCanopyDistance,
-        horizontalCanopyDistanceFull,
-        centerDisplacement,
-        centerDisplacementFull,
-        displacementDirection,
-        displacementDirectionFull,
-        freeFallResult.directionDeg, // Pass direction
-        freeFallResult.distance // Pass distance
-    );
-
-    if (currentMarker) {
-        currentMarker.setLatLng([lastLat, lastLng]);
-        updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
-    }
-
-    updateJumpRunTrack();
-    jumpRunTrack();
-
-    console.log('calculateJump completed');
-    return {
-        radius: horizontalCanopyDistance,
-        radiusFull: horizontalCanopyDistanceFull,
-        displacement: centerDisplacement,
-        displacementFull: centerDisplacementFull,
-        direction: meanWindDirection,
-        directionFull: meanWindDirectionFull,
-        freeFall: freeFallResult,
-        freeFallDirection: freeFallResult.directionDeg, // Ensure included
-        freeFallDistance: freeFallResult.distance // Ensure included
-    };
-}
-
-// Helper function to calculate landing pattern coordinates without displaying
-function calculateLandingPatternCoords(lat, lng, interpolatedData, sliderIndex) {
-    const CANOPY_SPEED_KT = parseInt(document.getElementById('canopySpeed').value) || 20;
-    const DESCENT_RATE_MPS = parseFloat(document.getElementById('descentRate').value) || 3.5;
-    const LEG_HEIGHT_FINAL = parseInt(document.getElementById('legHeightFinal').value) || 100;
-    const LEG_HEIGHT_BASE = parseInt(document.getElementById('legHeightBase').value) || 200;
-    const LEG_HEIGHT_DOWNWIND = parseInt(document.getElementById('legHeightDownwind').value) || 300;
-    const baseHeight = Math.round(lastAltitude);
-
-    const landingDirection = document.querySelector('input[name="landingDirection"]:checked')?.value || 'LL';
-    const customLandingDirLL = parseInt(document.getElementById('customLandingDirectionLL')?.value, 10) || null;
-    const customLandingDirRR = parseInt(document.getElementById('customLandingDirectionRR')?.value, 10) || null;
-
-    const heights = interpolatedData.map(d => d.height);
-    const dirs = interpolatedData.map(d => Number.isFinite(d.dir) ? parseFloat(d.dir) : 0);
-    const spdsKt = interpolatedData.map(d => Utils.convertWind(parseFloat(d.spd) || 0, 'kt', 'km/h')); // km/h to kt
-    const uComponents = spdsKt.map((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
-    const vComponents = spdsKt.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
-
-    let effectiveLandingWindDir;
-    if (landingDirection === 'LL' && Number.isFinite(customLandingDirLL) && customLandingDirLL >= 0 && customLandingDirLL <= 359) {
-        effectiveLandingWindDir = customLandingDirLL;
-    } else if (landingDirection === 'RR' && Number.isFinite(customLandingDirRR) && customLandingDirRR >= 0 && customLandingDirRR <= 359) {
-        effectiveLandingWindDir = customLandingDirRR;
-    } else {
-        // Only use calculated wind direction if no valid custom direction exists
-        effectiveLandingWindDir = Number.isFinite(landingWindDir) ? landingWindDir : dirs[0];
-    }
-
-    if (!Number.isFinite(effectiveLandingWindDir)) {
-        console.warn('Invalid landing wind direction:', effectiveLandingWindDir);
-        return { downwindLat: lat, downwindLng: lng };
-    }
-
-    const calculateLegEndpoint = (startLat, startLng, bearing, groundSpeedKt, timeSec) => {
-        const speedMps = groundSpeedKt * 0.514444; // kt to m/s
-        const lengthMeters = speedMps * timeSec;
-        const metersPerDegreeLat = 111000;
-        const distanceDeg = lengthMeters / metersPerDegreeLat;
-        const radBearing = bearing * Math.PI / 180;
-        const deltaLat = distanceDeg * Math.cos(radBearing);
-        const deltaLng = distanceDeg * Math.sin(radBearing) / Math.cos(startLat * Math.PI / 180);
-        return [startLat + deltaLat, startLng + deltaLng];
-    };
-
-    // Final Leg
-    const finalLimits = [baseHeight, baseHeight + LEG_HEIGHT_FINAL];
-    const finalMeanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, ...finalLimits);
-    const finalWindDir = finalMeanWind[0];
-    const finalWindSpeedKt = finalMeanWind[1];
-    const finalCourse = (effectiveLandingWindDir + 180) % 360;
-    const finalWindAngle = Utils.calculateWindAngle(effectiveLandingWindDir, finalWindDir);
-    const { crosswind: finalCrosswind, headwind: finalHeadwind } = Utils.calculateWindComponents(finalWindSpeedKt, finalWindAngle);
-    const finalGroundSpeedKt = Utils.calculateGroundSpeed(CANOPY_SPEED_KT, finalHeadwind);
-    const finalTime = LEG_HEIGHT_FINAL / DESCENT_RATE_MPS;
-    const finalEnd = calculateLegEndpoint(lat, lng, finalCourse, finalGroundSpeedKt, finalTime);
-
-    // Base Leg
-    const baseLimits = [baseHeight + LEG_HEIGHT_FINAL, baseHeight + LEG_HEIGHT_BASE];
-    const baseMeanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, ...baseLimits);
-    const baseWindDir = baseMeanWind[0];
-    const baseWindSpeedKt = baseMeanWind[1];
-    const baseHeading = landingDirection === 'LL' ? (effectiveLandingWindDir + 90) % 360 : (effectiveLandingWindDir - 90 + 360) % 360;
-    const baseCourse = Utils.calculateCourseFromHeading(baseHeading, baseWindDir, baseWindSpeedKt, CANOPY_SPEED_KT).trueCourse;
-    const baseWindAngle = Utils.calculateWindAngle(baseCourse, baseWindDir);
-    const { crosswind: baseCrosswind, headwind: baseHeadwind } = Utils.calculateWindComponents(baseWindSpeedKt, baseWindAngle);
-    const baseGroundSpeedKt = CANOPY_SPEED_KT - baseHeadwind;
-    const baseTime = (LEG_HEIGHT_BASE - LEG_HEIGHT_FINAL) / DESCENT_RATE_MPS;
-    let baseBearing = (baseCourse + 180) % 360;
-    if (baseGroundSpeedKt < 0) baseBearing = (baseBearing + 180) % 360;
-    const baseEnd = calculateLegEndpoint(finalEnd[0], finalEnd[1], baseBearing, baseGroundSpeedKt, baseTime);
-
-    // Downwind Leg
-    const downwindLimits = [baseHeight + LEG_HEIGHT_BASE, baseHeight + LEG_HEIGHT_DOWNWIND];
-    const downwindMeanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, ...downwindLimits);
-    const downwindWindDir = downwindMeanWind[0];
-    const downwindWindSpeedKt = downwindMeanWind[1];
-    const downwindCourse = effectiveLandingWindDir;
-    const downwindWindAngle = Utils.calculateWindAngle(downwindCourse, downwindWindDir);
-    const { crosswind: downwindCrosswind, headwind: downwindHeadwind } = Utils.calculateWindComponents(downwindWindSpeedKt, downwindWindAngle);
-    const downwindGroundSpeedKt = CANOPY_SPEED_KT + downwindHeadwind;
-    const downwindTime = (LEG_HEIGHT_DOWNWIND - LEG_HEIGHT_BASE) / DESCENT_RATE_MPS;
-    const downwindEnd = calculateLegEndpoint(baseEnd[0], baseEnd[1], downwindCourse, downwindGroundSpeedKt, downwindTime);
-
-    return { downwindLat: downwindEnd[0], downwindLng: downwindEnd[1] };
-}
-
-function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, displacement, displacementFull, direction, directionFull, freeFallDirection, freeFallDistance) {
-    console.log('updateJumpCircle called with:', { blueLat, blueLng, redLat, redLng, radius, radiusFull, displacement, displacementFull, direction, directionFull, freeFallDirection, freeFallDistance, zoom: map.getZoom() });
-    if (!map) {
-        console.warn('Map not available to update jump circles');
-        return;
-    }
-
-    const currentZoom = map.getZoom();
-    const isVisible = currentZoom >= minZoom && currentZoom <= maxZoom;
-    console.log('Zoom check:', { currentZoom, minZoom, maxZoom, isVisible });
-
-    // Remove existing blue and red circles safely
-    const removeLayer = (layer, name) => {
-        if (layer && typeof layer === 'object' && '_leaflet_id' in layer && map.hasLayer(layer)) {
-            console.log(`Removing existing ${name} circle`);
-            map.removeLayer(layer);
-        }
-    };
-    removeLayer(jumpCircle, 'blue jump');
-    removeLayer(jumpCircleFull, 'red jump');
-
-    // Only remove green circles if showExitArea is false or calculateJump is true
-    if (!userSettings.showExitArea || userSettings.calculateJump) {
-        removeLayer(jumpCircleGreen, 'green jump');
-        removeLayer(jumpCircleGreenLight, 'light green jump');
-        jumpCircleGreen = null;
-        jumpCircleGreenLight = null;
-    }
-
-    // Reset blue and red circle variables
-    jumpCircle = null;
-    jumpCircleFull = null;
-
-    if (isVisible && Number.isFinite(blueLat) && Number.isFinite(blueLng) && Number.isFinite(redLat) && Number.isFinite(redLng)) {
-        const newCenterBlue = calculateNewCenter(blueLat, blueLng, displacement, direction);
-        const newCenterRed = calculateNewCenter(redLat, redLng, displacementFull, directionFull);
-        console.log('New centers calculated:', { blue: newCenterBlue, red: newCenterRed });
-
-        if (!Number.isFinite(newCenterBlue[0]) || !Number.isFinite(newCenterBlue[1]) || !Number.isFinite(newCenterRed[0]) || !Number.isFinite(newCenterRed[1])) {
-            console.warn('Invalid center coordinates:', { newCenterBlue, newCenterRed });
-            return;
-        }
-
-        if (!Number.isFinite(radius) || radius <= 0 || !Number.isFinite(radiusFull) || radiusFull <= 0) {
-            console.warn('Invalid radius values:', { radius, radiusFull });
-            return;
-        }
-
-        console.log('Creating circles with radii:', { blueRadius: radius, redRadius: radiusFull, greenRadius: userSettings.showExitArea ? radiusFull : null, greenLightRadius: userSettings.showExitArea ? radius : null });
-
-        // Blue circle
-        jumpCircle = L.circle(newCenterBlue, {
-            radius: radius,
-            color: 'blue',
-            fillColor: 'blue',
-            fillOpacity: 0.2,
-            weight: 2
-        });
-
-        // Red circle
-        jumpCircleFull = L.circle(newCenterRed, {
-            radius: radiusFull,
-            color: 'red',
-            fillColor: 'red',
-            fillOpacity: 0.2,
-            weight: 2
-        });
-
-        // Add blue and red circles to map
-        jumpCircle.addTo(map);
-        jumpCircleFull.addTo(map);
-
-        // Green circles (only if showExitArea is true)
-        if (userSettings.showExitArea) {
-            // First green circle (same as red circle radius)
-            let jumpCircleGreenCenter = newCenterRed;
-            if (Number.isFinite(freeFallDirection) && Number.isFinite(freeFallDistance)) {
-                const greenShiftDirection = (freeFallDirection + 180) % 360;
-                jumpCircleGreenCenter = calculateNewCenter(newCenterRed[0], newCenterRed[1], freeFallDistance, greenShiftDirection);
-                console.log('Green circle center calculated:', { center: jumpCircleGreenCenter, shiftDirection: greenShiftDirection, shiftDistance: freeFallDistance });
-            } else {
-                console.warn('Free fall direction or distance not provided, using red circle center:', { freeFallDirection, freeFallDistance });
-            }
-
-            jumpCircleGreen = L.circle(jumpCircleGreenCenter, {
-                radius: radiusFull,
-                color: 'green',
-                fillColor: 'none',
-                fillOpacity: 0,
-                weight: 2
-            });
-
-            // Light green circle (same as blue circle radius)
-            let jumpCircleGreenLightCenter = newCenterBlue;
-            if (Number.isFinite(freeFallDirection) && Number.isFinite(freeFallDistance)) {
-                const greenLightShiftDirection = (freeFallDirection + 180) % 360;
-                jumpCircleGreenLightCenter = calculateNewCenter(newCenterBlue[0], newCenterBlue[1], freeFallDistance, greenLightShiftDirection);
-                console.log('Light green circle center calculated:', { center: jumpCircleGreenLightCenter, shiftDirection: greenLightShiftDirection, shiftDistance: freeFallDistance });
-            } else {
-                console.warn('Free fall direction or distance not provided, using blue circle center for light green:', { freeFallDirection, freeFallDistance });
-            }
-
-            jumpCircleGreenLight = L.circle(jumpCircleGreenLightCenter, {
-                radius: radius,
-                color: 'lightgreen',
-                fillColor: 'none',
-                fillOpacity: 0,
-                weight: 2
-            });
-
-            // Add green circles to map
-            jumpCircleGreen.addTo(map);
-            jumpCircleGreenLight.addTo(map);
-        }
-
-        console.log('Jump circles added at zoom:', currentZoom, 'Layers on map:', {
-            blue: !!jumpCircle && map.hasLayer(jumpCircle),
-            red: !!jumpCircleFull && map.hasLayer(jumpCircleFull),
-            green: !!jumpCircleGreen && map.hasLayer(jumpCircleGreen),
-            greenLight: !!jumpCircleGreenLight && map.hasLayer(jumpCircleGreenLight)
-        });
-    } else {
-        console.log('Jump circles not displayed - zoom:', currentZoom, 'visible:', isVisible, 'coords valid:', Number.isFinite(blueLat) && Number.isFinite(blueLng) && Number.isFinite(redLat) && Number.isFinite(redLng), 'calculateJump:', userSettings.calculateJump);
-        // Preserve green circles if showExitArea is true
-        if (!userSettings.showExitArea) {
-            jumpCircleGreen = null;
-            jumpCircleGreenLight = null;
-        }
-    }
-
-    if (currentMarker) {
-        currentMarker.setLatLng([lastLat, lastLng]);
-        updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
-    }
-    console.log('updateJumpCircle completed');
-}
-
-function calculateNewCenter(lat, lng, distance, bearing) {
-    const R = 6371000; // Earth's radius in meters
-    const lat1 = lat * Math.PI / 180; // Convert to radians
-    const lng1 = lng * Math.PI / 180;
-    const bearingRad = bearing * Math.PI / 180; // Wind FROM direction
-
-    const delta = distance / R; // Angular distance
-
-    const lat2 = Math.asin(Math.sin(lat1) * Math.cos(delta) +
-        Math.cos(lat1) * Math.sin(delta) * Math.cos(bearingRad));
-    const lng2 = lng1 + Math.atan2(Math.sin(bearingRad) * Math.sin(delta) * Math.cos(lat1),
-        Math.cos(delta) - Math.sin(lat1) * Math.sin(lat2));
-
-    // Convert back to degrees
-    const newLat = lat2 * 180 / Math.PI;
-    const newLng = lng2 * 180 / Math.PI;
-
-    // Normalize longitude to [-180, 180]
-    const normalizedLng = ((newLng + 540) % 360) - 180;
-
-    return [newLat, normalizedLng];
-}
-
-function getSettingValue(name, type = 'radio', defaultValue) {
-    const selector = type === 'radio' ? `input[name="${name}"]:checked` : `#${name}`;
-    const element = document.querySelector(selector);
-    return element ? (type === 'select' ? parseInt(element.value) || defaultValue : element.value) : defaultValue;
-}
-
-function getLastFullHourUTC() {
-    const now = new Date();
-    const utcYear = now.getUTCFullYear();
-    const utcMonth = now.getUTCMonth();
-    const utcDate = now.getUTCDate();
-    const utcHour = now.getUTCHours();
-    const lastFullHour = new Date(Date.UTC(utcYear, utcMonth, utcDate, utcHour, 0, 0));
-    console.log('Last full hour UTC:', lastFullHour.toISOString());
-    return lastFullHour; // Return Date object instead of string
-}
-
-
 function updateHeightUnitLabels() {
     const heightUnit = getHeightUnit();
     const refLevel = document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL';
@@ -700,7 +119,6 @@ function updateHeightUnitLabels() {
     lowerLabel.textContent = `Lower Limit (${heightUnit}):`;
     upperLabel.textContent = `Upper Limit (${heightUnit}):`;
 }
-
 function updateWindUnitLabels() {
     const windSpeedUnit = getWindSpeedUnit();
     const meanWindResult = document.getElementById('meanWindResult');
@@ -718,7 +136,61 @@ function updateWindUnitLabels() {
         }
     }
 }
+function updateReferenceLabels() {
+    const refLevel = document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL';
+    console.log('Updating labels to refLevel:', refLevel);
+    const meanWindResult = document.getElementById('meanWindResult');
+    if (meanWindResult && meanWindResult.innerHTML) {
+        const currentText = meanWindResult.innerHTML;
+        const updatedText = currentText.replace(/\((\d+)-(\d+) m [A-Za-z]+\)/, `($1-$2 m ${refLevel})`);
+        meanWindResult.innerHTML = updatedText;
+    }
+}
+function updateModelRunInfo() {
+    const modelLabel = document.getElementById('modelLabel'); // Target the label
+    const modelSelect = document.getElementById('modelSelect');
+    if (modelLabel && lastModelRun) {
+        const model = modelSelect.value;
+        const titleContent = `Model: ${model.replace('_', ' ').toUpperCase()}\nRun: ${lastModelRun}`; // Use \n for line break in title
+        modelLabel.title = titleContent; // Set the title attribute
+    }
+    // Optional: If you want to use local time, uncomment and adjust as async
+    /*
+    if (modelLabel && lastModelRun) {
+        const model = modelSelect.value;
+        const timeZone = document.querySelector('input[name="timeZone"]:checked')?.value || 'Z';
+        const displayTime = timeZone === 'Z' || !lastLat || !lastLng
+            ? lastModelRun
+            : await Utils.formatLocalTime(lastModelRun.replace(' ', 'T') + ':00Z', lastLat, lastLng);
+        const titleContent = `Model: ${model.replace('_', ' ').toUpperCase()}\nRun: ${displayTime}`;
+        modelLabel.title = titleContent;
+    }
+    */
+}
 
+// == Utility Functions ==
+function calculateNewCenter(lat, lng, distance, bearing) {
+    const R = 6371000; // Earth's radius in meters
+    const lat1 = lat * Math.PI / 180; // Convert to radians
+    const lng1 = lng * Math.PI / 180;
+    const bearingRad = bearing * Math.PI / 180; // Wind FROM direction
+
+    const delta = distance / R; // Angular distance
+
+    const lat2 = Math.asin(Math.sin(lat1) * Math.cos(delta) +
+        Math.cos(lat1) * Math.sin(delta) * Math.cos(bearingRad));
+    const lng2 = lng1 + Math.atan2(Math.sin(bearingRad) * Math.sin(delta) * Math.cos(lat1),
+        Math.cos(delta) - Math.sin(lat1) * Math.sin(lat2));
+
+    // Convert back to degrees
+    const newLat = lat2 * 180 / Math.PI;
+    const newLng = lng2 * 180 / Math.PI;
+
+    // Normalize longitude to [-180, 180]
+    const normalizedLng = ((newLng + 540) % 360) - 180;
+
+    return [newLat, normalizedLng];
+}
 function generateWindBarb(direction, speedKt) {
     // Convert speed to knots if not already (assuming speedKt is in knots)
     const speed = Math.round(speedKt);
@@ -787,79 +259,21 @@ function generateWindBarb(direction, speedKt) {
     svg += `</g></svg>`;
     return svg;
 }
-
-function createCustomMarker(lat, lng) {
-    const customIcon = L.icon({
-        iconUrl: 'favicon.ico',
-        iconSize: [32, 32],
-        iconAnchor: [16, 32],
-        popupAnchor: [0, -32],
-        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-        shadowSize: [41, 41],
-        shadowAnchor: [13, 32]
-    });
-    return L.marker([lat, lng], {
-        icon: customIcon,
-        draggable: true
-    });
+async function getAltitude(lat, lng) {
+    const { elevation } = await Utils.getLocationData(lat, lng);
+    console.log('Fetched elevation from Open-Meteo:', elevation);
+    return elevation !== 'N/A' ? elevation : 'N/A';
 }
-
-function attachMarkerDragend(marker) {
-    marker.on('dragend', async (e) => {
-        const position = marker.getLatLng();
-        lastLat = position.lat;
-        lastLng = position.lng;
-        lastAltitude = await getAltitude(lastLat, lastLng);
-        const wasOpen = marker.getPopup()?.isOpen() || false;
-        updateMarkerPopup(marker, lastLat, lastLng, lastAltitude, wasOpen);
-        if (userSettings.calculateJump) calculateJump();
-        recenterMap();
-
-        // Reset custom direction on marker move
-        userSettings.isCustomJumpRunDirection = false;
-        saveSettings();
-
-        const slider = document.getElementById('timeSlider');
-        const currentIndex = parseInt(slider.value) || 0;
-        const currentTime = weatherData?.time?.[currentIndex] || null;
-
-        document.getElementById('info').innerHTML = `Fetching weather and models...`;
-        const availableModels = await checkAvailableModels(lastLat, lastLng);
-        if (availableModels.length > 0) {
-            await fetchWeatherForLocation(lastLat, lastLng, currentTime);
-            updateModelRunInfo();
-            if (lastAltitude !== 'N/A') calculateMeanWind();
-            updateLandingPattern();
-            if (userSettings.showJumpRunTrack) updateJumpRunTrack(); // Ensure track updates
-            slider.value = currentIndex;
-        } else {
-            document.getElementById('info').innerHTML = `No models available.`;
-        }
-    });
+function getLastFullHourUTC() {
+    const now = new Date();
+    const utcYear = now.getUTCFullYear();
+    const utcMonth = now.getUTCMonth();
+    const utcDate = now.getUTCDate();
+    const utcHour = now.getUTCHours();
+    const lastFullHour = new Date(Date.UTC(utcYear, utcMonth, utcDate, utcHour, 0, 0));
+    console.log('Last full hour UTC:', lastFullHour.toISOString());
+    return lastFullHour; // Return Date object instead of string
 }
-
-function updateMarkerPopup(marker, lat, lng, altitude, open = false) {
-    console.log('Updating marker popup:', { lat, lng, altitude, format: getCoordinateFormat(), open });
-    const coordFormat = getCoordinateFormat();
-    const coords = Utils.convertCoords(lat, lng, coordFormat);
-    let popupContent;
-    if (coordFormat === 'MGRS') {
-        popupContent = `MGRS: ${coords.lat}<br>Alt: ${altitude}m`;
-    } else {
-        popupContent = `Lat: ${coords.lat}<br>Lng: ${coords.lng}<br>Alt: ${altitude}m`;
-    }
-    // Bind popup only if not already bound
-    if (!marker.getPopup()) {
-        marker.bindPopup(popupContent);
-    } else {
-        marker.setPopupContent(popupContent);
-    }
-    // Open popup only if explicitly requested
-    if (open) {
-        marker.openPopup();
-    }
-}
-
 async function getDisplayTime(utcTimeStr) {
     const timeZone = document.querySelector('input[name="timeZone"]:checked')?.value || 'Z';
     if (timeZone === 'Z' || !lastLat || !lastLng) {
@@ -868,35 +282,15 @@ async function getDisplayTime(utcTimeStr) {
         return await Utils.formatLocalTime(utcTimeStr, lastLat, lastLng); // Async
     }
 }
-
-async function updateAllDisplays() {
-    const sliderIndex = getSliderValue();
-    if (weatherData && lastLat && lastLng) {
-        await updateWeatherDisplay(sliderIndex);
-        if (lastAltitude !== 'N/A') calculateMeanWind();
-        if (userSettings.showLandingPattern) updateLandingPattern();
-        if (userSettings.calculateJump) {
-            calculateJump();
-            if (userSettings.showJumpRunTrack) updateJumpRunTrack();
-        }
-        recenterMap();
-    }
+function debounce(func, wait) {
+    let timeout;
+    return function (...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+    };
 }
 
-async function fetchWeatherForLocation(lat, lng, currentTime = null, isInitialLoad = false) {
-    document.getElementById('info').innerHTML = `Fetching weather and models...`;
-    const availableModels = await checkAvailableModels(lat, lng);
-    if (availableModels.length > 0) {
-        await fetchWeather(lat, lng, currentTime, isInitialLoad); // Pass isInitialLoad
-        updateModelRunInfo();
-        if (lastAltitude !== 'N/A') calculateMeanWind();
-        updateLandingPattern();
-    } else {
-        document.getElementById('info').innerHTML = `No models available.`;
-    }
-}
-
-// Initialize the map and center it on the user's location if available
+// == Map Initialization and Interaction ==
 function initMap() {
     const defaultCenter = [48.0179, 11.1923];
     const defaultZoom = 10;
@@ -1251,7 +645,75 @@ function initMap() {
         lastTapTime = currentTime;
     }, { passive: false });
 }
+function createCustomMarker(lat, lng) {
+    const customIcon = L.icon({
+        iconUrl: 'favicon.ico',
+        iconSize: [32, 32],
+        iconAnchor: [16, 32],
+        popupAnchor: [0, -32],
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+        shadowSize: [41, 41],
+        shadowAnchor: [13, 32]
+    });
+    return L.marker([lat, lng], {
+        icon: customIcon,
+        draggable: true
+    });
+}
+function attachMarkerDragend(marker) {
+    marker.on('dragend', async (e) => {
+        const position = marker.getLatLng();
+        lastLat = position.lat;
+        lastLng = position.lng;
+        lastAltitude = await getAltitude(lastLat, lastLng);
+        const wasOpen = marker.getPopup()?.isOpen() || false;
+        updateMarkerPopup(marker, lastLat, lastLng, lastAltitude, wasOpen);
+        if (userSettings.calculateJump) calculateJump();
+        recenterMap();
 
+        // Reset custom direction on marker move
+        userSettings.isCustomJumpRunDirection = false;
+        saveSettings();
+
+        const slider = document.getElementById('timeSlider');
+        const currentIndex = parseInt(slider.value) || 0;
+        const currentTime = weatherData?.time?.[currentIndex] || null;
+
+        document.getElementById('info').innerHTML = `Fetching weather and models...`;
+        const availableModels = await checkAvailableModels(lastLat, lastLng);
+        if (availableModels.length > 0) {
+            await fetchWeatherForLocation(lastLat, lastLng, currentTime);
+            updateModelRunInfo();
+            if (lastAltitude !== 'N/A') calculateMeanWind();
+            updateLandingPattern();
+            if (userSettings.showJumpRunTrack) updateJumpRunTrack(); // Ensure track updates
+            slider.value = currentIndex;
+        } else {
+            document.getElementById('info').innerHTML = `No models available.`;
+        }
+    });
+}
+function updateMarkerPopup(marker, lat, lng, altitude, open = false) {
+    console.log('Updating marker popup:', { lat, lng, altitude, format: getCoordinateFormat(), open });
+    const coordFormat = getCoordinateFormat();
+    const coords = Utils.convertCoords(lat, lng, coordFormat);
+    let popupContent;
+    if (coordFormat === 'MGRS') {
+        popupContent = `MGRS: ${coords.lat}<br>Alt: ${altitude}m`;
+    } else {
+        popupContent = `Lat: ${coords.lat}<br>Lng: ${coords.lng}<br>Alt: ${altitude}m`;
+    }
+    // Bind popup only if not already bound
+    if (!marker.getPopup()) {
+        marker.bindPopup(popupContent);
+    } else {
+        marker.setPopupContent(popupContent);
+    }
+    // Open popup only if explicitly requested
+    if (open) {
+        marker.openPopup();
+    }
+}
 function recenterMap() {
     if (map && currentMarker) {
         map.invalidateSize(); // Update map dimensions
@@ -1261,13 +723,65 @@ function recenterMap() {
         console.warn('Cannot recenter map: map or marker not defined');
     }
 }
-
-async function getAltitude(lat, lng) {
-    const { elevation } = await Utils.getLocationData(lat, lng);
-    console.log('Fetched elevation from Open-Meteo:', elevation);
-    return elevation !== 'N/A' ? elevation : 'N/A';
+function initializeMap() {
+    console.log('Initializing map...');
+    initMap();
 }
 
+// == Weather Data Handling ==
+async function checkAvailableModels(lat, lon) {
+    const modelList = [
+        'icon_seamless', 'icon_global', 'icon_eu', 'icon_d2', 'ecmwf_ifs025', 'ecmwf_aifs025_single', 'gfs_seamless', 'gfs_global', 'gfs_hrrr', 'arome_france', 'gem_hrdps_continental', 'gem_regional'
+    ];
+
+    let availableModels = [];
+    for (const model of modelList) {
+        try {
+            const response = await fetch(
+                `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m&models=${model}`
+            );
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            const data = await response.json();
+            if (data.hourly && data.hourly.temperature_2m && data.hourly.temperature_2m.length > 0) {
+                availableModels.push(model);
+            }
+        } catch (error) {
+            console.log(`${model} not available: ${error.message}`);
+        }
+    }
+
+    const modelSelect = document.getElementById('modelSelect');
+    modelSelect.innerHTML = '';
+    availableModels.forEach(model => {
+        const option = document.createElement('option');
+        option.value = model;
+        option.textContent = model.replace('_', ' ').toUpperCase();
+        modelSelect.appendChild(option);
+    });
+
+    const modelDisplay = availableModels.length > 0
+        ? `<br><strong>Available Models:</strong><ul>${availableModels.map(m => `<li>${m.replace('_', ' ').toUpperCase()}</li>`).join('')}</ul>`
+        : '<br><strong>Available Models:</strong> None';
+
+    const currentContent = document.getElementById('info').innerHTML;
+    document.getElementById('info').innerHTML = currentContent + modelDisplay;
+
+    return availableModels;
+}
+async function fetchWeatherForLocation(lat, lng, currentTime = null, isInitialLoad = false) {
+    document.getElementById('info').innerHTML = `Fetching weather and models...`;
+    const availableModels = await checkAvailableModels(lat, lng);
+    if (availableModels.length > 0) {
+        await fetchWeather(lat, lng, currentTime, isInitialLoad); // Pass isInitialLoad
+        updateModelRunInfo();
+        if (lastAltitude !== 'N/A') calculateMeanWind();
+        updateLandingPattern();
+    } else {
+        document.getElementById('info').innerHTML = `No models available.`;
+    }
+}
 async function fetchWeather(lat, lon, currentTime = null) {
     try {
         document.getElementById('loading').style.display = 'block';
@@ -1533,7 +1047,6 @@ async function fetchWeather(lat, lon, currentTime = null) {
         Utils.handleError(`Failed to fetch weather data: ${error.message}`);
     }
 }
-
 async function updateWeatherDisplay(index, originalTime = null) {
     console.log(`updateWeatherDisplay called with index: ${index}, Time: ${weatherData.time[index]}`);
     if (!weatherData || !weatherData.time || index < 0 || index >= weatherData.time.length) {
@@ -1610,49 +1123,66 @@ async function updateWeatherDisplay(index, originalTime = null) {
     document.getElementById('selectedTime').innerHTML = `Selected Time: ${time}`;
     updateLandingPattern();
 }
+function calculateMeanWind() {
+    console.log('Calculating mean wind with model:', document.getElementById('modelSelect').value, 'weatherData:', weatherData);
+    const index = document.getElementById('timeSlider').value || 0;
+    const interpolatedData = interpolateWeatherData(index);
+    let lowerLimitInput = parseFloat(document.getElementById('lowerLimit').value) || 0;
+    let upperLimitInput = parseFloat(document.getElementById('upperLimit').value);
+    const refLevel = document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL';
+    const heightUnit = getHeightUnit();
+    const windSpeedUnit = getWindSpeedUnit();
+    const baseHeight = Math.round(lastAltitude);
 
-async function checkAvailableModels(lat, lon) {
-    const modelList = [
-        'icon_seamless', 'icon_global', 'icon_eu', 'icon_d2', 'ecmwf_ifs025', 'ecmwf_aifs025_single', 'gfs_seamless', 'gfs_global', 'gfs_hrrr', 'arome_france', 'gem_hrdps_continental', 'gem_regional'
-    ];
-
-    let availableModels = [];
-    for (const model of modelList) {
-        try {
-            const response = await fetch(
-                `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m&models=${model}`
-            );
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-            const data = await response.json();
-            if (data.hourly && data.hourly.temperature_2m && data.hourly.temperature_2m.length > 0) {
-                availableModels.push(model);
-            }
-        } catch (error) {
-            console.log(`${model} not available: ${error.message}`);
-        }
+    if (!weatherData || lastAltitude === 'N/A') {
+        handleError('Cannot calculate mean wind: missing data or altitude');
+        return;
     }
 
-    const modelSelect = document.getElementById('modelSelect');
-    modelSelect.innerHTML = '';
-    availableModels.forEach(model => {
-        const option = document.createElement('option');
-        option.value = model;
-        option.textContent = model.replace('_', ' ').toUpperCase();
-        modelSelect.appendChild(option);
-    });
+    // Convert inputs to meters
+    lowerLimitInput = heightUnit === 'ft' ? lowerLimitInput / 3.28084 : lowerLimitInput;
+    upperLimitInput = heightUnit === 'ft' ? upperLimitInput / 3.28084 : upperLimitInput;
 
-    const modelDisplay = availableModels.length > 0
-        ? `<br><strong>Available Models:</strong><ul>${availableModels.map(m => `<li>${m.replace('_', ' ').toUpperCase()}</li>`).join('')}</ul>`
-        : '<br><strong>Available Models:</strong> None';
+    if ((refLevel === 'AMSL') && lowerLimitInput < baseHeight) {
+        Utils.handleError(`Lower limit adjusted to terrain altitude (${baseHeight} m ${refLevel}) as it cannot be below ground level in ${refLevel} mode.`);
+        lowerLimitInput = baseHeight;
+        document.getElementById('lowerLimit').value = Utils.convertHeight(lowerLimitInput, heightUnit);
+    }
 
-    const currentContent = document.getElementById('info').innerHTML;
-    document.getElementById('info').innerHTML = currentContent + modelDisplay;
+    const lowerLimit = refLevel === 'AGL' ? lowerLimitInput + baseHeight : lowerLimitInput;
+    const upperLimit = refLevel === 'AGL' ? upperLimitInput + baseHeight : upperLimitInput;
 
-    return availableModels;
+    if (isNaN(lowerLimitInput) || isNaN(upperLimitInput) || lowerLimitInput >= upperLimitInput) {
+        Utils.handleError('Invalid layer limits. Ensure Lower < Upper and both are numbers.');
+        return;
+    }
+
+    // Check if interpolatedData is valid
+    if (!interpolatedData || interpolatedData.length === 0) {
+        Utils.handleError('No valid weather data available to calculate mean wind.');
+        return;
+    }
+
+    // Use raw heights and speeds in knots
+    const heights = interpolatedData.map(d => d.height);
+    const dirs = interpolatedData.map(d => parseFloat(d.dir) || 0);
+    const spds = interpolatedData.map(d => Utils.convertWind(parseFloat(d.spd) || 0, windSpeedUnit, 'km/h')); // Fixed order
+
+    const xKomponente = spds.map((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
+    const yKomponente = spds.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
+
+    const meanWind = Utils.calculateMeanWind(heights, xKomponente, yKomponente, lowerLimit, upperLimit);
+    const [dir, spd] = meanWind;
+
+    const roundedDir = Utils.roundToTens(dir);
+    const displayLower = Math.round(Utils.convertHeight(lowerLimitInput, heightUnit));
+    const displayUpper = Math.round(Utils.convertHeight(upperLimitInput, heightUnit));
+    const displaySpd = Utils.convertWind(spd, windSpeedUnit, 'kt');
+    const formattedSpd = Number.isFinite(spd) ? (windSpeedUnit === 'bft' ? Math.round(spd) : spd.toFixed(1)) : 'N/A';
+    const result = `Mean wind (${displayLower}-${displayUpper} ${heightUnit} ${refLevel}): ${Utils.roundToTens(dir)}° ${formattedSpd} ${windSpeedUnit}`;
+    document.getElementById('meanWindResult').innerHTML = result;
+    console.log('Calculated Mean Wind:', result, 'u:', meanWind[2], 'v:', meanWind[3]);
 }
-
 function interpolateWeatherData(sliderIndex) {
     if (!weatherData || !weatherData.time || sliderIndex >= weatherData.time.length) {
         console.warn('No weather data available for interpolation');
@@ -1799,68 +1329,6 @@ function interpolateWeatherData(sliderIndex) {
     console.log('Interpolated data length:', interpolatedData.length, 'Max height:', interpolatedData[interpolatedData.length - 1].displayHeight);
     return interpolatedData;
 }
-
-function calculateMeanWind() {
-    console.log('Calculating mean wind with model:', document.getElementById('modelSelect').value, 'weatherData:', weatherData);
-    const index = document.getElementById('timeSlider').value || 0;
-    const interpolatedData = interpolateWeatherData(index);
-    let lowerLimitInput = parseFloat(document.getElementById('lowerLimit').value) || 0;
-    let upperLimitInput = parseFloat(document.getElementById('upperLimit').value);
-    const refLevel = document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL';
-    const heightUnit = getHeightUnit();
-    const windSpeedUnit = getWindSpeedUnit();
-    const baseHeight = Math.round(lastAltitude);
-
-    if (!weatherData || lastAltitude === 'N/A') {
-        handleError('Cannot calculate mean wind: missing data or altitude');
-        return;
-    }
-
-    // Convert inputs to meters
-    lowerLimitInput = heightUnit === 'ft' ? lowerLimitInput / 3.28084 : lowerLimitInput;
-    upperLimitInput = heightUnit === 'ft' ? upperLimitInput / 3.28084 : upperLimitInput;
-
-    if ((refLevel === 'AMSL') && lowerLimitInput < baseHeight) {
-        Utils.handleError(`Lower limit adjusted to terrain altitude (${baseHeight} m ${refLevel}) as it cannot be below ground level in ${refLevel} mode.`);
-        lowerLimitInput = baseHeight;
-        document.getElementById('lowerLimit').value = Utils.convertHeight(lowerLimitInput, heightUnit);
-    }
-
-    const lowerLimit = refLevel === 'AGL' ? lowerLimitInput + baseHeight : lowerLimitInput;
-    const upperLimit = refLevel === 'AGL' ? upperLimitInput + baseHeight : upperLimitInput;
-
-    if (isNaN(lowerLimitInput) || isNaN(upperLimitInput) || lowerLimitInput >= upperLimitInput) {
-        Utils.handleError('Invalid layer limits. Ensure Lower < Upper and both are numbers.');
-        return;
-    }
-
-    // Check if interpolatedData is valid
-    if (!interpolatedData || interpolatedData.length === 0) {
-        Utils.handleError('No valid weather data available to calculate mean wind.');
-        return;
-    }
-
-    // Use raw heights and speeds in knots
-    const heights = interpolatedData.map(d => d.height);
-    const dirs = interpolatedData.map(d => parseFloat(d.dir) || 0);
-    const spds = interpolatedData.map(d => Utils.convertWind(parseFloat(d.spd) || 0, windSpeedUnit, 'km/h')); // Fixed order
-
-    const xKomponente = spds.map((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
-    const yKomponente = spds.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
-
-    const meanWind = Utils.calculateMeanWind(heights, xKomponente, yKomponente, lowerLimit, upperLimit);
-    const [dir, spd] = meanWind;
-
-    const roundedDir = Utils.roundToTens(dir);
-    const displayLower = Math.round(Utils.convertHeight(lowerLimitInput, heightUnit));
-    const displayUpper = Math.round(Utils.convertHeight(upperLimitInput, heightUnit));
-    const displaySpd = Utils.convertWind(spd, windSpeedUnit, 'kt');
-    const formattedSpd = Number.isFinite(spd) ? (windSpeedUnit === 'bft' ? Math.round(spd) : spd.toFixed(1)) : 'N/A';
-    const result = `Mean wind (${displayLower}-${displayUpper} ${heightUnit} ${refLevel}): ${Utils.roundToTens(dir)}° ${formattedSpd} ${windSpeedUnit}`;
-    document.getElementById('meanWindResult').innerHTML = result;
-    console.log('Calculated Mean Wind:', result, 'u:', meanWind[2], 'v:', meanWind[3]);
-}
-
 function downloadTableAsAscii(format) {
     if (!weatherData || !weatherData.time) {
         Utils.handleError('No weather data available to download.');
@@ -2067,37 +1535,671 @@ function downloadTableAsAscii(format) {
     updateReferenceLabels();
 }
 
-function createArrowIcon(lat, lng, bearing, color) {
-    // Normalize bearing to 0-360
-    const normalizedBearing = (bearing + 360) % 360;
+// == Jump and Free Fall Calculations ==
+function calculateFreeFall(weatherData, exitAltitude, openingAltitude, sliderIndex, startLat, startLng, elevation) {
+    console.log('Starting calculateFreeFall...', { exitAltitude, openingAltitude, sliderIndex });
 
-    // Use the original SVG shape
-    const arrowSvg = `
-        <svg width="40" height="20" viewBox="0 0 40 20" xmlns="http://www.w3.org/2000/svg">
-            <line x1="0" y1="10" x2="30" y2="10" stroke="${color}" stroke-width="4" />
-            <polygon points="30,5 40,10 30,15" fill="${color}" />
-        </svg>
-    `;
+    if (!weatherData || !weatherData.time || !weatherData.surface_pressure) {
+        console.warn('Invalid weather data provided');
+        return null;
+    }
+    if (!Number.isFinite(startLat) || !Number.isFinite(startLng) || !Number.isFinite(elevation)) {
+        console.warn('Invalid coordinates or elevation');
+        return null;
+    }
 
-    // Wrap SVG in a div with CSS rotation
-    return L.divIcon({
-        html: `
-            <div style="
-                transform: rotate(${normalizedBearing}deg);
-                transform-origin: center center;
-                width: 40px;
-                height: 20px;
-            ">
-                ${arrowSvg}
-            </div>
-        `,
-        className: 'wind-arrow-icon', // Avoid Leaflet default styles
-        iconSize: [40, 20], // Match SVG dimensions
-        iconAnchor: [20, 10], // Center of the icon (half of width and height)
-        popupAnchor: [0, -10] // Adjust if popups are needed
+    const mass = 80;
+    const g = 9.81;
+    const Rl = 287.102;
+    const cdHorizontal = 1;
+    const areaHorizontal = 0.5;
+    const cdVertical = 1;
+    const areaVertical = 0.5;
+    const dt = 0.5;
+
+    const hStart = elevation + exitAltitude;
+    const hStop = elevation + openingAltitude;
+    const jumpRunData = jumpRunTrack();
+    const jumpRunDirection = jumpRunData ? jumpRunData.direction : 0;
+    const aircraftSpeedKt = 90;
+    const aircraftSpeedMps = aircraftSpeedKt * 0.514444;
+    const vxInitial = Math.cos((jumpRunDirection) * Math.PI / 180) * aircraftSpeedMps;
+    const vyInitial = Math.sin((jumpRunDirection) * Math.PI / 180) * aircraftSpeedMps;
+
+    console.log('Free fall initial values: ', aircraftSpeedKt, ' kt ', jumpRunDirection, '°');
+    console.log('Free fall initial velocity: ', { vxInitial, vyInitial });
+
+    const interpolatedData = interpolateWeatherData(sliderIndex);
+    if (!interpolatedData || interpolatedData.length === 0) {
+        console.warn('No interpolated weather data available');
+        return null;
+    }
+    const heights = interpolatedData.map(d => d.height);
+    const windDirs = interpolatedData.map(d => Number.isFinite(d.dir) ? parseFloat(d.dir) : 0);
+    const windSpdsMps = interpolatedData.map(d => Utils.convertWind(parseFloat(d.spd) || 0, 'm/s', 'km/h'));
+    const tempsC = interpolatedData.map(d => d.temp);
+
+    const trajectory = [{
+        time: 0,
+        height: hStart,
+        vz: 0,
+        vxGround: vxInitial,
+        vyGround: vyInitial,
+        x: 0,
+        y: 0
+    }];
+
+    const surfacePressure = weatherData.surface_pressure[sliderIndex] || 1013.25;
+    const surfaceTempC = weatherData.temperature_2m[sliderIndex] || 15;
+    const surfaceTempK = surfaceTempC + 273.15;
+    let rho = (surfacePressure * 100) / (Rl * surfaceTempK);
+
+    let current = trajectory[0];
+    while (current.height > hStop) {
+        const windDir = Utils.LIP(heights, windDirs, current.height);
+        const windSpd = Utils.LIP(heights, windSpdsMps, current.height);
+        const tempC = Utils.LIP(heights, tempsC, current.height);
+        const tempK = tempC + 273.15;
+        rho = (surfacePressure * 100 * Math.exp(-g * (current.height - elevation) / (Rl * tempK))) / (Rl * tempK);
+
+        // Wind direction is "from," displacement is "to" (add 180°)
+        const windDirTo = (windDir + 180) % 360;
+        const vxWind = windSpd * Math.cos(windDirTo * Math.PI / 180); // Displacement direction
+        const vyWind = windSpd * Math.sin(windDirTo * Math.PI / 180);
+
+        const vxAir = current.vxGround - vxWind;
+        const vyAir = current.vyGround - vyWind;
+        const vAirMag = Math.sqrt(vxAir * vxAir + vyAir * vyAir);
+
+        const bv = 0.5 * cdVertical * areaVertical * rho / mass;
+        const bh = 0.5 * cdHorizontal * areaHorizontal * rho / mass;
+
+        const az = -g - bv * current.vz * Math.abs(current.vz);
+        const ax = -bh * vAirMag * vxAir;
+        const ay = -bh * vAirMag * vyAir;
+
+        let nextHeight = current.height + current.vz * dt;
+        let nextVz = current.vz + az * dt;
+        let nextTime = current.time + dt;
+
+        if (nextHeight <= hStop) {
+            const fraction = (current.height - hStop) / (current.height - nextHeight);
+            nextTime = current.time + dt * fraction;
+            nextHeight = hStop;
+            nextVz = current.vz + az * dt * fraction;
+        }
+
+        const next = {
+            time: nextTime,
+            height: nextHeight,
+            vz: nextVz,
+            vxGround: vxInitial === 0 ? vxWind : current.vxGround + ax * dt,
+            vyGround: vyInitial === 0 ? vyWind : current.vyGround + ay * dt,
+            x: current.x + (vxInitial === 0 ? vxWind : current.vxGround) * dt,
+            y: current.y + (vyInitial === 0 ? vyWind : current.vyGround) * dt
+        };
+
+        trajectory.push(next);
+        current = next;
+
+        if (next.height === hStop) break;
+    }
+
+    const final = trajectory[trajectory.length - 1];
+    const distance = Math.sqrt(final.x * final.x + final.y * final.y);
+    const directionRad = Math.atan2(final.y, final.x);
+    let directionDeg = directionRad * 180 / Math.PI;
+    directionDeg = (directionDeg + 360) % 360;
+
+    console.log(`Free fall from exit to opening: ${Math.round(directionDeg)}° ${Math.round(distance)} m, vz: ${final.vz.toFixed(2)} m/s`);
+    console.log('Elevation used:', elevation);
+
+    const result = {
+        time: final.time,
+        height: final.height,
+        vz: final.vz,
+        xDisplacement: final.x,
+        yDisplacement: final.y,
+        path: trajectory.map(point => ({
+            latLng: calculateNewCenter(startLat, startLng, Math.sqrt(point.x * point.x + point.y * point.y), Math.atan2(point.y, point.x) * 180 / Math.PI),
+            height: point.height,
+            time: point.time,
+            vz: point.vz
+        })),
+        directionDeg: directionDeg, // Include direction
+        distance: distance // Include distance
+    };
+
+    console.log('Free fall result:', result);
+    return result;
+}
+function visualizeFreeFallPath(path) {
+    if (!map || !userSettings.calculateJump) return;
+
+    const latLngs = path.map(point => point.latLng);
+    const freeFallPolyline = L.polyline(latLngs, {
+        color: 'purple',
+        weight: 3,
+        opacity: 0.7,
+        dashArray: '10, 10'
+    }).addTo(map);
+
+    freeFallPolyline.bindPopup(`Free Fall Path<br>Duration: ${path[path.length - 1].time.toFixed(1)}s<br>Distance: ${Math.sqrt(path[path.length - 1].latLng[0] ** 2 + path[path.length - 1].latLng[1] ** 2).toFixed(1)}m`);
+}
+function calculateJump() {
+    console.log('Starting calculateJump...');
+    if (!weatherData || !weatherData.time || !weatherData.surface_pressure) {
+        console.warn('Weather data not available');
+        return null;
+    }
+    const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
+    const exitAltitude = parseInt(document.getElementById('exitAltitude')?.value) || 3000;
+    const openingAltitude = parseInt(document.getElementById('openingAltitude')?.value) || 1200;
+    const legHeightDownwind = parseInt(document.getElementById('legHeightDownwind')?.value) || 300;
+    const descentRate = parseFloat(document.getElementById('descentRate')?.value) || 3.5;
+    const canopySpeed = parseFloat(document.getElementById('canopySpeed')?.value) || 20;
+
+    const canopySpeedMps = canopySpeed * 0.514444; // Convert kt to m/s
+    const heightDistance = openingAltitude - 200 - legHeightDownwind;
+    const flyTime = heightDistance / descentRate;
+    const horizontalCanopyDistance = flyTime * canopySpeedMps;
+    const heightDistanceFull = openingAltitude - 200;
+    const flyTimeFull = heightDistanceFull / descentRate;
+    const horizontalCanopyDistanceFull = flyTimeFull * canopySpeedMps;
+
+    console.log('Calculated radii:', { horizontalCanopyDistance, horizontalCanopyDistanceFull });
+    console.log('Jump inputs:', { exitAltitude, openingAltitude, legHeightDownwind, descentRate, canopySpeed, sliderIndex, lastLat, lastLng, lastAltitude });
+
+    // Free fall phase
+    const freeFallResult = calculateFreeFall(weatherData, exitAltitude, openingAltitude, sliderIndex, lastLat, lastLng, lastAltitude);
+    console.log('Freefall calculated');
+    if (!freeFallResult) {
+        console.warn('Free fall calculation failed');
+        return null;
+    }
+
+    if (horizontalCanopyDistance <= 0 || horizontalCanopyDistanceFull <= 0) {
+        console.warn('Invalid radii:', { horizontalCanopyDistance, horizontalCanopyDistanceFull });
+        return null;
+    }
+
+    const interpolatedData = interpolateWeatherData(sliderIndex);
+
+    if (!interpolatedData || interpolatedData.length === 0) {
+        console.warn('No interpolated weather data available');
+        return null;
+    }
+
+    const elevation = Math.round(lastAltitude);
+    const lowerLimitFull = elevation;
+    const upperLimitFull = elevation + openingAltitude - 200;
+    const lowerLimit = elevation + legHeightDownwind;
+    const upperLimit = elevation + openingAltitude - 200;
+
+    const heights = interpolatedData.map(d => d.height);
+    const dirs = interpolatedData.map(d => Number.isFinite(d.dir) ? parseFloat(d.dir) : 0);
+    const spdsMps = interpolatedData.map(d => Utils.convertWind(parseFloat(d.spd) || 0, 'm/s', 'km/h')); // km/h to m/s
+
+    const uComponents = spdsMps.map((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
+    const vComponents = spdsMps.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
+
+    const meanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, lowerLimit, upperLimit);
+    const meanWindDirection = meanWind[0];
+    const meanWindSpeedMps = meanWind[1];
+    console.log('Mean wind blue: ', meanWindDirection.toFixed(1), meanWindSpeedMps.toFixed(1), 'm/s');
+
+    const meanWindFull = Utils.calculateMeanWind(heights, uComponents, vComponents, lowerLimitFull, upperLimitFull);
+    const meanWindDirectionFull = meanWindFull[0];
+    const meanWindSpeedMpsFull = meanWindFull[1];
+    console.log('Mean wind red: ', meanWindDirectionFull.toFixed(1), meanWindSpeedMpsFull.toFixed(1), 'm/s');
+
+    const centerDisplacement = meanWindSpeedMps * flyTime;
+    const centerDisplacementFull = meanWindSpeedMpsFull * flyTimeFull;
+    const displacementDirection = meanWindDirection;
+    const displacementDirectionFull = meanWindDirectionFull;
+
+    if (!Number.isFinite(lastLat) || !Number.isFinite(lastLng)) {
+        console.error('Invalid lastLat or lastLng:', { lastLat, lastLng });
+        return null;
+    }
+
+    // Always calculate landing pattern coordinates, but only display if enabled
+    console.log('Calculating landing pattern coordinates...');
+    const landingPatternCoords = calculateLandingPatternCoords(lastLat, lastLng, interpolatedData, sliderIndex);
+    let downwindLat = landingPatternCoords.downwindLat;
+    let downwindLng = landingPatternCoords.downwindLng;
+
+    if (userSettings.showLandingPattern) {
+        console.log('Displaying landing pattern...');
+        updateLandingPattern();
+    } else {
+        console.log('Landing pattern not displayed; blue circle still uses downwind end');
+    }
+
+    // Fallback if downwind coordinates are invalid
+    if (!Number.isFinite(downwindLat) || !Number.isFinite(downwindLng)) {
+        console.warn('Downwind coordinates invalid, using lastLat, lastLng as fallback');
+        downwindLat = lastLat;
+        downwindLng = lastLng;
+    }
+
+    console.log('Calling updateJumpCircle with:', { downwindLat, downwindLng, lastLat, lastLng, horizontalCanopyDistance, horizontalCanopyDistanceFull, centerDisplacement, centerDisplacementFull, displacementDirection, displacementDirectionFull, freeFallDirection: freeFallResult.directionDeg, freeFallDistance: freeFallResult.distance });
+    updateJumpCircle(
+        downwindLat,
+        downwindLng,
+        lastLat,
+        lastLng,
+        horizontalCanopyDistance,
+        horizontalCanopyDistanceFull,
+        centerDisplacement,
+        centerDisplacementFull,
+        displacementDirection,
+        displacementDirectionFull,
+        freeFallResult.directionDeg, // Pass direction
+        freeFallResult.distance // Pass distance
+    );
+
+    if (currentMarker) {
+        currentMarker.setLatLng([lastLat, lastLng]);
+        updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
+    }
+
+    updateJumpRunTrack();
+    jumpRunTrack();
+
+    console.log('calculateJump completed');
+    return {
+        radius: horizontalCanopyDistance,
+        radiusFull: horizontalCanopyDistanceFull,
+        displacement: centerDisplacement,
+        displacementFull: centerDisplacementFull,
+        direction: meanWindDirection,
+        directionFull: meanWindDirectionFull,
+        freeFall: freeFallResult,
+        freeFallDirection: freeFallResult.directionDeg, // Ensure included
+        freeFallDistance: freeFallResult.distance // Ensure included
+    };
+}
+function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, displacement, displacementFull, direction, directionFull, freeFallDirection, freeFallDistance) {
+    console.log('updateJumpCircle called with:', { blueLat, blueLng, redLat, redLng, radius, radiusFull, displacement, displacementFull, direction, directionFull, freeFallDirection, freeFallDistance, zoom: map.getZoom() });
+    if (!map) {
+        console.warn('Map not available to update jump circles');
+        return;
+    }
+
+    const currentZoom = map.getZoom();
+    const isVisible = currentZoom >= minZoom && currentZoom <= maxZoom;
+    console.log('Zoom check:', { currentZoom, minZoom, maxZoom, isVisible });
+
+    // Remove existing blue and red circles safely
+    const removeLayer = (layer, name) => {
+        if (layer && typeof layer === 'object' && '_leaflet_id' in layer && map.hasLayer(layer)) {
+            console.log(`Removing existing ${name} circle`);
+            map.removeLayer(layer);
+        }
+    };
+    removeLayer(jumpCircle, 'blue jump');
+    removeLayer(jumpCircleFull, 'red jump');
+
+    // Only remove green circles if showExitArea is false or calculateJump is true
+    if (!userSettings.showExitArea || userSettings.calculateJump) {
+        removeLayer(jumpCircleGreen, 'green jump');
+        removeLayer(jumpCircleGreenLight, 'light green jump');
+        jumpCircleGreen = null;
+        jumpCircleGreenLight = null;
+    }
+
+    // Reset blue and red circle variables
+    jumpCircle = null;
+    jumpCircleFull = null;
+
+    if (isVisible && Number.isFinite(blueLat) && Number.isFinite(blueLng) && Number.isFinite(redLat) && Number.isFinite(redLng)) {
+        const newCenterBlue = calculateNewCenter(blueLat, blueLng, displacement, direction);
+        const newCenterRed = calculateNewCenter(redLat, redLng, displacementFull, directionFull);
+        console.log('New centers calculated:', { blue: newCenterBlue, red: newCenterRed });
+
+        if (!Number.isFinite(newCenterBlue[0]) || !Number.isFinite(newCenterBlue[1]) || !Number.isFinite(newCenterRed[0]) || !Number.isFinite(newCenterRed[1])) {
+            console.warn('Invalid center coordinates:', { newCenterBlue, newCenterRed });
+            return;
+        }
+
+        if (!Number.isFinite(radius) || radius <= 0 || !Number.isFinite(radiusFull) || radiusFull <= 0) {
+            console.warn('Invalid radius values:', { radius, radiusFull });
+            return;
+        }
+
+        console.log('Creating circles with radii:', { blueRadius: radius, redRadius: radiusFull, greenRadius: userSettings.showExitArea ? radiusFull : null, greenLightRadius: userSettings.showExitArea ? radius : null });
+
+        // Blue circle
+        jumpCircle = L.circle(newCenterBlue, {
+            radius: radius,
+            color: 'blue',
+            fillColor: 'blue',
+            fillOpacity: 0.2,
+            weight: 2
+        });
+
+        // Red circle
+        jumpCircleFull = L.circle(newCenterRed, {
+            radius: radiusFull,
+            color: 'red',
+            fillColor: 'red',
+            fillOpacity: 0.2,
+            weight: 2
+        });
+
+        // Add blue and red circles to map
+        jumpCircle.addTo(map);
+        jumpCircleFull.addTo(map);
+
+        // Green circles (only if showExitArea is true)
+        if (userSettings.showExitArea) {
+            // First green circle (same as red circle radius)
+            let jumpCircleGreenCenter = newCenterRed;
+            if (Number.isFinite(freeFallDirection) && Number.isFinite(freeFallDistance)) {
+                const greenShiftDirection = (freeFallDirection + 180) % 360;
+                jumpCircleGreenCenter = calculateNewCenter(newCenterRed[0], newCenterRed[1], freeFallDistance, greenShiftDirection);
+                console.log('Green circle center calculated:', { center: jumpCircleGreenCenter, shiftDirection: greenShiftDirection, shiftDistance: freeFallDistance });
+            } else {
+                console.warn('Free fall direction or distance not provided, using red circle center:', { freeFallDirection, freeFallDistance });
+            }
+
+            jumpCircleGreen = L.circle(jumpCircleGreenCenter, {
+                radius: radiusFull,
+                color: 'green',
+                fillColor: 'none',
+                fillOpacity: 0,
+                weight: 2
+            });
+
+            // Light green circle (same as blue circle radius)
+            let jumpCircleGreenLightCenter = newCenterBlue;
+            if (Number.isFinite(freeFallDirection) && Number.isFinite(freeFallDistance)) {
+                const greenLightShiftDirection = (freeFallDirection + 180) % 360;
+                jumpCircleGreenLightCenter = calculateNewCenter(newCenterBlue[0], newCenterBlue[1], freeFallDistance, greenLightShiftDirection);
+                console.log('Light green circle center calculated:', { center: jumpCircleGreenLightCenter, shiftDirection: greenLightShiftDirection, shiftDistance: freeFallDistance });
+            } else {
+                console.warn('Free fall direction or distance not provided, using blue circle center for light green:', { freeFallDirection, freeFallDistance });
+            }
+
+            jumpCircleGreenLight = L.circle(jumpCircleGreenLightCenter, {
+                radius: radius,
+                color: 'lightgreen',
+                fillColor: 'none',
+                fillOpacity: 0,
+                weight: 2
+            });
+
+            // Add green circles to map
+            jumpCircleGreen.addTo(map);
+            jumpCircleGreenLight.addTo(map);
+        }
+
+        console.log('Jump circles added at zoom:', currentZoom, 'Layers on map:', {
+            blue: !!jumpCircle && map.hasLayer(jumpCircle),
+            red: !!jumpCircleFull && map.hasLayer(jumpCircleFull),
+            green: !!jumpCircleGreen && map.hasLayer(jumpCircleGreen),
+            greenLight: !!jumpCircleGreenLight && map.hasLayer(jumpCircleGreenLight)
+        });
+    } else {
+        console.log('Jump circles not displayed - zoom:', currentZoom, 'visible:', isVisible, 'coords valid:', Number.isFinite(blueLat) && Number.isFinite(blueLng) && Number.isFinite(redLat) && Number.isFinite(redLng), 'calculateJump:', userSettings.calculateJump);
+        // Preserve green circles if showExitArea is true
+        if (!userSettings.showExitArea) {
+            jumpCircleGreen = null;
+            jumpCircleGreenLight = null;
+        }
+    }
+
+    if (currentMarker) {
+        currentMarker.setLatLng([lastLat, lastLng]);
+        updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
+    }
+    console.log('updateJumpCircle completed');
+}
+function jumpRunTrack() {
+    console.log('Starting jumpRunTrack...');
+    const exitAltitude = parseInt(document.getElementById('exitAltitude')?.value) || userSettings.exitAltitude || 3000;
+    const openingAltitude = parseInt(document.getElementById('openingAltitude')?.value) || userSettings.openingAltitude || 1000;
+    const customDirection = parseInt(document.getElementById('jumpRunTrackDirection')?.value, 10);
+    const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
+
+    if (!weatherData || !lastLat || !lastLng || lastAltitude === null || lastAltitude === 'N/A') {
+        console.warn('Cannot calculate jump run track: missing weather data, coordinates, or altitude');
+        return null;
+    }
+
+    const interpolatedData = interpolateWeatherData(sliderIndex);
+    if (!interpolatedData || interpolatedData.length === 0) {
+        console.warn('No interpolated weather data available');
+        return null;
+    }
+
+    const elevation = Math.round(lastAltitude);
+    const lowerLimit = elevation;
+    const upperLimit = elevation + openingAltitude;
+    console.log('Jump run track limits:', lowerLimit, upperLimit);
+
+    const heights = interpolatedData.map(d => d.height);
+    const dirs = interpolatedData.map(d => Number.isFinite(d.dir) ? parseFloat(d.dir) : 0);
+    const spdsMps = interpolatedData.map(d => {
+        const spd = Number.isFinite(d.spd) ? parseFloat(d.spd) : 0;
+        return Utils.convertWind(spd, 'm/s', getWindSpeedUnit());
     });
+
+    const uComponents = spdsMps.map((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
+    const vComponents = spdsMps.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
+
+    const meanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, lowerLimit, upperLimit);
+    const meanWindDirection = meanWind[0];
+    const meanWindSpeed = meanWind[1];
+
+    if (!Number.isFinite(meanWindDirection) || !Number.isFinite(meanWindSpeed)) {
+        console.warn('Invalid mean wind calculation:', meanWind);
+        return null;
+    }
+
+    let jumpRunTrackDirection;
+    if (userSettings.isCustomJumpRunDirection && !isNaN(customDirection) && customDirection >= 0 && customDirection <= 359) {
+        jumpRunTrackDirection = customDirection;
+        console.log(`Using custom jump run direction: ${jumpRunTrackDirection}°`);
+    } else {
+        jumpRunTrackDirection = Math.round(meanWindDirection);
+        console.log(`Using calculated jump run direction: ${jumpRunTrackDirection}°`);
+    }
+
+    // Update input field to reflect calculated direction if not custom
+    const directionInput = document.getElementById('jumpRunTrackDirection');
+    if (!userSettings.isCustomJumpRunDirection || !directionInput.value || isNaN(customDirection) || customDirection < 0 || customDirection > 359) {
+        directionInput.value = jumpRunTrackDirection;
+    }
+
+    console.log(`Jump Run Track: ${jumpRunTrackDirection}° (Mean wind: ${meanWindDirection.toFixed(1)}° @ ${meanWindSpeed.toFixed(1)} ${getWindSpeedUnit()})`);
+
+    return {
+        direction: jumpRunTrackDirection,
+        meanWindDirection: meanWindDirection,
+        meanWindSpeed: meanWindSpeed
+    };
+}
+function updateJumpRunTrack() {
+    if (!map) {
+        console.warn('Map not available to update jump run track');
+        return;
+    }
+
+    const currentZoom = map.getZoom();
+    const isVisible = currentZoom >= minZoom && currentZoom <= maxZoom;
+
+    if (jumpRunTrackLayer && map.hasLayer(jumpRunTrackLayer)) {
+        console.log('Removing existing jump run track');
+        map.removeLayer(jumpRunTrackLayer);
+    }
+
+    if (!userSettings.calculateJump || !lastLat || !lastLng || !weatherData) {
+        console.log('Jump run track not updated: missing data or feature disabled');
+        return;
+    }
+
+    const trackData = jumpRunTrack();
+    if (!trackData || !Number.isFinite(trackData.direction)) {
+        console.warn('Invalid jump run track data:', trackData);
+        return;
+    }
+
+    if (!userSettings.showJumpRunTrack || !isVisible) {
+        console.log('Jump run track not displayed - zoom:', currentZoom, 'visible:', isVisible);
+        jumpRunTrackLayer = null;
+        return;
+    }
+
+    const direction = trackData.direction;
+    const offset = parseInt(document.getElementById('jumpRunTrackOffset')?.value) || 0;
+
+    const trackLengthMeters = 3000;
+    const halfLengthMeters = trackLengthMeters / 2;
+    const earthRadius = 6371000;
+    let centerLat = lastLat * Math.PI / 180;
+    let centerLng = lastLng * Math.PI / 180;
+
+    const offsetDirectionRad = offset > 0 ? (direction + 90) * Math.PI / 180 : (direction - 90 + 360) * Math.PI / 180;
+    const offsetDistance = Math.abs(offset) / earthRadius;
+
+    if (offset !== 0) {
+        const newCenterLat = Math.asin(Math.sin(centerLat) * Math.cos(offsetDistance) + Math.cos(centerLat) * Math.sin(offsetDistance) * Math.cos(offsetDirectionRad));
+        const newCenterLng = centerLng + Math.atan2(Math.sin(offsetDirectionRad) * Math.sin(offsetDistance) * Math.cos(centerLat), Math.cos(offsetDistance) - Math.sin(centerLat) * Math.sin(newCenterLat));
+        centerLat = newCenterLat;
+        centerLng = newCenterLng;
+    }
+
+    const bearingRad = direction * Math.PI / 180;
+    const deltaForward = halfLengthMeters / earthRadius;
+    let lat2 = Math.asin(Math.sin(centerLat) * Math.cos(deltaForward) + Math.cos(centerLat) * Math.sin(deltaForward) * Math.cos(bearingRad));
+    let lng2 = centerLng + Math.atan2(Math.sin(bearingRad) * Math.sin(deltaForward) * Math.cos(centerLat), Math.cos(deltaForward) - Math.sin(centerLat) * Math.sin(lat2));
+    lat2 = lat2 * 180 / Math.PI;
+    lng2 = ((lng2 * 180 / Math.PI + 540) % 360) - 180;
+
+    const bearingOppositeRad = ((direction + 180) % 360) * Math.PI / 180;
+    const deltaBackward = halfLengthMeters / earthRadius;
+    let lat0 = Math.asin(Math.sin(centerLat) * Math.cos(deltaBackward) + Math.cos(centerLat) * Math.sin(deltaBackward) * Math.cos(bearingOppositeRad));
+    let lng0 = centerLng + Math.atan2(Math.sin(bearingOppositeRad) * Math.sin(deltaBackward) * Math.cos(centerLat), Math.cos(deltaBackward) - Math.sin(centerLat) * Math.sin(lat0));
+    lat0 = lat0 * 180 / Math.PI;
+    lng0 = ((lng0 * 180 / Math.PI + 540) % 360) - 180;
+
+    const trackPoints = [[lat0, lng0], [lat2, lng2]];
+
+    const polyline = L.polyline(trackPoints, {
+        color: 'orange',
+        weight: 3,
+        opacity: 1,
+        dashArray: '5, 10',
+    });
+
+    // Use a plane icon instead of a triangle
+    const planeIcon = L.icon({
+        iconUrl: 'airplane_orange.png', // Path to your plane icon
+        iconSize: [30, 30], // Size of the icon
+        iconAnchor: [15, 15], // Center of the icon (adjust if needed)
+        className: 'jump-run-plane', // Optional CSS class for styling
+        opacity: 1,
+    });
+
+    const arrowMarker = L.marker([lat2, lng2], {
+        icon: planeIcon,
+        rotationAngle: direction, // Rotate the icon to match the jump run direction
+        rotationOrigin: 'center center' // Ensure rotation is around the center
+    });
+
+    jumpRunTrackLayer = L.layerGroup([polyline, arrowMarker]);
+    jumpRunTrackLayer.addTo(map);
+    console.log('Jump run track added at zoom:', currentZoom, 'Layer on map:', map.hasLayer(jumpRunTrackLayer));
 }
 
+// == Landing Pattern Calculations ==
+function calculateLandingPatternCoords(lat, lng, interpolatedData, sliderIndex) {
+    const CANOPY_SPEED_KT = parseInt(document.getElementById('canopySpeed').value) || 20;
+    const DESCENT_RATE_MPS = parseFloat(document.getElementById('descentRate').value) || 3.5;
+    const LEG_HEIGHT_FINAL = parseInt(document.getElementById('legHeightFinal').value) || 100;
+    const LEG_HEIGHT_BASE = parseInt(document.getElementById('legHeightBase').value) || 200;
+    const LEG_HEIGHT_DOWNWIND = parseInt(document.getElementById('legHeightDownwind').value) || 300;
+    const baseHeight = Math.round(lastAltitude);
+
+    const landingDirection = document.querySelector('input[name="landingDirection"]:checked')?.value || 'LL';
+    const customLandingDirLL = parseInt(document.getElementById('customLandingDirectionLL')?.value, 10) || null;
+    const customLandingDirRR = parseInt(document.getElementById('customLandingDirectionRR')?.value, 10) || null;
+
+    const heights = interpolatedData.map(d => d.height);
+    const dirs = interpolatedData.map(d => Number.isFinite(d.dir) ? parseFloat(d.dir) : 0);
+    const spdsKt = interpolatedData.map(d => Utils.convertWind(parseFloat(d.spd) || 0, 'kt', 'km/h')); // km/h to kt
+    const uComponents = spdsKt.map((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
+    const vComponents = spdsKt.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
+
+    let effectiveLandingWindDir;
+    if (landingDirection === 'LL' && Number.isFinite(customLandingDirLL) && customLandingDirLL >= 0 && customLandingDirLL <= 359) {
+        effectiveLandingWindDir = customLandingDirLL;
+    } else if (landingDirection === 'RR' && Number.isFinite(customLandingDirRR) && customLandingDirRR >= 0 && customLandingDirRR <= 359) {
+        effectiveLandingWindDir = customLandingDirRR;
+    } else {
+        // Only use calculated wind direction if no valid custom direction exists
+        effectiveLandingWindDir = Number.isFinite(landingWindDir) ? landingWindDir : dirs[0];
+    }
+
+    if (!Number.isFinite(effectiveLandingWindDir)) {
+        console.warn('Invalid landing wind direction:', effectiveLandingWindDir);
+        return { downwindLat: lat, downwindLng: lng };
+    }
+
+    const calculateLegEndpoint = (startLat, startLng, bearing, groundSpeedKt, timeSec) => {
+        const speedMps = groundSpeedKt * 0.514444; // kt to m/s
+        const lengthMeters = speedMps * timeSec;
+        const metersPerDegreeLat = 111000;
+        const distanceDeg = lengthMeters / metersPerDegreeLat;
+        const radBearing = bearing * Math.PI / 180;
+        const deltaLat = distanceDeg * Math.cos(radBearing);
+        const deltaLng = distanceDeg * Math.sin(radBearing) / Math.cos(startLat * Math.PI / 180);
+        return [startLat + deltaLat, startLng + deltaLng];
+    };
+
+    // Final Leg
+    const finalLimits = [baseHeight, baseHeight + LEG_HEIGHT_FINAL];
+    const finalMeanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, ...finalLimits);
+    const finalWindDir = finalMeanWind[0];
+    const finalWindSpeedKt = finalMeanWind[1];
+    const finalCourse = (effectiveLandingWindDir + 180) % 360;
+    const finalWindAngle = Utils.calculateWindAngle(effectiveLandingWindDir, finalWindDir);
+    const { crosswind: finalCrosswind, headwind: finalHeadwind } = Utils.calculateWindComponents(finalWindSpeedKt, finalWindAngle);
+    const finalGroundSpeedKt = Utils.calculateGroundSpeed(CANOPY_SPEED_KT, finalHeadwind);
+    const finalTime = LEG_HEIGHT_FINAL / DESCENT_RATE_MPS;
+    const finalEnd = calculateLegEndpoint(lat, lng, finalCourse, finalGroundSpeedKt, finalTime);
+
+    // Base Leg
+    const baseLimits = [baseHeight + LEG_HEIGHT_FINAL, baseHeight + LEG_HEIGHT_BASE];
+    const baseMeanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, ...baseLimits);
+    const baseWindDir = baseMeanWind[0];
+    const baseWindSpeedKt = baseMeanWind[1];
+    const baseHeading = landingDirection === 'LL' ? (effectiveLandingWindDir + 90) % 360 : (effectiveLandingWindDir - 90 + 360) % 360;
+    const baseCourse = Utils.calculateCourseFromHeading(baseHeading, baseWindDir, baseWindSpeedKt, CANOPY_SPEED_KT).trueCourse;
+    const baseWindAngle = Utils.calculateWindAngle(baseCourse, baseWindDir);
+    const { crosswind: baseCrosswind, headwind: baseHeadwind } = Utils.calculateWindComponents(baseWindSpeedKt, baseWindAngle);
+    const baseGroundSpeedKt = CANOPY_SPEED_KT - baseHeadwind;
+    const baseTime = (LEG_HEIGHT_BASE - LEG_HEIGHT_FINAL) / DESCENT_RATE_MPS;
+    let baseBearing = (baseCourse + 180) % 360;
+    if (baseGroundSpeedKt < 0) baseBearing = (baseBearing + 180) % 360;
+    const baseEnd = calculateLegEndpoint(finalEnd[0], finalEnd[1], baseBearing, baseGroundSpeedKt, baseTime);
+
+    // Downwind Leg
+    const downwindLimits = [baseHeight + LEG_HEIGHT_BASE, baseHeight + LEG_HEIGHT_DOWNWIND];
+    const downwindMeanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, ...downwindLimits);
+    const downwindWindDir = downwindMeanWind[0];
+    const downwindWindSpeedKt = downwindMeanWind[1];
+    const downwindCourse = effectiveLandingWindDir;
+    const downwindWindAngle = Utils.calculateWindAngle(downwindCourse, downwindWindDir);
+    const { crosswind: downwindCrosswind, headwind: downwindHeadwind } = Utils.calculateWindComponents(downwindWindSpeedKt, downwindWindAngle);
+    const downwindGroundSpeedKt = CANOPY_SPEED_KT + downwindHeadwind;
+    const downwindTime = (LEG_HEIGHT_DOWNWIND - LEG_HEIGHT_BASE) / DESCENT_RATE_MPS;
+    const downwindEnd = calculateLegEndpoint(baseEnd[0], baseEnd[1], downwindCourse, downwindGroundSpeedKt, downwindTime);
+
+    return { downwindLat: downwindEnd[0], downwindLng: downwindEnd[1] };
+}
 function updateLandingPattern() {
     console.log('updateLandingPattern called');
     if (!map || !userSettings.showLandingPattern || !weatherData || !lastLat || !lastLng || lastAltitude === null || lastAltitude === 'N/A') {
@@ -2435,359 +2537,38 @@ function updateLandingPattern() {
 
     //map.fitBounds([[lat, lng], finalEnd, baseEnd, downwindEnd], { padding: [50, 50] });
 }
+function createArrowIcon(lat, lng, bearing, color) {
+    // Normalize bearing to 0-360
+    const normalizedBearing = (bearing + 360) % 360;
 
-function updateJumpRunTrack() {
-    if (!map) {
-        console.warn('Map not available to update jump run track');
-        return;
-    }
+    // Use the original SVG shape
+    const arrowSvg = `
+        <svg width="40" height="20" viewBox="0 0 40 20" xmlns="http://www.w3.org/2000/svg">
+            <line x1="0" y1="10" x2="30" y2="10" stroke="${color}" stroke-width="4" />
+            <polygon points="30,5 40,10 30,15" fill="${color}" />
+        </svg>
+    `;
 
-    const currentZoom = map.getZoom();
-    const isVisible = currentZoom >= minZoom && currentZoom <= maxZoom;
-
-    if (jumpRunTrackLayer && map.hasLayer(jumpRunTrackLayer)) {
-        console.log('Removing existing jump run track');
-        map.removeLayer(jumpRunTrackLayer);
-    }
-
-    if (!userSettings.calculateJump || !lastLat || !lastLng || !weatherData) {
-        console.log('Jump run track not updated: missing data or feature disabled');
-        return;
-    }
-
-    const trackData = jumpRunTrack();
-    if (!trackData || !Number.isFinite(trackData.direction)) {
-        console.warn('Invalid jump run track data:', trackData);
-        return;
-    }
-
-    if (!userSettings.showJumpRunTrack || !isVisible) {
-        console.log('Jump run track not displayed - zoom:', currentZoom, 'visible:', isVisible);
-        jumpRunTrackLayer = null;
-        return;
-    }
-
-    const direction = trackData.direction;
-    const offset = parseInt(document.getElementById('jumpRunTrackOffset')?.value) || 0;
-
-    const trackLengthMeters = 3000;
-    const halfLengthMeters = trackLengthMeters / 2;
-    const earthRadius = 6371000;
-    let centerLat = lastLat * Math.PI / 180;
-    let centerLng = lastLng * Math.PI / 180;
-
-    const offsetDirectionRad = offset > 0 ? (direction + 90) * Math.PI / 180 : (direction - 90 + 360) * Math.PI / 180;
-    const offsetDistance = Math.abs(offset) / earthRadius;
-
-    if (offset !== 0) {
-        const newCenterLat = Math.asin(Math.sin(centerLat) * Math.cos(offsetDistance) + Math.cos(centerLat) * Math.sin(offsetDistance) * Math.cos(offsetDirectionRad));
-        const newCenterLng = centerLng + Math.atan2(Math.sin(offsetDirectionRad) * Math.sin(offsetDistance) * Math.cos(centerLat), Math.cos(offsetDistance) - Math.sin(centerLat) * Math.sin(newCenterLat));
-        centerLat = newCenterLat;
-        centerLng = newCenterLng;
-    }
-
-    const bearingRad = direction * Math.PI / 180;
-    const deltaForward = halfLengthMeters / earthRadius;
-    let lat2 = Math.asin(Math.sin(centerLat) * Math.cos(deltaForward) + Math.cos(centerLat) * Math.sin(deltaForward) * Math.cos(bearingRad));
-    let lng2 = centerLng + Math.atan2(Math.sin(bearingRad) * Math.sin(deltaForward) * Math.cos(centerLat), Math.cos(deltaForward) - Math.sin(centerLat) * Math.sin(lat2));
-    lat2 = lat2 * 180 / Math.PI;
-    lng2 = ((lng2 * 180 / Math.PI + 540) % 360) - 180;
-
-    const bearingOppositeRad = ((direction + 180) % 360) * Math.PI / 180;
-    const deltaBackward = halfLengthMeters / earthRadius;
-    let lat0 = Math.asin(Math.sin(centerLat) * Math.cos(deltaBackward) + Math.cos(centerLat) * Math.sin(deltaBackward) * Math.cos(bearingOppositeRad));
-    let lng0 = centerLng + Math.atan2(Math.sin(bearingOppositeRad) * Math.sin(deltaBackward) * Math.cos(centerLat), Math.cos(deltaBackward) - Math.sin(centerLat) * Math.sin(lat0));
-    lat0 = lat0 * 180 / Math.PI;
-    lng0 = ((lng0 * 180 / Math.PI + 540) % 360) - 180;
-
-    const trackPoints = [[lat0, lng0], [lat2, lng2]];
-
-    const polyline = L.polyline(trackPoints, {
-        color: 'orange',
-        weight: 3,
-        opacity: 1,
-        dashArray: '5, 10',
+    // Wrap SVG in a div with CSS rotation
+    return L.divIcon({
+        html: `
+            <div style="
+                transform: rotate(${normalizedBearing}deg);
+                transform-origin: center center;
+                width: 40px;
+                height: 20px;
+            ">
+                ${arrowSvg}
+            </div>
+        `,
+        className: 'wind-arrow-icon', // Avoid Leaflet default styles
+        iconSize: [40, 20], // Match SVG dimensions
+        iconAnchor: [20, 10], // Center of the icon (half of width and height)
+        popupAnchor: [0, -10] // Adjust if popups are needed
     });
-
-    // Use a plane icon instead of a triangle
-    const planeIcon = L.icon({
-        iconUrl: 'airplane_orange.png', // Path to your plane icon
-        iconSize: [30, 30], // Size of the icon
-        iconAnchor: [15, 15], // Center of the icon (adjust if needed)
-        className: 'jump-run-plane', // Optional CSS class for styling
-        opacity: 1,
-    });
-
-    const arrowMarker = L.marker([lat2, lng2], {
-        icon: planeIcon,
-        rotationAngle: direction, // Rotate the icon to match the jump run direction
-        rotationOrigin: 'center center' // Ensure rotation is around the center
-    });
-
-    jumpRunTrackLayer = L.layerGroup([polyline, arrowMarker]);
-    jumpRunTrackLayer.addTo(map);
-    console.log('Jump run track added at zoom:', currentZoom, 'Layer on map:', map.hasLayer(jumpRunTrackLayer));
 }
 
-function displayError(message) {
-    console.log('displayError called with:', message);
-    let errorElement = document.getElementById('error-message');
-    if (!errorElement) {
-        errorElement = document.createElement('div');
-        errorElement.id = 'error-message';
-        errorElement.style.position = 'fixed';
-        errorElement.style.top = '0';
-        errorElement.style.left = '0';
-        errorElement.style.width = '100%';
-        errorElement.style.backgroundColor = ' #ffcccc';
-        errorElement.style.borderRadius = '0 0 5px 5px';
-        errorElement.style.color = '#000000';
-        errorElement.style.padding = '10px';
-        errorElement.style.zIndex = '9999';
-        errorElement.style.display = 'block'; // Set initially
-        document.body.appendChild(errorElement);
-        console.log('New error element created and appended');
-    }
-    errorElement.textContent = message;
-    errorElement.style.display = 'block'; // Ensure it’s visible
-    console.log('Error element state:', {
-        display: errorElement.style.display,
-        text: errorElement.textContent,
-        position: errorElement.style.position,
-        zIndex: errorElement.style.zIndex
-    });
-    // Reset any existing timeout and set a new one
-    clearTimeout(window.errorTimeout); // Prevent overlap from multiple calls
-    window.errorTimeout = setTimeout(() => {
-        errorElement.style.display = 'none';
-        console.log('Error hidden after 5s');
-    }, 5000);
-}
-
-function showPasswordModal(feature, onSuccess, onCancel) {
-    const modal = document.getElementById('passwordModal');
-    const input = document.getElementById('passwordInput');
-    const error = document.getElementById('passwordError');
-    const submitBtn = document.getElementById('passwordSubmit');
-    const cancelBtn = document.getElementById('passwordCancel');
-    const header = document.getElementById('modalHeader');
-    const message = document.getElementById('modalMessage');
-
-    if (!modal || !input || !submitBtn || !cancelBtn || !header || !message) {
-        console.error('Modal elements not found');
-        return;
-    }
-
-    const featureName = feature === 'landingPattern' ? 'Landing Pattern' : 'Calculate Jump';
-    header.textContent = `${featureName} Access`;
-    message.textContent = `Please enter the password to enable ${featureName.toLowerCase()}:`;
-
-    input.value = '';
-    error.style.display = 'none';
-    modal.style.display = 'flex';
-
-    const submitHandler = () => {
-        if (input.value === FEATURE_PASSWORD) {
-            modal.style.display = 'none';
-            if (feature === 'landingPattern') {
-                isLandingPatternUnlocked = true;
-                const checkbox = document.getElementById('showLandingPattern');
-                if (checkbox) {
-                    checkbox.style.opacity = '1'; // Visual feedback
-                    checkbox.title = ''; // Clear tooltip
-                }
-            }
-            if (feature === 'calculateJump') {
-                isCalculateJumpUnlocked = true;
-                const checkbox = document.getElementById('calculateJumpCheckbox');
-                if (checkbox) {
-                    checkbox.style.opacity = '1'; // Visual feedback
-                    checkbox.title = ''; // Clear tooltip
-                }
-            }
-            localStorage.setItem('unlockedFeatures', JSON.stringify({
-                landingPattern: isLandingPatternUnlocked,
-                calculateJump: isCalculateJumpUnlocked
-            }));
-            console.log('Feature unlocked and saved:', feature);
-            onSuccess();
-        } else {
-            error.style.display = 'block';
-        }
-    };
-
-    submitBtn.onclick = submitHandler;
-    input.onkeypress = (e) => { if (e.key === 'Enter') submitHandler(); };
-    cancelBtn.onclick = () => {
-        modal.style.display = 'none';
-        onCancel();
-    };
-}
-
-function isFeatureUnlocked(feature) {
-    return feature === 'landingPattern' ? isLandingPatternUnlocked : isCalculateJumpUnlocked;
-}
-
-function jumpRunTrackOLD() {
-    console.log('Starting jumpRunTrack...');
-
-    const exitAltitude = parseInt(document.getElementById('exitAltitude')?.value) || userSettings.exitAltitude || 3000;
-    const openingAltitude = parseInt(document.getElementById('openingAltitude')?.value) || userSettings.openingAltitude || 1000;
-    const customDirection = parseInt(document.getElementById('jumpRunTrackDirection')?.value, 10);
-    const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
-
-    if (!weatherData || !lastLat || !lastLng || lastAltitude === null || lastAltitude === 'N/A') {
-        console.warn('Cannot calculate jump run track: missing weather data, coordinates, or altitude');
-        return null;
-    }
-
-    const interpolatedData = interpolateWeatherData(sliderIndex);
-    if (!interpolatedData || interpolatedData.length === 0) {
-        console.warn('No interpolated weather data available');
-        return null;
-    }
-
-    const elevation = Math.round(lastAltitude);
-    const lowerLimit = elevation;
-    const upperLimit = elevation + openingAltitude;
-    console.log('Jump run track limits:', lowerLimit, upperLimit);
-
-    const heights = interpolatedData.map(d => d.height);
-    const dirs = interpolatedData.map(d => Number.isFinite(d.dir) ? parseFloat(d.dir) : 0);
-    const spdsMps = interpolatedData.map(d => {
-        const spd = Number.isFinite(d.spd) ? parseFloat(d.spd) : 0;
-        return Utils.convertWind(spd, 'm/s', getWindSpeedUnit());
-    });
-
-    const uComponents = spdsMps.map((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
-    const vComponents = spdsMps.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
-
-    const meanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, lowerLimit, upperLimit);
-    const meanWindDirection = meanWind[0];
-    const meanWindSpeed = meanWind[1];
-
-    if (!Number.isFinite(meanWindDirection) || !Number.isFinite(meanWindSpeed)) {
-        console.warn('Invalid mean wind calculation:', meanWind);
-        return null;
-    }
-
-    // Verwende benutzerdefinierte Richtung, falls gültig, sonst die berechnete
-    let jumpRunTrackDirection;
-    if (!isNaN(customDirection) && customDirection >= 0 && customDirection <= 359) {
-        jumpRunTrackDirection = customDirection;
-        console.log(`Using custom jump run direction: ${jumpRunTrackDirection}°`);
-    } else {
-        jumpRunTrackDirection = Math.round(meanWindDirection);
-        console.log(`Using calculated jump run direction: ${jumpRunTrackDirection}°`);
-    }
-
-    // Setze den berechneten Wert ins Feld, falls es leer ist oder ungültig war
-    const directionInput = document.getElementById('jumpRunTrackDirection');
-    if (!directionInput.value || isNaN(customDirection) || customDirection < 0 || customDirection > 359) {
-        directionInput.value = jumpRunTrackDirection;
-    }
-
-    console.log(`Jump Run Track: ${jumpRunTrackDirection}° (Mean wind: ${meanWindDirection.toFixed(1)}° @ ${meanWindSpeed.toFixed(1)} ${getWindSpeedUnit()})`);
-
-    return {
-        direction: jumpRunTrackDirection,
-        meanWindDirection: meanWindDirection,
-        meanWindSpeed: meanWindSpeed
-    };
-}
-
-function jumpRunTrack() {
-    console.log('Starting jumpRunTrack...');
-    const exitAltitude = parseInt(document.getElementById('exitAltitude')?.value) || userSettings.exitAltitude || 3000;
-    const openingAltitude = parseInt(document.getElementById('openingAltitude')?.value) || userSettings.openingAltitude || 1000;
-    const customDirection = parseInt(document.getElementById('jumpRunTrackDirection')?.value, 10);
-    const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
-
-    if (!weatherData || !lastLat || !lastLng || lastAltitude === null || lastAltitude === 'N/A') {
-        console.warn('Cannot calculate jump run track: missing weather data, coordinates, or altitude');
-        return null;
-    }
-
-    const interpolatedData = interpolateWeatherData(sliderIndex);
-    if (!interpolatedData || interpolatedData.length === 0) {
-        console.warn('No interpolated weather data available');
-        return null;
-    }
-
-    const elevation = Math.round(lastAltitude);
-    const lowerLimit = elevation;
-    const upperLimit = elevation + openingAltitude;
-    console.log('Jump run track limits:', lowerLimit, upperLimit);
-
-    const heights = interpolatedData.map(d => d.height);
-    const dirs = interpolatedData.map(d => Number.isFinite(d.dir) ? parseFloat(d.dir) : 0);
-    const spdsMps = interpolatedData.map(d => {
-        const spd = Number.isFinite(d.spd) ? parseFloat(d.spd) : 0;
-        return Utils.convertWind(spd, 'm/s', getWindSpeedUnit());
-    });
-
-    const uComponents = spdsMps.map((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
-    const vComponents = spdsMps.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
-
-    const meanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, lowerLimit, upperLimit);
-    const meanWindDirection = meanWind[0];
-    const meanWindSpeed = meanWind[1];
-
-    if (!Number.isFinite(meanWindDirection) || !Number.isFinite(meanWindSpeed)) {
-        console.warn('Invalid mean wind calculation:', meanWind);
-        return null;
-    }
-
-    let jumpRunTrackDirection;
-    if (userSettings.isCustomJumpRunDirection && !isNaN(customDirection) && customDirection >= 0 && customDirection <= 359) {
-        jumpRunTrackDirection = customDirection;
-        console.log(`Using custom jump run direction: ${jumpRunTrackDirection}°`);
-    } else {
-        jumpRunTrackDirection = Math.round(meanWindDirection);
-        console.log(`Using calculated jump run direction: ${jumpRunTrackDirection}°`);
-    }
-
-    // Update input field to reflect calculated direction if not custom
-    const directionInput = document.getElementById('jumpRunTrackDirection');
-    if (!userSettings.isCustomJumpRunDirection || !directionInput.value || isNaN(customDirection) || customDirection < 0 || customDirection > 359) {
-        directionInput.value = jumpRunTrackDirection;
-    }
-
-    console.log(`Jump Run Track: ${jumpRunTrackDirection}° (Mean wind: ${meanWindDirection.toFixed(1)}° @ ${meanWindSpeed.toFixed(1)} ${getWindSpeedUnit()})`);
-
-    return {
-        direction: jumpRunTrackDirection,
-        meanWindDirection: meanWindDirection,
-        meanWindSpeed: meanWindSpeed
-    };
-}
-
-// ********** Event listener section **********
-document.addEventListener('DOMContentLoaded', () => {
-    // Initialize settings and UI
-    initializeSettings();
-    initializeUIElements();
-    initializeMap();
-
-    // Setup event listeners
-    setupSliderEvents();
-    setupModelSelectEvents();
-    setupDownloadEvents();
-    setupMenuEvents();
-    setupRadioEvents();
-    setupInputEvents();
-    setupCheckboxEvents();
-    setupCoordinateEvents();
-    setupResetButton();
-});
-
-// Initialize settings
-function initializeSettings() {
-    userSettings = JSON.parse(localStorage.getItem('upperWindsSettings')) || { ...defaultSettings };
-    console.log('Loaded userSettings:', userSettings);
-}
-
-// Initialize UI elements based on user settings
+// == UI and Event Handling ==
 function initializeUIElements() {
     setElementValue('modelSelect', userSettings.model);
     setRadioValue('refLevel', userSettings.refLevel);
@@ -2843,29 +2624,6 @@ function initializeUIElements() {
     if (directionSpan) directionSpan.textContent = '-'; // Initial placeholder
     updateUIState();
 }
-
-function setElementValue(id, value) {
-    const element = document.getElementById(id);
-    if (element) element.value = value;
-    else console.warn(`Element ${id} not found`);
-}
-
-function setRadioValue(name, value) {
-    const radio = document.querySelector(`input[name="${name}"][value="${value}"]`);
-    if (radio) radio.checked = true;
-    else console.warn(`Radio ${name} with value ${value} not found`);
-}
-
-function setInputValue(id, value) {
-    const element = document.getElementById(id);
-    if (element) element.value = value;
-}
-
-function setCheckboxValue(id, value) {
-    const element = document.getElementById(id);
-    if (element) element.checked = value;
-}
-
 function updateUIState() {
     const info = document.getElementById('info');
     if (info) info.style.display = userSettings.showTable ? 'block' : 'none';
@@ -2880,14 +2638,6 @@ function updateUIState() {
     updateHeightUnitLabels();
     updateWindUnitLabels();
 }
-
-// Initialize map
-function initializeMap() {
-    console.log('Initializing map...');
-    initMap();
-}
-
-// Handle slider-specific logic
 function setupSliderEvents() {
     const slider = document.getElementById('timeSlider');
     if (!slider) return Utils.handleError('Slider element missing.');
@@ -2916,8 +2666,6 @@ function setupSliderEvents() {
     console.log('Slider oninput triggered, new value:', this.value);
 
 }
-
-// Setup model select events
 function setupModelSelectEvents() {
     const modelSelect = document.getElementById('modelSelect');
     if (!modelSelect) return;
@@ -2938,8 +2686,6 @@ function setupModelSelectEvents() {
         }
     });
 }
-
-// Setup download events
 function setupDownloadEvents() {
     const downloadButton = document.getElementById('downloadButton');
     if (downloadButton) {
@@ -2949,8 +2695,6 @@ function setupDownloadEvents() {
         });
     }
 }
-
-// Setup menu events
 function setupMenuEvents() {
     const hamburgerBtn = document.getElementById('hamburgerBtn');
     const menu = document.getElementById('menu');
@@ -2979,8 +2723,6 @@ function setupMenuEvents() {
         });
     }
 }
-
-// Setup radio events
 function setupRadioEvents() {
     setupRadioGroup('refLevel', () => {
         updateReferenceLabels();
@@ -3032,47 +2774,6 @@ function setupRadioEvents() {
         updateAllDisplays();
     });
 }
-
-function setupRadioGroup(name, callback) {
-    const radios = document.querySelectorAll(`input[name="${name}"]`);
-    radios.forEach(radio => {
-        radio.addEventListener('change', () => {
-            userSettings[name] = document.querySelector(`input[name="${name}"]:checked`).value;
-            saveSettings();
-            console.log(`${name} changed to:`, userSettings[name]);
-
-            // Only for landingDirection, handle custom inputs
-            if (name === 'landingDirection') {
-                const customLL = document.getElementById('customLandingDirectionLL');
-                const customRR = document.getElementById('customLandingDirectionRR');
-                const landingDirection = userSettings.landingDirection;
-
-                if (customLL) customLL.disabled = landingDirection !== 'LL';
-                if (customRR) customRR.disabled = landingDirection !== 'RR';
-
-                // Do NOT overwrite custom direction with calculated value here
-                // Only set it if the field is empty AND no stored value exists
-                if (landingDirection === 'LL' && customLL && !customLL.value && userSettings.customLandingDirectionLL === '') {
-                    customLL.value = Math.round(landingWindDir || 0);
-                    userSettings.customLandingDirectionLL = parseInt(customLL.value);
-                    saveSettings();
-                }
-                if (landingDirection === 'RR' && customRR && !customRR.value && userSettings.customLandingDirectionRR === '') {
-                    customRR.value = Math.round(landingWindDir || 0);
-                    userSettings.customLandingDirectionRR = parseInt(customRR.value);
-                    saveSettings();
-                }
-            }
-            callback();
-        });
-    });
-}
-
-function getSliderValue() {
-    return parseInt(document.getElementById('timeSlider')?.value) || 0;
-}
-
-// Setup input events
 function setupInputEvents() {
     setupInput('lowerLimit', 'change', 300, (value) => {
         if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') calculateMeanWind();
@@ -3201,65 +2902,6 @@ function setupInputEvents() {
         }
     });
 }
-
-function setupInput(id, eventType, debounceTime, callback) {
-    const input = document.getElementById(id);
-    if (!input) return;
-    input.addEventListener(eventType, debounce(() => {
-        const value = input.type === 'number' ? parseFloat(input.value) : input.value;
-        userSettings[id] = value;
-        saveSettings();
-        console.log(`${id} changed to:`, value);
-        callback(value);
-    }, debounceTime));
-}
-
-function validateLegHeights(final, base, downwind) {
-    const finalVal = parseInt(final.value) || 100;
-    const baseVal = parseInt(base.value) || 200;
-    const downwindVal = parseInt(downwind.value) || 300;
-
-    if (baseVal <= finalVal) {
-        Utils.handleError('Base leg must start higher than final leg.');
-        return false;
-    }
-    if (downwindVal <= baseVal) {
-        Utils.handleError('Downwind leg must start higher than base leg.');
-        return false;
-    }
-    return true;
-}
-
-function setupLegHeightInput(id, defaultValue) {
-    const input = document.getElementById(id);
-    if (!input) return;
-    input.addEventListener('blur', () => {
-        const value = parseInt(input.value) || defaultValue;
-        userSettings[id] = value;
-        saveSettings();
-        const finalInput = document.getElementById('legHeightFinal');
-        const baseInput = document.getElementById('legHeightBase');
-        const downwindInput = document.getElementById('legHeightDownwind');
-        if (!isNaN(value) && value >= 50 && value <= 1000 && validateLegHeights(finalInput, baseInput, downwindInput)) {
-            updateAllDisplays();
-            weatherData && lastLat && lastLng && id === 'legHeightDownwind' && userSettings.calculateJump && calculateJump();
-        } else {
-            let adjustedValue = defaultValue;
-            const finalVal = parseInt(finalInput?.value) || 100;
-            const baseVal = parseInt(baseInput?.value) || 200;
-            const downwindVal = parseInt(downwindInput?.value) || 300;
-            if (id === 'legHeightFinal') adjustedValue = Math.min(baseVal - 1, 100);
-            if (id === 'legHeightBase') adjustedValue = Math.max(finalVal + 1, Math.min(downwindVal - 1, 200));
-            if (id === 'legHeightDownwind') adjustedValue = Math.max(baseVal + 1, 300);
-            input.value = adjustedValue;
-            userSettings[id] = adjustedValue;
-            saveSettings();
-            Utils.handleError(`Adjusted ${id} to ${adjustedValue} to maintain valid leg order.`);
-        }
-    });
-}
-
-// Setup checkbox events
 function setupCheckboxEvents() {
     setupCheckbox('showTableCheckbox', 'showTable', (checkbox) => {
         try {
@@ -3428,56 +3070,6 @@ function setupCheckboxEvents() {
         }
     });
 }
-
-// Modified setupCheckbox to pass the checkbox element
-function setupCheckbox(id, settingsKey, callback) {
-    const checkbox = document.getElementById(id);
-    if (!checkbox) {
-        console.warn(`Checkbox with ID "${id}" not found`);
-        return;
-    }
-    checkbox.checked = userSettings[settingsKey]; // Set initial state
-    callback(checkbox); // Run callback with initial state
-    checkbox.addEventListener('change', () => {
-        console.log(`${id} changed to:`, checkbox.checked);
-        callback(checkbox);
-    });
-}
-
-function toggleSubmenu(id, isVisible) {
-    const checkbox = document.getElementById(id);
-    const submenu = checkbox?.parentElement.nextElementSibling;
-    if (submenu) {
-        submenu.classList.toggle('hidden', !isVisible);
-        console.log('Submenu visibility:', !submenu.classList.contains('hidden'));
-    } else {
-        console.warn(`Submenu for ${id} not found`);
-    }
-}
-
-function clearJumpCircles() {
-    if (jumpCircle) {
-        map.removeLayer(jumpCircle);
-        jumpCircle = null;
-    }
-    if (jumpCircleFull) {
-        map.removeLayer(jumpCircleFull);
-        jumpCircleFull = null;
-    }
-   // Only clear green circles if showExitArea is false
-   if (!userSettings.showExitArea) {
-    if (jumpCircleGreen) {
-        map.removeLayer(jumpCircleGreen);
-        jumpCircleGreen = null;
-    }
-    if (jumpCircleGreenLight) {
-        map.removeLayer(jumpCircleGreenLight);
-        jumpCircleGreenLight = null;
-    }
-}
-}
-
-// Setup coordinate events
 function setupCoordinateEvents() {
     const coordInputs = document.getElementById('coordInputs');
     if (coordInputs) {
@@ -3520,7 +3112,186 @@ function setupCoordinateEvents() {
         });
     }
 }
+function setupCheckbox(id, settingsKey, callback) {
+    const checkbox = document.getElementById(id);
+    if (!checkbox) {
+        console.warn(`Checkbox with ID "${id}" not found`);
+        return;
+    }
+    checkbox.checked = userSettings[settingsKey]; // Set initial state
+    callback(checkbox); // Run callback with initial state
+    checkbox.addEventListener('change', () => {
+        console.log(`${id} changed to:`, checkbox.checked);
+        callback(checkbox);
+    });
+}
+function setupResetButton() {
+    const resetButton = document.createElement('button');
+    resetButton.textContent = 'Reset Settings';
+    resetButton.style.margin = '10px';
+    document.getElementById('bottom-container').appendChild(resetButton);
+    resetButton.addEventListener('click', () => {
+        userSettings = { ...defaultSettings };
+        isLandingPatternUnlocked = false;
+        isCalculateJumpUnlocked = false;
+        localStorage.setItem('upperWindsSettings', JSON.stringify(userSettings));
+        localStorage.setItem('unlockedFeatures', JSON.stringify({
+            landingPattern: false,
+            calculateJump: false
+        }));
+        console.log('Settings and unlock status reset');
+        location.reload();
+    });
+}
+function displayError(message) {
+    console.log('displayError called with:', message);
+    let errorElement = document.getElementById('error-message');
+    if (!errorElement) {
+        errorElement = document.createElement('div');
+        errorElement.id = 'error-message';
+        errorElement.style.position = 'fixed';
+        errorElement.style.top = '0';
+        errorElement.style.left = '0';
+        errorElement.style.width = '100%';
+        errorElement.style.backgroundColor = ' #ffcccc';
+        errorElement.style.borderRadius = '0 0 5px 5px';
+        errorElement.style.color = '#000000';
+        errorElement.style.padding = '10px';
+        errorElement.style.zIndex = '9999';
+        errorElement.style.display = 'block'; // Set initially
+        document.body.appendChild(errorElement);
+        console.log('New error element created and appended');
+    }
+    errorElement.textContent = message;
+    errorElement.style.display = 'block'; // Ensure it’s visible
+    console.log('Error element state:', {
+        display: errorElement.style.display,
+        text: errorElement.textContent,
+        position: errorElement.style.position,
+        zIndex: errorElement.style.zIndex
+    });
+    // Reset any existing timeout and set a new one
+    clearTimeout(window.errorTimeout); // Prevent overlap from multiple calls
+    window.errorTimeout = setTimeout(() => {
+        errorElement.style.display = 'none';
+        console.log('Error hidden after 5s');
+    }, 5000);
+}
+function showPasswordModal(feature, onSuccess, onCancel) {
+    const modal = document.getElementById('passwordModal');
+    const input = document.getElementById('passwordInput');
+    const error = document.getElementById('passwordError');
+    const submitBtn = document.getElementById('passwordSubmit');
+    const cancelBtn = document.getElementById('passwordCancel');
+    const header = document.getElementById('modalHeader');
+    const message = document.getElementById('modalMessage');
 
+    if (!modal || !input || !submitBtn || !cancelBtn || !header || !message) {
+        console.error('Modal elements not found');
+        return;
+    }
+
+    const featureName = feature === 'landingPattern' ? 'Landing Pattern' : 'Calculate Jump';
+    header.textContent = `${featureName} Access`;
+    message.textContent = `Please enter the password to enable ${featureName.toLowerCase()}:`;
+
+    input.value = '';
+    error.style.display = 'none';
+    modal.style.display = 'flex';
+
+    const submitHandler = () => {
+        if (input.value === FEATURE_PASSWORD) {
+            modal.style.display = 'none';
+            if (feature === 'landingPattern') {
+                isLandingPatternUnlocked = true;
+                const checkbox = document.getElementById('showLandingPattern');
+                if (checkbox) {
+                    checkbox.style.opacity = '1'; // Visual feedback
+                    checkbox.title = ''; // Clear tooltip
+                }
+            }
+            if (feature === 'calculateJump') {
+                isCalculateJumpUnlocked = true;
+                const checkbox = document.getElementById('calculateJumpCheckbox');
+                if (checkbox) {
+                    checkbox.style.opacity = '1'; // Visual feedback
+                    checkbox.title = ''; // Clear tooltip
+                }
+            }
+            localStorage.setItem('unlockedFeatures', JSON.stringify({
+                landingPattern: isLandingPatternUnlocked,
+                calculateJump: isCalculateJumpUnlocked
+            }));
+            console.log('Feature unlocked and saved:', feature);
+            onSuccess();
+        } else {
+            error.style.display = 'block';
+        }
+    };
+
+    submitBtn.onclick = submitHandler;
+    input.onkeypress = (e) => { if (e.key === 'Enter') submitHandler(); };
+    cancelBtn.onclick = () => {
+        modal.style.display = 'none';
+        onCancel();
+    };
+}
+function isFeatureUnlocked(feature) {
+    return feature === 'landingPattern' ? isLandingPatternUnlocked : isCalculateJumpUnlocked;
+}
+// Setup values
+function getSliderValue() {
+    return parseInt(document.getElementById('timeSlider')?.value) || 0;
+}
+function setElementValue(id, value) {
+    const element = document.getElementById(id);
+    if (element) element.value = value;
+    else console.warn(`Element ${id} not found`);
+}
+function setRadioValue(name, value) {
+    const radio = document.querySelector(`input[name="${name}"][value="${value}"]`);
+    if (radio) radio.checked = true;
+    else console.warn(`Radio ${name} with value ${value} not found`);
+}
+function setInputValue(id, value) {
+    const element = document.getElementById(id);
+    if (element) element.value = value;
+}
+function setCheckboxValue(id, value) {
+    const element = document.getElementById(id);
+    if (element) element.checked = value;
+}
+function toggleSubmenu(id, isVisible) {
+    const checkbox = document.getElementById(id);
+    const submenu = checkbox?.parentElement.nextElementSibling;
+    if (submenu) {
+        submenu.classList.toggle('hidden', !isVisible);
+        console.log('Submenu visibility:', !submenu.classList.contains('hidden'));
+    } else {
+        console.warn(`Submenu for ${id} not found`);
+    }
+}
+function clearJumpCircles() {
+    if (jumpCircle) {
+        map.removeLayer(jumpCircle);
+        jumpCircle = null;
+    }
+    if (jumpCircleFull) {
+        map.removeLayer(jumpCircleFull);
+        jumpCircleFull = null;
+    }
+   // Only clear green circles if showExitArea is false
+   if (!userSettings.showExitArea) {
+    if (jumpCircleGreen) {
+        map.removeLayer(jumpCircleGreen);
+        jumpCircleGreen = null;
+    }
+    if (jumpCircleGreenLight) {
+        map.removeLayer(jumpCircleGreenLight);
+        jumpCircleGreenLight = null;
+    }
+}
+}
 function updateCoordInputs(format) {
     const coordInputs = document.getElementById('coordInputs');
     if (!coordInputs) return;
@@ -3553,7 +3324,6 @@ function updateCoordInputs(format) {
     }
     console.log(`Coordinate inputs updated to ${format}`);
 }
-
 function parseCoordinates() {
     let lat, lng;
 
@@ -3610,32 +3380,122 @@ function parseCoordinates() {
     }
     return [lat, lng];
 }
+function setupRadioGroup(name, callback) {
+    const radios = document.querySelectorAll(`input[name="${name}"]`);
+    radios.forEach(radio => {
+        radio.addEventListener('change', () => {
+            userSettings[name] = document.querySelector(`input[name="${name}"]:checked`).value;
+            saveSettings();
+            console.log(`${name} changed to:`, userSettings[name]);
 
-// Setup reset button
-function setupResetButton() {
-    const resetButton = document.createElement('button');
-    resetButton.textContent = 'Reset Settings';
-    resetButton.style.margin = '10px';
-    document.getElementById('bottom-container').appendChild(resetButton);
-    resetButton.addEventListener('click', () => {
-        userSettings = { ...defaultSettings };
-        isLandingPatternUnlocked = false;
-        isCalculateJumpUnlocked = false;
-        localStorage.setItem('upperWindsSettings', JSON.stringify(userSettings));
-        localStorage.setItem('unlockedFeatures', JSON.stringify({
-            landingPattern: false,
-            calculateJump: false
-        }));
-        console.log('Settings and unlock status reset');
-        location.reload();
+            // Only for landingDirection, handle custom inputs
+            if (name === 'landingDirection') {
+                const customLL = document.getElementById('customLandingDirectionLL');
+                const customRR = document.getElementById('customLandingDirectionRR');
+                const landingDirection = userSettings.landingDirection;
+
+                if (customLL) customLL.disabled = landingDirection !== 'LL';
+                if (customRR) customRR.disabled = landingDirection !== 'RR';
+
+                // Do NOT overwrite custom direction with calculated value here
+                // Only set it if the field is empty AND no stored value exists
+                if (landingDirection === 'LL' && customLL && !customLL.value && userSettings.customLandingDirectionLL === '') {
+                    customLL.value = Math.round(landingWindDir || 0);
+                    userSettings.customLandingDirectionLL = parseInt(customLL.value);
+                    saveSettings();
+                }
+                if (landingDirection === 'RR' && customRR && !customRR.value && userSettings.customLandingDirectionRR === '') {
+                    customRR.value = Math.round(landingWindDir || 0);
+                    userSettings.customLandingDirectionRR = parseInt(customRR.value);
+                    saveSettings();
+                }
+            }
+            callback();
+        });
     });
 }
-
-// Placeholder for debounce (implement this if not already defined)
-function debounce(func, wait) {
-    let timeout;
-    return function (...args) {
-        clearTimeout(timeout);
-        timeout = setTimeout(() => func.apply(this, args), wait);
-    };
+function setupInput(id, eventType, debounceTime, callback) {
+    const input = document.getElementById(id);
+    if (!input) return;
+    input.addEventListener(eventType, debounce(() => {
+        const value = input.type === 'number' ? parseFloat(input.value) : input.value;
+        userSettings[id] = value;
+        saveSettings();
+        console.log(`${id} changed to:`, value);
+        callback(value);
+    }, debounceTime));
 }
+function validateLegHeights(final, base, downwind) {
+    const finalVal = parseInt(final.value) || 100;
+    const baseVal = parseInt(base.value) || 200;
+    const downwindVal = parseInt(downwind.value) || 300;
+
+    if (baseVal <= finalVal) {
+        Utils.handleError('Base leg must start higher than final leg.');
+        return false;
+    }
+    if (downwindVal <= baseVal) {
+        Utils.handleError('Downwind leg must start higher than base leg.');
+        return false;
+    }
+    return true;
+}
+function setupLegHeightInput(id, defaultValue) {
+    const input = document.getElementById(id);
+    if (!input) return;
+    input.addEventListener('blur', () => {
+        const value = parseInt(input.value) || defaultValue;
+        userSettings[id] = value;
+        saveSettings();
+        const finalInput = document.getElementById('legHeightFinal');
+        const baseInput = document.getElementById('legHeightBase');
+        const downwindInput = document.getElementById('legHeightDownwind');
+        if (!isNaN(value) && value >= 50 && value <= 1000 && validateLegHeights(finalInput, baseInput, downwindInput)) {
+            updateAllDisplays();
+            weatherData && lastLat && lastLng && id === 'legHeightDownwind' && userSettings.calculateJump && calculateJump();
+        } else {
+            let adjustedValue = defaultValue;
+            const finalVal = parseInt(finalInput?.value) || 100;
+            const baseVal = parseInt(baseInput?.value) || 200;
+            const downwindVal = parseInt(downwindInput?.value) || 300;
+            if (id === 'legHeightFinal') adjustedValue = Math.min(baseVal - 1, 100);
+            if (id === 'legHeightBase') adjustedValue = Math.max(finalVal + 1, Math.min(downwindVal - 1, 200));
+            if (id === 'legHeightDownwind') adjustedValue = Math.max(baseVal + 1, 300);
+            input.value = adjustedValue;
+            userSettings[id] = adjustedValue;
+            saveSettings();
+            Utils.handleError(`Adjusted ${id} to ${adjustedValue} to maintain valid leg order.`);
+        }
+    });
+}
+async function updateAllDisplays() {
+    const sliderIndex = getSliderValue();
+    if (weatherData && lastLat && lastLng) {
+        await updateWeatherDisplay(sliderIndex);
+        if (lastAltitude !== 'N/A') calculateMeanWind();
+        if (userSettings.showLandingPattern) updateLandingPattern();
+        if (userSettings.calculateJump) {
+            calculateJump();
+            if (userSettings.showJumpRunTrack) updateJumpRunTrack();
+        }
+        recenterMap();
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Initialize settings and UI
+    initializeSettings();
+    initializeUIElements();
+    initializeMap();
+
+    // Setup event listeners
+    setupSliderEvents();
+    setupModelSelectEvents();
+    setupDownloadEvents();
+    setupMenuEvents();
+    setupRadioEvents();
+    setupInputEvents();
+    setupCheckboxEvents();
+    setupCoordinateEvents();
+    setupResetButton();
+});
