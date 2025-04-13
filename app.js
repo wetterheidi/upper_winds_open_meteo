@@ -298,7 +298,7 @@ function calculateBearing(lat1, lng1, lat2, lng2) {
     const dLon = toRad(lng2 - lng1);
     const y = Math.sin(dLon) * Math.cos(toRad(lat2));
     const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
-              Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLon);
+        Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLon);
     let bearing = toDeg(Math.atan2(y, x));
     bearing = (bearing + 360) % 360; // Normalize to 0-360
     return bearing;
@@ -529,9 +529,7 @@ function initMap() {
         lastLat = lat;
         lastLng = lng;
         lastAltitude = await getAltitude(lat, lng);
-    
         console.log('Map double-clicked, moving marker to:', { lat, lng });
-    
         if (currentMarker) currentMarker.remove();
         currentMarker = createCustomMarker(lat, lng).addTo(map);
         attachMarkerDragend(currentMarker);
@@ -542,25 +540,13 @@ function initMap() {
                 updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, true);
             }
         });
-    
         updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, true);
-        customJumpRunDirection = null; // Reset direction
-        const directionInput = document.getElementById('jumpRunTrackDirection');
-        if (directionInput) {
-            directionInput.value = ''; // Clear input
-            console.log('Cleared jumpRunTrackDirection input for marker click');
-        }
-        console.log('Marker moved via click, resetting JRT direction');
-        if (userSettings.showJumpRunTrack) {
-            console.log('Updating JRT for marker click');
-            updateJumpRunTrack();
-        }
+        resetJumpRunDirection(true);
         if (userSettings.calculateJump) {
             console.log('Recalculating jump for marker click');
             calculateJump();
         }
         recenterMap();
-    
         const slider = document.getElementById('timeSlider');
         const currentIndex = parseInt(slider.value) || 0;
         const currentTime = weatherData?.time?.[currentIndex] || null;
@@ -571,7 +557,7 @@ function initMap() {
     map.on('zoomend', () => {
         const currentZoom = map.getZoom();
         console.log('Zoom level changed to:', currentZoom);
-    
+
         if (userSettings.calculateJump && weatherData && lastLat && lastLng) {
             console.log('Recalculating jump for zoom:', currentZoom);
             const jumpResult = calculateJump();
@@ -611,17 +597,17 @@ function initMap() {
                 clearJumpCircles();
             }
         }
-    
+
         if (userSettings.showJumpRunTrack) {
             console.log('Updating jump run track for zoom:', currentZoom);
             updateJumpRunTrack();
         }
-    
+
         if (userSettings.showLandingPattern) {
             console.log('Updating landing pattern for zoom:', currentZoom);
             updateLandingPattern();
         }
-    
+
         if (currentMarker && lastLat && lastLng) {
             currentMarker.setLatLng([lastLat, lastLng]);
             updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, false);
@@ -637,23 +623,18 @@ function initMap() {
 
     mapContainer.addEventListener('touchstart', async (e) => {
         if (e.touches.length !== 1) return;
-
         const currentTime = new Date().getTime();
         const timeSinceLastTap = currentTime - lastTapTime;
-
         if (timeSinceLastTap < tapThreshold && timeSinceLastTap > 0) {
             e.preventDefault();
-
             const rect = mapContainer.getBoundingClientRect();
             const touchX = e.touches[0].clientX - rect.left;
             const touchY = e.touches[0].clientY - rect.top;
             const latlng = map.containerPointToLatLng([touchX, touchY]);
-
             const { lat, lng } = latlng;
             lastLat = lat;
             lastLng = lng;
             lastAltitude = await getAltitude(lat, lng);
-
             if (currentMarker) currentMarker.remove();
             currentMarker = createCustomMarker(lat, lng).addTo(map);
             attachMarkerDragend(currentMarker);
@@ -664,19 +645,17 @@ function initMap() {
                     updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, true);
                 }
             });
-
-            updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, true); // Open popup on touch
+            updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, true);
+            resetJumpRunDirection(true);
             if (userSettings.calculateJump) {
                 calculateJump();
             }
             recenterMap();
-
             const slider = document.getElementById('timeSlider');
             const currentIndex = parseInt(slider.value) || 0;
             const currentTime = weatherData?.time?.[currentIndex] || null;
             await fetchWeatherForLocation(lastLat, lastLng, currentTime);
         }
-
         lastTapTime = currentTime;
     }, { passive: false });
 }
@@ -703,29 +682,16 @@ function attachMarkerDragend(marker) {
         lastAltitude = await getAltitude(lastLat, lastLng);
         const wasOpen = marker.getPopup()?.isOpen() || false;
         updateMarkerPopup(marker, lastLat, lastLng, lastAltitude, wasOpen);
-
         console.log('Marker dragged to:', { lat: lastLat, lng: lastLng });
-        customJumpRunDirection = null; // Reset direction
-        const directionInput = document.getElementById('jumpRunTrackDirection');
-        if (directionInput) {
-            directionInput.value = ''; // Clear input
-            console.log('Cleared jumpRunTrackDirection input for marker drag');
-        }
-        console.log('Marker dragged, resetting JRT direction');
-        if (userSettings.showJumpRunTrack) {
-            console.log('Updating JRT for marker drag');
-            updateJumpRunTrack();
-        }
+        resetJumpRunDirection(true);
         if (userSettings.calculateJump) {
             console.log('Recalculating jump for marker drag');
             calculateJump();
         }
         recenterMap();
-
         const slider = document.getElementById('timeSlider');
         const currentIndex = parseInt(slider.value) || 0;
         const currentTime = weatherData?.time?.[currentIndex] || null;
-
         document.getElementById('info').innerHTML = `Fetching weather and models...`;
         const availableModels = await checkAvailableModels(lastLat, lastLng);
         if (availableModels.length > 0) {
@@ -2007,6 +1973,19 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
     }
     console.log('updateJumpCircle completed');
 }
+function resetJumpRunDirection(triggerUpdate = true) {
+    customJumpRunDirection = null;
+    const directionInput = document.getElementById('jumpRunTrackDirection');
+    if (directionInput) {
+        directionInput.value = '';
+        console.log('Cleared jumpRunTrackDirection input');
+    }
+    console.log('Reset JRT direction to calculated');
+    if (triggerUpdate && userSettings.showJumpRunTrack && weatherData && lastLat && lastLng) {
+        console.log('Triggering JRT update after reset');
+        updateJumpRunTrack();
+    }
+}
 function jumpRunTrack() {
     console.log('Starting jumpRunTrack...', {
         weatherData: !!weatherData,
@@ -2144,6 +2123,8 @@ function updateJumpRunTrack() {
             lastLng,
             isZoomInRange
         });
+        const directionInput = document.getElementById('jumpRunTrackDirection');
+        if (directionInput) directionInput.value = '';
         return;
     }
 
@@ -2270,8 +2251,12 @@ function updateJumpRunTrack() {
         saveSettings();
 
         // Update direction and offset inputs
-        if (directionInput) {
-            directionInput.value = customJumpRunDirection;
+        const directionInput = document.getElementById('jumpRunTrackDirection');
+        if (directionInput && customJumpRunDirection !== null) {
+            directionInput.value = Math.round(customJumpRunDirection);
+            console.log('Updated jumpRunTrackDirection input to custom:', directionInput.value);
+        } else {
+            console.log('Not updating jumpRunTrackDirection input (using calculated direction)');
         }
         const offsetInput = document.getElementById('jumpRunTrackOffset');
         if (offsetInput) {
@@ -2828,13 +2813,7 @@ function setupSliderEvents() {
     const debouncedUpdate = debounce(async (index) => {
         console.log('Slider event triggered:', { index, weatherData: !!weatherData });
         if (weatherData && index >= 0 && index < weatherData.time.length) {
-            customJumpRunDirection = null; // Reset direction
-            const directionInput = document.getElementById('jumpRunTrackDirection');
-            if (directionInput) {
-                directionInput.value = ''; // Clear input
-                console.log('Cleared jumpRunTrackDirection input for slider move');
-            }
-            console.log('Slider moved, resetting JRT direction to calculated');
+            resetJumpRunDirection(false); // Update triggered below
             await updateWeatherDisplay(index);
             if (lastLat && lastLng && lastAltitude !== 'N/A') {
                 calculateMeanWind();
@@ -2849,13 +2828,7 @@ function setupSliderEvents() {
             }
         } else {
             slider.value = 0;
-            customJumpRunDirection = null;
-            const directionInput = document.getElementById('jumpRunTrackDirection');
-            if (directionInput) {
-                directionInput.value = '';
-                console.log('Cleared jumpRunTrackDirection input for slider reset');
-            }
-            console.log('Slider reset to 0, resetting JRT direction');
+            resetJumpRunDirection(false);
             await updateWeatherDisplay(0);
             if (lastLat && lastLng && lastAltitude !== 'N/A') {
                 calculateMeanWind();
@@ -2889,13 +2862,7 @@ function setupModelSelectEvents() {
             const currentIndex = getSliderValue();
             const currentTime = weatherData?.time?.[currentIndex] || null;
             document.getElementById('info').innerHTML = `Fetching weather with ${modelSelect.value}...`;
-            customJumpRunDirection = null; // Reset direction
-            const directionInput = document.getElementById('jumpRunTrackDirection');
-            if (directionInput) {
-                directionInput.value = ''; // Clear input
-                console.log('Cleared jumpRunTrackDirection input for model change');
-            }
-            console.log('Model changed, resetting JRT direction');
+            resetJumpRunDirection(false);
             await fetchWeather(lastLat, lastLng, currentTime);
             updateModelRunInfo();
             await updateWeatherDisplay(currentIndex);
@@ -3341,9 +3308,7 @@ function setupCoordinateEvents() {
                 lastLat = lat;
                 lastLng = lng;
                 lastAltitude = await getAltitude(lat, lng);
-    
                 console.log('Coordinate input, moving marker to:', { lat, lng });
-    
                 if (currentMarker) {
                     currentMarker.setLatLng([lat, lng]);
                 } else {
@@ -3356,19 +3321,8 @@ function setupCoordinateEvents() {
                         }
                     });
                 }
-    
                 updateMarkerPopup(currentMarker, lat, lng, lastAltitude, true);
-                customJumpRunDirection = null; // Reset direction
-                const directionInput = document.getElementById('jumpRunTrackDirection');
-                if (directionInput) {
-                    directionInput.value = ''; // Clear input
-                    console.log('Cleared jumpRunTrackDirection input for coordinate input');
-                }
-                console.log('Marker moved via coordinates, resetting JRT direction');
-                if (userSettings.showJumpRunTrack) {
-                    console.log('Updating JRT for coordinate input');
-                    updateJumpRunTrack();
-                }
+                resetJumpRunDirection(true);
                 if (userSettings.calculateJump) {
                     console.log('Recalculating jump for coordinate input');
                     calculateJump();
@@ -3549,17 +3503,17 @@ function clearJumpCircles() {
         map.removeLayer(jumpCircleFull);
         jumpCircleFull = null;
     }
-   // Only clear green circles if showExitArea is false
-   if (!userSettings.showExitArea) {
-    if (jumpCircleGreen) {
-        map.removeLayer(jumpCircleGreen);
-        jumpCircleGreen = null;
+    // Only clear green circles if showExitArea is false
+    if (!userSettings.showExitArea) {
+        if (jumpCircleGreen) {
+            map.removeLayer(jumpCircleGreen);
+            jumpCircleGreen = null;
+        }
+        if (jumpCircleGreenLight) {
+            map.removeLayer(jumpCircleGreenLight);
+            jumpCircleGreenLight = null;
+        }
     }
-    if (jumpCircleGreenLight) {
-        map.removeLayer(jumpCircleGreenLight);
-        jumpCircleGreenLight = null;
-    }
-}
 }
 function updateCoordInputs(format) {
     const coordInputs = document.getElementById('coordInputs');
