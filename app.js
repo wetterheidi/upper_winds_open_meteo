@@ -2271,59 +2271,13 @@ function updateJumpRunTrack() {
         weatherData: !!weatherData,
         lastLat,
         lastLng,
-        customJumpRunDirection
+        customJumpRunDirection,
+        currentZoom: map.getZoom()
     });
 
-    if (!userSettings.showJumpRunTrack || !weatherData || !lastLat || !lastLng) {
-        if (jumpRunTrackLayer) {
-            if (jumpRunTrackLayer.airplaneMarker) {
-                map.removeLayer(jumpRunTrackLayer.airplaneMarker);
-                jumpRunTrackLayer.airplaneMarker = null;
-            }
-            map.removeLayer(jumpRunTrackLayer);
-            jumpRunTrackLayer = null;
-        }
-        console.log('Jump run track not updated: missing required data', {
-            showJumpRunTrack: userSettings.showJumpRunTrack,
-            weatherData: !!weatherData,
-            lastLat,
-            lastLng
-        });
-        return;
-    }
-
-    const trackData = jumpRunTrack();
-    if (!trackData || !trackData.latlngs || !Array.isArray(trackData.latlngs) || trackData.latlngs.length < 2) {
-        if (jumpRunTrackLayer) {
-            if (jumpRunTrackLayer.airplaneMarker) {
-                map.removeLayer(jumpRunTrackLayer.airplaneMarker);
-                jumpRunTrackLayer.airplaneMarker = null;
-            }
-            map.removeLayer(jumpRunTrackLayer);
-            jumpRunTrackLayer = null;
-        }
-        console.error('Invalid trackData from jumpRunTrack:', trackData);
-        return;
-    }
-
-    let { latlngs, direction } = trackData;
-
-    // Validate latlngs format
-    const isValidLatLngs = latlngs.every(ll => Array.isArray(ll) && ll.length === 2 && !isNaN(ll[0]) && !isNaN(ll[1]));
-    if (!isValidLatLngs) {
-        if (jumpRunTrackLayer) {
-            if (jumpRunTrackLayer.airplaneMarker) {
-                map.removeLayer(jumpRunTrackLayer.airplaneMarker);
-                jumpRunTrackLayer.airplaneMarker = null;
-            }
-            map.removeLayer(jumpRunTrackLayer);
-            jumpRunTrackLayer = null;
-        }
-        console.error('Invalid latlngs format in trackData:', latlngs);
-        return;
-    }
-
-    console.log('Updating jump run track with:', { latlngs, direction });
+    // Check zoom level
+    const currentZoom = map.getZoom();
+    const isZoomInRange = currentZoom >= minZoom && currentZoom <= maxZoom;
 
     // Remove existing layer and marker if present
     if (jumpRunTrackLayer) {
@@ -2334,6 +2288,34 @@ function updateJumpRunTrack() {
         map.removeLayer(jumpRunTrackLayer);
         jumpRunTrackLayer = null;
     }
+
+    if (!userSettings.showJumpRunTrack || !weatherData || !lastLat || !lastLng || !isZoomInRange) {
+        console.log('Jump run track not drawn', {
+            showJumpRunTrack: userSettings.showJumpRunTrack,
+            weatherData: !!weatherData,
+            lastLat,
+            lastLng,
+            isZoomInRange
+        });
+        return;
+    }
+
+    const trackData = jumpRunTrack();
+    if (!trackData || !trackData.latlngs || !Array.isArray(trackData.latlngs) || trackData.latlngs.length < 2) {
+        console.error('Invalid trackData from jumpRunTrack:', trackData);
+        return;
+    }
+
+    let { latlngs, direction } = trackData;
+
+    // Validate latlngs format
+    const isValidLatLngs = latlngs.every(ll => Array.isArray(ll) && ll.length === 2 && !isNaN(ll[0]) && !isNaN(ll[1]));
+    if (!isValidLatLngs) {
+        console.error('Invalid latlngs format in trackData:', latlngs);
+        return;
+    }
+
+    console.log('Updating jump run track with:', { latlngs, direction });
 
     // Create polyline for the jump run track
     jumpRunTrackLayer = L.polyline(latlngs, {
@@ -2376,7 +2358,7 @@ function updateJumpRunTrack() {
     let originalLatLngs = latlngs.map(ll => [ll[0], ll[1]]); // Clone initial coordinates
 
     jumpRunTrackLayer.on('mousedown', function (e) {
-        if (!userSettings.showJumpRunTrack) return;
+        if (!userSettings.showJumpRunTrack || !isZoomInRange) return;
         isDragging = true;
         startLatLng = e.latlng;
         map.dragging.disable();
