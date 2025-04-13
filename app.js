@@ -1671,6 +1671,7 @@ function calculateFreeFall(weatherData, exitAltitude, openingAltitude, sliderInd
     };
 
     console.log('Free fall result:', result);
+    console.log(`Free fall considerations output: Throw and drift: ${Math.round(directionDeg)}°) ${Math.round(distance)} m ${Math.round(final.time)} s ${hStart} m ${hStop} m`);
     return result;
 }
 function visualizeFreeFallPath(path) {
