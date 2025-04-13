@@ -282,6 +282,18 @@ async function getDisplayTime(utcTimeStr) {
         return await Utils.formatLocalTime(utcTimeStr, lastLat, lastLng); // Async
     }
 }
+function calculateBearing(lat1, lng1, lat2, lng2) {
+    const toRad = deg => deg * Math.PI / 180;
+    const toDeg = rad => rad * 180 / Math.PI;
+
+    const dLon = toRad(lng2 - lng1);
+    const y = Math.sin(dLon) * Math.cos(toRad(lat2));
+    const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
+              Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLon);
+    let bearing = toDeg(Math.atan2(y, x));
+    bearing = (bearing + 360) % 360; // Normalize to 0-360
+    return bearing;
+}
 function debounce(func, wait) {
     let timeout;
     return function (...args) {
@@ -1957,7 +1969,7 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
     }
     console.log('updateJumpCircle completed');
 }
-function jumpRunTrack() {
+function jumpRunTrackOLD() {
     console.log('Starting jumpRunTrack...');
     const exitAltitude = parseInt(document.getElementById('exitAltitude')?.value) || userSettings.exitAltitude || 3000;
     const openingAltitude = parseInt(document.getElementById('openingAltitude')?.value) || userSettings.openingAltitude || 1000;
@@ -2022,7 +2034,93 @@ function jumpRunTrack() {
         meanWindSpeed: meanWindSpeed
     };
 }
-function updateJumpRunTrack() {
+function jumpRunTrack() {
+    console.log('Starting jumpRunTrack...');
+    const exitAltitude = parseInt(document.getElementById('exitAltitude')?.value) || userSettings.exitAltitude || 3000;
+    const openingAltitude = parseInt(document.getElementById('openingAltitude')?.value) || userSettings.openingAltitude || 1000;
+    const customDirection = parseInt(document.getElementById('jumpRunTrackDirection')?.value, 10);
+    const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
+    const offset = parseInt(document.getElementById('jumpRunTrackOffset')?.value) || userSettings.jumpRunTrackOffset || 0;
+
+    if (!weatherData || !lastLat || !lastLng || lastAltitude === null || lastAltitude === 'N/A') {
+        console.warn('Cannot calculate jump run track: missing weather data, coordinates, or altitude');
+        return null;
+    }
+
+    const interpolatedData = interpolateWeatherData(sliderIndex);
+    if (!interpolatedData || interpolatedData.length === 0) {
+        console.warn('No interpolated weather data available');
+        return null;
+    }
+
+    const elevation = Math.round(lastAltitude);
+    const lowerLimit = elevation;
+    const upperLimit = elevation + openingAltitude;
+    console.log('Jump run track limits:', lowerLimit, upperLimit);
+
+    const heights = interpolatedData.map(d => d.height);
+    const dirs = interpolatedData.map(d => Number.isFinite(d.dir) ? parseFloat(d.dir) : 0);
+    const spdsMps = interpolatedData.map(d => {
+        const spd = Number.isFinite(d.spd) ? parseFloat(d.spd) : 0;
+        return Utils.convertWind(spd, 'm/s', getWindSpeedUnit());
+    });
+
+    const uComponents = spdsMps.map((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
+    const vComponents = spdsMps.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
+
+    const meanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, lowerLimit, upperLimit);
+    const meanWindDirection = meanWind[0];
+    const meanWindSpeed = meanWind[1];
+
+    if (!Number.isFinite(meanWindDirection) || !Number.isFinite(meanWindSpeed)) {
+        console.warn('Invalid mean wind calculation:', meanWind);
+        return null;
+    }
+
+    let jumpRunTrackDirection;
+    if (userSettings.isCustomJumpRunDirection && !isNaN(customDirection) && customDirection >= 0 && customDirection <= 359) {
+        jumpRunTrackDirection = customDirection;
+        console.log(`Using custom jump run direction: ${jumpRunTrackDirection}°`);
+    } else {
+        jumpRunTrackDirection = Math.round(meanWindDirection);
+        console.log(`Using calculated jump run direction: ${jumpRunTrackDirection}°`);
+    }
+
+    // Update input field to reflect calculated direction if not custom
+    const directionInput = document.getElementById('jumpRunTrackDirection');
+    if (!userSettings.isCustomJumpRunDirection || !directionInput.value || isNaN(customDirection) || customDirection < 0 || customDirection > 359) {
+        directionInput.value = jumpRunTrackDirection;
+    }
+
+    // Calculate latlngs for the jump run track
+    const trackLength = 2000; // meters, typical jump run length (adjust as needed)
+    const halfLength = trackLength / 2;
+
+    // Center the track on the DIP (lastLat, lastLng)
+    const centerLat = lastLat;
+    const centerLng = lastLng;
+
+    // Calculate start and end points along the jump run direction
+    // Direction is "to" (aircraft flies toward this bearing), so reverse for start point
+    const startPoint = calculateNewCenter(centerLat, centerLng, halfLength + offset, (jumpRunTrackDirection + 180) % 360);
+    const endPoint = calculateNewCenter(centerLat, centerLng, halfLength - offset, jumpRunTrackDirection);
+
+    const latlngs = [
+        [startPoint[0], startPoint[1]], // Start (rear of aircraft path)
+        [endPoint[0], endPoint[1]]      // End (front of aircraft path)
+    ];
+
+    console.log(`Jump Run Track: ${jumpRunTrackDirection}° (Mean wind: ${meanWindDirection.toFixed(1)}° @ ${meanWindSpeed.toFixed(1)} ${getWindSpeedUnit()})`);
+    console.log('Jump Run Track latlngs:', latlngs);
+
+    return {
+        direction: jumpRunTrackDirection,
+        meanWindDirection: meanWindDirection,
+        meanWindSpeed: meanWindSpeed,
+        latlngs: latlngs
+    };
+}
+function updateJumpRunTrackOLD() {
     if (!map) {
         console.warn('Map not available to update jump run track');
         return;
@@ -2113,6 +2211,189 @@ function updateJumpRunTrack() {
     jumpRunTrackLayer = L.layerGroup([polyline, arrowMarker]);
     jumpRunTrackLayer.addTo(map);
     console.log('Jump run track added at zoom:', currentZoom, 'Layer on map:', map.hasLayer(jumpRunTrackLayer));
+}
+function updateJumpRunTrack() {
+    if (!userSettings.showJumpRunTrack || !weatherData || !lastLat || !lastLng) {
+        if (jumpRunTrackLayer) {
+            // Remove both polyline and airplane marker
+            if (jumpRunTrackLayer.airplaneMarker) {
+                map.removeLayer(jumpRunTrackLayer.airplaneMarker);
+                jumpRunTrackLayer.airplaneMarker = null;
+            }
+            map.removeLayer(jumpRunTrackLayer);
+            jumpRunTrackLayer = null;
+        }
+        console.log('Jump run track not updated: missing required data', {
+            showJumpRunTrack: userSettings.showJumpRunTrack,
+            weatherData: !!weatherData,
+            lastLat,
+            lastLng
+        });
+        return;
+    }
+
+    const trackData = jumpRunTrack();
+    if (!trackData || !trackData.latlngs || !Array.isArray(trackData.latlngs) || trackData.latlngs.length < 2) {
+        if (jumpRunTrackLayer) {
+            // Remove both polyline and airplane marker
+            if (jumpRunTrackLayer.airplaneMarker) {
+                map.removeLayer(jumpRunTrackLayer.airplaneMarker);
+                jumpRunTrackLayer.airplaneMarker = null;
+            }
+            map.removeLayer(jumpRunTrackLayer);
+            jumpRunTrackLayer = null;
+        }
+        console.error('Invalid trackData from jumpRunTrack:', trackData);
+        return;
+    }
+
+    let { latlngs, direction } = trackData;
+
+    // Validate latlngs format
+    const isValidLatLngs = latlngs.every(ll => Array.isArray(ll) && ll.length === 2 && !isNaN(ll[0]) && !isNaN(ll[1]));
+    if (!isValidLatLngs) {
+        if (jumpRunTrackLayer) {
+            // Remove both polyline and airplane marker
+            if (jumpRunTrackLayer.airplaneMarker) {
+                map.removeLayer(jumpRunTrackLayer.airplaneMarker);
+                jumpRunTrackLayer.airplaneMarker = null;
+            }
+            map.removeLayer(jumpRunTrackLayer);
+            jumpRunTrackLayer = null;
+        }
+        console.error('Invalid latlngs format in trackData:', latlngs);
+        return;
+    }
+
+    console.log('Updating jump run track with latlngs:', latlngs, 'direction:', direction);
+
+    // Remove existing layer and marker if present
+    if (jumpRunTrackLayer) {
+        if (jumpRunTrackLayer.airplaneMarker) {
+            map.removeLayer(jumpRunTrackLayer.airplaneMarker);
+            jumpRunTrackLayer.airplaneMarker = null;
+        }
+        map.removeLayer(jumpRunTrackLayer);
+        jumpRunTrackLayer = null;
+    }
+
+    // Create polyline for the jump run track
+    jumpRunTrackLayer = L.polyline(latlngs, {
+        color: 'orange',
+        weight: 4,
+        opacity: 0.7,
+        interactive: true // Ensure the polyline can receive mouse events
+    }).addTo(map);
+
+    // Add airplane symbol at the front end
+    const frontEnd = latlngs[1]; // Second point is the front
+    const airplaneIcon = L.icon({
+        iconUrl: 'airplane_orange.png',
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
+        popupAnchor: [0, -16],
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+        shadowSize: [41, 41],
+        shadowAnchor: [13, 32]
+    });
+
+    // Create new airplane marker
+    jumpRunTrackLayer.airplaneMarker = L.marker(frontEnd, {
+        icon: airplaneIcon,
+        rotationAngle: direction,
+        rotationOrigin: 'center center',
+        draggable: false
+    }).addTo(map);
+
+    // Update direction input
+    const directionInput = document.getElementById('jumpRunTrackDirection');
+    if (directionInput) {
+        directionInput.value = Math.round(direction);
+    }
+
+    // Dragging functionality
+    let isDragging = false;
+    let startLatLng = null;
+    let originalLatLngs = latlngs.map(ll => [ll[0], ll[1]]); // Clone initial coordinates
+
+    jumpRunTrackLayer.on('mousedown', function (e) {
+        if (!userSettings.showJumpRunTrack) return;
+        isDragging = true;
+        startLatLng = e.latlng;
+        map.dragging.disable(); // Disable map dragging during polyline drag
+    });
+
+    map.on('mousemove', function (e) {
+        if (!isDragging || !startLatLng) return;
+
+        const currentLatLng = e.latlng;
+        const latDiff = currentLatLng.lat - startLatLng.lat;
+        const lngDiff = currentLatLng.lng - startLatLng.lng;
+
+        // Translate all points by the drag offset
+        const newLatLngs = originalLatLngs.map(([lat, lng]) => [
+            lat + latDiff,
+            lng + lngDiff
+        ]);
+
+        jumpRunTrackLayer.setLatLngs(newLatLngs);
+
+        // Update airplane position
+        const newFrontEnd = newLatLngs[1];
+        if (jumpRunTrackLayer.airplaneMarker) {
+            jumpRunTrackLayer.airplaneMarker.setLatLng(newFrontEnd);
+        }
+    });
+
+    map.on('mouseup', function () {
+        if (!isDragging) return;
+        isDragging = false;
+        map.dragging.enable(); // Re-enable map dragging
+
+        // Update stored coordinates
+        originalLatLngs = jumpRunTrackLayer.getLatLngs().map(ll => [ll.lat, ll.lng]);
+
+        // Calculate new direction based on the updated polyline
+        const [startLat, startLng] = originalLatLngs[0];
+        const [endLat, endLng] = originalLatLngs[1];
+        const newDirection = calculateBearing(startLat, startLng, endLat, endLng);
+
+        // Update settings
+        userSettings.jumpRunTrackDirection = Math.round(newDirection);
+        userSettings.isCustomJumpRunDirection = true;
+        saveSettings();
+
+        // Update direction input
+        if (directionInput) {
+            directionInput.value = userSettings.jumpRunTrackDirection;
+        }
+
+        // Ensure airplane rotation matches new direction
+        if (jumpRunTrackLayer.airplaneMarker) {
+            jumpRunTrackLayer.airplaneMarker.setRotationAngle(newDirection);
+        }
+    });
+
+    // Tooltip with direction
+    jumpRunTrackLayer.bindTooltip(`Jump Run: ${Math.round(direction)}°`, {
+        permanent: false,
+        direction: 'top',
+        offset: [0, -10]
+    });
+}
+
+// Helper function to calculate bearing between two points (unchanged)
+function calculateBearing(lat1, lng1, lat2, lng2) {
+    const toRad = deg => deg * Math.PI / 180;
+    const toDeg = rad => rad * 180 / Math.PI;
+
+    const dLon = toRad(lng2 - lng1);
+    const y = Math.sin(dLon) * Math.cos(toRad(lat2));
+    const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
+              Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLon);
+    let bearing = toDeg(Math.atan2(y, x));
+    bearing = (bearing + 360) % 360; // Normalize to 0-360
+    return bearing;
 }
 
 // == Landing Pattern Calculations ==
