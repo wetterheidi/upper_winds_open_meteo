@@ -101,6 +101,8 @@ function initializeSettings() {
             userSettings[key] = storedSettings[key];
         }
     }
+    // Force reset jumpRunTrackOffset to 0 on load
+    userSettings.jumpRunTrackOffset = 0;
     console.log('Loaded userSettings:', userSettings);
 }
 function updateHeightUnitLabels() {
@@ -2005,71 +2007,6 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
     }
     console.log('updateJumpCircle completed');
 }
-function jumpRunTrackOLD() {
-    console.log('Starting jumpRunTrack...');
-    const exitAltitude = parseInt(document.getElementById('exitAltitude')?.value) || userSettings.exitAltitude || 3000;
-    const openingAltitude = parseInt(document.getElementById('openingAltitude')?.value) || userSettings.openingAltitude || 1000;
-    const customDirection = parseInt(document.getElementById('jumpRunTrackDirection')?.value, 10);
-    const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
-
-    if (!weatherData || !lastLat || !lastLng || lastAltitude === null || lastAltitude === 'N/A') {
-        console.warn('Cannot calculate jump run track: missing weather data, coordinates, or altitude');
-        return null;
-    }
-
-    const interpolatedData = interpolateWeatherData(sliderIndex);
-    if (!interpolatedData || interpolatedData.length === 0) {
-        console.warn('No interpolated weather data available');
-        return null;
-    }
-
-    const elevation = Math.round(lastAltitude);
-    const lowerLimit = elevation;
-    const upperLimit = elevation + openingAltitude;
-    console.log('Jump run track limits:', lowerLimit, upperLimit);
-
-    const heights = interpolatedData.map(d => d.height);
-    const dirs = interpolatedData.map(d => Number.isFinite(d.dir) ? parseFloat(d.dir) : 0);
-    const spdsMps = interpolatedData.map(d => {
-        const spd = Number.isFinite(d.spd) ? parseFloat(d.spd) : 0;
-        return Utils.convertWind(spd, 'm/s', getWindSpeedUnit());
-    });
-
-    const uComponents = spdsMps.map((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
-    const vComponents = spdsMps.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
-
-    const meanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, lowerLimit, upperLimit);
-    const meanWindDirection = meanWind[0];
-    const meanWindSpeed = meanWind[1];
-
-    if (!Number.isFinite(meanWindDirection) || !Number.isFinite(meanWindSpeed)) {
-        console.warn('Invalid mean wind calculation:', meanWind);
-        return null;
-    }
-
-    let jumpRunTrackDirection;
-    if (userSettings.isCustomJumpRunDirection && !isNaN(customDirection) && customDirection >= 0 && customDirection <= 359) {
-        jumpRunTrackDirection = customDirection;
-        console.log(`Using custom jump run direction: ${jumpRunTrackDirection}°`);
-    } else {
-        jumpRunTrackDirection = Math.round(meanWindDirection);
-        console.log(`Using calculated jump run direction: ${jumpRunTrackDirection}°`);
-    }
-
-    // Update input field to reflect calculated direction if not custom
-    const directionInput = document.getElementById('jumpRunTrackDirection');
-    if (!userSettings.isCustomJumpRunDirection || !directionInput.value || isNaN(customDirection) || customDirection < 0 || customDirection > 359) {
-        directionInput.value = jumpRunTrackDirection;
-    }
-
-    console.log(`Jump Run Track: ${jumpRunTrackDirection}° (Mean wind: ${meanWindDirection.toFixed(1)}° @ ${meanWindSpeed.toFixed(1)} ${getWindSpeedUnit()})`);
-
-    return {
-        direction: jumpRunTrackDirection,
-        meanWindDirection: meanWindDirection,
-        meanWindSpeed: meanWindSpeed
-    };
-}
 function jumpRunTrack() {
     console.log('Starting jumpRunTrack...', {
         weatherData: !!weatherData,
@@ -2173,98 +2110,6 @@ function jumpRunTrack() {
         latlngs: latlngs
     };
 }
-function updateJumpRunTrackOLD() {
-    if (!map) {
-        console.warn('Map not available to update jump run track');
-        return;
-    }
-
-    const currentZoom = map.getZoom();
-    const isVisible = currentZoom >= minZoom && currentZoom <= maxZoom;
-
-    if (jumpRunTrackLayer && map.hasLayer(jumpRunTrackLayer)) {
-        console.log('Removing existing jump run track');
-        map.removeLayer(jumpRunTrackLayer);
-    }
-
-    if (!userSettings.calculateJump || !lastLat || !lastLng || !weatherData) {
-        console.log('Jump run track not updated: missing data or feature disabled');
-        return;
-    }
-
-    const trackData = jumpRunTrack();
-    if (!trackData || !Number.isFinite(trackData.direction)) {
-        console.warn('Invalid jump run track data:', trackData);
-        return;
-    }
-
-    if (!userSettings.showJumpRunTrack || !isVisible) {
-        console.log('Jump run track not displayed - zoom:', currentZoom, 'visible:', isVisible);
-        jumpRunTrackLayer = null;
-        return;
-    }
-
-    const direction = trackData.direction;
-    const offset = parseInt(document.getElementById('jumpRunTrackOffset')?.value) || 0;
-
-    const trackLengthMeters = 3000;
-    const halfLengthMeters = trackLengthMeters / 2;
-    const earthRadius = 6371000;
-    let centerLat = lastLat * Math.PI / 180;
-    let centerLng = lastLng * Math.PI / 180;
-
-    const offsetDirectionRad = offset > 0 ? (direction + 90) * Math.PI / 180 : (direction - 90 + 360) * Math.PI / 180;
-    const offsetDistance = Math.abs(offset) / earthRadius;
-
-    if (offset !== 0) {
-        const newCenterLat = Math.asin(Math.sin(centerLat) * Math.cos(offsetDistance) + Math.cos(centerLat) * Math.sin(offsetDistance) * Math.cos(offsetDirectionRad));
-        const newCenterLng = centerLng + Math.atan2(Math.sin(offsetDirectionRad) * Math.sin(offsetDistance) * Math.cos(centerLat), Math.cos(offsetDistance) - Math.sin(centerLat) * Math.sin(newCenterLat));
-        centerLat = newCenterLat;
-        centerLng = newCenterLng;
-    }
-
-    const bearingRad = direction * Math.PI / 180;
-    const deltaForward = halfLengthMeters / earthRadius;
-    let lat2 = Math.asin(Math.sin(centerLat) * Math.cos(deltaForward) + Math.cos(centerLat) * Math.sin(deltaForward) * Math.cos(bearingRad));
-    let lng2 = centerLng + Math.atan2(Math.sin(bearingRad) * Math.sin(deltaForward) * Math.cos(centerLat), Math.cos(deltaForward) - Math.sin(centerLat) * Math.sin(lat2));
-    lat2 = lat2 * 180 / Math.PI;
-    lng2 = ((lng2 * 180 / Math.PI + 540) % 360) - 180;
-
-    const bearingOppositeRad = ((direction + 180) % 360) * Math.PI / 180;
-    const deltaBackward = halfLengthMeters / earthRadius;
-    let lat0 = Math.asin(Math.sin(centerLat) * Math.cos(deltaBackward) + Math.cos(centerLat) * Math.sin(deltaBackward) * Math.cos(bearingOppositeRad));
-    let lng0 = centerLng + Math.atan2(Math.sin(bearingOppositeRad) * Math.sin(deltaBackward) * Math.cos(centerLat), Math.cos(deltaBackward) - Math.sin(centerLat) * Math.sin(lat0));
-    lat0 = lat0 * 180 / Math.PI;
-    lng0 = ((lng0 * 180 / Math.PI + 540) % 360) - 180;
-
-    const trackPoints = [[lat0, lng0], [lat2, lng2]];
-
-    const polyline = L.polyline(trackPoints, {
-        color: 'orange',
-        weight: 3,
-        opacity: 1,
-        dashArray: '5, 10',
-    });
-
-    // Use a plane icon instead of a triangle
-    const planeIcon = L.icon({
-        iconUrl: 'airplane_orange.png', // Path to your plane icon
-        iconSize: [30, 30], // Size of the icon
-        iconAnchor: [15, 15], // Center of the icon (adjust if needed)
-        className: 'jump-run-plane', // Optional CSS class for styling
-        opacity: 1,
-    });
-
-    const arrowMarker = L.marker([lat2, lng2], {
-        icon: planeIcon,
-        rotationAngle: direction, // Rotate the icon to match the jump run direction
-        rotationOrigin: 'center center' // Ensure rotation is around the center
-    });
-
-    jumpRunTrackLayer = L.layerGroup([polyline, arrowMarker]);
-    jumpRunTrackLayer.addTo(map);
-    console.log('Jump run track added at zoom:', currentZoom, 'Layer on map:', map.hasLayer(jumpRunTrackLayer));
-}
 function updateJumpRunTrack() {
     console.log('updateJumpRunTrack called', {
         showJumpRunTrack: userSettings.showJumpRunTrack,
@@ -2284,9 +2129,11 @@ function updateJumpRunTrack() {
         if (jumpRunTrackLayer.airplaneMarker) {
             map.removeLayer(jumpRunTrackLayer.airplaneMarker);
             jumpRunTrackLayer.airplaneMarker = null;
+            console.log('Removed airplane marker');
         }
         map.removeLayer(jumpRunTrackLayer);
         jumpRunTrackLayer = null;
+        console.log('Removed JRT polyline');
     }
 
     if (!userSettings.showJumpRunTrack || !weatherData || !lastLat || !lastLng || !isZoomInRange) {
@@ -2359,6 +2206,10 @@ function updateJumpRunTrack() {
 
     jumpRunTrackLayer.on('mousedown', function (e) {
         if (!userSettings.showJumpRunTrack || !isZoomInRange) return;
+        if (userSettings.jumpRunTrackOffset !== 0) {
+            displayError('JRT rotation only works at the original position. Reset offset to 0 or rotate before moving.');
+            return;
+        }
         isDragging = true;
         startLatLng = e.latlng;
         map.dragging.disable();
@@ -2411,7 +2262,7 @@ function updateJumpRunTrack() {
         const bearingToCenter = calculateBearing(lastLat, lastLng, centerLat, centerLng);
         const angleDiff = ((bearingToCenter - newDirection + 540) % 360) - 180;
         const offsetSign = angleDiff > -90 && angleDiff < 90 ? 1 : -1;
-        let newOffset = Math.round(- distance * offsetSign / 100) * 100;
+        let newOffset = Math.round(distance * offsetSign / 100) * 100;
         newOffset = Math.max(-5000, Math.min(5000, newOffset));
 
         // Update settings and input for offset only
@@ -2924,7 +2775,8 @@ function initializeUIElements() {
     setCheckboxValue('calculateJumpCheckbox', userSettings.calculateJump);
     setCheckboxValue('showLandingPattern', userSettings.showLandingPattern);
     setCheckboxValue('showJumpRunTrack', userSettings.showJumpRunTrack);
-    setInputValue('jumpRunTrackDirection', userSettings.jumpRunTrackDirection || '');
+    //setInputValue('jumpRunTrackDirection', userSettings.jumpRunTrackDirection || '');
+    setInputValue('jumpRunTrackOffset', userSettings.jumpRunTrackOffset); // Ensure offset input is set
     setCheckboxValue('showExitAreaCheckbox', userSettings.showExitArea); // New checkbox
     userSettings.isCustomJumpRunDirection = userSettings.isCustomJumpRunDirection || false;
 
@@ -3227,10 +3079,19 @@ function setupInputEvents() {
             setInputValue('customLandingDirectionLL', userSettings.customLandingDirectionLL || 0);
         }
     });
-    setupInput('jumpRunTrackDirection', 'blur', 0, (value) => {
+    setupInput('jumpRunTrackDirection', 'change', 0, (value) => {
         const customDir = parseInt(value, 10);
-        console.log('jumpRunTrackDirection input blurred:', { value, customDir });
+        console.log('jumpRunTrackDirection input blurred:', {
+            value,
+            customDir,
+            jumpRunTrackOffset: userSettings.jumpRunTrackOffset
+        });
         if (!isNaN(customDir) && customDir >= 0 && customDir <= 359) {
+            if (userSettings.jumpRunTrackOffset !== 0) {
+                console.log('Warning: Attempted to rotate JRT with non-zero offset');
+                displayError('JRT rotation only works at the original position. Reset offset to 0 or rotate before moving.');
+                return;
+            }
             customJumpRunDirection = customDir;
             console.log('Set custom direction from input:', customDir);
             if (userSettings.showJumpRunTrack && weatherData && lastLat && lastLng) {
@@ -3258,7 +3119,7 @@ function setupInputEvents() {
             }
         }
     });
-    setupInput('jumpRunTrackOffset', 'blur', 0, (value) => {
+    setupInput('jumpRunTrackOffset', 'change', 0, (value) => {
         const offset = parseInt(value, 10);
         if (!isNaN(offset) && offset >= -5000 && offset <= 5000 && offset % 100 === 0) {
             userSettings.jumpRunTrackOffset = offset;
@@ -3425,16 +3286,25 @@ function setupCheckboxEvents() {
         userSettings.showJumpRunTrack = checkbox.checked;
         saveSettings();
         if (checkbox.checked && userSettings.calculateJump) {
+            console.log('Show Jump Run Track enabled, updating JRT');
             updateJumpRunTrack();
         } else {
             if (jumpRunTrackLayer) {
+                if (jumpRunTrackLayer.airplaneMarker) {
+                    map.removeLayer(jumpRunTrackLayer.airplaneMarker);
+                    jumpRunTrackLayer.airplaneMarker = null;
+                    console.log('Removed airplane marker for JRT');
+                }
                 map.removeLayer(jumpRunTrackLayer);
                 jumpRunTrackLayer = null;
+                console.log('Removed JRT polyline');
             }
             const directionInput = document.getElementById('jumpRunTrackDirection');
-            if (directionInput && weatherData && lastLat && lastLng) {
+            if (directionInput) {
                 const trackData = jumpRunTrack();
-                if (trackData) directionInput.value = trackData.direction;
+                if (trackData) {
+                    directionInput.value = trackData.direction;
+                }
             }
         }
     });
