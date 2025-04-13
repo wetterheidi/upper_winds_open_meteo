@@ -3080,12 +3080,17 @@ function setupInputEvents() {
             }
             customJumpRunDirection = customDir;
             console.log('Set custom direction from input:', customDir);
-            if (userSettings.showJumpRunTrack && weatherData && lastLat && lastLng) {
-                console.log('Updating JRT for custom direction input');
-                updateJumpRunTrack();
+            if (weatherData && lastLat && lastLng) {
+                if (userSettings.showJumpRunTrack) {
+                    console.log('Updating JRT for custom direction input');
+                    updateJumpRunTrack();
+                }
+                if (userSettings.calculateJump) {
+                    console.log('Recalculating jump for custom JRT direction');
+                    calculateJump(); // Trigger free fall calculation to update green circles
+                }
             } else {
-                console.warn('Cannot update JRT: missing conditions', {
-                    showJumpRunTrack: userSettings.showJumpRunTrack,
+                console.warn('Cannot update JRT or jump: missing conditions', {
                     weatherData: !!weatherData,
                     lastLat,
                     lastLng
@@ -3099,9 +3104,15 @@ function setupInputEvents() {
             if (directionInput) {
                 directionInput.value = ''; // Clear input
             }
-            if (userSettings.showJumpRunTrack && weatherData && lastLat && lastLng) {
-                console.log('Updating JRT for invalid direction input');
-                updateJumpRunTrack();
+            if (weatherData && lastLat && lastLng) {
+                if (userSettings.showJumpRunTrack) {
+                    console.log('Updating JRT for invalid direction input');
+                    updateJumpRunTrack();
+                }
+                if (userSettings.calculateJump) {
+                    console.log('Recalculating jump for reset JRT direction');
+                    calculateJump(); // Trigger free fall calculation
+                }
             }
         }
     });
