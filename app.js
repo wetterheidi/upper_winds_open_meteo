@@ -1586,7 +1586,7 @@ function calculateFreeFall(weatherData, exitAltitude, openingAltitude, sliderInd
     const dt = 0.5;
 
     const hStart = elevation + exitAltitude;
-    const hStop = elevation + openingAltitude;
+    const hStop = elevation + openingAltitude - 200; //calculate until canopy is open
     const jumpRunData = jumpRunTrack();
     const jumpRunDirection = jumpRunData ? jumpRunData.direction : 0;
     const aircraftSpeedKt = 90;
