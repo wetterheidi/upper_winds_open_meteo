@@ -314,7 +314,7 @@ function debounce(func, wait) {
 // == Map Initialization and Interaction ==
 function initMap() {
     const defaultCenter = [48.0179, 11.1923];
-    const defaultZoom = 10;
+    const defaultZoom = 11;
 
     map = L.map('map', {
         center: defaultCenter,
@@ -1998,7 +1998,7 @@ function resetJumpRunDirection(triggerUpdate = true) {
         updateJumpRunTrack();
     }
 }
-function jumpRunTrack() {
+function jumpRunTrackOLD() {
     console.log('Starting jumpRunTrack...', {
         weatherData: !!weatherData,
         lastLat,
@@ -2101,7 +2101,117 @@ function jumpRunTrack() {
         latlngs: latlngs
     };
 }
-function updateJumpRunTrack() {
+function jumpRunTrack() {
+    console.log('Starting jumpRunTrack...', {
+        weatherData: !!weatherData,
+        lastLat,
+        lastLng,
+        lastAltitude,
+        customJumpRunDirection
+    });
+    const exitAltitude = parseInt(document.getElementById('exitAltitude')?.value) || userSettings.exitAltitude || 3000;
+    const openingAltitude = parseInt(document.getElementById('openingAltitude')?.value) || userSettings.openingAltitude || 1000;
+    const customDirection = parseInt(document.getElementById('jumpRunTrackDirection')?.value, 10);
+    const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
+    const offset = parseInt(document.getElementById('jumpRunTrackOffset')?.value) || userSettings.jumpRunTrackOffset || 0;
+
+    if (!weatherData || !lastLat || !lastLng || lastAltitude === null || lastAltitude === 'N/A') {
+        console.warn('Cannot calculate jump run track: missing data', {
+            weatherData: !!weatherData,
+            lastLat,
+            lastLng,
+            lastAltitude
+        });
+        return null;
+    }
+
+    const interpolatedData = interpolateWeatherData(sliderIndex);
+    if (!interpolatedData || interpolatedData.length === 0) {
+        console.warn('No interpolated weather data available for sliderIndex:', sliderIndex);
+        return null;
+    }
+
+    const elevation = Math.round(lastAltitude);
+    const lowerLimit = elevation;
+    const upperLimit = elevation + openingAltitude;
+    console.log('Jump run track limits:', { lowerLimit, upperLimit, elevation });
+
+    const heights = interpolatedData.map(d => d.height);
+    const dirs = interpolatedData.map(d => Number.isFinite(d.dir) ? parseFloat(d.dir) : 0);
+    const spdsMps = interpolatedData.map(d => {
+        const spd = Number.isFinite(d.spd) ? parseFloat(d.spd) : 0;
+        return Utils.convertWind(spd, 'm/s', getWindSpeedUnit());
+    });
+
+    console.log('Interpolated data:', { heights, dirs, spdsMps });
+
+    const uComponents = spdsMps.map((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
+    const vComponents = spdsMps.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
+
+    const meanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, lowerLimit, upperLimit);
+    const meanWindDirection = meanWind[0];
+    const meanWindSpeed = meanWind[1];
+
+    if (!Number.isFinite(meanWindDirection) || !Number.isFinite(meanWindSpeed)) {
+        console.warn('Invalid mean wind calculation:', meanWind);
+        return null;
+    }
+
+    let jumpRunTrackDirection;
+    if (customJumpRunDirection !== null && !isNaN(customJumpRunDirection) && customJumpRunDirection >= 0 && customJumpRunDirection <= 359) {
+        jumpRunTrackDirection = customJumpRunDirection;
+        console.log(`Using custom jump run direction: ${jumpRunTrackDirection}°`);
+    } else {
+        jumpRunTrackDirection = Math.round(meanWindDirection);
+        customJumpRunDirection = null; // Ensure reset
+        console.log(`Using calculated jump run direction: ${jumpRunTrackDirection}°`, {
+            meanWindDirection: meanWindDirection.toFixed(1),
+            inputValue: document.getElementById('jumpRunTrackDirection')?.value
+        });
+    }
+
+    // Update input field only if calculated or explicitly set
+    const directionInput = document.getElementById('jumpRunTrackDirection');
+    if (directionInput) {
+        directionInput.value = jumpRunTrackDirection;
+        console.log('Updated jumpRunTrackDirection input to:', jumpRunTrackDirection);
+    }
+
+    // Calculate latlngs for the jump run track
+    const trackLength = 2000; // meters, typical jump run length
+    const halfLength = trackLength / 2;
+
+    // Apply offset perpendicular to the track direction
+    let centerLat = lastLat;
+    let centerLng = lastLng;
+    if (offset !== 0) {
+        const offsetDistance = Math.abs(offset);
+        const offsetBearing = offset >= 0
+            ? (jumpRunTrackDirection + 90) % 360
+            : (jumpRunTrackDirection - 90 + 360) % 360;
+        [centerLat, centerLng] = calculateNewCenter(lastLat, lastLng, offsetDistance, offsetBearing);
+    }
+
+    // Calculate start and end points along the jump run direction from the offset center
+    const startPoint = calculateNewCenter(centerLat, centerLng, halfLength, (jumpRunTrackDirection + 180) % 360);
+    const endPoint = calculateNewCenter(centerLat, centerLng, halfLength, jumpRunTrackDirection);
+
+    const latlngs = [
+        [startPoint[0], startPoint[1]], // Rear
+        [endPoint[0], endPoint[1]]      // Front
+    ];
+
+    console.log(`Jump Run Track: ${jumpRunTrackDirection}° (Mean wind: ${meanWindDirection.toFixed(1)}° @ ${meanWindSpeed.toFixed(1)} ${getWindSpeedUnit()})`);
+    console.log('Jump Run Track latlngs:', latlngs);
+
+    return {
+        direction: jumpRunTrackDirection,
+        meanWindDirection: meanWindDirection,
+        meanWindSpeed: meanWindSpeed,
+        latlngs: latlngs
+    };
+}
+function updateJumpRunTrackOLD() {
     console.log('updateJumpRunTrack called', {
         showJumpRunTrack: userSettings.showJumpRunTrack,
         weatherData: !!weatherData,
@@ -2140,7 +2250,12 @@ function updateJumpRunTrack() {
         return;
     }
 
+    // Temporarily set offset to 0 to get unshifted track
+    const originalOffset = userSettings.jumpRunTrackOffset;
+    userSettings.jumpRunTrackOffset = 0;
     const trackData = jumpRunTrack();
+    userSettings.jumpRunTrackOffset = originalOffset; // Restore original offset
+
     if (!trackData || !trackData.latlngs || !Array.isArray(trackData.latlngs) || trackData.latlngs.length < 2) {
         console.error('Invalid trackData from jumpRunTrack:', trackData);
         return;
@@ -2155,7 +2270,21 @@ function updateJumpRunTrack() {
         return;
     }
 
-    console.log('Updating jump run track with:', { latlngs, direction });
+    // Apply lateral offset if jumpRunTrackOffset is non-zero
+    if (userSettings.jumpRunTrackOffset !== 0) {
+        const offsetDistance = Math.abs(userSettings.jumpRunTrackOffset);
+        // Positive offset: shift right (direction + 90°); negative: shift left (direction - 90°)
+        const offsetBearing = userSettings.jumpRunTrackOffset >= 0
+            ? (direction + 90) % 360
+            : (direction - 90 + 360) % 360;
+
+        // Shift each point in latlngs perpendicular to the track direction
+        latlngs = latlngs.map(([lat, lng]) => {
+            return calculateNewCenter(lat, lng, offsetDistance, offsetBearing);
+        });
+    }
+
+    console.log('Updating jump run track with:', { latlngs, direction, offset: userSettings.jumpRunTrackOffset });
 
     // Create polyline for the jump run track
     jumpRunTrackLayer = L.polyline(latlngs, {
@@ -2259,6 +2388,202 @@ function updateJumpRunTrack() {
         newOffset = Math.max(-5000, Math.min(5000, newOffset));
 
         // Update settings and input for offset only
+        userSettings.jumpRunTrackOffset = newOffset;
+        saveSettings();
+
+        // Update direction and offset inputs
+        const directionInput = document.getElementById('jumpRunTrackDirection');
+        if (directionInput && customJumpRunDirection !== null) {
+            directionInput.value = Math.round(customJumpRunDirection);
+            console.log('Updated jumpRunTrackDirection input to custom:', directionInput.value);
+        } else {
+            console.log('Not updating jumpRunTrackDirection input (using calculated direction)');
+        }
+        const offsetInput = document.getElementById('jumpRunTrackOffset');
+        if (offsetInput) {
+            offsetInput.value = userSettings.jumpRunTrackOffset;
+        }
+
+        // Ensure airplane rotation matches new direction
+        if (jumpRunTrackLayer.airplaneMarker) {
+            jumpRunTrackLayer.airplaneMarker.setRotationAngle(newDirection);
+        }
+
+        console.log('Jump run track dragged: new direction:', newDirection, 'new offset:', newOffset);
+    });
+
+    // Tooltip with direction
+    jumpRunTrackLayer.bindTooltip(`Jump Run: ${Math.round(direction)}°`, {
+        permanent: false,
+        direction: 'top',
+        offset: [0, -10]
+    });
+}
+function updateJumpRunTrack() {
+    console.log('updateJumpRunTrack called', {
+        showJumpRunTrack: userSettings.showJumpRunTrack,
+        weatherData: !!weatherData,
+        lastLat,
+        lastLng,
+        customJumpRunDirection,
+        currentZoom: map.getZoom()
+    });
+
+    // Check zoom level
+    const currentZoom = map.getZoom();
+    const isZoomInRange = currentZoom >= minZoom && currentZoom <= maxZoom;
+
+    // Remove existing layer and marker if present
+    if (jumpRunTrackLayer) {
+        if (jumpRunTrackLayer.airplaneMarker) {
+            map.removeLayer(jumpRunTrackLayer.airplaneMarker);
+            jumpRunTrackLayer.airplaneMarker = null;
+            console.log('Removed airplane marker');
+        }
+        map.removeLayer(jumpRunTrackLayer);
+        jumpRunTrackLayer = null;
+        console.log('Removed JRT polyline');
+    }
+
+    if (!userSettings.showJumpRunTrack || !weatherData || !lastLat || !lastLng || !isZoomInRange) {
+        console.log('Jump run track not drawn', {
+            showJumpRunTrack: userSettings.showJumpRunTrack,
+            weatherData: !!weatherData,
+            lastLat,
+            lastLng,
+            isZoomInRange
+        });
+        const directionInput = document.getElementById('jumpRunTrackDirection');
+        if (directionInput) directionInput.value = '';
+        return;
+    }
+
+    const trackData = jumpRunTrack();
+    if (!trackData || !trackData.latlngs || !Array.isArray(trackData.latlngs) || trackData.latlngs.length < 2) {
+        console.error('Invalid trackData from jumpRunTrack:', trackData);
+        return;
+    }
+
+    let { latlngs, direction } = trackData;
+
+    // Validate latlngs format
+    const isValidLatLngs = latlngs.every(ll => Array.isArray(ll) && ll.length === 2 && !isNaN(ll[0]) && !isNaN(ll[1]));
+    if (!isValidLatLngs) {
+        console.error('Invalid latlngs format in trackData:', latlngs);
+        return;
+    }
+
+    console.log('Updating jump run track with:', { latlngs, direction, offset: userSettings.jumpRunTrackOffset });
+
+    // Create polyline for the jump run track
+    jumpRunTrackLayer = L.polyline(latlngs, {
+        color: 'orange',
+        weight: 4,
+        opacity: 0.7,
+        interactive: true
+    }).addTo(map);
+
+    // Add airplane symbol at the front end
+    const frontEnd = latlngs[1]; // Second point is the front
+    const airplaneIcon = L.icon({
+        iconUrl: 'airplane_orange.png',
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
+        popupAnchor: [0, -16],
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+        shadowSize: [41, 41],
+        shadowAnchor: [13, 32]
+    });
+
+    // Create new airplane marker
+    jumpRunTrackLayer.airplaneMarker = L.marker(frontEnd, {
+        icon: airplaneIcon,
+        rotationAngle: direction,
+        rotationOrigin: 'center center',
+        draggable: false
+    }).addTo(map);
+
+    // Update direction input
+    const directionInput = document.getElementById('jumpRunTrackDirection');
+    if (directionInput) {
+        directionInput.value = Math.round(direction);
+        console.log('Set direction input to:', direction);
+    }
+
+    // Dragging functionality
+    let isDragging = false;
+    let startLatLng = null;
+    let originalLatLngs = latlngs.map(ll => [ll[0], ll[1]]); // Clone initial coordinates
+
+    jumpRunTrackLayer.on('mousedown', function (e) {
+        if (!userSettings.showJumpRunTrack || !isZoomInRange) return;
+        if (userSettings.jumpRunTrackOffset !== 0) {
+            displayError('JRT rotation only works at the original position. Reset offset to 0 or rotate before moving.');
+            return;
+        }
+        isDragging = true;
+        startLatLng = e.latlng;
+        map.dragging.disable();
+        console.log('Started dragging JRT');
+    });
+
+    map.on('mousemove', function (e) {
+        if (!isDragging || !startLatLng) return;
+
+        const currentLatLng = e.latlng;
+        const latDiff = currentLatLng.lat - startLatLng.lat;
+        const lngDiff = currentLatLng.lng - startLatLng.lng;
+
+        const newLatLngs = originalLatLngs.map(([lat, lng]) => [
+            lat + latDiff,
+            lng + lngDiff
+        ]);
+
+        jumpRunTrackLayer.setLatLngs(newLatLngs);
+
+        const newFrontEnd = newLatLngs[1];
+        if (jumpRunTrackLayer.airplaneMarker) {
+            jumpRunTrackLayer.airplaneMarker.setLatLng(newFrontEnd);
+        }
+    });
+
+    map.on('mouseup', function () {
+        if (!isDragging) return;
+        isDragging = false;
+        map.dragging.enable();
+
+        // Update stored coordinates
+        originalLatLngs = jumpRunTrackLayer.getLatLngs().map(ll => [ll.lat, ll.lng]);
+
+        // Calculate new direction based on the updated polyline
+        const [startLat, startLng] = originalLatLngs[0];
+        const [endLat, endLng] = originalLatLngs[1];
+        const newDirection = calculateBearing(startLat, startLng, endLat, endLng);
+
+        // Update temporary custom direction
+        customJumpRunDirection = Math.round(newDirection);
+        console.log('JRT dragged, set custom direction:', customJumpRunDirection);
+
+        // Calculate new offset (lateral distance perpendicular to direction)
+        const centerLat = (startLat + endLat) / 2;
+        const centerLng = (startLng + endLng) / 2;
+        const dipLatLng = L.latLng(lastLat, lastLng);
+        const centerLatLng = L.latLng(centerLat, centerLng);
+        const distance = dipLatLng.distanceTo(centerLatLng);
+        const bearingToCenter = calculateBearing(lastLat, lastLng, centerLat, centerLng);
+
+        // Calculate angle relative to perpendicular directions
+        const rightBearing = (newDirection + 90) % 360;
+        const leftBearing = (newDirection - 90 + 360) % 360;
+        const angleToRight = Math.abs(((bearingToCenter - rightBearing + 540) % 360) - 180);
+        const angleToLeft = Math.abs(((bearingToCenter - leftBearing + 540) % 360) - 180);
+
+        // Determine if closer to right (+ve) or left (-ve)
+        const offsetSign = angleToRight < angleToLeft ? 1 : -1;
+        let newOffset = Math.round(distance * offsetSign / 100) * 100;
+        newOffset = Math.max(-5000, Math.min(5000, newOffset));
+
+        // Update settings and input for offset
         userSettings.jumpRunTrackOffset = newOffset;
         saveSettings();
 
