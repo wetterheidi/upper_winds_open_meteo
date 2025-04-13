@@ -411,7 +411,7 @@ class Utils {
             typeof direction !== 'string' || !['N', 'S', 'E', 'W'].includes(direction.toUpperCase())) {
             throw new Error('Invalid DMS input: degrees, minutes, seconds must be numbers, and direction must be N, S, E, or W');
         }
-    
+
         // Calculate decimal degrees
         let decimal = degrees + (minutes / 60) + (seconds / 3600);
         if (direction.toUpperCase() === 'S' || direction.toUpperCase() === 'W') {
@@ -477,6 +477,39 @@ class Utils {
             default:
                 return result.Decimal;
         }
+    }
+    // Calculate True Airspeed (TAS) from Indicated Airspeed (IAS) and height above ground (in feet)
+    static calculateTAS(ias, heightFt) {
+        if (isNaN(ias) || isNaN(heightFt) || ias < 0 || heightFt < 0) {
+            return 'N/A';
+        }
+
+        // Constants for standard atmosphere (troposphere)
+        const seaLevelDensity = 1.225; // kg/m³
+        const lapseRate = 0.0065; // K/m
+        const seaLevelTemp = 288.15; // K (15°C)
+        const gravity = 9.80665; // m/s²
+        const gasConstant = 287.05; // J/(kg·K) for dry air
+        const metersPerFoot = 0.3048;
+
+        // Convert height to meters
+        const heightM = heightFt * metersPerFoot;
+
+        // Simplified temperature at altitude: T = T₀ - L * h
+        const tempAtAltitude = seaLevelTemp - lapseRate * heightM;
+
+        // Pressure ratio using barometric formula: (T/T₀)^(-g/(L*R))
+        const tempRatio = tempAtAltitude / seaLevelTemp;
+        const exponent = -gravity / (lapseRate * gasConstant);
+        const pressureRatio = Math.pow(tempRatio, exponent);
+
+        // Density ratio: ρ/ρ₀ = (P/P₀) * (T₀/T)
+        const densityRatio = pressureRatio * (seaLevelTemp / tempAtAltitude);
+
+        // TAS = IAS / √(ρ/ρ₀)
+        const tas = ias / Math.sqrt(densityRatio);
+
+        return Number(tas.toFixed(2)); // Return TAS in knots, rounded to 2 decimal places
     }
 }
 
