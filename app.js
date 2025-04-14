@@ -68,7 +68,10 @@ const defaultSettings = {
     exitAltitude: 3000,
     showJumpRunTrack: false,
     showExitArea: false,
-    jumpRunTrackOffset: 0 // Keep offset as it’s a user-configurable setting
+    jumpRunTrackOffset: 0, // Keep offset as it’s a user-configurable setting
+    aircraftSpeedKt: 90, // Added for Jump Parameters
+    jumperSeparation: 5,  // Added for Jump Parameters
+    numberOfJumpers: 5
 };
 
 // == Settings Management ==
@@ -1590,7 +1593,7 @@ function calculateFreeFall(weatherData, exitAltitude, openingAltitude, sliderInd
     const hStop = elevation + openingAltitude - 200; //calculate until canopy is open
     const jumpRunData = jumpRunTrack();
     const jumpRunDirection = jumpRunData ? jumpRunData.direction : 0;
-    const aircraftSpeedKt = 90;
+    const aircraftSpeedKt = userSettings.aircraftSpeedKt; // Use user-defined speed
     const aircraftSpeedMps = aircraftSpeedKt * 0.514444;
     const vxInitial = Math.cos((jumpRunDirection) * Math.PI / 180) * aircraftSpeedMps;
     const vyInitial = Math.sin((jumpRunDirection) * Math.PI / 180) * aircraftSpeedMps;
@@ -1698,7 +1701,7 @@ function calculateFreeFall(weatherData, exitAltitude, openingAltitude, sliderInd
         directionDeg: directionDeg, // Include direction
         distance: distance // Include distance
     };
-
+    console.log('Aircraft Speed IAS: ', aircraftSpeedKt);
     console.log('Free fall result:', result);
     console.log(`Free fall considerations output: Throw and drift: ${Math.round(directionDeg)}°) ${Math.round(distance)} m ${Math.round(final.time)} s ${hStart} m ${hStop} m`);
     return result;
@@ -2103,25 +2106,83 @@ function jumpRunTrack() {
         console.log(`Using custom jump run direction: ${jumpRunTrackDirection}°`);
     } else {
         jumpRunTrackDirection = Math.round(meanWindDirection);
-        customJumpRunDirection = null; // Ensure reset
+        customJumpRunDirection = null;
         console.log(`Using calculated jump run direction: ${jumpRunTrackDirection}°`, {
             meanWindDirection: meanWindDirection.toFixed(1),
             inputValue: document.getElementById('jumpRunTrackDirection')?.value
         });
     }
 
-    // Update input field only if calculated or explicitly set
+    // Calculate ground speed at exit altitude
+    const exitHeightM = elevation + exitAltitude;
+    const exitHeightFt = exitHeightM / 0.3048;
+    const iasKt = userSettings.aircraftSpeedKt || 90;
+    console.log('TAS input:', { iasKt, exitHeightFt });
+    const tasKt = Utils.calculateTAS(iasKt, exitHeightFt);
+    console.log('TAS output:', tasKt);
+    let trackLength = 2000; // Default fallback
+    if (tasKt === 'N/A') {
+        console.warn('Failed to calculate TAS for ground speed');
+    } else {
+        const windDirAtExit = Utils.LIP(heights, dirs, exitHeightM);
+        const windSpeedMpsAtExit = Utils.LIP(heights, spdsMps, exitHeightM);
+        const windSpeedKtAtExit = windSpeedMpsAtExit * 1.94384;
+
+        const tasMps = tasKt * 0.514444;
+        const trackRad = (jumpRunTrackDirection * Math.PI) / 180;
+        const tasVx = tasMps * Math.cos(trackRad);
+        const tasVy = tasMps * Math.sin(trackRad);
+
+        const windDirToRad = ((windDirAtExit + 180) % 360) * Math.PI / 180;
+        const windVx = windSpeedMpsAtExit * Math.cos(windDirToRad);
+        const windVy = windSpeedMpsAtExit * Math.sin(windDirToRad);
+
+        const groundVx = tasVx + windVx;
+        const groundVy = tasVy + windVy;
+        const groundSpeedMps = Math.sqrt(groundVx * groundVx + groundVy * groundVy);
+        const groundSpeedKt = groundSpeedMps * 1.94384;
+
+        // Calculate dynamic track length
+        const numberOfJumpers = parseInt(userSettings.numberOfJumpers) || 10;
+        const jumperSeparation = parseFloat(userSettings.jumperSeparation) || 5;
+        if (numberOfJumpers >= 1 && jumperSeparation >= 1 && Number.isFinite(groundSpeedMps)) {
+            trackLength = numberOfJumpers * jumperSeparation * groundSpeedMps;
+            // Cap track length for practicality (e.g., 100–10,000 m)
+            trackLength = Math.max(100, Math.min(10000, Math.round(trackLength)));
+            console.log('Dynamic track length calculation:', {
+                numberOfJumpers,
+                jumperSeparation,
+                groundSpeedMps: groundSpeedMps.toFixed(2),
+                trackLength
+            });
+        } else {
+            console.warn('Invalid inputs for track length, using default:', {
+                numberOfJumpers,
+                jumperSeparation,
+                groundSpeedMps
+            });
+        }
+
+        console.log('Aircraft Ground Speed Calculation:', {
+            exitAltitude: exitHeightM.toFixed(1) + ' m',
+            exitHeightFt: exitHeightFt.toFixed(1) + ' ft',
+            ias: iasKt.toFixed(1) + ' kt',
+            tas: tasKt.toFixed(1) + ' kt',
+            jumpRunDirection: jumpRunTrackDirection.toFixed(1) + '°',
+            windDirAtExit: windDirAtExit.toFixed(1) + '°',
+            windSpeedAtExit: windSpeedKtAtExit.toFixed(1) + ' kt',
+            groundSpeed: groundSpeedKt.toFixed(1) + ' kt'
+        });
+    }
+
     const directionInput = document.getElementById('jumpRunTrackDirection');
     if (directionInput) {
         directionInput.value = jumpRunTrackDirection;
         console.log('Updated jumpRunTrackDirection input to:', jumpRunTrackDirection);
     }
 
-    // Calculate latlngs for the jump run track
-    const trackLength = 2000; // meters, typical jump run length
     const halfLength = trackLength / 2;
 
-    // Apply offset perpendicular to the track direction
     let centerLat = lastLat;
     let centerLng = lastLng;
     if (offset !== 0) {
@@ -2132,20 +2193,20 @@ function jumpRunTrack() {
         [centerLat, centerLng] = calculateNewCenter(lastLat, lastLng, offsetDistance, offsetBearing);
     }
 
-    // Calculate start and end points along the jump run direction from the offset center
     const startPoint = calculateNewCenter(centerLat, centerLng, halfLength, (jumpRunTrackDirection + 180) % 360);
     const endPoint = calculateNewCenter(centerLat, centerLng, halfLength, jumpRunTrackDirection);
 
     const latlngs = [
-        [startPoint[0], startPoint[1]], // Rear
-        [endPoint[0], endPoint[1]]      // Front
+        [startPoint[0], startPoint[1]],
+        [endPoint[0], endPoint[1]]
     ];
 
-    console.log(`Jump Run Track: ${jumpRunTrackDirection}° (Mean wind: ${meanWindDirection.toFixed(1)}° @ ${meanWindSpeed.toFixed(1)} ${getWindSpeedUnit()})`);
+    console.log(`Jump Run Track: ${jumpRunTrackDirection}° (Mean wind: ${meanWindDirection.toFixed(1)}° @ ${meanWindSpeed.toFixed(1)} ${getWindSpeedUnit()}), Length: ${trackLength} m`);
     console.log('Jump Run Track latlngs:', latlngs);
 
     return {
         direction: jumpRunTrackDirection,
+        trackLength: trackLength,
         meanWindDirection: meanWindDirection,
         meanWindSpeed: meanWindSpeed,
         latlngs: latlngs
@@ -2196,7 +2257,7 @@ function updateJumpRunTrack() {
         return;
     }
 
-    let { latlngs, direction } = trackData;
+    let { latlngs, direction, trackLength } = trackData;
 
     // Validate latlngs format
     const isValidLatLngs = latlngs.every(ll => Array.isArray(ll) && ll.length === 2 && !isNaN(ll[0]) && !isNaN(ll[1]));
@@ -2205,7 +2266,7 @@ function updateJumpRunTrack() {
         return;
     }
 
-    console.log('Updating jump run track with:', { latlngs, direction, offset: userSettings.jumpRunTrackOffset });
+    console.log('Updating jump run track with:', { latlngs, direction, trackLength, offset: userSettings.jumpRunTrackOffset });
 
     // Create polyline for the jump run track
     jumpRunTrackLayer = L.polyline(latlngs, {
@@ -2341,7 +2402,7 @@ function updateJumpRunTrack() {
     });
 
     // Tooltip with direction
-    jumpRunTrackLayer.bindTooltip(`Jump Run: ${Math.round(direction)}°`, {
+    jumpRunTrackLayer.bindTooltip(`Jump Run: ${Math.round(direction)}°, ${Math.round(trackLength)} m`, {
         permanent: false,
         direction: 'top',
         offset: [0, -10]
@@ -2825,6 +2886,9 @@ function initializeUIElements() {
     setInputValue('openingAltitude', userSettings.openingAltitude);
     setInputValue('exitAltitude', userSettings.exitAltitude);
     setInputValue('interpStepSelect', userSettings.interpStep);
+    setInputValue('aircraftSpeedKt', userSettings.aircraftSpeedKt); // Added
+    setInputValue('numberOfJumpers', userSettings.numberOfJumpers); // Added
+    setInputValue('jumperSeparation', userSettings.jumperSeparation); // Added
     setCheckboxValue('showTableCheckbox', userSettings.showTable);
     setCheckboxValue('calculateJumpCheckbox', userSettings.calculateJump);
     setCheckboxValue('showLandingPattern', userSettings.showLandingPattern);
@@ -3190,6 +3254,54 @@ function setupInputEvents() {
             if (userSettings.calculateJump && userSettings.showJumpRunTrack) {
                 updateJumpRunTrack();
             }
+        }
+    });
+    setupInput('aircraftSpeedKt', 'change', 300, (value) => {
+        const speed = parseFloat(value);
+        if (!isNaN(speed) && speed >= 10 && speed <= 150) {
+            userSettings.aircraftSpeedKt = speed;
+            saveSettings();
+            if (userSettings.calculateJump && weatherData && lastLat && lastLng) {
+                console.log('Recalculating jump for aircraft speed change');
+                calculateJump();
+            }
+        } else {
+            Utils.handleError('Aircraft speed must be between 10 and 150 kt.');
+            setInputValue('aircraftSpeedKt', defaultSettings.aircraftSpeedKt);
+            userSettings.aircraftSpeedKt = defaultSettings.aircraftSpeedKt;
+            saveSettings();
+        }
+    });
+    setupInput('numberOfJumpers', 'change', 300, (value) => {
+        const number = parseFloat(value);
+        if (!isNaN(number) && number >= 1 && number <= 50) {
+            userSettings.numberOfJumpers = number;
+            saveSettings();
+            if (userSettings.calculateJump && weatherData && lastLat && lastLng) {
+                console.log('Recalculating jump for jumper number change');
+                calculateJump();
+            }
+        } else {
+            Utils.handleError('Jumper number must be between 1 and 50.');
+            setInputValue('numberOfJumpers', defaultSettings.numberOfJumpers);
+            userSettings.numberOfJumpers = defaultSettings.numberOfJumpers;
+            saveSettings();
+        }
+    });
+    setupInput('jumperSeparation', 'change', 300, (value) => {
+        const separation = parseFloat(value);
+        if (!isNaN(separation) && separation >= 1 && separation <= 50) {
+            userSettings.jumperSeparation = separation;
+            saveSettings();
+            if (userSettings.calculateJump && weatherData && lastLat && lastLng) {
+                console.log('Recalculating jump for jumper separation change');
+                calculateJump();
+            }
+        } else {
+            Utils.handleError('Jumper separation must be between 1 and 50 seconds.');
+            setInputValue('jumperSeparation', defaultSettings.jumperSeparation);
+            userSettings.jumperSeparation = defaultSettings.jumperSeparation;
+            saveSettings();
         }
     });
 }

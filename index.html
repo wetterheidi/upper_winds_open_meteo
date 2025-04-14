@@ -160,23 +160,6 @@
                             </li>
                         </ul>
                     </li>
-                    <li>
-                        <span>Canopy Parameters</span>
-                        <ul class="submenu hidden">
-                            <li>
-                                <label class="radio-label">
-                                    Canopy Speed (kt):
-                                    <input type="number" id="canopySpeed" min="5" max="50" step="1" value="20">
-                                </label>
-                            </li>
-                            <li>
-                                <label class="radio-label">
-                                    Descent Rate (m/s):
-                                    <input type="number" id="descentRate" min="1" max="10" step="0.1" value="3.5">
-                                </label>
-                            </li>
-                        </ul>
-                    </li>
                 </ul>
             </li>
             <li>
@@ -262,6 +245,41 @@
                     <li>
                         <label class="radio-label">
                             <input type="checkbox" id="showExitAreaCheckbox"> Show Exit Area                        </label>
+                    </li>
+                    <li>
+                        <span>Jump Parameters</span>
+                        <ul class="submenu hidden">
+                            <li>
+                                <label class="radio-label">
+                                    Aircraft Speed (ktIAS):
+                                    <input type="number" id="aircraftSpeedKt" min="10" max="150" step="5" value="90">
+                                </label>
+                            </li>
+                            <li>
+                                <label class="radio-label">
+                                    Number Of Jumpers:
+                                    <input type="number" id="numberOfJumpers" min="1" max="50" step="1" value="5">
+                                </label>
+                            </li>
+                            <li>
+                                <label class="radio-label">
+                                    Separation (s):
+                                    <input type="number" id="jumperSeparation" min="1" max="50" step="1" value="5">
+                                </label>
+                            </li>
+                            <li>
+                                <label class="radio-label">
+                                    Canopy Speed (kt):
+                                    <input type="number" id="canopySpeed" min="5" max="50" step="1" value="20">
+                                </label>
+                            </li>
+                            <li>
+                                <label class="radio-label">
+                                    Descent Rate (m/s):
+                                    <input type="number" id="descentRate" min="1" max="10" step="0.1" value="3.5">
+                                </label>
+                            </li>
+                        </ul>
                     </li>
                 </ul>
             </li>
