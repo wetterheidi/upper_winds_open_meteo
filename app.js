@@ -725,23 +725,51 @@ function attachMarkerDragend(marker) {
         }
     });
 }
-function updateMarkerPopup(marker, lat, lng, altitude, open = false) {
+async function updateMarkerPopup(marker, lat, lng, altitude, open = false) {
     console.log('Updating marker popup:', { lat, lng, altitude, format: getCoordinateFormat(), open });
     const coordFormat = getCoordinateFormat();
     const coords = Utils.convertCoords(lat, lng, coordFormat);
+    const sliderIndex = getSliderValue();
+
+    // If weatherData is missing and we have coordinates, fetch it
+    if (!weatherData && lat && lng) {
+        console.log('No weather data available, fetching for:', { lat, lng });
+        await fetchWeatherForLocation(lat, lng, null, false);
+    }
+
+    console.log('Weather data status:', {
+        weatherDataExists: !!weatherData,
+        surfacePressureExists: !!weatherData?.surface_pressure,
+        sliderIndex,
+        surfacePressureLength: weatherData?.surface_pressure?.length,
+        samplePressure: weatherData?.surface_pressure?.[sliderIndex]
+    });
+
     let popupContent;
     if (coordFormat === 'MGRS') {
         popupContent = `MGRS: ${coords.lat}<br>Alt: ${altitude}m`;
     } else {
         popupContent = `Lat: ${coords.lat}<br>Lng: ${coords.lng}<br>Alt: ${altitude}m`;
     }
-    // Bind popup only if not already bound
+
+    if (weatherData && weatherData.surface_pressure && sliderIndex >= 0 && sliderIndex < weatherData.surface_pressure.length) {
+        const surfacePressure = weatherData.surface_pressure[sliderIndex];
+        popupContent += `<br>QFE: ${surfacePressure.toFixed(0)} hPa`;
+    } else {
+        popupContent += `<br>QFE: N/A`;
+        console.warn('Surface pressure not available:', {
+            hasWeatherData: !!weatherData,
+            hasSurfacePressure: !!weatherData?.surface_pressure,
+            sliderIndexValid: sliderIndex >= 0 && sliderIndex < (weatherData?.surface_pressure?.length || 0)
+        });
+    }
+
     if (!marker.getPopup()) {
         marker.bindPopup(popupContent);
     } else {
         marker.setPopupContent(popupContent);
     }
-    // Open popup only if explicitly requested
+
     if (open) {
         marker.openPopup();
     }
@@ -2245,202 +2273,6 @@ function jumpRunTrack() {
         approachLength: approachLength
     };
 }
-function updateJumpRunTrackOLD() {
-    console.log('updateJumpRunTrack called', {
-        showJumpRunTrack: userSettings.showJumpRunTrack,
-        weatherData: !!weatherData,
-        lastLat,
-        lastLng,
-        customJumpRunDirection,
-        currentZoom: map.getZoom()
-    });
-
-    // Check zoom level
-    const currentZoom = map.getZoom();
-    const isZoomInRange = currentZoom >= minZoom && currentZoom <= maxZoom;
-
-    // Remove existing layer and marker if present
-    if (jumpRunTrackLayer) {
-        if (jumpRunTrackLayer.airplaneMarker) {
-            map.removeLayer(jumpRunTrackLayer.airplaneMarker);
-            jumpRunTrackLayer.airplaneMarker = null;
-            console.log('Removed airplane marker');
-        }
-        map.removeLayer(jumpRunTrackLayer);
-        jumpRunTrackLayer = null;
-        console.log('Removed JRT polyline');
-    }
-
-    if (!userSettings.showJumpRunTrack || !weatherData || !lastLat || !lastLng || !isZoomInRange) {
-        console.log('Jump run track not drawn', {
-            showJumpRunTrack: userSettings.showJumpRunTrack,
-            weatherData: !!weatherData,
-            lastLat,
-            lastLng,
-            isZoomInRange
-        });
-        const directionInput = document.getElementById('jumpRunTrackDirection');
-        if (directionInput) directionInput.value = '';
-        return;
-    }
-
-    const trackData = jumpRunTrack();
-    if (!trackData || !trackData.latlngs || !Array.isArray(trackData.latlngs) || trackData.latlngs.length < 2) {
-        console.error('Invalid trackData from jumpRunTrack:', trackData);
-        return;
-    }
-
-    let { latlngs, direction, trackLength } = trackData;
-
-    // Validate latlngs format
-    const isValidLatLngs = latlngs.every(ll => Array.isArray(ll) && ll.length === 2 && !isNaN(ll[0]) && !isNaN(ll[1]));
-    if (!isValidLatLngs) {
-        console.error('Invalid latlngs format in trackData:', latlngs);
-        return;
-    }
-
-    console.log('Updating jump run track with:', { latlngs, direction, trackLength, offset: userSettings.jumpRunTrackOffset });
-
-    // Create polyline for the jump run track
-    jumpRunTrackLayer = L.polyline(latlngs, {
-        color: 'orange',
-        weight: 4,
-        opacity: 0.7,
-        interactive: true
-    }).addTo(map);
-
-    // Add airplane symbol at the front end
-    const frontEnd = latlngs[1]; // Second point is the front
-    const airplaneIcon = L.icon({
-        iconUrl: 'airplane_orange.png',
-        iconSize: [32, 32],
-        iconAnchor: [16, 16],
-        popupAnchor: [0, -16],
-        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-        shadowSize: [41, 41],
-        shadowAnchor: [13, 32]
-    });
-
-    // Create new airplane marker
-    jumpRunTrackLayer.airplaneMarker = L.marker(frontEnd, {
-        icon: airplaneIcon,
-        rotationAngle: direction,
-        rotationOrigin: 'center center',
-        draggable: false
-    }).addTo(map);
-
-    // Update direction input
-    const directionInput = document.getElementById('jumpRunTrackDirection');
-    if (directionInput) {
-        directionInput.value = Math.round(direction);
-        console.log('Set direction input to:', direction);
-    }
-
-    // Dragging functionality
-    let isDragging = false;
-    let startLatLng = null;
-    let originalLatLngs = latlngs.map(ll => [ll[0], ll[1]]); // Clone initial coordinates
-
-    jumpRunTrackLayer.on('mousedown', function (e) {
-        if (!userSettings.showJumpRunTrack || !isZoomInRange) return;
-        if (userSettings.jumpRunTrackOffset !== 0) {
-            displayError('JRT rotation only works at the original position. Reset offset to 0 or rotate before moving.');
-            return;
-        }
-        isDragging = true;
-        startLatLng = e.latlng;
-        map.dragging.disable();
-        console.log('Started dragging JRT');
-    });
-
-    map.on('mousemove', function (e) {
-        if (!isDragging || !startLatLng) return;
-
-        const currentLatLng = e.latlng;
-        const latDiff = currentLatLng.lat - startLatLng.lat;
-        const lngDiff = currentLatLng.lng - startLatLng.lng;
-
-        const newLatLngs = originalLatLngs.map(([lat, lng]) => [
-            lat + latDiff,
-            lng + lngDiff
-        ]);
-
-        jumpRunTrackLayer.setLatLngs(newLatLngs);
-
-        const newFrontEnd = newLatLngs[1];
-        if (jumpRunTrackLayer.airplaneMarker) {
-            jumpRunTrackLayer.airplaneMarker.setLatLng(newFrontEnd);
-        }
-    });
-
-    map.on('mouseup', function () {
-        if (!isDragging) return;
-        isDragging = false;
-        map.dragging.enable();
-
-        // Update stored coordinates
-        originalLatLngs = jumpRunTrackLayer.getLatLngs().map(ll => [ll.lat, ll.lng]);
-
-        // Calculate new direction based on the updated polyline
-        const [startLat, startLng] = originalLatLngs[0];
-        const [endLat, endLng] = originalLatLngs[1];
-        const newDirection = calculateBearing(startLat, startLng, endLat, endLng);
-
-        // Update temporary custom direction
-        customJumpRunDirection = Math.round(newDirection);
-        console.log('JRT dragged, set custom direction:', customJumpRunDirection);
-
-        // Calculate new offset (lateral distance perpendicular to direction)
-        const centerLat = (startLat + endLat) / 2;
-        const centerLng = (startLng + endLng) / 2;
-        const dipLatLng = L.latLng(lastLat, lastLng);
-        const centerLatLng = L.latLng(centerLat, centerLng);
-        const distance = dipLatLng.distanceTo(centerLatLng);
-        const bearingToCenter = calculateBearing(lastLat, lastLng, centerLat, centerLng);
-
-        // Calculate angle relative to perpendicular directions
-        const rightBearing = (newDirection + 90) % 360;
-        const leftBearing = (newDirection - 90 + 360) % 360;
-        const angleToRight = Math.abs(((bearingToCenter - rightBearing + 540) % 360) - 180);
-        const angleToLeft = Math.abs(((bearingToCenter - leftBearing + 540) % 360) - 180);
-
-        // Determine if closer to right (+ve) or left (-ve)
-        const offsetSign = angleToRight < angleToLeft ? 1 : -1;
-        let newOffset = Math.round(distance * offsetSign / 100) * 100;
-        newOffset = Math.max(-5000, Math.min(5000, newOffset));
-
-        // Update settings and input for offset
-        userSettings.jumpRunTrackOffset = newOffset;
-        saveSettings();
-
-        // Update direction and offset inputs
-        const directionInput = document.getElementById('jumpRunTrackDirection');
-        if (directionInput && customJumpRunDirection !== null) {
-            directionInput.value = Math.round(customJumpRunDirection);
-            console.log('Updated jumpRunTrackDirection input to custom:', directionInput.value);
-        } else {
-            console.log('Not updating jumpRunTrackDirection input (using calculated direction)');
-        }
-        const offsetInput = document.getElementById('jumpRunTrackOffset');
-        if (offsetInput) {
-            offsetInput.value = userSettings.jumpRunTrackOffset;
-        }
-
-        // Ensure airplane rotation matches new direction
-        if (jumpRunTrackLayer.airplaneMarker) {
-            jumpRunTrackLayer.airplaneMarker.setRotationAngle(newDirection);
-        }
-
-        console.log('Jump run track dragged: new direction:', newDirection, 'new offset:', newOffset);
-    });
-
-    // Tooltip with direction
-    jumpRunTrackLayer.bindTooltip(`Jump Run: ${Math.round(direction)}°, ${Math.round(trackLength)} m`, {
-        permanent: false,
-        direction: 'top',
-        offset: [0, -10]
-    });
-}
 function updateJumpRunTrack() {
     console.log('updateJumpRunTrack called', {
         showJumpRunTrack: userSettings.showJumpRunTrack,
@@ -3226,7 +3058,7 @@ function setupSliderEvents() {
     const debouncedUpdate = debounce(async (index) => {
         console.log('Slider event triggered:', { index, weatherData: !!weatherData });
         if (weatherData && index >= 0 && index < weatherData.time.length) {
-            resetJumpRunDirection(false); // Update triggered below
+            resetJumpRunDirection(false);
             await updateWeatherDisplay(index);
             if (lastLat && lastLng && lastAltitude !== 'N/A') {
                 calculateMeanWind();
@@ -3238,8 +3070,16 @@ function setupSliderEvents() {
                     console.log('Recalculating jump for slider change');
                     calculateJump();
                 }
+                if (currentMarker) {
+                    console.log('Updating marker popup for slider change');
+                    const wasOpen = currentMarker.getPopup()?.isOpen() || false;
+                    await updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, wasOpen);
+                } else {
+                    console.warn('No currentMarker to update popup');
+                }
             }
         } else {
+            console.log('Slider reset to 0: invalid index or no weather data');
             slider.value = 0;
             resetJumpRunDirection(false);
             await updateWeatherDisplay(0);
@@ -3252,6 +3092,13 @@ function setupSliderEvents() {
                 if (userSettings.calculateJump) {
                     console.log('Recalculating jump for slider reset');
                     calculateJump();
+                }
+                if (currentMarker) {
+                    console.log('Updating marker popup for slider reset');
+                    const wasOpen = currentMarker.getPopup()?.isOpen() || false;
+                    await updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, wasOpen);
+                } else {
+                    console.warn('No currentMarker to update popup');
                 }
             }
         }
@@ -3284,6 +3131,13 @@ function setupModelSelectEvents() {
             if (userSettings.showJumpRunTrack) {
                 console.log('Updating JRT for model change');
                 updateJumpRunTrack();
+            }
+            if (currentMarker) {
+                console.log('Updating marker popup for model change');
+                const wasOpen = currentMarker.getPopup()?.isOpen() || false;
+                await updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, wasOpen);
+            } else {
+                console.warn('No currentMarker to update popup');
             }
             userSettings.model = modelSelect.value;
             saveSettings();
