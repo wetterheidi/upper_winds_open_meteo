@@ -1996,8 +1996,9 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
             radius: radius,
             color: 'blue',
             fillColor: 'blue',
-            fillOpacity: 0.2,
-            weight: 2
+            fillOpacity: 0,
+            weight: 2,
+            opacity: 0.4
         });
 
         // Red circle
@@ -2005,8 +2006,9 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
             radius: radiusFull,
             color: 'red',
             fillColor: 'red',
-            fillOpacity: 0.2,
-            weight: 2
+            fillOpacity: 0,
+            weight: 2,
+            opacity: 0.4
         });
 
         // Add blue and red circles to map
@@ -2028,8 +2030,8 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
             jumpCircleGreen = L.circle(jumpCircleGreenCenter, {
                 radius: radiusFull,
                 color: 'green',
-                fillColor: 'none',
-                fillOpacity: 0,
+                fillColor: 'green',
+                fillOpacity: 0.2,
                 weight: 2
             });
 
@@ -2046,8 +2048,8 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
             jumpCircleGreenLight = L.circle(jumpCircleGreenLightCenter, {
                 radius: radius,
                 color: 'lightgreen',
-                fillColor: 'none',
-                fillOpacity: 0,
+                fillColor: 'lightgreen',
+                fillOpacity: 0.2,
                 weight: 2
             });
 
