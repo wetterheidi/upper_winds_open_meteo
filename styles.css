@@ -797,10 +797,15 @@ input[type="checkbox"][style*="opacity: 1"] {
     white-space: nowrap;
 }
 
-#favoriteBtn, #clearHistoryBtn {
-    margin-top: 2px;
+#favoriteBtn {
+    margin-top: 3px;
     padding: 5px 10px;
     margin-left: 10px;
+    font-size: 12px;
+}
+
+#coordHistory {
+    padding: 5px;
     font-size: 12px;
 }
 

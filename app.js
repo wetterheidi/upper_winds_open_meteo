@@ -3781,16 +3781,23 @@ function setupCheckboxEvents() {
             console.log('Show Jump Run Track enabled, updating JRT');
             updateJumpRunTrack();
         } else {
+            // Remove jump run track, airplane marker, and approach path
             if (jumpRunTrackLayer) {
                 if (jumpRunTrackLayer.airplaneMarker) {
                     map.removeLayer(jumpRunTrackLayer.airplaneMarker);
                     jumpRunTrackLayer.airplaneMarker = null;
                     console.log('Removed airplane marker for JRT');
                 }
+                if (jumpRunTrackLayer.approachLayer) {
+                    map.removeLayer(jumpRunTrackLayer.approachLayer);
+                    jumpRunTrackLayer.approachLayer = null;
+                    console.log('Removed approach path for JRT');
+                }
                 map.removeLayer(jumpRunTrackLayer);
                 jumpRunTrackLayer = null;
                 console.log('Removed JRT polyline');
             }
+            // Update direction input
             const directionInput = document.getElementById('jumpRunTrackDirection');
             if (directionInput) {
                 const trackData = jumpRunTrack();
@@ -3798,6 +3805,9 @@ function setupCheckboxEvents() {
                     // Update value without triggering change event
                     directionInput.value = trackData.direction;
                     console.log('Updated jumpRunTrackDirection value without event:', trackData.direction);
+                } else {
+                    directionInput.value = '';
+                    console.log('Cleared jumpRunTrackDirection value');
                 }
             }
         }
