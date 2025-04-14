@@ -1657,25 +1657,36 @@ function calculateFreeFall(weatherData, exitAltitude, openingAltitude, sliderInd
         return null;
     }
 
-    const mass = 80;
-    const g = 9.81;
-    const Rl = 287.102;
-    const cdHorizontal = 1;
-    const areaHorizontal = 0.5;
-    const cdVertical = 1;
-    const areaVertical = 0.5;
+    // RW values
+    const mass = 80; // jumpers mass
+    const g = 9.81; //Erdbeschleunigung
+    const Rl = 287.102; //gas constant dry air
+    const cdHorizontal = 1; // Widerstandswert horizontal
+    const areaHorizontal = 0.5; // Auftriebsfläche horizontal
+    const cdVertical = 1; // Widerstandswert vertikal
+    const areaVertical = 0.5; //Auftriebsfläche vertikal
     const dt = 0.5;
 
     const hStart = elevation + exitAltitude;
     const hStop = elevation + openingAltitude - 200; //calculate until canopy is open
     const jumpRunData = jumpRunTrack();
     const jumpRunDirection = jumpRunData ? jumpRunData.direction : 0;
-    const aircraftSpeedKt = userSettings.aircraftSpeedKt; // Use user-defined speed
-    const aircraftSpeedMps = aircraftSpeedKt * 0.514444;
+    const aircraftSpeedKt = userSettings.aircraftSpeedKt; // Use user-defined IAS speed
+    const exitAltitudeFt = exitAltitude / 0.3048; // Convert to feet (adjust if elevation matters)
+
+    const aircraftSpeedTAS = Utils.calculateTAS(aircraftSpeedKt, exitAltitudeFt);
+    let aircraftSpeedMps;
+    if (aircraftSpeedTAS === 'N/A') {
+        console.warn('TAS calculation failed, using IAS', aircraftSpeedKt);
+        aircraftSpeedMps = aircraftSpeedKt * 0.514444;
+    } else {
+        aircraftSpeedMps = aircraftSpeedTAS * 0.514444;
+    }
+    
     const vxInitial = Math.cos((jumpRunDirection) * Math.PI / 180) * aircraftSpeedMps;
     const vyInitial = Math.sin((jumpRunDirection) * Math.PI / 180) * aircraftSpeedMps;
-
-    console.log('Free fall initial values: ', aircraftSpeedKt, ' kt ', jumpRunDirection, '°');
+    
+    console.log('Free fall initial values: IAS', aircraftSpeedKt, 'kt, TAS', aircraftSpeedTAS, 'kt, direction', jumpRunDirection, '°');
     console.log('Free fall initial velocity: ', { vxInitial, vyInitial });
 
     const interpolatedData = interpolateWeatherData(sliderIndex);
@@ -1771,6 +1782,8 @@ function calculateFreeFall(weatherData, exitAltitude, openingAltitude, sliderInd
         yDisplacement: final.y,
         path: trajectory.map(point => ({
             latLng: calculateNewCenter(startLat, startLng, Math.sqrt(point.x * point.x + point.y * point.y), Math.atan2(point.y, point.x) * 180 / Math.PI),
+            point_x: point.x,
+            point_y: point.y,
             height: point.height,
             time: point.time,
             vz: point.vz
@@ -1780,7 +1793,7 @@ function calculateFreeFall(weatherData, exitAltitude, openingAltitude, sliderInd
     };
     console.log('Aircraft Speed IAS: ', aircraftSpeedKt);
     console.log('Free fall result:', result);
-    console.log(`Free fall considerations output: Throw and drift: ${Math.round(directionDeg)}°) ${Math.round(distance)} m ${Math.round(final.time)} s ${hStart} m ${hStop} m`);
+    console.log(`Free fall considerations output: Throw and drift: ${Math.round(directionDeg)}° ${Math.round(distance)} m ${Math.round(final.time)} s ${hStart} m ${hStop} m`);
     return result;
 }
 function visualizeFreeFallPath(path) {
@@ -1898,12 +1911,12 @@ function calculateJump() {
         distance: freeFallResult.distance,
         time: freeFallResult.time
     });
-    
+
     if (typeof freeFallResult.time === 'undefined') {
         console.warn('freeFallResult.time is undefined! Full freeFallResult:', freeFallResult);
     }
 
-    console.log('Calling updateJumpCircle with:', { downwindLat, downwindLng, lastLat, lastLng, horizontalCanopyDistance, horizontalCanopyDistanceFull, centerDisplacement, centerDisplacementFull, displacementDirection, displacementDirectionFull, freeFallDirection: freeFallResult.directionDeg, freeFallDistance: freeFallResult.distance, freeFallTime: freeFallResult.time});
+    console.log('Calling updateJumpCircle with:', { downwindLat, downwindLng, lastLat, lastLng, horizontalCanopyDistance, horizontalCanopyDistanceFull, centerDisplacement, centerDisplacementFull, displacementDirection, displacementDirectionFull, freeFallDirection: freeFallResult.directionDeg, freeFallDistance: freeFallResult.distance, freeFallTime: freeFallResult.time });
     updateJumpCircle(
         downwindLat,
         downwindLng,
@@ -2057,18 +2070,18 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
             jumpCircleGreen.addTo(map);
             jumpCircleGreenLight.addTo(map);
 
-           // Debug tooltip data and validation
-           console.log('Tooltip data:', { freeFallDirection, freeFallDistance, freeFallTime });
-           console.log('freeFallTime validation:', {
-               value: freeFallTime,
-               type: typeof freeFallTime,
-               isNumber: typeof freeFallTime === 'number',
-               isNotNaN: !isNaN(freeFallTime),
-               valid: typeof freeFallTime === 'number' && !isNaN(freeFallTime)
-           });
+            // Debug tooltip data and validation
+            console.log('Tooltip data:', { freeFallDirection, freeFallDistance, freeFallTime });
+            console.log('freeFallTime validation:', {
+                value: freeFallTime,
+                type: typeof freeFallTime,
+                isNumber: typeof freeFallTime === 'number',
+                isNotNaN: !isNaN(freeFallTime),
+                valid: typeof freeFallTime === 'number' && !isNaN(freeFallTime)
+            });
 
-           // Tooltip content with freeFallTime
-           const tooltipContent = `
+            // Tooltip content with freeFallTime
+            const tooltipContent = `
                Exit area calculated with:<br>
                Throw/Drift: ${Number.isFinite(freeFallDirection) ? Math.round(freeFallDirection) : 'N/A'}° ${Number.isFinite(freeFallDistance) ? Math.round(freeFallDistance) : 'N/A'} m<br>
                Free Fall Time: ${freeFallTime != null && !isNaN(freeFallTime) ? Math.round(freeFallTime) : 'N/A'} sec
