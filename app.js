@@ -803,9 +803,9 @@ async function updateMarkerPopup(marker, lat, lng, altitude, open = false) {
 
     if (weatherData && weatherData.surface_pressure && sliderIndex >= 0 && sliderIndex < weatherData.surface_pressure.length) {
         const surfacePressure = weatherData.surface_pressure[sliderIndex];
-        popupContent += `<br>QFE: ${surfacePressure.toFixed(0)} hPa`;
+        popupContent += ` QFE: ${surfacePressure.toFixed(0)} hPa`;
     } else {
-        popupContent += `<br>QFE: N/A`;
+        popupContent += ` QFE: N/A`;
         console.warn('Surface pressure not available:', {
             hasWeatherData: !!weatherData,
             hasSurfacePressure: !!weatherData?.surface_pressure,
@@ -2362,7 +2362,9 @@ function updateJumpRunTrack() {
             isZoomInRange
         });
         const directionInput = document.getElementById('jumpRunTrackDirection');
-        if (directionInput) directionInput.value = '';
+        if (directionInput) {
+            setInputValueSilently('jumpRunTrackDirection', '');
+        }
         return;
     }
 
@@ -2390,7 +2392,7 @@ function updateJumpRunTrack() {
     jumpRunTrackLayer = L.polyline(latlngs, {
         color: 'orange',
         weight: 4,
-        opacity: 0.7,
+        opacity: 0.9,
         interactive: true
     }).addTo(map);
 
@@ -2401,12 +2403,11 @@ function updateJumpRunTrack() {
             jumpRunTrackLayer.approachLayer = L.polyline(approachLatLngs, {
                 color: 'orange',
                 weight: 3,
-                opacity: 0.7,
-                dashArray: '10, 10', // Dashed pattern
+                opacity: 0.9,
+                dashArray: '10, 10',
                 interactive: true
             }).addTo(map);
 
-            // Tooltip for approach path
             jumpRunTrackLayer.approachLayer.bindTooltip(`Approach: ${Math.round(direction)}°, ${Math.round(approachLength)} m`, {
                 permanent: false,
                 direction: 'top',
@@ -2418,7 +2419,7 @@ function updateJumpRunTrack() {
     }
 
     // Add airplane symbol at the front end
-    const frontEnd = latlngs[1]; // Second point is the front
+    const frontEnd = latlngs[1];
     const airplaneIcon = L.icon({
         iconUrl: 'airplane_orange.png',
         iconSize: [32, 32],
@@ -2436,25 +2437,20 @@ function updateJumpRunTrack() {
         draggable: false
     }).addTo(map);
 
-    // Update direction input
+    // Update direction input silently
     const directionInput = document.getElementById('jumpRunTrackDirection');
     if (directionInput) {
-        directionInput.value = Math.round(direction);
-        console.log('Set direction input to:', direction);
+        setInputValueSilently('jumpRunTrackDirection', Math.round(direction));
     }
 
     // Dragging functionality
     let isDragging = false;
     let startLatLng = null;
-    let originalLatLngs = latlngs.map(ll => [ll[0], ll[1]]); // Clone track coordinates
-    let originalApproachLatLngs = approachLatLngs ? approachLatLngs.map(ll => [ll[0], ll[1]]) : null; // Clone approach coordinates
+    let originalLatLngs = latlngs.map(ll => [ll[0], ll[1]]);
+    let originalApproachLatLngs = approachLatLngs ? approachLatLngs.map(ll => [ll[0], ll[1]]) : null;
 
     jumpRunTrackLayer.on('mousedown', function (e) {
         if (!userSettings.showJumpRunTrack || !isZoomInRange) return;
-        if (userSettings.jumpRunTrackOffset !== 0) {
-            displayError('JRT rotation only works at the original position. Reset offset to 0 or rotate before moving.');
-            return;
-        }
         isDragging = true;
         startLatLng = e.latlng;
         map.dragging.disable();
@@ -2464,10 +2460,6 @@ function updateJumpRunTrack() {
     if (jumpRunTrackLayer.approachLayer) {
         jumpRunTrackLayer.approachLayer.on('mousedown', function (e) {
             if (!userSettings.showJumpRunTrack || !isZoomInRange) return;
-            if (userSettings.jumpRunTrackOffset !== 0) {
-                displayError('JRT rotation only works at the original position. Reset offset to 0 or rotate before moving.');
-                return;
-            }
             isDragging = true;
             startLatLng = e.latlng;
             map.dragging.disable();
@@ -2482,14 +2474,12 @@ function updateJumpRunTrack() {
         const latDiff = currentLatLng.lat - startLatLng.lat;
         const lngDiff = currentLatLng.lng - startLatLng.lng;
 
-        // Update track
         const newLatLngs = originalLatLngs.map(([lat, lng]) => [
             lat + latDiff,
             lng + lngDiff
         ]);
         jumpRunTrackLayer.setLatLngs(newLatLngs);
 
-        // Update approach path
         if (originalApproachLatLngs && jumpRunTrackLayer.approachLayer) {
             const newApproachLatLngs = originalApproachLatLngs.map(([lat, lng]) => [
                 lat + latDiff,
@@ -2498,7 +2488,6 @@ function updateJumpRunTrack() {
             jumpRunTrackLayer.approachLayer.setLatLngs(newApproachLatLngs);
         }
 
-        // Update airplane marker
         const newFrontEnd = newLatLngs[1];
         if (jumpRunTrackLayer.airplaneMarker) {
             jumpRunTrackLayer.airplaneMarker.setLatLng(newFrontEnd);
@@ -2510,22 +2499,18 @@ function updateJumpRunTrack() {
         isDragging = false;
         map.dragging.enable();
 
-        // Update stored coordinates
         originalLatLngs = jumpRunTrackLayer.getLatLngs().map(ll => [ll.lat, ll.lng]);
         if (jumpRunTrackLayer.approachLayer) {
             originalApproachLatLngs = jumpRunTrackLayer.approachLayer.getLatLngs().map(ll => [ll.lat, ll.lng]);
         }
 
-        // Calculate new direction based on the updated polyline
         const [startLat, startLng] = originalLatLngs[0];
         const [endLat, endLng] = originalLatLngs[1];
         const newDirection = calculateBearing(startLat, startLng, endLat, endLng);
 
-        // Update temporary custom direction
         customJumpRunDirection = Math.round(newDirection);
         console.log('JRT dragged, set custom direction:', customJumpRunDirection);
 
-        // Calculate new offset
         const centerLat = (startLat + endLat) / 2;
         const centerLng = (startLng + endLng) / 2;
         const dipLatLng = L.latLng(lastLat, lastLng);
@@ -2547,8 +2532,7 @@ function updateJumpRunTrack() {
 
         const directionInput = document.getElementById('jumpRunTrackDirection');
         if (directionInput && customJumpRunDirection !== null) {
-            directionInput.value = Math.round(customJumpRunDirection);
-            console.log('Updated jumpRunTrackDirection input to custom:', directionInput.value);
+            setInputValueSilently('jumpRunTrackDirection', Math.round(customJumpRunDirection));
         }
         const offsetInput = document.getElementById('jumpRunTrackOffset');
         if (offsetInput) {
@@ -2562,7 +2546,6 @@ function updateJumpRunTrack() {
         console.log('Jump run track dragged: new direction:', newDirection, 'new offset:', newOffset);
     });
 
-    // Tooltip for jump run track
     jumpRunTrackLayer.bindTooltip(`Jump Run: ${Math.round(direction)}°, ${Math.round(trackLength)} m`, {
         permanent: false,
         direction: 'top',
@@ -3389,15 +3372,15 @@ function setupInputEvents() {
     });
     setupInput('jumpRunTrackDirection', 'change', 0, (value) => {
         const customDir = parseInt(value, 10);
-        console.log('jumpRunTrackDirection input blurred:', {
+        console.log('jumpRunTrackDirection change event:', {
             value,
             customDir,
             jumpRunTrackOffset: userSettings.jumpRunTrackOffset
         });
         if (!isNaN(customDir) && customDir >= 0 && customDir <= 359) {
             if (userSettings.jumpRunTrackOffset !== 0) {
-                console.log('Warning: Attempted to rotate JRT with non-zero offset');
-                displayError('JRT rotation only works at the original position. Reset offset to 0 or rotate before moving.');
+                console.log('Error: Attempted to rotate jump run track with non-zero offset');
+                displayError('jump run track rotation only works at the original position. Reset offset to 0 or rotate before moving.');
                 return;
             }
             customJumpRunDirection = customDir;
@@ -3409,7 +3392,7 @@ function setupInputEvents() {
                 }
                 if (userSettings.calculateJump) {
                     console.log('Recalculating jump for custom JRT direction');
-                    calculateJump(); // Trigger free fall calculation to update green circles
+                    calculateJump();
                 }
             } else {
                 console.warn('Cannot update JRT or jump: missing conditions', {
@@ -3424,7 +3407,7 @@ function setupInputEvents() {
             customJumpRunDirection = null;
             const directionInput = document.getElementById('jumpRunTrackDirection');
             if (directionInput) {
-                directionInput.value = ''; // Clear input
+                setInputValueSilently('jumpRunTrackDirection', '');
             }
             if (weatherData && lastLat && lastLng) {
                 if (userSettings.showJumpRunTrack) {
@@ -3433,17 +3416,19 @@ function setupInputEvents() {
                 }
                 if (userSettings.calculateJump) {
                     console.log('Recalculating jump for reset JRT direction');
-                    calculateJump(); // Trigger free fall calculation
+                    calculateJump();
                 }
             }
         }
     });
     setupInput('jumpRunTrackOffset', 'change', 0, (value) => {
         const offset = parseInt(value, 10);
+        console.log('jumpRunTrackOffset change event:', { value, offset });
         if (!isNaN(offset) && offset >= -50000 && offset <= 50000 && offset % 100 === 0) {
             userSettings.jumpRunTrackOffset = offset;
             saveSettings();
             if (userSettings.calculateJump && userSettings.showJumpRunTrack && weatherData && lastLat && lastLng) {
+                console.log('Updating JRT for offset change');
                 updateJumpRunTrack();
             }
         } else {
@@ -3455,6 +3440,7 @@ function setupInputEvents() {
             userSettings.jumpRunTrackOffset = 0;
             saveSettings();
             if (userSettings.calculateJump && userSettings.showJumpRunTrack) {
+                console.log('Resetting JRT for invalid offset');
                 updateJumpRunTrack();
             }
         }
@@ -3652,6 +3638,7 @@ function setupCheckboxEvents() {
     setupCheckbox('showJumpRunTrack', 'showJumpRunTrack', (checkbox) => {
         userSettings.showJumpRunTrack = checkbox.checked;
         saveSettings();
+        console.log('showJumpRunTrack changed:', checkbox.checked);
         if (checkbox.checked && userSettings.calculateJump) {
             console.log('Show Jump Run Track enabled, updating JRT');
             updateJumpRunTrack();
@@ -3670,7 +3657,9 @@ function setupCheckboxEvents() {
             if (directionInput) {
                 const trackData = jumpRunTrack();
                 if (trackData) {
+                    // Update value without triggering change event
                     directionInput.value = trackData.direction;
+                    console.log('Updated jumpRunTrackDirection value without event:', trackData.direction);
                 }
             }
         }
@@ -3872,6 +3861,14 @@ function setRadioValue(name, value) {
 function setInputValue(id, value) {
     const element = document.getElementById(id);
     if (element) element.value = value;
+}
+function setInputValueSilently(id, value) {
+    const input = document.getElementById(id);
+    if (input) {
+        const lastValue = input.value;
+        input.value = value;
+        console.log(`Set ${id} silently:`, { old: lastValue, new: value });
+    }
 }
 function setCheckboxValue(id, value) {
     const element = document.getElementById(id);
