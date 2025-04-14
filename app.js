@@ -3023,6 +3023,128 @@ function createArrowIcon(lat, lng, bearing, color) {
     });
 }
 
+// == Coordinates History and Favorites ==
+function initCoordStorage() {
+    if (!localStorage.getItem('coordHistory')) {
+        localStorage.setItem('coordHistory', JSON.stringify([]));
+    }
+}
+function getCoordHistory() {
+    return JSON.parse(localStorage.getItem('coordHistory')) || [];
+}
+function formatCoordLabel(lat, lng, format) {
+    if (format === 'DMS') {
+        const latDMS = Utils.decimalToDMS(lat, 'lat');
+        const lngDMS = Utils.decimalToDMS(lng, 'lng');
+        return `${latDMS.deg}°${latDMS.min}'${latDMS.sec}"${latDMS.dir} ${lngDMS.deg}°${lngDMS.min}'${lngDMS.sec}"${lngDMS.dir}`;
+    } else if (format === 'MGRS') {
+        try {
+            return mgrs.forward([lng, lat], 10);
+        } catch (e) {
+            console.warn('MGRS format failed:', e);
+            return `${lat.toFixed(2)}, ${lng.toFixed(2)}`;
+        }
+    }
+    return `${lat.toFixed(2)}, ${lng.toFixed(2)}`;
+}
+function addCoordToHistory(lat, lng) {
+    const history = getCoordHistory();
+    const format = userSettings.coordFormat;
+    const newEntry = {
+        lat: parseFloat(lat.toFixed(4)),
+        lng: parseFloat(lng.toFixed(4)),
+        label: formatCoordLabel(lat, lng, format),
+        isFavorite: false,
+        timestamp: Date.now()
+    };
+    const existing = history.find(
+        entry => entry.lat === newEntry.lat && entry.lng === newEntry.lng
+    );
+    if (existing) {
+        newEntry.isFavorite = existing.isFavorite;
+        newEntry.label = existing.isFavorite ? existing.label : newEntry.label;
+        history.splice(history.indexOf(existing), 1);
+    }
+    history.unshift(newEntry);
+    const favorites = history.filter(entry => entry.isFavorite);
+    const nonFavorites = history.filter(entry => !entry.isFavorite).slice(0, 5);
+    localStorage.setItem('coordHistory', JSON.stringify([...favorites, ...nonFavorites]));
+    updateCoordDropdown();
+}
+function toggleFavorite(lat, lng) {
+    console.log('Toggling favorite for:', { lat, lng });
+    const history = getCoordHistory();
+    const entry = history.find(
+        entry => entry.lat === parseFloat(lat.toFixed(4)) && entry.lng === parseFloat(lng.toFixed(4))
+    );
+    if (entry) {
+        console.log('Found entry:', entry);
+        entry.isFavorite = !entry.isFavorite;
+        if (entry.isFavorite) {
+            entry.label = prompt('Name this favorite location:', entry.label) || entry.label;
+        } else {
+            entry.label = formatCoordLabel(entry.lat, entry.lng, userSettings.coordFormat);
+        }
+        localStorage.setItem('coordHistory', JSON.stringify(history));
+        updateCoordDropdown();
+        console.log('Updated history:', getCoordHistory());
+    } else {
+        console.log('No matching coordinate, adding as favorite');
+        const format = userSettings.coordFormat;
+        const newEntry = {
+            lat: parseFloat(lat.toFixed(4)),
+            lng: parseFloat(lng.toFixed(4)),
+            label: prompt('Name this favorite location:', formatCoordLabel(lat, lng, format)) || formatCoordLabel(lat, lng, format),
+            isFavorite: true,
+            timestamp: Date.now()
+        };
+        history.unshift(newEntry);
+        localStorage.setItem('coordHistory', JSON.stringify(history));
+        updateCoordDropdown();
+    }
+}
+function updateCoordDropdown() {
+    const select = document.getElementById('coordHistory');
+    if (!select) return;
+    select.innerHTML = '<option value="">Select a location</option>';
+    const history = getCoordHistory();
+    history.sort((a, b) => {
+        if (a.isFavorite && !b.isFavorite) return -1;
+        if (!a.isFavorite && b.isFavorite) return 1;
+        return b.timestamp - a.timestamp;
+    });
+    history.forEach(entry => {
+        const option = document.createElement('option');
+        option.value = `${entry.lat},${entry.lng}`;
+        option.text = `${entry.isFavorite ? '★ ' : ''}${entry.label}`;
+        select.appendChild(option);
+    });
+}
+function populateCoordInputs(lat, lng) {
+    const format = userSettings.coordFormat;
+    if (format === 'Decimal') {
+        document.getElementById('latDec').value = lat;
+        document.getElementById('lngDec').value = lng;
+    } else if (format === 'DMS') {
+        const latDMS = Utils.decimalToDMS(lat, 'lat');
+        const lngDMS = Utils.decimalToDMS(lng, 'lng');
+        document.getElementById('latDeg').value = latDMS.deg;
+        document.getElementById('latMin').value = latDMS.min;
+        document.getElementById('latSec').value = latDMS.sec;
+        document.getElementById('latDir').value = latDMS.dir;
+        document.getElementById('lngDeg').value = lngDMS.deg;
+        document.getElementById('lngMin').value = lngDMS.min;
+        document.getElementById('lngSec').value = lngDMS.sec;
+        document.getElementById('lngDir').value = lngDMS.dir;
+    } else if (format === 'MGRS') {
+        try {
+            document.getElementById('mgrsCoord').value = mgrs.forward([lng, lat], 10);
+        } catch (e) {
+            console.warn('MGRS conversion failed:', e);
+        }
+    }
+}
+
 // == UI and Event Handling ==
 function initializeUIElements() {
     setElementValue('modelSelect', userSettings.model);
@@ -3691,6 +3813,7 @@ function setupCheckboxEvents() {
     });
 }
 function setupCoordinateEvents() {
+    initCoordStorage();
     const coordInputs = document.getElementById('coordInputs');
     if (coordInputs) {
         updateCoordInputs(userSettings.coordFormat);
@@ -3721,6 +3844,7 @@ function setupCoordinateEvents() {
                 }
                 updateMarkerPopup(currentMarker, lat, lng, lastAltitude, true);
                 resetJumpRunDirection(true);
+                addCoordToHistory(lat, lng);
                 if (userSettings.calculateJump) {
                     console.log('Recalculating jump for coordinate input');
                     calculateJump();
@@ -3729,6 +3853,29 @@ function setupCoordinateEvents() {
                 await fetchWeatherForLocation(lat, lng);
             } catch (error) {
                 Utils.handleError(error.message);
+            }
+        });
+    }
+
+    const coordHistory = document.getElementById('coordHistory');
+    if (coordHistory) {
+        coordHistory.addEventListener('change', (e) => {
+            if (e.target.value) {
+                const [lat, lng] = e.target.value.split(',').map(parseFloat);
+                populateCoordInputs(lat, lng);
+                moveMarkerBtn.click();
+            }
+        });
+    }
+
+    const favoriteBtn = document.getElementById('favoriteBtn');
+    if (favoriteBtn) {
+        favoriteBtn.addEventListener('click', () => {
+            try {
+                const [lat, lng] = parseCoordinates();
+                toggleFavorite(lat, lng);
+            } catch (error) {
+                Utils.handleError('Please enter valid coordinates to favorite');
             }
         });
     }
@@ -3925,7 +4072,7 @@ function updateCoordInputs(format) {
     const coordInputs = document.getElementById('coordInputs');
     if (!coordInputs) return;
 
-    coordInputs.innerHTML = ''; // Clear existing inputs
+    coordInputs.innerHTML = '';
     if (format === 'Decimal') {
         coordInputs.innerHTML = `
             <label>Latitude: <input type="number" id="latDec" step="any" placeholder="e.g., 48.0179"></label>
@@ -3951,7 +4098,15 @@ function updateCoordInputs(format) {
             <label>MGRS: <input type="text" id="mgrsCoord" placeholder="e.g., 32UPU12345678"></label>
         `;
     }
+    coordInputs.innerHTML += `
+        <label for="coordHistory">Recent/Favorites:</label>
+        <select id="coordHistory" aria-label="Select recent or favorite coordinates">
+            <option value="">Select a location</option>
+        </select>
+        <button id="favoriteBtn" style="margin-left: 10px;">Toggle Favorite</button>
+    `;
     console.log(`Coordinate inputs updated to ${format}`);
+    updateCoordDropdown();
 }
 function parseCoordinates() {
     let lat, lng;

@@ -797,6 +797,13 @@ input[type="checkbox"][style*="opacity: 1"] {
     white-space: nowrap;
 }
 
+#favoriteBtn, #clearHistoryBtn {
+    margin-top: 2px;
+    padding: 5px 10px;
+    margin-left: 10px;
+    font-size: 12px;
+}
+
 @keyframes spin {
     0% {
         transform: rotate(0deg);
