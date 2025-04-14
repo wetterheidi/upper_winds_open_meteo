@@ -883,12 +883,14 @@ async function fetchWeatherForLocation(lat, lng, currentTime = null, isInitialLo
     document.getElementById('info').innerHTML = `Fetching weather and models...`;
     const availableModels = await checkAvailableModels(lat, lng);
     if (availableModels.length > 0) {
-        await fetchWeather(lat, lng, currentTime, isInitialLoad); // Pass isInitialLoad
+        await fetchWeather(lat, lng, currentTime, isInitialLoad);
         updateModelRunInfo();
         if (lastAltitude !== 'N/A') calculateMeanWind();
         updateLandingPattern();
+        restoreUIInteractivity(); // Ensure UI is responsive
     } else {
         document.getElementById('info').innerHTML = `No models available.`;
+        restoreUIInteractivity(); // Even on failure, check UI
     }
 }
 async function fetchWeather(lat, lon, currentTime = null) {
@@ -2338,7 +2340,7 @@ function jumpRunTrack() {
         approachTime: approachTime
     };
 }
-function updateJumpRunTrack() {
+function updateJumpRunTrackOLD() {
     console.log('updateJumpRunTrack called', {
         showJumpRunTrack: userSettings.showJumpRunTrack,
         weatherData: !!weatherData,
@@ -2560,6 +2562,254 @@ function updateJumpRunTrack() {
         }
 
         console.log('Jump run track dragged: new direction:', newDirection, 'new offset:', newOffset);
+    });
+
+    jumpRunTrackLayer.bindTooltip(`Jump Run: ${Math.round(direction)}°, ${Math.round(trackLength)} m`, {
+        permanent: false,
+        direction: 'top',
+        offset: [0, -10]
+    });
+}
+function updateJumpRunTrack() {
+    console.log('updateJumpRunTrack called', {
+        showJumpRunTrack: userSettings.showJumpRunTrack,
+        weatherData: !!weatherData,
+        lastLat,
+        lastLng,
+        customJumpRunDirection,
+        currentZoom: map.getZoom()
+    });
+
+    // Check zoom level
+    const currentZoom = map.getZoom();
+    const isZoomInRange = currentZoom >= minZoom && currentZoom <= maxZoom;
+
+    // Remove existing layers if present
+    if (jumpRunTrackLayer) {
+        if (jumpRunTrackLayer.airplaneMarker) {
+            map.removeLayer(jumpRunTrackLayer.airplaneMarker);
+            jumpRunTrackLayer.airplaneMarker = null;
+            console.log('Removed airplane marker');
+        }
+        if (jumpRunTrackLayer.approachLayer) {
+            map.removeLayer(jumpRunTrackLayer.approachLayer);
+            jumpRunTrackLayer.approachLayer = null;
+            console.log('Removed approach path');
+        }
+        map.removeLayer(jumpRunTrackLayer);
+        jumpRunTrackLayer = null;
+        console.log('Removed JRT polyline');
+    }
+
+    if (!userSettings.showJumpRunTrack || !weatherData || !lastLat || !lastLng || !isZoomInRange) {
+        console.log('Jump run track not drawn', {
+            showJumpRunTrack: userSettings.showJumpRunTrack,
+            weatherData: !!weatherData,
+            lastLat,
+            lastLng,
+            isZoomInRange
+        });
+        const directionInput = document.getElementById('jumpRunTrackDirection');
+        if (directionInput) {
+            setInputValueSilently('jumpRunTrackDirection', '');
+        }
+        return;
+    }
+
+    const trackData = jumpRunTrack();
+    if (!trackData || !trackData.latlngs || !Array.isArray(trackData.latlngs) || trackData.latlngs.length < 2) {
+        console.error('Invalid trackData from jumpRunTrack:', trackData);
+        return;
+    }
+
+    let { latlngs, direction, trackLength, approachLatLngs, approachLength, approachTime } = trackData;
+
+    // Validate latlngs format
+    const isValidLatLngs = latlngs.every(ll => Array.isArray(ll) && ll.length === 2 && !isNaN(ll[0]) && !isNaN(ll[1]));
+    if (!isValidLatLngs) {
+        console.error('Invalid latlngs format in trackData:', latlngs);
+        return;
+    }
+
+    console.log('Updating jump run track with:', { latlngs, direction, trackLength, offset: userSettings.jumpRunTrackOffset });
+    if (approachLatLngs) {
+        console.log('Updating approach path with:', { approachLatLngs, approachLength });
+    }
+
+    // Create polyline for the jump run track
+    jumpRunTrackLayer = L.polyline(latlngs, {
+        color: 'orange',
+        weight: 4,
+        opacity: 0.9,
+        interactive: true
+    }).addTo(map);
+
+    // Create polyline for the approach path (dashed)
+    if (approachLatLngs && Array.isArray(approachLatLngs) && approachLatLngs.length === 2) {
+        const isValidApproachLatLngs = approachLatLngs.every(ll => Array.isArray(ll) && ll.length === 2 && !isNaN(ll[0]) && !isNaN(ll[1]));
+        if (isValidApproachLatLngs) {
+            jumpRunTrackLayer.approachLayer = L.polyline(approachLatLngs, {
+                color: 'orange',
+                weight: 3,
+                opacity: 0.9,
+                dashArray: '10, 10',
+                interactive: true
+            }).addTo(map);
+
+            jumpRunTrackLayer.approachLayer.bindTooltip(`Approach: ${Math.round(direction)}°, ${Math.round(approachLength)} m, ${Math.round(approachTime / 60)} min`, {
+                permanent: false,
+                direction: 'top',
+                offset: [0, -10]
+            });
+        } else {
+            console.warn('Invalid approachLatLngs format:', approachLatLngs);
+        }
+    }
+
+    // Add airplane symbol at the front end
+    const frontEnd = latlngs[1];
+    const airplaneIcon = L.icon({
+        iconUrl: 'airplane_orange.png',
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
+        popupAnchor: [0, -16],
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+        shadowSize: [41, 41],
+        shadowAnchor: [13, 32]
+    });
+
+    jumpRunTrackLayer.airplaneMarker = L.marker(frontEnd, {
+        icon: airplaneIcon,
+        rotationAngle: direction,
+        rotationOrigin: 'center center',
+        draggable: false
+    }).addTo(map);
+
+    // Update direction input silently
+    const directionInput = document.getElementById('jumpRunTrackDirection');
+    if (directionInput) {
+        setInputValueSilently('jumpRunTrackDirection', Math.round(direction));
+    }
+
+    // Dragging functionality
+    let isDragging = false;
+    let startLatLng = null;
+    let originalLatLngs = latlngs.map(ll => [ll[0], ll[1]]);
+    let originalApproachLatLngs = approachLatLngs ? approachLatLngs.map(ll => [ll[0], ll[1]]) : null;
+
+    jumpRunTrackLayer.on('mousedown', function (e) {
+        if (!userSettings.showJumpRunTrack || !isZoomInRange) return;
+        isDragging = true;
+        startLatLng = e.latlng;
+        map.dragging.disable();
+        console.log('Started dragging JRT');
+    });
+
+    if (jumpRunTrackLayer.approachLayer) {
+        jumpRunTrackLayer.approachLayer.on('mousedown', function (e) {
+            if (!userSettings.showJumpRunTrack || !isZoomInRange) return;
+            isDragging = true;
+            startLatLng = e.latlng;
+            map.dragging.disable();
+            console.log('Started dragging approach path');
+        });
+    }
+
+    map.on('mousemove', function (e) {
+        if (!isDragging || !startLatLng) return;
+
+        const currentLatLng = e.latlng;
+        const latDiff = currentLatLng.lat - startLatLng.lat;
+        const lngDiff = currentLatLng.lng - startLatLng.lng;
+
+        const newLatLngs = originalLatLngs.map(([lat, lng]) => [
+            lat + latDiff,
+            lng + lngDiff
+        ]);
+        jumpRunTrackLayer.setLatLngs(newLatLngs);
+
+        if (originalApproachLatLngs && jumpRunTrackLayer.approachLayer) {
+            const newApproachLatLngs = originalApproachLatLngs.map(([lat, lng]) => [
+                lat + latDiff,
+                lng + lngDiff
+            ]);
+            jumpRunTrackLayer.approachLayer.setLatLngs(newApproachLatLngs);
+        }
+
+        const newFrontEnd = newLatLngs[1];
+        if (jumpRunTrackLayer.airplaneMarker) {
+            jumpRunTrackLayer.airplaneMarker.setLatLng(newFrontEnd);
+        }
+    });
+
+    // Add timeout to ensure dragging is re-enabled
+    let dragTimeout = null;
+    map.on('mouseup', function () {
+        if (!isDragging) return;
+        isDragging = false;
+        map.dragging.enable();
+        clearTimeout(dragTimeout);
+        console.log('Dragging ended, map dragging re-enabled');
+
+        originalLatLngs = jumpRunTrackLayer.getLatLngs().map(ll => [ll.lat, ll.lng]);
+        if (jumpRunTrackLayer.approachLayer) {
+            originalApproachLatLngs = jumpRunTrackLayer.approachLayer.getLatLngs().map(ll => [ll.lat, ll.lng]);
+        }
+
+        const [startLat, startLng] = originalLatLngs[0];
+        const [endLat, endLng] = originalLatLngs[1];
+        const newDirection = calculateBearing(startLat, startLng, endLat, endLng);
+
+        customJumpRunDirection = Math.round(newDirection);
+        console.log('JRT dragged, set custom direction:', customJumpRunDirection);
+
+        const centerLat = (startLat + endLat) / 2;
+        const centerLng = (startLng + endLng) / 2;
+        const dipLatLng = L.latLng(lastLat, lastLng);
+        const centerLatLng = L.latLng(centerLat, centerLng);
+        const distance = dipLatLng.distanceTo(centerLatLng);
+        const bearingToCenter = calculateBearing(lastLat, lastLng, centerLat, centerLng);
+
+        const rightBearing = (newDirection + 90) % 360;
+        const leftBearing = (newDirection - 90 + 360) % 360;
+        const angleToRight = Math.abs(((bearingToCenter - rightBearing + 540) % 360) - 180);
+        const angleToLeft = Math.abs(((bearingToCenter - leftBearing + 540) % 360) - 180);
+
+        const offsetSign = angleToRight < angleToLeft ? 1 : -1;
+        let newOffset = Math.round(distance * offsetSign / 100) * 100;
+        newOffset = Math.max(-50000, Math.min(50000, newOffset));
+
+        userSettings.jumpRunTrackOffset = newOffset;
+        saveSettings();
+
+        const directionInput = document.getElementById('jumpRunTrackDirection');
+        if (directionInput && customJumpRunDirection !== null) {
+            setInputValueSilently('jumpRunTrackDirection', Math.round(customJumpRunDirection));
+        }
+        const offsetInput = document.getElementById('jumpRunTrackOffset');
+        if (offsetInput) {
+            offsetInput.value = userSettings.jumpRunTrackOffset;
+        }
+
+        if (jumpRunTrackLayer.airplaneMarker) {
+            jumpRunTrackLayer.airplaneMarker.setRotationAngle(newDirection);
+        }
+
+        console.log('Jump run track dragged: new direction:', newDirection, 'new offset:', newOffset);
+    });
+
+    // Safety timeout to re-enable dragging
+    map.on('mousedown', function () {
+        if (isDragging) {
+            dragTimeout = setTimeout(() => {
+                if (isDragging) {
+                    isDragging = false;
+                    map.dragging.enable();
+                    console.warn('Forced re-enable of map dragging due to timeout');
+                    displayError('Dragging reset to restore UI interactivity');
+                }
+            }, 5000);
+        }
     });
 
     jumpRunTrackLayer.bindTooltip(`Jump Run: ${Math.round(direction)}°, ${Math.round(trackLength)} m`, {
@@ -3219,6 +3469,33 @@ function updateUIState() {
     updateHeightUnitLabels();
     updateWindUnitLabels();
 }
+function restoreUIInteractivity() {
+    const menu = document.getElementById('menu');
+    const checkboxes = menu.querySelectorAll('input[type="checkbox"]');
+    const inputs = menu.querySelectorAll('input[type="number"], input[type="text"]');
+    
+    // Check if elements are disabled unexpectedly
+    checkboxes.forEach(cb => {
+        if (cb.disabled && cb.id !== 'showJumpRunTrack' && cb.id !== 'showExitAreaCheckbox') {
+            console.warn(`Checkbox ${cb.id} is disabled unexpectedly, re-enabling`);
+            cb.disabled = false;
+        }
+    });
+    
+    inputs.forEach(input => {
+        if (input.disabled && input.id !== 'customLandingDirectionLL' && input.id !== 'customLandingDirectionRR') {
+            console.warn(`Input ${input.id} is disabled unexpectedly, re-enabling`);
+            input.disabled = false;
+        }
+    });
+    
+    // Force a DOM refresh
+    menu.style.display = 'none';
+    void menu.offsetHeight; // Trigger reflow
+    menu.style.display = 'block';
+    
+    console.log('UI interactivity check completed');
+}
 function setupSliderEvents() {
     const slider = document.getElementById('timeSlider');
     if (!slider) return Utils.handleError('Slider element missing.');
@@ -3329,30 +3606,25 @@ function setupMenuEvents() {
     const hamburgerBtn = document.getElementById('hamburgerBtn');
     const menu = document.getElementById('menu');
     if (hamburgerBtn && menu) {
-        // Toggle main menu visibility only on hamburger button click
         hamburgerBtn.addEventListener('click', () => {
             const isHidden = menu.classList.contains('hidden');
             menu.classList.toggle('hidden', !isHidden);
             console.log('Main menu toggled:', isHidden ? 'shown' : 'hidden');
         });
 
-        // Handle submenu toggling for all menu items with a span
         const menuItems = menu.querySelectorAll('li span');
         menuItems.forEach(item => {
             item.addEventListener('click', (e) => {
-                // Find the submenu directly following the span
                 const submenu = item.nextElementSibling;
                 if (submenu && submenu.classList.contains('submenu')) {
                     console.log('Clicked menu item:', item.textContent);
                     const isSubmenuHidden = submenu.classList.contains('hidden');
-                    // Close other submenus at the same level to prevent overlap
                     const parentUl = item.closest('ul');
                     parentUl.querySelectorAll('.submenu').forEach(otherSubmenu => {
                         if (otherSubmenu !== submenu) {
                             otherSubmenu.classList.add('hidden');
                         }
                     });
-                    // Toggle the clicked submenu
                     submenu.classList.toggle('hidden', !isSubmenuHidden);
                     console.log('Submenu toggled:', isSubmenuHidden ? 'shown' : 'hidden');
                 } else {
@@ -3362,9 +3634,22 @@ function setupMenuEvents() {
             });
         });
 
-        // Prevent clicks within the menu from propagating to the document
         menu.addEventListener('click', (e) => {
             e.stopPropagation();
+        });
+
+        // Debug unresponsive clicks
+        menu.addEventListener('click', (e) => {
+            const target = e.target;
+            if ((target.type === 'checkbox' || target.type === 'number' || target.type === 'text') && target.disabled) {
+                console.warn('Click ignored on disabled element:', {
+                    id: target.id,
+                    type: target.type,
+                    disabled: target.disabled,
+                    menuVisible: !menu.classList.contains('hidden')
+                });
+                displayError('Cannot interact with disabled menu item');
+            }
         });
     } else {
         console.warn('Hamburger button or menu not found');
