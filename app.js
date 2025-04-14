@@ -2334,7 +2334,8 @@ function jumpRunTrack() {
         meanWindSpeed: meanWindSpeed,
         latlngs: latlngs,
         approachLatLngs: approachLatLngs, // Add approach path coordinates
-        approachLength: approachLength
+        approachLength: approachLength,
+        approachTime: approachTime
     };
 }
 function updateJumpRunTrack() {
@@ -2389,7 +2390,7 @@ function updateJumpRunTrack() {
         return;
     }
 
-    let { latlngs, direction, trackLength, approachLatLngs, approachLength } = trackData;
+    let { latlngs, direction, trackLength, approachLatLngs, approachLength, approachTime } = trackData;
 
     // Validate latlngs format
     const isValidLatLngs = latlngs.every(ll => Array.isArray(ll) && ll.length === 2 && !isNaN(ll[0]) && !isNaN(ll[1]));
@@ -2423,7 +2424,7 @@ function updateJumpRunTrack() {
                 interactive: true
             }).addTo(map);
 
-            jumpRunTrackLayer.approachLayer.bindTooltip(`Approach: ${Math.round(direction)}°, ${Math.round(approachLength)} m`, {
+            jumpRunTrackLayer.approachLayer.bindTooltip(`Approach: ${Math.round(direction)}°, ${Math.round(approachLength)} m, ${Math.round(approachTime / 60)} min`, {
                 permanent: false,
                 direction: 'top',
                 offset: [0, -10]
