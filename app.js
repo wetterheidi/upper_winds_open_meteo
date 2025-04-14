@@ -2121,7 +2121,10 @@ function jumpRunTrack() {
     const tasKt = Utils.calculateTAS(iasKt, exitHeightFt);
     console.log('TAS output:', tasKt);
     let trackLength = 2000; // Default fallback
-    if (tasKt === 'N/A') {
+    let approachLength = 2000; // Default fallback for approach
+    let groundSpeedMps = null;
+    let approachLatLngs = null;
+    if (tasKt === 'N/A' || !Number.isFinite(tasKt)) {
         console.warn('Failed to calculate TAS for ground speed');
     } else {
         const windDirAtExit = Utils.LIP(heights, dirs, exitHeightM);
@@ -2139,7 +2142,7 @@ function jumpRunTrack() {
 
         const groundVx = tasVx + windVx;
         const groundVy = tasVy + windVy;
-        const groundSpeedMps = Math.sqrt(groundVx * groundVx + groundVy * groundVy);
+        groundSpeedMps = Math.sqrt(groundVx * groundVx + groundVy * groundVy);
         const groundSpeedKt = groundSpeedMps * 1.94384;
 
         // Calculate dynamic track length
@@ -2147,7 +2150,6 @@ function jumpRunTrack() {
         const jumperSeparation = parseFloat(userSettings.jumperSeparation) || 5;
         if (numberOfJumpers >= 1 && jumperSeparation >= 1 && Number.isFinite(groundSpeedMps)) {
             trackLength = numberOfJumpers * jumperSeparation * groundSpeedMps;
-            // Cap track length for practicality (e.g., 100–10,000 m)
             trackLength = Math.max(100, Math.min(10000, Math.round(trackLength)));
             console.log('Dynamic track length calculation:', {
                 numberOfJumpers,
@@ -2175,6 +2177,7 @@ function jumpRunTrack() {
         });
     }
 
+    // Update input field only if calculated or explicitly set
     const directionInput = document.getElementById('jumpRunTrackDirection');
     if (directionInput) {
         directionInput.value = jumpRunTrackDirection;
@@ -2183,6 +2186,7 @@ function jumpRunTrack() {
 
     const halfLength = trackLength / 2;
 
+    // Apply offset perpendicular to the track direction
     let centerLat = lastLat;
     let centerLng = lastLng;
     if (offset !== 0) {
@@ -2193,26 +2197,55 @@ function jumpRunTrack() {
         [centerLat, centerLng] = calculateNewCenter(lastLat, lastLng, offsetDistance, offsetBearing);
     }
 
+    // Calculate approach path
+    const approachTime = 120; // Fixed 120 seconds
+    if (Number.isFinite(groundSpeedMps)) {
+        approachLength = groundSpeedMps * approachTime;
+        approachLength = Math.max(100, Math.min(20000, Math.round(approachLength))); // Cap 100–20,000 m
+        console.log('Approach path calculation:', {
+            groundSpeedMps: groundSpeedMps.toFixed(2),
+            approachTime,
+            approachLength
+        });
+
+        // Approach extends from back end (startPoint) backward
+        const startPoint = calculateNewCenter(centerLat, centerLng, trackLength / 2, (jumpRunTrackDirection + 180) % 360);
+        const approachEndPoint = calculateNewCenter(startPoint[0], startPoint[1], approachLength, (jumpRunTrackDirection + 180) % 360);
+        approachLatLngs = [
+            [startPoint[0], startPoint[1]], // Connect to back end
+            [approachEndPoint[0], approachEndPoint[1]] // Extend backward
+        ];
+    } else {
+        console.warn('Invalid ground speed for approach path, using default length');
+    }
+
+
+    // Calculate jump run track points
     const startPoint = calculateNewCenter(centerLat, centerLng, halfLength, (jumpRunTrackDirection + 180) % 360);
     const endPoint = calculateNewCenter(centerLat, centerLng, halfLength, jumpRunTrackDirection);
 
     const latlngs = [
-        [startPoint[0], startPoint[1]],
-        [endPoint[0], endPoint[1]]
+        [startPoint[0], startPoint[1]], // Rear
+        [endPoint[0], endPoint[1]]      // Front
     ];
 
     console.log(`Jump Run Track: ${jumpRunTrackDirection}° (Mean wind: ${meanWindDirection.toFixed(1)}° @ ${meanWindSpeed.toFixed(1)} ${getWindSpeedUnit()}), Length: ${trackLength} m`);
     console.log('Jump Run Track latlngs:', latlngs);
+    if (approachLatLngs) {
+        console.log(`Approach Path: ${jumpRunTrackDirection}°, Length: ${approachLength} m, latlngs:`, approachLatLngs);
+    }
 
     return {
         direction: jumpRunTrackDirection,
         trackLength: trackLength,
         meanWindDirection: meanWindDirection,
         meanWindSpeed: meanWindSpeed,
-        latlngs: latlngs
+        latlngs: latlngs,
+        approachLatLngs: approachLatLngs, // Add approach path coordinates
+        approachLength: approachLength
     };
 }
-function updateJumpRunTrack() {
+function updateJumpRunTrackOLD() {
     console.log('updateJumpRunTrack called', {
         showJumpRunTrack: userSettings.showJumpRunTrack,
         weatherData: !!weatherData,
@@ -2402,6 +2435,253 @@ function updateJumpRunTrack() {
     });
 
     // Tooltip with direction
+    jumpRunTrackLayer.bindTooltip(`Jump Run: ${Math.round(direction)}°, ${Math.round(trackLength)} m`, {
+        permanent: false,
+        direction: 'top',
+        offset: [0, -10]
+    });
+}
+function updateJumpRunTrack() {
+    console.log('updateJumpRunTrack called', {
+        showJumpRunTrack: userSettings.showJumpRunTrack,
+        weatherData: !!weatherData,
+        lastLat,
+        lastLng,
+        customJumpRunDirection,
+        currentZoom: map.getZoom()
+    });
+
+    // Check zoom level
+    const currentZoom = map.getZoom();
+    const isZoomInRange = currentZoom >= minZoom && currentZoom <= maxZoom;
+
+    // Remove existing layers if present
+    if (jumpRunTrackLayer) {
+        if (jumpRunTrackLayer.airplaneMarker) {
+            map.removeLayer(jumpRunTrackLayer.airplaneMarker);
+            jumpRunTrackLayer.airplaneMarker = null;
+            console.log('Removed airplane marker');
+        }
+        if (jumpRunTrackLayer.approachLayer) {
+            map.removeLayer(jumpRunTrackLayer.approachLayer);
+            jumpRunTrackLayer.approachLayer = null;
+            console.log('Removed approach path');
+        }
+        map.removeLayer(jumpRunTrackLayer);
+        jumpRunTrackLayer = null;
+        console.log('Removed JRT polyline');
+    }
+
+    if (!userSettings.showJumpRunTrack || !weatherData || !lastLat || !lastLng || !isZoomInRange) {
+        console.log('Jump run track not drawn', {
+            showJumpRunTrack: userSettings.showJumpRunTrack,
+            weatherData: !!weatherData,
+            lastLat,
+            lastLng,
+            isZoomInRange
+        });
+        const directionInput = document.getElementById('jumpRunTrackDirection');
+        if (directionInput) directionInput.value = '';
+        return;
+    }
+
+    const trackData = jumpRunTrack();
+    if (!trackData || !trackData.latlngs || !Array.isArray(trackData.latlngs) || trackData.latlngs.length < 2) {
+        console.error('Invalid trackData from jumpRunTrack:', trackData);
+        return;
+    }
+
+    let { latlngs, direction, trackLength, approachLatLngs, approachLength } = trackData;
+
+    // Validate latlngs format
+    const isValidLatLngs = latlngs.every(ll => Array.isArray(ll) && ll.length === 2 && !isNaN(ll[0]) && !isNaN(ll[1]));
+    if (!isValidLatLngs) {
+        console.error('Invalid latlngs format in trackData:', latlngs);
+        return;
+    }
+
+    console.log('Updating jump run track with:', { latlngs, direction, trackLength, offset: userSettings.jumpRunTrackOffset });
+    if (approachLatLngs) {
+        console.log('Updating approach path with:', { approachLatLngs, approachLength });
+    }
+
+    // Create polyline for the jump run track
+    jumpRunTrackLayer = L.polyline(latlngs, {
+        color: 'orange',
+        weight: 4,
+        opacity: 0.7,
+        interactive: true
+    }).addTo(map);
+
+    // Create polyline for the approach path (dashed)
+    if (approachLatLngs && Array.isArray(approachLatLngs) && approachLatLngs.length === 2) {
+        const isValidApproachLatLngs = approachLatLngs.every(ll => Array.isArray(ll) && ll.length === 2 && !isNaN(ll[0]) && !isNaN(ll[1]));
+        if (isValidApproachLatLngs) {
+            jumpRunTrackLayer.approachLayer = L.polyline(approachLatLngs, {
+                color: 'orange',
+                weight: 3,
+                opacity: 0.7,
+                dashArray: '10, 10', // Dashed pattern
+                interactive: true
+            }).addTo(map);
+
+            // Tooltip for approach path
+            jumpRunTrackLayer.approachLayer.bindTooltip(`Approach: ${Math.round(direction)}°, ${Math.round(approachLength)} m`, {
+                permanent: false,
+                direction: 'top',
+                offset: [0, -10]
+            });
+        } else {
+            console.warn('Invalid approachLatLngs format:', approachLatLngs);
+        }
+    }
+
+    // Add airplane symbol at the front end
+    const frontEnd = latlngs[1]; // Second point is the front
+    const airplaneIcon = L.icon({
+        iconUrl: 'airplane_orange.png',
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
+        popupAnchor: [0, -16],
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+        shadowSize: [41, 41],
+        shadowAnchor: [13, 32]
+    });
+
+    jumpRunTrackLayer.airplaneMarker = L.marker(frontEnd, {
+        icon: airplaneIcon,
+        rotationAngle: direction,
+        rotationOrigin: 'center center',
+        draggable: false
+    }).addTo(map);
+
+    // Update direction input
+    const directionInput = document.getElementById('jumpRunTrackDirection');
+    if (directionInput) {
+        directionInput.value = Math.round(direction);
+        console.log('Set direction input to:', direction);
+    }
+
+    // Dragging functionality
+    let isDragging = false;
+    let startLatLng = null;
+    let originalLatLngs = latlngs.map(ll => [ll[0], ll[1]]); // Clone track coordinates
+    let originalApproachLatLngs = approachLatLngs ? approachLatLngs.map(ll => [ll[0], ll[1]]) : null; // Clone approach coordinates
+
+    jumpRunTrackLayer.on('mousedown', function (e) {
+        if (!userSettings.showJumpRunTrack || !isZoomInRange) return;
+        if (userSettings.jumpRunTrackOffset !== 0) {
+            displayError('JRT rotation only works at the original position. Reset offset to 0 or rotate before moving.');
+            return;
+        }
+        isDragging = true;
+        startLatLng = e.latlng;
+        map.dragging.disable();
+        console.log('Started dragging JRT');
+    });
+
+    if (jumpRunTrackLayer.approachLayer) {
+        jumpRunTrackLayer.approachLayer.on('mousedown', function (e) {
+            if (!userSettings.showJumpRunTrack || !isZoomInRange) return;
+            if (userSettings.jumpRunTrackOffset !== 0) {
+                displayError('JRT rotation only works at the original position. Reset offset to 0 or rotate before moving.');
+                return;
+            }
+            isDragging = true;
+            startLatLng = e.latlng;
+            map.dragging.disable();
+            console.log('Started dragging approach path');
+        });
+    }
+
+    map.on('mousemove', function (e) {
+        if (!isDragging || !startLatLng) return;
+
+        const currentLatLng = e.latlng;
+        const latDiff = currentLatLng.lat - startLatLng.lat;
+        const lngDiff = currentLatLng.lng - startLatLng.lng;
+
+        // Update track
+        const newLatLngs = originalLatLngs.map(([lat, lng]) => [
+            lat + latDiff,
+            lng + lngDiff
+        ]);
+        jumpRunTrackLayer.setLatLngs(newLatLngs);
+
+        // Update approach path
+        if (originalApproachLatLngs && jumpRunTrackLayer.approachLayer) {
+            const newApproachLatLngs = originalApproachLatLngs.map(([lat, lng]) => [
+                lat + latDiff,
+                lng + lngDiff
+            ]);
+            jumpRunTrackLayer.approachLayer.setLatLngs(newApproachLatLngs);
+        }
+
+        // Update airplane marker
+        const newFrontEnd = newLatLngs[1];
+        if (jumpRunTrackLayer.airplaneMarker) {
+            jumpRunTrackLayer.airplaneMarker.setLatLng(newFrontEnd);
+        }
+    });
+
+    map.on('mouseup', function () {
+        if (!isDragging) return;
+        isDragging = false;
+        map.dragging.enable();
+
+        // Update stored coordinates
+        originalLatLngs = jumpRunTrackLayer.getLatLngs().map(ll => [ll.lat, ll.lng]);
+        if (jumpRunTrackLayer.approachLayer) {
+            originalApproachLatLngs = jumpRunTrackLayer.approachLayer.getLatLngs().map(ll => [ll.lat, ll.lng]);
+        }
+
+        // Calculate new direction based on the updated polyline
+        const [startLat, startLng] = originalLatLngs[0];
+        const [endLat, endLng] = originalLatLngs[1];
+        const newDirection = calculateBearing(startLat, startLng, endLat, endLng);
+
+        // Update temporary custom direction
+        customJumpRunDirection = Math.round(newDirection);
+        console.log('JRT dragged, set custom direction:', customJumpRunDirection);
+
+        // Calculate new offset
+        const centerLat = (startLat + endLat) / 2;
+        const centerLng = (startLng + endLng) / 2;
+        const dipLatLng = L.latLng(lastLat, lastLng);
+        const centerLatLng = L.latLng(centerLat, centerLng);
+        const distance = dipLatLng.distanceTo(centerLatLng);
+        const bearingToCenter = calculateBearing(lastLat, lastLng, centerLat, centerLng);
+
+        const rightBearing = (newDirection + 90) % 360;
+        const leftBearing = (newDirection - 90 + 360) % 360;
+        const angleToRight = Math.abs(((bearingToCenter - rightBearing + 540) % 360) - 180);
+        const angleToLeft = Math.abs(((bearingToCenter - leftBearing + 540) % 360) - 180);
+
+        const offsetSign = angleToRight < angleToLeft ? 1 : -1;
+        let newOffset = Math.round(distance * offsetSign / 100) * 100;
+        newOffset = Math.max(-5000, Math.min(5000, newOffset));
+
+        userSettings.jumpRunTrackOffset = newOffset;
+        saveSettings();
+
+        const directionInput = document.getElementById('jumpRunTrackDirection');
+        if (directionInput && customJumpRunDirection !== null) {
+            directionInput.value = Math.round(customJumpRunDirection);
+            console.log('Updated jumpRunTrackDirection input to custom:', directionInput.value);
+        }
+        const offsetInput = document.getElementById('jumpRunTrackOffset');
+        if (offsetInput) {
+            offsetInput.value = userSettings.jumpRunTrackOffset;
+        }
+
+        if (jumpRunTrackLayer.airplaneMarker) {
+            jumpRunTrackLayer.airplaneMarker.setRotationAngle(newDirection);
+        }
+
+        console.log('Jump run track dragged: new direction:', newDirection, 'new offset:', newOffset);
+    });
+
+    // Tooltip for jump run track
     jumpRunTrackLayer.bindTooltip(`Jump Run: ${Math.round(direction)}°, ${Math.round(trackLength)} m`, {
         permanent: false,
         direction: 'top',
