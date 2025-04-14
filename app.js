@@ -2540,7 +2540,7 @@ function updateJumpRunTrack() {
 
         const offsetSign = angleToRight < angleToLeft ? 1 : -1;
         let newOffset = Math.round(distance * offsetSign / 100) * 100;
-        newOffset = Math.max(-5000, Math.min(5000, newOffset));
+        newOffset = Math.max(-50000, Math.min(50000, newOffset));
 
         userSettings.jumpRunTrackOffset = newOffset;
         saveSettings();
@@ -3310,10 +3310,10 @@ function setupInputEvents() {
         if (weatherData && lastLat && lastLng && lastAltitude !== 'N/A') calculateMeanWind();
     });
     setupInput('openingAltitude', 'change', 300, (value) => {
-        if (!isNaN(value) && value >= 500 && value <= 5000) {
+        if (!isNaN(value) && value >= 500 && value <= 15000) {
             if (userSettings.calculateJump && weatherData && lastLat && lastLng) calculateJump();
         } else {
-            Utils.handleError('Opening altitude must be between 500 and 5000 meters.');
+            Utils.handleError('Opening altitude must be between 500 and 15000 meters.');
             setInputValue('openingAltitude', 1200);
             userSettings.openingAltitude = 1200;
             saveSettings();
@@ -3440,14 +3440,14 @@ function setupInputEvents() {
     });
     setupInput('jumpRunTrackOffset', 'change', 0, (value) => {
         const offset = parseInt(value, 10);
-        if (!isNaN(offset) && offset >= -5000 && offset <= 5000 && offset % 100 === 0) {
+        if (!isNaN(offset) && offset >= -50000 && offset <= 50000 && offset % 100 === 0) {
             userSettings.jumpRunTrackOffset = offset;
             saveSettings();
             if (userSettings.calculateJump && userSettings.showJumpRunTrack && weatherData && lastLat && lastLng) {
                 updateJumpRunTrack();
             }
         } else {
-            Utils.handleError('Offset must be between -5000 and 5000 in steps of 100.');
+            Utils.handleError('Offset must be between -50000 and 50000 in steps of 100.');
             const offsetInput = document.getElementById('jumpRunTrackOffset');
             if (offsetInput) {
                 offsetInput.value = 0;
