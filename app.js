@@ -485,7 +485,7 @@ function initMap() {
         fetchWeatherForLocation(lastLat, lastLng, initialTime, true);
     }
 
-    // Coordinate control (unchanged)
+    // Coordinate control with elevation
     L.Control.Coordinates = L.Control.extend({
         options: { position: 'bottomleft' },
         onAdd: function (map) {
@@ -495,32 +495,81 @@ function initMap() {
             container.style.borderRadius = '4px';
             container.style.boxShadow = '0 2px 5px rgba(0, 0, 0, 0.2)';
             container.innerHTML = 'Move mouse over map';
+            this._container = container;
             return container;
+        },
+        update: function (content) {
+            this._container.innerHTML = content;
         }
     });
 
     var coordsControl = new L.Control.Coordinates();
     coordsControl.addTo(map);
 
-    // Add marker click handler
-    currentMarker.on('click', () => {
-        if (currentMarker.getPopup()?.isOpen()) {
-            currentMarker.closePopup();
-        } else {
-            updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, true);
+    // Cache for elevation to reduce API calls
+    const elevationCache = new Map(); // Key: "lat,lng", Value: elevation
+
+    // Debounced elevation fetch
+    const debouncedGetElevation = debounce(async (lat, lng, requestLatLng, callback) => {
+        const cacheKey = `${lat.toFixed(5)},${lng.toFixed(5)}`;
+        if (elevationCache.has(cacheKey)) {
+            console.log('Using cached elevation:', { lat, lng, elevation: elevationCache.get(cacheKey) });
+            callback(elevationCache.get(cacheKey), requestLatLng);
+            return;
         }
-    });
+        try {
+            const elevation = await getAltitude(lat, lng);
+            elevationCache.set(cacheKey, elevation);
+            console.log('Fetched elevation:', { lat, lng, elevation });
+            callback(elevation, requestLatLng);
+        } catch (error) {
+            console.warn('Failed to fetch elevation:', error);
+            callback('N/A', requestLatLng);
+        }
+    }, 500);
+
+    // Track last mouse position
+    let lastMouseLatLng = null;
 
     map.on('mousemove', function (e) {
         const coordFormat = getCoordinateFormat();
+        const lat = e.latlng.lat;
+        const lng = e.latlng.lng;
+        lastMouseLatLng = { lat, lng }; // Store current mouse position
+
+        let coordText;
         if (coordFormat === 'MGRS') {
-            var mgrs = Utils.decimalToMgrs(e.latlng.lat, e.latlng.lng);
-            coordsControl.getContainer().innerHTML = `MGRS: ${mgrs}`;
+            const mgrs = Utils.decimalToMgrs(lat, lng);
+            coordText = `MGRS: ${mgrs}`;
         } else {
-            var lat = e.latlng.lat.toFixed(5);
-            var lng = e.latlng.lng.toFixed(5);
-            coordsControl.getContainer().innerHTML = `Lat: ${lat}, Lng: ${lng}`;
+            coordText = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
         }
+
+        // Update immediately with coordinates and fetching status
+        coordsControl.update(`${coordText}<br>Elevation: Fetching...`);
+
+        // Fetch elevation with debounce
+        debouncedGetElevation(lat, lng, { lat, lng }, (elevation, requestLatLng) => {
+            // Check if mouse is still near the requested position
+            if (lastMouseLatLng) {
+                const deltaLat = Math.abs(lastMouseLatLng.lat - requestLatLng.lat);
+                const deltaLng = Math.abs(lastMouseLatLng.lng - requestLatLng.lng);
+                const threshold = 0.05; // ~5.5km, generous to account for movement
+                if (deltaLat < threshold && deltaLng < threshold) {
+                    console.log('Updating elevation display:', { lat: requestLatLng.lat, lng: requestLatLng.lng, elevation });
+                    coordsControl.update(`${coordText}<br>Elevation: ${elevation === 'N/A' ? 'N/A' : elevation + 'm'}`);
+                } else {
+                    console.log('Discarded elevation update: mouse moved too far', {
+                        requestLat: requestLatLng.lat,
+                        requestLng: requestLatLng.lng,
+                        currentLat: lastMouseLatLng.lat,
+                        currentLng: lastMouseLatLng.lng
+                    });
+                }
+            } else {
+                console.warn('No lastMouseLatLng, skipping elevation update');
+            }
+        });
     });
 
     map.on('mouseout', function () {
@@ -3232,6 +3281,7 @@ function setupRadioEvents() {
         const customLL = document.getElementById('customLandingDirectionLL');
         const customRR = document.getElementById('customLandingDirectionRR');
         const landingDirection = userSettings.landingDirection;
+        console.log('landingDirection changed:', { landingDirection, customLL: customLL?.value, customRR: customRR?.value });
         if (customLL) {
             customLL.disabled = landingDirection !== 'LL';
             if (landingDirection === 'LL' && !customLL.value && landingWindDir !== null) {
@@ -3248,6 +3298,7 @@ function setupRadioEvents() {
                 saveSettings();
             }
         }
+        updateUIState(); // Ensure UI reflects disabled state
         updateAllDisplays();
     });
 }
@@ -3304,18 +3355,36 @@ function setupInputEvents() {
     setupLegHeightInput('legHeightFinal', 100);
     setupLegHeightInput('legHeightBase', 200);
     setupLegHeightInput('legHeightDownwind', 300);
-    setupInput('customLandingDirectionLL', 'change', 300, (value) => {
+    setupInput('customLandingDirectionLL', 'input', 100, (value) => {
         const customDir = parseInt(value, 10);
+        console.log('customLandingDirectionLL input:', { value, customDir });
         if (!isNaN(customDir) && customDir >= 0 && customDir <= 359) {
-            userSettings.customLandingDirectionLL = customDir; // Store user input
+            userSettings.customLandingDirectionLL = customDir;
             saveSettings();
             if (userSettings.landingDirection === 'LL' && weatherData && lastLat && lastLng) {
+                console.log('Updating landing pattern for LL:', customDir);
                 updateLandingPattern();
                 recenterMap();
             }
         } else {
             Utils.handleError('Landing direction must be between 0 and 359°.');
             setInputValue('customLandingDirectionLL', userSettings.customLandingDirectionLL || 0);
+        }
+    });
+    setupInput('customLandingDirectionRR', 'input', 100, (value) => {
+        const customDir = parseInt(value, 10);
+        console.log('customLandingDirectionRR input:', { value, customDir });
+        if (!isNaN(customDir) && customDir >= 0 && customDir <= 359) {
+            userSettings.customLandingDirectionRR = customDir;
+            saveSettings();
+            if (userSettings.landingDirection === 'RR' && weatherData && lastLat && lastLng) {
+                console.log('Updating landing pattern for RR:', customDir);
+                updateLandingPattern();
+                recenterMap();
+            }
+        } else {
+            Utils.handleError('Landing direction must be between 0 and 359°.');
+            setInputValue('customLandingDirectionRR', userSettings.customLandingDirectionRR || 0);
         }
     });
     setupInput('jumpRunTrackDirection', 'change', 0, (value) => {
