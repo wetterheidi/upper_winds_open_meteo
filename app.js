@@ -22,6 +22,7 @@ let jumpCircleGreen = null; // New green circle
 let jumpCircleGreenLight = null; // New light green circle (blue circle radius)
 let jumpRunTrackLayer = null;
 let customJumpRunDirection = null; // Temporary storage for custom direction during sessionconst minZoom = 11; // Placeholder, adjust as needed
+let isJumperSeparationManual = false; // Tracks if jumperSeparation is manually set
 const minZoom = 11; // Placeholder, adjust as needed
 const maxZoom = 14; // Placeholder, adjust as needed
 const landingPatternMinZoom = 14; // New constant for landing pattern
@@ -39,6 +40,36 @@ const getWindSpeedUnit = () => getSettingValue('windUnit', 'radio', 'kt');
 const getCoordinateFormat = () => getSettingValue('coordFormat', 'radio', 'Decimal');
 const getInterpolationStep = () => getSettingValue('interpStepSelect', 'select', 200);
 const getDownloadFormat = () => getSettingValue('downloadFormat', 'radio', 'csv');
+// == Lookup Table for Jumper Separation ==
+const jumperSeparationTable = {
+    135: 5,
+    130: 5,
+    125: 5,
+    120: 5,
+    115: 5,
+    110: 5,
+    105: 5,
+    100: 6,
+    95: 7,
+    90: 7,
+    85: 7,
+    80: 8,
+    75: 8,
+    70: 9,
+    65: 10,
+    60: 10,
+    55: 11,
+    50: 12,
+    45: 14,
+    40: 15,
+    35: 17,
+    30: 20,
+    25: 24,
+    20: 30,
+    15: 40,
+    10: 60,
+    5: 119
+};
 // Default settings object
 const defaultSettings = {
     model: 'icon_global',
@@ -74,6 +105,7 @@ const defaultSettings = {
     numberOfJumpers: 5
 };
 
+
 // == Settings Management ==
 function getSettingValue(name, type = 'radio', defaultValue) {
     const selector = type === 'radio' ? `input[name="${name}"]:checked` : `#${name}`;
@@ -97,15 +129,14 @@ function saveUnlockStatus() {
 }
 function initializeSettings() {
     const storedSettings = JSON.parse(localStorage.getItem('upperWindsSettings')) || {};
-    // Copy only valid settings, excluding jumpRunTrackDirection and isCustomJumpRunDirection
     userSettings = { ...defaultSettings };
     for (const key in defaultSettings) {
         if (storedSettings.hasOwnProperty(key)) {
             userSettings[key] = storedSettings[key];
         }
     }
-    // Force reset jumpRunTrackOffset to 0 on load
     userSettings.jumpRunTrackOffset = 0;
+    isJumperSeparationManual = false; // Start with auto separation
     console.log('Loaded userSettings:', userSettings);
 }
 function updateHeightUnitLabels() {
@@ -1647,6 +1678,30 @@ function downloadTableAsAscii(format) {
 }
 
 // == Jump and Free Fall Calculations ==
+function getSeparationFromTAS(ias) {
+    // Convert exitAltitude from meters to feet (1m = 3.28084ft)
+    const exitAltitudeFt = userSettings.exitAltitude * 3.28084;
+    
+    // Calculate TAS using Utils.calculateTAS
+    const tas = Utils.calculateTAS(ias, exitAltitudeFt);
+    if (tas === 'N/A') {
+        console.warn('TAS calculation failed, using default separation');
+        return defaultSettings.jumperSeparation; // Fallback to default (5s)
+    }
+
+    // Round TAS to nearest table key
+    const speeds = Object.keys(jumperSeparationTable).map(Number).sort((a, b) => b - a);
+    let closestSpeed = speeds[0]; // Default to highest speed
+    for (const speed of speeds) {
+        if (tas <= speed) closestSpeed = speed;
+        else break;
+    }
+
+    // Return separation from table, default to 7 seconds if not found
+    const separation = jumperSeparationTable[closestSpeed] || 7;
+    console.log(`Calculated TAS: ${tas}kt, Closest speed: ${closestSpeed}kt, Separation: ${separation}s`);
+    return separation;
+}
 function calculateFreeFall(weatherData, exitAltitude, openingAltitude, sliderIndex, startLat, startLng, elevation) {
     console.log('Starting calculateFreeFall...', { exitAltitude, openingAltitude, sliderIndex });
 
@@ -3418,9 +3473,8 @@ function initializeUIElements() {
     setInputValue('openingAltitude', userSettings.openingAltitude);
     setInputValue('exitAltitude', userSettings.exitAltitude);
     setInputValue('interpStepSelect', userSettings.interpStep);
-    setInputValue('aircraftSpeedKt', userSettings.aircraftSpeedKt); // Added
+    setInputValue('aircraftSpeedKt', userSettings.aircraftSpeedKt);
     setInputValue('numberOfJumpers', userSettings.numberOfJumpers); // Added
-    setInputValue('jumperSeparation', userSettings.jumperSeparation); // Added
     setCheckboxValue('showTableCheckbox', userSettings.showTable);
     setCheckboxValue('calculateJumpCheckbox', userSettings.calculateJump);
     setCheckboxValue('showLandingPattern', userSettings.showLandingPattern);
@@ -3439,7 +3493,10 @@ function initializeUIElements() {
     if (customRR && userSettings.customLandingDirectionRR !== '' && !isNaN(userSettings.customLandingDirectionRR)) {
         customRR.value = userSettings.customLandingDirectionRR;
     }
-
+    const separation = getSeparationFromTAS(userSettings.aircraftSpeedKt);
+    setInputValue('jumperSeparation', separation);
+    userSettings.jumperSeparation = separation;
+    saveSettings();
     // Set initial tooltip and style for locked state
     const landingPatternCheckbox = document.getElementById('showLandingPattern');
     const calculateJumpCheckbox = document.getElementById('calculateJumpCheckbox');
@@ -3873,6 +3930,14 @@ function setupInputEvents() {
         if (!isNaN(speed) && speed >= 10 && speed <= 150) {
             userSettings.aircraftSpeedKt = speed;
             saveSettings();
+            // Update jumperSeparation if not manually set
+            if (!isJumperSeparationManual) {
+                const separation = getSeparationFromTAS(speed);
+                setInputValue('jumperSeparation', separation);
+                userSettings.jumperSeparation = separation;
+                saveSettings();
+                console.log(`Auto-updated jumperSeparation to ${separation}s for IAS ${speed}kt`);
+            }
             if (userSettings.calculateJump && weatherData && lastLat && lastLng) {
                 console.log('Recalculating jump for aircraft speed change');
                 calculateJump();
@@ -3904,7 +3969,9 @@ function setupInputEvents() {
         const separation = parseFloat(value);
         if (!isNaN(separation) && separation >= 1 && separation <= 50) {
             userSettings.jumperSeparation = separation;
+            isJumperSeparationManual = true; // Mark as manually set
             saveSettings();
+            console.log(`jumperSeparation manually set to ${separation}s`);
             if (userSettings.calculateJump && weatherData && lastLat && lastLng) {
                 console.log('Recalculating jump for jumper separation change');
                 calculateJump();
@@ -3913,6 +3980,7 @@ function setupInputEvents() {
             Utils.handleError('Jumper separation must be between 1 and 50 seconds.');
             setInputValue('jumperSeparation', defaultSettings.jumperSeparation);
             userSettings.jumperSeparation = defaultSettings.jumperSeparation;
+            isJumperSeparationManual = false; // Reset to auto on invalid input
             saveSettings();
         }
     });
