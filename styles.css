@@ -129,6 +129,10 @@ html {
     background: #f0f8ff;
 }
 
+#menu.hidden {
+    display: none !important;
+}
+
 /* Consistent checkbox styles for all menu checkboxes */
 .menu input[type="checkbox"],
 .submenu input[type="checkbox"] {

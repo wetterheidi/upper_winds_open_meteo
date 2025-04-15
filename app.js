@@ -3663,10 +3663,33 @@ function setupMenuEvents() {
     const hamburgerBtn = document.getElementById('hamburgerBtn');
     const menu = document.getElementById('menu');
     if (hamburgerBtn && menu) {
-        hamburgerBtn.addEventListener('click', () => {
+        // Ensure menu is hidden on load
+        menu.classList.add('hidden');
+        console.log('Menu initialized as hidden on load');
+
+        // Log initial styles for debugging
+        const computedStyle = window.getComputedStyle(menu);
+        console.log('Initial menu styles:', {
+            display: computedStyle.display,
+            visibility: computedStyle.visibility,
+            opacity: computedStyle.opacity,
+            hasHiddenClass: menu.classList.contains('hidden')
+        });
+
+        hamburgerBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            e.preventDefault(); // Prevent any default behavior
+            menu.classList.toggle('hidden');
             const isHidden = menu.classList.contains('hidden');
-            menu.classList.toggle('hidden', !isHidden);
-            console.log('Main menu toggled:', isHidden ? 'shown' : 'hidden');
+            
+            // Log styles after toggle for debugging
+            const currentStyle = window.getComputedStyle(menu);
+            console.log('Main menu toggled:', isHidden ? 'hidden' : 'shown', {
+                display: currentStyle.display,
+                visibility: currentStyle.visibility,
+                opacity: currentStyle.opacity,
+                hasHiddenClass: isHidden
+            });
         });
 
         const menuItems = menu.querySelectorAll('li span');
