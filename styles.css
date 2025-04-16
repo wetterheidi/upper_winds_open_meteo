@@ -1,3 +1,4 @@
+/* Existing root variables */
 :root {
     --label-width: 135px;
     --input-width: 70px;
@@ -10,17 +11,14 @@ html {
 
 #map {
     height: 70vh;
-    /* Or use flex-grow: 1 if keeping flex layout */
     width: 100%;
     margin-top: 90px;
-    /* Keep space for slider */
     z-index: 0;
 }
 
 /* Leaflet popup customization */
 .leaflet-popup-content {
     font-size: 13px;
-    /* Adjust this value */
     font-family: 'Roboto', sans-serif;
     line-height: 1.0;
 }
@@ -36,9 +34,7 @@ html {
 
 .leaflet-bottom .leaflet-control-scale {
     margin-bottom: 40px;
-    /* Adjust this value to move it up */
     margin-left: 10px;
-    /* Optional: Adjust this to move it right */
 }
 
 .hamburger-menu {
@@ -63,9 +59,10 @@ html {
     background: #0056b3;
 }
 
-.menu {
+/* Updated menu styling with scrolling */
+#menu {
     list-style: none;
-    padding: 0;
+    padding: 10px;
     margin: 0;
     background: linear-gradient(to bottom, #ffffff, #f7f7f7);
     border: 1px solid #ccc;
@@ -73,12 +70,40 @@ html {
     top: 40px;
     left: 0;
     min-width: 200px;
+    max-height: 80vh; /* Limit height to 80% of viewport */
+    overflow-y: auto; /* Enable vertical scrolling */
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
     z-index: 300;
     border-radius: 8px;
-    /* Add rounded corners */
-    overflow: hidden;
-    /* Ensure child elements respect the rounded boundary */
+}
+
+/* Scrollbar styling for WebKit browsers */
+#menu::-webkit-scrollbar {
+    width: 8px;
+}
+
+#menu::-webkit-scrollbar-track {
+    background: #f7f7f7;
+    border-radius: 4px;
+}
+
+#menu::-webkit-scrollbar-thumb {
+    background: #4da8da;
+    border-radius: 4px;
+}
+
+#menu::-webkit-scrollbar-thumb:hover {
+    background: #0056b3;
+}
+
+/* Firefox scrollbar styling */
+#menu {
+    scrollbar-width: thin;
+    scrollbar-color: #4da8da #f7f7f7;
+}
+
+#menu.hidden {
+    display: none !important;
 }
 
 .menu li {
@@ -111,12 +136,10 @@ html {
 
 .submenu:not(.hidden) {
     display: block;
-    /* Or your preferred style, e.g., 'list-item' */
 }
 
 .submenu li {
     padding: 8px 10px;
-    /* Adjusted padding for radio buttons */
     border-bottom: 1px solid #eee;
     font-size: 13px;
 }
@@ -129,15 +152,11 @@ html {
     background: #f0f8ff;
 }
 
-#menu.hidden {
-    display: none !important;
-}
-
-/* Consistent checkbox styles for all menu checkboxes */
+/* Consistent checkbox styles */
 .menu input[type="checkbox"],
 .submenu input[type="checkbox"] {
     appearance: none;
-    width: 16px; /* Match the size of browser default checkboxes */
+    width: 16px;
     height: 16px;
     border: 2px solid #4da8da;
     border-radius: 4px;
@@ -154,7 +173,7 @@ html {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    font-size: 14px; /* Slightly larger checkmark */
+    font-size: 14px;
     color: #4da8da;
 }
 
@@ -169,7 +188,7 @@ html {
     box-shadow: 0 0 3px rgba(0, 123, 255, 0.5);
 }
 
-/* New styles for radio buttons */
+/* Radio button styles */
 .submenu .radio-label {
     display: flex;
     align-items: center;
@@ -181,13 +200,10 @@ html {
 
 .submenu input[type="radio"] {
     appearance: none;
-    /* Remove default styling */
     width: 16px;
     height: 16px;
     border: 2px solid #4da8da;
-    /* Match button color */
     border-radius: 50%;
-    /* Circular radio buttons */
     margin-right: 8px;
     background-color: #fff;
     cursor: pointer;
@@ -208,7 +224,6 @@ html {
 
 .submenu input[type="radio"]:hover:not(:checked) {
     background: #e6f0fa;
-    /* Light hover effect */
 }
 
 .submenu input[type="radio"]:focus {
@@ -235,7 +250,6 @@ html {
 
 .submenu input[type="number"] {
     width: 60px;
-    /* Match the customLandingDirection width */
     padding: 2px;
     margin-left: 5px;
     border: 1px solid #ccc;
@@ -254,13 +268,11 @@ html {
     display: flex;
     align-items: center;
     gap: 5px;
-    /* Space between radio button, label text, and input */
     white-space: nowrap;
-    /* Prevent wrapping *
 }
 
 #customLandingDirection {
-    width: 60px; /* Adjust width as needed */
+    width: 60px;
     padding: 2px;
 }
 
@@ -268,9 +280,9 @@ html {
     display: none;
 }
 
+/* Remaining existing styles unchanged */
 #info {
     display: none;
-    /* Initially hidden */
     background: rgba(255, 255, 255, 0.95);
     padding: 15px;
     border-radius: 8px;
@@ -285,7 +297,6 @@ html {
     margin-top: 10px;
     z-index: 100;
 }
-
 
 #info::-webkit-scrollbar {
     width: 8px;
@@ -310,17 +321,14 @@ body {
     display: flex;
     flex-direction: column;
     box-sizing: border-box;
-    /* Include padding in height calculation */
 }
 
-/* Ensure all elements inherit consistently */
 * {
     font-size: 13px;
     font-family: 'Roboto', sans-serif;
     font-weight: 400;
 }
 
-/* Specific overrides for consistency  second info*/
 #info,
 #info table,
 #info th,
@@ -330,11 +338,12 @@ body {
     font-weight: 400;
 }
 
-#info table td:nth-child(4) { /* Target the "Wind" column */
+#info table td:nth-child(4) {
     padding: 2px;
     text-align: center;
     vertical-align: middle;
 }
+
 #info table td:nth-child(4) svg {
     display: inline-block;
     vertical-align: middle;
@@ -350,7 +359,6 @@ button {
     font-weight: 400;
 }
 
-/* Keep your existing styles, just ensure font consistency */
 #info th {
     background-color: #e0e0e0;
     color: #222;
@@ -358,12 +366,9 @@ button {
     letter-spacing: 0.5px;
 }
 
-/* third info*/
-
 #slider-container {
     background: #fff;
     padding: 10px;
-    /* Increased padding for better spacing */
     border-radius: 8px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
     color: #333;
@@ -371,13 +376,11 @@ button {
     max-width: 300px;
     position: fixed;
     top: 10px;
-    /* Default value */
     left: 50%;
     transform: translateX(-50%);
     z-index: 200;
 }
 
-/* Ensure bottom-container adjusts */
 #bottom-container {
     background: #fff;
     padding: 10px;
@@ -390,30 +393,25 @@ button {
     flex: 0 0 auto;
     display: grid;
     grid-template-rows: auto auto;
-    /* Remove third row if table is hidden */
     gap: 10px;
 }
 
-/* For Chrome, Edge, and Safari */
 #bottom-container::-webkit-scrollbar {
     width: 8px;
 }
 
 #bottom-container::-webkit-scrollbar-thumb {
     background: #ddd;
-    /* Light gray thumb */
     border-radius: 4px;
 }
 
 #bottom-container::-webkit-scrollbar-track {
     background: #fff;
-    /* Match #bottom-container's background */
 }
 
 #info table {
     border-collapse: collapse;
     width: 100%;
-    /* Changed from 90% to 100% to fully utilize #info's width */
     font-size: 13px;
 }
 
@@ -486,13 +484,11 @@ button {
 
 #controls-row button {
     grid-column: 5 / 6;
-    /* Desktop default */
     width: auto;
     min-width: 100px;
     padding: 6px 10px;
 }
 
-/* Move #info to its own row */
 #bottom-container #info {
     grid-column: 1 / -1;
     grid-row: 3;
@@ -507,7 +503,6 @@ button {
 
 #controls-row #loading {
     grid-column: 1 / 6;
-    /* Span full width if visible */
 }
 
 #meanWindControls input,
@@ -537,17 +532,6 @@ button {
     padding: 6px;
     box-sizing: border-box;
     margin-right: 5px;
-    /* Add spacing to the right of the select */
-}
-
-#meanWindResult {
-    font-size: 13px;
-    font-family: 'Roboto', sans-serif;
-    font-weight: bold;
-    text-align: left;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 #controls-row button {
@@ -631,15 +615,11 @@ button {
     z-index: 1200;
     display: none;
     width: 220px;
-    /* Fixed width */
     font-size: 13px;
     line-height: 1.4;
     top: calc(100% + 5px);
-    /* Below the button */
     right: 0;
-    /* Align right edge with button’s right edge */
     transform: translateX(10%);
-    /* Shift left so left edge aligns with button’s right edge, adjust as needed */
 }
 
 button {
@@ -670,13 +650,11 @@ input[type="number"] {
     z-index: 1500;
     margin-right: 10px;
     font-size: 13px !important;
-    /* Ensure it’s enforced */
 }
 
 #meanWindControls input {
     box-sizing: border-box;
     width: 100%;
-    /* Let the grid column define the width */
 }
 
 select:focus,
@@ -707,44 +685,47 @@ input[type="number"]:focus {
     display: none;
 }
 
-* Base styling for all coordinate inputs */
 #coordInputs label {
-    display: block; /* Stack labels vertically */
-    margin: 5px 0; /* Space between latitude and longitude */
+    display: block;
+    margin: 5px 0;
 }
 
-/* Default inline behavior for DMS */
-#coordInputs label input, #coordInputs label select {
+#coordInputs label input,
+#coordInputs label select {
     display: inline-block;
-    margin-right: 1px; /* Space between fields */
-    vertical-align: middle; /* Align inputs with text */
+    margin-right: 1px;
+    vertical-align: middle;
 }
 
-/* Specific widths by input type */
-#latDec, #lngDec { /* Decimal format */
-    width: 120px; /* Wider for decimal numbers */
+#latDec,
+#lngDec {
+    width: 120px;
 }
 
-#latDeg, #latMin, #lngDeg, #lngMin { /* DMS degrees and minutes */
-    width: 50px; /* Narrow for integer values */
+#latDeg,
+#latMin,
+#lngDeg,
+#lngMin {
+    width: 50px;
 }
 
-#latSec, #lngSec { /* DMS seconds */
-    width: 60px; /* Slightly wider for decimals */
+#latSec,
+#lngSec {
+    width: 60px;
 }
 
-#latDir, #lngDir { /* DMS direction dropdowns */
-    width: 50px; /* Narrow for N/S/E/W */
+#latDir,
+#lngDir {
+    width: 50px;
 }
 
-#mgrsCoord { /* MGRS format */
-    width: 100%; /* Full width of submenu for long string */
-    width: 120px; /* Cap for readability */
+#mgrsCoord {
+    width: 100%;
+    width: 120px;
 }
 
 #moveMarkerBtn {
     display: block;
-    /* Ensure button takes full width or adjust as needed */
     margin-top: 5px;
 }
 
@@ -826,15 +807,11 @@ input[type="checkbox"][style*="opacity: 1"] {
     0% {
         transform: rotate(0deg);
     }
-
     100% {
         transform: rotate(360deg);
     }
 }
 
-
-
-/* Desktop-specific centering */
 @media (min-width: 769px) {
     #bottom-container {
         display: grid;
@@ -866,7 +843,6 @@ input[type="checkbox"][style*="opacity: 1"] {
 
     #map {
         margin-top: 90px;
-        /* Consistent space */
     }
 
     #bottom-container {
@@ -893,14 +869,12 @@ input[type="checkbox"][style*="opacity: 1"] {
         grid-template-rows: auto auto;
     }
 
-    /* Move #meanWindResult to the second row, spanning all columns */
     #meanWindResult {
         grid-column: 1 / 5;
         grid-row: 2;
         margin-top: 5px;
     }
 
-    /* Move #downloadButton to the second row, spanning all columns */
     #controls-row button {
         grid-column: 3 / 4;
         grid-row: 1;
@@ -909,7 +883,6 @@ input[type="checkbox"][style*="opacity: 1"] {
 
     #controls-row select {
         margin-right: 5px;
-        /* Ensure space before button */
     }
 
     #model-row {
@@ -930,18 +903,13 @@ input[type="checkbox"][style*="opacity: 1"] {
 
     #slider-container {
         top: 35px;
-        /* Increased to clear hamburger menu and its potential dropdown */
         padding: 8px;
-        /* Slightly reduced padding */
         max-width: 90%;
-        /* Ensure it fits within narrow screens */
     }
 
     #hamburgerBtn {
         font-size: 18px;
-        /* Further reduce button size */
         padding: 2px 6px;
-        /* Tighten padding */
     }
 
     .menu {
@@ -949,7 +917,6 @@ input[type="checkbox"][style*="opacity: 1"] {
         min-width: 120px;
         top: 30px;
         border-radius: 8px;
-        /* Maintain rounded corners */
     }
 
     .submenu {
@@ -958,7 +925,6 @@ input[type="checkbox"][style*="opacity: 1"] {
 
     .submenu li {
         padding: 6px 8px;
-        /* Slightly tighter for small screens */
     }
 
     .submenu input[type="radio"] {
@@ -973,14 +939,11 @@ input[type="checkbox"][style*="opacity: 1"] {
 
     #map {
         margin-top: 115px;
-        /* Ensure map clears the adjusted slider position */
     }
 
     #controls-row {
         grid-template-columns: 100px 60px auto;
-        /* Simplified for small screens, remove 1fr */
         grid-template-rows: auto auto;
-        /* Allow wrapping if needed */
     }
 
     #controls-row label {
@@ -1002,11 +965,10 @@ input[type="checkbox"][style*="opacity: 1"] {
         min-width: 80px;
     }
 
-    /* If info or other elements follow, ensure they adjust */
     #bottom-container #info {
         grid-column: 1 / -1;
         grid-row: 2;
-        /* Moves below controls */
+        margin-top: 5px;
     }
 }
 
@@ -1025,12 +987,10 @@ input[type="checkbox"][style*="opacity: 1"] {
     #info td {
         font-size: 13px;
         padding: 4px 2px;
-        /* Reduce padding for compactness */
     }
 
     #info table {
         font-size: 12px;
-        /* Slightly smaller text */
         width: 100%;
     }
 
@@ -1048,7 +1008,6 @@ input[type="checkbox"][style*="opacity: 1"] {
 
     #slider-container {
         top: 35px;
-        /* Increased to clear hamburger menu and its potential dropdown */
         width: 90%;
         padding: 5px;
     }
@@ -1060,27 +1019,19 @@ input[type="checkbox"][style*="opacity: 1"] {
     #bottom-container {
         display: grid;
         grid-template-rows: auto auto;
-        /* Ensure two distinct rows */
         gap: 5px;
         padding: 5px;
-        /* Reduce padding */
         max-height: calc(100vh - 90px);
-        /* Account for map and slider */
         overflow-y: auto;
     }
 
     #bottom-container #info {
         grid-column: 1 / -1;
-        /* Full width */
         grid-row: 2;
-        /* Second row, below controls */
         max-height: 40vh;
-        /* Limit height to prevent overlap */
         overflow-y: auto;
         z-index: 100;
-        /* Below controls */
         margin-top: 5px;
-        /* Space from button */
     }
 }
 
@@ -1110,7 +1061,6 @@ input[type="checkbox"][style*="opacity: 1"] {
     font-size: 13px;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
     table-layout: fixed;
-    /* Enforce fixed column widths */
 }
 
 #info th {
@@ -1122,7 +1072,6 @@ input[type="checkbox"][style*="opacity: 1"] {
     text-align: center;
     vertical-align: middle;
     width: 25%;
-    /* Equal width for each column */
 }
 
 #info tr:nth-child(even) {
@@ -1143,32 +1092,24 @@ input[type="checkbox"][style*="opacity: 1"] {
     text-align: center;
     vertical-align: middle;
     width: 25%;
-    /* Equal width for each column */
     overflow: hidden;
-    /* Handle overflow content */
     text-overflow: ellipsis;
-    /* Add ellipsis for truncated text if needed */
 }
 
-/* Enhanced wind speed styles */
 #info table tr.wind-low {
     border: 2px solid lightblue !important;
-    /* Keep for debugging */
 }
 
 #info table tr.wind-moderate {
     border: 2px solid lightgreen !important;
-    /* Keep for debugging */
 }
 
 #info table tr.wind-high {
     border: 2px solid #f5f34f !important;
-    /* Keep for debugging */
 }
 
 #info table tr.wind-very-high {
     border: 2px solid #ffcccc !important;
-    /* Keep for debugging */
 }
 
 @media (max-width: 600px) {
@@ -1182,7 +1123,6 @@ input[type="checkbox"][style*="opacity: 1"] {
     }
 }
 
-/* Loading spinner styles */
 #loading {
     position: fixed;
     top: 50%;
@@ -1236,12 +1176,10 @@ input[type="checkbox"][style*="opacity: 1"] {
     width: 50px;
 }
 
-/* Spin animation */
 @keyframes spin {
     0% {
         transform: rotate(0deg);
     }
-
     100% {
         transform: rotate(360deg);
     }
@@ -1251,11 +1189,9 @@ input[type="checkbox"][style*="opacity: 1"] {
     0% {
         transform: scale(1);
     }
-
     50% {
         transform: scale(1.1);
     }
-
     100% {
         transform: scale(1);
     }
