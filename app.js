@@ -435,6 +435,7 @@ function initMap() {
     updateMarkerPopup(currentMarker, defaultCenter[0], defaultCenter[1], initialAltitude, true); // Open popup initially
     if (userSettings.calculateJump) {
         calculateJump();
+        calculateCutAway();
     }
     recenterMap();
 
@@ -472,6 +473,7 @@ function initMap() {
                 updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, true); // Open popup initially
                 if (userSettings.calculateJump) {
                     calculateJump();
+                    calculateCutAway();
                 }
                 recenterMap();
 
@@ -631,6 +633,7 @@ function initMap() {
         if (userSettings.calculateJump) {
             console.log('Recalculating jump for marker click');
             calculateJump();
+            calculateCutAway();
         }
         recenterMap();
 
@@ -745,6 +748,7 @@ function initMap() {
             resetJumpRunDirection(true);
             if (userSettings.calculateJump) {
                 calculateJump();
+                calculateCutAway();
             }
             recenterMap();
             const slider = document.getElementById('timeSlider');
@@ -783,6 +787,7 @@ function attachMarkerDragend(marker) {
         if (userSettings.calculateJump) {
             console.log('Recalculating jump for marker drag');
             calculateJump();
+            calculateCutAway();
         }
         recenterMap();
         const slider = document.getElementById('timeSlider');
@@ -916,7 +921,14 @@ async function fetchWeatherForLocation(lat, lng, currentTime = null, isInitialLo
     if (availableModels.length > 0) {
         await fetchWeather(lat, lng, currentTime, isInitialLoad);
         updateModelRunInfo();
-        if (lastAltitude !== 'N/A') calculateMeanWind();
+        if (lastAltitude !== 'N/A') {
+            calculateMeanWind();
+            if (userSettings.calculateJump) {
+                console.log('Recalculating jump for location change');
+                calculateJump();
+                calculateCutAway(); // Call calculateCutAway after calculateJump
+            }
+        }
         updateLandingPattern();
         restoreUIInteractivity(); // Ensure UI is responsive
     } else {
@@ -1681,7 +1693,7 @@ function downloadTableAsAscii(format) {
 function getSeparationFromTAS(ias) {
     // Convert exitAltitude from meters to feet (1m = 3.28084ft)
     const exitAltitudeFt = userSettings.exitAltitude * 3.28084;
-    
+
     // Calculate TAS using Utils.calculateTAS
     const tas = Utils.calculateTAS(ias, exitAltitudeFt);
     if (tas === 'N/A') {
@@ -1739,10 +1751,10 @@ function calculateFreeFall(weatherData, exitAltitude, openingAltitude, sliderInd
     } else {
         aircraftSpeedMps = aircraftSpeedTAS * 0.514444;
     }
-    
+
     const vxInitial = Math.cos((jumpRunDirection) * Math.PI / 180) * aircraftSpeedMps;
     const vyInitial = Math.sin((jumpRunDirection) * Math.PI / 180) * aircraftSpeedMps;
-    
+
     console.log('Free fall initial values: IAS', aircraftSpeedKt, 'kt, TAS', aircraftSpeedTAS, 'kt, direction', jumpRunDirection, '°');
     console.log('Free fall initial velocity: ', { vxInitial, vyInitial });
 
@@ -2008,7 +2020,8 @@ function calculateJump() {
         directionFull: meanWindDirectionFull,
         freeFall: freeFallResult,
         freeFallDirection: freeFallResult.directionDeg, // Ensure included
-        freeFallDistance: freeFallResult.distance // Ensure included
+        freeFallDistance: freeFallResult.distance, // Ensure included
+        meanWindFull
     };
 }
 function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, displacement, displacementFull, direction, directionFull, freeFallDirection, freeFallDistance, freeFallTime) {
@@ -2017,7 +2030,6 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
         console.warn('Map not available to update jump circles');
         return;
     }
-
     const currentZoom = map.getZoom();
     const isVisible = currentZoom >= minZoom && currentZoom <= maxZoom;
     console.log('Zoom check:', { currentZoom, minZoom, maxZoom, isVisible });
@@ -2395,236 +2407,6 @@ function jumpRunTrack() {
         approachTime: approachTime
     };
 }
-function updateJumpRunTrackOLD() {
-    console.log('updateJumpRunTrack called', {
-        showJumpRunTrack: userSettings.showJumpRunTrack,
-        weatherData: !!weatherData,
-        lastLat,
-        lastLng,
-        customJumpRunDirection,
-        currentZoom: map.getZoom()
-    });
-
-    // Check zoom level
-    const currentZoom = map.getZoom();
-    const isZoomInRange = currentZoom >= minZoom && currentZoom <= maxZoom;
-
-    // Remove existing layers if present
-    if (jumpRunTrackLayer) {
-        if (jumpRunTrackLayer.airplaneMarker) {
-            map.removeLayer(jumpRunTrackLayer.airplaneMarker);
-            jumpRunTrackLayer.airplaneMarker = null;
-            console.log('Removed airplane marker');
-        }
-        if (jumpRunTrackLayer.approachLayer) {
-            map.removeLayer(jumpRunTrackLayer.approachLayer);
-            jumpRunTrackLayer.approachLayer = null;
-            console.log('Removed approach path');
-        }
-        map.removeLayer(jumpRunTrackLayer);
-        jumpRunTrackLayer = null;
-        console.log('Removed JRT polyline');
-    }
-
-    if (!userSettings.showJumpRunTrack || !weatherData || !lastLat || !lastLng || !isZoomInRange) {
-        console.log('Jump run track not drawn', {
-            showJumpRunTrack: userSettings.showJumpRunTrack,
-            weatherData: !!weatherData,
-            lastLat,
-            lastLng,
-            isZoomInRange
-        });
-        const directionInput = document.getElementById('jumpRunTrackDirection');
-        if (directionInput) {
-            setInputValueSilently('jumpRunTrackDirection', '');
-        }
-        return;
-    }
-
-    const trackData = jumpRunTrack();
-    if (!trackData || !trackData.latlngs || !Array.isArray(trackData.latlngs) || trackData.latlngs.length < 2) {
-        console.error('Invalid trackData from jumpRunTrack:', trackData);
-        return;
-    }
-
-    let { latlngs, direction, trackLength, approachLatLngs, approachLength, approachTime } = trackData;
-
-    // Validate latlngs format
-    const isValidLatLngs = latlngs.every(ll => Array.isArray(ll) && ll.length === 2 && !isNaN(ll[0]) && !isNaN(ll[1]));
-    if (!isValidLatLngs) {
-        console.error('Invalid latlngs format in trackData:', latlngs);
-        return;
-    }
-
-    console.log('Updating jump run track with:', { latlngs, direction, trackLength, offset: userSettings.jumpRunTrackOffset });
-    if (approachLatLngs) {
-        console.log('Updating approach path with:', { approachLatLngs, approachLength });
-    }
-
-    // Create polyline for the jump run track
-    jumpRunTrackLayer = L.polyline(latlngs, {
-        color: 'orange',
-        weight: 4,
-        opacity: 0.9,
-        interactive: true
-    }).addTo(map);
-
-    // Create polyline for the approach path (dashed)
-    if (approachLatLngs && Array.isArray(approachLatLngs) && approachLatLngs.length === 2) {
-        const isValidApproachLatLngs = approachLatLngs.every(ll => Array.isArray(ll) && ll.length === 2 && !isNaN(ll[0]) && !isNaN(ll[1]));
-        if (isValidApproachLatLngs) {
-            jumpRunTrackLayer.approachLayer = L.polyline(approachLatLngs, {
-                color: 'orange',
-                weight: 3,
-                opacity: 0.9,
-                dashArray: '10, 10',
-                interactive: true
-            }).addTo(map);
-
-            jumpRunTrackLayer.approachLayer.bindTooltip(`Approach: ${Math.round(direction)}°, ${Math.round(approachLength)} m, ${Math.round(approachTime / 60)} min`, {
-                permanent: false,
-                direction: 'top',
-                offset: [0, -10]
-            });
-        } else {
-            console.warn('Invalid approachLatLngs format:', approachLatLngs);
-        }
-    }
-
-    // Add airplane symbol at the front end
-    const frontEnd = latlngs[1];
-    const airplaneIcon = L.icon({
-        iconUrl: 'airplane_orange.png',
-        iconSize: [32, 32],
-        iconAnchor: [16, 16],
-        popupAnchor: [0, -16],
-        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-        shadowSize: [41, 41],
-        shadowAnchor: [13, 32]
-    });
-
-    jumpRunTrackLayer.airplaneMarker = L.marker(frontEnd, {
-        icon: airplaneIcon,
-        rotationAngle: direction,
-        rotationOrigin: 'center center',
-        draggable: false
-    }).addTo(map);
-
-    // Update direction input silently
-    const directionInput = document.getElementById('jumpRunTrackDirection');
-    if (directionInput) {
-        setInputValueSilently('jumpRunTrackDirection', Math.round(direction));
-    }
-
-    // Dragging functionality
-    let isDragging = false;
-    let startLatLng = null;
-    let originalLatLngs = latlngs.map(ll => [ll[0], ll[1]]);
-    let originalApproachLatLngs = approachLatLngs ? approachLatLngs.map(ll => [ll[0], ll[1]]) : null;
-
-    jumpRunTrackLayer.on('mousedown', function (e) {
-        if (!userSettings.showJumpRunTrack || !isZoomInRange) return;
-        isDragging = true;
-        startLatLng = e.latlng;
-        map.dragging.disable();
-        console.log('Started dragging JRT');
-    });
-
-    if (jumpRunTrackLayer.approachLayer) {
-        jumpRunTrackLayer.approachLayer.on('mousedown', function (e) {
-            if (!userSettings.showJumpRunTrack || !isZoomInRange) return;
-            isDragging = true;
-            startLatLng = e.latlng;
-            map.dragging.disable();
-            console.log('Started dragging approach path');
-        });
-    }
-
-    map.on('mousemove', function (e) {
-        if (!isDragging || !startLatLng) return;
-
-        const currentLatLng = e.latlng;
-        const latDiff = currentLatLng.lat - startLatLng.lat;
-        const lngDiff = currentLatLng.lng - startLatLng.lng;
-
-        const newLatLngs = originalLatLngs.map(([lat, lng]) => [
-            lat + latDiff,
-            lng + lngDiff
-        ]);
-        jumpRunTrackLayer.setLatLngs(newLatLngs);
-
-        if (originalApproachLatLngs && jumpRunTrackLayer.approachLayer) {
-            const newApproachLatLngs = originalApproachLatLngs.map(([lat, lng]) => [
-                lat + latDiff,
-                lng + lngDiff
-            ]);
-            jumpRunTrackLayer.approachLayer.setLatLngs(newApproachLatLngs);
-        }
-
-        const newFrontEnd = newLatLngs[1];
-        if (jumpRunTrackLayer.airplaneMarker) {
-            jumpRunTrackLayer.airplaneMarker.setLatLng(newFrontEnd);
-        }
-    });
-
-    map.on('mouseup', function () {
-        if (!isDragging) return;
-        isDragging = false;
-        map.dragging.enable();
-
-        originalLatLngs = jumpRunTrackLayer.getLatLngs().map(ll => [ll.lat, ll.lng]);
-        if (jumpRunTrackLayer.approachLayer) {
-            originalApproachLatLngs = jumpRunTrackLayer.approachLayer.getLatLngs().map(ll => [ll.lat, ll.lng]);
-        }
-
-        const [startLat, startLng] = originalLatLngs[0];
-        const [endLat, endLng] = originalLatLngs[1];
-        const newDirection = calculateBearing(startLat, startLng, endLat, endLng);
-
-        customJumpRunDirection = Math.round(newDirection);
-        console.log('JRT dragged, set custom direction:', customJumpRunDirection);
-
-        const centerLat = (startLat + endLat) / 2;
-        const centerLng = (startLng + endLng) / 2;
-        const dipLatLng = L.latLng(lastLat, lastLng);
-        const centerLatLng = L.latLng(centerLat, centerLng);
-        const distance = dipLatLng.distanceTo(centerLatLng);
-        const bearingToCenter = calculateBearing(lastLat, lastLng, centerLat, centerLng);
-
-        const rightBearing = (newDirection + 90) % 360;
-        const leftBearing = (newDirection - 90 + 360) % 360;
-        const angleToRight = Math.abs(((bearingToCenter - rightBearing + 540) % 360) - 180);
-        const angleToLeft = Math.abs(((bearingToCenter - leftBearing + 540) % 360) - 180);
-
-        const offsetSign = angleToRight < angleToLeft ? 1 : -1;
-        let newOffset = Math.round(distance * offsetSign / 100) * 100;
-        newOffset = Math.max(-50000, Math.min(50000, newOffset));
-
-        userSettings.jumpRunTrackOffset = newOffset;
-        saveSettings();
-
-        const directionInput = document.getElementById('jumpRunTrackDirection');
-        if (directionInput && customJumpRunDirection !== null) {
-            setInputValueSilently('jumpRunTrackDirection', Math.round(customJumpRunDirection));
-        }
-        const offsetInput = document.getElementById('jumpRunTrackOffset');
-        if (offsetInput) {
-            offsetInput.value = userSettings.jumpRunTrackOffset;
-        }
-
-        if (jumpRunTrackLayer.airplaneMarker) {
-            jumpRunTrackLayer.airplaneMarker.setRotationAngle(newDirection);
-        }
-
-        console.log('Jump run track dragged: new direction:', newDirection, 'new offset:', newOffset);
-    });
-
-    jumpRunTrackLayer.bindTooltip(`Jump Run: ${Math.round(direction)}°, ${Math.round(trackLength)} m`, {
-        permanent: false,
-        direction: 'top',
-        offset: [0, -10]
-    });
-}
 function updateJumpRunTrack() {
     console.log('updateJumpRunTrack called', {
         showJumpRunTrack: userSettings.showJumpRunTrack,
@@ -2634,7 +2416,6 @@ function updateJumpRunTrack() {
         customJumpRunDirection,
         currentZoom: map.getZoom()
     });
-
     // Check zoom level
     const currentZoom = map.getZoom();
     const isZoomInRange = currentZoom >= minZoom && currentZoom <= maxZoom;
@@ -2871,6 +2652,52 @@ function updateJumpRunTrack() {
         permanent: false,
         direction: 'top',
         offset: [0, -10]
+    });
+}
+function calculateCutAway() {
+    if (!weatherData || lastAltitude === 'N/A' || !userSettings.openingAltitude) {
+        console.log('Cannot calculate cut-away: missing data', {
+            weatherData: !!weatherData,
+            lastAltitude,
+            openingAltitude: userSettings.openingAltitude
+        });
+        return;
+    }
+
+    // Run calculateJump to get meanWindFull
+    const jumpResult = calculateJump();
+    if (!jumpResult || !jumpResult.meanWindFull) {
+        console.log('Cannot calculate cut-away: calculateJump failed or no meanWindFull');
+        return;
+    }
+
+    const meanWindDirectionFull = jumpResult.meanWindFull[0]; // degrees
+    const meanWindSpeedMpsFull = jumpResult.meanWindFull[1]; // m/s
+    const openingAltitude = userSettings.openingAltitude; // meters
+    const surfaceAltitude = lastAltitude; // meters
+    const verticalSpeed = 5; // m/s, as specified
+
+    // Calculate descent time
+    const heightDifference = openingAltitude - 200 - surfaceAltitude; // meters
+    const descentTime = heightDifference / verticalSpeed; // seconds
+
+    // Calculate displacement distance
+    const displacementDistance = meanWindSpeedMpsFull * descentTime; // meters
+
+    // Calculate landing position
+    const [newLat, newLng] = calculateNewCenter(lastLat, lastLng, displacementDistance, meanWindDirectionFull);
+
+    console.log('Cut-away canopy calculation:', {
+        cutAwayAltitude: `${openingAltitude - 200} m`,
+        surfaceAltitude: `${surfaceAltitude} m`,
+        meanWindSpeed: `${meanWindSpeedMpsFull.toFixed(2)} m/s`,
+        meanWindDirection: `${Math.round(meanWindDirectionFull)}°`,
+        descentTime: `${descentTime.toFixed(2)} s`,
+        displacementDistance: `${displacementDistance.toFixed(2)} m`,
+        landingPosition: {
+            lat: newLat.toFixed(5),
+            lng: newLng.toFixed(5)
+        }
     });
 }
 
@@ -3530,7 +3357,7 @@ function restoreUIInteractivity() {
     const menu = document.getElementById('menu');
     const checkboxes = menu.querySelectorAll('input[type="checkbox"]');
     const inputs = menu.querySelectorAll('input[type="number"], input[type="text"]');
-    
+
     // Check if elements are disabled unexpectedly
     checkboxes.forEach(cb => {
         if (cb.disabled && cb.id !== 'showJumpRunTrack' && cb.id !== 'showExitAreaCheckbox') {
@@ -3538,19 +3365,19 @@ function restoreUIInteractivity() {
             cb.disabled = false;
         }
     });
-    
+
     inputs.forEach(input => {
         if (input.disabled && input.id !== 'customLandingDirectionLL' && input.id !== 'customLandingDirectionRR') {
             console.warn(`Input ${input.id} is disabled unexpectedly, re-enabling`);
             input.disabled = false;
         }
     });
-    
+
     // Force a DOM refresh
     menu.style.display = 'none';
     void menu.offsetHeight; // Trigger reflow
     menu.style.display = 'block';
-    
+
     console.log('UI interactivity check completed');
 }
 function setupSliderEvents() {
@@ -3573,6 +3400,7 @@ function setupSliderEvents() {
                 if (userSettings.calculateJump) {
                     console.log('Recalculating jump for slider change');
                     calculateJump();
+                    calculateCutAway();
                 }
                 if (currentMarker) {
                     console.log('Updating marker popup for slider change');
@@ -3596,6 +3424,7 @@ function setupSliderEvents() {
                 if (userSettings.calculateJump) {
                     console.log('Recalculating jump for slider reset');
                     calculateJump();
+                    calculateCutAway();
                 }
                 if (currentMarker) {
                     console.log('Updating marker popup for slider reset');
@@ -3631,7 +3460,14 @@ function setupModelSelectEvents() {
             updateModelRunInfo();
             await updateWeatherDisplay(currentIndex);
             updateReferenceLabels();
-            if (lastAltitude !== 'N/A') calculateMeanWind();
+            if (lastAltitude !== 'N/A') {
+                calculateMeanWind();
+                if (userSettings.calculateJump) {
+                    console.log('Recalculating jump for model change');
+                    calculateJump();
+                    calculateCutAway(); // Call calculateCutAway after calculateJump
+                }
+            }
             if (userSettings.showJumpRunTrack) {
                 console.log('Updating JRT for model change');
                 updateJumpRunTrack();
@@ -3681,7 +3517,7 @@ function setupMenuEvents() {
             e.preventDefault(); // Prevent any default behavior
             menu.classList.toggle('hidden');
             const isHidden = menu.classList.contains('hidden');
-            
+
             // Log styles after toggle for debugging
             const currentStyle = window.getComputedStyle(menu);
             console.log('Main menu toggled:', isHidden ? 'hidden' : 'shown', {
@@ -3797,7 +3633,10 @@ function setupInputEvents() {
     });
     setupInput('openingAltitude', 'change', 300, (value) => {
         if (!isNaN(value) && value >= 500 && value <= 15000) {
-            if (userSettings.calculateJump && weatherData && lastLat && lastLng) calculateJump();
+            if (userSettings.calculateJump && weatherData && lastLat && lastLng){
+                calculateJump();
+                calculateCutAway();
+            }
         } else {
             Utils.handleError('Opening altitude must be between 500 and 15000 meters.');
             setInputValue('openingAltitude', 1200);
@@ -3896,6 +3735,7 @@ function setupInputEvents() {
                 if (userSettings.calculateJump) {
                     console.log('Recalculating jump for custom JRT direction');
                     calculateJump();
+                    calculateCutAway();
                 }
             } else {
                 console.warn('Cannot update JRT or jump: missing conditions', {
@@ -3920,6 +3760,7 @@ function setupInputEvents() {
                 if (userSettings.calculateJump) {
                     console.log('Recalculating jump for reset JRT direction');
                     calculateJump();
+                    calculateCutAway();
                 }
             }
         }
@@ -3964,6 +3805,7 @@ function setupInputEvents() {
             if (userSettings.calculateJump && weatherData && lastLat && lastLng) {
                 console.log('Recalculating jump for aircraft speed change');
                 calculateJump();
+                calculateCutAway();
             }
         } else {
             Utils.handleError('Aircraft speed must be between 10 and 150 kt.');
@@ -3980,6 +3822,7 @@ function setupInputEvents() {
             if (userSettings.calculateJump && weatherData && lastLat && lastLng) {
                 console.log('Recalculating jump for jumper number change');
                 calculateJump();
+                calculateCutAway();
             }
         } else {
             Utils.handleError('Jumper number must be between 1 and 50.');
@@ -3998,6 +3841,7 @@ function setupInputEvents() {
             if (userSettings.calculateJump && weatherData && lastLat && lastLng) {
                 console.log('Recalculating jump for jumper separation change');
                 calculateJump();
+                calculateCutAway();
             }
         } else {
             Utils.handleError('Jumper separation must be between 1 and 50 seconds.');
@@ -4045,6 +3889,7 @@ function setupCheckboxEvents() {
             if (weatherData && lastLat !== null && lastLng !== null) {
                 console.log('Calling calculateJump with:', { weatherData, lastLat, lastLng });
                 calculateJump();
+                calculateCutAway();
             } else {
                 console.warn('Cannot calculate jump yet: Missing data', { weatherData: !!weatherData, lastLat, lastLng });
                 if (!checkbox.dataset.initialLoad) {
@@ -4195,6 +4040,7 @@ function setupCheckboxEvents() {
         console.log('Show Exit Area set to:', userSettings.showExitArea);
         if (userSettings.calculateJump && weatherData && lastLat && lastLng) {
             calculateJump(); // Recalculate to update green circle visibility
+            calculateCutAway();
         }
     });
 }
@@ -4234,6 +4080,7 @@ function setupCoordinateEvents() {
                 if (userSettings.calculateJump) {
                     console.log('Recalculating jump for coordinate input');
                     calculateJump();
+                    calculateCutAway();
                 }
                 recenterMap();
                 await fetchWeatherForLocation(lat, lng);
@@ -4646,6 +4493,7 @@ async function updateAllDisplays() {
         if (userSettings.showLandingPattern) updateLandingPattern();
         if (userSettings.calculateJump) {
             calculateJump();
+            calculateCutAway();
             if (userSettings.showJumpRunTrack) updateJumpRunTrack();
         }
         recenterMap();
