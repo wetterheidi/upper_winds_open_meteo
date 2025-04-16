@@ -812,7 +812,7 @@ function createCustomMarker(lat, lng) {
 function createCutAwayMarker(lat, lng) {
     const cutAwayIcon = L.icon({
         iconUrl: 'schere_purple.png', // Use a different icon if available
-        iconSize: [32, 32],
+        iconSize: [25, 25],
         iconAnchor: [16, 32],
         popupAnchor: [0, -32],
         shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
@@ -2740,59 +2740,116 @@ function updateJumpRunTrack() {
     });
 }
 function calculateCutAway() {
+    // Silently skip if cut-away marker is not placed
+    if (cutAwayLat === null || cutAwayLng === null) {
+        return;
+    }
+
+    // Validate other required data
     if (!weatherData || lastAltitude === 'N/A' || !userSettings.cutAwayAltitude) {
         console.log('Cannot calculate cut-away: missing data', {
             weatherData: !!weatherData,
             lastAltitude,
-            cutAwayAltitude: userSettings.cutAwayAltitude,
-            cutAwayLat,
-            cutAwayLng
+            cutAwayAltitude: userSettings.cutAwayAltitude
         });
+        Utils.handleError('Cannot calculate cut-away: missing required data.');
         return;
     }
 
-    // Run calculateJump to get meanWindFull
-    const jumpResult = calculateJump();
-    if (!jumpResult || !jumpResult.meanWindFull) {
-        console.log('Cannot calculate cut-away: calculateJump failed or no meanWindFull');
+    // Get current time slider index
+    const index = parseInt(document.getElementById('timeSlider')?.value) || 0;
+
+    // Generate interpolated data
+    let interpolatedData;
+    try {
+        if (typeof interpolateWeatherData === 'function') {
+            interpolatedData = interpolateWeatherData(index);
+        } else {
+            console.warn('interpolateWeatherData is not a function');
+            Utils.handleError('Cannot calculate cut-away: weather data processing unavailable.');
+            return;
+        }
+    } catch (error) {
+        console.warn('Error calling interpolateWeatherData:', error);
+        Utils.handleError('Cannot calculate cut-away: error processing weather data.');
         return;
     }
 
-    const meanWindDirectionFull = jumpResult.meanWindFull[0]; // degrees
-    const meanWindSpeedMpsFull = jumpResult.meanWindFull[1]; // m/s
+    if (!interpolatedData || !Array.isArray(interpolatedData) || interpolatedData.length === 0) {
+        console.warn('Cannot calculate cut-away: invalid interpolatedData', { interpolatedData });
+        Utils.handleError('Cannot calculate cut-away: no valid weather data available.');
+        return;
+    }
+
+    // Prepare altitude range for mean wind calculation
+    const elevation = Math.round(lastAltitude); // Surface altitude in meters
+    const lowerLimit = elevation;
+    const upperLimit = elevation + userSettings.cutAwayAltitude; // Surface + cutAwayAltitude
+    console.log('Cut-away wind limits:', { lowerLimit, upperLimit, elevation });
+
+    // Extract wind data and convert speeds from km/h to m/s
+    const heights = interpolatedData.map(d => d.height);
+    const dirs = interpolatedData.map(d => Number.isFinite(d.dir) ? parseFloat(d.dir) : 0);
+    const spdsMps = interpolatedData.map(d => {
+        const spdKmh = Number.isFinite(d.spd) ? parseFloat(d.spd) : 0; // Speed in km/h
+        return spdKmh * 0.277778; // Convert km/h to m/s (1 km/h = 0.277778 m/s)
+    });
+
+    console.log('Interpolated data for cut-away:', { heights, dirs, spdsMps });
+
+    // Calculate U and V components
+    const uComponents = spdsMps.map((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
+    const vComponents = spdsMps.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
+
+    // Compute mean wind
+    const meanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, lowerLimit, upperLimit);
+    if (!meanWind || !Array.isArray(meanWind) || meanWind.length < 2 || !Number.isFinite(meanWind[0]) || !Number.isFinite(meanWind[1])) {
+        console.warn('Invalid mean wind calculation for cut-away:', meanWind);
+        Utils.handleError('Cannot calculate cut-away: invalid wind calculation.');
+        return;
+    }
+
+    const meanWindDirection = meanWind[0]; // degrees
+    const meanWindSpeedMps = meanWind[1]; // m/s
+
+    // Vertical speed calculations
     const cutAwayAltitude = userSettings.cutAwayAltitude; // meters
     const surfaceAltitude = lastAltitude; // meters
-    // vz = Math.sqrt((2 * 9.81 * 5) /(1.2 * size * cD));
-    const verticalSpeedMax = Math.sqrt((2 * 9.81 * 5) /(1.2 * 13 * 2.6)).toFixed(1); // m/s, for Fully Open (max displacement)
-    console.log('Vertical speed Max: ', verticalSpeedMax);
-    const verticalSpeedMean = Math.sqrt((2 * 9.81 * 5) /(1.2 * 2 * 1.5)).toFixed(1); // m/s, for Partially Collapsed
-    console.log('Vertical speed Max: ', verticalSpeedMax);
-    const verticalSpeedMin = Math.sqrt((2 * 9.81 * 5) /(1.2 * 0.1 * 1)).toFixed(1); // m/s, for Fully Collapsed (min displacement)
-    console.log('Vertical speed Max: ', verticalSpeedMax);
+    const verticalSpeedMax = Math.sqrt((2 * 9.81 * 5) / (1.2 * 13 * 2.6)).toFixed(1); // m/s, Fully Open
+    const verticalSpeedMean = Math.sqrt((2 * 9.81 * 5) / (1.2 * 2 * 1.5)).toFixed(1); // m/s, Partially Collapsed
+    const verticalSpeedMin = Math.sqrt((2 * 9.81 * 5) / (1.2 * 0.1 * 1)).toFixed(1); // m/s, Fully Collapsed
     const radius = 150; // meters
 
+    // Log vertical speeds
+    console.log('Vertical speeds:', {
+        Max: `${verticalSpeedMax} m/s (Fully Open)`,
+        Mean: `${verticalSpeedMean} m/s (Partially Collapsed)`,
+        Min: `${verticalSpeedMin} m/s (Fully Collapsed)`
+    });
+
     // Calculate descent times
-    const heightDifference = cutAwayAltitude - surfaceAltitude; // meters
+    const heightDifference = cutAwayAltitude; // meters
     const descentTimeMin = heightDifference / verticalSpeedMin; // seconds
     const descentTimeMean = heightDifference / verticalSpeedMean; // seconds
     const descentTimeMax = heightDifference / verticalSpeedMax; // seconds
 
     // Calculate displacement distances
-    const displacementDistanceMin = meanWindSpeedMpsFull * descentTimeMin; // meters
-    const displacementDistanceMean = meanWindSpeedMpsFull * descentTimeMean; // meters
-    const displacementDistanceMax = meanWindSpeedMpsFull * descentTimeMax; // meters
+    const displacementDistanceMin = meanWindSpeedMps * descentTimeMin; // meters
+    const displacementDistanceMean = meanWindSpeedMps * descentTimeMean; // meters
+    const displacementDistanceMax = meanWindSpeedMps * descentTimeMax; // meters
 
     // Calculate landing positions
-    const [newLatMin, newLngMin] = calculateNewCenter(cutAwayLat, cutAwayLng, displacementDistanceMin, ((meanWindDirectionFull + 180) % 360));
-    const [newLatMean, newLngMean] = calculateNewCenter(cutAwayLat, cutAwayLng, displacementDistanceMean, ((meanWindDirectionFull + 180) % 360));
-    const [newLatMax, newLngMax] = calculateNewCenter(cutAwayLat, cutAwayLng, displacementDistanceMax, ((meanWindDirectionFull + 180) % 360));
+    const adjustedWindDirection = ((meanWindDirection + 180) % 360);
+    const [newLatMin, newLngMin] = calculateNewCenter(cutAwayLat, cutAwayLng, displacementDistanceMin, adjustedWindDirection);
+    const [newLatMean, newLngMean] = calculateNewCenter(cutAwayLat, cutAwayLng, displacementDistanceMean, adjustedWindDirection);
+    const [newLatMax, newLngMax] = calculateNewCenter(cutAwayLat, cutAwayLng, displacementDistanceMax, adjustedWindDirection);
 
     // Log all calculations
     console.log('Cut-away canopy calculation:', {
         cutAwayAltitude: `${cutAwayAltitude} m`,
         surfaceAltitude: `${surfaceAltitude} m`,
-        meanWindSpeed: `${meanWindSpeedMpsFull.toFixed(2)} m/s`,
-        meanWindDirection: `${Math.round((meanWindDirectionFull + 180) % 360)}°`,
+        meanWindSpeed: `${meanWindSpeedMps.toFixed(2)} m/s`,
+        meanWindDirection: `${Math.round(adjustedWindDirection)}°`,
         descentTimeMin: `${descentTimeMin.toFixed(0)} s`,
         descentTimeMean: `${descentTimeMean.toFixed(0)} s`,
         descentTimeMax: `${descentTimeMax.toFixed(0)} s`,
@@ -2821,27 +2878,27 @@ function calculateCutAway() {
 
     // Add circle for the selected cut-away state if showCutAwayFinder is enabled
     if (userSettings.showCutAwayFinder && userSettings.calculateJump) {
-        let center, descentTime, displacementDistance, stateLabel, verticalSpeed;
+        let center, descentTime, displacementDistance, stateLabel, verticalSpeedSelected;
         switch (userSettings.cutAwayState) {
-            case 'Collapsed':
-                center = [newLatMin, newLngMin];
-                descentTime = descentTimeMin;
-                displacementDistance = displacementDistanceMin;
-                verticalSpeed =verticalSpeedMin;
-                stateLabel = 'Fully Collapsed';
-                break;
             case 'Partially':
                 center = [newLatMean, newLngMean];
                 descentTime = descentTimeMean;
                 displacementDistance = displacementDistanceMean;
-                verticalSpeed =verticalSpeedMean;
+                verticalSpeedSelected = verticalSpeedMean;
                 stateLabel = 'Partially Collapsed';
+                break;
+            case 'Collapsed':
+                center = [newLatMin, newLngMin];
+                descentTime = descentTimeMin;
+                displacementDistance = displacementDistanceMin;
+                verticalSpeedSelected = verticalSpeedMin;
+                stateLabel = 'Fully Collapsed';
                 break;
             case 'Open':
                 center = [newLatMax, newLngMax];
                 descentTime = descentTimeMax;
                 displacementDistance = displacementDistanceMax;
-                verticalSpeed =verticalSpeedMax;
+                verticalSpeedSelected = verticalSpeedMax;
                 stateLabel = 'Fully Open';
                 break;
             default:
@@ -2853,8 +2910,8 @@ function calculateCutAway() {
         const tooltipContent = `
             <b>Cut-Away (${stateLabel})</b><br>
             Cut-Away Altitude: ${cutAwayAltitude} m<br>
-            Displacement: ${meanWindDirectionFull.toFixed(0)}°, ${displacementDistance.toFixed(0)} m<br>
-            Descent Time/Speed: ${descentTime.toFixed(0)} s at ${verticalSpeed} m/s<br>
+            Displacement: ${meanWindDirection.toFixed(0)}°, ${displacementDistance.toFixed(0)} m<br>
+            Descent Time/Speed: ${descentTime.toFixed(0)} s at ${verticalSpeedSelected} m/s<br>
         `;
 
         // Add circle to map
@@ -3800,7 +3857,7 @@ function setupRadioEvents() {
         updateAllDisplays();
     });
     setupRadioGroup('cutAwayState', () => {
-        userSettings.cutAwayState = getSettingValue('cutAwayState', 'radio', 'Collapsed');
+        userSettings.cutAwayState = getSettingValue('cutAwayState', 'radio', 'Partially');
         saveSettings();
         console.log('cutAwayState changed:', userSettings.cutAwayState);
         if (userSettings.showCutAwayFinder && userSettings.calculateJump && weatherData && lastLat && lastLng) {
