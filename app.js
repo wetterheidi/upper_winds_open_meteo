@@ -2214,8 +2214,8 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
 
             jumpCircleGreenLight = L.circle(jumpCircleGreenLightCenter, {
                 radius: radius,
-                color: 'lightgreen',
-                fillColor: 'lightgreen',
+                color: 'darkgreen',
+                fillColor: 'darkgreen',
                 fillOpacity: 0.2,
                 weight: 2
             });
