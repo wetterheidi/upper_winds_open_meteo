@@ -2792,7 +2792,7 @@ function calculateCutAway() {
         cutAwayAltitude: `${cutAwayAltitude} m`,
         surfaceAltitude: `${surfaceAltitude} m`,
         meanWindSpeed: `${meanWindSpeedMpsFull.toFixed(2)} m/s`,
-        meanWindDirection: `${Math.round(meanWindDirectionFull)}°`,
+        meanWindDirection: `${Math.round((meanWindDirectionFull + 180) % 360)}°`,
         descentTimeMin: `${descentTimeMin.toFixed(0)} s`,
         descentTimeMean: `${descentTimeMean.toFixed(0)} s`,
         descentTimeMax: `${descentTimeMax.toFixed(0)} s`,
