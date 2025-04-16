@@ -28,6 +28,9 @@ const maxZoom = 14; // Placeholder, adjust as needed
 const landingPatternMinZoom = 14; // New constant for landing pattern
 let isLandingPatternUnlocked = false;   // Track unlock state during session
 let isCalculateJumpUnlocked = false;    // Track unlock state during session
+let cutAwayMarker = null; // New marker for cut-away
+let cutAwayLat = null;   // New coordinate for cut-away
+let cutAwayLng = null;   // New coordinate for cut-away
 let cutAwayCircle = null; // New variable to track cut-away circle
 let userSettings = JSON.parse(localStorage.getItem('upperWindsSettings')) || { ...defaultSettings };
 const unlockedFeatures = JSON.parse(localStorage.getItem('unlockedFeatures')) || {};
@@ -612,6 +615,34 @@ function initMap() {
         coordsControl.getContainer().innerHTML = 'Move mouse over map';
     });
 
+    // New right-click event to place/move cut-away marker
+    map.on('contextmenu', (e) => {
+        if (!userSettings.showCutAwayFinder || !userSettings.calculateJump) {
+            console.log('Cut-away marker placement ignored: showCutAwayFinder or calculateJump not enabled');
+            return;
+        }
+        const { lat, lng } = e.latlng;
+        console.log('Right-click: Placing/moving cut-away marker at:', { lat, lng });
+
+        if (cutAwayMarker) {
+            cutAwayMarker.setLatLng([lat, lng]);
+        } else {
+            cutAwayMarker = createCutAwayMarker(lat, lng).addTo(map);
+            attachCutAwayMarkerDragend(cutAwayMarker);
+        }
+
+        cutAwayLat = lat;
+        cutAwayLng = lng;
+
+        updateCutAwayMarkerPopup(cutAwayMarker, lat, lng);
+
+        if (weatherData && userSettings.calculateJump) {
+            console.log('Recalculating cut-away for marker placement');
+            calculateJump();
+            calculateCutAway();
+        }
+    });
+
     // Map click and touch events (unchanged from previous modification)
     map.on('dblclick', async (e) => {
         const { lat, lng } = e.latlng;
@@ -777,6 +808,23 @@ function createCustomMarker(lat, lng) {
         draggable: true
     });
 }
+// New function to create cut-away marker
+function createCutAwayMarker(lat, lng) {
+    const cutAwayIcon = L.icon({
+        iconUrl: 'schere_purple.png', // Use a different icon if available
+        iconSize: [32, 32],
+        iconAnchor: [16, 32],
+        popupAnchor: [0, -32],
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+        shadowSize: [41, 41],
+        shadowAnchor: [13, 32],
+        className: 'cutaway-marker' // For CSS styling (e.g., different color)
+    });
+    return L.marker([lat, lng], {
+        icon: cutAwayIcon,
+        draggable: true
+    });
+}
 function attachMarkerDragend(marker) {
     marker.on('dragend', async (e) => {
         const position = marker.getLatLng();
@@ -810,6 +858,21 @@ function attachMarkerDragend(marker) {
             slider.value = currentIndex;
         } else {
             document.getElementById('info').innerHTML = `No models available.`;
+        }
+    });
+}
+// New function to attach dragend handler for cut-away marker
+function attachCutAwayMarkerDragend(marker) {
+    marker.on('dragend', (e) => {
+        const position = marker.getLatLng();
+        cutAwayLat = position.lat;
+        cutAwayLng = position.lng;
+        console.log('Cut-away marker dragged to:', { lat: cutAwayLat, lng: cutAwayLng });
+        updateCutAwayMarkerPopup(marker, cutAwayLat, cutAwayLng);
+        if (userSettings.showCutAwayFinder && userSettings.calculateJump && weatherData) {
+            console.log('Recalculating cut-away for marker drag');
+            calculateJump();
+            calculateCutAway();
         }
     });
 }
@@ -858,6 +921,25 @@ async function updateMarkerPopup(marker, lat, lng, altitude, open = false) {
         marker.setPopupContent(popupContent);
     }
 
+    if (open) {
+        marker.openPopup();
+    }
+}
+// New function to update cut-away marker popup
+function updateCutAwayMarkerPopup(marker, lat, lng, open = false) {
+    const coordFormat = getCoordinateFormat();
+    const coords = Utils.convertCoords(lat, lng, coordFormat);
+    let popupContent = `<b>Cut-Away Start</b><br>`;
+    if (coordFormat === 'MGRS') {
+        popupContent += `MGRS: ${coords.lat}`;
+    } else {
+        popupContent += `Lat: ${coords.lat}<br>Lng: ${coords.lng}`;
+    }
+    if (!marker.getPopup()) {
+        marker.bindPopup(popupContent);
+    } else {
+        marker.setPopupContent(popupContent);
+    }
     if (open) {
         marker.openPopup();
     }
@@ -2662,7 +2744,9 @@ function calculateCutAway() {
         console.log('Cannot calculate cut-away: missing data', {
             weatherData: !!weatherData,
             lastAltitude,
-            cutAwayAltitude: userSettings.cutAwayAltitude
+            cutAwayAltitude: userSettings.cutAwayAltitude,
+            cutAwayLat,
+            cutAwayLng
         });
         return;
     }
@@ -2678,10 +2762,14 @@ function calculateCutAway() {
     const meanWindSpeedMpsFull = jumpResult.meanWindFull[1]; // m/s
     const cutAwayAltitude = userSettings.cutAwayAltitude; // meters
     const surfaceAltitude = lastAltitude; // meters
-    const verticalSpeedMax = 1.5; // m/s, for Fully Open (max displacement)
-    const verticalSpeedMean = 8.5; // m/s, for Partially Collapsed
-    const verticalSpeedMin = 33.5; // m/s, for Fully Collapsed (min displacement)
-    const radius = 100; // meters
+    // vz = Math.sqrt((2 * 9.81 * 5) /(1.2 * size * cD));
+    const verticalSpeedMax = Math.sqrt((2 * 9.81 * 5) /(1.2 * 13 * 2.6)).toFixed(1); // m/s, for Fully Open (max displacement)
+    console.log('Vertical speed Max: ', verticalSpeedMax);
+    const verticalSpeedMean = Math.sqrt((2 * 9.81 * 5) /(1.2 * 2 * 1.5)).toFixed(1); // m/s, for Partially Collapsed
+    console.log('Vertical speed Max: ', verticalSpeedMax);
+    const verticalSpeedMin = Math.sqrt((2 * 9.81 * 5) /(1.2 * 0.1 * 1)).toFixed(1); // m/s, for Fully Collapsed (min displacement)
+    console.log('Vertical speed Max: ', verticalSpeedMax);
+    const radius = 150; // meters
 
     // Calculate descent times
     const heightDifference = cutAwayAltitude - surfaceAltitude; // meters
@@ -2695,9 +2783,9 @@ function calculateCutAway() {
     const displacementDistanceMax = meanWindSpeedMpsFull * descentTimeMax; // meters
 
     // Calculate landing positions
-    const [newLatMin, newLngMin] = calculateNewCenter(lastLat, lastLng, displacementDistanceMin, meanWindDirectionFull);
-    const [newLatMean, newLngMean] = calculateNewCenter(lastLat, lastLng, displacementDistanceMean, meanWindDirectionFull);
-    const [newLatMax, newLngMax] = calculateNewCenter(lastLat, lastLng, displacementDistanceMax, meanWindDirectionFull);
+    const [newLatMin, newLngMin] = calculateNewCenter(cutAwayLat, cutAwayLng, displacementDistanceMin, meanWindDirectionFull);
+    const [newLatMean, newLngMean] = calculateNewCenter(cutAwayLat, cutAwayLng, displacementDistanceMean, meanWindDirectionFull);
+    const [newLatMax, newLngMax] = calculateNewCenter(cutAwayLat, cutAwayLng, displacementDistanceMax, meanWindDirectionFull);
 
     // Log all calculations
     console.log('Cut-away canopy calculation:', {
@@ -3479,21 +3567,23 @@ function setupSliderEvents() {
             await updateWeatherDisplay(index);
             if (lastLat && lastLng && lastAltitude !== 'N/A') {
                 calculateMeanWind();
+                if (userSettings.calculateJump) {
+                    calculateJump();
+                    calculateCutAway();
+                }
                 if (userSettings.showJumpRunTrack) {
                     console.log('Updating JRT for slider change');
                     updateJumpRunTrack();
-                }
-                if (userSettings.calculateJump) {
-                    console.log('Recalculating jump for slider change');
-                    calculateJump();
-                    calculateCutAway();
                 }
                 if (currentMarker) {
                     console.log('Updating marker popup for slider change');
                     const wasOpen = currentMarker.getPopup()?.isOpen() || false;
                     await updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, wasOpen);
-                } else {
-                    console.warn('No currentMarker to update popup');
+                }
+                if (cutAwayMarker && cutAwayLat && cutAwayLng) {
+                    console.log('Updating cut-away marker popup for slider change');
+                    const wasOpen = cutAwayMarker.getPopup()?.isOpen() || false;
+                    updateCutAwayMarkerPopup(cutAwayMarker, cutAwayLat, cutAwayLng, wasOpen);
                 }
             }
         } else {
@@ -3503,21 +3593,23 @@ function setupSliderEvents() {
             await updateWeatherDisplay(0);
             if (lastLat && lastLng && lastAltitude !== 'N/A') {
                 calculateMeanWind();
+                if (userSettings.calculateJump) {
+                    calculateJump();
+                    calculateCutAway();
+                }
                 if (userSettings.showJumpRunTrack) {
                     console.log('Updating JRT for slider reset');
                     updateJumpRunTrack();
-                }
-                if (userSettings.calculateJump) {
-                    console.log('Recalculating jump for slider reset');
-                    calculateJump();
-                    calculateCutAway();
                 }
                 if (currentMarker) {
                     console.log('Updating marker popup for slider reset');
                     const wasOpen = currentMarker.getPopup()?.isOpen() || false;
                     await updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, wasOpen);
-                } else {
-                    console.warn('No currentMarker to update popup');
+                }
+                if (cutAwayMarker && cutAwayLat && cutAwayLng) {
+                    console.log('Updating cut-away marker popup for slider reset');
+                    const wasOpen = cutAwayMarker.getPopup()?.isOpen() || false;
+                    updateCutAwayMarkerPopup(cutAwayMarker, cutAwayLat, cutAwayLng, wasOpen);
                 }
             }
         }
@@ -3551,7 +3643,7 @@ function setupModelSelectEvents() {
                 if (userSettings.calculateJump) {
                     console.log('Recalculating jump for model change');
                     calculateJump();
-                    calculateCutAway(); // Call calculateCutAway after calculateJump
+                    calculateCutAway();
                 }
             }
             if (userSettings.showJumpRunTrack) {
@@ -3562,8 +3654,11 @@ function setupModelSelectEvents() {
                 console.log('Updating marker popup for model change');
                 const wasOpen = currentMarker.getPopup()?.isOpen() || false;
                 await updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, wasOpen);
-            } else {
-                console.warn('No currentMarker to update popup');
+            }
+            if (cutAwayMarker && cutAwayLat && cutAwayLng) {
+                console.log('Updating cut-away marker popup for model change');
+                const wasOpen = cutAwayMarker.getPopup()?.isOpen() || false;
+                updateCutAwayMarkerPopup(cutAwayMarker, cutAwayLat, cutAwayLng, wasOpen);
             }
             userSettings.model = modelSelect.value;
             saveSettings();
@@ -3585,11 +3680,9 @@ function setupMenuEvents() {
     const hamburgerBtn = document.getElementById('hamburgerBtn');
     const menu = document.getElementById('menu');
     if (hamburgerBtn && menu) {
-        // Ensure menu is hidden on load
         menu.classList.add('hidden');
         console.log('Menu initialized as hidden on load');
 
-        // Log initial styles for debugging
         const computedStyle = window.getComputedStyle(menu);
         console.log('Initial menu styles:', {
             display: computedStyle.display,
@@ -3600,11 +3693,9 @@ function setupMenuEvents() {
 
         hamburgerBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            e.preventDefault(); // Prevent any default behavior
+            e.preventDefault();
             menu.classList.toggle('hidden');
             const isHidden = menu.classList.contains('hidden');
-
-            // Log styles after toggle for debugging
             const currentStyle = window.getComputedStyle(menu);
             console.log('Main menu toggled:', isHidden ? 'hidden' : 'shown', {
                 display: currentStyle.display,
@@ -3640,7 +3731,6 @@ function setupMenuEvents() {
             e.stopPropagation();
         });
 
-        // Debug unresponsive clicks
         menu.addEventListener('click', (e) => {
             const target = e.target;
             if ((target.type === 'checkbox' || target.type === 'number' || target.type === 'text') && target.disabled) {
@@ -3951,22 +4041,7 @@ function setupInputEvents() {
         if (!isNaN(value) && value >= 400 && value <= 15000) {
             userSettings.cutAwayAltitude = value;
             saveSettings();
-            if (userSettings.showCutAwayFinder && weatherData && lastLat && lastLng) {
-                calculateJump();
-                calculateCutAway();
-            }
-        } else {
-            Utils.handleError('Cut away altitude must be between 400 and 15000 meters.');
-            setInputValue('cutAwayAltitude', 1000);
-            userSettings.cutAwayAltitude = 1000;
-            saveSettings();
-        }
-    });
-    setupInput('cutAwayAltitude', 'change', 300, (value) => {
-        if (!isNaN(value) && value >= 400 && value <= 15000) {
-            userSettings.cutAwayAltitude = value;
-            saveSettings();
-            if (userSettings.showCutAwayFinder && userSettings.calculateJump && weatherData && lastLat && lastLng) {
+            if (userSettings.showCutAwayFinder && userSettings.calculateJump && weatherData && cutAwayLat !== null && cutAwayLng !== null) {
                 console.log('Recalculating jump for cut-away altitude change');
                 calculateJump();
                 calculateCutAway();
@@ -4175,7 +4250,6 @@ function setupCheckboxEvents() {
         userSettings.showCutAwayFinder = checkbox.checked;
         saveSettings();
         console.log('showCutAwayFinder changed:', checkbox.checked);
-        // Explicitly find and toggle the submenu
         const checkboxElement = document.getElementById('showCutAwayFinder');
         if (checkboxElement) {
             const parentLi = checkboxElement.closest('li');
@@ -4194,7 +4268,7 @@ function setupCheckboxEvents() {
         } else {
             console.warn('showCutAwayFinder checkbox not found');
         }
-        if (checkbox.checked && userSettings.calculateJump && weatherData && lastLat && lastLng) {
+        if (checkbox.checked && userSettings.calculateJump && weatherData && cutAwayLat !== null && cutAwayLng !== null) {
             console.log('Show Cut Away Finder enabled, running calculateCutAway');
             calculateJump();
             calculateCutAway();
@@ -4306,6 +4380,27 @@ function setupResetButton() {
         console.log('Settings and unlock status reset');
         location.reload();
     });
+}
+// New function to handle reset cut-away marker button
+function setupResetCutAwayMarkerButton() {
+    const resetButton = document.getElementById('resetCutAwayMarker');
+    if (resetButton) {
+        resetButton.addEventListener('click', () => {
+            if (cutAwayMarker) {
+                map.removeLayer(cutAwayMarker);
+                cutAwayMarker = null;
+                cutAwayLat = null;
+                cutAwayLng = null;
+                console.log('Cut-away marker reset');
+                if (cutAwayCircle) {
+                    map.removeLayer(cutAwayCircle);
+                    cutAwayCircle = null;
+                    console.log('Cleared cut-away circle');
+                }
+                document.getElementById('info').innerHTML = 'Right-click map to place cut-away marker';
+            }
+        });
+    }
 }
 function displayError(message) {
     console.log('displayError called with:', message);
@@ -4679,4 +4774,5 @@ document.addEventListener('DOMContentLoaded', () => {
     setupCheckboxEvents();
     setupCoordinateEvents();
     setupResetButton();
+    setupResetCutAwayMarkerButton(); // New event setup
 });
