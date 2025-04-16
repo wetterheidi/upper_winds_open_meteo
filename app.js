@@ -4335,6 +4335,11 @@ function setupCheckboxEvents() {
                 cutAwayCircle = null;
                 console.log('Cleared cut-away circle');
             }
+            if (cutAwayMarker) {
+                map.removeLayer(cutAwayMarker);
+                cutAwayMarker = null;
+                console.log('Cleared cut-away marker');
+            }
         }
     });
 }
