@@ -2783,9 +2783,9 @@ function calculateCutAway() {
     const displacementDistanceMax = meanWindSpeedMpsFull * descentTimeMax; // meters
 
     // Calculate landing positions
-    const [newLatMin, newLngMin] = calculateNewCenter(cutAwayLat, cutAwayLng, displacementDistanceMin, meanWindDirectionFull);
-    const [newLatMean, newLngMean] = calculateNewCenter(cutAwayLat, cutAwayLng, displacementDistanceMean, meanWindDirectionFull);
-    const [newLatMax, newLngMax] = calculateNewCenter(cutAwayLat, cutAwayLng, displacementDistanceMax, meanWindDirectionFull);
+    const [newLatMin, newLngMin] = calculateNewCenter(cutAwayLat, cutAwayLng, displacementDistanceMin, ((meanWindDirectionFull + 180) % 360));
+    const [newLatMean, newLngMean] = calculateNewCenter(cutAwayLat, cutAwayLng, displacementDistanceMean, ((meanWindDirectionFull + 180) % 360));
+    const [newLatMax, newLngMax] = calculateNewCenter(cutAwayLat, cutAwayLng, displacementDistanceMax, ((meanWindDirectionFull + 180) % 360));
 
     // Log all calculations
     console.log('Cut-away canopy calculation:', {
