@@ -813,6 +813,15 @@ input[type="checkbox"][style*="opacity: 1"] {
     font-size: 12px;
 }
 
+.cutaway-tooltip {
+    background-color: rgba(255, 255, 255, 0.8);
+    border: 1px solid red;
+    border-radius: 3px;
+    padding: 5px;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
 @keyframes spin {
     0% {
         transform: rotate(0deg);
