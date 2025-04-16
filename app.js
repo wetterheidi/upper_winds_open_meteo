@@ -2673,30 +2673,55 @@ function calculateCutAway() {
 
     const meanWindDirectionFull = jumpResult.meanWindFull[0]; // degrees
     const meanWindSpeedMpsFull = jumpResult.meanWindFull[1]; // m/s
-    const openingAltitude = userSettings.openingAltitude; // meters
+    const cutAwayAltitude = userSettings.openingAltitude; // meters
     const surfaceAltitude = lastAltitude; // meters
-    const verticalSpeed = 5; // m/s, as specified
+    const verticalSpeedMax = 1.5; // m/s, "Max", because of maximum displacement, when min vz!
+    const verticalSpeedMean = 8.5;
+    const verticalSpeedMin = 33.5;
+    const radius = 100; 
 
     // Calculate descent time
-    const heightDifference = openingAltitude - 200 - surfaceAltitude; // meters
-    const descentTime = heightDifference / verticalSpeed; // seconds
+    const heightDifference = cutAwayAltitude - surfaceAltitude; // meters
+    //const descentTime = heightDifference / verticalSpeed; // seconds
+    const descentTimeMin = heightDifference / verticalSpeedMin; // seconds 
+    const descentTimeMean = heightDifference / verticalSpeedMean; // seconds
+    const descentTimeMax = heightDifference / verticalSpeedMax; // seconds
+
 
     // Calculate displacement distance
-    const displacementDistance = meanWindSpeedMpsFull * descentTime; // meters
+    //const displacementDistance = meanWindSpeedMpsFull * descentTime; // meters
+    const displacementDistanceMin = meanWindSpeedMpsFull * descentTimeMin; // meters
+    const displacementDistanceMean = meanWindSpeedMpsFull * descentTimeMean; // meters
+    const displacementDistanceMax = meanWindSpeedMpsFull * descentTimeMax; // meters
 
     // Calculate landing position
-    const [newLat, newLng] = calculateNewCenter(lastLat, lastLng, displacementDistance, meanWindDirectionFull);
+    //const [newLat, newLng] = calculateNewCenter(lastLat, lastLng, displacementDistance, meanWindDirectionFull);
+    const [newLatMin, newLngMin] = calculateNewCenter(lastLat, lastLng, displacementDistanceMin, meanWindDirectionFull);
+    const [newLatMean, newLngMean] = calculateNewCenter(lastLat, lastLng, displacementDistanceMean, meanWindDirectionFull);
+    const [newLatMax, newLngMax] = calculateNewCenter(lastLat, lastLng, displacementDistanceMax, meanWindDirectionFull);
 
     console.log('Cut-away canopy calculation:', {
         cutAwayAltitude: `${openingAltitude - 200} m`,
         surfaceAltitude: `${surfaceAltitude} m`,
         meanWindSpeed: `${meanWindSpeedMpsFull.toFixed(2)} m/s`,
         meanWindDirection: `${Math.round(meanWindDirectionFull)}°`,
-        descentTime: `${descentTime.toFixed(2)} s`,
-        displacementDistance: `${displacementDistance.toFixed(2)} m`,
-        landingPosition: {
-            lat: newLat.toFixed(5),
-            lng: newLng.toFixed(5)
+        descentTimeMin: `${descentTimeMin.toFixed(0)} s`,
+        descentTimeMean: `${descentTimeMean.toFixed(0)} s`,
+        descentTimeMax: `${descentTimeMax.toFixed(0)} s`,
+        displacementDistanceMin: `${displacementDistanceMin.toFixed(0)} m`,
+        displacementDistanceMean: `${displacementDistanceMean.toFixed(0)} m`,
+        displacementDistanceMax: `${displacementDistanceMax.toFixed(0)} m`,
+        landingPositionMin: {
+            lat: newLatMin.toFixed(5),
+            lng: newLngMin.toFixed(5)
+        },
+        landingPositionMean: {
+            lat: newLatMean.toFixed(5),
+            lng: newLngMean.toFixed(5)
+        },
+        landingPositionMax: {
+            lat: newLatMax.toFixed(5),
+            lng: newLngMax.toFixed(5)
         }
     });
 }
@@ -3851,6 +3876,21 @@ function setupInputEvents() {
             saveSettings();
         }
     });
+    setupInput('cutAwayAltitude', 'change', 300, (value) => {
+        if (!isNaN(value) && value >= 400 && value <= 15000) {
+            userSettings.cutAwayAltitude = value;
+            saveSettings();
+            if (userSettings.showCutAwayFinder && weatherData && lastLat && lastLng) {
+                calculateJump();
+                calculateCutAway();
+            }
+        } else {
+            Utils.handleError('Cut away altitude must be between 400 and 15000 meters.');
+            setInputValue('cutAwayAltitude', 1000);
+            userSettings.cutAwayAltitude = 1000;
+            saveSettings();
+        }
+    });
 }
 function setupCheckboxEvents() {
     setupCheckbox('showTableCheckbox', 'showTable', (checkbox) => {
@@ -4040,6 +4080,18 @@ function setupCheckboxEvents() {
         console.log('Show Exit Area set to:', userSettings.showExitArea);
         if (userSettings.calculateJump && weatherData && lastLat && lastLng) {
             calculateJump(); // Recalculate to update green circle visibility
+            calculateCutAway();
+        }
+    });
+
+    setupCheckbox('showCutAwayFinder', 'showCutAwayFinder', (checkbox) => {
+        userSettings.showCutAwayFinder = checkbox.checked;
+        saveSettings();
+        console.log('showCutAwayFinder changed:', checkbox.checked);
+        toggleSubmenu('showCutAwayFinder', checkbox.checked);
+        if (checkbox.checked && weatherData && lastLat && lastLng) {
+            console.log('Show Cut Away Finder enabled, running calculateCutAway');
+            calculateJump();
             calculateCutAway();
         }
     });

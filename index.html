@@ -281,6 +281,32 @@
                             </li>
                         </ul>
                     </li>
+                    <li>
+                        <input type="checkbox" id="showCutAwayFinder" /> Show Cut Away Finder
+                        <ul class="submenu hidden">
+                            <li>
+                                <label class="radio-label">
+                                    Cut Away Altitude (m):
+                                    <input type="number" id="cutAwayAltitude" min="400" max="15000" step="100" value="1000">
+                                </label>
+                            </li>
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="cutAwayState" value="Collapsed" checked> Fully Collapsed
+                                </label>
+                            </li>
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="cutAwayState" value="Partially"> Partially Collapsed
+                                </label>
+                            </li>
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="cutAwayState" value="Open"> Fully Open
+                                </label>
+                            </li>
+                        </ul>
+                    </li>
                 </ul>
             </li>
         </ul>
