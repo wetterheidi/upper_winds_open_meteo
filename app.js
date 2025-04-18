@@ -810,7 +810,6 @@ function createCustomMarker(lat, lng) {
         draggable: true
     });
 }
-// New function to create cut-away marker
 function createCutAwayMarker(lat, lng) {
     const cutAwayIcon = L.icon({
         iconUrl: 'schere_purple.png', // Use a different icon if available
@@ -863,7 +862,6 @@ function attachMarkerDragend(marker) {
         }
     });
 }
-// New function to attach dragend handler for cut-away marker
 function attachCutAwayMarkerDragend(marker) {
     marker.on('dragend', (e) => {
         const position = marker.getLatLng();
@@ -927,7 +925,6 @@ async function updateMarkerPopup(marker, lat, lng, altitude, open = false) {
         marker.openPopup();
     }
 }
-// New function to update cut-away marker popup
 function updateCutAwayMarkerPopup(marker, lat, lng, open = false) {
     const coordFormat = getCoordinateFormat();
     const coords = Utils.convertCoords(lat, lng, coordFormat);
@@ -2196,7 +2193,7 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
                 radius: radiusFull,
                 color: 'green',
                 fillColor: 'green',
-                fillOpacity: 0.2,
+                fillOpacity: 0,
                 weight: 2
             }).addTo(map);
             console.log('Added green circle at:', { center: jumpCircleGreenCenter, radius: radiusFull });
@@ -2215,7 +2212,7 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
                 radius: radius,
                 color: 'darkgreen',
                 fillColor: 'darkgreen',
-                fillOpacity: 0.2,
+                fillOpacity: 0,
                 weight: 2
             }).addTo(map);
             console.log('Added dark green circle at:', { center: jumpCircleGreenLightCenter, radius });
