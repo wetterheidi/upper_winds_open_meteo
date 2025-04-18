@@ -1967,7 +1967,7 @@ function calculateJump() {
     if (!weatherData || !weatherData.time || !weatherData.surface_pressure) {
         console.warn('Weather data not available');
         return null;
-    }    
+    }
     const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
     const exitAltitude = parseInt(document.getElementById('exitAltitude')?.value) || 3000;
     const openingAltitude = parseInt(document.getElementById('openingAltitude')?.value) || 1200;
@@ -2372,6 +2372,25 @@ function jumpRunTrack() {
         // Calculate dynamic track length
         const numberOfJumpers = parseInt(userSettings.numberOfJumpers) || 10;
         const jumperSeparation = parseFloat(userSettings.jumperSeparation) || 5;
+
+
+        //++++++++++++++++++++++++++++++++++++++++
+        let separation;
+        if (numberOfJumpers == 1) {
+            //200 m separation
+            separation = 200 / groundSpeedMps;
+        } else if (numberOfJumpers <= 6) {
+            //300 m separation
+            separation = 300 / groundSpeedMps;
+        } else {
+            //500 m separation
+            separation = 500 / groundSpeedMps;
+        }
+        console.log('Dynamic separation: ', separation.toFixed(0))
+        //++++++++++++++++++++++++++++++++++++++++
+
+
+
         if (numberOfJumpers >= 1 && jumperSeparation >= 1 && Number.isFinite(groundSpeedMps)) {
             trackLength = numberOfJumpers * jumperSeparation * groundSpeedMps;
             trackLength = Math.max(100, Math.min(10000, Math.round(trackLength)));
