@@ -2231,9 +2231,9 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
         const zoom = map.getZoom();
         blueCircleMetadata.forEach(({ circle, label, center, radius, content }) => {
             label.setIcon(L.divIcon({
-                className: 'isoline-label',
-                html: `<span style="font-size: ${zoom <= 12 ? '10px' : '12px'}">${content}</span>`,
-                iconSize: zoom <= 12 ? [60, 16] : [100, 20],
+                className: `isoline-label isoline-label-${zoom <= 11 ? 'small' : 'large'}`,
+                html: `<span style="font-size: ${zoom <= 11 ? '7px' : '9px'}">${content}</span>`,
+                iconSize: zoom <= 11 ? [50, 12] : [60, 14],
                 iconAnchor: calculateLabelAnchor(center, radius)
             }));
         });
@@ -2447,7 +2447,7 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
             const centerPoint = map.latLngToLayerPoint(centerLatLng);
             const topEdgePoint = map.latLngToLayerPoint(topEdgeLatLng);
             const offsetY = centerPoint.y - topEdgePoint.y + 10; // Positive for top edge
-            return [50, offsetY]; // Center horizontally, offset vertically
+            return [25, offsetY]; // Center horizontally, offset vertically
         }
 
         // Only call updateBlueCircleLabels if metadata exists

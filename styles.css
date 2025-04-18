@@ -783,7 +783,7 @@ input[type="checkbox"][style*="opacity: 1"] {
 }
 
 .isoline-label {
-    background: rgba(255, 255, 255, 0.8) !important;
+    background: rgba(255, 255, 255, 0.7) !important;
     color: blue !important;
     font-weight: bold;
     border: none;
@@ -796,20 +796,20 @@ input[type="checkbox"][style*="opacity: 1"] {
     pointer-events: none !important; /* Prevent mouse interaction */
 }
 
-/* Enforce iconSize dimensions */
-.isoline-label[style*="width: 50px"] {
-    width: 50px !important;
-    height: 12px !important;
-}
-
-.isoline-label[style*="width: 60px"] {
-    width: 60px !important;
-    height: 14px !important;
-}
-
 .isoline-label span {
     margin: 0 !important;
     padding: 0 !important;
+    display: inline-block;
+}
+
+.isoline-label-small {
+    width: 30px !important;
+    height: 12px !important;
+}
+
+.isoline-label-large {
+    width: 50px !important;
+    height: 14px !important;
 }
 
 #favoriteBtn {
