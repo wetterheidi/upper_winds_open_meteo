@@ -782,6 +782,36 @@ input[type="checkbox"][style*="opacity: 1"] {
     white-space: nowrap;
 }
 
+.isoline-label {
+    background: rgba(255, 255, 255, 0.8) !important;
+    color: blue !important;
+    font-weight: bold;
+    border: none;
+    border-radius: 3px;
+    padding: 0;
+    line-height: 1 !important; /* Tighten line height */
+    text-align: center;
+    overflow: hidden !important; /* Clip text if it overflows */
+    z-index: 2100 !important; /* Above other tooltips */
+    pointer-events: none !important; /* Prevent mouse interaction */
+}
+
+/* Enforce iconSize dimensions */
+.isoline-label[style*="width: 50px"] {
+    width: 50px !important;
+    height: 12px !important;
+}
+
+.isoline-label[style*="width: 60px"] {
+    width: 60px !important;
+    height: 14px !important;
+}
+
+.isoline-label span {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
 #favoriteBtn {
     margin-top: 3px;
     padding: 5px 10px;
