@@ -1,13 +1,13 @@
 
 // == Project: Skydiving Weather and Jump Planner ==
 // == Constants and Global Variables ==
-const FEATURE_PASSWORD = "skydiver2025"; // Hardcoded password (change as needed)
+let userSettings = JSON.parse(localStorage.getItem('upperWindsSettings')) || { ...defaultSettings };
 let map;
-let weatherData = null;
 let lastLat = null;
 let lastLng = null;
 let lastAltitude = null;
 let currentMarker = null;
+let weatherData = null;
 let lastModelRun = null;
 let landingPatternPolygon = null;
 let secondlandingPatternPolygon = null;
@@ -16,31 +16,24 @@ let finalArrow = null;
 let baseArrow = null;
 let downwindArrow = null;
 let landingWindDir = null;
+let jumpRunTrackLayer = null;
+let customJumpRunDirection = null; // Temporary storage for custom direction during session
+let isJumperSeparationManual = false; // Tracks if jumperSeparation is manually set
 let jumpCircle = null;
-let jumpCircleFull = null; // New red circle for full descent
-let jumpCircleGreen = null; // New green circle
-let jumpCircleGreenLight = null; // New light green circle (blue circle radius)
+let jumpCircleFull = null; 
+let jumpCircleGreen = null; 
+let jumpCircleGreenLight = null; 
 let blueCircleLayer = null;
 let greenCircleLayer = null;
 let redCircleLayer = null;
-let jumpRunTrackLayer = null;
-let customJumpRunDirection = null; // Temporary storage for custom direction during sessionconst minZoom = 11; // Placeholder, adjust as needed
-let isJumperSeparationManual = false; // Tracks if jumperSeparation is manually set
-const minZoom = 11; // Placeholder, adjust as needed
-const maxZoom = 14; // Placeholder, adjust as needed
-const landingPatternMinZoom = 14; // New constant for landing pattern
-let isLandingPatternUnlocked = false;   // Track unlock state during session
-let isCalculateJumpUnlocked = false;    // Track unlock state during session
-let cutAwayMarker = null; // New marker for cut-away
-let cutAwayLat = null;   // New coordinate for cut-away
-let cutAwayLng = null;   // New coordinate for cut-away
-let cutAwayCircle = null; // New variable to track cut-away circle
-let userSettings = JSON.parse(localStorage.getItem('upperWindsSettings')) || { ...defaultSettings };
-const unlockedFeatures = JSON.parse(localStorage.getItem('unlockedFeatures')) || {};
-isLandingPatternUnlocked = unlockedFeatures.landingPattern || false;
-isCalculateJumpUnlocked = unlockedFeatures.calculateJump || false;
-console.log('Initial unlock status:', { isLandingPatternUnlocked, isCalculateJumpUnlocked });
+let cutAwayMarker = null;
+let cutAwayLat = null;   
+let cutAwayLng = null;   
+let cutAwayCircle = null; 
 
+const minZoom = 11; 
+const maxZoom = 14; 
+const landingPatternMinZoom = 14; 
 const debouncedCalculateJump = debounce(calculateJump, 300);
 const getTemperatureUnit = () => getSettingValue('temperatureUnit', 'radio', 'C');
 const getHeightUnit = () => getSettingValue('heightUnit', 'radio', 'm');
@@ -48,7 +41,6 @@ const getWindSpeedUnit = () => getSettingValue('windUnit', 'radio', 'kt');
 const getCoordinateFormat = () => getSettingValue('coordFormat', 'radio', 'Decimal');
 const getInterpolationStep = () => getSettingValue('interpStepSelect', 'select', 200);
 const getDownloadFormat = () => getSettingValue('downloadFormat', 'radio', 'csv');
-// == Lookup Table for Jumper Separation ==
 const jumperSeparationTable = {
     135: 5,
     130: 5,
@@ -78,7 +70,6 @@ const jumperSeparationTable = {
     10: 60,
     5: 119
 };
-// Default settings object
 const defaultSettings = {
     model: 'icon_global',
     refLevel: 'AGL',
@@ -116,6 +107,14 @@ const defaultSettings = {
     cutAwayState: 'Partially' // Added for cut-away radio buttons
 };
 
+// == Password handling ==
+let isLandingPatternUnlocked = false;   // Track unlock state during session
+let isCalculateJumpUnlocked = false;    // Track unlock state during session
+const FEATURE_PASSWORD = "skydiver2025"; // Hardcoded password 
+const unlockedFeatures = JSON.parse(localStorage.getItem('unlockedFeatures')) || {};
+isLandingPatternUnlocked = unlockedFeatures.landingPattern || false;
+isCalculateJumpUnlocked = unlockedFeatures.calculateJump || false;
+console.log('Initial unlock status:', { isLandingPatternUnlocked, isCalculateJumpUnlocked });
 
 // == Settings Management ==
 function getSettingValue(name, type = 'radio', defaultValue) {
@@ -1966,7 +1965,7 @@ function visualizeFreeFallPath(path) {
     freeFallPolyline.bindPopup(`Free Fall Path<br>Duration: ${path[path.length - 1].time.toFixed(1)}s<br>Distance: ${Math.sqrt(path[path.length - 1].latLng[0] ** 2 + path[path.length - 1].latLng[1] ** 2).toFixed(1)}m`);
 }
 function calculateJump() {
-    console.log('Starting calculateJump...', { 
+    console.log('Starting calculateJump...', {
         calculateJump: userSettings.calculateJump,
         showCanopyArea: userSettings.showCanopyArea,
         showCutAwayFinder: userSettings.showCutAwayFinder,
@@ -2020,7 +2019,7 @@ function calculateJump() {
         jumpCircleFull = null;
         jumpCircleGreen = null;
         jumpCircleGreenLight = null;
-        console.log('calculateJump: Cleared all circles and markers', { 
+        console.log('calculateJump: Cleared all circles and markers', {
             currentMarkerExists: !!currentMarker,
             cutAwayMarkerExists: !!cutAwayMarker,
             cutAwayCircleExists: !!cutAwayCircle
@@ -2208,7 +2207,7 @@ function calculateJump() {
         freeFallTime: freeFallResult.time,
         showCanopyArea: userSettings.showCanopyArea
     });
-    
+
     updateJumpCircle(
         downwindLat,
         downwindLng,
@@ -2237,7 +2236,7 @@ function calculateJump() {
     updateJumpRunTrack();
     jumpRunTrack();
 
-    console.log('calculateJump completed', { 
+    console.log('calculateJump completed', {
         currentMarkerExists: !!currentMarker,
         cutAwayMarkerExists: !!cutAwayMarker,
         cutAwayCircleExists: !!cutAwayCircle
@@ -2264,13 +2263,13 @@ function clearIsolineMarkers() {
     if (map) {
         let markerCount = 0;
         map.eachLayer(layer => {
-            if (layer instanceof L.Marker && 
-                layer !== currentMarker && 
-                layer !== cutAwayMarker && 
-                layer.options.icon && 
-                layer.options.icon.options && 
-                typeof layer.options.icon.options.className === 'string' && 
-                layer.options.icon.options.className.match(/isoline-label/) && 
+            if (layer instanceof L.Marker &&
+                layer !== currentMarker &&
+                layer !== cutAwayMarker &&
+                layer.options.icon &&
+                layer.options.icon.options &&
+                typeof layer.options.icon.options.className === 'string' &&
+                layer.options.icon.options.className.match(/isoline-label/) &&
                 !layer.options.icon.options.className.match(/landing-pattern-arrow|wind-arrow-icon/)) {
                 console.log('Removing isoline-label marker:', layer, 'className:', layer.options.icon.options.className);
                 layer.remove();
@@ -2279,11 +2278,11 @@ function clearIsolineMarkers() {
                 console.log('Skipping currentMarker:', layer, 'className:', layer.options?.icon?.options?.className || 'none');
             } else if (layer === cutAwayMarker) {
                 console.log('Skipping cutAwayMarker:', layer, 'className:', layer.options?.icon?.options?.className || 'none');
-            } else if (layer instanceof L.Marker && 
-                       layer.options.icon && 
-                       layer.options.icon.options && 
-                       typeof layer.options.icon.options.className === 'string' && 
-                       layer.options.icon.options.className.match(/landing-pattern-arrow|wind-arrow-icon/)) {
+            } else if (layer instanceof L.Marker &&
+                layer.options.icon &&
+                layer.options.icon.options &&
+                typeof layer.options.icon.options.className === 'string' &&
+                layer.options.icon.options.className.match(/landing-pattern-arrow|wind-arrow-icon/)) {
                 console.log('Skipping landing pattern arrow marker:', layer, 'className:', layer.options.icon.options.className);
             }
         });
@@ -2291,13 +2290,13 @@ function clearIsolineMarkers() {
         // Fallback: Remove only markers that are not currentMarker, cutAwayMarker, or landing pattern arrows
         if (markerCount === 0) {
             map.eachLayer(layer => {
-                if (layer instanceof L.Marker && 
-                    layer !== currentMarker && 
-                    layer !== cutAwayMarker && 
-                    (!layer.options.icon || 
-                     !layer.options.icon.options || 
-                     !layer.options.icon.options.className || 
-                     !layer.options.icon.options.className.match(/landing-pattern-arrow|wind-arrow-icon/))) {
+                if (layer instanceof L.Marker &&
+                    layer !== currentMarker &&
+                    layer !== cutAwayMarker &&
+                    (!layer.options.icon ||
+                        !layer.options.icon.options ||
+                        !layer.options.icon.options.className ||
+                        !layer.options.icon.options.className.match(/landing-pattern-arrow|wind-arrow-icon/))) {
                     console.log('Fallback: Removing marker:', layer, 'className:', layer.options?.icon?.options?.className || 'none');
                     layer.remove();
                 }
@@ -2308,10 +2307,10 @@ function clearIsolineMarkers() {
     }
 }
 function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, additionalBlueRadii, additionalBlueDisplacements, additionalBlueDirections, additionalBlueUpperLimits, displacement, displacementFull, direction, directionFull, freeFallDirection, freeFallDistance, freeFallTime) {
-    console.log('updateJumpCircle called with:', { 
-        blueLat, blueLng, redLat, redLng, radius, radiusFull, 
-        additionalBlueRadii, additionalBlueDisplacements, additionalBlueDirections, additionalBlueUpperLimits, 
-        displacement, displacementFull, direction, directionFull, freeFallDirection, freeFallDistance, freeFallTime, 
+    console.log('updateJumpCircle called with:', {
+        blueLat, blueLng, redLat, redLng, radius, radiusFull,
+        additionalBlueRadii, additionalBlueDisplacements, additionalBlueDirections, additionalBlueUpperLimits,
+        displacement, displacementFull, direction, directionFull, freeFallDirection, freeFallDistance, freeFallTime,
         zoom: map?.getZoom(), showCanopyArea: userSettings.showCanopyArea, showExitArea: userSettings.showExitArea, calculateJump: userSettings.calculateJump, showCutAwayFinder: userSettings.showCutAwayFinder,
         callCount: (window.updateJumpCircleCallCount = (window.updateJumpCircleCallCount || 0) + 1),
         currentMarkerExists: !!currentMarker,
@@ -2539,17 +2538,16 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
                     blueCircleMetadata.push({ circle, label, center: addCenter, radius: addRadius, content: blueContent });
 
                     // Optional: Hide labels for odd-indexed circles at zoom 11 or lower
-                    // Temporarily disabled to test marker cleanup
-                    // if (currentZoom <= 11 && i % 2 === 1) {
-                    //     label.remove();
-                    //     console.log(`Hid label for blue circle ${i} at zoom:`, currentZoom);
-                    // }
+                    if (currentZoom <= 11 && i % 2 === 1) {
+                        label.remove();
+                        console.log(`Hid label for blue circle ${i} at zoom:`, currentZoom);
+                    }
                 } else {
-                    console.warn(`Invalid data for blue circle ${i}:`, { 
-                        addRadius, 
-                        displacement: additionalBlueDisplacements[i], 
-                        direction: additionalBlueDirections[i], 
-                        upperLimit: additionalBlueUpperLimits[i] 
+                    console.warn(`Invalid data for blue circle ${i}:`, {
+                        addRadius,
+                        displacement: additionalBlueDisplacements[i],
+                        direction: additionalBlueDirections[i],
+                        upperLimit: additionalBlueUpperLimits[i]
                     });
                 }
             });
@@ -3157,7 +3155,7 @@ function updateJumpRunTrack() {
     });
 }
 function calculateCutAway() {
-    console.log('calculateCutAway called', { 
+    console.log('calculateCutAway called', {
         calculateJump: userSettings.calculateJump,
         showCanopyArea: userSettings.showCanopyArea,
         showCutAwayFinder: userSettings.showCutAwayFinder,
@@ -3361,7 +3359,7 @@ function calculateCutAway() {
         });
         console.log('Added cut-away circle:', { center, radius, stateLabel });
     }
-    console.log('calculateCutAway completed', { 
+    console.log('calculateCutAway completed', {
         cutAwayMarkerExists: !!cutAwayMarker,
         cutAwayCircleExists: !!cutAwayCircle
     });
@@ -4591,7 +4589,7 @@ function setupCheckboxEvents() {
                 }
             }
         };
-    
+
         const disableFeature = () => {
             console.log('Disabling Calculate Jump');
             userSettings.calculateJump = false;
@@ -4601,7 +4599,7 @@ function setupCheckboxEvents() {
             console.log('Calling calculateJump to clear circles and markers');
             calculateJump();
         };
-    
+
         if (!checkbox.dataset.initialLoad) {
             console.log('Initial load: Disabling Calculate Jump');
             checkbox.dataset.initialLoad = 'true';
@@ -4610,7 +4608,7 @@ function setupCheckboxEvents() {
             saveSettings();
             return;
         }
-    
+
         console.log('Calculate Jump checkbox changed to:', checkbox.checked);
         if (checkbox.checked) {
             if (isFeatureUnlocked('calculateJump')) {
