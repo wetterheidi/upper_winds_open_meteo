@@ -1966,7 +1966,18 @@ function visualizeFreeFallPath(path) {
     freeFallPolyline.bindPopup(`Free Fall Path<br>Duration: ${path[path.length - 1].time.toFixed(1)}s<br>Distance: ${Math.sqrt(path[path.length - 1].latLng[0] ** 2 + path[path.length - 1].latLng[1] ** 2).toFixed(1)}m`);
 }
 function calculateJump() {
-    console.log('Starting calculateJump...', { calculateJump: userSettings.calculateJump });
+    console.log('Starting calculateJump...', { 
+        calculateJump: userSettings.calculateJump,
+        showCanopyArea: userSettings.showCanopyArea,
+        showCutAwayFinder: userSettings.showCutAwayFinder,
+        currentMarkerExists: !!currentMarker,
+        currentMarkerClassName: currentMarker?.options?.icon?.options?.className || 'none',
+        cutAwayMarkerExists: !!cutAwayMarker,
+        cutAwayMarkerClassName: cutAwayMarker?.options?.icon?.options?.className || 'none',
+        cutAwayCircleExists: !!cutAwayCircle,
+        cutAwayLat,
+        cutAwayLng
+    });
     if (!userSettings.calculateJump) {
         console.log('Clearing jump circles due to calculateJump false');
         // Explicitly clear markers and layers
@@ -2009,7 +2020,11 @@ function calculateJump() {
         jumpCircleFull = null;
         jumpCircleGreen = null;
         jumpCircleGreenLight = null;
-        console.log('calculateJump: Cleared all circles and markers');
+        console.log('calculateJump: Cleared all circles and markers', { 
+            currentMarkerExists: !!currentMarker,
+            cutAwayMarkerExists: !!cutAwayMarker,
+            cutAwayCircleExists: !!cutAwayCircle
+        });
         return null;
     }
 
@@ -2193,7 +2208,7 @@ function calculateJump() {
         freeFallTime: freeFallResult.time,
         showCanopyArea: userSettings.showCanopyArea
     });
-
+    
     updateJumpCircle(
         downwindLat,
         downwindLng,
@@ -2222,7 +2237,11 @@ function calculateJump() {
     updateJumpRunTrack();
     jumpRunTrack();
 
-    console.log('calculateJump completed');
+    console.log('calculateJump completed', { 
+        currentMarkerExists: !!currentMarker,
+        cutAwayMarkerExists: !!cutAwayMarker,
+        cutAwayCircleExists: !!cutAwayCircle
+    });
     return {
         radius: horizontalCanopyDistance,
         radiusFull: horizontalCanopyDistanceFull,
@@ -2245,35 +2264,61 @@ function clearIsolineMarkers() {
     if (map) {
         let markerCount = 0;
         map.eachLayer(layer => {
-            if (layer instanceof L.Marker &&
-                layer.options.icon &&
-                layer.options.icon.options &&
-                typeof layer.options.icon.options.className === 'string' &&
-                layer.options.icon.options.className.match(/isoline-label/)) {
+            if (layer instanceof L.Marker && 
+                layer !== currentMarker && 
+                layer !== cutAwayMarker && 
+                layer.options.icon && 
+                layer.options.icon.options && 
+                typeof layer.options.icon.options.className === 'string' && 
+                layer.options.icon.options.className.match(/isoline-label/) && 
+                !layer.options.icon.options.className.match(/landing-pattern-arrow|wind-arrow-icon/)) {
                 console.log('Removing isoline-label marker:', layer, 'className:', layer.options.icon.options.className);
                 layer.remove();
                 markerCount++;
+            } else if (layer === currentMarker) {
+                console.log('Skipping currentMarker:', layer, 'className:', layer.options?.icon?.options?.className || 'none');
+            } else if (layer === cutAwayMarker) {
+                console.log('Skipping cutAwayMarker:', layer, 'className:', layer.options?.icon?.options?.className || 'none');
+            } else if (layer instanceof L.Marker && 
+                       layer.options.icon && 
+                       layer.options.icon.options && 
+                       typeof layer.options.icon.options.className === 'string' && 
+                       layer.options.icon.options.className.match(/landing-pattern-arrow|wind-arrow-icon/)) {
+                console.log('Skipping landing pattern arrow marker:', layer, 'className:', layer.options.icon.options.className);
             }
         });
         console.log('Cleared', markerCount, 'isoline-label markers');
-        // Fallback: Remove all markers except currentMarker if none found
+        // Fallback: Remove only markers that are not currentMarker, cutAwayMarker, or landing pattern arrows
         if (markerCount === 0) {
             map.eachLayer(layer => {
-                if (layer instanceof L.Marker && layer !== currentMarker) {
-                    console.log('Fallback: Removing marker:', layer);
+                if (layer instanceof L.Marker && 
+                    layer !== currentMarker && 
+                    layer !== cutAwayMarker && 
+                    (!layer.options.icon || 
+                     !layer.options.icon.options || 
+                     !layer.options.icon.options.className || 
+                     !layer.options.icon.options.className.match(/landing-pattern-arrow|wind-arrow-icon/))) {
+                    console.log('Fallback: Removing marker:', layer, 'className:', layer.options?.icon?.options?.className || 'none');
                     layer.remove();
                 }
             });
         }
+    } else {
+        console.warn('Map not available in clearIsolineMarkers');
     }
 }
 function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, additionalBlueRadii, additionalBlueDisplacements, additionalBlueDirections, additionalBlueUpperLimits, displacement, displacementFull, direction, directionFull, freeFallDirection, freeFallDistance, freeFallTime) {
-    console.log('updateJumpCircle called with:', {
-        blueLat, blueLng, redLat, redLng, radius, radiusFull,
-        additionalBlueRadii, additionalBlueDisplacements, additionalBlueDirections, additionalBlueUpperLimits,
-        displacement, displacementFull, direction, directionFull, freeFallDirection, freeFallDistance, freeFallTime,
-        zoom: map?.getZoom(), showCanopyArea: userSettings.showCanopyArea, showExitArea: userSettings.showExitArea, calculateJump: userSettings.calculateJump,
-        callCount: (window.updateJumpCircleCallCount = (window.updateJumpCircleCallCount || 0) + 1)
+    console.log('updateJumpCircle called with:', { 
+        blueLat, blueLng, redLat, redLng, radius, radiusFull, 
+        additionalBlueRadii, additionalBlueDisplacements, additionalBlueDirections, additionalBlueUpperLimits, 
+        displacement, displacementFull, direction, directionFull, freeFallDirection, freeFallDistance, freeFallTime, 
+        zoom: map?.getZoom(), showCanopyArea: userSettings.showCanopyArea, showExitArea: userSettings.showExitArea, calculateJump: userSettings.calculateJump, showCutAwayFinder: userSettings.showCutAwayFinder,
+        callCount: (window.updateJumpCircleCallCount = (window.updateJumpCircleCallCount || 0) + 1),
+        currentMarkerExists: !!currentMarker,
+        currentMarkerClassName: currentMarker?.options?.icon?.options?.className || 'none',
+        cutAwayMarkerExists: !!cutAwayMarker,
+        cutAwayMarkerClassName: cutAwayMarker?.options?.icon?.options?.className || 'none',
+        cutAwayCircleExists: !!cutAwayCircle
     });
     if (!map) {
         console.warn('Map not available to update jump circles');
@@ -2300,7 +2345,7 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
     };
 
     // Log state before cleanup
-    console.log('Before cleanup - blueLayer:', !!blueCircleLayer);
+    console.log('Before cleanup - blueLayer:', !!blueCircleLayer, 'cutAwayMarkerExists:', !!cutAwayMarker, 'cutAwayCircleExists:', !!cutAwayCircle);
 
     // Clear all layers to ensure no leftover markers
     if (blueCircleLayer) {
@@ -2340,7 +2385,7 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
     jumpCircleGreenLight = null;
 
     // Log state after cleanup
-    console.log('After cleanup - blueLayer:', !!blueCircleLayer);
+    console.log('After cleanup - blueLayer:', !!blueCircleLayer, 'cutAwayMarkerExists:', !!cutAwayMarker, 'cutAwayCircleExists:', !!cutAwayCircle);
 
     // Define updateBlueCircleLabels before listener management
     function updateBlueCircleLabels() {
@@ -2374,10 +2419,11 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
 
     // Check if calculateJump is enabled
     if (!userSettings.calculateJump) {
-        console.log('Calculate Jump unchecked, cleared all circles and labels', {
+        console.log('Calculate Jump unchecked in updateJumpCircle, cleared all circles and labels', {
             calculateJump: userSettings.calculateJump,
             showCanopyArea: userSettings.showCanopyArea,
-            showExitArea: userSettings.showExitArea
+            showExitArea: userSettings.showExitArea,
+            showCutAwayFinder: userSettings.showCutAwayFinder
         });
         clearIsolineMarkers();
         return false;
@@ -2493,16 +2539,17 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
                     blueCircleMetadata.push({ circle, label, center: addCenter, radius: addRadius, content: blueContent });
 
                     // Optional: Hide labels for odd-indexed circles at zoom 11 or lower
-                    if (currentZoom <= 11 && i % 2 === 1) {
-                        label.remove();
-                        console.log(`Hid label for blue circle ${i} at zoom:`, currentZoom);
-                    }
+                    // Temporarily disabled to test marker cleanup
+                    // if (currentZoom <= 11 && i % 2 === 1) {
+                    //     label.remove();
+                    //     console.log(`Hid label for blue circle ${i} at zoom:`, currentZoom);
+                    // }
                 } else {
-                    console.warn(`Invalid data for blue circle ${i}:`, {
-                        addRadius,
-                        displacement: additionalBlueDisplacements[i],
-                        direction: additionalBlueDirections[i],
-                        upperLimit: additionalBlueUpperLimits[i]
+                    console.warn(`Invalid data for blue circle ${i}:`, { 
+                        addRadius, 
+                        displacement: additionalBlueDisplacements[i], 
+                        direction: additionalBlueDirections[i], 
+                        upperLimit: additionalBlueUpperLimits[i] 
                     });
                 }
             });
@@ -2618,7 +2665,10 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
         greenLight: !!jumpCircleGreenLight && map.hasLayer(jumpCircleGreenLight),
         blueLayerExists: !!blueCircleLayer,
         redLayerExists: !!redCircleLayer,
-        greenLayerExists: !!greenCircleLayer
+        greenLayerExists: !!greenCircleLayer,
+        currentMarkerExists: !!currentMarker,
+        cutAwayMarkerExists: !!cutAwayMarker,
+        cutAwayCircleExists: !!cutAwayCircle
     });
 
     if (currentMarker) {
@@ -3107,8 +3157,20 @@ function updateJumpRunTrack() {
     });
 }
 function calculateCutAway() {
+    console.log('calculateCutAway called', { 
+        calculateJump: userSettings.calculateJump,
+        showCanopyArea: userSettings.showCanopyArea,
+        showCutAwayFinder: userSettings.showCutAwayFinder,
+        cutAwayLat,
+        cutAwayLng,
+        cutAwayMarkerExists: !!cutAwayMarker,
+        cutAwayMarkerClassName: cutAwayMarker?.options?.icon?.options?.className || 'none',
+        cutAwayCircleExists: !!cutAwayCircle
+    });
+
     // Silently skip if cut-away marker is not placed
     if (cutAwayLat === null || cutAwayLng === null) {
+        console.log('Skipping calculateCutAway: cutAwayLat or cutAwayLng is null');
         return;
     }
 
@@ -3241,6 +3303,7 @@ function calculateCutAway() {
     if (cutAwayCircle) {
         map.removeLayer(cutAwayCircle);
         cutAwayCircle = null;
+        console.log('Cleared existing cut-away circle');
     }
 
     // Add circle for the selected cut-away state if showCutAwayFinder is enabled
@@ -3296,7 +3359,12 @@ function calculateCutAway() {
             direction: 'center',
             className: 'cutaway-tooltip'
         });
+        console.log('Added cut-away circle:', { center, radius, stateLabel });
     }
+    console.log('calculateCutAway completed', { 
+        cutAwayMarkerExists: !!cutAwayMarker,
+        cutAwayCircleExists: !!cutAwayCircle
+    });
 }
 
 // == Landing Pattern Calculations ==
@@ -4523,7 +4591,7 @@ function setupCheckboxEvents() {
                 }
             }
         };
-
+    
         const disableFeature = () => {
             console.log('Disabling Calculate Jump');
             userSettings.calculateJump = false;
@@ -4531,9 +4599,9 @@ function setupCheckboxEvents() {
             saveSettings();
             toggleSubmenu('calculateJumpCheckbox', false);
             console.log('Calling calculateJump to clear circles and markers');
-            calculateJump(); // Replace clearJumpCircles with calculateJump
+            calculateJump();
         };
-
+    
         if (!checkbox.dataset.initialLoad) {
             console.log('Initial load: Disabling Calculate Jump');
             checkbox.dataset.initialLoad = 'true';
@@ -4542,7 +4610,7 @@ function setupCheckboxEvents() {
             saveSettings();
             return;
         }
-
+    
         console.log('Calculate Jump checkbox changed to:', checkbox.checked);
         if (checkbox.checked) {
             if (isFeatureUnlocked('calculateJump')) {
@@ -4684,6 +4752,7 @@ function setupCheckboxEvents() {
     });
 
     setupCheckbox('showCutAwayFinder', 'showCutAwayFinder', (checkbox) => {
+        console.log('showCutAwayFinder checkbox changed to:', checkbox.checked);
         userSettings.showCutAwayFinder = checkbox.checked;
         saveSettings();
         console.log('showCutAwayFinder changed:', checkbox.checked);
@@ -4720,6 +4789,10 @@ function setupCheckboxEvents() {
                 cutAwayMarker = null;
                 console.log('Cleared cut-away marker');
             }
+            // Clear cutAwayLat and cutAwayLng to prevent instant circle on recheck
+            cutAwayLat = null;
+            cutAwayLng = null;
+            console.log('Cleared cutAwayLat and cutAwayLng');
         }
     });
 }
@@ -4823,7 +4896,6 @@ function setupResetButton() {
         location.reload();
     });
 }
-// New function to handle reset cut-away marker button
 function setupResetCutAwayMarkerButton() {
     const resetButton = document.getElementById('resetCutAwayMarker');
     if (resetButton) {
