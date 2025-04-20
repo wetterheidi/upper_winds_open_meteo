@@ -7,6 +7,7 @@ let lastLat = null;
 let lastLng = null;
 let lastAltitude = null;
 let currentMarker = null;
+let gpxLayer = null;
 let weatherData = null;
 let lastModelRun = null;
 let landingPatternPolygon = null;
@@ -957,6 +958,49 @@ function recenterMap() {
 function initializeMap() {
     console.log('Initializing map...');
     initMap();
+}
+function loadGpxTrack(file) {
+    if (!file) {
+        Utils.handleError('No file selected.');
+        return;
+    }
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        try {
+            const gpxData = e.target.result;
+            if (gpxLayer) {
+                map.removeLayer(gpxLayer);
+                gpxLayer = null;
+            }
+            gpxLayer = new L.GPX(gpxData, {
+                async: true,
+                marker_options: {
+                    startIconUrl: 'https://cdn.jsdelivr.net/npm/leaflet-gpx@1.7.0/pin-icon-start.png',
+                    endIconUrl: 'https://cdn.jsdelivr.net/npm/leaflet-gpx@1.7.0/pin-icon-end.png',
+                    shadowUrl: 'https://cdn.jsdelivr.net/npm/leaflet-gpx@1.7.0/pin-shadow.png'
+                },
+                polyline_options: {
+                    color: '#56e2db',
+                    weight: 4,
+                    opacity: 0.75
+                }
+            }).on('loaded', function (e) {
+                map.fitBounds(e.target.getBounds());
+                const distance = (e.target.get_distance() / 1000).toFixed(2); // km
+                const elevationMin = e.target.get_elevation_min()?.toFixed(0); // meters
+                const elevationMax = e.target.get_elevation_max()?.toFixed(0); // meters
+                document.getElementById('info').innerHTML += `<br><strong>GPX Track:</strong> Distance: ${distance} km, Min Elevation: ${elevationMin || 'N/A'} m, Max Elevation: ${elevationMax || 'N/A'} m`;
+            }).on('error', function (e) {
+                Utils.handleError('Failed to load GPX file: ' + e.error);
+            }).addTo(map);
+        } catch (error) {
+            Utils.handleError('Error parsing GPX file: ' + error.message);
+        }
+    };
+    reader.onerror = function () {
+        Utils.handleError('Error reading GPX file.');
+    };
+    reader.readAsText(file);
 }
 
 // == Weather Data Handling ==
@@ -5159,6 +5203,30 @@ function setupCoordinateEvents() {
         });
     }
 }
+function setupGpxTrackEvents() {
+    const gpxFileInput = document.getElementById('gpxFileInput');
+    if (gpxFileInput) {
+        gpxFileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            console.log('GPX file selected:', file?.name);
+            loadGpxTrack(file);
+        });
+    }
+    const clearGpxButton = document.getElementById('clearGpxTrack');
+    if (clearGpxButton) {
+        clearGpxButton.addEventListener('click', () => {
+            if (gpxLayer) {
+                map.removeLayer(gpxLayer);
+                gpxLayer = null;
+                console.log('Cleared GPX track');
+                document.getElementById('info').innerHTML = 'Click on the map to fetch weather data.';
+                gpxFileInput.value = ''; // Clear file input
+            } else {
+                Utils.handleError('No GPX track to clear.');
+            }
+        });
+    }
+}
 function setupCheckbox(id, settingsKey, callback) {
     const checkbox = document.getElementById(id);
     if (!checkbox) {
@@ -5613,4 +5681,5 @@ document.addEventListener('DOMContentLoaded', () => {
     setupResetButton();
     setupResetCutAwayMarkerButton(); 
     setupClearHistoricalDate(); // Add this line
+    setupGpxTrackEvents(); // Add this line
 });

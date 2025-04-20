@@ -188,6 +188,20 @@
                 </ul>
             </li>
             <li>
+                <span>GPX Track</span>
+                <ul class="submenu hidden">
+                    <li>
+                        <label class="radio-label">
+                            Upload GPX File:
+                            <input type="file" id="gpxFileInput" accept=".gpx" style="margin-top: 5px;">
+                            <li>
+                                <button id="clearGpxTrack" style="margin-left: 10px;">Clear</button>
+                            </li>
+                        </label>
+                    </li>
+                </ul>
+            </li>
+            <li>
                 <label class="radio-label">
                     <input type="checkbox" id="showLandingPattern" name="showLandingPattern"> Landing Pattern
                 </label>
@@ -393,6 +407,7 @@
     <script src="https://unpkg.com/leaflet-rotatedmarker@0.2.0/leaflet.rotatedMarker.js"></script>
     <script src="https://ppete2.github.io/Leaflet.PolylineMeasure/Leaflet.PolylineMeasure.js"></script>
     <link rel="stylesheet" href="https://ppete2.github.io/Leaflet.PolylineMeasure/Leaflet.PolylineMeasure.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-gpx/1.7.0/gpx.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/luxon/3.4.4/luxon.min.js"></script>
     <script src="https://unpkg.com/mgrs@1.0.0/dist/mgrs.js"></script>
     <script src="utils.js"></script>
