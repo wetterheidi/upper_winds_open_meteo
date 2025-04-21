@@ -517,6 +517,19 @@ class Utils {
     
         return Number(tas.toFixed(2));
     }
+    
+    static calculateTASFromGroundSpeed(groundSpeed, windSpeed, windDirection, trueCourse, heightFt) {
+        if (isNaN(groundSpeed) || isNaN(windSpeed) || isNaN(windDirection) || isNaN(trueCourse)) {
+            return 'N/A';
+        }
+        const groundSpeedKts = Utils.convertWind(groundSpeed, 'kt', 'm/s');
+        const windSpeedKts = Utils.convertWind(windSpeed, 'kt', 'm/s');
+        const windAngle = Utils.calculateWindAngle(trueCourse, windDirection);
+        const { crosswind, headwind } = Utils.calculateWindComponents(windSpeedKts, windAngle);
+        const tasKts = groundSpeedKts + headwind;
+        const tasAdjusted = Utils.calculateTAS(tasKts, heightFt);
+        return Number(tasAdjusted.toFixed(1));
+    }
 }
 
 window.Utils = Utils;

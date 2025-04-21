@@ -417,7 +417,7 @@ button {
 
 #info th,
 #info td {
-    border: 1px solid #ccc;
+    border: 1px solid #333;
     padding: 5px;
     text-align: center;
 }
@@ -1097,7 +1097,7 @@ input[type="checkbox"][style*="opacity: 1"] {
     color: #333;
     font-weight: bold;
     padding: 10px 8px;
-    border-bottom: 2px solid #ccc;
+    border-bottom: 2px solid #333;
     text-align: center;
     vertical-align: middle;
     width: 25%;
@@ -1105,7 +1105,7 @@ input[type="checkbox"][style*="opacity: 1"] {
 
 #info td {
     padding: 8px;
-    border: 1px solid #ccc;
+    border: 1px solid #333;
     text-align: center;
     vertical-align: middle;
     width: 25%;
