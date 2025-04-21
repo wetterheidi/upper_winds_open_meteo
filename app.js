@@ -8,6 +8,7 @@ let lastLng = null;
 let lastAltitude = null;
 let currentMarker = null;
 let gpxLayer = null;
+let gpxPoints = []; // Store track points for tooltip updates
 let weatherData = null;
 let lastModelRun = null;
 let landingPatternPolygon = null;
@@ -978,6 +979,38 @@ function interpolateColor(aglHeight, minHeight = 0, maxHeight = 3000) {
         return `rgb(${r}, ${g}, ${b})`;
     }
 }
+function getTooltipContent(point, index, points, groundAltitude, windUnit, heightUnit) {
+    const coordFormat = getCoordinateFormat();
+    const coords = Utils.convertCoords(point.lat, point.lng, coordFormat);
+    //let tooltipContent = coordFormat === 'MGRS' ? `MGRS: ${coords.lat}` : `Lat: ${coords.lat}<br>Lng: ${coords.lng}`;
+    const elevation = point.ele;
+    let aglHeight = (elevation !== null && groundAltitude !== null) ? (elevation - groundAltitude) : null;
+    if (aglHeight !== null) {
+        // Use userSettings.heightUnit as fallback if heightUnit is undefined
+        const effectiveHeightUnit = heightUnit || userSettings.heightUnit || 'm';
+        aglHeight = Utils.convertHeight(aglHeight, effectiveHeightUnit);
+        aglHeight = Math.round(aglHeight);
+        tooltipContent = `Altitude: ${aglHeight} ${effectiveHeightUnit} AGL`;
+    } else {
+        tooltipContent = `Altitude: N/A`;
+    }
+    let speed = 'N/A';
+    let descentRate = 'N/A';
+    if (index > 0 && point.time && points[index - 1].time && point.ele !== null && points[index - 1].ele !== null) {
+        const timeDiff = (point.time.toMillis() - points[index - 1].time.toMillis()) / 1000; // seconds
+        if (timeDiff > 0) {
+            const distance = map.distance([points[index - 1].lat, points[index - 1].lng], [point.lat, point.lng]);
+            const speedMs = distance / timeDiff;
+            speed = Utils.convertWind(speedMs, windUnit, 'm/s');
+            speed = windUnit === 'bft' ? Math.round(speed) : speed.toFixed(1);
+            const eleDiff = point.ele - points[index - 1].ele;
+            descentRate = (eleDiff / timeDiff).toFixed(1);
+        }
+    }
+    tooltipContent += `<br>Speed: ${speed} ${windUnit}`;
+    tooltipContent += `<br>Descent Rate: ${descentRate} m/s`;
+    return tooltipContent;
+}
 function loadGpxTrack(file) {
     if (!file) {
         Utils.handleError('No file selected.');
@@ -991,7 +1024,7 @@ function loadGpxTrack(file) {
                 map.removeLayer(gpxLayer);
                 gpxLayer = null;
             }
-            // Parse GPX to extract points manually for custom rendering
+            gpxPoints = [];
             const parser = new DOMParser();
             const xml = parser.parseFromString(gpxData, 'text/xml');
             const trackpoints = xml.getElementsByTagName('trkpt');
@@ -1000,25 +1033,28 @@ function loadGpxTrack(file) {
                 const lat = parseFloat(trackpoints[i].getAttribute('lat'));
                 const lng = parseFloat(trackpoints[i].getAttribute('lon'));
                 const ele = trackpoints[i].getElementsByTagName('ele')[0]?.textContent;
+                const time = trackpoints[i].getElementsByTagName('time')[0]?.textContent;
                 points.push({
                     lat: lat,
                     lng: lng,
-                    ele: ele ? parseFloat(ele) : null
+                    ele: ele ? parseFloat(ele) : null,
+                    time: time ? luxon.DateTime.fromISO(time, { zone: 'utc' }) : null
                 });
             }
             if (points.length < 2) {
                 throw new Error('GPX track has insufficient points.');
             }
-            // Create a layer group for segmented polylines
+            gpxPoints = points;
             gpxLayer = L.layerGroup();
             const groundAltitude = lastAltitude !== 'N/A' && !isNaN(lastAltitude) ? parseFloat(lastAltitude) : null;
-            // Draw each segment with color based on average AGL height
+            const windUnit = getWindSpeedUnit();
+            const heightUnit = getHeightUnit();
             for (let i = 0; i < points.length - 1; i++) {
                 const p1 = points[i];
                 const p2 = points[i + 1];
                 const ele1 = p1.ele;
                 const ele2 = p2.ele;
-                let color = '#808080'; // Default gray for missing elevation
+                let color = '#808080';
                 if (groundAltitude !== null && ele1 !== null && ele2 !== null) {
                     const agl1 = ele1 - groundAltitude;
                     const agl2 = ele2 - groundAltitude;
@@ -1029,31 +1065,25 @@ function loadGpxTrack(file) {
                     color: color,
                     weight: 4,
                     opacity: 0.75
-                }).bindTooltip('', { sticky: true }); // Initialize empty tooltip
+                }).bindTooltip('', { sticky: true });
                 segment.on('mousemove', function (e) {
                     const latlng = e.latlng;
-                    // Find closest point
                     let closestPoint = points[0];
                     let minDist = Infinity;
-                    points.forEach(p => {
+                    let closestIndex = 0;
+                    points.forEach((p, index) => {
                         const dist = Math.sqrt(Math.pow(p.lat - latlng.lat, 2) + Math.pow(p.lng - latlng.lng, 2));
                         if (dist < minDist) {
                             minDist = dist;
                             closestPoint = p;
+                            closestIndex = index;
                         }
                     });
-                    const elevation = closestPoint.ele;
-                    const aglHeight = (elevation !== null && groundAltitude !== null) ? (elevation - groundAltitude).toFixed(0) : 'N/A';
-                    const coordFormat = getCoordinateFormat();
-                    const coords = Utils.convertCoords(closestPoint.lat, closestPoint.lng, coordFormat);
-                    let tooltipContent = coordFormat === 'MGRS' ? `MGRS: ${coords.lat}` : `Lat: ${coords.lat}<br>Lng: ${coords.lng}`;
-                    tooltipContent += `<br>AGL: ${aglHeight} m`;
-                    segment.setTooltipContent(tooltipContent).openTooltip(latlng);
+                    segment.setTooltipContent(getTooltipContent(closestPoint, closestIndex, points, groundAltitude, getWindSpeedUnit(), getHeightUnit())).openTooltip(latlng);
                 });
                 gpxLayer.addLayer(segment);
             }
-            // Add start/end markers
-            gpxLayer.addLayer(L.marker([points[0].lat, points[0].lng], {
+            /*gpxLayer.addLayer(L.marker([points[0].lat, points[0].lng], {
                 icon: L.icon({
                     iconUrl: 'https://cdn.jsdelivr.net/npm/leaflet-gpx@1.7.0/pin-icon-start.png',
                     iconSize: [29, 24],
@@ -1072,15 +1102,14 @@ function loadGpxTrack(file) {
                     shadowSize: [36, 16],
                     shadowAnchor: [12, 12]
                 })
-            }));
+            }));*/
             gpxLayer.addTo(map);
             map.fitBounds(L.latLngBounds(points.map(p => [p.lat, p.lng])));
-            // Update info with track stats
             const distance = (points.reduce((dist, p, i) => {
                 if (i === 0) return 0;
                 const prev = points[i - 1];
                 return dist + map.distance([prev.lat, prev.lng], [p.lat, p.lng]);
-            }, 0) / 1000).toFixed(2); // km
+            }, 0) / 1000).toFixed(2);
             const elevations = points.map(p => p.ele).filter(e => e !== null);
             const elevationMin = elevations.length ? Math.min(...elevations).toFixed(0) : 'N/A';
             const elevationMax = elevations.length ? Math.max(...elevations).toFixed(0) : 'N/A';
@@ -4669,6 +4698,30 @@ function setupRadioEvents() {
     setupRadioGroup('heightUnit', () => {
         updateHeightUnitLabels();
         updateAllDisplays();
+        if (gpxLayer && gpxPoints.length > 0) {
+            const groundAltitude = lastAltitude !== 'N/A' && !isNaN(lastAltitude) ? parseFloat(lastAltitude) : null;
+            const windUnit = getWindSpeedUnit();
+            const heightUnit = getHeightUnit();
+            gpxLayer.eachLayer(layer => {
+                if (layer instanceof L.Polyline) {
+                    layer.on('mousemove', function (e) {
+                        const latlng = e.latlng;
+                        let closestPoint = gpxPoints[0];
+                        let minDist = Infinity;
+                        let closestIndex = 0;
+                        gpxPoints.forEach((p, index) => {
+                            const dist = Math.sqrt(Math.pow(p.lat - latlng.lat, 2) + Math.pow(p.lng - latlng.lng, 2));
+                            if (dist < minDist) {
+                                minDist = dist;
+                                closestPoint = p;
+                                closestIndex = index;
+                            }
+                        });
+                        layer.setTooltipContent(getTooltipContent(closestPoint, closestIndex, gpxPoints, groundAltitude, windUnit, heightUnit)).openTooltip(latlng);
+                    });
+                }
+            });
+        }
     });
     setupRadioGroup('temperatureUnit', () => {
         updateAllDisplays();
@@ -4676,6 +4729,30 @@ function setupRadioEvents() {
     setupRadioGroup('windUnit', () => {
         updateWindUnitLabels();
         updateAllDisplays();
+        if (gpxLayer && gpxPoints.length > 0) {
+            const groundAltitude = lastAltitude !== 'N/A' && !isNaN(lastAltitude) ? parseFloat(lastAltitude) : null;
+            const windUnit = getWindSpeedUnit();
+            const heightUnit = getHeightUnit();
+            gpxLayer.eachLayer(layer => {
+                if (layer instanceof L.Polyline) {
+                    layer.on('mousemove', function (e) {
+                        const latlng = e.latlng;
+                        let closestPoint = gpxPoints[0];
+                        let minDist = Infinity;
+                        let closestIndex = 0;
+                        gpxPoints.forEach((p, index) => {
+                            const dist = Math.sqrt(Math.pow(p.lat - latlng.lat, 2) + Math.pow(p.lng - latlng.lng, 2));
+                            if (dist < minDist) {
+                                minDist = dist;
+                                closestPoint = p;
+                                closestIndex = index;
+                            }
+                        });
+                        layer.setTooltipContent(getTooltipContent(closestPoint, closestIndex, gpxPoints, groundAltitude, windUnit, heightUnit)).openTooltip(latlng);
+                    });
+                }
+            });
+        }
     });
     setupRadioGroup('timeZone', async () => {
         updateAllDisplays();
@@ -4723,6 +4800,31 @@ function setupRadioEvents() {
             calculateCutAway();
         }
     });
+    // Trigger initial tooltip refresh for heightUnit
+    if (gpxLayer && gpxPoints.length > 0) {
+        const groundAltitude = lastAltitude !== 'N/A' && !isNaN(lastAltitude) ? parseFloat(lastAltitude) : null;
+        const windUnit = getWindSpeedUnit();
+        const heightUnit = getHeightUnit();
+        gpxLayer.eachLayer(layer => {
+            if (layer instanceof L.Polyline) {
+                layer.on('mousemove', function (e) {
+                    const latlng = e.latlng;
+                    let closestPoint = gpxPoints[0];
+                    let minDist = Infinity;
+                    let closestIndex = 0;
+                    gpxPoints.forEach((p, index) => {
+                        const dist = Math.sqrt(Math.pow(p.lat - latlng.lat, 2) + Math.pow(p.lng - latlng.lng, 2));
+                        if (dist < minDist) {
+                            minDist = dist;
+                            closestPoint = p;
+                            closestIndex = index;
+                        }
+                    });
+                    layer.setTooltipContent(getTooltipContent(closestPoint, closestIndex, gpxPoints, groundAltitude, windUnit, heightUnit)).openTooltip(latlng);
+                });
+            }
+        });
+    }
 }
 function setupInputEvents() {
     setupInput('lowerLimit', 'change', 300, (value) => {
