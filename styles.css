@@ -23,6 +23,13 @@ html {
     line-height: 1.0;
 }
 
+.leaflet-tooltip {
+    z-index: 800 !important; /* Ensure tooltip is above all map elements */
+    background-color: white;
+    padding: 2px;
+    pointer-events: none; /* Prevent tooltip from blocking mouse events */
+}
+
 .leaflet-popup-content-wrapper {
     padding: 0.5px;
     border-radius: 5px;

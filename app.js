@@ -441,6 +441,11 @@ function initMap() {
         maxWidth: 100
     }).addTo(map);
 
+    // Add pane for GPX track
+    map.createPane('gpxTrackPane');
+    map.getPane('gpxTrackPane').style.zIndex = 650; // Above circles (default z-index: 400-500)
+    map.getPane('tooltipPane').style.zIndex = 700; // Higher than gpxTrackPane
+    
     const initialAltitude = 'N/A';
     currentMarker = createCustomMarker(defaultCenter[0], defaultCenter[1]).addTo(map);
     attachMarkerDragend(currentMarker);
@@ -1022,7 +1027,7 @@ function loadGpxTrack(file) {
         return;
     }
     const reader = new FileReader();
-    reader.onload = function (e) {
+    reader.onload = async function (e) {
         try {
             const gpxData = e.target.result;
             if (gpxLayer) {
@@ -1050,7 +1055,9 @@ function loadGpxTrack(file) {
                 throw new Error('GPX track has insufficient points.');
             }
             gpxPoints = points;
-            gpxLayer = L.layerGroup();
+
+            // Create GPX layer with custom pane
+            gpxLayer = L.layerGroup({ pane: 'gpxTrackPane' }); // Assign to gpxTrackPane
             const groundAltitude = lastAltitude !== 'N/A' && !isNaN(lastAltitude) ? parseFloat(lastAltitude) : null;
             const windUnit = getWindSpeedUnit();
             const heightUnit = getHeightUnit();
@@ -1069,7 +1076,8 @@ function loadGpxTrack(file) {
                 const segment = L.polyline([[p1.lat, p1.lng], [p2.lat, p2.lng]], {
                     color: color,
                     weight: 4,
-                    opacity: 0.75
+                    opacity: 0.75,
+                    pane: 'gpxTrackPane' // Ensure polyline is in the custom pane
                 }).bindTooltip('', { sticky: true });
                 segment.on('mousemove', function (e) {
                     const latlng = e.latlng;
@@ -1088,26 +1096,6 @@ function loadGpxTrack(file) {
                 });
                 gpxLayer.addLayer(segment);
             }
-            /*gpxLayer.addLayer(L.marker([points[0].lat, points[0].lng], {
-                icon: L.icon({
-                    iconUrl: 'https://cdn.jsdelivr.net/npm/leaflet-gpx@1.7.0/pin-icon-start.png',
-                    iconSize: [29, 24],
-                    iconAnchor: [14, 24],
-                    shadowUrl: 'https://cdn.jsdelivr.net/npm/leaflet-gpx@1.7.0/pin-shadow.png',
-                    shadowSize: [36, 16],
-                    shadowAnchor: [12, 12]
-                })
-            }));
-            gpxLayer.addLayer(L.marker([points[points.length - 1].lat, points[points.length - 1].lng], {
-                icon: L.icon({
-                    iconUrl: 'https://cdn.jsdelivr.net/npm/leaflet-gpx@1.7.0/pin-icon-end.png',
-                    iconSize: [29, 24],
-                    iconAnchor: [14, 24],
-                    shadowUrl: 'https://cdn.jsdelivr.net/npm/leaflet-gpx@1.7.0/pin-shadow.png',
-                    shadowSize: [36, 16],
-                    shadowAnchor: [12, 12]
-                })
-            }));*/
             gpxLayer.addTo(map);
             map.fitBounds(L.latLngBounds(points.map(p => [p.lat, p.lng])));
             const distance = (points.reduce((dist, p, i) => {
@@ -2973,6 +2961,10 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
     if (currentMarker) {
         currentMarker.setLatLng([lastLat, lastLng]);
         updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
+    }
+
+    if (gpxLayer) {
+        gpxLayer.bringToFront(); // Fallback to ensure GPX is above circles
     }
     console.log('updateJumpCircle completed');
     return true;
