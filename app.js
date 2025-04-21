@@ -959,6 +959,25 @@ function initializeMap() {
     console.log('Initializing map...');
     initMap();
 }
+function interpolateColor(aglHeight, minHeight = 0, maxHeight = 3000) {
+    // Map AGL height (0m to 3000m) to a color gradient: red (high) -> yellow (mid) -> green (low)
+    const ratio = Math.min(Math.max((aglHeight - minHeight) / (maxHeight - minHeight), 0), 1);
+    if (aglHeight < 0 || isNaN(aglHeight)) return '#808080'; // Gray for invalid/negative heights
+    // Linear interpolation between colors
+    if (ratio <= 0.5) {
+        // Red (#FF0000) to Yellow (#FFFF00)
+        const r = 255;
+        const g = Math.round(255 * (ratio * 2));
+        const b = 0;
+        return `rgb(${r}, ${g}, ${b})`;
+    } else {
+        // Yellow (#FFFF00) to Green (#00FF00)
+        const r = Math.round(255 * (1 - (ratio - 0.5) * 2));
+        const g = 255;
+        const b = 0;
+        return `rgb(${r}, ${g}, ${b})`;
+    }
+}
 function loadGpxTrack(file) {
     if (!file) {
         Utils.handleError('No file selected.');
@@ -972,27 +991,100 @@ function loadGpxTrack(file) {
                 map.removeLayer(gpxLayer);
                 gpxLayer = null;
             }
-            gpxLayer = new L.GPX(gpxData, {
-                async: true,
-                marker_options: {
-                    startIconUrl: 'https://cdn.jsdelivr.net/npm/leaflet-gpx@1.7.0/pin-icon-start.png',
-                    endIconUrl: 'https://cdn.jsdelivr.net/npm/leaflet-gpx@1.7.0/pin-icon-end.png',
-                    shadowUrl: 'https://cdn.jsdelivr.net/npm/leaflet-gpx@1.7.0/pin-shadow.png'
-                },
-                polyline_options: {
-                    color: '#56e2db',
+            // Parse GPX to extract points manually for custom rendering
+            const parser = new DOMParser();
+            const xml = parser.parseFromString(gpxData, 'text/xml');
+            const trackpoints = xml.getElementsByTagName('trkpt');
+            const points = [];
+            for (let i = 0; i < trackpoints.length; i++) {
+                const lat = parseFloat(trackpoints[i].getAttribute('lat'));
+                const lng = parseFloat(trackpoints[i].getAttribute('lon'));
+                const ele = trackpoints[i].getElementsByTagName('ele')[0]?.textContent;
+                points.push({
+                    lat: lat,
+                    lng: lng,
+                    ele: ele ? parseFloat(ele) : null
+                });
+            }
+            if (points.length < 2) {
+                throw new Error('GPX track has insufficient points.');
+            }
+            // Create a layer group for segmented polylines
+            gpxLayer = L.layerGroup();
+            const groundAltitude = lastAltitude !== 'N/A' && !isNaN(lastAltitude) ? parseFloat(lastAltitude) : null;
+            // Draw each segment with color based on average AGL height
+            for (let i = 0; i < points.length - 1; i++) {
+                const p1 = points[i];
+                const p2 = points[i + 1];
+                const ele1 = p1.ele;
+                const ele2 = p2.ele;
+                let color = '#808080'; // Default gray for missing elevation
+                if (groundAltitude !== null && ele1 !== null && ele2 !== null) {
+                    const agl1 = ele1 - groundAltitude;
+                    const agl2 = ele2 - groundAltitude;
+                    const avgAgl = (agl1 + agl2) / 2;
+                    color = interpolateColor(avgAgl);
+                }
+                const segment = L.polyline([[p1.lat, p1.lng], [p2.lat, p2.lng]], {
+                    color: color,
                     weight: 4,
                     opacity: 0.75
-                }
-            }).on('loaded', function (e) {
-                map.fitBounds(e.target.getBounds());
-                const distance = (e.target.get_distance() / 1000).toFixed(2); // km
-                const elevationMin = e.target.get_elevation_min()?.toFixed(0); // meters
-                const elevationMax = e.target.get_elevation_max()?.toFixed(0); // meters
-                document.getElementById('info').innerHTML += `<br><strong>GPX Track:</strong> Distance: ${distance} km, Min Elevation: ${elevationMin || 'N/A'} m, Max Elevation: ${elevationMax || 'N/A'} m`;
-            }).on('error', function (e) {
-                Utils.handleError('Failed to load GPX file: ' + e.error);
-            }).addTo(map);
+                }).bindTooltip('', { sticky: true }); // Initialize empty tooltip
+                segment.on('mousemove', function (e) {
+                    const latlng = e.latlng;
+                    // Find closest point
+                    let closestPoint = points[0];
+                    let minDist = Infinity;
+                    points.forEach(p => {
+                        const dist = Math.sqrt(Math.pow(p.lat - latlng.lat, 2) + Math.pow(p.lng - latlng.lng, 2));
+                        if (dist < minDist) {
+                            minDist = dist;
+                            closestPoint = p;
+                        }
+                    });
+                    const elevation = closestPoint.ele;
+                    const aglHeight = (elevation !== null && groundAltitude !== null) ? (elevation - groundAltitude).toFixed(0) : 'N/A';
+                    const coordFormat = getCoordinateFormat();
+                    const coords = Utils.convertCoords(closestPoint.lat, closestPoint.lng, coordFormat);
+                    let tooltipContent = coordFormat === 'MGRS' ? `MGRS: ${coords.lat}` : `Lat: ${coords.lat}<br>Lng: ${coords.lng}`;
+                    tooltipContent += `<br>AGL: ${aglHeight} m`;
+                    segment.setTooltipContent(tooltipContent).openTooltip(latlng);
+                });
+                gpxLayer.addLayer(segment);
+            }
+            // Add start/end markers
+            gpxLayer.addLayer(L.marker([points[0].lat, points[0].lng], {
+                icon: L.icon({
+                    iconUrl: 'https://cdn.jsdelivr.net/npm/leaflet-gpx@1.7.0/pin-icon-start.png',
+                    iconSize: [29, 24],
+                    iconAnchor: [14, 24],
+                    shadowUrl: 'https://cdn.jsdelivr.net/npm/leaflet-gpx@1.7.0/pin-shadow.png',
+                    shadowSize: [36, 16],
+                    shadowAnchor: [12, 12]
+                })
+            }));
+            gpxLayer.addLayer(L.marker([points[points.length - 1].lat, points[points.length - 1].lng], {
+                icon: L.icon({
+                    iconUrl: 'https://cdn.jsdelivr.net/npm/leaflet-gpx@1.7.0/pin-icon-end.png',
+                    iconSize: [29, 24],
+                    iconAnchor: [14, 24],
+                    shadowUrl: 'https://cdn.jsdelivr.net/npm/leaflet-gpx@1.7.0/pin-shadow.png',
+                    shadowSize: [36, 16],
+                    shadowAnchor: [12, 12]
+                })
+            }));
+            gpxLayer.addTo(map);
+            map.fitBounds(L.latLngBounds(points.map(p => [p.lat, p.lng])));
+            // Update info with track stats
+            const distance = (points.reduce((dist, p, i) => {
+                if (i === 0) return 0;
+                const prev = points[i - 1];
+                return dist + map.distance([prev.lat, prev.lng], [p.lat, p.lng]);
+            }, 0) / 1000).toFixed(2); // km
+            const elevations = points.map(p => p.ele).filter(e => e !== null);
+            const elevationMin = elevations.length ? Math.min(...elevations).toFixed(0) : 'N/A';
+            const elevationMax = elevations.length ? Math.max(...elevations).toFixed(0) : 'N/A';
+            document.getElementById('info').innerHTML += `<br><strong>GPX Track:</strong> Distance: ${distance} km, Min Elevation: ${elevationMin} m, Max Elevation: ${elevationMax} m`;
         } catch (error) {
             Utils.handleError('Error parsing GPX file: ' + error.message);
         }
@@ -5220,7 +5312,7 @@ function setupGpxTrackEvents() {
                 gpxLayer = null;
                 console.log('Cleared GPX track');
                 document.getElementById('info').innerHTML = 'Click on the map to fetch weather data.';
-                gpxFileInput.value = ''; // Clear file input
+                gpxFileInput.value = '';
             } else {
                 Utils.handleError('No GPX track to clear.');
             }
