@@ -40,7 +40,7 @@ A web application for visualizing upper-level wind, temperature, and atmospheric
   - Includes wind arrows with tool tips to display the exact direction and speed.
 - **Jump Calculation**: 
   - Calculate skydiving jump trajectories, including free-fall and canopy phases, using exit altitude (500-15000m), opening altitude (500-10000m), and weather data.
-  - Visualizes jump circles: blue (canopy glide), red (full descent), green/light green (exit areas), and jump run tracks with customizable direction and offset.
+  - Visualizes jump circles: various blue (canopy glide), red (full descent), green/light green (exit areas), and jump run tracks with customizable direction and offset.
 - **Data Table**: 
   - Toggleable wind table showing height, pressure, temperature, dewpoint, wind direction/speed, and humidity.
   - Adjustable interpolation steps (100m to 2000m); wind speeds color-coded: low (blue, ≤3 kt), moderate (green, ≤10 kt), high (yellow, ≤16 kt), very high (red, >16 kt).
@@ -54,7 +54,7 @@ A web application for visualizing upper-level wind, temperature, and atmospheric
 
 ## Dependencies
 - **Leaflet**: Via CDN (`https://unpkg.com/leaflet@1.9.4/dist/leaflet.js`) for maps.
--**Leaflet Plugins**: RotatedMarker, PolylineMeasure for enhanced functionality.
+-**Leaflet Plugins**: RotatedMarker, PolylineMeasure, GPX for enhanced functionality.
 - **Luxon**: Via CDN (`https://cdnjs.cloudflare.com/ajax/libs/luxon/3.4.4/luxon.min.js`) for date/time handling.
 - **MGRS**: Via CDN (`https://unpkg.com/mgrs@1.0.0/dist/mgrs.js`) for MGRS coordinate support.
 - **OpenMeteo API**: Free, no key required.
@@ -67,16 +67,22 @@ A web application for visualizing upper-level wind, temperature, and atmospheric
   - Use the top-right measurement tool for distances and bearings.
 - **Coordinate Input**: 
   - Open the "Coordinate Input" menu, enter coordinates, and click "Move Marker" to update the location.
+  - Save up to five favorite locations.
 - **Model Selection**: 
   - Choose a model from the dropdown; hover over "Forecast Model" for the latest run time.
 - **Time Navigation**: 
   - Use the time slider to explore forecasts; disabled for single time steps.
+  - Display historical weather data.
 - **Weather Display**: 
   - Enable the wind table with "Show Wind Table" and customize units/interpolation in the settings menu.
 - **Mean Wind**: 
   - Adjust altitude limits in the bottom container to calculate mean wind.
 - **Skydiving Features**: 
-  - Configure canopy speed, descent rate, leg heights, exit/opening altitudes, and visualize patterns, jump circles, or jump run tracks.
+  - Configure canopy speed, descent rate, leg heights, exit/opening altitudes,number of jumpers and exit separation.
+  - isualize patterns, jump circles, jump run tracks, approach.
+  - Place a cut away finder at the location of the cut away. A tooltip shows the displacement, descent time and speed.
+- **GPX Track visualization**:
+  - GPX track visualization with color-coded AGL height (red to green gradient), interactive tooltips showing AGL height, speed, and descent rate.
 - **Download**: 
   - Click "Download Table" to save the current table as a text file.
 
@@ -110,6 +116,15 @@ Leverages [OpenMeteo API](https://open-meteo.com/) for:
   - Upgraded coordinate inputs with dynamic styling for Decimal, DMS, and MGRS.
   - Added a reset button to clear settings and unlock states.
   - Optimized error handling, UI responsiveness, and localStorage persistence.
+
+- **v1.4.0 (April 21, 2025)**:
+  - Added tooltips to the exit circles containing throw, drift and free fall time.
+  - Jump run track now adjusts dynamically to the number of jumpers and the exit separation. x-2 min Approach is also shown as a dashed line.
+  - Added option to load historical weahter data for the chosen location.
+  - Added GPX track visualization with color-coded AGL height (red to green gradient), interactive tooltips showing coordinates, AGL height, speed, and descent rate, with dynamic updates for wind and height units.
+  - Enhanced weather table with conditional row background colors based on relative humidity: white (<65%), light grey (65%-85%), medium grey (85%-99%), dark grey (100%), preserving wind speed-based border colors (blue, green, yellow, red).
+  - Updated mouse-over elevation display to support user-selected height units (m or ft), ensuring consistency with other height displays.
+
 
 ## Warning
 Data is sourced from OpenMeteo and may contain inaccuracies. Always verify with official meteorological sources for critical applications, especially skydiving or aviation.
