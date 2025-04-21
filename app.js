@@ -580,7 +580,7 @@ function initMap() {
         const coordFormat = getCoordinateFormat();
         const lat = e.latlng.lat;
         const lng = e.latlng.lng;
-        lastMouseLatLng = { lat, lng }; // Store current mouse position
+        lastMouseLatLng = { lat, lng };
 
         let coordText;
         if (coordFormat === 'MGRS') {
@@ -595,14 +595,19 @@ function initMap() {
 
         // Fetch elevation with debounce
         debouncedGetElevation(lat, lng, { lat, lng }, (elevation, requestLatLng) => {
-            // Check if mouse is still near the requested position
             if (lastMouseLatLng) {
                 const deltaLat = Math.abs(lastMouseLatLng.lat - requestLatLng.lat);
                 const deltaLng = Math.abs(lastMouseLatLng.lng - requestLatLng.lng);
-                const threshold = 0.05; // ~5.5km, generous to account for movement
+                const threshold = 0.05; // ~5.5km
                 if (deltaLat < threshold && deltaLng < threshold) {
-                    console.log('Updating elevation display:', { lat: requestLatLng.lat, lng: requestLatLng.lng, elevation });
-                    coordsControl.update(`${coordText}<br>Elevation: ${elevation === 'N/A' ? 'N/A' : elevation + 'm'}`);
+                    const heightUnit = getHeightUnit();
+                    let displayElevation = elevation === 'N/A' ? 'N/A' : elevation;
+                    if (displayElevation !== 'N/A') {
+                        displayElevation = Utils.convertHeight(displayElevation, heightUnit);
+                        displayElevation = Math.round(displayElevation); // Round for readability
+                    }
+                    console.log('Updating elevation display:', { lat: requestLatLng.lat, lng: requestLatLng.lng, elevation, heightUnit, displayElevation });
+                    coordsControl.update(`${coordText}<br>Elevation: ${displayElevation} ${displayElevation === 'N/A' ? '' : heightUnit}`);
                 } else {
                     console.log('Discarded elevation update: mouse moved too far', {
                         requestLat: requestLatLng.lat,
@@ -4801,6 +4806,36 @@ function setupRadioEvents() {
     setupRadioGroup('heightUnit', () => {
         updateHeightUnitLabels();
         updateAllDisplays();
+        if (lastMouseLatLng && coordsControl) {
+            const coordFormat = getCoordinateFormat();
+            const lat = lastMouseLatLng.lat;
+            const lng = lastMouseLatLng.lng;
+            let coordText;
+            if (coordFormat === 'MGRS') {
+                const mgrs = Utils.decimalToMgrs(lat, lng);
+                coordText = `MGRS: ${mgrs}`;
+            } else {
+                coordText = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
+            }
+            // Trigger elevation fetch to update with new height unit
+            debouncedGetElevation(lat, lng, { lat, lng }, (elevation, requestLatLng) => {
+                if (lastMouseLatLng) {
+                    const deltaLat = Math.abs(lastMouseLatLng.lat - requestLatLng.lat);
+                    const deltaLng = Math.abs(lastMouseLatLng.lng - requestLatLng.lng);
+                    const threshold = 0.05;
+                    if (deltaLat < threshold && deltaLng < threshold) {
+                        const heightUnit = getHeightUnit();
+                        let displayElevation = elevation === 'N/A' ? 'N/A' : elevation;
+                        if (displayElevation !== 'N/A') {
+                            displayElevation = Utils.convertHeight(displayElevation, heightUnit);
+                            displayElevation = Math.round(displayElevation);
+                        }
+                        console.log('Updating elevation display after heightUnit change:', { lat, lng, elevation, heightUnit, displayElevation });
+                        coordsControl.update(`${coordText}<br>Elevation: ${displayElevation} ${displayElevation === 'N/A' ? '' : heightUnit}`);
+                    }
+                }
+            });
+        }
         if (gpxLayer && gpxPoints.length > 0) {
             const groundAltitude = lastAltitude !== 'N/A' && !isNaN(lastAltitude) ? parseFloat(lastAltitude) : null;
             const windUnit = getWindSpeedUnit();
