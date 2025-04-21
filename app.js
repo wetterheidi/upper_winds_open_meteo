@@ -1740,7 +1740,7 @@ async function fetchWeather(lat, lon, currentTime = null, isInitialLoad = false)
         Utils.handleError(`Failed to fetch weather data: ${error.message}`);
     }
 }
-async function updateWeatherDisplay(index, originalTime = null) {
+async function updateWeatherDisplayOLD(index, originalTime = null) {
     console.log(`updateWeatherDisplay called with index: ${index}, Time: ${weatherData.time[index]}`);
     if (!weatherData || !weatherData.time || index < 0 || index >= weatherData.time.length) {
         console.error('No weather data available or index out of bounds:', index);
@@ -1810,6 +1810,109 @@ async function updateWeatherDisplay(index, originalTime = null) {
         const windBarbSvg = data.dir === 'N/A' || isNaN(speedKt) ? 'N/A' : generateWindBarb(data.dir, speedKt);
 
         output += `<tr class="${rowClass}"><td>${Math.round(displayHeight)}</td><td>${Utils.roundToTens(data.dir)}</td><td>${formattedWind}</td><td>${windBarbSvg}</td><td>${formattedTemp}</td></tr>`;
+    });
+    output += `</table>`;
+    document.getElementById('info').innerHTML = output;
+    document.getElementById('selectedTime').innerHTML = `Selected Time: ${time}`;
+    updateLandingPattern();
+}
+async function updateWeatherDisplay(index, originalTime = null) {
+    console.log(`updateWeatherDisplay called with index: ${index}, Time: ${weatherData.time[index]}`);
+    if (!weatherData || !weatherData.time || index < 0 || index >= weatherData.time.length) {
+        console.error('No weather data available or index out of bounds:', index);
+        document.getElementById('info').innerHTML = 'No weather data available';
+        document.getElementById('selectedTime').innerHTML = 'Selected Time: ';
+        const slider = document.getElementById('timeSlider');
+        if (slider) slider.value = 0;
+        return;
+    }
+
+    landingWindDir = weatherData.wind_direction_10m[index] || null;
+    console.log('landingWindDir updated to:', landingWindDir);
+
+    const customLandingDirectionLLInput = document.getElementById('customLandingDirectionLL');
+    const customLandingDirectionRRInput = document.getElementById('customLandingDirectionRR');
+    if (customLandingDirectionLLInput && customLandingDirectionRRInput && landingWindDir !== null) {
+        customLandingDirectionLLInput.value = Math.round(landingWindDir);
+        customLandingDirectionRRInput.value = Math.round(landingWindDir);
+    }
+
+    const refLevel = document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL';
+    const heightUnit = getHeightUnit();
+    const windSpeedUnit = getWindSpeedUnit();
+    const temperatureUnit = getTemperatureUnit();
+    const time = await getDisplayTime(weatherData.time[index]);
+    const interpolatedData = interpolateWeatherData(index);
+    const surfaceHeight = refLevel === 'AMSL' && lastAltitude !== 'N/A' ? Math.round(lastAltitude) : 0;
+
+    if (!userSettings.showTable) {
+        document.getElementById('info').innerHTML = '';
+        document.getElementById('selectedTime').innerHTML = `Selected Time: ${time}`;
+        return;
+    }
+
+    let output = `<table id="weatherTable">`;
+    output += `<tr><th>Height (${heightUnit} ${refLevel})</th><th>Dir (deg)</th><th>Spd (${windSpeedUnit})</th><th>Wind</th><th>T (${temperatureUnit === 'C' ? '°C' : '°F'})</th></tr>`;
+    interpolatedData.forEach((data, idx) => {
+        const spd = parseFloat(data.spd);
+        let windClass = '';
+        if (windSpeedUnit === 'bft') {
+            const bft = Math.round(spd);
+            if (bft <= 1) windClass = 'wind-low';
+            else if (bft <= 3) windClass = 'wind-moderate';
+            else if (bft <= 4) windClass = 'wind-high';
+            else windClass = 'wind-very-high';
+        } else {
+            const spdInKt = Utils.convertWind(spd, 'kt', 'km/h');
+            if (spdInKt <= 3) windClass = 'wind-low';
+            else if (spdInKt <= 10) windClass = 'wind-moderate';
+            else if (spdInKt <= 16) windClass = 'wind-high';
+            else windClass = 'wind-very-high';
+        }
+
+        // Apply conditional background color based on RH
+        const humidity = data.rh;
+        let humidityClass = '';
+        if (humidity !== 'N/A' && Number.isFinite(humidity)) {
+            if (humidity < 65) {
+                humidityClass = 'humidity-low';
+            } else if (humidity >= 65 && humidity <= 85) {
+                humidityClass = 'humidity-moderate';
+            } else if (humidity > 85 && humidity < 100) {
+                humidityClass = 'humidity-high';
+            } else if (humidity === 100) {
+                humidityClass = 'humidity-saturated';
+            }
+        }
+        console.log(`Row ${idx}: RH=${humidity}, windClass=${windClass}, humidityClass=${humidityClass}`);
+
+        const displayHeight = refLevel === 'AMSL' ? data.displayHeight + (heightUnit === 'ft' ? Math.round(surfaceHeight * 3.28084) : surfaceHeight) : data.displayHeight;
+        const displayTemp = Utils.convertTemperature(data.temp, temperatureUnit === 'C' ? '°C' : '°F');
+        const formattedTemp = displayTemp === 'N/A' ? 'N/A' : displayTemp.toFixed(0);
+
+        const convertedSpd = Utils.convertWind(spd, windSpeedUnit, 'km/h');
+        let formattedWind;
+        const surfaceDisplayHeight = refLevel === 'AMSL' ? (heightUnit === 'ft' ? Math.round(surfaceHeight * 3.28084) : surfaceHeight) : 0;
+        if (Math.round(displayHeight) === surfaceDisplayHeight && weatherData.wind_gusts_10m[index] !== undefined && Number.isFinite(weatherData.wind_gusts_10m[index])) {
+            const gustSpd = weatherData.wind_gusts_10m[index];
+            const convertedGust = Utils.convertWind(gustSpd, windSpeedUnit, 'km/h');
+            const spdValue = windSpeedUnit === 'bft' ? Math.round(convertedSpd) : convertedSpd.toFixed(0);
+            const gustValue = windSpeedUnit === 'bft' ? Math.round(convertedGust) : convertedGust.toFixed(0);
+            formattedWind = `${spdValue} G ${gustValue}`;
+        } else {
+            formattedWind = convertedSpd === 'N/A' ? 'N/A' : (windSpeedUnit === 'bft' ? Math.round(convertedSpd) : convertedSpd.toFixed(0));
+        }
+
+        const speedKt = Math.round(Utils.convertWind(spd, 'kt', 'km/h') / 5) * 5;
+        const windBarbSvg = data.dir === 'N/A' || isNaN(speedKt) ? 'N/A' : generateWindBarb(data.dir, speedKt);
+
+        output += `<tr class="${windClass} ${humidityClass}">
+            <td>${Math.round(displayHeight)}</td>
+            <td>${Utils.roundToTens(data.dir)}</td>
+            <td>${formattedWind}</td>
+            <td>${windBarbSvg}</td>
+            <td>${formattedTemp}</td>
+        </tr>`;
     });
     output += `</table>`;
     document.getElementById('info').innerHTML = output;

@@ -1085,9 +1085,8 @@ input[type="checkbox"][style*="opacity: 1"] {
 }
 
 #info table {
-    width: 100%;
     border-collapse: collapse;
-    margin-top: 10px;
+    width: 100%;
     font-size: 13px;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
     table-layout: fixed;
@@ -1104,28 +1103,40 @@ input[type="checkbox"][style*="opacity: 1"] {
     width: 25%;
 }
 
-#info tr:nth-child(even) {
-    background: linear-gradient(to bottom, #f9f9f9, #f1f1f1);
-}
-
-#info tr:nth-child(odd) {
-    background: linear-gradient(to bottom, #ffffff, #f7f7f7);
-}
-
-#info tr:hover {
-    background: linear-gradient(to bottom, #e6f0fa, #d9e2ec);
-}
-
 #info td {
-    padding: 8px 8px;
-    border-bottom: 1px solid #ddd;
+    padding: 8px;
+    border: 1px solid #ccc;
     text-align: center;
     vertical-align: middle;
     width: 25%;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
+/* Remove default alternating and hover backgrounds to avoid conflicts */
+#info tr:nth-child(even),
+#info tr:nth-child(odd),
+#info tr:hover {
+    background: none !important;
+}
+
+/* New styles for humidity-based row backgrounds */
+#info table tr.humidity-low {
+    background: #FFFFFF !important; /* White for <65% */
+}
+
+#info table tr.humidity-moderate {
+    background: #F4F4F4 !important; /* Light grey for 65%-85% */
+}
+
+#info table tr.humidity-high {
+    background: #cdcdcd !important; /* Medium grey for 85%-99% */
+}
+
+#info table tr.humidity-saturated {
+    background: #B9B9B9 !important; /* Dark grey for 100% */
+    color: #FFFFFF !important; /* White text for readability */
+}
+
+/* Wind speed classes for border colors */
 #info table tr.wind-low {
     border: 2px solid lightblue !important;
 }
