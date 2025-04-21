@@ -1192,271 +1192,6 @@ async function fetchWeatherForLocation(lat, lng, currentTime = null, isInitialLo
         restoreUIInteractivity(); // Even on failure, check UI
     }
 }
-async function fetchWeatherOLD(lat, lon, currentTime = null) {
-    try {
-        document.getElementById('loading').style.display = 'block';
-        const modelSelect = document.getElementById('modelSelect');
-        const modelMap = {
-            'icon_seamless': 'dwd_icon',
-            'icon_global': 'dwd_icon',
-            'icon_eu': 'dwd_icon_eu',
-            'icon_d2': 'dwd_icon_d2',
-            'ecmwf_ifs025': 'ecmwf_ifs025',
-            'ecmwf_aifs025': 'ecmwf_aifs025_single',
-            'gfs_seamless': 'ncep_gfs013',
-            'gfs_global': 'ncep_gfs025',
-            'gfs_hrrr': 'ncep_hrrr_conus',
-            'arome_france': 'meteofrance_arome_france0025',
-            'gem_hrdps_continental': 'cmc_gem_hrdps',
-            'gem_regional': 'cmc_gem_rdps'
-        };
-        const model = modelMap[modelSelect.value] || modelSelect.value;
-
-        // Fetch model run time
-        console.log('Fetching meta for model:', model);
-        const metaResponse = await fetch(`https://api.open-meteo.com/data/${model}/static/meta.json`);
-        if (!metaResponse.ok) {
-            const errorText = await metaResponse.text();
-            throw new Error(`Meta fetch failed: ${metaResponse.status} - ${errorText}`);
-        }
-        const metaData = await metaResponse.json();
-        const runDate = new Date(metaData.last_run_initialisation_time * 1000);
-        const utcNow = new Date(Date.UTC(
-            new Date().getUTCFullYear(),
-            new Date().getUTCMonth(),
-            new Date().getUTCDate(),
-            new Date().getUTCHours(),
-            new Date().getUTCSeconds()
-        ));
-        const year = runDate.getUTCFullYear();
-        const month = String(runDate.getUTCMonth() + 1).padStart(2, '0');
-        const day = String(runDate.getUTCDate()).padStart(2, '0');
-        const hour = String(runDate.getUTCHours()).padStart(2, '0');
-        const minute = String(runDate.getUTCMinutes()).padStart(2, '0');
-        lastModelRun = `${year}-${month}-${day} ${hour}${minute}Z`;
-
-        let newHour = (runDate.getUTCHours() + 6) % 24;
-        let newDay = runDate.getUTCDate() + Math.floor((runDate.getUTCHours() + 6) / 24);
-        let newMonth = runDate.getUTCMonth();
-        let newYear = runDate.getUTCFullYear();
-        if (newDay > new Date(newYear, newMonth + 1, 0).getUTCDate()) {
-            newDay = 1;
-            newMonth = (newMonth + 1) % 12;
-            if (newMonth === 0) newYear++;
-        }
-        let startDate = new Date(Date.UTC(newYear, newMonth, newDay, newHour));
-        if (startDate > utcNow) {
-            startDate = utcNow;
-        }
-        const startYear = startDate.getUTCFullYear();
-        const startMonth = String(startDate.getUTCMonth() + 1).padStart(2, '0');
-        const startDay = String(startDate.getUTCDate()).padStart(2, '0');
-        const startDateStr = `${startYear}-${startMonth}-${startDay}`;
-
-        const endDate = new Date(Date.UTC(
-            startDate.getUTCFullYear(),
-            startDate.getUTCMonth(),
-            startDate.getUTCDate() + (modelSelect.value === 'icon_d2' ? 2 : 7)
-        ));
-        const endYear = endDate.getUTCFullYear();
-        const endMonth = String(endDate.getUTCMonth() + 1).padStart(2, '0');
-        const endDay = String(endDate.getUTCDate()).padStart(2, '0');
-        const endDateStr = `${endYear}-${endMonth}-${endDay}`;
-
-
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
-            `&hourly=surface_pressure,temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,` +
-            `temperature_1000hPa,relative_humidity_1000hPa,wind_speed_1000hPa,wind_direction_1000hPa,geopotential_height_1000hPa,` +
-            `temperature_950hPa,relative_humidity_950hPa,wind_speed_950hPa,wind_direction_950hPa,geopotential_height_950hPa,` +
-            `temperature_925hPa,relative_humidity_925hPa,wind_speed_925hPa,wind_direction_925hPa,geopotential_height_925hPa,` +
-            `temperature_900hPa,relative_humidity_900hPa,wind_speed_900hPa,wind_direction_900hPa,geopotential_height_900hPa,` +
-            `temperature_850hPa,relative_humidity_850hPa,wind_speed_850hPa,wind_direction_850hPa,geopotential_height_850hPa,` +
-            `temperature_800hPa,relative_humidity_800hPa,wind_speed_800hPa,wind_direction_800hPa,geopotential_height_800hPa,` +
-            `temperature_700hPa,relative_humidity_700hPa,wind_speed_700hPa,wind_direction_700hPa,geopotential_height_700hPa,` +
-            `temperature_600hPa,relative_humidity_600hPa,wind_speed_600hPa,wind_direction_600hPa,geopotential_height_600hPa,` +
-            `temperature_500hPa,relative_humidity_500hPa,wind_speed_500hPa,wind_direction_500hPa,geopotential_height_500hPa,` +
-            `temperature_400hPa,relative_humidity_400hPa,wind_speed_400hPa,wind_direction_400hPa,geopotential_height_400hPa,` +
-            `temperature_300hPa,relative_humidity_300hPa,wind_speed_300hPa,wind_direction_300hPa,geopotential_height_300hPa,` +
-            `temperature_250hPa,relative_humidity_250hPa,wind_speed_250hPa,wind_direction_250hPa,geopotential_height_250hPa,` +
-            `temperature_200hPa,relative_humidity_200hPa,wind_speed_200hPa,wind_direction_200hPa,geopotential_height_200hPa` +
-            `&models=${modelSelect.value}&start_date=${startDateStr}&end_date=${endDateStr}`;
-
-        console.log('Fetching weather from:', url);
-        const response = await fetch(url);
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`HTTP error! Status: ${response.status} - ${errorText}`);
-        }
-
-        const data = await response.json();
-
-        if (!data.hourly || !data.hourly.time) {
-            throw new Error('No hourly data returned from API');
-        }
-
-        const lastValidIndex = data.hourly.time.length - 1;
-
-        weatherData = {
-            time: data.hourly.time.slice(0, lastValidIndex + 1),
-            surface_pressure: data.hourly.surface_pressure?.slice(0, lastValidIndex + 1) || [],
-            temperature_2m: data.hourly.temperature_2m?.slice(0, lastValidIndex + 1) || [],
-            relative_humidity_2m: data.hourly.relative_humidity_2m?.slice(0, lastValidIndex + 1) || [],
-            wind_speed_10m: data.hourly.wind_speed_10m?.slice(0, lastValidIndex + 1) || [],
-            wind_direction_10m: data.hourly.wind_direction_10m?.slice(0, lastValidIndex + 1) || [],
-            wind_gusts_10m: data.hourly.wind_gusts_10m?.slice(0, lastValidIndex + 1) || [],
-            temperature_1000hPa: data.hourly.temperature_1000hPa?.slice(0, lastValidIndex + 1) || [],
-            relative_humidity_1000hPa: data.hourly.relative_humidity_1000hPa?.slice(0, lastValidIndex + 1) || [],
-            wind_speed_1000hPa: data.hourly.wind_speed_1000hPa?.slice(0, lastValidIndex + 1) || [],
-            wind_direction_1000hPa: data.hourly.wind_direction_1000hPa?.slice(0, lastValidIndex + 1) || [],
-            geopotential_height_1000hPa: data.hourly.geopotential_height_1000hPa?.slice(0, lastValidIndex + 1) || [],
-            temperature_950hPa: data.hourly.temperature_950hPa?.slice(0, lastValidIndex + 1) || [],
-            relative_humidity_950hPa: data.hourly.relative_humidity_950hPa?.slice(0, lastValidIndex + 1) || [],
-            wind_speed_950hPa: data.hourly.wind_speed_950hPa?.slice(0, lastValidIndex + 1) || [],
-            wind_direction_950hPa: data.hourly.wind_direction_950hPa?.slice(0, lastValidIndex + 1) || [],
-            geopotential_height_950hPa: data.hourly.geopotential_height_950hPa?.slice(0, lastValidIndex + 1) || [],
-            temperature_925hPa: data.hourly.temperature_925hPa?.slice(0, lastValidIndex + 1) || [],
-            relative_humidity_925hPa: data.hourly.relative_humidity_925hPa?.slice(0, lastValidIndex + 1) || [],
-            wind_speed_925hPa: data.hourly.wind_speed_925hPa?.slice(0, lastValidIndex + 1) || [],
-            wind_direction_925hPa: data.hourly.wind_direction_925hPa?.slice(0, lastValidIndex + 1) || [],
-            geopotential_height_925hPa: data.hourly.geopotential_height_925hPa?.slice(0, lastValidIndex + 1) || [],
-            temperature_900hPa: data.hourly.temperature_900hPa?.slice(0, lastValidIndex + 1) || [],
-            relative_humidity_900hPa: data.hourly.relative_humidity_900hPa?.slice(0, lastValidIndex + 1) || [],
-            wind_speed_900hPa: data.hourly.wind_speed_900hPa?.slice(0, lastValidIndex + 1) || [],
-            wind_direction_900hPa: data.hourly.wind_direction_900hPa?.slice(0, lastValidIndex + 1) || [],
-            geopotential_height_900hPa: data.hourly.geopotential_height_900hPa?.slice(0, lastValidIndex + 1) || [],
-            temperature_850hPa: data.hourly.temperature_850hPa?.slice(0, lastValidIndex + 1) || [],
-            relative_humidity_850hPa: data.hourly.relative_humidity_850hPa?.slice(0, lastValidIndex + 1) || [],
-            wind_speed_850hPa: data.hourly.wind_speed_850hPa?.slice(0, lastValidIndex + 1) || [],
-            wind_direction_850hPa: data.hourly.wind_direction_850hPa?.slice(0, lastValidIndex + 1) || [],
-            geopotential_height_850hPa: data.hourly.geopotential_height_850hPa?.slice(0, lastValidIndex + 1) || [],
-            temperature_800hPa: data.hourly.temperature_800hPa?.slice(0, lastValidIndex + 1) || [],
-            relative_humidity_800hPa: data.hourly.relative_humidity_800hPa?.slice(0, lastValidIndex + 1) || [],
-            wind_speed_800hPa: data.hourly.wind_speed_800hPa?.slice(0, lastValidIndex + 1) || [],
-            wind_direction_800hPa: data.hourly.wind_direction_800hPa?.slice(0, lastValidIndex + 1) || [],
-            geopotential_height_800hPa: data.hourly.geopotential_height_800hPa?.slice(0, lastValidIndex + 1) || [],
-            temperature_700hPa: data.hourly.temperature_700hPa?.slice(0, lastValidIndex + 1) || [],
-            relative_humidity_700hPa: data.hourly.relative_humidity_700hPa?.slice(0, lastValidIndex + 1) || [],
-            wind_speed_700hPa: data.hourly.wind_speed_700hPa?.slice(0, lastValidIndex + 1) || [],
-            wind_direction_700hPa: data.hourly.wind_direction_700hPa?.slice(0, lastValidIndex + 1) || [],
-            geopotential_height_700hPa: data.hourly.geopotential_height_700hPa?.slice(0, lastValidIndex + 1) || [],
-            temperature_600hPa: data.hourly.temperature_600hPa?.slice(0, lastValidIndex + 1) || [],
-            relative_humidity_600hPa: data.hourly.relative_humidity_600hPa?.slice(0, lastValidIndex + 1) || [],
-            wind_speed_600hPa: data.hourly.wind_speed_600hPa?.slice(0, lastValidIndex + 1) || [],
-            wind_direction_600hPa: data.hourly.wind_direction_600hPa?.slice(0, lastValidIndex + 1) || [],
-            geopotential_height_600hPa: data.hourly.geopotential_height_600hPa?.slice(0, lastValidIndex + 1) || [],
-            temperature_500hPa: data.hourly.temperature_500hPa?.slice(0, lastValidIndex + 1) || [],
-            relative_humidity_500hPa: data.hourly.relative_humidity_500hPa?.slice(0, lastValidIndex + 1) || [],
-            wind_speed_500hPa: data.hourly.wind_speed_500hPa?.slice(0, lastValidIndex + 1) || [],
-            wind_direction_500hPa: data.hourly.wind_direction_500hPa?.slice(0, lastValidIndex + 1) || [],
-            geopotential_height_500hPa: data.hourly.geopotential_height_500hPa?.slice(0, lastValidIndex + 1) || [],
-            temperature_400hPa: data.hourly.temperature_400hPa?.slice(0, lastValidIndex + 1) || [],
-            relative_humidity_400hPa: data.hourly.relative_humidity_400hPa?.slice(0, lastValidIndex + 1) || [],
-            wind_speed_400hPa: data.hourly.wind_speed_400hPa?.slice(0, lastValidIndex + 1) || [],
-            wind_direction_400hPa: data.hourly.wind_direction_400hPa?.slice(0, lastValidIndex + 1) || [],
-            geopotential_height_400hPa: data.hourly.geopotential_height_400hPa?.slice(0, lastValidIndex + 1) || [],
-            temperature_300hPa: data.hourly.temperature_300hPa?.slice(0, lastValidIndex + 1) || [],
-            relative_humidity_300hPa: data.hourly.relative_humidity_300hPa?.slice(0, lastValidIndex + 1) || [],
-            wind_speed_300hPa: data.hourly.wind_speed_300hPa?.slice(0, lastValidIndex + 1) || [],
-            wind_direction_300hPa: data.hourly.wind_direction_300hPa?.slice(0, lastValidIndex + 1) || [],
-            geopotential_height_300hPa: data.hourly.geopotential_height_300hPa?.slice(0, lastValidIndex + 1) || [],
-            temperature_250hPa: data.hourly.temperature_250hPa?.slice(0, lastValidIndex + 1) || [],
-            relative_humidity_250hPa: data.hourly.relative_humidity_250hPa?.slice(0, lastValidIndex + 1) || [],
-            wind_speed_250hPa: data.hourly.wind_speed_250hPa?.slice(0, lastValidIndex + 1) || [],
-            wind_direction_250hPa: data.hourly.wind_direction_250hPa?.slice(0, lastValidIndex + 1) || [],
-            geopotential_height_250hPa: data.hourly.geopotential_height_250hPa?.slice(0, lastValidIndex + 1) || [],
-            temperature_200hPa: data.hourly.temperature_200hPa?.slice(0, lastValidIndex + 1) || [],
-            relative_humidity_200hPa: data.hourly.relative_humidity_200hPa?.slice(0, lastValidIndex + 1) || [],
-            wind_speed_200hPa: data.hourly.wind_speed_200hPa?.slice(0, lastValidIndex + 1) || [],
-            wind_direction_200hPa: data.hourly.wind_direction_200hPa?.slice(0, lastValidIndex + 1) || [],
-            geopotential_height_200hPa: data.hourly.geopotential_height_200hPa?.slice(0, lastValidIndex + 1) || []
-        };
-
-        const slider = document.getElementById('timeSlider');
-        slider.min = 0;
-        slider.max = weatherData.time.length - 1;
-
-        if (weatherData.time.length <= 1) {
-            slider.disabled = true;
-            slider.style.opacity = '0.5';
-            slider.style.cursor = 'not-allowed';
-            document.getElementById('info').innerHTML += '<br><strong>Note:</strong> Only one forecast time available.';
-        } else {
-            slider.disabled = false;
-            slider.style.opacity = '1';
-            slider.style.cursor = 'pointer';
-        }
-
-        // Set slider to closest time based on currentTime
-        console.log('fetchWeather: currentTime received:', currentTime);
-        console.log('Luxon available:', typeof luxon !== 'undefined' ? luxon.VERSION : 'Not loaded');
-        let initialIndex = 0;
-        if (currentTime && weatherData.time.length > 0) {
-            let targetDate = null;
-            // Handle "YYYY-MM-DD HHMM GMT+2" format
-            if (typeof currentTime === 'string' && currentTime.includes('GMT')) {
-                const match = currentTime.match(/^(\d{4}-\d{2}-\d{2})\s(\d{4})\sGMT([+-]\d{1,2})$/);
-                if (match) {
-                    const [, dateStr, timeStr, offset] = match;
-                    const formattedTime = `${timeStr.slice(0, 2)}:${timeStr.slice(2, 4)}`;
-                    // Parse offset number and pad to two digits
-                    const offsetNum = parseInt(offset);
-                    const formattedOffset = `${offsetNum >= 0 ? '+' : '-'}${Math.abs(offsetNum).toString().padStart(2, '0')}:00`;
-                    const isoString = `${dateStr}T${formattedTime}:00${formattedOffset}`;
-                    targetDate = luxon.DateTime.fromISO(isoString);
-                    console.log('fetchWeather: Parsed ISO string:', isoString);
-                } else {
-                    console.warn('fetchWeather: Invalid currentTime format:', currentTime);
-                }
-            } else {
-                // Try standard ISO format
-                targetDate = luxon.DateTime.fromISO(currentTime, { zone: 'utc' });
-            }
-            console.log('fetchWeather: targetDate (ISO):', targetDate && targetDate.isValid ? targetDate.toISO() : null);
-            if (targetDate && targetDate.isValid) {
-                const targetTimestamp = targetDate.toMillis();
-                console.log('fetchWeather: targetTimestamp:', targetTimestamp);
-                let minDiff = Infinity;
-                weatherData.time.forEach((time, index) => {
-                    const timeTimestamp = luxon.DateTime.fromISO(time, { zone: 'utc' }).toMillis();
-                    const diff = Math.abs(timeTimestamp - targetTimestamp);
-                    if (diff < minDiff) {
-                        minDiff = diff;
-                        initialIndex = index;
-                    }
-                });
-                console.log(`fetchWeather: Slider set to index ${initialIndex} for time ${weatherData.time[initialIndex]}`);
-            } else {
-                console.warn('fetchWeather: Failed to parse currentTime, defaulting to index 0');
-            }
-        } else {
-            // Default to closest current or future time
-            const now = luxon.DateTime.utc();
-            console.log('fetchWeather: No currentTime provided, using current UTC time:', now.toISO());
-            let minDiff = Infinity;
-            weatherData.time.forEach((time, index) => {
-                const timeTimestamp = luxon.DateTime.fromISO(time, { zone: 'utc' }).toMillis();
-                const diff = Math.abs(timeTimestamp - now.toMillis());
-                if (diff < minDiff) {
-                    minDiff = diff;
-                    initialIndex = index;
-                }
-            });
-            console.log(`fetchWeather: Slider set to index ${initialIndex} for time ${weatherData.time[initialIndex]}`);
-        }
-        slider.value = initialIndex;
-        await updateWeatherDisplay(initialIndex);
-        document.getElementById('loading').style.display = 'none';
-
-        // Reattach slider event listener after initial set
-        slider.oninput = function () {
-            console.log('Slider oninput triggered, new value:', this.value);
-            updateWeatherDisplay(this.value);
-        };
-    } catch (error) {
-        document.getElementById('loading').style.display = 'none';
-        Utils.handleError(`Failed to fetch weather data: ${error.message}`);
-    }
-}
 async function fetchWeather(lat, lon, currentTime = null, isInitialLoad = false) {
     try {
         document.getElementById('loading').style.display = 'block';
@@ -1990,22 +1725,30 @@ function interpolateWeatherData(sliderIndex) {
         return [];
     }
 
-    const baseHeight = Math.round(lastAltitude); // Elevation from Open-Meteo in meters
-    const interpStep = parseInt(getInterpolationStep()) || 100; // Step size in user's unit (m or ft)
+    const baseHeight = Math.round(lastAltitude);
+    const interpStep = parseInt(getInterpolationStep()) || 100;
     const heightUnit = getHeightUnit();
 
-    // Define pressure levels from 1000 hPa to 200 hPa
-    const pressureLevels = [1000, 950, 925, 900, 850, 800, 700, 600, 500, 400, 300, 250, 200];
-    let heightData = pressureLevels.map(hPa => weatherData[`geopotential_height_${hPa}hPa`][sliderIndex]).filter(h => h !== null && h !== undefined);
-    let tempData = pressureLevels.map(hPa => weatherData[`temperature_${hPa}hPa`][sliderIndex]);
-    let rhData = pressureLevels.map(hPa => weatherData[`relative_humidity_${hPa}hPa`][sliderIndex]);
-    let spdData = pressureLevels.map(hPa => weatherData[`wind_speed_${hPa}hPa`][sliderIndex]);
-    let dirData = pressureLevels.map(hPa => weatherData[`wind_direction_${hPa}hPa`][sliderIndex]);
+    // Define all possible pressure levels
+    const allPressureLevels = [1000, 950, 925, 900, 850, 800, 700, 600, 500, 400, 300, 250, 200];
 
-    if (heightData.length < 2) {
-        console.warn('Insufficient pressure level data for interpolation');
+    // Filter pressure levels with valid geopotential height data
+    const validPressureLevels = allPressureLevels.filter(hPa => {
+        const height = weatherData[`geopotential_height_${hPa}hPa`]?.[sliderIndex];
+        return height !== null && height !== undefined;
+    });
+
+    if (validPressureLevels.length < 2) {
+        console.warn('Insufficient valid pressure level data for interpolation:', validPressureLevels);
         return [];
     }
+
+    // Collect data for valid pressure levels
+    let heightData = validPressureLevels.map(hPa => weatherData[`geopotential_height_${hPa}hPa`][sliderIndex]);
+    let tempData = validPressureLevels.map(hPa => weatherData[`temperature_${hPa}hPa`][sliderIndex]);
+    let rhData = validPressureLevels.map(hPa => weatherData[`relative_humidity_${hPa}hPa`][sliderIndex]);
+    let spdData = validPressureLevels.map(hPa => weatherData[`wind_speed_${hPa}hPa`][sliderIndex]);
+    let dirData = validPressureLevels.map(hPa => weatherData[`wind_direction_${hPa}hPa`][sliderIndex]);
 
     const surfacePressure = weatherData.surface_pressure[sliderIndex];
     if (surfacePressure === null || surfacePressure === undefined) {
@@ -2013,44 +1756,44 @@ function interpolateWeatherData(sliderIndex) {
         return [];
     }
 
-    // Calculate initial wind components at pressure levels
+    // Calculate wind components at valid pressure levels
     let uComponents = spdData.map((spd, i) => -spd * Math.sin(dirData[i] * Math.PI / 180));
     let vComponents = spdData.map((spd, i) => -spd * Math.cos(dirData[i] * Math.PI / 180));
 
-    // Add surface and intermediate points if surfacePressure > 1000 hPa
-    const h1000 = weatherData.geopotential_height_1000hPa[sliderIndex];
-    if (surfacePressure > 1000 && Number.isFinite(h1000) && h1000 > baseHeight) {
-        const stepsBetween = Math.floor((h1000 - baseHeight) / interpStep);
+    // Add surface and intermediate points if surfacePressure > lowest valid pressure level
+    const lowestPressureLevel = Math.max(...validPressureLevels);
+    const hLowest = weatherData[`geopotential_height_${lowestPressureLevel}hPa`][sliderIndex];
+    if (surfacePressure > lowestPressureLevel && Number.isFinite(hLowest) && hLowest > baseHeight) {
+        const stepsBetween = Math.floor((hLowest - baseHeight) / interpStep);
 
         // Surface wind components
         const uSurface = -weatherData.wind_speed_10m[sliderIndex] * Math.sin(weatherData.wind_direction_10m[sliderIndex] * Math.PI / 180);
         const vSurface = -weatherData.wind_speed_10m[sliderIndex] * Math.cos(weatherData.wind_direction_10m[sliderIndex] * Math.PI / 180);
-        const u1000 = uComponents[0]; // First element corresponds to 1000 hPa
-        const v1000 = vComponents[0];
+        const uLowest = uComponents[validPressureLevels.indexOf(lowestPressureLevel)];
+        const vLowest = vComponents[validPressureLevels.indexOf(lowestPressureLevel)];
 
-        // Add intermediate points with logarithmic interpolation of u and v
+        // Add intermediate points with logarithmic interpolation
         for (let i = stepsBetween - 1; i >= 1; i--) {
             const h = baseHeight + i * interpStep;
-            if (h >= h1000) continue;
-            const fraction = (h - baseHeight) / (h1000 - baseHeight);
+            if (h >= hLowest) continue;
+            const fraction = (h - baseHeight) / (hLowest - baseHeight);
             const logPSurface = Math.log(surfacePressure);
-            const logP1000 = Math.log(1000);
-            const logP = logPSurface + fraction * (logP1000 - logPSurface);
+            const logPLowest = Math.log(lowestPressureLevel);
+            const logP = logPSurface + fraction * (logPLowest - logPSurface);
             const p = Math.exp(logP);
 
-            // Logarithmic interpolation of wind components
-            const logHeight = Math.log(h - baseHeight + 1); // +1 to avoid log(0)
-            const logH0 = Math.log(1); // Surface relative height
-            const logH1 = Math.log(h1000 - baseHeight);
-            const u = Utils.LIP([logH0, logH1], [uSurface, u1000], logHeight);
-            const v = Utils.LIP([logH0, logH1], [vSurface, v1000], logHeight);
+            const logHeight = Math.log(h - baseHeight + 1);
+            const logH0 = Math.log(1);
+            const logH1 = Math.log(hLowest - baseHeight);
+            const u = Utils.LIP([logH0, logH1], [uSurface, uLowest], logHeight);
+            const v = Utils.LIP([logH0, logH1], [vSurface, vLowest], logHeight);
             const spd = Utils.windSpeed(u, v);
             const dir = Utils.windDirection(u, v);
 
             heightData.unshift(h);
-            pressureLevels.unshift(p);
-            tempData.unshift(Utils.LIP([baseHeight, h1000], [weatherData.temperature_2m[sliderIndex], weatherData.temperature_1000hPa[sliderIndex]], h));
-            rhData.unshift(Utils.LIP([baseHeight, h1000], [weatherData.relative_humidity_2m[sliderIndex], weatherData.relative_humidity_1000hPa[sliderIndex]], h));
+            validPressureLevels.unshift(p);
+            tempData.unshift(Utils.LIP([baseHeight, hLowest], [weatherData.temperature_2m[sliderIndex], weatherData[`temperature_${lowestPressureLevel}hPa`][sliderIndex]], h));
+            rhData.unshift(Utils.LIP([baseHeight, hLowest], [weatherData.relative_humidity_2m[sliderIndex], weatherData[`relative_humidity_${lowestPressureLevel}hPa`][sliderIndex]], h));
             spdData.unshift(spd);
             dirData.unshift(dir);
             uComponents.unshift(u);
@@ -2059,7 +1802,7 @@ function interpolateWeatherData(sliderIndex) {
 
         // Add surface data
         heightData.unshift(baseHeight);
-        pressureLevels.unshift(surfacePressure);
+        validPressureLevels.unshift(surfacePressure);
         tempData.unshift(weatherData.temperature_2m[sliderIndex]);
         rhData.unshift(weatherData.relative_humidity_2m[sliderIndex]);
         spdData.unshift(weatherData.wind_speed_10m[sliderIndex]);
@@ -2068,31 +1811,29 @@ function interpolateWeatherData(sliderIndex) {
         vComponents.unshift(vSurface);
     }
 
-    // Determine the maximum height (200 hPa level, relative to AGL)
-    const maxPressureIndex = pressureLevels.indexOf(200);
-    const maxHeightASL = heightData[maxPressureIndex]; // Absolute height at 200 hPa in meters
-    const maxHeightAGL = maxHeightASL - baseHeight; // Convert to AGL in meters
+    // Determine the maximum height using the lowest pressure level (highest altitude)
+    const minPressureIndex = validPressureLevels.indexOf(Math.min(...validPressureLevels));
+    const maxHeightASL = heightData[minPressureIndex];
+    const maxHeightAGL = maxHeightASL - baseHeight;
     if (maxHeightAGL <= 0 || isNaN(maxHeightAGL)) {
-        console.warn('Invalid max height at 200 hPa:', { maxHeightASL, baseHeight });
+        console.warn('Invalid max height at lowest pressure level:', { maxHeightASL, baseHeight, minPressure: validPressureLevels[minPressureIndex] });
         return [];
     }
 
     // Convert maxHeightAGL to user's unit for step calculation
     const maxHeightInUnit = heightUnit === 'ft' ? maxHeightAGL * 3.28084 : maxHeightAGL;
     const steps = Math.floor(maxHeightInUnit / interpStep);
-    const heightsInUnit = Array.from({ length: steps + 1 }, (_, i) => i * interpStep); // Heights in user's unit
+    const heightsInUnit = Array.from({ length: steps + 1 }, (_, i) => i * interpStep);
 
-    console.log('Interpolating up to 200 hPa:', { maxHeightAGL, interpStep });
+    console.log('Interpolating up to lowest pressure level:', { maxHeightAGL, minPressure: validPressureLevels[minPressureIndex], interpStep });
 
     const interpolatedData = [];
     heightsInUnit.forEach(height => {
-        // Convert height from user's unit to meters for interpolation
         const heightAGLInMeters = heightUnit === 'ft' ? height / 3.28084 : height;
-        const heightASLInMeters = baseHeight + heightAGLInMeters; // Absolute height (ASL) in meters
+        const heightASLInMeters = baseHeight + heightAGLInMeters;
 
         let dataPoint;
         if (heightAGLInMeters === 0) {
-            // Surface data at 0 in user's unit
             dataPoint = {
                 height: heightASLInMeters,
                 pressure: surfacePressure,
@@ -2103,9 +1844,8 @@ function interpolateWeatherData(sliderIndex) {
                 dew: Utils.calculateDewpoint(weatherData.temperature_2m[sliderIndex], weatherData.relative_humidity_2m[sliderIndex])
             };
         } else {
-            // Interpolate at higher altitudes
-            const pressure = Utils.interpolatePressure(heightASLInMeters, pressureLevels, heightData);
-            const windComponents = Utils.interpolateWindAtAltitude(heightASLInMeters, pressureLevels, heightData, uComponents, vComponents);
+            const pressure = Utils.interpolatePressure(heightASLInMeters, validPressureLevels, heightData);
+            const windComponents = Utils.interpolateWindAtAltitude(heightASLInMeters, validPressureLevels, heightData, uComponents, vComponents);
             const spd = Utils.windSpeed(windComponents.u, windComponents.v);
             const dir = Utils.windDirection(windComponents.u, windComponents.v);
             const temp = Utils.LIP(heightData, tempData, heightASLInMeters);
@@ -2123,7 +1863,7 @@ function interpolateWeatherData(sliderIndex) {
             };
         }
 
-        dataPoint.displayHeight = height; // Height in user's unit for display
+        dataPoint.displayHeight = height;
         interpolatedData.push(dataPoint);
     });
 
