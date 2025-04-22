@@ -364,17 +364,17 @@ function debounce(func, wait) {
 }
 const debouncedPositionUpdate = debounce(async (position) => {
     const { latitude, longitude, accuracy } = position.coords;
-    const currentTime = new Date().getTime() / 1000; // Current time in seconds
+    const currentTime = new Date().getTime() / 1000;
     console.log('Debounced position update:', { latitude, longitude, accuracy, currentTime });
 
-    // Calculate speed and direction if previous position exists
+    // Calculate speed and direction
     let speed = 'N/A';
     let direction = 'N/A';
     if (prevLat !== null && prevLng !== null && prevTime !== null) {
-        const distance = map.distance([prevLat, prevLng], [latitude, longitude]); // Distance in meters
-        const timeDiff = currentTime - prevTime; // Time difference in seconds
+        const distance = map.distance([prevLat, prevLng], [latitude, longitude]);
+        const timeDiff = currentTime - prevTime;
         if (timeDiff > 0) {
-            const speedMs = distance / timeDiff; // Speed in m/s
+            const speedMs = distance / timeDiff;
             const windUnit = getWindSpeedUnit();
             speed = Utils.convertWind(speedMs, windUnit, 'm/s');
             speed = windUnit === 'bft' ? Math.round(speed) : speed.toFixed(1);
@@ -383,28 +383,25 @@ const debouncedPositionUpdate = debounce(async (position) => {
     }
 
     // Update live marker
-    if (liveMarker) {
-        liveMarker.setLatLng([latitude, longitude]);
-    } else {
+    if (!liveMarker) {
         liveMarker = createLiveMarker(latitude, longitude).addTo(map);
-        liveMarker.on('click', () => {
-            if (liveMarker.getPopup()?.isOpen()) {
-                liveMarker.closePopup();
-            } else {
-                updateLiveMarkerPopup(liveMarker, latitude, longitude, getAltitude(latitude, longitude), accuracy, speed, direction, true);
-            }
-        });
+        console.log('Created new liveMarker at:', { latitude, longitude });
+    } else {
+        liveMarker.setLatLng([latitude, longitude]);
+        console.log('Updated liveMarker to:', { latitude, longitude });
     }
 
-    // Update popup
-    updateLiveMarkerPopup(liveMarker, latitude, longitude, await getAltitude(latitude, longitude), accuracy, speed, direction, liveMarker.getPopup()?.isOpen() || false);
+    // Update popup content
+    const altitude = await getAltitude(latitude, longitude);
+    updateLiveMarkerPopup(liveMarker, latitude, longitude, altitude, accuracy, speed, direction, liveMarker.getPopup()?.isOpen() || false);
+    console.log('Updated liveMarker popup:', { latitude, longitude, altitude, accuracy, speed, direction });
 
     // Update accuracy circle
     if (userSettings.trackPosition && accuracy) {
         updateAccuracyCircle(latitude, longitude, accuracy);
     }
 
-    // Store current position and time for next update
+    // Store current position and time
     prevLat = latitude;
     prevLng = longitude;
     prevTime = currentTime;
@@ -496,20 +493,9 @@ function initMap() {
 
     // Add pane for GPX track
     map.createPane('gpxTrackPane');
-    map.getPane('gpxTrackPane').style.zIndex = 650; // Above circles (default z-index: 400-500)
-    map.getPane('tooltipPane').style.zIndex = 700; // Higher than gpxTrackPane
+    map.getPane('gpxTrackPane').style.zIndex = 650;
+    map.getPane('tooltipPane').style.zIndex = 700;
 
-    const initialAltitude = 'N/A';
-    currentMarker = createCustomMarker(defaultCenter[0], defaultCenter[1]).addTo(map);
-    attachMarkerDragend(currentMarker);
-    updateMarkerPopup(currentMarker, defaultCenter[0], defaultCenter[1], initialAltitude, true); // Open popup initially
-    if (userSettings.calculateJump) {
-        debouncedCalculateJump(); // Use debounced version
-        calculateCutAway();
-    }
-    recenterMap();
-
-    // Helper function to handle initial fetch
     async function fetchInitialWeather(lat, lng) {
         const lastFullHourUTC = getLastFullHourUTC();
         console.log('initMap: Last full hour UTC:', lastFullHourUTC.toISOString());
@@ -526,38 +512,39 @@ function initMap() {
         await fetchWeatherForLocation(lat, lng, initialTime, true);
     }
 
-    // Geolocation handling
-    if (userSettings.trackPosition) {
-        setCheckboxValue('trackPositionCheckbox', true);
-        startPositionTracking();
-    }
+    // Initialize currentMarker at default location temporarily
+    const initialAltitude = 'N/A';
+    currentMarker = createCustomMarker(defaultCenter[0], defaultCenter[1]).addTo(map);
+    attachMarkerDragend(currentMarker);
+    updateMarkerPopup(currentMarker, defaultCenter[0], defaultCenter[1], initialAltitude, true);
 
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
             async (position) => {
                 const userCoords = [position.coords.latitude, position.coords.longitude];
+                lastLat = position.coords.latitude;
+                lastLng = position.coords.longitude;
+                lastAltitude = await getAltitude(lastLat, lastLng);
+
+                // Update currentMarker to user's position
+                if (currentMarker) currentMarker.remove();
+                currentMarker = createCustomMarker(lastLat, lastLng).addTo(map);
+                attachMarkerDragend(currentMarker);
+                updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, true);
                 map.setView(userCoords, defaultZoom);
-                if (!userSettings.trackPosition) {
 
-                    if (currentMarker) currentMarker.remove();
-                    lastLat = position.coords.latitude;
-                    lastLng = position.coords.longitude;
-                    lastAltitude = await getAltitude(lastLat, lastLng);
+                if (userSettings.calculateJump) {
+                    debouncedCalculateJump();
+                    calculateCutAway();
+                }
+                recenterMap();
 
-                    currentMarker = createCustomMarker(lastLat, lastLng).addTo(map);
-                    attachMarkerDragend(currentMarker);
-                    updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, true); // Open popup initially
-                    if (userSettings.calculateJump) {
-                        debouncedCalculateJump(); // Use debounced version
-                        calculateCutAway();
-                    }
-                    recenterMap();
+                await fetchInitialWeather(lastLat, lastLng);
 
-                    const lastFullHourUTC = getLastFullHourUTC();
-                    const initialTime = userSettings.timeZone === 'Z'
-                        ? lastFullHourUTC.toISOString().replace(':00.000Z', 'Z')
-                        : await Utils.formatLocalTime(lastFullHourUTC.toISOString(), lastLat, lastLng);
-                    await fetchWeatherForLocation(lastLat, lastLng, initialTime, true);
+                // Start tracking if enabled
+                if (userSettings.trackPosition) {
+                    setCheckboxValue('trackPositionCheckbox', true);
+                    startPositionTracking();
                 }
             },
             async (error) => {
@@ -566,16 +553,29 @@ function initMap() {
                 lastLat = defaultCenter[0];
                 lastLng = defaultCenter[1];
                 lastAltitude = await getAltitude(lastLat, lastLng);
-                updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, true); // Open popup initially
+                // Update currentMarker to default location
+                if (currentMarker) currentMarker.remove();
+                currentMarker = createCustomMarker(lastLat, lastLng).addTo(map);
+                attachMarkerDragend(currentMarker);
+                updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, true);
+                map.setView(defaultCenter, defaultZoom);
                 recenterMap();
 
-                const lastFullHourUTC = getLastFullHourUTC();
-                const initialTime = userSettings.timeZone === 'Z'
-                    ? lastFullHourUTC.toISOString().replace(':00.000Z', 'Z')
-                    : await Utils.formatLocalTime(lastFullHourUTC.toISOString(), lastLat, lastLng);
-                await fetchWeatherForLocation(lastLat, lastLng, initialTime, true);
+                await fetchInitialWeather(lastLat, lastLng);
+
+                // Disable tracking if geolocation fails
+                if (userSettings.trackPosition) {
+                    Utils.handleError('Tracking disabled due to geolocation failure.');
+                    setCheckboxValue('trackPositionCheckbox', false);
+                    userSettings.trackPosition = false;
+                    saveSettings();
+                }
             },
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            {
+                enableHighAccuracy: true,
+                timeout: 20000,
+                maximumAge: 0
+            }
         );
     } else {
         console.warn('Geolocation not supported.');
@@ -583,16 +583,23 @@ function initMap() {
         lastLat = defaultCenter[0];
         lastLng = defaultCenter[1];
         lastAltitude = getAltitude(lastLat, lastLng);
-        updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, true); // Open popup initially
+        // Update currentMarker to default location
+        if (currentMarker) currentMarker.remove();
+        currentMarker = createCustomMarker(lastLat, lastLng).addTo(map);
+        attachMarkerDragend(currentMarker);
+        updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, true);
+        map.setView(defaultCenter, defaultZoom);
         recenterMap();
 
-        const lastFullHourUTC = getLastFullHourUTC();
-        console.log('initMap: Last full hour UTC:', lastFullHourUTC.toISOString());
-        const initialTime = userSettings.timeZone === 'Z'
-            ? lastFullHourUTC.toISOString().replace(':00.000Z', 'Z')
-            : Utils.formatLocalTime(lastFullHourUTC.toISOString(), lastLat, lastLng);
-        console.log('initMap: initialTime:', initialTime);
-        fetchWeatherForLocation(lastLat, lastLng, initialTime, true);
+        fetchInitialWeather(lastLat, lastLng);
+
+        // Disable tracking if geolocation is not supported
+        if (userSettings.trackPosition) {
+            Utils.handleError('Tracking disabled: Geolocation not supported.');
+            setCheckboxValue('trackPositionCheckbox', false);
+            userSettings.trackPosition = false;
+            saveSettings();
+        }
     }
 
     // Coordinate control with elevation
@@ -892,10 +899,23 @@ function createLiveMarker(lat, lng) {
         popupAnchor: [0, -24],
         className: 'live-marker'
     });
-    return L.marker([lat, lng], {
+    const marker = L.marker([lat, lng], {
         icon: liveIcon,
         zIndexOffset: 100
     });
+    // Bind popup with initial placeholder content
+    marker.bindPopup('Initializing live position...');
+    // Add click handler to update and open popup
+    marker.on('click', async () => {
+        console.log('liveMarker clicked at:', { lat: marker.getLatLng().lat, lng: marker.getLatLng().lng });
+        const altitude = await getAltitude(marker.getLatLng().lat, marker.getLatLng().lng);
+        const accuracy = marker._accuracy || 0; // Fallback if accuracy not set
+        const speed = marker._speed || 'N/A';
+        const direction = marker._direction || 'N/A';
+        updateLiveMarkerPopup(marker, marker.getLatLng().lat, marker.getLatLng().lng, altitude, accuracy, speed, direction, true);
+    });
+    console.log('Created liveMarker with popup bound:', { lat, lng });
+    return marker;
 }
 function createCutAwayMarker(lat, lng) {
     const cutAwayIcon = L.icon({
@@ -1027,11 +1047,13 @@ function updateLiveMarkerPopup(marker, lat, lng, altitude, accuracy, speed, dire
     popupContent += `Speed: ${speed} ${windUnit}<br>`;
     popupContent += `Direction: ${direction}°`;
 
-    if (!marker.getPopup()) {
-        marker.bindPopup(popupContent);
-    } else {
-        marker.setPopupContent(popupContent);
-    }
+    marker.setPopupContent(popupContent);
+    // Store data for click handler
+    marker._accuracy = accuracy;
+    marker._speed = speed;
+    marker._direction = direction;
+    console.log('Set liveMarker popup content:', { popupContent, open });
+
     if (open) {
         marker.openPopup();
     }
@@ -1227,43 +1249,85 @@ function startPositionTracking() {
     prevLng = null;
     prevTime = null;
 
-    let attemptHighAccuracy = true;
+    // Try getCurrentPosition for initial position
+    navigator.geolocation.getCurrentPosition(
+        async (position) => {
+            const { latitude, longitude, accuracy } = position.coords;
+            console.log('Initial position from getCurrentPosition:', { latitude, longitude, accuracy });
 
-    function tryWatchPosition(highAccuracy) {
-        watchId = navigator.geolocation.watchPosition(
-            (position) => debouncedPositionUpdate(position),
-            (error) => {
-                console.warn('Geolocation watch error:', error.message);
-                if (highAccuracy && error.code === error.TIMEOUT) {
-                    console.log('High-accuracy timeout, retrying with low accuracy');
-                    attemptHighAccuracy = false;
-                    navigator.geolocation.clearWatch(watchId);
-                    tryWatchPosition(false);
-                } else {
-                    let errorMessage = 'Unable to retrieve your location. ';
-                    if (error.code === error.TIMEOUT) {
-                        errorMessage += 'Please move to an area with better GPS signal (e.g., outdoors) or check location settings.';
-                    } else if (error.code === error.PERMISSION_DENIED) {
-                        errorMessage += 'Please grant location permissions in your browser settings.';
-                    } else {
-                        errorMessage += 'An unexpected error occurred. Please try again.';
-                    }
-                    Utils.handleError(errorMessage);
-                    stopPositionTracking();
-                    setCheckboxValue('trackPositionCheckbox', false);
-                    userSettings.trackPosition = false;
-                    saveSettings();
-                }
-            },
-            {
-                enableHighAccuracy: highAccuracy,
-                timeout: 20000,
-                maximumAge: 0
+            // Create liveMarker with initial position
+            if (!liveMarker) {
+                liveMarker = createLiveMarker(latitude, longitude).addTo(map);
+                console.log('Created initial liveMarker at:', { latitude, longitude });
+            } else {
+                liveMarker.setLatLng([latitude, longitude]);
+                console.log('Updated initial liveMarker to:', { latitude, longitude });
             }
-        );
-    }
 
-    tryWatchPosition(true);
+            // Update popup content
+            const altitude = await getAltitude(latitude, longitude);
+            updateLiveMarkerPopup(liveMarker, latitude, longitude, altitude, accuracy, 'N/A', 'N/A', false);
+            console.log('Set initial liveMarker popup:', { latitude, longitude, altitude, accuracy });
+
+            // Start watchPosition for continuous updates
+            let attemptHighAccuracy = true;
+            function tryWatchPosition(highAccuracy) {
+                watchId = navigator.geolocation.watchPosition(
+                    (position) => debouncedPositionUpdate(position),
+                    (error) => {
+                        console.warn('Geolocation watch error:', error.message);
+                        if (highAccuracy && error.code === error.TIMEOUT) {
+                            console.log('High-accuracy timeout, retrying with low accuracy');
+                            attemptHighAccuracy = false;
+                            navigator.geolocation.clearWatch(watchId);
+                            tryWatchPosition(false);
+                        } else {
+                            let errorMessage = 'Unable to retrieve your location. ';
+                            if (error.code === error.TIMEOUT) {
+                                errorMessage += 'Please move to an area with better GPS signal (e.g., outdoors) or check location settings.';
+                            } else if (error.code === error.PERMISSION_DENIED) {
+                                errorMessage += 'Please grant location permissions in your browser settings.';
+                            } else {
+                                errorMessage += 'An unexpected error occurred. Please try again.';
+                            }
+                            Utils.handleError(errorMessage);
+                            stopPositionTracking();
+                            setCheckboxValue('trackPositionCheckbox', false);
+                            userSettings.trackPosition = false;
+                            saveSettings();
+                        }
+                    },
+                    {
+                        enableHighAccuracy: highAccuracy,
+                        timeout: 20000,
+                        maximumAge: 0
+                    }
+                );
+            }
+            tryWatchPosition(true);
+        },
+        (error) => {
+            console.warn('Initial getCurrentPosition error:', error.message);
+            let errorMessage = 'Unable to retrieve initial location. ';
+            if (error.code === error.TIMEOUT) {
+                errorMessage += 'Please move to an area with better GPS signal (e.g., outdoors).';
+            } else if (error.code === error.PERMISSION_DENIED) {
+                errorMessage += 'Please grant location permissions.';
+            } else {
+                errorMessage += 'An unexpected error occurred.';
+            }
+            Utils.handleError(errorMessage);
+            stopPositionTracking();
+            setCheckboxValue('trackPositionCheckbox', false);
+            userSettings.trackPosition = false;
+            saveSettings();
+        },
+        {
+            enableHighAccuracy: true,
+            timeout: 20000,
+            maximumAge: 0
+        }
+    );
 }
 function stopPositionTracking() {
     if (watchId !== null) {
@@ -1285,13 +1349,12 @@ function stopPositionTracking() {
     prevLng = null;
     prevTime = null;
 
-    // Update UI to indicate tracking stopped
     const trackLabel = document.querySelector('label[for="trackPositionCheckbox"]');
     if (trackLabel) {
         trackLabel.textContent = 'Track My Position (Stopped)';
         setTimeout(() => {
             trackLabel.textContent = 'Track My Position';
-        }, 5000); // Reset label after 5 seconds
+        }, 5000);
     }
 }
 function updateAccuracyCircle(lat, lng, accuracy) {
