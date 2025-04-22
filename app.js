@@ -363,9 +363,9 @@ function debounce(func, wait) {
     };
 }
 const debouncedPositionUpdate = debounce(async (position) => {
-    const { latitude, longitude, accuracy } = position.coords;
+    const { latitude, longitude, accuracy, altitude: deviceAltitude, altitudeAccuracy } = position.coords;
     const currentTime = new Date().getTime() / 1000;
-    console.log('Debounced position update:', { latitude, longitude, accuracy, currentTime });
+    console.log('Debounced position update:', { latitude, longitude, accuracy, deviceAltitude, altitudeAccuracy, currentTime });
 
     // Calculate speed and direction
     let speed = 'N/A';
@@ -391,10 +391,12 @@ const debouncedPositionUpdate = debounce(async (position) => {
         console.log('Updated liveMarker to:', { latitude, longitude });
     }
 
+    // Get terrain altitude
+    const terrainAltitude = await getAltitude(latitude, longitude);
+
     // Update popup content
-    const altitude = await getAltitude(latitude, longitude);
-    updateLiveMarkerPopup(liveMarker, latitude, longitude, altitude, accuracy, speed, direction, liveMarker.getPopup()?.isOpen() || false);
-    console.log('Updated liveMarker popup:', { latitude, longitude, altitude, accuracy, speed, direction });
+    updateLiveMarkerPopup(liveMarker, latitude, longitude, terrainAltitude, deviceAltitude, altitudeAccuracy, accuracy, speed, direction, liveMarker.getPopup()?.isOpen() || false);
+    console.log('Updated liveMarker popup:', { latitude, longitude, terrainAltitude, deviceAltitude, altitudeAccuracy, accuracy, speed, direction });
 
     // Update accuracy circle
     if (userSettings.trackPosition && accuracy) {
@@ -908,11 +910,11 @@ function createLiveMarker(lat, lng) {
     // Add click handler to update and open popup
     marker.on('click', async () => {
         console.log('liveMarker clicked at:', { lat: marker.getLatLng().lat, lng: marker.getLatLng().lng });
-        const altitude = await getAltitude(marker.getLatLng().lat, marker.getLatLng().lng);
-        const accuracy = marker._accuracy || 0; // Fallback if accuracy not set
+        const terrainAltitude = await getAltitude(marker.getLatLng().lat, marker.getLatLng().lng);
+        const accuracy = marker._accuracy || 0;
         const speed = marker._speed || 'N/A';
         const direction = marker._direction || 'N/A';
-        updateLiveMarkerPopup(marker, marker.getLatLng().lat, marker.getLatLng().lng, altitude, accuracy, speed, direction, true);
+        updateLiveMarkerPopup(marker, marker.getLatLng().lat, marker.getLatLng().lng, terrainAltitude, marker._deviceAltitude, marker._altitudeAccuracy, accuracy, speed, direction, true);
     });
     console.log('Created liveMarker with popup bound:', { lat, lng });
     return marker;
@@ -1032,26 +1034,47 @@ async function updateMarkerPopup(marker, lat, lng, altitude, open = false) {
         marker.openPopup();
     }
 }
-function updateLiveMarkerPopup(marker, lat, lng, altitude, accuracy, speed, direction, open = false) {
+function updateLiveMarkerPopup(marker, lat, lng, terrainAltitude, deviceAltitude, altitudeAccuracy, accuracy, speed, direction, open = false) {
     const coordFormat = getCoordinateFormat();
     const coords = Utils.convertCoords(lat, lng, coordFormat);
     const windUnit = getWindSpeedUnit();
+    const heightUnit = getHeightUnit();
     let popupContent = `<b>Live Position</b><br>`;
     if (coordFormat === 'MGRS') {
         popupContent += `MGRS: ${coords.lat}<br>`;
     } else {
         popupContent += `Lat: ${coords.lat}<br>Lng: ${coords.lng}<br>`;
     }
-    popupContent += `Alt: ${altitude !== 'N/A' ? Math.round(altitude) : 'N/A'} m<br>`;
+
+    // Show device altitude if available, otherwise N/A
+    if (deviceAltitude !== null && deviceAltitude !== undefined) {
+        const deviceAlt = Utils.convertHeight(deviceAltitude, heightUnit);
+        popupContent += `Device Alt: ${Math.round(deviceAlt)} ${heightUnit} MSL (±${Math.round(altitudeAccuracy || 0)} m)<br>`;
+        if (terrainAltitude !== 'N/A') {
+            const agl = Utils.convertHeight(deviceAltitude - terrainAltitude, heightUnit);
+            popupContent += `AGL: ${Math.round(agl)} ${heightUnit}<br>`;
+        } else {
+            popupContent += `AGL: N/A<br>`;
+        }
+    } else {
+        popupContent += `Device Alt: N/A<br>`;
+        popupContent += `AGL: N/A<br>`;
+    }
+
+    // Show terrain altitude
+    const terrainAlt = terrainAltitude !== 'N/A' ? Utils.convertHeight(terrainAltitude, heightUnit) : 'N/A';
+    popupContent += `Terrain Alt: ${terrainAlt !== 'N/A' ? Math.round(terrainAlt) : 'N/A'} ${heightUnit}<br>`;
+
     popupContent += `Accuracy: ${Math.round(accuracy)} m<br>`;
     popupContent += `Speed: ${speed} ${windUnit}<br>`;
     popupContent += `Direction: ${direction}°`;
 
     marker.setPopupContent(popupContent);
-    // Store data for click handler
     marker._accuracy = accuracy;
     marker._speed = speed;
     marker._direction = direction;
+    marker._deviceAltitude = deviceAltitude;
+    marker._altitudeAccuracy = altitudeAccuracy;
     console.log('Set liveMarker popup content:', { popupContent, open });
 
     if (open) {
@@ -1252,8 +1275,8 @@ function startPositionTracking() {
     // Try getCurrentPosition for initial position
     navigator.geolocation.getCurrentPosition(
         async (position) => {
-            const { latitude, longitude, accuracy } = position.coords;
-            console.log('Initial position from getCurrentPosition:', { latitude, longitude, accuracy });
+            const { latitude, longitude, accuracy, altitude: deviceAltitude, altitudeAccuracy } = position.coords;
+            console.log('Initial position from getCurrentPosition:', { latitude, longitude, accuracy, deviceAltitude, altitudeAccuracy });
 
             // Create liveMarker with initial position
             if (!liveMarker) {
@@ -1265,9 +1288,9 @@ function startPositionTracking() {
             }
 
             // Update popup content
-            const altitude = await getAltitude(latitude, longitude);
-            updateLiveMarkerPopup(liveMarker, latitude, longitude, altitude, accuracy, 'N/A', 'N/A', false);
-            console.log('Set initial liveMarker popup:', { latitude, longitude, altitude, accuracy });
+            const terrainAltitude = await getAltitude(latitude, longitude);
+            updateLiveMarkerPopup(liveMarker, latitude, longitude, terrainAltitude, deviceAltitude, altitudeAccuracy, accuracy, 'N/A', 'N/A', false);
+            console.log('Set initial liveMarker popup:', { latitude, longitude, terrainAltitude, deviceAltitude, altitudeAccuracy, accuracy });
 
             // Start watchPosition for continuous updates
             let attemptHighAccuracy = true;
