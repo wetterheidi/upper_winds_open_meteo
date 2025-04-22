@@ -7,6 +7,8 @@ let lastLat = null;
 let lastLng = null;
 let lastAltitude = null;
 let currentMarker = null;
+let liveMarker = null; // New marker for live position
+let watchId = null;
 let gpxLayer = null;
 let gpxPoints = [];
 let weatherData = null;
@@ -22,20 +24,23 @@ let jumpRunTrackLayer = null;
 let customJumpRunDirection = null; // Temporary storage for custom direction during session
 let isJumperSeparationManual = false; // Tracks if jumperSeparation is manually set
 let jumpCircle = null;
-let jumpCircleFull = null; 
-let jumpCircleGreen = null; 
-let jumpCircleGreenLight = null; 
+let jumpCircleFull = null;
+let jumpCircleGreen = null;
+let jumpCircleGreenLight = null;
 let blueCircleLayer = null;
 let greenCircleLayer = null;
 let redCircleLayer = null;
 let cutAwayMarker = null;
-let cutAwayLat = null;   
-let cutAwayLng = null;   
-let cutAwayCircle = null; 
+let cutAwayLat = null;
+let cutAwayLng = null;
+let cutAwayCircle = null;
+let prevLat = null;
+let prevLng = null;
+let prevTime = null;
 
-const minZoom = 11; 
-const maxZoom = 14; 
-const landingPatternMinZoom = 14; 
+const minZoom = 11;
+const maxZoom = 14;
+const landingPatternMinZoom = 14;
 const debouncedCalculateJump = debounce(calculateJump, 300);
 const getTemperatureUnit = () => getSettingValue('temperatureUnit', 'radio', 'C');
 const getHeightUnit = () => getSettingValue('heightUnit', 'radio', 'm');
@@ -106,7 +111,8 @@ const defaultSettings = {
     jumperSeparation: 5,  // Added for Jump Parameters
     numberOfJumpers: 5,
     cutAwayAltitude: 1000, // Added for cut-away input
-    cutAwayState: 'Partially' // Added for cut-away radio buttons
+    cutAwayState: 'Partially', // Added for cut-away radio buttons
+    trackPosition: false // New setting for live tracking
 };
 
 // == Password handling ==
@@ -356,6 +362,53 @@ function debounce(func, wait) {
         timeout = setTimeout(() => func.apply(this, args), wait);
     };
 }
+const debouncedPositionUpdate = debounce(async (position) => {
+    const { latitude, longitude, accuracy } = position.coords;
+    const currentTime = new Date().getTime() / 1000; // Current time in seconds
+    console.log('Debounced position update:', { latitude, longitude, accuracy, currentTime });
+
+    // Calculate speed and direction if previous position exists
+    let speed = 'N/A';
+    let direction = 'N/A';
+    if (prevLat !== null && prevLng !== null && prevTime !== null) {
+        const distance = map.distance([prevLat, prevLng], [latitude, longitude]); // Distance in meters
+        const timeDiff = currentTime - prevTime; // Time difference in seconds
+        if (timeDiff > 0) {
+            const speedMs = distance / timeDiff; // Speed in m/s
+            const windUnit = getWindSpeedUnit();
+            speed = Utils.convertWind(speedMs, windUnit, 'm/s');
+            speed = windUnit === 'bft' ? Math.round(speed) : speed.toFixed(1);
+            direction = calculateBearing(prevLat, prevLng, latitude, longitude).toFixed(0);
+        }
+    }
+
+    // Update live marker
+    if (liveMarker) {
+        liveMarker.setLatLng([latitude, longitude]);
+    } else {
+        liveMarker = createLiveMarker(latitude, longitude).addTo(map);
+        liveMarker.on('click', () => {
+            if (liveMarker.getPopup()?.isOpen()) {
+                liveMarker.closePopup();
+            } else {
+                updateLiveMarkerPopup(liveMarker, latitude, longitude, getAltitude(latitude, longitude), accuracy, speed, direction, true);
+            }
+        });
+    }
+
+    // Update popup
+    updateLiveMarkerPopup(liveMarker, latitude, longitude, await getAltitude(latitude, longitude), accuracy, speed, direction, liveMarker.getPopup()?.isOpen() || false);
+
+    // Update accuracy circle
+    if (userSettings.trackPosition && accuracy) {
+        updateAccuracyCircle(latitude, longitude, accuracy);
+    }
+
+    // Store current position and time for next update
+    prevLat = latitude;
+    prevLng = longitude;
+    prevTime = currentTime;
+}, 1000);
 
 // == Map Initialization and Interaction ==
 function initMap() {
@@ -445,7 +498,7 @@ function initMap() {
     map.createPane('gpxTrackPane');
     map.getPane('gpxTrackPane').style.zIndex = 650; // Above circles (default z-index: 400-500)
     map.getPane('tooltipPane').style.zIndex = 700; // Higher than gpxTrackPane
-    
+
     const initialAltitude = 'N/A';
     currentMarker = createCustomMarker(defaultCenter[0], defaultCenter[1]).addTo(map);
     attachMarkerDragend(currentMarker);
@@ -474,31 +527,38 @@ function initMap() {
     }
 
     // Geolocation handling
+    if (userSettings.trackPosition) {
+        setCheckboxValue('trackPositionCheckbox', true);
+        startPositionTracking();
+    }
+
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
             async (position) => {
                 const userCoords = [position.coords.latitude, position.coords.longitude];
                 map.setView(userCoords, defaultZoom);
+                if (!userSettings.trackPosition) {
 
-                if (currentMarker) currentMarker.remove();
-                lastLat = position.coords.latitude;
-                lastLng = position.coords.longitude;
-                lastAltitude = await getAltitude(lastLat, lastLng);
+                    if (currentMarker) currentMarker.remove();
+                    lastLat = position.coords.latitude;
+                    lastLng = position.coords.longitude;
+                    lastAltitude = await getAltitude(lastLat, lastLng);
 
-                currentMarker = createCustomMarker(lastLat, lastLng).addTo(map);
-                attachMarkerDragend(currentMarker);
-                updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, true); // Open popup initially
-                if (userSettings.calculateJump) {
-                    debouncedCalculateJump(); // Use debounced version
-                    calculateCutAway();
+                    currentMarker = createCustomMarker(lastLat, lastLng).addTo(map);
+                    attachMarkerDragend(currentMarker);
+                    updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, true); // Open popup initially
+                    if (userSettings.calculateJump) {
+                        debouncedCalculateJump(); // Use debounced version
+                        calculateCutAway();
+                    }
+                    recenterMap();
+
+                    const lastFullHourUTC = getLastFullHourUTC();
+                    const initialTime = userSettings.timeZone === 'Z'
+                        ? lastFullHourUTC.toISOString().replace(':00.000Z', 'Z')
+                        : await Utils.formatLocalTime(lastFullHourUTC.toISOString(), lastLat, lastLng);
+                    await fetchWeatherForLocation(lastLat, lastLng, initialTime, true);
                 }
-                recenterMap();
-
-                const lastFullHourUTC = getLastFullHourUTC();
-                const initialTime = userSettings.timeZone === 'Z'
-                    ? lastFullHourUTC.toISOString().replace(':00.000Z', 'Z')
-                    : await Utils.formatLocalTime(lastFullHourUTC.toISOString(), lastLat, lastLng);
-                await fetchWeatherForLocation(lastLat, lastLng, initialTime, true);
             },
             async (error) => {
                 console.warn(`Geolocation error: ${error.message}`);
@@ -824,6 +884,19 @@ function createCustomMarker(lat, lng) {
         draggable: true
     });
 }
+function createLiveMarker(lat, lng) {
+    const liveIcon = L.divIcon({
+        html: `<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,2 22,22 2,22" fill="red" stroke="black" stroke-width="1"/></svg>`,
+        iconSize: [24, 24],
+        iconAnchor: [12, 24],
+        popupAnchor: [0, -24],
+        className: 'live-marker'
+    });
+    return L.marker([lat, lng], {
+        icon: liveIcon,
+        zIndexOffset: 100
+    });
+}
 function createCutAwayMarker(lat, lng) {
     const cutAwayIcon = L.icon({
         iconUrl: 'schere_purple.png', // Use a different icon if available
@@ -935,6 +1008,30 @@ async function updateMarkerPopup(marker, lat, lng, altitude, open = false) {
         marker.setPopupContent(popupContent);
     }
 
+    if (open) {
+        marker.openPopup();
+    }
+}
+function updateLiveMarkerPopup(marker, lat, lng, altitude, accuracy, speed, direction, open = false) {
+    const coordFormat = getCoordinateFormat();
+    const coords = Utils.convertCoords(lat, lng, coordFormat);
+    const windUnit = getWindSpeedUnit();
+    let popupContent = `<b>Live Position</b><br>`;
+    if (coordFormat === 'MGRS') {
+        popupContent += `MGRS: ${coords.lat}<br>`;
+    } else {
+        popupContent += `Lat: ${coords.lat}<br>Lng: ${coords.lng}<br>`;
+    }
+    popupContent += `Alt: ${altitude !== 'N/A' ? Math.round(altitude) : 'N/A'} m<br>`;
+    popupContent += `Accuracy: ${Math.round(accuracy)} m<br>`;
+    popupContent += `Speed: ${speed} ${windUnit}<br>`;
+    popupContent += `Direction: ${direction}°`;
+
+    if (!marker.getPopup()) {
+        marker.bindPopup(popupContent);
+    } else {
+        marker.setPopupContent(popupContent);
+    }
     if (open) {
         marker.openPopup();
     }
@@ -1115,6 +1212,100 @@ function loadGpxTrack(file) {
         Utils.handleError('Error reading GPX file.');
     };
     reader.readAsText(file);
+}
+function startPositionTracking() {
+    if (!navigator.geolocation) {
+        Utils.handleError('Geolocation not supported by your browser. Please use a device with location services.');
+        setCheckboxValue('trackPositionCheckbox', false);
+        userSettings.trackPosition = false;
+        saveSettings();
+        return;
+    }
+
+    console.log('Starting position tracking');
+    prevLat = null;
+    prevLng = null;
+    prevTime = null;
+
+    let attemptHighAccuracy = true;
+
+    function tryWatchPosition(highAccuracy) {
+        watchId = navigator.geolocation.watchPosition(
+            (position) => debouncedPositionUpdate(position),
+            (error) => {
+                console.warn('Geolocation watch error:', error.message);
+                if (highAccuracy && error.code === error.TIMEOUT) {
+                    console.log('High-accuracy timeout, retrying with low accuracy');
+                    attemptHighAccuracy = false;
+                    navigator.geolocation.clearWatch(watchId);
+                    tryWatchPosition(false);
+                } else {
+                    let errorMessage = 'Unable to retrieve your location. ';
+                    if (error.code === error.TIMEOUT) {
+                        errorMessage += 'Please move to an area with better GPS signal (e.g., outdoors) or check location settings.';
+                    } else if (error.code === error.PERMISSION_DENIED) {
+                        errorMessage += 'Please grant location permissions in your browser settings.';
+                    } else {
+                        errorMessage += 'An unexpected error occurred. Please try again.';
+                    }
+                    Utils.handleError(errorMessage);
+                    stopPositionTracking();
+                    setCheckboxValue('trackPositionCheckbox', false);
+                    userSettings.trackPosition = false;
+                    saveSettings();
+                }
+            },
+            {
+                enableHighAccuracy: highAccuracy,
+                timeout: 20000,
+                maximumAge: 0
+            }
+        );
+    }
+
+    tryWatchPosition(true);
+}
+function stopPositionTracking() {
+    if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+        console.log('Stopped position tracking');
+    }
+    if (liveMarker) {
+        map.removeLayer(liveMarker);
+        liveMarker = null;
+        console.log('Removed live marker');
+    }
+    if (window.accuracyCircle) {
+        map.removeLayer(window.accuracyCircle);
+        window.accuracyCircle = null;
+        console.log('Cleared accuracy circle');
+    }
+    prevLat = null;
+    prevLng = null;
+    prevTime = null;
+
+    // Update UI to indicate tracking stopped
+    const trackLabel = document.querySelector('label[for="trackPositionCheckbox"]');
+    if (trackLabel) {
+        trackLabel.textContent = 'Track My Position (Stopped)';
+        setTimeout(() => {
+            trackLabel.textContent = 'Track My Position';
+        }, 5000); // Reset label after 5 seconds
+    }
+}
+function updateAccuracyCircle(lat, lng, accuracy) {
+    if (window.accuracyCircle) {
+        map.removeLayer(window.accuracyCircle);
+    }
+    window.accuracyCircle = L.circle([lat, lng], {
+        radius: accuracy,
+        color: 'blue',
+        fillOpacity: 0.1,
+        weight: 1,
+        dashArray: '5, 5'
+    }).addTo(map);
+    console.log('Updated accuracy circle:', { lat, lng, radius: accuracy });
 }
 
 // == Weather Data Handling ==
@@ -5197,6 +5388,17 @@ function setupCheckboxEvents() {
             console.log('Cleared cutAwayLat and cutAwayLng');
         }
     });
+
+    setupCheckbox('trackPositionCheckbox', 'trackPosition', (checkbox) => {
+        userSettings.trackPosition = checkbox.checked;
+        saveSettings();
+        console.log('trackPosition changed:', checkbox.checked);
+        if (checkbox.checked) {
+            startPositionTracking();
+        } else {
+            stopPositionTracking();
+        }
+    });
 }
 function setupCoordinateEvents() {
     initCoordStorage();
@@ -5743,7 +5945,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupCheckboxEvents();
     setupCoordinateEvents();
     setupResetButton();
-    setupResetCutAwayMarkerButton(); 
+    setupResetCutAwayMarkerButton();
     setupClearHistoricalDate(); // Add this line
     setupGpxTrackEvents(); // Add this line
 });
