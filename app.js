@@ -409,6 +409,19 @@ const debouncedPositionUpdate = debounce(async (position) => {
         console.warn('livePositionControl not initialized in debouncedPositionUpdate');
     }
 
+    // Update accuracy circle
+    console.log('Checking accuracy circle update:', { trackPosition: userSettings.trackPosition, accuracy });
+    if (accuracy && Number.isFinite(accuracy) && accuracy > 0) {
+        updateAccuracyCircle(latitude, longitude, accuracy);
+    } else {
+        console.warn('Skipping accuracy circle update: invalid accuracy', { accuracy });
+        if (window.accuracyCircle) {
+            map.removeLayer(window.accuracyCircle);
+            window.accuracyCircle = null;
+            console.log('Removed invalid accuracy circle');
+        }
+    }
+
     // Store current position and time
     prevLat = latitude;
     prevLng = longitude;
@@ -416,7 +429,7 @@ const debouncedPositionUpdate = debounce(async (position) => {
 }, 1000);
 L.Control.LivePosition = L.Control.extend({
     options: {
-        position: 'bottomleft' // Changed from bottomcenter to a valid Leaflet position
+        position: 'bottomleft'
     },
     onAdd: function (map) {
         const container = L.DomUtil.create('div', 'leaflet-control-live-position');
@@ -478,7 +491,6 @@ L.Control.LivePosition = L.Control.extend({
         console.log('LivePosition control removed from map');
     }
 });
-
 L.control.livePosition = function (opts) {
     return new L.Control.LivePosition(opts);
 };
@@ -1391,6 +1403,19 @@ function startPositionTracking() {
                 } else {
                     console.warn('livePositionControl not initialized after getCurrentPosition');
                 }
+
+                // Update accuracy circle
+                console.log('Initial accuracy circle update:', { trackPosition: userSettings.trackPosition, accuracy });
+                if (accuracy && Number.isFinite(accuracy) && accuracy > 0) {
+                    updateAccuracyCircle(latitude, longitude, accuracy);
+                } else {
+                    console.warn('Skipping initial accuracy circle update: invalid accuracy', { accuracy });
+                    if (window.accuracyCircle) {
+                        map.removeLayer(window.accuracyCircle);
+                        window.accuracyCircle = null;
+                        console.log('Removed invalid initial accuracy circle');
+                    }
+                }
             } catch (error) {
                 console.error('Error updating livePositionControl:', error);
                 Utils.handleError('Failed to update live position display: ' + error.message);
@@ -1490,17 +1515,28 @@ function stopPositionTracking() {
     }
 }
 function updateAccuracyCircle(lat, lng, accuracy) {
-    if (window.accuracyCircle) {
-        map.removeLayer(window.accuracyCircle);
+    try {
+        if (window.accuracyCircle) {
+            map.removeLayer(window.accuracyCircle);
+            window.accuracyCircle = null;
+            console.log('Removed previous accuracy circle');
+        }
+        window.accuracyCircle = L.circle([lat, lng], {
+            radius: accuracy,
+            color: 'blue',
+            fillOpacity: 0.1,
+            weight: 1,
+            dashArray: '5, 5',
+            zIndexOffset: 200 // Ensure above other layers
+        }).addTo(map);
+        console.log('Updated accuracy circle:', { lat, lng, radius: accuracy });
+    } catch (error) {
+        console.error('Error updating accuracy circle:', error);
+        if (window.accuracyCircle) {
+            map.removeLayer(window.accuracyCircle);
+            window.accuracyCircle = null;
+        }
     }
-    window.accuracyCircle = L.circle([lat, lng], {
-        radius: accuracy,
-        color: 'blue',
-        fillOpacity: 0.1,
-        weight: 1,
-        dashArray: '5, 5'
-    }).addTo(map);
-    console.log('Updated accuracy circle:', { lat, lng, radius: accuracy });
 }
 
 // == Weather Data Handling ==
@@ -5585,9 +5621,10 @@ function setupCheckboxEvents() {
     });
 
     setupCheckbox('trackPositionCheckbox', 'trackPosition', (checkbox) => {
+        console.log('trackPositionCheckbox changed to:', checkbox.checked);
         userSettings.trackPosition = checkbox.checked;
         saveSettings();
-        console.log('trackPosition changed:', checkbox.checked);
+        console.log('trackPosition set to:', userSettings.trackPosition);
         if (checkbox.checked) {
             startPositionTracking();
         } else {
