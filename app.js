@@ -37,6 +37,7 @@ let cutAwayCircle = null;
 let prevLat = null;
 let prevLng = null;
 let prevTime = null;
+let livePositionControl = null;
 
 const minZoom = 11;
 const maxZoom = 14;
@@ -392,15 +393,20 @@ const debouncedPositionUpdate = debounce(async (position) => {
     }
 
     // Get terrain altitude
-    const terrainAltitude = await getAltitude(latitude, longitude);
+    let terrainAltitude;
+    try {
+        terrainAltitude = await getAltitude(latitude, longitude);
+    } catch (error) {
+        console.warn('Failed to fetch terrain altitude:', error);
+        terrainAltitude = 'N/A';
+    }
 
-    // Update popup content
-    updateLiveMarkerPopup(liveMarker, latitude, longitude, terrainAltitude, deviceAltitude, altitudeAccuracy, accuracy, speed, direction, liveMarker.getPopup()?.isOpen() || false);
-    console.log('Updated liveMarker popup:', { latitude, longitude, terrainAltitude, deviceAltitude, altitudeAccuracy, accuracy, speed, direction });
-
-    // Update accuracy circle
-    if (userSettings.trackPosition && accuracy) {
-        updateAccuracyCircle(latitude, longitude, accuracy);
+    // Update control content
+    if (livePositionControl) {
+        livePositionControl.update(latitude, longitude, terrainAltitude, deviceAltitude, altitudeAccuracy, accuracy, speed, direction);
+        console.log('Updated livePositionControl:', { latitude, longitude, terrainAltitude, deviceAltitude, altitudeAccuracy, accuracy, speed, direction });
+    } else {
+        console.warn('livePositionControl not initialized in debouncedPositionUpdate');
     }
 
     // Store current position and time
@@ -408,6 +414,75 @@ const debouncedPositionUpdate = debounce(async (position) => {
     prevLng = longitude;
     prevTime = currentTime;
 }, 1000);
+L.Control.LivePosition = L.Control.extend({
+    options: {
+        position: 'bottomleft' // Changed from bottomcenter to a valid Leaflet position
+    },
+    onAdd: function (map) {
+        const container = L.DomUtil.create('div', 'leaflet-control-live-position');
+        container.style.background = 'rgba(255, 255, 255, 0.9)';
+        container.style.padding = '10px';
+        container.style.border = '2px solid rgba(0, 0, 0, 0.2)';
+        container.style.borderRadius = '5px';
+        container.style.boxShadow = '0 2px 5px rgba(0, 0, 0, 0.3)';
+        container.style.textAlign = 'left';
+        container.style.maxWidth = '300px';
+        container.style.margin = '0 auto 10px auto';
+        container.style.pointerEvents = 'none';
+        container.style.display = 'block';
+        container.style.opacity = '1';
+        container.style.visibility = 'visible';
+        container.innerHTML = 'Initializing live position...';
+        this._container = container;
+        console.log('LivePosition control added to map', { styles: container.style });
+        return container;
+    },
+    update: function (lat, lng, terrainAltitude, deviceAltitude, altitudeAccuracy, accuracy, speed, direction) {
+        try {
+            const coordFormat = getCoordinateFormat();
+            const coords = Utils.convertCoords(lat, lng, coordFormat);
+            const windUnit = getWindSpeedUnit();
+            const heightUnit = getHeightUnit();
+            let content = `<b>Live Position</b><br>`;
+            if (coordFormat === 'MGRS') {
+                content += `MGRS: ${coords.lat}<br>`;
+            } else {
+                content += `Lat: ${coords.lat}<br>Lng: ${coords.lng}<br>`;
+            }
+            if (deviceAltitude !== null && deviceAltitude !== undefined) {
+                const deviceAlt = Utils.convertHeight(deviceAltitude, heightUnit);
+                content += `Device Alt: ${Math.round(deviceAlt)} ${heightUnit} MSL (±${Math.round(altitudeAccuracy || 0)} m)<br>`;
+                if (terrainAltitude !== 'N/A') {
+                    const agl = Utils.convertHeight(deviceAltitude - terrainAltitude, heightUnit);
+                    content += `AGL: ${Math.round(agl)} ${heightUnit}<br>`;
+                } else {
+                    content += `AGL: N/A<br>`;
+                }
+            } else {
+                content += `Device Alt: N/A<br>`;
+                content += `AGL: N/A<br>`;
+            }
+            const terrainAlt = terrainAltitude !== 'N/A' ? Utils.convertHeight(terrainAltitude, heightUnit) : 'N/A';
+            content += `Terrain Alt: ${terrainAlt !== 'N/A' ? Math.round(terrainAlt) : 'N/A'} ${heightUnit}<br>`;
+            content += `Accuracy: ${Math.round(accuracy)} m<br>`;
+            content += `Speed: ${speed} ${windUnit}<br>`;
+            content += `Direction: ${direction}°`;
+            this._container.innerHTML = content;
+            console.log('Updated livePositionControl content:', { content });
+        } catch (error) {
+            console.error('Error updating livePositionControl:', error);
+            this._container.innerHTML = 'Error updating live position';
+        }
+    },
+    onRemove: function (map) {
+        console.log('LivePosition control removed from map');
+    }
+});
+
+L.control.livePosition = function (opts) {
+    return new L.Control.LivePosition(opts);
+};
+
 
 // == Map Initialization and Interaction ==
 function initMap() {
@@ -905,18 +980,7 @@ function createLiveMarker(lat, lng) {
         icon: liveIcon,
         zIndexOffset: 100
     });
-    // Bind popup with initial placeholder content
-    marker.bindPopup('Initializing live position...');
-    // Add click handler to update and open popup
-    marker.on('click', async () => {
-        console.log('liveMarker clicked at:', { lat: marker.getLatLng().lat, lng: marker.getLatLng().lng });
-        const terrainAltitude = await getAltitude(marker.getLatLng().lat, marker.getLatLng().lng);
-        const accuracy = marker._accuracy || 0;
-        const speed = marker._speed || 'N/A';
-        const direction = marker._direction || 'N/A';
-        updateLiveMarkerPopup(marker, marker.getLatLng().lat, marker.getLatLng().lng, terrainAltitude, marker._deviceAltitude, marker._altitudeAccuracy, accuracy, speed, direction, true);
-    });
-    console.log('Created liveMarker with popup bound:', { lat, lng });
+    console.log('Created liveMarker:', { lat, lng });
     return marker;
 }
 function createCutAwayMarker(lat, lng) {
@@ -1267,10 +1331,35 @@ function startPositionTracking() {
         return;
     }
 
+    if (!map || !map._container || !map._controlCorners) {
+        console.error('Map not fully initialized in startPositionTracking', { map: !!map, container: !!map?._container, controlCorners: !!map?._controlCorners });
+        Utils.handleError('Map not ready. Please try again.');
+        setCheckboxValue('trackPositionCheckbox', false);
+        userSettings.trackPosition = false;
+        saveSettings();
+        return;
+    }
+
     console.log('Starting position tracking');
     prevLat = null;
     prevLng = null;
     prevTime = null;
+
+    // Initialize live position control
+    try {
+        if (!livePositionControl) {
+            livePositionControl = new L.Control.LivePosition({ position: 'bottomleft' });
+            livePositionControl.addTo(map);
+            console.log('Added livePositionControl to map');
+        } else {
+            console.log('livePositionControl already exists');
+        }
+    } catch (error) {
+        console.error('Error initializing livePositionControl:', error);
+        Utils.handleError('Failed to initialize live position display: ' + error.message);
+        livePositionControl = null;
+        return;
+    }
 
     // Try getCurrentPosition for initial position
     navigator.geolocation.getCurrentPosition(
@@ -1287,10 +1376,25 @@ function startPositionTracking() {
                 console.log('Updated initial liveMarker to:', { latitude, longitude });
             }
 
-            // Update popup content
-            const terrainAltitude = await getAltitude(latitude, longitude);
-            updateLiveMarkerPopup(liveMarker, latitude, longitude, terrainAltitude, deviceAltitude, altitudeAccuracy, accuracy, 'N/A', 'N/A', false);
-            console.log('Set initial liveMarker popup:', { latitude, longitude, terrainAltitude, deviceAltitude, altitudeAccuracy, accuracy });
+            // Update control content
+            try {
+                let terrainAltitude;
+                try {
+                    terrainAltitude = await getAltitude(latitude, longitude);
+                } catch (error) {
+                    console.warn('Failed to fetch initial terrain altitude:', error);
+                    terrainAltitude = 'N/A';
+                }
+                if (livePositionControl) {
+                    livePositionControl.update(latitude, longitude, terrainAltitude, deviceAltitude, altitudeAccuracy, accuracy, 'N/A', 'N/A');
+                    console.log('Set initial livePositionControl:', { latitude, longitude, terrainAltitude, deviceAltitude, altitudeAccuracy, accuracy });
+                } else {
+                    console.warn('livePositionControl not initialized after getCurrentPosition');
+                }
+            } catch (error) {
+                console.error('Error updating livePositionControl:', error);
+                Utils.handleError('Failed to update live position display: ' + error.message);
+            }
 
             // Start watchPosition for continuous updates
             let attemptHighAccuracy = true;
@@ -1367,6 +1471,11 @@ function stopPositionTracking() {
         map.removeLayer(window.accuracyCircle);
         window.accuracyCircle = null;
         console.log('Cleared accuracy circle');
+    }
+    if (livePositionControl) {
+        livePositionControl.remove();
+        livePositionControl = null;
+        console.log('Removed livePositionControl');
     }
     prevLat = null;
     prevLng = null;

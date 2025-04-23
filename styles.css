@@ -44,6 +44,30 @@ html {
     margin-left: 10px;
 }
 
+.leaflet-control-live-position {
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 10px;
+    z-index: 1000; /* Above map tiles but below popups */
+    font-size: 12px;
+    line-height: 1.4;
+    display: block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    background: rgba(255, 255, 255, 0.9) !important;
+    padding: 10px;
+    border: 2px solid rgba(0, 0, 0, 0.2);
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+    max-width: 300px;
+    margin: 0 auto 10px auto;
+    pointer-events: none;
+}
+.leaflet-bottom .leaflet-control-live-position {
+    margin-bottom: 10px;
+}
+
 .hamburger-menu {
     position: fixed;
     top: 5px;
