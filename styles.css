@@ -55,11 +55,11 @@ html {
     display: block !important;
     opacity: 1 !important;
     visibility: visible !important;
-    background: rgba(255, 255, 255, 0.9) !important;
+    background: rgba(255, 255, 255, 0.8) !important;
     padding: 10px;
-    border: 2px solid rgba(0, 0, 0, 0.2);
-    border-radius: 5px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+    box-shadow: rgba(0,0,0,0.2);
     max-width: 300px;
     margin: 0 auto 10px auto;
     pointer-events: none;

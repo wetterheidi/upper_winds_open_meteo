@@ -38,6 +38,16 @@ let prevLat = null;
 let prevLng = null;
 let prevTime = null;
 let livePositionControl = null;
+// New: Store last position data for instant unit updates
+let lastLatitude = null;
+let lastLongitude = null;
+let lastDeviceAltitude = null;
+let lastAltitudeAccuracy = null;
+let lastAccuracy = null;
+let lastSpeed = 'N/A';
+let lastEffectiveWindUnit = 'kt';
+let lastDirection = 'N/A';
+let lastTerrainAltitude = 'N/A';
 
 const minZoom = 11;
 const maxZoom = 14;
@@ -370,15 +380,18 @@ const debouncedPositionUpdate = debounce(async (position) => {
 
     // Calculate speed and direction
     let speed = 'N/A';
+    let effectiveWindUnit = getWindSpeedUnit();
+    if (effectiveWindUnit === 'bft') {
+        effectiveWindUnit = 'kt'; // Fall back to kt for bft
+    }
     let direction = 'N/A';
     if (prevLat !== null && prevLng !== null && prevTime !== null) {
         const distance = map.distance([prevLat, prevLng], [latitude, longitude]);
         const timeDiff = currentTime - prevTime;
         if (timeDiff > 0) {
-            const speedMs = distance / timeDiff;
-            const windUnit = getWindSpeedUnit();
-            speed = Utils.convertWind(speedMs, windUnit, 'm/s');
-            speed = windUnit === 'bft' ? Math.round(speed) : speed.toFixed(1);
+            const speedMs = distance / timeDiff; // Speed in m/s
+            speed = Utils.convertWind(speedMs, effectiveWindUnit, 'm/s'); // Convert to kt, km/h, or m/s
+            speed = effectiveWindUnit === 'bft' ? Math.round(speed) : speed.toFixed(1); // Round to 0 for bft (unused), 1 otherwise
             direction = calculateBearing(prevLat, prevLng, latitude, longitude).toFixed(0);
         }
     }
@@ -403,8 +416,8 @@ const debouncedPositionUpdate = debounce(async (position) => {
 
     // Update control content
     if (livePositionControl) {
-        livePositionControl.update(latitude, longitude, terrainAltitude, deviceAltitude, altitudeAccuracy, accuracy, speed, direction);
-        console.log('Updated livePositionControl:', { latitude, longitude, terrainAltitude, deviceAltitude, altitudeAccuracy, accuracy, speed, direction });
+        livePositionControl.update(latitude, longitude, terrainAltitude, deviceAltitude, altitudeAccuracy, accuracy, speed, effectiveWindUnit, direction);
+        console.log('Updated livePositionControl:', { latitude, longitude, terrainAltitude, deviceAltitude, altitudeAccuracy, accuracy, speed, effectiveWindUnit, direction });
     } else {
         console.warn('livePositionControl not initialized in debouncedPositionUpdate');
     }
@@ -421,6 +434,18 @@ const debouncedPositionUpdate = debounce(async (position) => {
             console.log('Removed invalid accuracy circle');
         }
     }
+
+    // Store last position data
+    lastLatitude = latitude;
+    lastLongitude = longitude;
+    lastDeviceAltitude = deviceAltitude;
+    lastAltitudeAccuracy = altitudeAccuracy;
+    lastAccuracy = accuracy;
+    lastSpeed = speed;
+    lastEffectiveWindUnit = effectiveWindUnit;
+    lastDirection = direction;
+    lastTerrainAltitude = terrainAltitude;
+    console.log('Stored last position data:', { lastLatitude, lastLongitude, lastDeviceAltitude, lastAltitudeAccuracy, lastAccuracy, lastSpeed, lastEffectiveWindUnit, lastDirection, lastTerrainAltitude });
 
     // Store current position and time
     prevLat = latitude;
@@ -450,12 +475,12 @@ L.Control.LivePosition = L.Control.extend({
         console.log('LivePosition control added to map', { styles: container.style });
         return container;
     },
-    update: function (lat, lng, terrainAltitude, deviceAltitude, altitudeAccuracy, accuracy, speed, direction) {
+    update: function (lat, lng, terrainAltitude, deviceAltitude, altitudeAccuracy, accuracy, speed, effectiveWindUnit, direction) {
         try {
             const coordFormat = getCoordinateFormat();
             const coords = Utils.convertCoords(lat, lng, coordFormat);
-            const windUnit = getWindSpeedUnit();
             const heightUnit = getHeightUnit();
+            const refLevel = getSettingValue('refLevel', 'radio', 'AGL');
             let content = `<b>Live Position</b><br>`;
             if (coordFormat === 'MGRS') {
                 content += `MGRS: ${coords.lat}<br>`;
@@ -463,22 +488,23 @@ L.Control.LivePosition = L.Control.extend({
                 content += `Lat: ${coords.lat}<br>Lng: ${coords.lng}<br>`;
             }
             if (deviceAltitude !== null && deviceAltitude !== undefined) {
-                const deviceAlt = Utils.convertHeight(deviceAltitude, heightUnit);
-                content += `Device Alt: ${Math.round(deviceAlt)} ${heightUnit} MSL (±${Math.round(altitudeAccuracy || 0)} m)<br>`;
-                if (terrainAltitude !== 'N/A') {
-                    const agl = Utils.convertHeight(deviceAltitude - terrainAltitude, heightUnit);
-                    content += `AGL: ${Math.round(agl)} ${heightUnit}<br>`;
+                let displayAltitude;
+                if (refLevel === 'AGL' && terrainAltitude !== 'N/A') {
+                    displayAltitude = deviceAltitude - terrainAltitude;
                 } else {
-                    content += `AGL: N/A<br>`;
+                    displayAltitude = deviceAltitude;
                 }
+                const convertedAltitude = Utils.convertHeight(displayAltitude, heightUnit);
+                const convertedAltitudeAccuracy = Utils.convertHeight(altitudeAccuracy || 0, heightUnit);
+                content += `Altitude: ${Math.round(convertedAltitude)} ${heightUnit} ${refLevel} (±${Math.round(convertedAltitudeAccuracy)} ${heightUnit})<br>`;
             } else {
-                content += `Device Alt: N/A<br>`;
-                content += `AGL: N/A<br>`;
+                content += `Altitude: N/A<br>`;
             }
             const terrainAlt = terrainAltitude !== 'N/A' ? Utils.convertHeight(terrainAltitude, heightUnit) : 'N/A';
             content += `Terrain Alt: ${terrainAlt !== 'N/A' ? Math.round(terrainAlt) : 'N/A'} ${heightUnit}<br>`;
-            content += `Accuracy: ${Math.round(accuracy)} m<br>`;
-            content += `Speed: ${speed} ${windUnit}<br>`;
+            const convertedAccuracy = accuracy && Number.isFinite(accuracy) ? Utils.convertHeight(accuracy, heightUnit) : 'N/A';
+            content += `Accuracy: ${convertedAccuracy !== 'N/A' ? Math.round(convertedAccuracy) : 'N/A'} ${convertedAccuracy !== 'N/A' ? heightUnit : ''}<br>`;
+            content += `Speed: ${speed} ${effectiveWindUnit}<br>`;
             content += `Direction: ${direction}°`;
             this._container.innerHTML = content;
             console.log('Updated livePositionControl content:', { content });
@@ -1157,6 +1183,43 @@ function updateLiveMarkerPopup(marker, lat, lng, terrainAltitude, deviceAltitude
         marker.openPopup();
     }
 }
+function updateLivePositionControl() {
+    if (!livePositionControl || lastLatitude === null || lastLongitude === null) {
+        console.log('Skipping livePositionControl update: no control or position data', { livePositionControl: !!livePositionControl, lastLatitude });
+        return;
+    }
+    try {
+        console.log('Updating livePositionControl with last position data');
+        // Recalculate speed for current windUnit
+        let newSpeed = lastSpeed;
+        let newEffectiveWindUnit = getWindSpeedUnit();
+        if (newEffectiveWindUnit === 'bft') {
+            newEffectiveWindUnit = 'kt';
+        }
+        if (lastSpeed !== 'N/A' && Number.isFinite(parseFloat(lastSpeed))) {
+            const speedMs = Utils.convertWind(parseFloat(lastSpeed), 'm/s', lastEffectiveWindUnit); // Convert back to m/s
+            newSpeed = Utils.convertWind(speedMs, newEffectiveWindUnit, 'm/s');
+            newSpeed = newEffectiveWindUnit === 'bft' ? Math.round(newSpeed) : newSpeed.toFixed(1);
+        }
+        livePositionControl.update(
+            lastLatitude,
+            lastLongitude,
+            lastTerrainAltitude,
+            lastDeviceAltitude,
+            lastAltitudeAccuracy,
+            lastAccuracy,
+            newSpeed,
+            newEffectiveWindUnit,
+            lastDirection
+        );
+        // Update stored speed and unit
+        lastSpeed = newSpeed;
+        lastEffectiveWindUnit = newEffectiveWindUnit;
+        console.log('Updated livePositionControl:', { newSpeed, newEffectiveWindUnit });
+    } catch (error) {
+        console.error('Error updating livePositionControl:', error);
+    }
+}
 function updateCutAwayMarkerPopup(marker, lat, lng, open = false) {
     const coordFormat = getCoordinateFormat();
     const coords = Utils.convertCoords(lat, lng, coordFormat);
@@ -1505,6 +1568,17 @@ function stopPositionTracking() {
     prevLat = null;
     prevLng = null;
     prevTime = null;
+    // Clear last position data
+    lastLatitude = null;
+    lastLongitude = null;
+    lastDeviceAltitude = null;
+    lastAltitudeAccuracy = null;
+    lastAccuracy = null;
+    lastSpeed = 'N/A';
+    lastEffectiveWindUnit = 'kt';
+    lastDirection = 'N/A';
+    lastTerrainAltitude = 'N/A';
+    console.log('Cleared last position data');
 
     const trackLabel = document.querySelector('label[for="trackPositionCheckbox"]');
     if (trackLabel) {
@@ -6147,17 +6221,24 @@ function setupLegHeightInput(id, defaultValue) {
     });
 }
 async function updateAllDisplays() {
-    const sliderIndex = getSliderValue();
-    if (weatherData && lastLat && lastLng) {
-        await updateWeatherDisplay(sliderIndex);
-        if (lastAltitude !== 'N/A') calculateMeanWind();
-        if (userSettings.showLandingPattern) updateLandingPattern();
-        if (userSettings.calculateJump) {
-            debouncedCalculateJump(); // Use debounced version
-            calculateCutAway();
-            if (userSettings.showJumpRunTrack) updateJumpRunTrack();
+    console.log('updateAllDisplays called');
+    try {
+        const sliderIndex = getSliderValue();
+        if (weatherData && lastLat && lastLng) {
+            await updateWeatherDisplay(sliderIndex);
+            if (lastAltitude !== 'N/A') calculateMeanWind();
+            if (userSettings.showLandingPattern) updateLandingPattern();
+            if (userSettings.calculateJump) {
+                debouncedCalculateJump(); // Use debounced version
+                calculateCutAway();
+                if (userSettings.showJumpRunTrack) updateJumpRunTrack();
+            }
+            recenterMap();
         }
-        recenterMap();
+        // Add live position control update
+        updateLivePositionControl();
+    } catch (error) {
+        console.error('Error in updateAllDisplays:', error);
     }
 }
 
