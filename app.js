@@ -1007,12 +1007,11 @@ function createCustomMarker(lat, lng) {
     });
 }
 function createLiveMarker(lat, lng) {
-    const liveIcon = L.divIcon({
-        html: `<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,2 22,22 2,22" fill="red" stroke="black" stroke-width="1"/></svg>`,
-        iconSize: [24, 24],
-        iconAnchor: [12, 24],
-        popupAnchor: [0, -24],
-        className: 'live-marker'
+    const liveIcon = L.icon({
+        iconUrl: 'star.png', // Path to your image
+        iconSize: [24, 24], // Size of the image (adjust to your image)
+        iconAnchor: [12, 12], // Anchor point (center-bottom for a pin-like marker)
+        popupAnchor: [0, -24], // Popup anchor (unused but kept for compatibility)
     });
     const marker = L.marker([lat, lng], {
         icon: liveIcon,
