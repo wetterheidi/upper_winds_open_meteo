@@ -1,6 +1,42 @@
-
 // == Project: Skydiving Weather and Jump Planner ==
 // == Constants and Global Variables ==
+const defaultSettings = {
+    model: 'icon_global',
+    refLevel: 'AGL',
+    heightUnit: 'm',
+    temperatureUnit: 'C',
+    windUnit: 'kt',
+    timeZone: 'Z',
+    coordFormat: 'Decimal',
+    downloadFormat: 'HEIDIS',
+    showTable: false,
+    canopySpeed: 20,
+    descentRate: 3.5,
+    showLandingPattern: false,
+    landingDirection: 'LL',
+    customLandingDirectionLL: '',
+    customLandingDirectionRR: '',
+    legHeightDownwind: 300,
+    legHeightBase: 200,
+    legHeightFinal: 100,
+    interpStep: '200',
+    lowerLimit: 0,
+    upperLimit: 3000,
+    baseMaps: 'Esri Street',
+    calculateJump: false,
+    openingAltitude: 1200,
+    exitAltitude: 3000,
+    showJumpRunTrack: false,
+    showExitArea: false,
+    showCanopyArea: false, // Add this line
+    jumpRunTrackOffset: 0, // Keep offset as it’s a user-configurable setting
+    aircraftSpeedKt: 90, // Added for Jump Parameters
+    jumperSeparation: 5,  // Added for Jump Parameters
+    numberOfJumpers: 5,
+    cutAwayAltitude: 1000, // Added for cut-away input
+    cutAwayState: 'Partially', // Added for cut-away radio buttons
+    trackPosition: false // New setting for live tracking
+};
 let userSettings = JSON.parse(localStorage.getItem('upperWindsSettings')) || { ...defaultSettings };
 let map;
 let lastLat = null;
@@ -88,43 +124,7 @@ const jumperSeparationTable = {
     10: 60,
     5: 119
 };
-const defaultSettings = {
-    model: 'icon_global',
-    refLevel: 'AGL',
-    heightUnit: 'm',
-    temperatureUnit: 'C',
-    windUnit: 'kt',
-    timeZone: 'Z',
-    coordFormat: 'Decimal',
-    downloadFormat: 'HEIDIS',
-    showTable: false,
-    canopySpeed: 20,
-    descentRate: 3.5,
-    showLandingPattern: false,
-    landingDirection: 'LL',
-    customLandingDirectionLL: '',
-    customLandingDirectionRR: '',
-    legHeightDownwind: 300,
-    legHeightBase: 200,
-    legHeightFinal: 100,
-    interpStep: '200',
-    lowerLimit: 0,
-    upperLimit: 3000,
-    baseMaps: 'Esri Street',
-    calculateJump: false,
-    openingAltitude: 1200,
-    exitAltitude: 3000,
-    showJumpRunTrack: false,
-    showExitArea: false,
-    showCanopyArea: false, // Add this line
-    jumpRunTrackOffset: 0, // Keep offset as it’s a user-configurable setting
-    aircraftSpeedKt: 90, // Added for Jump Parameters
-    jumperSeparation: 5,  // Added for Jump Parameters
-    numberOfJumpers: 5,
-    cutAwayAltitude: 1000, // Added for cut-away input
-    cutAwayState: 'Partially', // Added for cut-away radio buttons
-    trackPosition: false // New setting for live tracking
-};
+
 
 // == Password handling ==
 let isLandingPatternUnlocked = false;   // Track unlock state during session
