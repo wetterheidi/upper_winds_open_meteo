@@ -1252,29 +1252,31 @@ L.Control.LivePosition = L.Control.extend({
             const coords = Utils.convertCoords(lat, lng, coordFormat);
             const heightUnit = getHeightUnit();
             const refLevel = getSettingValue('refLevel', 'radio', 'AGL');
-            let content = `<span style="font-weight: bold;">Live Position</span><br>`; // Use span with inline style as fallback
+            let content = `<span style="font-weight: bold;">Live Position</span><br>`;
             if (coordFormat === 'MGRS') {
                 content += `MGRS: ${coords.lat}<br>`;
             } else {
                 content += `Lat: ${coords.lat}<br>Lng: ${coords.lng}<br>`;
             }
-            const convertedAccuracy = accuracy && Number.isFinite(accuracy) ? Utils.convertHeight(accuracy, heightUnit) : 'N/A';
-            content += `Accuracy: ${convertedAccuracy !== 'N/A' ? Math.round(convertedAccuracy) : 'N/A'} ${convertedAccuracy !== 'N/A' ? heightUnit : ''}<br>`;
             if (deviceAltitude !== null && deviceAltitude !== undefined) {
                 let displayAltitude;
                 let displayRefLevel = refLevel;
                 if (refLevel === 'AGL' && lastAltitude !== null && !isNaN(lastAltitude)) {
-                    displayAltitude = deviceAltitude - parseFloat(lastAltitude); // Subtract DIP elevation
-                    displayRefLevel = 'abv DIP'; // Display abv DIP in panel
+                    displayAltitude = deviceAltitude - parseFloat(lastAltitude);
+                    displayRefLevel = 'abv DIP';
                 } else {
-                    displayAltitude = deviceAltitude; // AMSL or no DIP elevation
+                    displayAltitude = deviceAltitude;
                 }
                 const convertedAltitude = Utils.convertHeight(displayAltitude, heightUnit);
-                const convertedAltitudeAccuracy = Utils.convertHeight(altitudeAccuracy || 0, heightUnit);
-                content += `Altitude: ${Math.round(convertedAltitude)} ${heightUnit} ${displayRefLevel} (±${Math.round(convertedAltitudeAccuracy)} ${heightUnit})<br>`;
+                const convertedAltitudeAccuracy = altitudeAccuracy && Number.isFinite(altitudeAccuracy) && altitudeAccuracy > 0 
+                    ? Utils.convertHeight(altitudeAccuracy, heightUnit) 
+                    : 'N/A';
+                content += `Altitude: ${Math.round(convertedAltitude)} ${heightUnit} ${displayRefLevel} (±${convertedAltitudeAccuracy !== 'N/A' ? Math.round(convertedAltitudeAccuracy) : 'N/A'} ${convertedAltitudeAccuracy !== 'N/A' ? heightUnit : ''})<br>`;
             } else {
                 content += `Altitude: N/A<br>`;
             }
+            const convertedAccuracy = accuracy && Number.isFinite(accuracy) ? Utils.convertHeight(accuracy, heightUnit) : 'N/A';
+            content += `Accuracy: ${convertedAccuracy !== 'N/A' ? Math.round(convertedAccuracy) : 'N/A'} ${convertedAccuracy !== 'N/A' ? heightUnit : ''}<br>`;
             content += `Speed: ${speed} ${effectiveWindUnit}<br>`;
             content += `Direction: ${direction}°`;
             this._container.innerHTML = content;
