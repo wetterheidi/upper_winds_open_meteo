@@ -1100,6 +1100,7 @@ function loadGpxTrack(file) {
             }
             gpxPoints = points;
 
+            // Create GPX layer with custom pane
             gpxLayer = L.layerGroup({ pane: 'gpxTrackPane' });
             const groundAltitude = lastAltitude !== 'N/A' && !isNaN(lastAltitude) ? parseFloat(lastAltitude) : null;
             const windUnit = getWindSpeedUnit();
@@ -1141,6 +1142,8 @@ function loadGpxTrack(file) {
             }
             gpxLayer.addTo(map);
             console.log('GPX layer added:', { gpxLayer });
+
+            // Center map to track bounds
             if (points.length > 0) {
                 const bounds = L.latLngBounds(points.map(p => [p.lat, p.lng]));
                 if (bounds.isValid()) {
@@ -1151,7 +1154,48 @@ function loadGpxTrack(file) {
                     console.warn('Invalid GPX track bounds:', { points });
                     Utils.handleError('Unable to display GPX track: invalid coordinates.');
                 }
+
+                // Handle timestamp for time slider
+                if (points[0].time && points[0].time.isValid) {
+                    const initialTimestamp = points[0].time;
+                    console.log('GPX initial timestamp:', initialTimestamp.toISO());
+                    const today = luxon.DateTime.utc().startOf('day');
+                    const trackDate = initialTimestamp.startOf('day');
+                    const isToday = trackDate.hasSame(today, 'day');
+
+                    // Round to nearest hour
+                    let roundedTimestamp = initialTimestamp.startOf('hour');
+                    if (initialTimestamp.minute >= 30) {
+                        roundedTimestamp = roundedTimestamp.plus({ hours: 1 });
+                    }
+                    console.log('GPX rounded timestamp:', roundedTimestamp.toISO());
+
+                    const lat = points[0].lat;
+                    const lng = points[0].lng;
+
+                    if (isToday) {
+                        // For today's tracks, fetch current weather with rounded timestamp
+                        console.log('GPX track is from today, fetching current weather for:', roundedTimestamp.toISO());
+                        await fetchWeatherForLocation(lat, lng, roundedTimestamp.toISO());
+                    } else {
+                        // For past tracks, set historical date and fetch historical weather
+                        console.log('GPX track is from past date:', trackDate.toISODate());
+                        const historicalDatePicker = document.getElementById('historicalDatePicker');
+                        if (historicalDatePicker) {
+                            historicalDatePicker.value = trackDate.toFormat('yyyy-MM-dd');
+                            console.log('Set historicalDatePicker to:', historicalDatePicker.value);
+                            await fetchWeatherForLocation(lat, lng, roundedTimestamp.toISO());
+                        } else {
+                            console.warn('historicalDatePicker not found, cannot fetch historical data');
+                            Utils.handleError('Cannot fetch historical weather: date picker not found.');
+                        }
+                    }
+                } else {
+                    console.warn('No valid timestamp in GPX track, skipping time slider adjustment');
+                }
             }
+
+            // Display track info
             const distance = (points.reduce((dist, p, i) => {
                 if (i === 0) return 0;
                 const prev = points[i - 1];
@@ -1162,6 +1206,7 @@ function loadGpxTrack(file) {
             const elevationMax = elevations.length ? Math.max(...elevations).toFixed(0) : 'N/A';
             document.getElementById('info').innerHTML += `<br><strong>GPX Track:</strong> Distance: ${distance} km, Min Elevation: ${elevationMin} m, Max Elevation: ${elevationMax} m`;
         } catch (error) {
+            console.error('Error in loadGpxTrack:', error);
             Utils.handleError('Error parsing GPX file: ' + error.message);
         } finally {
             isLoadingGpx = false;
