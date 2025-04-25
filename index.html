@@ -18,16 +18,6 @@
         <button id="hamburgerBtn" aria-label="Open menu">☰</button>
         <ul id="menu" class="menu hidden">
             <li>
-                <input type="checkbox" id="trackPositionCheckbox" name="trackPosition">
-                <label for="trackPositionCheckbox">Track My Position</label>
-                <ul class="submenu hidden">
-                    <li>
-                        <label class="radio-label">
-                            <input type="checkbox" id="showJumpMasterLine"> Show Jump Master Line                        </label>
-                    </li>
-                </ul>
-            </li>
-            <li>
                 <label class="radio-label">
                     <input type="checkbox" id="showTableCheckbox" name="showTable"> Show Wind Table
                 </label>
@@ -349,6 +339,37 @@
                             </li>
                             <li>
                                 <button id="resetCutAwayMarker">Reset Cut-Away Marker</button>
+                            </li>
+                        </ul>
+                    </li>
+                </ul>
+            </li>
+            <li>
+                <span>Jump Master</span>
+                <ul class="submenu hidden">
+                    <li>
+                        <button id="placeHarpButton">Place HARP</button>
+                        <button id="clearHarpButton">Clear HARP</button>
+                    </li>
+                    <li>
+                        <label class="radio-label">
+                            <input type="checkbox" id="trackPositionCheckbox" name="trackPosition"> Start Live Tracking
+                        </label>
+                    </li>
+                    <li>
+                        <label class="radio-label">
+                            <input type="checkbox" id="showJumpMasterLine" name="showJumpMasterLine"> Show Jump Master Line To
+                        </label>
+                        <ul class="submenu hidden">
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="jumpMasterLineTarget" value="DIP" checked> DIP
+                                </label>
+                            </li>
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="jumpMasterLineTarget" value="HARP"> HARP
+                                </label>
                             </li>
                         </ul>
                     </li>

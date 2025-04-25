@@ -68,6 +68,10 @@ html {
     margin-bottom: 10px;
 }
 
+.harp-marker {
+    background: transparent;
+}
+
 .hamburger-menu {
     position: fixed;
     top: 5px;

@@ -36,7 +36,10 @@ const defaultSettings = {
     cutAwayAltitude: 1000, // Added for cut-away input
     cutAwayState: 'Partially', // Added for cut-away radio buttons
     trackPosition: false, // New setting for live tracking
-    showJumpMasterLine: false // New setting
+    showJumpMasterLine: false, // New setting
+    jumpMasterLineTarget: 'DIP', // New setting for DIP or HARP
+    harpLat: null, // New setting for HARP position
+    harpLng: null
 };
 let userSettings = JSON.parse(localStorage.getItem('upperWindsSettings')) || { ...defaultSettings };
 let map;
@@ -46,6 +49,8 @@ let lastAltitude = null;
 let currentMarker = null;
 let liveMarker = null; // New marker for live position
 let jumpMasterLine = null; // New global for Jump Master Line
+let isPlacingHarp = false; // Flag for HARP placement mode
+let harpMarker = null;
 let watchId = null;
 let gpxLayer = null;
 let gpxPoints = [];
@@ -846,6 +851,29 @@ function initMap() {
         lastTapTime = currentTime;
     }, { passive: false });
 }
+function handleHarpPlacement(e) {
+    if (!isPlacingHarp) return;
+    const { lat, lng } = e.latlng;
+    if (harpMarker) {
+        harpMarker.setLatLng([lat, lng]);
+        console.log('Updated HARP marker position:', { lat, lng });
+    } else {
+        harpMarker = createHarpMarker(lat, lng).addTo(map);
+        console.log('Placed new HARP marker:', { lat, lng });
+    }
+    userSettings.harpLat = lat;
+    userSettings.harpLng = lng;
+    saveSettings();
+    isPlacingHarp = false;
+    map.off('click', handleHarpPlacement);
+    console.log('HARP placement mode deactivated');
+    // Enable HARP radio button
+    const harpRadio = document.querySelector('input[name="jumpMasterLineTarget"][value="HARP"]');
+    if (harpRadio) {
+        harpRadio.disabled = false;
+        console.log('Enabled HARP radio button');
+    }
+}
 function createCustomMarker(lat, lng) {
     const customIcon = L.icon({
         iconUrl: 'favicon.ico',
@@ -876,6 +904,63 @@ function createCutAwayMarker(lat, lng) {
         icon: cutAwayIcon,
         draggable: true
     });
+}
+function createHarpMarker(latitude, longitude) {
+    const marker = L.marker([latitude, longitude], {
+        icon: L.divIcon({
+            className: 'harp-marker',
+            html: '<div style="background-color: green; width: 10px; height: 10px; border-radius: 50%;"></div>',
+            iconSize: [10, 10],
+            iconAnchor: [5, 5]
+        }),
+        pane: 'markerPane' // Use standard marker pane
+    });
+    console.log('Created HARP marker at:', { latitude, longitude });
+    return marker;
+}
+function clearHarpMarker() {
+    if (harpMarker) {
+        map.removeLayer(harpMarker);
+        harpMarker = null;
+        console.log('Removed HARP marker');
+    }
+    userSettings.harpLat = null;
+    userSettings.harpLng = null;
+    saveSettings();
+    const harpRadio = document.querySelector('input[name="jumpMasterLineTarget"][value="HARP"]');
+    if (harpRadio) {
+        harpRadio.disabled = true;
+        console.log('Disabled HARP radio button');
+    }
+    // If Jump Master Line is set to HARP, remove it or switch to DIP
+    if (userSettings.jumpMasterLineTarget === 'HARP' && userSettings.showJumpMasterLine) {
+        if (jumpMasterLine) {
+            map.removeLayer(jumpMasterLine);
+            jumpMasterLine = null;
+            console.log('Removed Jump Master Line: HARP marker cleared');
+        }
+        // Switch to DIP
+        userSettings.jumpMasterLineTarget = 'DIP';
+        const dipRadio = document.querySelector('input[name="jumpMasterLineTarget"][value="DIP"]');
+        if (dipRadio) {
+            dipRadio.checked = true;
+            console.log('Switched Jump Master Line to DIP');
+        }
+        saveSettings();
+        // Update line if live tracking is active
+        if (liveMarker && currentMarker && lastLat !== null && lastLng !== null) {
+            debouncedPositionUpdate({
+                coords: {
+                    latitude: lastLatitude,
+                    longitude: lastLongitude,
+                    accuracy: lastAccuracy,
+                    altitude: lastDeviceAltitude,
+                    altitudeAccuracy: lastAltitudeAccuracy
+                }
+            });
+        }
+    }
+    Utils.handleMessage('HARP marker cleared');
 }
 function attachMarkerDragend(marker) {
     marker.on('dragend', async (e) => {
@@ -1227,7 +1312,6 @@ const debouncedPositionUpdate = debounce(async (position) => {
     const currentTime = new Date().getTime() / 1000;
     console.log('Debounced position update:', { latitude, longitude, accuracy, deviceAltitude, altitudeAccuracy, currentTime });
 
-    // Calculate speed and direction
     let speed = 'N/A';
     let effectiveWindUnit = getWindSpeedUnit();
     if (effectiveWindUnit === 'bft') {
@@ -1245,19 +1329,20 @@ const debouncedPositionUpdate = debounce(async (position) => {
         }
     }
 
-    // Update live marker with animation
     if (!liveMarker) {
         liveMarker = createLiveMarker(latitude, longitude).addTo(map);
         console.log('Created new liveMarker at:', { latitude, longitude });
     } else {
+        if (!map.hasLayer(liveMarker)) {
+            liveMarker.addTo(map);
+            console.log('Re-added liveMarker to map:', { latitude, longitude });
+        }
         requestAnimationFrame(() => {
             liveMarker.setLatLng([latitude, longitude]);
             console.log('Updated liveMarker to:', { latitude, longitude });
         });
     }
 
-    // Update accuracy circle
-    console.log('Checking accuracy circle update:', { trackPosition: userSettings.trackPosition, accuracy });
     if (accuracy && Number.isFinite(accuracy) && accuracy > 0) {
         updateAccuracyCircle(latitude, longitude, accuracy);
     } else {
@@ -1269,7 +1354,6 @@ const debouncedPositionUpdate = debounce(async (position) => {
         }
     }
 
-    // Update control content
     if (livePositionControl) {
         livePositionControl.update(latitude, longitude, deviceAltitude, altitudeAccuracy, accuracy, speed, effectiveWindUnit, direction);
         console.log('Updated livePositionControl:', { latitude, longitude, deviceAltitude, altitudeAccuracy, accuracy, speed, effectiveWindUnit, direction });
@@ -1277,43 +1361,67 @@ const debouncedPositionUpdate = debounce(async (position) => {
         console.warn('livePositionControl not initialized in debouncedPositionUpdate');
     }
 
-    // Update Jump Master Line if enabled
-    if (userSettings.showJumpMasterLine && liveMarker && currentMarker && lastLat !== null && lastLng !== null) {
-        try {
-            const liveLatLng = liveMarker.getLatLng();
-            const dipLatLng = currentMarker.getLatLng();
-            const bearing = calculateBearing(liveLatLng.lat, liveLatLng.lng, dipLatLng.lat, dipLatLng.lng).toFixed(0);
-            const distanceMeters = map.distance(liveLatLng, dipLatLng);
-            const heightUnit = getHeightUnit();
-            const convertedDistance = Utils.convertHeight(distanceMeters, heightUnit);
-            const roundedDistance = Math.round(convertedDistance);
-
-            // Update or create Jump Master Line
-            if (jumpMasterLine) {
-                jumpMasterLine.setLatLngs([[liveLatLng.lat, liveLatLng.lng], [dipLatLng.lat, dipLatLng.lng]]);
-                jumpMasterLine.setPopupContent(`<b>Jump Master Line</b><br>Bearing: ${bearing}°<br>Distance: ${roundedDistance} ${heightUnit}`);
-                console.log('Updated Jump Master Line:', { bearing, distance: roundedDistance, unit: heightUnit });
-            } else {
-                jumpMasterLine = L.polyline([[liveLatLng.lat, liveLatLng.lng], [dipLatLng.lat, dipLatLng.lng]], {
-                    color: 'blue',
-                    weight: 3,
-                    opacity: 0.8,
-                    dashArray: '5, 5'
-                }).addTo(map);
-                jumpMasterLine.bindPopup(`<b>Jump Master Line</b><br>Bearing: ${bearing}°<br>Distance: ${roundedDistance} ${heightUnit}`, { autoClose: false }).openPopup();
-                console.log('Created Jump Master Line:', { bearing, distance: roundedDistance, unit: heightUnit });
-            }
-        } catch (error) {
-            console.error('Error updating Jump Master Line:', error);
+    if (userSettings.showJumpMasterLine && liveMarker) {
+        let targetMarker = null;
+        let targetLat = null;
+        let targetLng = null;
+        if (userSettings.jumpMasterLineTarget === 'DIP' && currentMarker && lastLat !== null && lastLng !== null) {
+            targetMarker = currentMarker;
+            targetLat = lastLat;
+            targetLng = lastLng;
+        } else if (userSettings.jumpMasterLineTarget === 'HARP' && harpMarker && userSettings.harpLat !== null && userSettings.harpLng !== null) {
+            targetMarker = harpMarker;
+            targetLat = userSettings.harpLat;
+            targetLng = userSettings.harpLng;
         }
-    } else if (jumpMasterLine && (!userSettings.showJumpMasterLine || !currentMarker || lastLat === null || lastLng === null)) {
-        // Remove line if disabled or DIP is missing
+
+        if (targetMarker) {
+            try {
+                const liveLatLng = liveMarker.getLatLng();
+                const targetLatLng = targetMarker.getLatLng();
+                const bearing = calculateBearing(liveLatLng.lat, liveLatLng.lng, targetLatLng.lat, targetLatLng.lng).toFixed(0);
+                const distanceMeters = map.distance(liveLatLng, targetLatLng);
+                const heightUnit = getHeightUnit();
+                const convertedDistance = Utils.convertHeight(distanceMeters, heightUnit);
+                const roundedDistance = Math.round(convertedDistance);
+                const popupContent = `<b>Jump Master Line to ${userSettings.jumpMasterLineTarget}</b><br>Bearing: ${bearing}°<br>Distance: ${roundedDistance} ${heightUnit}`;
+
+                if (jumpMasterLine) {
+                    jumpMasterLine.setLatLngs([[liveLatLng.lat, liveLatLng.lng], [targetLatLng.lat, targetLatLng.lng]]);
+                    jumpMasterLine.setPopupContent(popupContent);
+                    // Update popup position to line's midpoint
+                    const lineCenter = jumpMasterLine.getCenter();
+                    jumpMasterLine.getPopup().setLatLng(lineCenter);
+                    if (!jumpMasterLine.isPopupOpen()) {
+                        jumpMasterLine.openPopup();
+                    }
+                    console.log(`Updated Jump Master Line to ${userSettings.jumpMasterLineTarget}:`, { bearing, distance: roundedDistance, unit: heightUnit, popupPosition: lineCenter });
+                } else {
+                    jumpMasterLine = L.polyline([[liveLatLng.lat, liveLatLng.lng], [targetLatLng.lat, targetLatLng.lng]], {
+                        color: 'red',
+                        weight: 3,
+                        opacity: 0.8,
+                        dashArray: '5, 5'
+                    }).addTo(map);
+                    jumpMasterLine.bindPopup(popupContent, { autoClose: false }).openPopup();
+                    console.log(`Created Jump Master Line to ${userSettings.jumpMasterLineTarget}:`, { bearing, distance: roundedDistance, unit: heightUnit });
+                }
+            } catch (error) {
+                console.error('Error updating Jump Master Line:', error);
+            }
+        } else {
+            if (jumpMasterLine) {
+                map.removeLayer(jumpMasterLine);
+                jumpMasterLine = null;
+                console.log(`Removed Jump Master Line: no valid target (${userSettings.jumpMasterLineTarget})`);
+            }
+        }
+    } else if (jumpMasterLine) {
         map.removeLayer(jumpMasterLine);
         jumpMasterLine = null;
-        console.log('Removed Jump Master Line: disabled or no DIP');
+        console.log('Removed Jump Master Line: disabled or no liveMarker');
     }
 
-    // Store last position data
     lastLatitude = latitude;
     lastLongitude = longitude;
     lastDeviceAltitude = deviceAltitude;
@@ -1324,7 +1432,6 @@ const debouncedPositionUpdate = debounce(async (position) => {
     lastDirection = direction;
     console.log('Stored last position data:', { lastLatitude, lastLongitude, lastDeviceAltitude, lastAltitudeAccuracy, lastAccuracy, lastSpeed, lastEffectiveWindUnit, lastDirection });
 
-    // Store current position and time
     prevLat = latitude;
     prevLng = longitude;
     prevTime = currentTime;
@@ -3049,7 +3156,8 @@ function clearIsolineMarkers() {
             if (layer instanceof L.Marker &&
                 layer !== currentMarker &&
                 layer !== cutAwayMarker &&
-                layer !== liveMarker && // Skip liveMarker
+                layer !== liveMarker &&
+                layer !== harpMarker && // Skip harpMarker
                 layer.options.icon &&
                 layer.options.icon.options &&
                 typeof layer.options.icon.options.className === 'string' &&
@@ -3064,6 +3172,8 @@ function clearIsolineMarkers() {
                 console.log('Skipping cutAwayMarker:', layer, 'className:', layer.options?.icon?.options?.className || 'none');
             } else if (layer === liveMarker) {
                 console.log('Skipping liveMarker:', layer, 'className:', layer.options?.icon?.options?.className || 'none');
+            } else if (layer === harpMarker) {
+                console.log('Skipping harpMarker:', layer, 'className:', layer.options?.icon?.options?.className || 'none');
             } else if (layer instanceof L.Marker &&
                 layer.options.icon &&
                 layer.options.icon.options &&
@@ -3073,13 +3183,14 @@ function clearIsolineMarkers() {
             }
         });
         console.log('Cleared', markerCount, 'isoline-label markers');
-        // Fallback: Remove only markers that are not currentMarker, cutAwayMarker, liveMarker, or landing pattern arrows
+        // Fallback: Remove only markers that are not currentMarker, cutAwayMarker, liveMarker, or harpMarker
         if (markerCount === 0) {
             map.eachLayer(layer => {
                 if (layer instanceof L.Marker &&
                     layer !== currentMarker &&
                     layer !== cutAwayMarker &&
-                    layer !== liveMarker && // Skip liveMarker
+                    layer !== liveMarker &&
+                    layer !== harpMarker &&
                     (!layer.options.icon ||
                      !layer.options.icon.options ||
                      !layer.options.icon.options.className ||
@@ -5167,6 +5278,28 @@ function setupRadioEvents() {
             calculateCutAway();
         }
     });
+    setupRadioGroup('jumpMasterLineTarget', () => {
+        userSettings.jumpMasterLineTarget = getSettingValue('jumpMasterLineTarget', 'radio', 'DIP');
+        saveSettings();
+        console.log('jumpMasterLineTarget changed:', userSettings.jumpMasterLineTarget);
+        if (userSettings.showJumpMasterLine && liveMarker) {
+            debouncedPositionUpdate({
+                coords: {
+                    latitude: lastLatitude,
+                    longitude: lastLongitude,
+                    accuracy: lastAccuracy,
+                    altitude: lastDeviceAltitude,
+                    altitudeAccuracy: lastAltitudeAccuracy
+                }
+            });
+        }
+        // Disable HARP if no marker
+        const harpRadio = document.querySelector('input[name="jumpMasterLineTarget"][value="HARP"]');
+        if (harpRadio) {
+            harpRadio.disabled = !harpMarker || userSettings.harpLat === null || userSettings.harpLng === null;
+            console.log('HARP radio button disabled:', harpRadio.disabled);
+        }
+    });
     // Trigger initial tooltip refresh for heightUnit
     if (gpxLayer && gpxPoints.length > 0) {
         const groundAltitude = lastAltitude !== 'N/A' && !isNaN(lastAltitude) ? parseFloat(lastAltitude) : null;
@@ -5700,7 +5833,6 @@ function setupCheckboxEvents() {
         userSettings.trackPosition = checkbox.checked;
         saveSettings();
         console.log('trackPosition set to:', userSettings.trackPosition);
-        // Toggle submenu
         const checkboxElement = document.getElementById('trackPositionCheckbox');
         if (checkboxElement) {
             const parentLi = checkboxElement.closest('li');
@@ -5709,7 +5841,7 @@ function setupCheckboxEvents() {
                 if (submenu) {
                     console.log(`Toggling trackPositionCheckbox submenu: setting hidden to ${!checkbox.checked}`);
                     submenu.classList.toggle('hidden', !checkbox.checked);
-                    toggleSubmenu('trackPositionCheckbox', checkbox.checked); // Keep for consistency
+                    toggleSubmenu('trackPositionCheckbox', checkbox.checked);
                     console.log('Track My Position submenu visibility:', !submenu.classList.contains('hidden'));
                 } else {
                     console.warn('Track My Position submenu not found');
@@ -5732,11 +5864,29 @@ function setupCheckboxEvents() {
         userSettings.showJumpMasterLine = checkbox.checked;
         saveSettings();
         console.log('showJumpMasterLine changed:', userSettings.showJumpMasterLine);
+        const checkboxElement = document.getElementById('showJumpMasterLine');
+        if (checkboxElement) {
+            const parentLi = checkboxElement.closest('li');
+            if (parentLi) {
+                const submenu = parentLi.querySelector(':scope > ul.submenu');
+                if (submenu) {
+                    console.log(`Toggling showJumpMasterLine submenu: setting hidden to ${!checkbox.checked}`);
+                    submenu.classList.toggle('hidden', !checkbox.checked);
+                    console.log('Show Jump Master Line To submenu visibility:', !submenu.classList.contains('hidden'));
+                } else {
+                    console.warn('Show Jump Master Line To submenu not found');
+                }
+            } else {
+                console.warn('Parent <li> for showJumpMasterLine not found');
+            }
+        } else {
+            console.warn('showJumpMasterLine checkbox not found');
+        }
         if (!userSettings.showJumpMasterLine && jumpMasterLine) {
             map.removeLayer(jumpMasterLine);
             jumpMasterLine = null;
             console.log('Removed Jump Master Line: unchecked');
-        } else if (userSettings.showJumpMasterLine && liveMarker && currentMarker && lastLat !== null && lastLng !== null) {
+        } else if (userSettings.showJumpMasterLine && liveMarker) {
             debouncedPositionUpdate({
                 coords: {
                     latitude: lastLatitude,
@@ -5749,7 +5899,28 @@ function setupCheckboxEvents() {
         }
     });
 
-    // Initialize submenu state for trackPositionCheckbox on page load
+    const placeHarpButton = document.getElementById('placeHarpButton');
+    if (placeHarpButton) {
+        placeHarpButton.addEventListener('click', () => {
+            isPlacingHarp = true;
+            console.log('HARP placement mode activated');
+            map.on('click', handleHarpPlacement);
+            Utils.handleMessage('Click the map to place the HARP marker');
+        });
+    } else {
+        console.warn('placeHarpButton not found:', { id: 'placeHarpButton' });
+    }
+
+    // Handle Clear HARP button
+    const clearHarpButton = document.getElementById('clearHarpButton');
+    if (clearHarpButton) {
+        clearHarpButton.addEventListener('click', () => {
+            clearHarpMarker();
+        });
+    } else {
+        console.warn('clearHarpButton not found:', { id: 'clearHarpButton' });
+    }
+
     const trackPositionCheckbox = document.getElementById('trackPositionCheckbox');
     if (trackPositionCheckbox && userSettings.trackPosition) {
         const parentLi = trackPositionCheckbox.closest('li');
@@ -5764,6 +5935,15 @@ function setupCheckboxEvents() {
             }
         } else {
             console.warn('Parent <li> for trackPositionCheckbox not found during initialization');
+        }
+    }
+    if (userSettings.harpLat !== null && userSettings.harpLng !== null) {
+        harpMarker = createHarpMarker(userSettings.harpLat, userSettings.harpLng).addTo(map);
+        console.log('Restored HARP marker from settings:', { lat: userSettings.harpLat, lng: userSettings.harpLng });
+        const harpRadio = document.querySelector('input[name="jumpMasterLineTarget"][value="HARP"]');
+        if (harpRadio) {
+            harpRadio.disabled = false;
+            console.log('Enabled HARP radio button on load');
         }
     }
 }

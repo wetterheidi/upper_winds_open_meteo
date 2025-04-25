@@ -530,6 +530,21 @@ class Utils {
         const tasAdjusted = Utils.calculateTAS(tasKts, heightFt);
         return Number(tasAdjusted.toFixed(1));
     }
+
+    static handleMessage(message) {
+        const infoDiv = document.getElementById('info');
+        if (infoDiv) {
+            infoDiv.textContent = message;
+            infoDiv.style.display = 'block';
+            setTimeout(() => {
+                infoDiv.style.display = 'none';
+            }, 3000); // Hide after 3 seconds
+            console.log('Displayed message:', message);
+        } else {
+            console.warn('Info div not found for handleMessage, using alert');
+            alert(message);
+        }
+    }
 }
 
 window.Utils = Utils;
