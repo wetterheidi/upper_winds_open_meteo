@@ -1398,7 +1398,7 @@ const debouncedPositionUpdate = debounce(async (position) => {
                     console.log(`Updated Jump Master Line to ${userSettings.jumpMasterLineTarget}:`, { bearing, distance: roundedDistance, unit: heightUnit, popupPosition: lineCenter });
                 } else {
                     jumpMasterLine = L.polyline([[liveLatLng.lat, liveLatLng.lng], [targetLatLng.lat, targetLatLng.lng]], {
-                        color: 'red',
+                        color: 'blue',
                         weight: 3,
                         opacity: 0.8,
                         dashArray: '5, 5'
@@ -1603,56 +1603,91 @@ function updateLivePositionControl() {
     }
 }
 function startPositionTracking() {
+    console.log('startPositionTracking called');
     if (!navigator.geolocation) {
         Utils.handleError('Geolocation not supported by your browser. Please use a device with location services.');
         setCheckboxValue('trackPositionCheckbox', false);
         userSettings.trackPosition = false;
         saveSettings();
+        console.warn('Geolocation not supported');
         return;
     }
-    if (!map || !map._container || !map._controlCorners) {
-        console.error('Map not fully initialized in startPositionTracking', { map: !!map, container: !!map?._container, controlCorners: !!map?._controlCorners });
-        Utils.handleError('Map not ready. Please try again.');
+
+    if (!map) {
+        Utils.handleError('Map not initialized. Please try again.');
         setCheckboxValue('trackPositionCheckbox', false);
         userSettings.trackPosition = false;
         saveSettings();
+        console.warn('Map not initialized');
         return;
     }
-    console.log('Starting position tracking');
-    prevLat = null;
-    prevLng = null;
-    prevTime = null;
-    // Initialize live position control
+
+    // Clear any existing watch to prevent conflicts
+    if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+        console.log('Cleared existing geolocation watch');
+    }
+
     try {
-        if (!livePositionControl) {
-            livePositionControl = new L.Control.LivePosition({ position: 'bottomleft' });
-            livePositionControl.addTo(map);
-            console.log('Added livePositionControl to map');
-        } else {
-            console.log('livePositionControl already exists');
+        watchId = navigator.geolocation.watchPosition(
+            (position) => {
+                console.log('Geolocation position received:', position);
+                debouncedPositionUpdate(position);
+            },
+            (error) => {
+                console.error('Geolocation error:', error);
+                Utils.handleError(`Geolocation error: ${error.message}`);
+                setCheckboxValue('trackPositionCheckbox', false);
+                userSettings.trackPosition = false;
+                saveSettings();
+                stopPositionTracking();
+            },
+            {
+                enableHighAccuracy: true,
+                maximumAge: 0,
+                timeout: 10000
+            }
+        );
+        console.log('Started geolocation watch with watchId:', watchId);
+
+        // Reinitialize livePositionControl to ensure valid state
+        if (livePositionControl) {
+            livePositionControl.remove();
+            livePositionControl = null;
+            console.log('Removed existing livePositionControl for reinitialization');
         }
+        livePositionControl = L.control({ position: 'topright' });
+        livePositionControl.onAdd = function () {
+            const div = L.DomUtil.create('div', 'live-position-control');
+            div.innerHTML = 'Live Position: Waiting for data...';
+            return div;
+        };
+        livePositionControl.update = function (latitude, longitude, altitude, altitudeAccuracy, accuracy, speed, windUnit, direction) {
+            if (!this._div) {
+                console.warn('livePositionControl._div is undefined, skipping update');
+                return;
+            }
+            this._div.innerHTML = `
+                <b>Live Position</b><br>
+                Lat: ${latitude.toFixed(5)}, Lng: ${longitude.toFixed(5)}<br>
+                Altitude: ${altitude ? altitude.toFixed(1) + ' m' : 'N/A'} (±${altitudeAccuracy ? altitudeAccuracy.toFixed(1) + ' m' : 'N/A'})<br>
+                Accuracy: ${accuracy ? accuracy.toFixed(1) + ' m' : 'N/A'}<br>
+                Speed: ${speed} ${windUnit}<br>
+                Direction: ${direction}°
+            `;
+            console.log('Updated livePositionControl DOM');
+        };
+        livePositionControl.addTo(map);
+        console.log('Initialized livePositionControl');
     } catch (error) {
-        console.error('Error initializing livePositionControl:', error);
-        Utils.handleError('Failed to initialize live position display: ' + error.message);
-        livePositionControl = null;
-        return;
+        console.error('Error starting position tracking:', error);
+        Utils.handleError('Failed to start position tracking.');
+        setCheckboxValue('trackPositionCheckbox', false);
+        userSettings.trackPosition = false;
+        saveSettings();
+        stopPositionTracking();
     }
-    // Start geolocation watch
-    watchId = navigator.geolocation.watchPosition(
-        (position) => debouncedPositionUpdate(position),
-        (error) => {
-            // ... (error handling unchanged)
-        },
-        {
-            enableHighAccuracy: true,
-            timeout: 20000,
-            maximumAge: 0
-        }
-    );
-    userSettings.trackPosition = true;
-    setCheckboxValue('trackPositionCheckbox', true);
-    saveSettings();
-    console.log('Position tracking started', { watchId });
 }
 function stopPositionTracking() {
     if (watchId !== null) {
@@ -5836,17 +5871,7 @@ function setupCheckboxEvents() {
         const checkboxElement = document.getElementById('trackPositionCheckbox');
         if (checkboxElement) {
             const parentLi = checkboxElement.closest('li');
-            if (parentLi) {
-                const submenu = parentLi.querySelector(':scope > ul.submenu');
-                if (submenu) {
-                    console.log(`Toggling trackPositionCheckbox submenu: setting hidden to ${!checkbox.checked}`);
-                    submenu.classList.toggle('hidden', !checkbox.checked);
-                    toggleSubmenu('trackPositionCheckbox', checkbox.checked);
-                    console.log('Track My Position submenu visibility:', !submenu.classList.contains('hidden'));
-                } else {
-                    console.warn('Track My Position submenu not found');
-                }
-            } else {
+            if (!parentLi) {
                 console.warn('Parent <li> for trackPositionCheckbox not found');
             }
         } else {
@@ -6062,18 +6087,24 @@ function setupGpxTrackEvents() {
         console.warn('Clear GPX button not found:', { id: 'clearGpxTrack' });
     }
 }
-function setupCheckbox(id, settingsKey, callback) {
+function setupCheckbox(id, setting, callback) {
+    console.log(`setupCheckbox called for id: ${id}`);
     const checkbox = document.getElementById(id);
-    if (!checkbox) {
-        console.warn(`Checkbox with ID "${id}" not found`);
-        return;
+    if (checkbox) {
+        // Remove existing change listeners to prevent duplicates
+        if (checkbox._changeHandler) {
+            checkbox.removeEventListener('change', checkbox._changeHandler);
+            console.log(`Removed previous change listener for ${id}`);
+        }
+        checkbox._changeHandler = () => {
+            console.log(`Change event fired for ${id}, checked: ${checkbox.checked}`);
+            callback(checkbox);
+        };
+        checkbox.addEventListener('change', checkbox._changeHandler);
+        console.log(`Attached change listener to ${id}`);
+    } else {
+        console.warn(`Checkbox ${id} not found`);
     }
-    checkbox.checked = userSettings[settingsKey]; // Set initial state
-    callback(checkbox); // Run callback with initial state
-    checkbox.addEventListener('change', () => {
-        console.log(`${id} changed to:`, checkbox.checked);
-        callback(checkbox);
-    });
 }
 function setupResetButton() {
     const resetButton = document.createElement('button');
@@ -6264,6 +6295,10 @@ function toggleSubmenu(id, isVisible) {
         console.log('Submenu visibility:', !submenu.classList.contains('hidden'));
     } else {
         console.warn(`Submenu for ${id} not found`);
+    }
+    if (id === 'trackPositionCheckbox') {
+        console.log('Skipping toggleSubmenu for trackPositionCheckbox: no submenu');
+        return;
     }
 }
 function clearJumpCircles() {
