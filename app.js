@@ -1321,6 +1321,7 @@ const debouncedPositionUpdate = debounce(async (position) => {
     console.log('Debounced position update:', { latitude, longitude, accuracy, deviceAltitude, altitudeAccuracy, currentTime });
 
     let speed = 'N/A';
+    let speedMs = 0; // Store raw speed in m/s for TOT calculation
     let effectiveWindUnit = getWindSpeedUnit();
     if (effectiveWindUnit === 'bft') {
         effectiveWindUnit = 'kt';
@@ -1330,10 +1331,11 @@ const debouncedPositionUpdate = debounce(async (position) => {
         const distance = map.distance([prevLat, prevLng], [latitude, longitude]);
         const timeDiff = currentTime - prevTime;
         if (timeDiff > 0) {
-            const speedMs = distance / timeDiff;
+            speedMs = distance / timeDiff; // Speed in meters per second
             speed = Utils.convertWind(speedMs, effectiveWindUnit, 'm/s');
             speed = effectiveWindUnit === 'bft' ? Math.round(speed) : speed.toFixed(1);
             direction = calculateBearing(prevLat, prevLng, latitude, longitude).toFixed(0);
+            console.log('Calculated speed:', { speedMs, convertedSpeed: speed, unit: effectiveWindUnit });
         }
     }
 
@@ -1392,7 +1394,18 @@ const debouncedPositionUpdate = debounce(async (position) => {
                 const heightUnit = getHeightUnit();
                 const convertedDistance = Utils.convertHeight(distanceMeters, heightUnit);
                 const roundedDistance = Math.round(convertedDistance);
-                const popupContent = `<b>Jump Master Line to ${userSettings.jumpMasterLineTarget}</b><br>Bearing: ${bearing}°<br>Distance: ${roundedDistance} ${heightUnit}`;
+
+                // Calculate Time on Target (TOT)
+                let totDisplay = 'N/A';
+                if (speedMs > 0) {
+                    const totSeconds = distanceMeters / speedMs; // Distance (m) / Speed (m/s)
+                    totDisplay = Math.round(totSeconds);
+                    console.log('Calculated TOT:', { distanceMeters, speedMs, totSeconds, totDisplay });
+                } else {
+                    console.log('TOT set to N/A: invalid or zero speed', { speedMs });
+                }
+
+                const popupContent = `<b>Jump Master Line to ${userSettings.jumpMasterLineTarget}</b><br>Bearing: ${bearing}°<br>Distance: ${roundedDistance} ${heightUnit}<br>TOT: X - ${totDisplay} s`;
 
                 if (jumpMasterLine) {
                     jumpMasterLine.setLatLngs([[liveLatLng.lat, liveLatLng.lng], [targetLatLng.lat, targetLatLng.lng]]);
@@ -1403,7 +1416,7 @@ const debouncedPositionUpdate = debounce(async (position) => {
                     if (!jumpMasterLine.isPopupOpen()) {
                         jumpMasterLine.openPopup();
                     }
-                    console.log(`Updated Jump Master Line to ${userSettings.jumpMasterLineTarget}:`, { bearing, distance: roundedDistance, unit: heightUnit, popupPosition: lineCenter });
+                    console.log(`Updated Jump Master Line to ${userSettings.jumpMasterLineTarget}:`, { bearing, distance: roundedDistance, unit: heightUnit, tot: totDisplay, popupPosition: lineCenter });
                 } else {
                     jumpMasterLine = L.polyline([[liveLatLng.lat, liveLatLng.lng], [targetLatLng.lat, targetLatLng.lng]], {
                         color: 'blue',
@@ -1412,7 +1425,7 @@ const debouncedPositionUpdate = debounce(async (position) => {
                         dashArray: '5, 5'
                     }).addTo(map);
                     jumpMasterLine.bindPopup(popupContent, { autoClose: false }).openPopup();
-                    console.log(`Created Jump Master Line to ${userSettings.jumpMasterLineTarget}:`, { bearing, distance: roundedDistance, unit: heightUnit });
+                    console.log(`Created Jump Master Line to ${userSettings.jumpMasterLineTarget}:`, { bearing, distance: roundedDistance, unit: heightUnit, tot: totDisplay });
                 }
             } catch (error) {
                 console.error('Error updating Jump Master Line:', error);
