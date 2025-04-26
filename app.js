@@ -382,6 +382,28 @@ function debounce(func, wait) {
         timeout = setTimeout(() => func.apply(this, args), wait);
     };
 }
+function configureMarker(lat, lng, altitude, openPopup = false) {
+    if (currentMarker) {
+        currentMarker.remove();
+    }
+    currentMarker = createCustomMarker(lat, lng).addTo(map);
+    attachMarkerDragend(currentMarker);
+    currentMarker.on('click', (e) => {
+        L.DomEvent.stopPropagation(e); // Prevent map click events from interfering
+        const popup = currentMarker.getPopup();
+        console.log('Marker click event, popup state:', { hasPopup: !!popup, isOpen: popup?.isOpen() });
+        if (popup?.isOpen()) {
+            currentMarker.closePopup();
+            console.log('Closed popup on marker click');
+        } else {
+            updateMarkerPopup(currentMarker, lat, lng, altitude, true);
+            console.log('Requested popup open on marker click');
+        }
+    });
+    updateMarkerPopup(currentMarker, lat, lng, altitude, openPopup);
+    console.log('Configured marker at:', { lat, lng, openPopup });
+    return currentMarker;
+}
 
 // == Map Initialization and Interaction ==
 function initMap() {
@@ -471,6 +493,8 @@ function initMap() {
     map.createPane('gpxTrackPane');
     map.getPane('gpxTrackPane').style.zIndex = 650;
     map.getPane('tooltipPane').style.zIndex = 700;
+    map.getPane('popupPane').style.zIndex = 700;
+
 
     async function fetchInitialWeather(lat, lng) {
         const lastFullHourUTC = getLastFullHourUTC();
@@ -490,9 +514,8 @@ function initMap() {
 
     // Initialize currentMarker at default location temporarily
     const initialAltitude = 'N/A';
-    currentMarker = createCustomMarker(defaultCenter[0], defaultCenter[1]).addTo(map);
-    attachMarkerDragend(currentMarker);
-    updateMarkerPopup(currentMarker, defaultCenter[0], defaultCenter[1], initialAltitude, false);
+    configureMarker(defaultCenter[0], defaultCenter[1], initialAltitude, false);
+    isManualPanning = false;
 
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
@@ -502,22 +525,18 @@ function initMap() {
                 lastLng = position.coords.longitude;
                 lastAltitude = await getAltitude(lastLat, lastLng);
 
-                // Update currentMarker to user's position
-                if (currentMarker) currentMarker.remove();
-                currentMarker = createCustomMarker(lastLat, lastLng).addTo(map);
-                attachMarkerDragend(currentMarker);
-                updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, false);
+                configureMarker(lastLat, lastLng, lastAltitude, false);
                 map.setView(userCoords, defaultZoom);
 
                 if (userSettings.calculateJump) {
                     debouncedCalculateJump();
                     calculateCutAway();
                 }
-                recenterMap();
+                recenterMap(true);
+                isManualPanning = false;
 
                 await fetchInitialWeather(lastLat, lastLng);
 
-                // Start tracking if enabled
                 if (userSettings.trackPosition) {
                     setCheckboxValue('trackPositionCheckbox', true);
                     startPositionTracking();
@@ -529,17 +548,13 @@ function initMap() {
                 lastLat = defaultCenter[0];
                 lastLng = defaultCenter[1];
                 lastAltitude = await getAltitude(lastLat, lastLng);
-                // Update currentMarker to default location
-                if (currentMarker) currentMarker.remove();
-                currentMarker = createCustomMarker(lastLat, lastLng).addTo(map);
-                attachMarkerDragend(currentMarker);
-                updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, false);
+                configureMarker(lastLat, lastLng, lastAltitude, false);
                 map.setView(defaultCenter, defaultZoom);
-                recenterMap();
+                recenterMap(true);
+                isManualPanning = false;
 
                 await fetchInitialWeather(lastLat, lastLng);
 
-                // Disable tracking if geolocation fails
                 if (userSettings.trackPosition) {
                     Utils.handleError('Tracking disabled due to geolocation failure.');
                     setCheckboxValue('trackPositionCheckbox', false);
@@ -559,17 +574,13 @@ function initMap() {
         lastLat = defaultCenter[0];
         lastLng = defaultCenter[1];
         lastAltitude = getAltitude(lastLat, lastLng);
-        // Update currentMarker to default location
-        if (currentMarker) currentMarker.remove();
-        currentMarker = createCustomMarker(lastLat, lastLng).addTo(map);
-        attachMarkerDragend(currentMarker);
-        updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, false);
+        configureMarker(lastLat, lastLng, lastAltitude, false);
         map.setView(defaultCenter, defaultZoom);
-        recenterMap();
+        recenterMap(true);
+        isManualPanning = false;
 
         fetchInitialWeather(lastLat, lastLng);
 
-        // Disable tracking if geolocation is not supported
         if (userSettings.trackPosition) {
             Utils.handleError('Tracking disabled: Geolocation not supported.');
             setCheckboxValue('trackPositionCheckbox', false);
@@ -670,6 +681,12 @@ function initMap() {
         });
     });
 
+    // Detect manual panning
+    map.on('movestart', () => {
+        isManualPanning = true;
+        console.log('Manual panning detected, isManualPanning set to true');
+    });
+
     map.on('mouseout', function () {
         coordsControl.getContainer().innerHTML = 'Move mouse over map';
     });
@@ -710,34 +727,22 @@ function initMap() {
         lastAltitude = await getAltitude(lat, lng);
         console.log('Map double-clicked, moving marker to:', { lat, lng });
 
-        if (currentMarker) currentMarker.remove();
-        currentMarker = createCustomMarker(lat, lng).addTo(map);
-        attachMarkerDragend(currentMarker);
-        currentMarker.on('click', () => {
-            if (currentMarker.getPopup()?.isOpen()) {
-                currentMarker.closePopup();
-            } else {
-                updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, true);
-            }
-        });
-
-        updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, false);
-        resetJumpRunDirection(false); // Do NOT update JRT yet
+        configureMarker(lastLat, lastLng, lastAltitude, false);
+        resetJumpRunDirection(false);
         if (userSettings.calculateJump) {
             console.log('Recalculating jump for marker click');
-            debouncedCalculateJump(); // Use debounced version
+            debouncedCalculateJump();
             calculateCutAway();
         }
-        recenterMap();
+        recenterMap(true);
+        isManualPanning = false;
 
         const slider = document.getElementById('timeSlider');
         const currentIndex = parseInt(slider.value) || 0;
         const currentTime = weatherData?.time?.[currentIndex] || null;
 
-        // Fetch weather data first
         await fetchWeatherForLocation(lat, lng, currentTime);
 
-        // Now update JRT with new weather data
         if (userSettings.showJumpRunTrack) {
             console.log('Updating JRT after weather fetch for double-click');
             updateJumpRunTrack();
@@ -751,7 +756,7 @@ function initMap() {
 
         if (userSettings.calculateJump && weatherData && lastLat && lastLng) {
             console.log('Recalculating jump for zoom:', currentZoom);
-            const jumpResult = debouncedCalculateJump(); // Use debounced version
+            const jumpResult = debouncedCalculateJump();
             console.log('Jump result:', jumpResult);
             if (jumpResult) {
                 console.log('Calling updateJumpCircle with:', {
@@ -802,7 +807,7 @@ function initMap() {
 
         if (currentMarker && lastLat && lastLng) {
             currentMarker.setLatLng([lastLat, lastLng]);
-            updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, false);
+            updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, currentMarker.getPopup()?.isOpen() || false);
         }
     });
 
@@ -827,23 +832,15 @@ function initMap() {
             lastLat = lat;
             lastLng = lng;
             lastAltitude = await getAltitude(lat, lng);
-            if (currentMarker) currentMarker.remove();
-            currentMarker = createCustomMarker(lat, lng).addTo(map);
-            attachMarkerDragend(currentMarker);
-            currentMarker.on('click', () => {
-                if (currentMarker.getPopup()?.isOpen()) {
-                    currentMarker.closePopup();
-                } else {
-                    updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, true);
-                }
-            });
-            updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, false);
+            configureMarker(lastLat, lastLng, lastAltitude, false);
             resetJumpRunDirection(true);
             if (userSettings.calculateJump) {
-                debouncedCalculateJump(); // Use debounced version
+                debouncedCalculateJump();
                 calculateCutAway();
             }
-            recenterMap();
+            recenterMap(true);
+            isManualPanning = false;
+
             const slider = document.getElementById('timeSlider');
             const currentIndex = parseInt(slider.value) || 0;
             const currentTime = weatherData?.time?.[currentIndex] || null;
@@ -978,7 +975,8 @@ function attachMarkerDragend(marker) {
             debouncedCalculateJump(); // Use debounced version
             calculateCutAway();
         }
-        recenterMap();
+        recenterMap(true); // Force recenter after fallback
+        isManualPanning = false; // Reset after marker placement
         const slider = document.getElementById('timeSlider');
         const currentIndex = parseInt(slider.value) || 0;
         const currentTime = weatherData?.time?.[currentIndex] || null;
@@ -1019,7 +1017,6 @@ async function updateMarkerPopup(marker, lat, lng, altitude, open = false) {
     const coords = Utils.convertCoords(lat, lng, coordFormat);
     const sliderIndex = getSliderValue();
 
-    // If weatherData is missing and we have coordinates, fetch it
     if (!weatherData && lat && lng) {
         console.log('No weather data available, fetching for:', { lat, lng });
         await fetchWeatherForLocation(lat, lng, null, false);
@@ -1052,14 +1049,20 @@ async function updateMarkerPopup(marker, lat, lng, altitude, open = false) {
         });
     }
 
-    if (!marker.getPopup()) {
-        marker.bindPopup(popupContent);
-    } else {
-        marker.setPopupContent(popupContent);
-    }
+    // Unbind existing popup to avoid conflicts
+    marker.unbindPopup();
+    marker.bindPopup(popupContent);
+    console.log('Popup rebound with content:', popupContent);
 
     if (open) {
+        console.log('Attempting to open popup');
         marker.openPopup();
+        const isOpen = marker.getPopup()?.isOpen();
+        console.log('Popup open status after openPopup():', isOpen);
+        if (!isOpen) {
+            console.warn('Popup failed to open, retrying');
+            marker.openPopup(); // Retry to ensure visibility
+        }
     }
 }
 function updateCutAwayMarkerPopup(marker, lat, lng, open = false) {
@@ -1080,14 +1083,18 @@ function updateCutAwayMarkerPopup(marker, lat, lng, open = false) {
         marker.openPopup();
     }
 }
-function recenterMap() {
+function recenterMap(force = false) {
     if (isLoadingGpx) {
         console.log('Skipping recenterMap during GPX loading');
         return;
     }
+    if (isManualPanning && !force) {
+        console.log('Skipping recenterMap due to manual panning');
+        return;
+    }
     if (map && currentMarker) {
-        map.invalidateSize(); // Update map dimensions
-        map.panTo(currentMarker.getLatLng()); // Center on marker
+        map.invalidateSize();
+        map.panTo(currentMarker.getLatLng());
         console.log('Map recentered on marker at:', currentMarker.getLatLng());
     } else {
         console.warn('Cannot recenter map: map or marker not defined');
@@ -5991,27 +5998,17 @@ function setupCoordinateEvents() {
                 lastLng = lng;
                 lastAltitude = await getAltitude(lat, lng);
                 console.log('Coordinate input, moving marker to:', { lat, lng });
-                if (currentMarker) {
-                    currentMarker.setLatLng([lat, lng]);
-                } else {
-                    currentMarker = createCustomMarker(lat, lng).addTo(map);
-                    currentMarker.on('click', () => {
-                        if (currentMarker.getPopup()?.isOpen()) {
-                            currentMarker.closePopup();
-                        } else {
-                            updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, true);
-                        }
-                    });
-                }
-                updateMarkerPopup(currentMarker, lat, lng, lastAltitude, false);
+                configureMarker(lat, lng, lastAltitude, false);
                 resetJumpRunDirection(true);
                 addCoordToHistory(lat, lng);
                 if (userSettings.calculateJump) {
                     console.log('Recalculating jump for coordinate input');
-                    debouncedCalculateJump(); // Use debounced version
+                    debouncedCalculateJump();
                     calculateCutAway();
                 }
-                recenterMap();
+                recenterMap(true);
+                isManualPanning = false;
+
                 await fetchWeatherForLocation(lat, lng);
             } catch (error) {
                 Utils.handleError(error.message);
