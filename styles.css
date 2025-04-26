@@ -45,10 +45,9 @@ html {
 }
 
 .leaflet-control-live-position {
-    position: relative;
-    left: 50%;
-    transform: translateX(-50%);
-    bottom: 10px;
+    position: absolute; /* Changed from relative to align with Leaflet */
+    right: 20px; /* Anchor to right with 20px offset (moves left) */
+    bottom: 10px; /* Keep vertical spacing */
     z-index: 1000; /* Above map tiles but below popups */
     font-size: 12px;
     line-height: 1.4;
@@ -61,11 +60,11 @@ html {
     border-radius: 4px;
     box-shadow: rgba(0,0,0,0.2);
     max-width: 300px;
-    margin: 0 auto 10px auto;
     pointer-events: none;
 }
+
 .leaflet-bottom .leaflet-control-live-position {
-    margin-bottom: 10px;
+    margin-bottom: 10px; /* Keep vertical spacing */
 }
 
 .harp-marker {

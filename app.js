@@ -495,6 +495,9 @@ function initMap() {
     map.getPane('tooltipPane').style.zIndex = 700;
     map.getPane('popupPane').style.zIndex = 700;
 
+    // Initialize livePositionControl
+    livePositionControl = L.control.livePosition({ position: 'bottomright' }).addTo(map);
+    console.log('Initialized livePositionControl');
 
     async function fetchInitialWeather(lat, lng) {
         const lastFullHourUTC = getLastFullHourUTC();
@@ -512,7 +515,6 @@ function initMap() {
         await fetchWeatherForLocation(lat, lng, initialTime, true);
     }
 
-    // Initialize currentMarker at default location temporarily
     const initialAltitude = 'N/A';
     configureMarker(defaultCenter[0], defaultCenter[1], initialAltitude, false);
     isManualPanning = false;
@@ -1321,7 +1323,7 @@ const debouncedPositionUpdate = debounce(async (position) => {
     console.log('Debounced position update:', { latitude, longitude, accuracy, deviceAltitude, altitudeAccuracy, currentTime });
 
     let speed = 'N/A';
-    let speedMs = 0; // Store raw speed in m/s for TOT calculation
+    let speedMs = 0;
     let effectiveWindUnit = getWindSpeedUnit();
     if (effectiveWindUnit === 'bft') {
         effectiveWindUnit = 'kt';
@@ -1331,7 +1333,7 @@ const debouncedPositionUpdate = debounce(async (position) => {
         const distance = map.distance([prevLat, prevLng], [latitude, longitude]);
         const timeDiff = currentTime - prevTime;
         if (timeDiff > 0) {
-            speedMs = distance / timeDiff; // Speed in meters per second
+            speedMs = distance / timeDiff;
             speed = Utils.convertWind(speedMs, effectiveWindUnit, 'm/s');
             speed = effectiveWindUnit === 'bft' ? Math.round(speed) : speed.toFixed(1);
             direction = calculateBearing(prevLat, prevLng, latitude, longitude).toFixed(0);
@@ -1366,7 +1368,11 @@ const debouncedPositionUpdate = debounce(async (position) => {
 
     if (livePositionControl) {
         livePositionControl.update(latitude, longitude, deviceAltitude, altitudeAccuracy, accuracy, speed, effectiveWindUnit, direction);
-        console.log('Updated livePositionControl:', { latitude, longitude, deviceAltitude, altitudeAccuracy, accuracy, speed, effectiveWindUnit, direction });
+        console.log('Updated livePositionControl content:', { latitude, longitude, deviceAltitude, altitudeAccuracy, accuracy, speed, effectiveWindUnit, direction });
+        // Ensure control is visible
+        livePositionControl._container.style.display = 'block';
+        livePositionControl._container.style.opacity = '1';
+        livePositionControl._container.style.visibility = 'visible';
     } else {
         console.warn('livePositionControl not initialized in debouncedPositionUpdate');
     }
@@ -1395,22 +1401,20 @@ const debouncedPositionUpdate = debounce(async (position) => {
                 const convertedDistance = Utils.convertHeight(distanceMeters, heightUnit);
                 const roundedDistance = Math.round(convertedDistance);
 
-                // Calculate Time on Target (TOT)
                 let totDisplay = 'N/A';
                 if (speedMs > 0) {
-                    const totSeconds = distanceMeters / speedMs; // Distance (m) / Speed (m/s)
+                    const totSeconds = distanceMeters / speedMs;
                     totDisplay = Math.round(totSeconds);
                     console.log('Calculated TOT:', { distanceMeters, speedMs, totSeconds, totDisplay });
                 } else {
                     console.log('TOT set to N/A: invalid or zero speed', { speedMs });
                 }
 
-                const popupContent = `<b>Jump Master Line to ${userSettings.jumpMasterLineTarget}</b><br>Bearing: ${bearing}°<br>Distance: ${roundedDistance} ${heightUnit}<br>TOT: X - ${totDisplay} s`;
+                const popupContent = `<b>Jump Master Line to ${userSettings.jumpMasterLineTarget}</b><br>Bearing: ${bearing}°<br>Distance: ${roundedDistance} ${heightUnit}<br>TOT: ${totDisplay} s`;
 
                 if (jumpMasterLine) {
                     jumpMasterLine.setLatLngs([[liveLatLng.lat, liveLatLng.lng], [targetLatLng.lat, targetLatLng.lng]]);
                     jumpMasterLine.setPopupContent(popupContent);
-                    // Update popup position to line's midpoint
                     const lineCenter = jumpMasterLine.getCenter();
                     jumpMasterLine.getPopup().setLatLng(lineCenter);
                     if (!jumpMasterLine.isPopupOpen()) {
@@ -1459,7 +1463,7 @@ const debouncedPositionUpdate = debounce(async (position) => {
 }, 500);
 L.Control.LivePosition = L.Control.extend({
     options: {
-        position: 'bottomleft'
+        position: 'bottomright'
     },
     onAdd: function (map) {
         const container = L.DomUtil.create('div', 'leaflet-control-live-position');
@@ -1475,6 +1479,7 @@ L.Control.LivePosition = L.Control.extend({
         container.style.display = 'block';
         container.style.opacity = '1';
         container.style.visibility = 'visible';
+        container.style.zIndex = '600';
         container.innerHTML = 'Initializing live position...';
         this._container = container;
         console.log('LivePosition control added to map', { styles: container.style });
@@ -1514,10 +1519,14 @@ L.Control.LivePosition = L.Control.extend({
             content += `Speed: ${speed} ${effectiveWindUnit}<br>`;
             content += `Direction: ${direction}°`;
             this._container.innerHTML = content;
+            this._container.style.display = 'block';
+            this._container.style.opacity = '1';
+            this._container.style.visibility = 'visible';
             console.log('Updated livePositionControl content:', { content });
         } catch (error) {
             console.error('Error updating livePositionControl:', error);
             this._container.innerHTML = 'Error updating live position';
+            this._container.style.display = 'block';
         }
     },
     onRemove: function (map) {
@@ -1529,10 +1538,10 @@ L.control.livePosition = function (opts) {
 };
 function createLiveMarker(lat, lng) {
     const liveIcon = L.icon({
-        iconUrl: 'star.png', // Path to your image
-        iconSize: [24, 24], // Size of the image (adjust to your image)
-        iconAnchor: [12, 12], // Anchor point (center-bottom for a pin-like marker)
-        popupAnchor: [0, -24], // Popup anchor (unused but kept for compatibility)
+        iconUrl: 'star.png',
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
+        popupAnchor: [0, -24],
     });
     const marker = L.marker([lat, lng], {
         icon: liveIcon,
@@ -1553,7 +1562,6 @@ function updateLiveMarkerPopup(marker, lat, lng, terrainAltitude, deviceAltitude
         popupContent += `Lat: ${coords.lat}<br>Lng: ${coords.lng}<br>`;
     }
 
-    // Show device altitude if available, otherwise N/A
     if (deviceAltitude !== null && deviceAltitude !== undefined) {
         const deviceAlt = Utils.convertHeight(deviceAltitude, heightUnit);
         popupContent += `Device Alt: ${Math.round(deviceAlt)} ${heightUnit} MSL (±${Math.round(altitudeAccuracy || 0)} m)<br>`;
@@ -1568,7 +1576,6 @@ function updateLiveMarkerPopup(marker, lat, lng, terrainAltitude, deviceAltitude
         popupContent += `AGL: N/A<br>`;
     }
 
-    // Show terrain altitude
     const terrainAlt = terrainAltitude !== 'N/A' ? Utils.convertHeight(terrainAltitude, heightUnit) : 'N/A';
     popupContent += `Terrain Alt: ${terrainAlt !== 'N/A' ? Math.round(terrainAlt) : 'N/A'} ${heightUnit}<br>`;
 
@@ -1576,16 +1583,26 @@ function updateLiveMarkerPopup(marker, lat, lng, terrainAltitude, deviceAltitude
     popupContent += `Speed: ${speed} ${windUnit}<br>`;
     popupContent += `Direction: ${direction}°`;
 
-    marker.setPopupContent(popupContent);
+    // Rebind popup to ensure fresh state
+    marker.unbindPopup();
+    marker.bindPopup(popupContent);
+    console.log('Rebound liveMarker popup with content:', { popupContent, open });
+
     marker._accuracy = accuracy;
     marker._speed = speed;
     marker._direction = direction;
     marker._deviceAltitude = deviceAltitude;
     marker._altitudeAccuracy = altitudeAccuracy;
-    console.log('Set liveMarker popup content:', { popupContent, open });
 
     if (open) {
+        console.log('Attempting to open liveMarker popup');
         marker.openPopup();
+        const isOpen = marker.getPopup()?.isOpen();
+        console.log('LiveMarker popup open status after openPopup():', isOpen);
+        if (!isOpen) {
+            console.warn('LiveMarker popup failed to open, retrying');
+            marker.openPopup();
+        }
     }
 }
 function updateLivePositionControl() {
@@ -1672,35 +1689,17 @@ function startPositionTracking() {
         );
         console.log('Started geolocation watch with watchId:', watchId);
 
-        // Reinitialize livePositionControl to ensure valid state
+        // Ensure livePositionControl is visible
         if (livePositionControl) {
-            livePositionControl.remove();
-            livePositionControl = null;
-            console.log('Removed existing livePositionControl for reinitialization');
+            livePositionControl._container.style.display = 'block';
+            livePositionControl._container.style.opacity = '1';
+            livePositionControl._container.style.visibility = 'visible';
+            console.log('Ensured livePositionControl is visible');
+        } else {
+            console.warn('livePositionControl not initialized in startPositionTracking');
+            livePositionControl = L.control.livePosition({ position: 'bottomright' }).addTo(map);
+            console.log('Reinitialized livePositionControl');
         }
-        livePositionControl = L.control({ position: 'topright' });
-        livePositionControl.onAdd = function () {
-            const div = L.DomUtil.create('div', 'live-position-control');
-            div.innerHTML = 'Live Position: Waiting for data...';
-            return div;
-        };
-        livePositionControl.update = function (latitude, longitude, altitude, altitudeAccuracy, accuracy, speed, windUnit, direction) {
-            if (!this._div) {
-                console.warn('livePositionControl._div is undefined, skipping update');
-                return;
-            }
-            this._div.innerHTML = `
-                <b>Live Position</b><br>
-                Lat: ${latitude.toFixed(5)}, Lng: ${longitude.toFixed(5)}<br>
-                Altitude: ${altitude ? altitude.toFixed(1) + ' m' : 'N/A'} (±${altitudeAccuracy ? altitudeAccuracy.toFixed(1) + ' m' : 'N/A'})<br>
-                Accuracy: ${accuracy ? accuracy.toFixed(1) + ' m' : 'N/A'}<br>
-                Speed: ${speed} ${windUnit}<br>
-                Direction: ${direction}°
-            `;
-            console.log('Updated livePositionControl DOM');
-        };
-        livePositionControl.addTo(map);
-        console.log('Initialized livePositionControl');
     } catch (error) {
         console.error('Error starting position tracking:', error);
         Utils.handleError('Failed to start position tracking.');
@@ -1714,39 +1713,28 @@ function stopPositionTracking() {
     if (watchId !== null) {
         navigator.geolocation.clearWatch(watchId);
         watchId = null;
-        console.log('Stopped position tracking');
+        console.log('Stopped geolocation watch');
     }
     if (liveMarker) {
         map.removeLayer(liveMarker);
         liveMarker = null;
-        console.log('Removed live marker');
+        console.log('Removed liveMarker');
     }
     if (window.accuracyCircle) {
         map.removeLayer(window.accuracyCircle);
         window.accuracyCircle = null;
-        console.log('Cleared accuracy circle');
+        console.log('Removed accuracy circle');
     }
     if (livePositionControl) {
-        livePositionControl.remove();
-        livePositionControl = null;
-        console.log('Removed livePositionControl');
+        livePositionControl._container.style.display = 'none';
+        console.log('Hid livePositionControl');
     }
-    if (jumpMasterLine) {
-        map.removeLayer(jumpMasterLine);
-        jumpMasterLine = null;
-        console.log('Removed Jump Master Line on tracking stop');
-    }
-    lastLatitude = null;
-    lastLongitude = null;
-    lastDeviceAltitude = null;
-    lastAltitudeAccuracy = null;
-    lastAccuracy = null;
+    prevLat = null;
+    prevLng = null;
+    prevTime = null;
     lastSpeed = 'N/A';
-    lastEffectiveWindUnit = 'kt';
     lastDirection = 'N/A';
-    userSettings.trackPosition = false;
-    setCheckboxValue('trackPositionCheckbox', false);
-    saveSettings();
+    console.log('Cleared tracking data');
 }
 function updateAccuracyCircle(lat, lng, accuracy) {
     try {
@@ -3248,9 +3236,9 @@ function clearIsolineMarkers() {
                     layer !== liveMarker &&
                     layer !== harpMarker &&
                     (!layer.options.icon ||
-                     !layer.options.icon.options ||
-                     !layer.options.icon.options.className ||
-                     !layer.options.icon.options.className.match(/landing-pattern-arrow|wind-arrow-icon/))) {
+                        !layer.options.icon.options ||
+                        !layer.options.icon.options.className ||
+                        !layer.options.icon.options.className.match(/landing-pattern-arrow|wind-arrow-icon/))) {
                     console.log('Fallback: Removing marker:', layer, 'className:', layer.options?.icon?.options?.className || 'none');
                     layer.remove();
                 }
