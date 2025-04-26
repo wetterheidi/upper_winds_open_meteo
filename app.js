@@ -1537,14 +1537,13 @@ L.control.livePosition = function (opts) {
     return new L.Control.LivePosition(opts);
 };
 function createLiveMarker(lat, lng) {
-    const liveIcon = L.icon({
-        iconUrl: 'star.png',
-        iconSize: [24, 24],
-        iconAnchor: [12, 12],
-        popupAnchor: [0, -24],
-    });
     const marker = L.marker([lat, lng], {
-        icon: liveIcon,
+        icon: L.divIcon({
+            className: 'live-marker',
+            html: '<div style="background-color: blue; width: 10px; height: 10px; border-radius: 50%;"></div>',
+            iconSize: [10, 10],
+            iconAnchor: [5, 5]
+        }),
         zIndexOffset: 100
     });
     console.log('Created liveMarker:', { lat, lng });
