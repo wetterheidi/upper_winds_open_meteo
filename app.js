@@ -1430,10 +1430,12 @@ const debouncedPositionUpdate = debounce(async (position) => {
                 console.log(`Removed Jump Master Line: no valid target (${userSettings.jumpMasterLineTarget})`);
             }
         }
-    } else if (jumpMasterLine) {
-        map.removeLayer(jumpMasterLine);
-        jumpMasterLine = null;
-        console.log('Removed Jump Master Line: disabled or no liveMarker');
+    } else {
+        if (jumpMasterLine) {
+            map.removeLayer(jumpMasterLine);
+            jumpMasterLine = null;
+            console.log('Removed Jump Master Line: disabled or no liveMarker');
+        }
     }
 
     if (livePositionControl) {
@@ -1743,8 +1745,11 @@ function stopPositionTracking() {
         console.log('Removed accuracy circle');
     }
     if (livePositionControl) {
+        livePositionControl._container.innerHTML = 'Initializing live position...';
         livePositionControl._container.style.display = 'none';
-        console.log('Hid livePositionControl');
+        console.log('Hid livePositionControl and reset content');
+    } else {
+        console.warn('livePositionControl not found in stopPositionTracking');
     }
     prevLat = null;
     prevLng = null;
@@ -5897,7 +5902,15 @@ function setupCheckboxEvents() {
         const checkboxElement = document.getElementById('trackPositionCheckbox');
         if (checkboxElement) {
             const parentLi = checkboxElement.closest('li');
-            if (!parentLi) {
+            if (parentLi) {
+                const submenu = parentLi.querySelector(':scope > ul.submenu');
+                if (submenu) {
+                    submenu.classList.toggle('hidden', !checkbox.checked);
+                    console.log('Track My Position submenu visibility:', !submenu.classList.contains('hidden'));
+                } else {
+                    console.warn('Track My Position submenu not found');
+                }
+            } else {
                 console.warn('Parent <li> for trackPositionCheckbox not found');
             }
         } else {
@@ -5907,6 +5920,22 @@ function setupCheckboxEvents() {
             startPositionTracking();
         } else {
             stopPositionTracking();
+            if (livePositionControl) {
+                livePositionControl.update(
+                    0,
+                    0,
+                    null,
+                    null,
+                    0,
+                    'N/A',
+                    'kt',
+                    'N/A',
+                    false,
+                    null
+                );
+                livePositionControl._container.style.display = 'none';
+                console.log('Cleared livePositionControl content and hid panel');
+            }
         }
     });
 
@@ -5933,23 +5962,51 @@ function setupCheckboxEvents() {
         } else {
             console.warn('showJumpMasterLine checkbox not found');
         }
-        if (!userSettings.showJumpMasterLine && jumpMasterLine) {
-            map.removeLayer(jumpMasterLine);
-            jumpMasterLine = null;
-            console.log('Removed Jump Master Line: unchecked');
-        } else if (userSettings.showJumpMasterLine && liveMarker) {
+        if (!userSettings.showJumpMasterLine) {
+            if (jumpMasterLine) {
+                map.removeLayer(jumpMasterLine);
+                jumpMasterLine = null;
+                console.log('Removed Jump Master Line: unchecked');
+            }
+            if (livePositionControl) {
+                livePositionControl.update(
+                    lastLatitude || 0,
+                    lastLongitude || 0,
+                    lastDeviceAltitude,
+                    lastAltitudeAccuracy,
+                    lastAccuracy,
+                    lastSpeed,
+                    lastEffectiveWindUnit,
+                    lastDirection,
+                    false,
+                    null
+                );
+                console.log('Cleared jump master line data from livePositionControl');
+            }
+        } else if (liveMarker && livePositionControl) {
+            livePositionControl.update(
+                lastLatitude || 0,
+                lastLongitude || 0,
+                lastDeviceAltitude,
+                lastAltitudeAccuracy,
+                lastAccuracy,
+                lastSpeed,
+                lastEffectiveWindUnit,
+                lastDirection,
+                true,
+                null
+            );
             debouncedPositionUpdate({
                 coords: {
-                    latitude: lastLatitude,
-                    longitude: lastLongitude,
-                    accuracy: lastAccuracy,
+                    latitude: lastLatitude || 0,
+                    longitude: lastLongitude || 0,
+                    accuracy: lastAccuracy || 0,
                     altitude: lastDeviceAltitude,
                     altitudeAccuracy: lastAltitudeAccuracy
                 }
             });
         }
     });
-
     const placeHarpButton = document.getElementById('placeHarpButton');
     if (placeHarpButton) {
         placeHarpButton.addEventListener('click', () => {
