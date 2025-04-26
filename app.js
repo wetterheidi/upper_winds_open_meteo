@@ -1362,21 +1362,11 @@ const debouncedPositionUpdate = debounce(async (position) => {
         if (window.accuracyCircle) {
             map.removeLayer(window.accuracyCircle);
             window.accuracyCircle = null;
-            console.log('Removed invalid accuracy circle');
+            console.log('Removed accuracy circle');
         }
     }
 
-    if (livePositionControl) {
-        livePositionControl.update(latitude, longitude, deviceAltitude, altitudeAccuracy, accuracy, speed, effectiveWindUnit, direction);
-        console.log('Updated livePositionControl content:', { latitude, longitude, deviceAltitude, altitudeAccuracy, accuracy, speed, effectiveWindUnit, direction });
-        // Ensure control is visible
-        livePositionControl._container.style.display = 'block';
-        livePositionControl._container.style.opacity = '1';
-        livePositionControl._container.style.visibility = 'visible';
-    } else {
-        console.warn('livePositionControl not initialized in debouncedPositionUpdate');
-    }
-
+    let jumpMasterLineData = null;
     if (userSettings.showJumpMasterLine && liveMarker) {
         let targetMarker = null;
         let targetLat = null;
@@ -1410,17 +1400,17 @@ const debouncedPositionUpdate = debounce(async (position) => {
                     console.log('TOT set to N/A: invalid or zero speed', { speedMs });
                 }
 
-                const popupContent = `<b>Jump Master Line to ${userSettings.jumpMasterLineTarget}</b><br>Bearing: ${bearing}°<br>Distance: ${roundedDistance} ${heightUnit}<br>TOT: ${totDisplay} s`;
+                jumpMasterLineData = {
+                    target: userSettings.jumpMasterLineTarget,
+                    bearing,
+                    distance: roundedDistance,
+                    tot: totDisplay,
+                    heightUnit
+                };
 
                 if (jumpMasterLine) {
                     jumpMasterLine.setLatLngs([[liveLatLng.lat, liveLatLng.lng], [targetLatLng.lat, targetLatLng.lng]]);
-                    jumpMasterLine.setPopupContent(popupContent);
-                    const lineCenter = jumpMasterLine.getCenter();
-                    jumpMasterLine.getPopup().setLatLng(lineCenter);
-                    if (!jumpMasterLine.isPopupOpen()) {
-                        jumpMasterLine.openPopup();
-                    }
-                    console.log(`Updated Jump Master Line to ${userSettings.jumpMasterLineTarget}:`, { bearing, distance: roundedDistance, unit: heightUnit, tot: totDisplay, popupPosition: lineCenter });
+                    console.log(`Updated Jump Master Line to ${userSettings.jumpMasterLineTarget}:`, { bearing, distance: roundedDistance, unit: heightUnit, tot: totDisplay });
                 } else {
                     jumpMasterLine = L.polyline([[liveLatLng.lat, liveLatLng.lng], [targetLatLng.lat, targetLatLng.lng]], {
                         color: 'blue',
@@ -1428,7 +1418,6 @@ const debouncedPositionUpdate = debounce(async (position) => {
                         opacity: 0.8,
                         dashArray: '5, 5'
                     }).addTo(map);
-                    jumpMasterLine.bindPopup(popupContent, { autoClose: false }).openPopup();
                     console.log(`Created Jump Master Line to ${userSettings.jumpMasterLineTarget}:`, { bearing, distance: roundedDistance, unit: heightUnit, tot: totDisplay });
                 }
             } catch (error) {
@@ -1445,6 +1434,38 @@ const debouncedPositionUpdate = debounce(async (position) => {
         map.removeLayer(jumpMasterLine);
         jumpMasterLine = null;
         console.log('Removed Jump Master Line: disabled or no liveMarker');
+    }
+
+    if (livePositionControl) {
+        livePositionControl.update(
+            latitude,
+            longitude,
+            deviceAltitude,
+            altitudeAccuracy,
+            accuracy,
+            speed,
+            effectiveWindUnit,
+            direction,
+            userSettings.showJumpMasterLine,
+            jumpMasterLineData
+        );
+        console.log('Updated livePositionControl content:', {
+            latitude,
+            longitude,
+            deviceAltitude,
+            altitudeAccuracy,
+            accuracy,
+            speed,
+            effectiveWindUnit,
+            direction,
+            showJumpMasterLine: userSettings.showJumpMasterLine,
+            jumpMasterLineData
+        });
+        livePositionControl._container.style.display = 'block';
+        livePositionControl._container.style.opacity = '1';
+        livePositionControl._container.style.visibility = 'visible';
+    } else {
+        console.warn('livePositionControl not initialized in debouncedPositionUpdate');
     }
 
     lastLatitude = latitude;
@@ -1467,25 +1488,14 @@ L.Control.LivePosition = L.Control.extend({
     },
     onAdd: function (map) {
         const container = L.DomUtil.create('div', 'leaflet-control-live-position');
-        container.style.background = 'rgba(255, 255, 255, 0.9)';
-        container.style.padding = '10px';
-        container.style.border = '2px solid rgba(0, 0, 0, 0.2)';
-        container.style.borderRadius = '5px';
-        container.style.boxShadow = '0 2px 5px rgba(0, 0, 0, 0.3)';
-        container.style.textAlign = 'left';
-        container.style.maxWidth = '300px';
-        container.style.margin = '0 auto 10px auto';
-        container.style.pointerEvents = 'none';
         container.style.display = 'block';
-        container.style.opacity = '1';
-        container.style.visibility = 'visible';
         container.style.zIndex = '600';
         container.innerHTML = 'Initializing live position...';
         this._container = container;
         console.log('LivePosition control added to map', { styles: container.style });
         return container;
     },
-    update: function (lat, lng, deviceAltitude, altitudeAccuracy, accuracy, speed, effectiveWindUnit, direction) {
+    update: function (lat, lng, deviceAltitude, altitudeAccuracy, accuracy, speed, effectiveWindUnit, direction, showJumpMasterLine, jumpMasterLineData) {
         try {
             const coordFormat = getCoordinateFormat();
             const coords = Utils.convertCoords(lat, lng, coordFormat);
@@ -1518,6 +1528,14 @@ L.Control.LivePosition = L.Control.extend({
             content += `Accuracy: ${convertedAccuracy !== 'N/A' ? Math.round(convertedAccuracy) : 'N/A'} ${convertedAccuracy !== 'N/A' ? heightUnit : ''}<br>`;
             content += `Speed: ${speed} ${effectiveWindUnit}<br>`;
             content += `Direction: ${direction}°`;
+
+            if (showJumpMasterLine && jumpMasterLineData) {
+                content += `<br><span style="font-weight: bold;">Jump Master Line to ${jumpMasterLineData.target}</span><br>`;
+                content += `Bearing: ${jumpMasterLineData.bearing}°<br>`;
+                content += `Distance: ${jumpMasterLineData.distance} ${jumpMasterLineData.heightUnit}<br>`;
+                content += `TOT: X - ${jumpMasterLineData.tot} s`;
+            }
+
             this._container.innerHTML = content;
             this._container.style.display = 'block';
             this._container.style.opacity = '1';
