@@ -47,6 +47,7 @@ let lastLat = null;
 let lastLng = null;
 let lastAltitude = null;
 let currentMarker = null;
+let isManualPanning = false; // New flag to track manual panning
 let liveMarker = null; // New marker for live position
 let jumpMasterLine = null; // New global for Jump Master Line
 let isPlacingHarp = false; // Flag for HARP placement mode
@@ -491,7 +492,7 @@ function initMap() {
     const initialAltitude = 'N/A';
     currentMarker = createCustomMarker(defaultCenter[0], defaultCenter[1]).addTo(map);
     attachMarkerDragend(currentMarker);
-    updateMarkerPopup(currentMarker, defaultCenter[0], defaultCenter[1], initialAltitude, true);
+    updateMarkerPopup(currentMarker, defaultCenter[0], defaultCenter[1], initialAltitude, false);
 
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
@@ -505,7 +506,7 @@ function initMap() {
                 if (currentMarker) currentMarker.remove();
                 currentMarker = createCustomMarker(lastLat, lastLng).addTo(map);
                 attachMarkerDragend(currentMarker);
-                updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, true);
+                updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, false);
                 map.setView(userCoords, defaultZoom);
 
                 if (userSettings.calculateJump) {
@@ -532,7 +533,7 @@ function initMap() {
                 if (currentMarker) currentMarker.remove();
                 currentMarker = createCustomMarker(lastLat, lastLng).addTo(map);
                 attachMarkerDragend(currentMarker);
-                updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, true);
+                updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, false);
                 map.setView(defaultCenter, defaultZoom);
                 recenterMap();
 
@@ -562,7 +563,7 @@ function initMap() {
         if (currentMarker) currentMarker.remove();
         currentMarker = createCustomMarker(lastLat, lastLng).addTo(map);
         attachMarkerDragend(currentMarker);
-        updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, true);
+        updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, false);
         map.setView(defaultCenter, defaultZoom);
         recenterMap();
 
@@ -720,7 +721,7 @@ function initMap() {
             }
         });
 
-        updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, true);
+        updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, false);
         resetJumpRunDirection(false); // Do NOT update JRT yet
         if (userSettings.calculateJump) {
             console.log('Recalculating jump for marker click');
@@ -836,7 +837,7 @@ function initMap() {
                     updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, true);
                 }
             });
-            updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, true);
+            updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, false);
             resetJumpRunDirection(true);
             if (userSettings.calculateJump) {
                 debouncedCalculateJump(); // Use debounced version
@@ -6002,7 +6003,7 @@ function setupCoordinateEvents() {
                         }
                     });
                 }
-                updateMarkerPopup(currentMarker, lat, lng, lastAltitude, true);
+                updateMarkerPopup(currentMarker, lat, lng, lastAltitude, false);
                 resetJumpRunDirection(true);
                 addCoordToHistory(lat, lng);
                 if (userSettings.calculateJump) {
