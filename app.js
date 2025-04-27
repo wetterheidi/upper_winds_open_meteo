@@ -39,7 +39,9 @@ const defaultSettings = {
     showJumpMasterLine: false, // New setting
     jumpMasterLineTarget: 'DIP', // New setting for DIP or HARP
     harpLat: null, // New setting for HARP position
-    harpLng: null
+    harpLng: null,
+    cacheRadiusKm: 5, // New setting: radius in km for caching tiles around DIP
+    cacheZoomLevels: [11, 12, 13, 14] // New setting: zoom levels to cache
 };
 let userSettings = JSON.parse(localStorage.getItem('upperWindsSettings')) || { ...defaultSettings };
 let map;
@@ -93,6 +95,7 @@ let lastSpeed = 'N/A';
 let lastEffectiveWindUnit = 'kt';
 let lastDirection = 'N/A';
 let lastTerrainAltitude = 'N/A';
+
 
 const minZoom = 11;
 const maxZoom = 14;
@@ -173,9 +176,24 @@ function initializeSettings() {
             userSettings[key] = storedSettings[key];
         }
     }
+    // Force Jump Master menu settings to defaults on load
+    userSettings.trackPosition = false;
+    userSettings.showJumpMasterLine = false;
+    userSettings.harpLat = null;
+    userSettings.harpLng = null;
+    // Preserve existing settings
     userSettings.jumpRunTrackOffset = 0;
     isJumperSeparationManual = false; // Start with auto separation
-    console.log('Loaded userSettings:', userSettings);
+    // Save updated settings to ensure defaults persist
+    saveSettings();
+    console.log('Initialized settings with Jump Master menu defaults:', {
+        trackPosition: userSettings.trackPosition,
+        showJumpMasterLine: userSettings.showJumpMasterLine,
+        harpLat: userSettings.harpLat,
+        harpLng: userSettings.harpLng,
+        jumpRunTrackOffset: userSettings.jumpRunTrackOffset,
+        isJumperSeparationManual
+    });
 }
 function updateHeightUnitLabels() {
     const heightUnit = getHeightUnit();
@@ -497,7 +515,12 @@ function initMap() {
 
     // Initialize livePositionControl
     livePositionControl = L.control.livePosition({ position: 'bottomright' }).addTo(map);
-    console.log('Initialized livePositionControl');
+    if (livePositionControl._container) {
+        livePositionControl._container.style.display = 'none';
+        console.log('Initialized livePositionControl and hid by default');
+    } else {
+        console.warn('livePositionControl._container not initialized in initMap');
+    }
 
     async function fetchInitialWeather(lat, lng) {
         const lastFullHourUTC = getLastFullHourUTC();
@@ -550,7 +573,7 @@ function initMap() {
                 lastLat = defaultCenter[0];
                 lastLng = defaultCenter[1];
                 lastAltitude = await getAltitude(lastLat, lastLng);
-                configureMarker(lastLat, lastLng, lastAltitude, false);
+                configureMarker(lastLat, lastLng, initialAltitude, false);
                 map.setView(defaultCenter, defaultZoom);
                 recenterMap(true);
                 isManualPanning = false;
@@ -576,7 +599,7 @@ function initMap() {
         lastLat = defaultCenter[0];
         lastLng = defaultCenter[1];
         lastAltitude = getAltitude(lastLat, lastLng);
-        configureMarker(lastLat, lastLng, lastAltitude, false);
+        configureMarker(lastLat, lastLng, initialAltitude, false);
         map.setView(defaultCenter, defaultZoom);
         recenterMap(true);
         isManualPanning = false;
@@ -6007,6 +6030,16 @@ function setupCheckboxEvents() {
             });
         }
     });
+
+    // Initialize HARP radio button as disabled (no HARP marker on load)
+    const harpRadio = document.querySelector('input[name="jumpMasterLineTarget"][value="HARP"]');
+    if (harpRadio) {
+        harpRadio.disabled = true;
+        console.log('Disabled HARP radio button on load');
+    } else {
+        console.warn('HARP radio button not found');
+    }
+
     const placeHarpButton = document.getElementById('placeHarpButton');
     if (placeHarpButton) {
         placeHarpButton.addEventListener('click', () => {
@@ -6019,7 +6052,6 @@ function setupCheckboxEvents() {
         console.warn('placeHarpButton not found:', { id: 'placeHarpButton' });
     }
 
-    // Handle Clear HARP button
     const clearHarpButton = document.getElementById('clearHarpButton');
     if (clearHarpButton) {
         clearHarpButton.addEventListener('click', () => {
@@ -6027,32 +6059,6 @@ function setupCheckboxEvents() {
         });
     } else {
         console.warn('clearHarpButton not found:', { id: 'clearHarpButton' });
-    }
-
-    const trackPositionCheckbox = document.getElementById('trackPositionCheckbox');
-    if (trackPositionCheckbox && userSettings.trackPosition) {
-        const parentLi = trackPositionCheckbox.closest('li');
-        if (parentLi) {
-            const submenu = parentLi.querySelector(':scope > ul.submenu');
-            if (submenu) {
-                submenu.classList.remove('hidden');
-                toggleSubmenu('trackPositionCheckbox', true);
-                console.log('Initialized Track My Position submenu visibility:', !submenu.classList.contains('hidden'));
-            } else {
-                console.warn('Track My Position submenu not found during initialization');
-            }
-        } else {
-            console.warn('Parent <li> for trackPositionCheckbox not found during initialization');
-        }
-    }
-    if (userSettings.harpLat !== null && userSettings.harpLng !== null) {
-        harpMarker = createHarpMarker(userSettings.harpLat, userSettings.harpLng).addTo(map);
-        console.log('Restored HARP marker from settings:', { lat: userSettings.harpLat, lng: userSettings.harpLng });
-        const harpRadio = document.querySelector('input[name="jumpMasterLineTarget"][value="HARP"]');
-        if (harpRadio) {
-            harpRadio.disabled = false;
-            console.log('Enabled HARP radio button on load');
-        }
     }
 }
 function setupCoordinateEvents() {
