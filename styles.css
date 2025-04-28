@@ -429,6 +429,21 @@ button {
     gap: 10px;
 }
 
+#bottom-container {
+    background: #fff;
+    padding: 10px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    box-sizing: border-box;
+    z-index: 100;
+    margin-bottom: 10px;
+    flex: 0 0 auto;
+    display: grid;
+    grid-template-rows: auto auto auto; /* Adjusted for button container */
+    gap: 10px;
+}
+
 #bottom-container::-webkit-scrollbar {
     width: 8px;
 }
@@ -440,6 +455,20 @@ button {
 
 #bottom-container::-webkit-scrollbar-track {
     background: #fff;
+}
+
+#bottom-container #info {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    padding: 10px;
+    margin: 0;
+}
+
+#bottom-container .button-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
 }
 
 #info table {
@@ -520,13 +549,6 @@ button {
     width: auto;
     min-width: 100px;
     padding: 6px 10px;
-}
-
-#bottom-container #info {
-    grid-column: 1 / -1;
-    grid-row: 3;
-    padding: 10px;
-    margin: 0;
 }
 
 #controls-row #info {
