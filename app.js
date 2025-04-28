@@ -573,7 +573,7 @@ function initMap() {
                 lastLat = defaultCenter[0];
                 lastLng = defaultCenter[1];
                 lastAltitude = await getAltitude(lastLat, lastLng);
-                configureMarker(lastLat, lastLng, initialAltitude, false);
+                configureMarker(lastLat, lastLng, lastAltitude, false);
                 map.setView(defaultCenter, defaultZoom);
                 recenterMap(true);
                 isManualPanning = false;
@@ -599,7 +599,7 @@ function initMap() {
         lastLat = defaultCenter[0];
         lastLng = defaultCenter[1];
         lastAltitude = getAltitude(lastLat, lastLng);
-        configureMarker(lastLat, lastLng, initialAltitude, false);
+        configureMarker(lastLat, lastLng, lastAltitude, false);
         map.setView(defaultCenter, defaultZoom);
         recenterMap(true);
         isManualPanning = false;
