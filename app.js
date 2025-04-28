@@ -95,6 +95,8 @@ let lastSpeed = 'N/A';
 let lastEffectiveWindUnit = 'kt';
 let lastDirection = 'N/A';
 let lastTerrainAltitude = 'N/A';
+let lastSmoothedSpeedMs = 0; // Store last smoothed speed for EMA
+
 
 
 const minZoom = 11;
@@ -1345,6 +1347,12 @@ const debouncedPositionUpdate = debounce(async (position) => {
     const currentTime = new Date().getTime() / 1000;
     console.log('Debounced position update:', { latitude, longitude, accuracy, deviceAltitude, altitudeAccuracy, currentTime });
 
+    // Optional: Filter out low-accuracy updates
+    if (accuracy > 30) {
+        console.log('Skipping position update due to low accuracy:', { accuracy });
+        return;
+    }
+
     let speed = 'N/A';
     let speedMs = 0;
     let effectiveWindUnit = getWindSpeedUnit();
@@ -1356,11 +1364,18 @@ const debouncedPositionUpdate = debounce(async (position) => {
         const distance = map.distance([prevLat, prevLng], [latitude, longitude]);
         const timeDiff = currentTime - prevTime;
         if (timeDiff > 0) {
-            speedMs = distance / timeDiff;
-            speed = Utils.convertWind(speedMs, effectiveWindUnit, 'm/s');
+            speedMs = distance / timeDiff; // Speed in meters/second
+            // Apply EMA smoothing with dynamic alpha
+            const alpha = speedMs < 25 ? 0.5 : 0.2; // Responsive at low speeds, stable at high speeds
+            lastSmoothedSpeedMs = alpha * speedMs + (1 - alpha) * lastSmoothedSpeedMs;
+            speed = Utils.convertWind(lastSmoothedSpeedMs, effectiveWindUnit, 'm/s');
             speed = effectiveWindUnit === 'bft' ? Math.round(speed) : speed.toFixed(1);
             direction = calculateBearing(prevLat, prevLng, latitude, longitude).toFixed(0);
-            console.log('Calculated speed:', { speedMs, convertedSpeed: speed, unit: effectiveWindUnit });
+            //Direction smoothing (optional)
+            /*let lastSmoothedDirection = 0; // Global variable
+            direction = alpha * calculateBearing(...) + (1 - alpha) * lastSmoothedDirection;
+            lastSmoothedDirection = direction;*/
+            console.log('Calculated speed:', { rawSpeedMs: speedMs, smoothedSpeedMs: lastSmoothedSpeedMs, convertedSpeed: speed, unit: effectiveWindUnit, alpha });
         }
     }
 
@@ -1415,12 +1430,12 @@ const debouncedPositionUpdate = debounce(async (position) => {
                 const roundedDistance = Math.round(convertedDistance);
 
                 let totDisplay = 'N/A';
-                if (speedMs > 0) {
-                    const totSeconds = distanceMeters / speedMs;
+                if (lastSmoothedSpeedMs > 0) {
+                    const totSeconds = distanceMeters / lastSmoothedSpeedMs;
                     totDisplay = Math.round(totSeconds);
-                    console.log('Calculated TOT:', { distanceMeters, speedMs, totSeconds, totDisplay });
+                    console.log('Calculated TOT:', { distanceMeters, smoothedSpeedMs: lastSmoothedSpeedMs, totSeconds, totDisplay });
                 } else {
-                    console.log('TOT set to N/A: invalid or zero speed', { speedMs });
+                    console.log('TOT set to N/A: invalid or zero speed', { smoothedSpeedMs: lastSmoothedSpeedMs });
                 }
 
                 jumpMasterLineData = {
@@ -1506,7 +1521,7 @@ const debouncedPositionUpdate = debounce(async (position) => {
     prevLat = latitude;
     prevLng = longitude;
     prevTime = currentTime;
-}, 500);
+}, 300);
 L.Control.LivePosition = L.Control.extend({
     options: {
         position: 'bottomright'
@@ -1542,8 +1557,8 @@ L.Control.LivePosition = L.Control.extend({
                     displayAltitude = deviceAltitude;
                 }
                 const convertedAltitude = Utils.convertHeight(displayAltitude, heightUnit);
-                const convertedAltitudeAccuracy = altitudeAccuracy && Number.isFinite(altitudeAccuracy) && altitudeAccuracy > 0 
-                    ? Utils.convertHeight(altitudeAccuracy, heightUnit) 
+                const convertedAltitudeAccuracy = altitudeAccuracy && Number.isFinite(altitudeAccuracy) && altitudeAccuracy > 0
+                    ? Utils.convertHeight(altitudeAccuracy, heightUnit)
                     : 'N/A';
                 content += `Altitude: ${Math.round(convertedAltitude)} ${heightUnit} ${displayRefLevel} (±${convertedAltitudeAccuracy !== 'N/A' ? Math.round(convertedAltitudeAccuracy) : 'N/A'} ${convertedAltitudeAccuracy !== 'N/A' ? heightUnit : ''})<br>`;
             } else {
