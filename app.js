@@ -1222,6 +1222,63 @@ function loadGpxTrack(file) {
             }
             gpxPoints = points;
 
+            // Move marker to final point and update lastAltitude
+            if (points.length > 0) {
+                const finalPoint = points[points.length - 1];
+                lastLat = finalPoint.lat;
+                lastLng = finalPoint.lng;
+                lastAltitude = await getAltitude(lastLat, lastLng); // Fetch terrain altitude for final point
+                console.log('Moved marker to final GPX point:', { lat: lastLat, lng: lastLng, lastAltitude });
+
+                // Update marker position
+                configureMarker(lastLat, lastLng, lastAltitude, false);
+                isManualPanning = false;
+
+                // Trigger weather fetch and jump calculations
+                let timestampToUse = null;
+                if (points[0].time && points[0].time.isValid) {
+                    const initialTimestamp = points[0].time;
+                    console.log('GPX initial timestamp:', initialTimestamp.toISO());
+                    const today = luxon.DateTime.utc().startOf('day');
+                    const trackDate = initialTimestamp.startOf('day');
+                    const isToday = trackDate.hasSame(today, 'day');
+
+                    // Round to nearest hour
+                    let roundedTimestamp = initialTimestamp.startOf('hour');
+                    if (initialTimestamp.minute >= 30) {
+                        roundedTimestamp = roundedTimestamp.plus({ hours: 1 });
+                    }
+                    console.log('GPX rounded timestamp:', roundedTimestamp.toISO());
+                    timestampToUse = roundedTimestamp.toISO();
+
+                    if (!isToday) {
+                        // Set historical date for past tracks
+                        const historicalDatePicker = document.getElementById('historicalDatePicker');
+                        if (historicalDatePicker) {
+                            historicalDatePicker.value = trackDate.toFormat('yyyy-MM-dd');
+                            console.log('Set historicalDatePicker to:', historicalDatePicker.value);
+                        } else {
+                            console.warn('historicalDatePicker not found, cannot set historical date');
+                            Utils.handleError('Cannot fetch historical weather: date picker not found.');
+                        }
+                    }
+                } else {
+                    console.warn('No valid timestamp in GPX track, using current time for weather');
+                }
+
+                await fetchWeatherForLocation(lastLat, lastLng, timestampToUse);
+                if (userSettings.calculateJump) {
+                    debouncedCalculateJump();
+                    calculateCutAway();
+                }
+                if (userSettings.showJumpRunTrack) {
+                    updateJumpRunTrack();
+                }
+                if (userSettings.showLandingPattern) {
+                    updateLandingPattern();
+                }
+            }
+
             // Create GPX layer with custom pane
             gpxLayer = L.layerGroup({ pane: 'gpxTrackPane' });
             const groundAltitude = lastAltitude !== 'N/A' && !isNaN(lastAltitude) ? parseFloat(lastAltitude) : null;
@@ -1270,50 +1327,11 @@ function loadGpxTrack(file) {
                 const bounds = L.latLngBounds(points.map(p => [p.lat, p.lng]));
                 if (bounds.isValid()) {
                     map.invalidateSize();
-                    map.fitBounds(bounds, { padding: [50, 50] });
+                    map.fitBounds(bounds, { padding: [50, 50], maxZoom: maxZoom });
                     console.log('Map fitted to GPX track bounds:', { bounds: bounds.toBBoxString() });
                 } else {
                     console.warn('Invalid GPX track bounds:', { points });
                     Utils.handleError('Unable to display GPX track: invalid coordinates.');
-                }
-
-                // Handle timestamp for time slider
-                if (points[0].time && points[0].time.isValid) {
-                    const initialTimestamp = points[0].time;
-                    console.log('GPX initial timestamp:', initialTimestamp.toISO());
-                    const today = luxon.DateTime.utc().startOf('day');
-                    const trackDate = initialTimestamp.startOf('day');
-                    const isToday = trackDate.hasSame(today, 'day');
-
-                    // Round to nearest hour
-                    let roundedTimestamp = initialTimestamp.startOf('hour');
-                    if (initialTimestamp.minute >= 30) {
-                        roundedTimestamp = roundedTimestamp.plus({ hours: 1 });
-                    }
-                    console.log('GPX rounded timestamp:', roundedTimestamp.toISO());
-
-                    const lat = points[0].lat;
-                    const lng = points[0].lng;
-
-                    if (isToday) {
-                        // For today's tracks, fetch current weather with rounded timestamp
-                        console.log('GPX track is from today, fetching current weather for:', roundedTimestamp.toISO());
-                        await fetchWeatherForLocation(lat, lng, roundedTimestamp.toISO());
-                    } else {
-                        // For past tracks, set historical date and fetch historical weather
-                        console.log('GPX track is from past date:', trackDate.toISODate());
-                        const historicalDatePicker = document.getElementById('historicalDatePicker');
-                        if (historicalDatePicker) {
-                            historicalDatePicker.value = trackDate.toFormat('yyyy-MM-dd');
-                            console.log('Set historicalDatePicker to:', historicalDatePicker.value);
-                            await fetchWeatherForLocation(lat, lng, roundedTimestamp.toISO());
-                        } else {
-                            console.warn('historicalDatePicker not found, cannot fetch historical data');
-                            Utils.handleError('Cannot fetch historical weather: date picker not found.');
-                        }
-                    }
-                } else {
-                    console.warn('No valid timestamp in GPX track, skipping time slider adjustment');
                 }
             }
 
@@ -5052,72 +5070,55 @@ function restoreUIInteractivity() {
 }
 function setupSliderEvents() {
     const slider = document.getElementById('timeSlider');
-    if (!slider) return Utils.handleError('Slider element missing.');
+    if (!slider) {
+        console.warn('Time slider not found:', { id: 'timeSlider' });
+        return;
+    }
 
-    slider.setAttribute('autocomplete', 'off');
+    // Use 'input' event for real-time updates as the slider moves
+    slider.addEventListener('input', async () => {
+        const sliderIndex = parseInt(slider.value) || 0;
+        console.log('Time slider moved to index:', sliderIndex);
 
-    const debouncedUpdate = debounce(async (index) => {
-        console.log('Slider event triggered:', { index, weatherData: !!weatherData });
-        if (weatherData && index >= 0 && index < weatherData.time.length) {
-            resetJumpRunDirection(false);
-            await updateWeatherDisplay(index);
-            if (lastLat && lastLng && lastAltitude !== 'N/A') {
-                calculateMeanWind();
-                if (userSettings.calculateJump) {
-                    debouncedCalculateJump(); // Use debounced version
-                    calculateCutAway();
-                }
-                if (userSettings.showJumpRunTrack) {
-                    console.log('Updating JRT for slider change');
-                    updateJumpRunTrack();
-                }
-                if (currentMarker) {
-                    console.log('Updating marker popup for slider change');
-                    const wasOpen = currentMarker.getPopup()?.isOpen() || false;
-                    await updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, wasOpen);
-                }
-                if (cutAwayMarker && cutAwayLat && cutAwayLng) {
-                    console.log('Updating cut-away marker popup for slider change');
-                    const wasOpen = cutAwayMarker.getPopup()?.isOpen() || false;
-                    updateCutAwayMarkerPopup(cutAwayMarker, cutAwayLat, cutAwayLng, wasOpen);
-                }
+        // Update weather display and related UI elements
+        if (weatherData && lastLat && lastLng) {
+            await updateWeatherDisplay(sliderIndex);
+            if (lastAltitude !== 'N/A') calculateMeanWind();
+            if (userSettings.showLandingPattern) {
+                console.log('Updating landing pattern for slider index:', sliderIndex);
+                updateLandingPattern();
             }
+            if (userSettings.calculateJump) {
+                console.log('Recalculating jump for slider index:', sliderIndex);
+                debouncedCalculateJump();
+                calculateCutAway();
+            }
+            if (userSettings.showJumpRunTrack) {
+                console.log('Updating jump run track for slider index:', sliderIndex);
+                updateJumpRunTrack();
+            }
+            recenterMap();
+            updateLivePositionControl();
         } else {
-            console.log('Slider reset to 0: invalid index or no weather data');
-            slider.value = 0;
-            resetJumpRunDirection(false);
-            await updateWeatherDisplay(0);
-            if (lastLat && lastLng && lastAltitude !== 'N/A') {
-                calculateMeanWind();
-                if (userSettings.calculateJump) {
-                    debouncedCalculateJump(); // Use debounced version
-                    calculateCutAway();
-                }
-                if (userSettings.showJumpRunTrack) {
-                    console.log('Updating JRT for slider reset');
-                    updateJumpRunTrack();
-                }
-                if (currentMarker) {
-                    console.log('Updating marker popup for slider reset');
-                    const wasOpen = currentMarker.getPopup()?.isOpen() || false;
-                    await updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, wasOpen);
-                }
-                if (cutAwayMarker && cutAwayLat && cutAwayLng) {
-                    console.log('Updating cut-away marker popup for slider reset');
-                    const wasOpen = cutAwayMarker.getPopup()?.isOpen() || false;
-                    updateCutAwayMarkerPopup(cutAwayMarker, cutAwayLat, cutAwayLng, wasOpen);
-                }
+            console.warn('Cannot update displays: missing data', {
+                weatherData: !!weatherData,
+                lastLat,
+                lastLng
+            });
+        }
+    });
+
+    // Update slider labels (e.g., time display)
+    slider.addEventListener('change', async () => {
+        const sliderIndex = parseInt(slider.value) || 0;
+        if (weatherData?.time?.[sliderIndex]) {
+            const displayTime = await getDisplayTime(weatherData.time[sliderIndex]);
+            const timeLabel = document.getElementById('timeLabel');
+            if (timeLabel) {
+                timeLabel.textContent = `Time: ${displayTime}`;
+                console.log('Updated time label:', displayTime);
             }
         }
-    }, 100);
-
-    slider.addEventListener('input', (e) => {
-        console.log('Slider input event:', e.target.value);
-        debouncedUpdate(parseInt(e.target.value));
-    });
-    slider.addEventListener('change', (e) => {
-        console.log('Slider change event:', e.target.value);
-        debouncedUpdate(parseInt(e.target.value));
     });
 }
 function setupModelSelectEvents() {
