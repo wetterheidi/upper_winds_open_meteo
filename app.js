@@ -43,6 +43,7 @@ const defaultSettings = {
     cacheRadiusKm: 5, // New setting: radius in km for caching tiles around DIP
     cacheZoomLevels: [11, 12, 13, 14] // New setting: zoom levels to cache
 };
+let isInitialized = false;
 let userSettings = JSON.parse(localStorage.getItem('upperWindsSettings')) || { ...defaultSettings };
 let map;
 let lastLat = null;
@@ -513,7 +514,6 @@ function initMap() {
     map.getPane('tooltipPane').style.zIndex = 700;
     map.getPane('popupPane').style.zIndex = 700;
 
-    // Initialize livePositionControl
     livePositionControl = L.control.livePosition({ position: 'bottomright' }).addTo(map);
     if (livePositionControl._container) {
         livePositionControl._container.style.display = 'none';
@@ -599,7 +599,7 @@ function initMap() {
         lastLat = defaultCenter[0];
         lastLng = defaultCenter[1];
         lastAltitude = getAltitude(lastLat, lastLng);
-        configureMarker(lastLat, lastLng, lastAltitude, false);
+        configureMarker(lastLat, lastLng, initialAltitude, false);
         map.setView(defaultCenter, defaultZoom);
         recenterMap(true);
         isManualPanning = false;
@@ -654,7 +654,6 @@ function initMap() {
         }
     }, 500);
 
-    // Track last mouse position
     let lastMouseLatLng = null;
 
     map.on('mousemove', function (e) {
@@ -771,48 +770,7 @@ function initMap() {
 
         if (userSettings.calculateJump && weatherData && lastLat && lastLng) {
             console.log('Recalculating jump for zoom:', currentZoom);
-            const jumpResult = calculateJump();
-            console.log('Jump result:', jumpResult);
-            if (jumpResult) {
-                console.log('Calling updateJumpCircle with:', {
-                    blueLat: jumpResult.blueLat || 0,
-                    blueLng: jumpResult.blueLng || 0,
-                    redLat: jumpResult.redLat || 0,
-                    redLng: jumpResult.redLng || 0,
-                    radius: jumpResult.radius || 0,
-                    radiusFull: jumpResult.radiusFull || 0,
-                    displacement: jumpResult.displacement || 0,
-                    displacementFull: jumpResult.displacementFull || 0,
-                    direction: jumpResult.direction || 0,
-                    directionFull: jumpResult.directionFull || 0,
-                    freeFallDirection: jumpResult.freeFallDirection || 0,
-                    freeFallDistance: jumpResult.freeFallDistance || 0,
-                    freeFallTime: jumpResult.freeFallTime || 0,
-                    zoom: currentZoom
-                });
-                updateJumpCircle(
-                    jumpResult.blueLat || 0,
-                    jumpResult.blueLng || 0,
-                    jumpResult.redLat || 0,
-                    jumpResult.redLng || 0,
-                    jumpResult.radius || 0,
-                    jumpResult.radiusFull || 0,
-                    jumpResult.additionalBlueRadii || [],
-                    jumpResult.additionalBlueDisplacements || [],
-                    jumpResult.additionalBlueDirections || [],
-                    jumpResult.additionalBlueUpperLimits || [],
-                    jumpResult.displacement || 0,
-                    jumpResult.displacementFull || 0,
-                    jumpResult.direction || 0,
-                    jumpResult.directionFull || 0,
-                    jumpResult.freeFallDirection || 0,
-                    jumpResult.freeFallDistance || 0,
-                    jumpResult.freeFallTime || 0
-                );
-            } else {
-                console.warn('calculateJump returned null, clearing jump circles');
-                clearJumpCircles();
-            }
+            calculateJump();
         }
 
         if (userSettings.showJumpRunTrack) {
@@ -830,9 +788,6 @@ function initMap() {
             updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, currentMarker.getPopup()?.isOpen() || false);
         }
     });
-
-    // Log initial zoom to confirm map setup
-    console.log('Initial zoom level:', map.getZoom());
 
     let lastTapTime = 0;
     const tapThreshold = 300;
@@ -868,6 +823,28 @@ function initMap() {
         }
         lastTapTime = currentTime;
     }, { passive: false });
+
+    map.on('click', (e) => {
+        L.DomEvent.stopPropagation(e);
+        console.log('Map click event stopped from propagating');
+    });
+    map.on('mousedown', (e) => {
+        L.DomEvent.stopPropagation(e);
+        console.log('Map mousedown event stopped from propagating');
+    });
+
+    const hamburgerBtn = document.getElementById('hamburgerBtn');
+    const menu = document.getElementById('menu');
+    if (hamburgerBtn && menu) {
+        hamburgerBtn.addEventListener('click', () => {
+            const isMenuOpen = !menu.classList.contains('hidden');
+            document.querySelector('.leaflet-container').style.pointerEvents = isMenuOpen ? 'none' : 'auto';
+            console.log('Map pointer events set to:', isMenuOpen ? 'none' : 'auto');
+        });
+    }
+
+    // Initialize app after map setup
+    initializeApp();
 }
 function handleHarpPlacement(e) {
     if (!isPlacingHarp) return;
@@ -3241,6 +3218,9 @@ function calculateJump() {
         return null;
     }
 
+    // Clear all circles before recalculating
+    clearJumpCircles();
+
     let result = {};
     if (userSettings.showExitArea) {
         const exitResult = calculateExitCircle();
@@ -3305,8 +3285,8 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
     }
 
     const currentZoom = map.getZoom();
-    const minZoom = 11; // Adjust as needed
-    const maxZoom = 14; // Adjust as needed
+    const minZoom = 11;
+    const maxZoom = 14;
     const isVisible = currentZoom >= minZoom && currentZoom <= maxZoom;
     console.log('Zoom check:', { currentZoom, minZoom, maxZoom, isVisible });
 
@@ -3324,7 +3304,8 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
         redCircle: !!jumpCircleFull,
         greenCircle: !!jumpCircleGreen,
         darkGreenCircle: !!jumpCircleGreenLight,
-        additionalBlueCircles: window.additionalBlueCircles?.length || 0
+        additionalBlueCircles: window.additionalBlueCircles?.length || 0,
+        additionalBlueLabels: window.additionalBlueLabels?.length || 0
     });
 
     // Clear circles based on mode
@@ -3334,6 +3315,10 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
         if (window.additionalBlueCircles) {
             window.additionalBlueCircles.forEach(circle => removeLayer(circle, 'additional blue circle'));
             window.additionalBlueCircles = [];
+        }
+        if (window.additionalBlueLabels) {
+            window.additionalBlueLabels.forEach(label => removeLayer(label, 'additional blue label'));
+            window.additionalBlueLabels = [];
         }
     } else if (showCanopyAreaOnly) {
         removeLayer(jumpCircleGreen, 'green circle');
@@ -3345,16 +3330,16 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
     window.additionalBlueCircles = [];
     window.additionalBlueLabels = [];
 
-    // Define calculateLabelAnchor
     function calculateLabelAnchor(center, radius) {
         const centerLatLng = L.latLng(center[0], center[1]);
-        const earthRadius = 6378137; // Earth's radius in meters
+        const earthRadius = 6378137;
         const deltaLat = (radius / earthRadius) * (180 / Math.PI);
         const topEdgeLatLng = L.latLng(center[0] + deltaLat, center[1]);
         const centerPoint = map.latLngToLayerPoint(centerLatLng);
         const topEdgePoint = map.latLngToLayerPoint(topEdgeLatLng);
-        const offsetY = centerPoint.y - topEdgePoint.y + 10; // Positive for top edge
-        return [25, offsetY]; // Center horizontally, offset vertically
+        const offsetY = centerPoint.y - topEdgePoint.y + 10;
+        console.log('calculateLabelAnchor:', { center, radius, anchor: [25, offsetY] });
+        return [25, offsetY];
     }
 
     function updateBlueCircleLabels() {
@@ -3388,14 +3373,14 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
     // Render exit circles
     if (userSettings.showExitArea && Number.isFinite(blueLat) && Number.isFinite(blueLng) && Number.isFinite(radius)) {
         jumpCircleGreen = L.circle([redLat, redLng], {
-            radius: radiusFull, // Green uses red radius
+            radius: radiusFull,
             color: 'green',
             fillColor: 'green',
             fillOpacity: 0.2,
             weight: 2
         }).addTo(map);
         jumpCircleGreenLight = L.circle([blueLat, blueLng], {
-            radius: radius, // Dark green uses blue radius
+            radius: radius,
             color: 'darkgreen',
             fillColor: 'darkgreen',
             fillOpacity: 0.2,
@@ -3428,7 +3413,6 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
         const newCenterBlue = calculateNewCenter(blueLat, blueLng, displacement, direction);
         const newCenterRed = calculateNewCenter(redLat, redLng, displacementFull, directionFull);
 
-        // Main blue circle
         jumpCircle = L.circle(newCenterBlue, {
             radius: radius,
             color: 'blue',
@@ -3440,7 +3424,6 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
         if (jumpCircle.setZIndex) jumpCircle.setZIndex(1000);
         console.log('Added main blue circle at:', { center: newCenterBlue, radius });
 
-        // Red circle
         jumpCircleFull = L.circle(newCenterRed, {
             radius: radiusFull,
             color: 'red',
@@ -3452,7 +3435,6 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
         if (jumpCircleFull.setZIndex) jumpCircleFull.setZIndex(400);
         console.log('Added red circle at:', { center: newCenterRed, radius: radiusFull });
 
-        // Additional blue circles with labels
         if (Array.isArray(additionalBlueRadii) && Array.isArray(additionalBlueDisplacements) && Array.isArray(additionalBlueDirections) && Array.isArray(additionalBlueUpperLimits)) {
             window.additionalBlueCircles = [];
             window.additionalBlueLabels = [];
@@ -3521,7 +3503,8 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
         red: !!jumpCircleFull,
         green: !!jumpCircleGreen,
         darkGreen: !!jumpCircleGreenLight,
-        additionalBlue: window.additionalBlueCircles?.length || 0
+        additionalBlue: window.additionalBlueCircles?.length || 0,
+        additionalBlueLabels: window.additionalBlueLabels?.length || 0
     });
 
     if (gpxLayer) {
@@ -5534,6 +5517,26 @@ function populateCoordInputs(lat, lng) {
 }
 
 // == UI and Event Handling ==
+function initializeApp() {
+    if (isInitialized) {
+        console.log('App already initialized, skipping');
+        return;
+    }
+    isInitialized = true;
+    console.log('Initializing app');
+
+    // Log and reset problematic userSettings keys
+    console.log('Initial userSettings:', userSettings);
+    if (userSettings.showJumpRunTrack || userSettings.showExitArea) {
+        console.warn('Resetting potentially problematic settings');
+        userSettings.showJumpRunTrack = false;
+        userSettings.showExitArea = false;
+        saveSettings();
+    }
+
+    setupCheckboxEvents();
+    setupSliderEvents();
+}
 function initializeUIElements() {
     setElementValue('modelSelect', userSettings.model);
     setRadioValue('refLevel', userSettings.refLevel);
@@ -5643,12 +5646,11 @@ function setupSliderEvents() {
         return;
     }
 
-    // Use 'input' event for real-time updates as the slider moves
+    // Use 'input' event for real-time updates
     slider.addEventListener('input', async () => {
         const sliderIndex = parseInt(slider.value) || 0;
         console.log('Time slider moved to index:', sliderIndex);
 
-        // Update weather display and related UI elements
         if (weatherData && lastLat && lastLng) {
             await updateWeatherDisplay(sliderIndex);
             if (lastAltitude !== 'N/A') calculateMeanWind();
@@ -5658,7 +5660,8 @@ function setupSliderEvents() {
             }
             if (userSettings.calculateJump) {
                 console.log('Recalculating jump for slider index:', sliderIndex);
-                debouncedCalculateJump();
+                clearJumpCircles();
+                calculateJump();
                 calculateCutAway();
             }
             if (userSettings.showJumpRunTrack) {
@@ -5676,7 +5679,6 @@ function setupSliderEvents() {
         }
     });
 
-    // Update slider labels (e.g., time display)
     slider.addEventListener('change', async () => {
         const sliderIndex = parseInt(slider.value) || 0;
         if (weatherData?.time?.[sliderIndex]) {
@@ -6400,6 +6402,7 @@ function setupCheckboxEvents() {
     setupCheckbox('showJumpRunTrack', 'showJumpRunTrack', (checkbox) => {
         userSettings.showJumpRunTrack = checkbox.checked;
         saveSettings();
+        checkbox.checked = userSettings.showJumpRunTrack; // Sync DOM state
         console.log('showJumpRunTrack changed:', checkbox.checked);
         if (checkbox.checked && userSettings.calculateJump && weatherData && lastLat && lastLng) {
             calculateJumpRunTrack();
@@ -6429,6 +6432,7 @@ function setupCheckboxEvents() {
     setupCheckbox('showExitAreaCheckbox', 'showExitArea', (checkbox) => {
         userSettings.showExitArea = checkbox.checked;
         saveSettings();
+        checkbox.checked = userSettings.showExitArea; // Sync DOM state
         console.log('Show Exit Area set to:', userSettings.showExitArea);
         if (checkbox.checked && userSettings.calculateJump && weatherData && lastLat && lastLng) {
             const exitResult = calculateExitCircle();
@@ -6460,6 +6464,7 @@ function setupCheckboxEvents() {
     setupCheckbox('showCanopyAreaCheckbox', 'showCanopyArea', (checkbox) => {
         userSettings.showCanopyArea = checkbox.checked;
         saveSettings();
+        checkbox.checked = userSettings.showCanopyArea; // Sync DOM state
         console.log('Show Canopy Area set to:', userSettings.showCanopyArea);
         if (checkbox.checked && userSettings.calculateJump && weatherData && lastLat && lastLng) {
             const canopyResult = calculateCanopyCircles();
@@ -6490,7 +6495,11 @@ function setupCheckboxEvents() {
                 window.additionalBlueCircles.forEach(circle => map.removeLayer(circle));
                 window.additionalBlueCircles = [];
             }
-            console.log('Cleared blue and red circles');
+            if (window.additionalBlueLabels) {
+                window.additionalBlueLabels.forEach(label => map.removeLayer(label));
+                window.additionalBlueLabels = [];
+            }
+            console.log('Cleared blue and red circles and labels');
         }
     });
 
@@ -6954,37 +6963,40 @@ function toggleSubmenu(id, isVisible) {
     }
 }
 function clearJumpCircles() {
-    // Clear all circles
-    if (jumpCircle) {
-        map.removeLayer(jumpCircle);
-        jumpCircle = null;
-        console.log('Cleared blue circle');
-    }
-    if (jumpCircleFull) {
-        map.removeLayer(jumpCircleFull);
-        jumpCircleFull = null;
-        console.log('Cleared red circle');
-    }
-    if (jumpCircleGreen) {
-        map.removeLayer(jumpCircleGreen);
-        jumpCircleGreen = null;
-        console.log('Cleared green circle');
-    }
-    if (jumpCircleGreenLight) {
-        map.removeLayer(jumpCircleGreenLight);
-        jumpCircleGreenLight = null;
-        console.log('Cleared dark green circle');
-    }
-    // Clear additional blue circles
+    console.log('Clearing all jump circles');
+    const removeLayer = (layer, name) => {
+        if (layer && typeof layer === 'object' && '_leaflet_id' in layer && map.hasLayer(layer)) {
+            console.log(`Removing ${name}`);
+            map.removeLayer(layer);
+        }
+    };
+
+    removeLayer(jumpCircle, 'blue circle');
+    removeLayer(jumpCircleFull, 'red circle');
+    removeLayer(jumpCircleGreen, 'green circle');
+    removeLayer(jumpCircleGreenLight, 'dark green circle');
+
     if (window.additionalBlueCircles) {
-        window.additionalBlueCircles.forEach((circle, i) => {
-            if (circle && typeof circle === 'object' && '_leaflet_id' in circle && map.hasLayer(circle)) {
-                map.removeLayer(circle);
-                console.log(`Cleared additional blue circle ${i}`);
-            }
-        });
+        window.additionalBlueCircles.forEach((circle, i) => removeLayer(circle, `additional blue circle ${i}`));
         window.additionalBlueCircles = [];
     }
+    if (window.additionalBlueLabels) {
+        window.additionalBlueLabels.forEach((label, i) => removeLayer(label, `additional blue label ${i}`));
+        window.additionalBlueLabels = [];
+    }
+
+    jumpCircle = null;
+    jumpCircleFull = null;
+    jumpCircleGreen = null;
+    jumpCircleGreenLight = null;
+    console.log('All jump circles cleared', {
+        blue: !!jumpCircle,
+        red: !!jumpCircleFull,
+        green: !!jumpCircleGreen,
+        darkGreen: !!jumpCircleGreenLight,
+        additionalBlueCircles: window.additionalBlueCircles?.length || 0,
+        additionalBlueLabels: window.additionalBlueLabels?.length || 0
+    });
 }
 function updateCoordInputs(format) {
     const coordInputs = document.getElementById('coordInputs');
