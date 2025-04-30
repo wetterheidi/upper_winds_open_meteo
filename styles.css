@@ -66,6 +66,23 @@ html {
     margin-bottom: 10px; /* Keep vertical spacing */
 }
 
+.leaflet-container {
+    z-index: 1;
+}
+
+.leaflet-overlay-pane,
+.leaflet-marker-pane,
+.leaflet-popup-pane {
+    z-index: 100;
+    pointer-events: none;
+}
+
+.leaflet-overlay-pane > *,
+.leaflet-marker-pane > *,
+.leaflet-popup-pane > * {
+    pointer-events: auto;
+}
+
 .harp-marker {
     background: transparent;
 }
@@ -74,7 +91,7 @@ html {
     position: fixed;
     top: 5px;
     left: 5px;
-    z-index: 300;
+    z-index: 4000;
 }
 
 #hamburgerBtn {
@@ -231,6 +248,26 @@ html {
     font-weight: 400;
 }
 
+.radio-label {
+    display: inline-block;
+    cursor: pointer;
+    position: relative;
+    z-index: 4000;
+}
+
+.radio-label input[type="checkbox"] {
+    pointer-events: auto !important;
+    opacity: 1;
+    margin-right: 5px;
+    cursor: pointer;
+    z-index: 4000;
+}
+
+.submenu {
+    margin-left: 20px;
+    z-index: 4000;
+}
+
 .submenu input[type="radio"] {
     appearance: none;
     width: 16px;
@@ -310,7 +347,7 @@ html {
 }
 
 .hidden {
-    display: none;
+    display: none !important;
 }
 
 /* Remaining existing styles unchanged */

@@ -167,214 +167,221 @@
                                 <label class="radio-label">
                                     Select Date:
                                     <input type="date" id="historicalDatePicker" min="2022-01-01">
-                                    <li>                                    
-                                        <button id="clearHistoricalDate" style="margin-left: 10px;">Clear</button>
-                                    </li>
-                                </label>
-                            </li>
-                        </ul>
-                    </li>
-                </ul>
-            </li>
-            <li>
-                <span>Coordinate Input</span>
-                <ul class="submenu hidden">
-                    <li>
-                        <div id="coordInputs"></div>
-                    </li>
-                    <li>
-                        <button id="moveMarkerBtn">Move Marker</button>
-                    </li>
-                </ul>
-            </li>
-            <li>
-                <span>GPX Track</span>
-                <ul class="submenu hidden">
-                    <li>
-                        <label class="radio-label">
-                            Upload GPX File:
-                            <input type="file" id="gpxFileInput" accept=".gpx" style="margin-top: 5px;">
                             <li>
-                                <button id="clearGpxTrack" style="margin-left: 10px;">Clear</button>
+                                <button id="clearHistoricalDate" style="margin-left: 10px;">Clear</button>
                             </li>
-                        </label>
+                            </label>
                     </li>
                 </ul>
             </li>
-            <li>
-                <label class="radio-label">
-                    <input type="checkbox" id="showLandingPattern" name="showLandingPattern"> Landing Pattern
+        </ul>
+        </li>
+        <li>
+            <span>Coordinate Input</span>
+            <ul class="submenu hidden">
+                <li>
+                    <div id="coordInputs"></div>
+                </li>
+                <li>
+                    <button id="moveMarkerBtn">Move Marker</button>
+                </li>
+            </ul>
+        </li>
+        <li>
+            <span>GPX Track</span>
+            <ul class="submenu hidden">
+                <li>
+                    <label class="radio-label">
+                        Upload GPX File:
+                        <input type="file" id="gpxFileInput" accept=".gpx" style="margin-top: 5px;">
+                <li>
+                    <button id="clearGpxTrack" style="margin-left: 10px;">Clear</button>
+                </li>
                 </label>
-                <ul class="submenu hidden">
-                    <li>
-                        <label class="radio-label">
-                            <input type="radio" name="landingDirection" value="LL" checked> LL
-                            <input type="number" id="customLandingDirectionLL" min="0" max="359" placeholder="0-359°">
-                            <label>°</label>
-                        </label>
-                    </li>
-                    <li>
-                        <label class="radio-label">
-                            <input type="radio" name="landingDirection" value="RR"> RR
-                            <input type="number" id="customLandingDirectionRR" min="0" max="359" placeholder="0-359°">
-                            <label>°</label>
-                        </label>
-                    </li>
-                    <li>
-                        <label class="radio-label">
-                            Start Downwind Leg at m AGL:
-                            <input type="number" id="legHeightDownwind" min="50" max="1000" step="50" value="300">
-                        </label>
-                    </li>
-                    <li>
-                        <label class="radio-label">
-                            Start Base Leg at m AGL:
-                            <input type="number" id="legHeightBase" min="50" max="1000" step="50" value="200">
-                        </label>
-                    </li>
-                    <li>
-                        <label class="radio-label">
-                            Start Final Leg at m AGL:
-                            <input type="number" id="legHeightFinal" min="50" max="1000" step="50" value="100">
-                        </label>
-                    </li>
-                </ul>
-            </li>
-            <li>
-                <label class="radio-label">
-                    <input type="checkbox" id="calculateJumpCheckbox" name="calculateJump"> Calculate Jump
-                </label>
-                <ul class="submenu hidden">
-                    <li>
-                        <label class="radio-label">
-                            Exit Altitude (m AGL):
-                            <input type="number" id="exitAltitude" min="500" max="15000" step="100" value="3000">
-                        </label>
-                    </li>
-                    <li>
-                        <label class="radio-label" title="Canopy open 200 m below opening altitude!">
-                            Opening Altitude (m AGL):
-                            <input type="number" id="openingAltitude" min="500" max="10000" step="100" value="1200">
-                        </label>
-                    </li>
-                    <li>
-                        <span>Other Jump Parameters</span>
-                        <ul class="submenu hidden">
-                            <li>
-                                <label class="radio-label">
-                                    Aircraft Speed (ktIAS):
-                                    <input type="number" id="aircraftSpeedKt" min="10" max="150" step="5" value="90">
-                                </label>
-                            </li>
-                            <li>
-                                <label class="radio-label">
-                                    Number Of Jumpers:
-                                    <input type="number" id="numberOfJumpers" min="1" max="50" step="1" value="5">
-                                </label>
-                            </li>
-                            <li>
-                                <label class="radio-label">
-                                    Separation (s):
-                                    <input type="number" id="jumperSeparation" min="1" max="50" step="1" value="5">
-                                </label>
-                            </li>
-                            <li>
-                                <label class="radio-label" title="Expert: 28 kt, Advanced: 22 kt, Student: 18 kt">
-                                    Canopy Speed (kt):
-                                    <input type="number" id="canopySpeed" min="5" max="50" step="1" value="20">
-                                </label>
-                            </li>
-                            <li>
-                                <label class="radio-label" title="Expert: 8 m/s, Advanced: 5 m/s, Student: 4 m/s">
-                                    Descent Rate (m/s):
-                                    <input type="number" id="descentRate" min="1" max="10" step="0.1" value="3.5">
-                                </label>
-                            </li>
-                        </ul>
-                    </li>
-                    <li>
-                        <label class="radio-label">
-                            <input type="checkbox" id="showJumpRunTrack" /> Show Jump Run Track:
-                            <input type="number" id="jumpRunTrackDirection" min="0" max="359" step="1" placeholder="Calculated" style="width: 60px;">
-                            <label>°</label>
-                        </label>
-                    </li>
-                    <li>
-                        <label class="radio-label">
-                            Jump Run Offset (m):
-                            <input type="number" id="jumpRunTrackOffset" min="-50000" max="50000" step="100" value="0" style="width: 80px;">
-                        </label>
-                    </li>
-                    <li>
-                        <label class="radio-label">
-                            <input type="checkbox" id="showExitAreaCheckbox"> Show Exit Area                        </label>
-                    </li>
-                    <li>
-                        <label class="radio-label">
-                            <input type="checkbox" id="showCanopyAreaCheckbox"> Show Canopy Flight Area                        </label>
-                    </li>
-                    <li>
-                        <input type="checkbox" id="showCutAwayFinder"/> Show Cut Away Finder
-                        <ul class="submenu hidden">
-                            <li>
-                                <label class="radio-label">
-                                    Cut Away Altitude (m):
-                                    <input type="number" id="cutAwayAltitude" min="400" max="15000" step="100" value="1000">
-                                </label>
-                            </li>
-                            <li>
-                                <label class="radio-label">
-                                    <input type="radio" name="cutAwayState" value="Collapsed"> Fully Collapsed
-                                </label>
-                            </li>
-                            <li>
-                                <label class="radio-label">
-                                    <input type="radio" name="cutAwayState" value="Partially"> Partially Collapsed
-                                </label>
-                            </li>
-                            <li>
-                                <label class="radio-label">
-                                    <input type="radio" name="cutAwayState" value="Open"> Fully Open
-                                </label>
-                            </li>
-                            <li>
-                                <button id="resetCutAwayMarker">Reset Cut-Away Marker</button>
-                            </li>
-                        </ul>
-                    </li>
-                </ul>
-            </li>
-            <li>
-                <span>Jump Master</span>
-                <ul class="submenu hidden">
-                    <li>
-                        <button id="placeHarpButton">Place HARP</button>
-                        <button id="clearHarpButton">Clear HARP</button>
-                    </li>
-                    <li>
-                        <label class="radio-label">
-                            <input type="checkbox" id="trackPositionCheckbox" name="trackPosition"> Start Live Tracking
-                        </label>
-                    </li>
-                    <li>
-                        <label class="radio-label">
-                            <input type="checkbox" id="showJumpMasterLine" name="showJumpMasterLine"> Show Jump Master Line To
-                        </label>
-                        <ul class="submenu hidden">
-                            <li>
-                                <label class="radio-label">
-                                    <input type="radio" name="jumpMasterLineTarget" value="DIP" checked> DIP
-                                </label>
-                            </li>
-                            <li>
-                                <label class="radio-label">
-                                    <input type="radio" name="jumpMasterLineTarget" value="HARP"> HARP
-                                </label>
-                            </li>
-                        </ul>
-                    </li>
-                </ul>
-            </li>
+        </li>
+        </ul>
+        </li>
+        <li>
+            <label class="radio-label">
+                <input type="checkbox" id="showLandingPattern" name="showLandingPattern"> Landing Pattern
+            </label>
+            <ul class="submenu hidden">
+                <li>
+                    <label class="radio-label">
+                        <input type="radio" name="landingDirection" value="LL" checked> LL
+                        <input type="number" id="customLandingDirectionLL" min="0" max="359" placeholder="0-359°">
+                        <label>°</label>
+                    </label>
+                </li>
+                <li>
+                    <label class="radio-label">
+                        <input type="radio" name="landingDirection" value="RR"> RR
+                        <input type="number" id="customLandingDirectionRR" min="0" max="359" placeholder="0-359°">
+                        <label>°</label>
+                    </label>
+                </li>
+                <li>
+                    <label class="radio-label">
+                        Start Downwind Leg at m AGL:
+                        <input type="number" id="legHeightDownwind" min="50" max="1000" step="50" value="300">
+                    </label>
+                </li>
+                <li>
+                    <label class="radio-label">
+                        Start Base Leg at m AGL:
+                        <input type="number" id="legHeightBase" min="50" max="1000" step="50" value="200">
+                    </label>
+                </li>
+                <li>
+                    <label class="radio-label">
+                        Start Final Leg at m AGL:
+                        <input type="number" id="legHeightFinal" min="50" max="1000" step="50" value="100">
+                    </label>
+                </li>
+            </ul>
+        </li>
+        <li>
+            <label class="radio-label">
+                <input type="checkbox" id="calculateJumpCheckbox" name="calculateJump"> Calculate Jump
+            </label>
+            <ul class="submenu hidden">
+                <li>
+                    <label class="radio-label">
+                        Exit Altitude (m AGL):
+                        <input type="number" id="exitAltitude" min="500" max="15000" step="100" value="3000">
+                    </label>
+                </li>
+                <li>
+                    <label class="radio-label" title="Canopy open 200 m below opening altitude!">
+                        Opening Altitude (m AGL):
+                        <input type="number" id="openingAltitude" min="500" max="10000" step="100" value="1200">
+                    </label>
+                </li>
+                <li>
+                    <span>Other Jump Parameters</span>
+                    <ul class="submenu hidden">
+                        <li>
+                            <label class="radio-label">
+                                Aircraft Speed (ktIAS):
+                                <input type="number" id="aircraftSpeedKt" min="10" max="150" step="5" value="90">
+                            </label>
+                        </li>
+                        <li>
+                            <label class="radio-label">
+                                Number Of Jumpers:
+                                <input type="number" id="numberOfJumpers" min="1" max="50" step="1" value="5">
+                            </label>
+                        </li>
+                        <li>
+                            <label class="radio-label">
+                                Separation (s):
+                                <input type="number" id="jumperSeparation" min="1" max="50" step="1" value="5">
+                            </label>
+                        </li>
+                        <li>
+                            <label class="radio-label" title="Expert: 28 kt, Advanced: 22 kt, Student: 18 kt">
+                                Canopy Speed (kt):
+                                <input type="number" id="canopySpeed" min="5" max="50" step="1" value="20">
+                            </label>
+                        </li>
+                        <li>
+                            <label class="radio-label" title="Expert: 8 m/s, Advanced: 5 m/s, Student: 4 m/s">
+                                Descent Rate (m/s):
+                                <input type="number" id="descentRate" min="1" max="10" step="0.1" value="3.5">
+                            </label>
+                        </li>
+                    </ul>
+                </li>
+                <li>
+                    <label class="radio-label">
+                        <input type="checkbox" id="showJumpRunTrack" /> Show Jump Run Track:
+                        <input type="number" id="jumpRunTrackDirection" min="0" max="359" step="1"
+                            placeholder="Calculated" style="width: 60px;">
+                        <label>°</label>
+                    </label>
+                </li>
+                <li>
+                    <label class="radio-label">
+                        Jump Run Offset (m):
+                        <input type="number" id="jumpRunTrackOffset" min="-50000" max="50000" step="100" value="0"
+                            style="width: 80px;">
+                    </label>
+                </li>
+                <li>
+                    <label class="radio-label">
+                        <input type="checkbox" id="showExitAreaCheckbox"> Show Exit Area </label>
+                </li>
+                <li>
+                    <label class="radio-label">
+                        <input type="checkbox" id="showCanopyAreaCheckbox"> Show Canopy Flight Area </label>
+                </li>
+                <li>
+                    <!--Cut away finder-->
+                    <label class="radio-label">
+                        <input type="checkbox" id="showCutAwayFinder" name="showCutAwayFinder"> Show Cut Away Finder
+                    </label>
+                    <ul class="submenu hidden">
+                        <li>
+                            <label class="radio-label">
+                                Cut Away Altitude (m):
+                                <input type="number" id="cutAwayAltitude" min="400" max="15000" step="100" value="1000">
+                            </label>
+                        </li>
+                        <li>
+                            <label class="radio-label">
+                                <input type="radio" name="cutAwayState" value="Collapsed"> Fully Collapsed
+                            </label>
+                        </li>
+                        <li>
+                            <label class="radio-label">
+                                <input type="radio" name="cutAwayState" value="Partially"> Partially Collapsed
+                            </label>
+                        </li>
+                        <li>
+                            <label class="radio-label">
+                                <input type="radio" name="cutAwayState" value="Open"> Fully Open
+                            </label>
+                        </li>
+                        <li>
+                            <button id="resetCutAwayMarker">Reset Cut-Away Marker</button>
+                        </li>
+                    </ul>
+                    <!--Cut away finder-->
+                </li>
+            </ul>
+        </li>
+        <li>
+            <span>Jump Master</span>
+            <ul class="submenu hidden">
+                <li>
+                    <button id="placeHarpButton">Place HARP</button>
+                    <button id="clearHarpButton">Clear HARP</button>
+                </li>
+                <li>
+                    <label class="radio-label">
+                        <input type="checkbox" id="trackPositionCheckbox" name="trackPosition"> Start Live Tracking
+                    </label>
+                </li>
+                <li>
+                    <label class="radio-label">
+                        <input type="checkbox" id="showJumpMasterLine" name="showJumpMasterLine"> Show Jump Master Line
+                        To
+                    </label>
+                    <ul class="submenu hidden">
+                        <li>
+                            <label class="radio-label">
+                                <input type="radio" name="jumpMasterLineTarget" value="DIP" checked> DIP
+                            </label>
+                        </li>
+                        <li>
+                            <label class="radio-label">
+                                <input type="radio" name="jumpMasterLineTarget" value="HARP"> HARP
+                            </label>
+                        </li>
+                    </ul>
+                </li>
+            </ul>
+        </li>
         </ul>
     </div>
     <div id="slider-container">
