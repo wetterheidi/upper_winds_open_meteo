@@ -79,10 +79,13 @@ A web application for visualizing upper-level wind, temperature, and atmospheric
   - Adjust altitude limits in the bottom container to calculate mean wind.
 - **Skydiving Features**: 
   - Configure canopy speed, descent rate, leg heights, exit/opening altitudes,number of jumpers and exit separation.
-  - isualize patterns, jump circles, jump run tracks, approach.
+  - Visualize patterns, jump circles, jump run tracks, approach.
   - Place a cut away finder at the location of the cut away. A tooltip shows the displacement, descent time and speed.
 - **GPX Track visualization**:
   - GPX track visualization with color-coded AGL height (red to green gradient), interactive tooltips showing AGL height, speed, and descent rate.
+- **Live Tracking**: 
+  - Enable "Track Position" to start real-time geolocation updates.
+  - Use "Jump Master Line" to track bearing and distance to DIP or HARP.
 - **Download**: 
   - Click "Download Table" to save the current table as a text file.
 
@@ -119,11 +122,16 @@ Leverages [OpenMeteo API](https://open-meteo.com/) for:
 
 - **v1.4.0 (April 21, 2025)**:
   - Added tooltips to the exit circles containing throw, drift and free fall time.
-  - Jump run track now adjusts dynamically to the number of jumpers and the exit separation. x-2 min Approach is also shown as a dashed line.
-  - Added option to load historical weahter data for the chosen location.
-  - Added GPX track visualization with color-coded AGL height (red to green gradient), interactive tooltips showing coordinates, AGL height, speed, and descent rate, with dynamic updates for wind and height units.
+  - Enhanced jump run tracks with dynamic jumper separation and 2-minute approach visualization.
+  - Added historical weather data support via date picker.
+  - Implemented GPX track visualization with color-coded AGL height and interactive tooltips. 
   - Enhanced weather table with conditional row background colors based on relative humidity: white (<65%), light grey (65%-85%), medium grey (85%-99%), dark grey (100%), preserving wind speed-based border colors (blue, green, yellow, red).
   - Updated mouse-over elevation display to support user-selected height units (m or ft), ensuring consistency with other height displays.
+
+- **v1.5.0 (May 1, 2025)**:
+  - Introduced Live Position Tracking with a control panel and Jump Master Line to DIP or HARP.
+  - Optimized error handling with auto-hiding banners and improved localStorage persistence.
+  - Enhanced UI responsiveness with dynamic submenu toggling and mobile-friendly controls.
 
 
 ## Warning
