@@ -23,7 +23,7 @@ const defaultSettings = {
     lowerLimit: 0,
     upperLimit: 3000,
     baseMaps: 'Esri Street',
-    calculateJump: false,
+    calculateJump: true,
     openingAltitude: 1200,
     exitAltitude: 3000,
     showJumpRunTrack: false,
@@ -3200,17 +3200,10 @@ function calculateJumpRunTrack() {
 }
 function calculateJump() {
     console.log('Starting calculateJump...', {
-        calculateJump: userSettings.calculateJump,
         showExitArea: userSettings.showExitArea,
         showCanopyArea: userSettings.showCanopyArea,
         showJumpRunTrack: userSettings.showJumpRunTrack
     });
-
-    if (!userSettings.calculateJump) {
-        console.log('Clearing jump circles due to calculateJump false');
-        clearJumpCircles();
-        return null;
-    }
 
     if (!weatherData || !lastLat || !lastLng) {
         console.warn('Missing required data for calculateJump');
@@ -3218,7 +3211,6 @@ function calculateJump() {
         return null;
     }
 
-    // Clear all circles before recalculating
     clearJumpCircles();
 
     let result = {};
@@ -3614,300 +3606,6 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
     return true;
 }
 
-function calculateJumpOLD() {
-    console.log('Starting calculateJump...', {
-        calculateJump: userSettings.calculateJump,
-        showCanopyArea: userSettings.showCanopyArea,
-        showCutAwayFinder: userSettings.showCutAwayFinder,
-        currentMarkerExists: !!currentMarker,
-        currentMarkerClassName: currentMarker?.options?.icon?.options?.className || 'none',
-        cutAwayMarkerExists: !!cutAwayMarker,
-        cutAwayMarkerClassName: cutAwayMarker?.options?.icon?.options?.className || 'none',
-        cutAwayCircleExists: !!cutAwayCircle,
-        cutAwayLat,
-        cutAwayLng
-    });
-    if (!userSettings.calculateJump) {
-        console.log('Clearing jump circles due to calculateJump false');
-        // Explicitly clear markers and layers
-        if (typeof clearIsolineMarkers === 'function') {
-            clearIsolineMarkers();
-        }
-        if (blueCircleLayer) {
-            console.log('Clearing blueCircleLayer');
-            blueCircleLayer.eachLayer(layer => {
-                console.log('Removing layer from blueCircleLayer:', layer);
-                layer.remove();
-            });
-            blueCircleLayer.clearLayers();
-            map.removeLayer(blueCircleLayer);
-            blueCircleLayer = null;
-        }
-        if (redCircleLayer) {
-            console.log('Clearing redCircleLayer');
-            redCircleLayer.eachLayer(layer => {
-                console.log('Removing layer from redCircleLayer:', layer);
-                layer.remove();
-            });
-            redCircleLayer.clearLayers();
-            map.removeLayer(redCircleLayer);
-            redCircleLayer = null;
-        }
-        if (greenCircleLayer) {
-            console.log('Clearing greenCircleLayer');
-            greenCircleLayer.eachLayer(layer => {
-                console.log('Removing layer from greenCircleLayer:', layer);
-                layer.remove();
-            });
-            greenCircleLayer.clearLayers();
-            map.removeLayer(greenCircleLayer);
-            greenCircleLayer = null;
-        }
-        window.additionalBlueCircles = [];
-        window.additionalBlueLabels = [];
-        jumpCircle = null;
-        jumpCircleFull = null;
-        jumpCircleGreen = null;
-        jumpCircleGreenLight = null;
-        console.log('calculateJump: Cleared all circles and markers', {
-            currentMarkerExists: !!currentMarker,
-            cutAwayMarkerExists: !!cutAwayMarker,
-            cutAwayCircleExists: !!cutAwayCircle
-        });
-        return null;
-    }
-
-    if (!weatherData || !weatherData.time || !weatherData.surface_pressure) {
-        console.warn('Weather data not available');
-        clearIsolineMarkers();
-        return null;
-    }
-    const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
-    const exitAltitude = parseInt(document.getElementById('exitAltitude')?.value) || 3000;
-    const openingAltitude = parseInt(document.getElementById('openingAltitude')?.value) || 1200;
-    const legHeightDownwind = parseInt(document.getElementById('legHeightDownwind')?.value) || 300;
-    const descentRate = parseFloat(document.getElementById('descentRate')?.value) || 3.5;
-    const canopySpeed = parseFloat(document.getElementById('canopySpeed')?.value) || 20;
-
-    // Initialize wind data early
-    const interpolatedData = interpolateWeatherData(sliderIndex);
-    if (!interpolatedData || interpolatedData.length === 0) {
-        console.warn('No interpolated weather data available');
-        clearIsolineMarkers();
-        return null;
-    }
-    const heights = interpolatedData.map(d => d.height);
-    const dirs = interpolatedData.map(d => Number.isFinite(d.dir) ? parseFloat(d.dir) : 0);
-    const spdsMps = interpolatedData.map(d => Utils.convertWind(parseFloat(d.spd) || 0, 'm/s', 'km/h')); // km/h to m/s
-    const uComponents = spdsMps.map((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
-    const vComponents = spdsMps.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
-
-    console.log('Interpolated data sample:', interpolatedData.slice(0, 3));
-
-    const canopySpeedMps = canopySpeed * 0.514444; // Convert kt to m/s
-    const heightDistance = openingAltitude - 200 - legHeightDownwind; // Blue: 1200 - 200 - 300 = 700m
-    const flyTime = heightDistance / descentRate; // 700 / 3.5 = 200s
-    const horizontalCanopyDistance = flyTime * canopySpeedMps; // Blue/dark green radius
-    const heightDistanceFull = openingAltitude - 200; // Red: 1200 - 200 = 1000m
-    const flyTimeFull = heightDistanceFull / descentRate; // 1000 / 3.5 = 285.714s
-    const horizontalCanopyDistanceFull = flyTimeFull * canopySpeedMps; // Red/green radius
-
-    // Calculate additional blue circle radii, displacements, and upper limits
-    const elevation = Math.round(lastAltitude);
-    const upperLimit = elevation + openingAltitude - 200; // e.g., 562 + 1000 = 1562m
-    const lowerLimit = elevation + legHeightDownwind; // e.g., 562 + 300 = 862m
-    const additionalBlueRadii = [];
-    const additionalBlueDisplacements = [];
-    const additionalBlueDirections = [];
-    const additionalBlueUpperLimits = []; // New array for AGL heights
-    let decrement;
-    if ((upperLimit - lowerLimit) <= 1000) {
-        decrement = 200;
-    } else if ((upperLimit - lowerLimit) > 1000 && (upperLimit - lowerLimit) <= 3000) {
-        decrement = 500;
-    } else {
-        decrement = 1000;
-    }
-    let currentUpper = upperLimit;
-    while (currentUpper >= lowerLimit + 200) {
-        const currentHeightDistance = currentUpper - lowerLimit; // Distance from currentUpper to lowerLimit
-        const currentFlyTime = currentHeightDistance / descentRate;
-        const currentRadius = currentFlyTime * canopySpeedMps;
-        if (currentRadius > 0) {
-            // Calculate mean wind for layer lowerLimit to currentUpper
-            const meanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, lowerLimit, currentUpper);
-            const currentMeanWindDirection = meanWind[0];
-            const currentMeanWindSpeedMps = meanWind[1];
-            const currentDisplacement = currentMeanWindSpeedMps * currentFlyTime;
-
-            additionalBlueRadii.push(currentRadius);
-            additionalBlueDisplacements.push(currentDisplacement);
-            additionalBlueDirections.push(currentMeanWindDirection);
-            additionalBlueUpperLimits.push(currentUpper - elevation); // Store AGL height
-            console.log(`Additional blue circle for ${currentUpper}m:`, {
-                radius: currentRadius,
-                displacement: currentDisplacement,
-                direction: currentMeanWindDirection,
-                heightAGL: currentUpper - elevation
-            });
-        }
-        currentUpper -= decrement; // Decrement dynamically
-    }
-
-    console.log('Calculated radii, displacements, and upper limits:', {
-        horizontalCanopyDistance,
-        horizontalCanopyDistanceFull,
-        additionalBlueRadii,
-        additionalBlueDisplacements,
-        additionalBlueDirections,
-        additionalBlueUpperLimits,
-        arraysValid: Array.isArray(additionalBlueRadii) && Array.isArray(additionalBlueDisplacements) &&
-            Array.isArray(additionalBlueDirections) && Array.isArray(additionalBlueUpperLimits),
-        arraysLength: additionalBlueRadii ? additionalBlueRadii.length : 0
-    });
-    console.log('Jump inputs:', { exitAltitude, openingAltitude, legHeightDownwind, descentRate, canopySpeed, sliderIndex, lastLat, lastLng, lastAltitude });
-    console.log('Altitude limits:', { upperLimit, lowerLimit, additionalUpperLimits: additionalBlueRadii.map((_, i) => upperLimit - i * decrement) });
-
-    // Free fall phase
-    const freeFallResult = calculateFreeFall(weatherData, exitAltitude, openingAltitude, sliderIndex, lastLat, lastLng, lastAltitude);
-    console.log('Freefall calculated');
-    if (!freeFallResult) {
-        console.warn('Free fall calculation failed');
-        clearIsolineMarkers();
-        return null;
-    }
-
-    if (horizontalCanopyDistance <= 0 || horizontalCanopyDistanceFull <= 0) {
-        console.warn('Invalid radii:', { horizontalCanopyDistance, horizontalCanopyDistanceFull });
-        clearIsolineMarkers();
-        return null;
-    }
-
-    const lowerLimitFull = elevation;
-    const upperLimitFull = elevation + openingAltitude - 200;
-
-    const meanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, lowerLimit, upperLimit);
-    const meanWindDirection = meanWind[0];
-    const meanWindSpeedMps = meanWind[1];
-    console.log('Mean wind blue: ', meanWindDirection.toFixed(1), meanWindSpeedMps.toFixed(1), 'm/s');
-
-    const meanWindFull = Utils.calculateMeanWind(heights, uComponents, vComponents, lowerLimitFull, upperLimitFull);
-    const meanWindDirectionFull = meanWindFull[0];
-    const meanWindSpeedMpsFull = meanWindFull[1];
-    console.log('Mean wind red: ', meanWindDirectionFull.toFixed(1), meanWindSpeedMpsFull.toFixed(1), 'm/s');
-
-    const centerDisplacement = meanWindSpeedMps * flyTime;
-    const centerDisplacementFull = meanWindSpeedMpsFull * flyTimeFull;
-    const displacementDirection = meanWindDirection;
-    const displacementDirectionFull = meanWindDirectionFull;
-
-    if (!Number.isFinite(lastLat) || !Number.isFinite(lastLng)) {
-        console.error('Invalid lastLat or lastLng:', { lastLat, lastLng });
-        clearIsolineMarkers();
-        return null;
-    }
-
-    // Always calculate landing pattern coordinates, but only display if enabled
-    console.log('Calculating landing pattern coordinates...');
-    const landingPatternCoords = calculateLandingPatternCoords(lastLat, lastLng, interpolatedData, sliderIndex);
-    let downwindLat = landingPatternCoords.downwindLat;
-    let downwindLng = landingPatternCoords.downwindLng;
-
-    if (userSettings.showLandingPattern) {
-        console.log('Displaying landing pattern...');
-        updateLandingPattern();
-    } else {
-        console.log('Landing pattern not displayed; blue circle still uses downwind end');
-    }
-
-    // Fallback if downwind coordinates are invalid
-    if (!Number.isFinite(downwindLat) || !Number.isFinite(downwindLng)) {
-        console.warn('Downwind coordinates invalid, using lastLat, lastLng as fallback');
-        downwindLat = lastLat;
-        downwindLng = lastLng;
-    }
-
-    console.log('calculateJump: Free fall result before updateJumpCircle:', {
-        directionDeg: freeFallResult.directionDeg,
-        distance: freeFallResult.distance,
-        time: freeFallResult.time
-    });
-
-    if (typeof freeFallResult.time === 'undefined') {
-        console.warn('freeFallResult.time is undefined! Full freeFallResult:', freeFallResult);
-    }
-
-    console.log('Calling updateJumpCircle with:', {
-        downwindLat,
-        downwindLng,
-        lastLat,
-        lastLng,
-        horizontalCanopyDistance,
-        horizontalCanopyDistanceFull,
-        additionalBlueRadii,
-        additionalBlueDisplacements,
-        additionalBlueDirections,
-        additionalBlueUpperLimits,
-        centerDisplacement,
-        centerDisplacementFull,
-        displacementDirection,
-        displacementDirectionFull,
-        freeFallDirection: freeFallResult.directionDeg,
-        freeFallDistance: freeFallResult.distance,
-        freeFallTime: freeFallResult.time,
-        showCanopyArea: userSettings.showCanopyArea
-    });
-
-    updateJumpCircle(
-        downwindLat,
-        downwindLng,
-        lastLat,
-        lastLng,
-        horizontalCanopyDistance,
-        horizontalCanopyDistanceFull,
-        additionalBlueRadii,
-        additionalBlueDisplacements,
-        additionalBlueDirections,
-        additionalBlueUpperLimits,
-        centerDisplacement,
-        centerDisplacementFull,
-        displacementDirection,
-        displacementDirectionFull,
-        freeFallResult.directionDeg,
-        freeFallResult.distance,
-        freeFallResult.time
-    );
-
-    if (currentMarker) {
-        currentMarker.setLatLng([lastLat, lastLng]);
-        updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
-    }
-
-    updateJumpRunTrack();
-    jumpRunTrack();
-
-    console.log('calculateJump completed', {
-        currentMarkerExists: !!currentMarker,
-        cutAwayMarkerExists: !!cutAwayMarker,
-        cutAwayCircleExists: !!cutAwayCircle
-    });
-    return {
-        radius: horizontalCanopyDistance,
-        radiusFull: horizontalCanopyDistanceFull,
-        additionalBlueRadii,
-        additionalBlueDisplacements,
-        additionalBlueDirections,
-        additionalBlueUpperLimits,
-        displacement: centerDisplacement,
-        displacementFull: centerDisplacementFull,
-        direction: meanWindDirection,
-        directionFull: meanWindDirectionFull,
-        freeFall: freeFallResult,
-        freeFallDirection: freeFallResult.directionDeg,
-        freeFallDistance: freeFallResult.distance,
-        meanWindFull
-    };
-}
 function clearIsolineMarkers() {
     console.log('clearIsolineMarkers called');
     if (map) {
@@ -3963,380 +3661,6 @@ function clearIsolineMarkers() {
     } else {
         console.warn('Map not available in clearIsolineMarkers');
     }
-}
-function updateJumpCircleOLD(blueLat, blueLng, redLat, redLng, radius, radiusFull, additionalBlueRadii, additionalBlueDisplacements, additionalBlueDirections, additionalBlueUpperLimits, displacement, displacementFull, direction, directionFull, freeFallDirection, freeFallDistance, freeFallTime) {
-    console.log('updateJumpCircle called with:', {
-        blueLat, blueLng, redLat, redLng, radius, radiusFull,
-        additionalBlueRadii, additionalBlueDisplacements, additionalBlueDirections, additionalBlueUpperLimits,
-        displacement, displacementFull, direction, directionFull, freeFallDirection, freeFallDistance, freeFallTime,
-        zoom: map?.getZoom(), showCanopyArea: userSettings.showCanopyArea, showExitArea: userSettings.showExitArea, calculateJump: userSettings.calculateJump, showCutAwayFinder: userSettings.showCutAwayFinder,
-        callCount: (window.updateJumpCircleCallCount = (window.updateJumpCircleCallCount || 0) + 1),
-        currentMarkerExists: !!currentMarker,
-        currentMarkerClassName: currentMarker?.options?.icon?.options?.className || 'none',
-        cutAwayMarkerExists: !!cutAwayMarker,
-        cutAwayMarkerClassName: cutAwayMarker?.options?.icon?.options?.className || 'none',
-        cutAwayCircleExists: !!cutAwayCircle
-    });
-    if (!map) {
-        console.warn('Map not available to update jump circles');
-        clearIsolineMarkers();
-        return false;
-    }
-
-    // Always clear isoline markers at the start
-    clearIsolineMarkers();
-
-    const currentZoom = map.getZoom();
-    const isVisible = currentZoom >= minZoom && currentZoom <= maxZoom;
-    console.log('Zoom check:', { currentZoom, minZoom, maxZoom, isVisible });
-
-    // Initialize metadata array
-    const blueCircleMetadata = [];
-
-    // Remove existing circles safely
-    const removeLayer = (layer, name) => {
-        if (layer && typeof layer === 'object' && '_leaflet_id' in layer && map.hasLayer(layer)) {
-            console.log(`Removing existing ${name}`);
-            map.removeLayer(layer);
-        }
-    };
-
-    // Log state before cleanup
-    console.log('Before cleanup - blueLayer:', !!blueCircleLayer, 'cutAwayMarkerExists:', !!cutAwayMarker, 'cutAwayCircleExists:', !!cutAwayCircle);
-
-    // Clear all layers to ensure no leftover markers
-    if (blueCircleLayer) {
-        blueCircleLayer.eachLayer(layer => {
-            console.log(`Removing layer from blueCircleLayer:`, layer);
-            layer.remove();
-        });
-        blueCircleLayer.clearLayers();
-        removeLayer(blueCircleLayer, 'blue circle layer');
-        blueCircleLayer = null;
-    }
-    if (greenCircleLayer) {
-        greenCircleLayer.eachLayer(layer => {
-            console.log(`Removing layer from greenCircleLayer:`, layer);
-            layer.remove();
-        });
-        greenCircleLayer.clearLayers();
-        removeLayer(greenCircleLayer, 'green circle layer');
-        greenCircleLayer = null;
-    }
-    if (redCircleLayer) {
-        redCircleLayer.eachLayer(layer => {
-            console.log(`Removing layer from redCircleLayer:`, layer);
-            layer.remove();
-        });
-        redCircleLayer.clearLayers();
-        removeLayer(redCircleLayer, 'red circle layer');
-        redCircleLayer = null;
-    }
-
-    // Clear arrays for compatibility
-    window.additionalBlueCircles = [];
-    window.additionalBlueLabels = [];
-    jumpCircle = null;
-    jumpCircleFull = null;
-    jumpCircleGreen = null;
-    jumpCircleGreenLight = null;
-
-    // Log state after cleanup
-    console.log('After cleanup - blueLayer:', !!blueCircleLayer, 'cutAwayMarkerExists:', !!cutAwayMarker, 'cutAwayCircleExists:', !!cutAwayCircle);
-
-    // Define updateBlueCircleLabels before listener management
-    function updateBlueCircleLabels() {
-        if (!blueCircleMetadata.length) {
-            console.log('No blue circle metadata to update labels');
-            return;
-        }
-        const zoom = map.getZoom();
-        blueCircleMetadata.forEach(({ circle, label, center, radius, content }) => {
-            label.setIcon(L.divIcon({
-                className: `isoline-label isoline-label-${zoom <= 11 ? 'small' : 'large'}`,
-                html: `<span style="font-size: ${zoom <= 11 ? '8px' : '10px'}">${content}</span>`,
-                iconSize: zoom <= 11 ? [50, 12] : [60, 14],
-                iconAnchor: calculateLabelAnchor(center, radius)
-            }));
-        });
-        console.log('Updated isoline labels for zoom:', zoom);
-    }
-
-    // Remove existing zoom event listener to avoid duplicates
-    try {
-        map.off('zoomend', updateBlueCircleLabels);
-    } catch (e) {
-        console.warn('Failed to remove zoomend listener:', e.message);
-    }
-
-    // Add map-wide click debug
-    map.on('click', (e) => {
-        console.log('Map clicked at:', e.latlng, 'Target:', e.originalEvent.target);
-    });
-
-    // Check if calculateJump is enabled
-    if (!userSettings.calculateJump) {
-        console.log('Calculate Jump unchecked in updateJumpCircle, cleared all circles and labels', {
-            calculateJump: userSettings.calculateJump,
-            showCanopyArea: userSettings.showCanopyArea,
-            showExitArea: userSettings.showExitArea,
-            showCutAwayFinder: userSettings.showCutAwayFinder
-        });
-        clearIsolineMarkers();
-        return false;
-    }
-
-    // Validate coordinates and radii
-    if (!isVisible || !Number.isFinite(blueLat) || !Number.isFinite(blueLng) || !Number.isFinite(redLat) || !Number.isFinite(redLng)) {
-        console.log('Invalid or invisible coordinates, skipping circle creation', {
-            isVisible,
-            blueLat,
-            blueLng,
-            redLat,
-            redLng
-        });
-        clearIsolineMarkers();
-        return false;
-    }
-
-    const newCenterBlue = calculateNewCenter(blueLat, blueLng, displacement, direction);
-    const newCenterRed = calculateNewCenter(redLat, redLng, displacementFull, directionFull);
-    console.log('New centers calculated:', { blue: newCenterBlue, red: newCenterRed });
-
-    if (!Number.isFinite(newCenterBlue[0]) || !Number.isFinite(newCenterBlue[1]) || !Number.isFinite(newCenterRed[0]) || !Number.isFinite(newCenterRed[1])) {
-        console.warn('Invalid center coordinates:', { newCenterBlue, newCenterRed });
-        clearIsolineMarkers();
-        return false;
-    }
-
-    if (!Number.isFinite(radius) || radius <= 0 || !Number.isFinite(radiusFull) || radiusFull <= 0) {
-        console.warn('Invalid radius values:', { radius, radiusFull });
-        clearIsolineMarkers();
-        return false;
-    }
-
-    console.log('Creating circles with radii and displacements:', {
-        blueRadius: radius,
-        redRadius: radiusFull,
-        additionalBlueRadii,
-        additionalBlueDisplacements,
-        additionalBlueDirections,
-        additionalBlueUpperLimits,
-        greenRadius: userSettings.showExitArea ? radiusFull : null,
-        greenLightRadius: userSettings.showExitArea ? radius : null
-    });
-
-    // Create layer groups only if needed
-    if (userSettings.showCanopyArea) {
-        blueCircleLayer = L.layerGroup().addTo(map);
-        redCircleLayer = L.layerGroup().addTo(map);
-    }
-    if (userSettings.showExitArea) {
-        greenCircleLayer = L.layerGroup().addTo(map);
-    }
-
-    // Draw blue and red circles if showCanopyArea is true
-    if (userSettings.showCanopyArea) {
-        // Main blue circle
-        jumpCircle = L.circle(newCenterBlue, {
-            radius: radius,
-            color: 'blue',
-            fillColor: 'blue',
-            fillOpacity: 0,
-            weight: 2,
-            opacity: 0.1,
-            interactive: true
-        }).addTo(blueCircleLayer);
-        if (jumpCircle.setZIndex) jumpCircle.setZIndex(1000);
-        console.log('Added main blue circle at:', { center: newCenterBlue, radius });
-
-        // Additional blue circles
-        window.additionalBlueCircles = [];
-        window.additionalBlueLabels = [];
-        if (Array.isArray(additionalBlueRadii) && Array.isArray(additionalBlueDisplacements) && Array.isArray(additionalBlueDirections) && Array.isArray(additionalBlueUpperLimits)) {
-            additionalBlueRadii.forEach((addRadius, i) => {
-                if (Number.isFinite(addRadius) && addRadius > 0 &&
-                    Number.isFinite(additionalBlueDisplacements[i]) && Number.isFinite(additionalBlueDirections[i]) &&
-                    Number.isFinite(additionalBlueUpperLimits[i])) {
-                    const addCenter = calculateNewCenter(blueLat, blueLng, additionalBlueDisplacements[i], additionalBlueDirections[i]);
-                    const blueContent = `${Math.round(additionalBlueUpperLimits[i])}m`; // Removed "Height AGL:"
-                    const circle = L.circle(addCenter, {
-                        radius: addRadius,
-                        color: 'blue',
-                        fillColor: 'blue',
-                        fillOpacity: 0.1,
-                        weight: 1,
-                        interactive: true
-                    });
-
-                    circle.addTo(blueCircleLayer);
-
-                    // Set z-index for blue circles
-                    if (circle.setZIndex) circle.setZIndex(1000);
-
-                    // Create marker for isoline label
-                    const label = L.marker(addCenter, {
-                        icon: L.divIcon({
-                            className: `isoline-label isoline-label-${currentZoom <= 11 ? 'small' : 'large'}`,
-                            html: `<span style="font-size: ${currentZoom <= 11 ? '8px' : '10px'}">${blueContent}</span>`,
-                            iconSize: currentZoom <= 11 ? [50, 12] : [60, 14],
-                            iconAnchor: calculateLabelAnchor(addCenter, addRadius)
-                        }),
-                        zIndexOffset: 2100
-                    }).addTo(blueCircleLayer);
-
-                    // Debug label binding
-                    console.log(`Label bound to blue circle ${i}:`, { content: blueContent });
-
-                    window.additionalBlueCircles.push(circle);
-                    window.additionalBlueLabels.push(label);
-                    console.log(`Added blue circle ${i}:`, { center: addCenter, radius: addRadius, content: blueContent });
-
-                    // Store metadata for zoom updates
-                    blueCircleMetadata.push({ circle, label, center: addCenter, radius: addRadius, content: blueContent });
-
-                    // Optional: Hide labels for odd-indexed circles at zoom 11 or lower
-                    if (currentZoom <= 11 && i % 2 === 1) {
-                        label.remove();
-                        console.log(`Hid label for blue circle ${i} at zoom:`, currentZoom);
-                    }
-                } else {
-                    console.warn(`Invalid data for blue circle ${i}:`, {
-                        addRadius,
-                        displacement: additionalBlueDisplacements[i],
-                        direction: additionalBlueDirections[i],
-                        upperLimit: additionalBlueUpperLimits[i]
-                    });
-                }
-            });
-        } else {
-            console.warn('Invalid or empty arrays for additional blue circles:', {
-                additionalBlueRadii,
-                additionalBlueDisplacements,
-                additionalBlueDirections,
-                additionalBlueUpperLimits
-            });
-        }
-
-        // Red circle
-        jumpCircleFull = L.circle(newCenterRed, {
-            radius: radiusFull,
-            color: 'red',
-            fillColor: 'red',
-            fillOpacity: 0,
-            weight: 2,
-            opacity: 0.8,
-            interactive: false
-        }).addTo(redCircleLayer);
-        if (jumpCircleFull.setZIndex) jumpCircleFull.setZIndex(400);
-        console.log('Added red circle at:', { center: newCenterRed, radius: radiusFull });
-    }
-
-    // Draw green circles if showExitArea is true
-    console.log('Checking showExitArea:', userSettings.showExitArea);
-    if (userSettings.showExitArea) {
-        // First green circle (same as red circle radius)
-        let jumpCircleGreenCenter = newCenterRed;
-        if (Number.isFinite(freeFallDirection) && Number.isFinite(freeFallDistance)) {
-            const greenShiftDirection = (freeFallDirection + 180) % 360;
-            jumpCircleGreenCenter = calculateNewCenter(newCenterRed[0], newCenterRed[1], freeFallDistance, greenShiftDirection);
-            console.log('Green circle center calculated:', { center: jumpCircleGreenCenter, shiftDirection: greenShiftDirection, shiftDistance: freeFallDistance });
-        } else {
-            console.warn('Free fall direction or distance not provided, using red circle center:', { freeFallDirection, freeFallDistance });
-        }
-
-        jumpCircleGreen = L.circle(jumpCircleGreenCenter, {
-            radius: radiusFull,
-            color: 'green',
-            fillColor: 'green',
-            fillOpacity: 0.2,
-            weight: 2,
-            interactive: true
-        }).addTo(greenCircleLayer);
-        if (jumpCircleGreen.setZIndex) jumpCircleGreen.setZIndex(600);
-        console.log('Added green circle at:', { center: jumpCircleGreenCenter, radius: radiusFull });
-
-        // Dark green circle (same as blue circle radius)
-        let jumpCircleGreenLightCenter = newCenterBlue;
-        if (Number.isFinite(freeFallDirection) && Number.isFinite(freeFallDistance)) {
-            const greenLightShiftDirection = (freeFallDirection + 180) % 360;
-            jumpCircleGreenLightCenter = calculateNewCenter(newCenterBlue[0], newCenterBlue[1], freeFallDistance, greenLightShiftDirection);
-            console.log('Dark green circle center calculated:', { center: jumpCircleGreenLightCenter, shiftDirection: greenLightShiftDirection, shiftDistance: freeFallDistance });
-        } else {
-            console.warn('Free fall direction or distance not provided, using blue circle center for dark green:', { freeFallDirection, freeFallDistance });
-        }
-
-        jumpCircleGreenLight = L.circle(jumpCircleGreenLightCenter, {
-            radius: radius,
-            color: 'darkgreen',
-            fillColor: 'darkgreen',
-            fillOpacity: 0.2,
-            weight: 2,
-            interactive: true
-        }).addTo(greenCircleLayer);
-        if (jumpCircleGreenLight.setZIndex) jumpCircleGreenLight.setZIndex(600);
-        console.log('Added dark green circle at:', { center: jumpCircleGreenLightCenter, radius });
-
-        // Tooltip content with freeFallTime
-        const tooltipContent = `
-            Exit areas calculated with:<br>
-            Throw/Drift: ${Number.isFinite(freeFallDirection) ? Math.round(freeFallDirection) : 'N/A'}° ${Number.isFinite(freeFallDistance) ? Math.round(freeFallDistance) : 'N/A'} m<br>
-            Free Fall Time: ${freeFallTime != null && !isNaN(freeFallTime) ? Math.round(freeFallTime) : 'N/A'} sec
-        `;
-
-        // Bind tooltip to jumpCircleGreenLight
-        jumpCircleGreenLight.bindTooltip(tooltipContent, {
-            direction: 'top',
-            offset: [0, 0],
-            className: 'wind-tooltip'
-        });
-        console.log('Tooltip bound to dark green circle:', { hasTooltip: !!jumpCircleGreenLight.getTooltip(), tooltipContent });
-    }
-
-    // Calculate pixel anchor for label at circle's top edge
-    function calculateLabelAnchor(center, radius) {
-        const centerLatLng = L.latLng(center[0], center[1]);
-        const earthRadius = 6378137; // Earth's radius in meters
-        const deltaLat = (radius / earthRadius) * (180 / Math.PI);
-        const topEdgeLatLng = L.latLng(center[0] + deltaLat, center[1]);
-        const centerPoint = map.latLngToLayerPoint(centerLatLng);
-        const topEdgePoint = map.latLngToLayerPoint(topEdgeLatLng);
-        const offsetY = centerPoint.y - topEdgePoint.y + 10; // Positive for top edge
-        return [25, offsetY]; // Center horizontally, offset vertically
-    }
-
-    // Only call updateBlueCircleLabels if metadata exists
-    if (blueCircleMetadata.length) {
-        updateBlueCircleLabels();
-        map.on('zoomend', updateBlueCircleLabels);
-    } else {
-        console.log('No blue circles created, skipping label update and zoom listener');
-    }
-
-    console.log('Jump circles added at zoom:', currentZoom, 'Layers on map:', {
-        blue: !!jumpCircle && map.hasLayer(jumpCircle),
-        red: !!jumpCircleFull && map.hasLayer(jumpCircleFull),
-        additionalBlue: window.additionalBlueCircles.map((c, i) => !!c && map.hasLayer(c)),
-        green: !!jumpCircleGreen && map.hasLayer(jumpCircleGreen),
-        greenLight: !!jumpCircleGreenLight && map.hasLayer(jumpCircleGreenLight),
-        blueLayerExists: !!blueCircleLayer,
-        redLayerExists: !!redCircleLayer,
-        greenLayerExists: !!greenCircleLayer,
-        currentMarkerExists: !!currentMarker,
-        cutAwayMarkerExists: !!cutAwayMarker,
-        cutAwayCircleExists: !!cutAwayCircle
-    });
-
-    if (currentMarker) {
-        currentMarker.setLatLng([lastLat, lastLng]);
-        updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
-    }
-
-    if (gpxLayer) {
-        gpxLayer.bringToFront(); // Fallback to ensure GPX is above circles
-    }
-    console.log('updateJumpCircle completed');
-    return true;
 }
 function resetJumpRunDirection(triggerUpdate = true) {
     customJumpRunDirection = null;
@@ -6340,60 +5664,6 @@ function setupInputEvents() {
     });
 }
 function setupCheckboxEvents() {
-    const enableCalculateJump = (checkbox) => {
-        userSettings.calculateJump = true;
-        saveSettings();
-        toggleSubmenu('calculateJumpCheckbox', true);
-        console.log('Calculate Jump enabled');
-        if (weatherData && lastLat !== null && lastLng !== null) {
-            console.log('Calling calculate functions with:', { weatherData, lastLat, lastLng });
-            if (userSettings.showExitArea) calculateExitCircle();
-            if (userSettings.showCanopyArea) calculateCanopyCircles();
-            if (userSettings.showJumpRunTrack) calculateJumpRunTrack();
-            calculateCutAway();
-        } else {
-            Utils.handleError('Please click the map to set a location first.');
-        }
-    };
-
-    const disableCalculateJump = (checkbox) => {
-        userSettings.calculateJump = false;
-        userSettings.showExitArea = false;
-        userSettings.showCanopyArea = false;
-        userSettings.showJumpRunTrack = false;
-        userSettings.showCutAwayFinder = false;
-        saveSettings();
-        checkbox.checked = false;
-        toggleSubmenu('calculateJumpCheckbox', false);
-        console.log('Disabling Calculate Jump');
-        clearJumpCircles();
-        if (jumpRunTrackLayer) {
-            if (jumpRunTrackLayer.airplaneMarker) {
-                map.removeLayer(jumpRunTrackLayer.airplaneMarker);
-                jumpRunTrackLayer.airplaneMarker = null;
-            }
-            if (jumpRunTrackLayer.approachLayer) {
-                map.removeLayer(jumpRunTrackLayer.approachLayer);
-                jumpRunTrackLayer.approachLayer = null;
-            }
-            map.removeLayer(jumpRunTrackLayer);
-            jumpRunTrackLayer = null;
-            console.log('Removed JRT polyline');
-        }
-        if (cutAwayCircle) {
-            map.removeLayer(cutAwayCircle);
-            cutAwayCircle = null;
-            console.log('Cleared cut-away circle');
-        }
-        ['showExitAreaCheckbox', 'showCanopyAreaCheckbox', 'showJumpRunTrack', 'showCutAwayFinder'].forEach(id => {
-            const cb = document.getElementById(id);
-            if (cb) {
-                cb.checked = false;
-                console.log(`Reset ${id} to unchecked`);
-            }
-        });
-    };
-
     setupCheckbox('showTableCheckbox', 'showTable', (checkbox) => {
         userSettings.showTable = checkbox.checked;
         saveSettings();
@@ -6409,20 +5679,126 @@ function setupCheckboxEvents() {
         recenterMap();
     });
 
-    setupCheckbox('calculateJumpCheckbox', 'calculateJump', (checkbox) => {
-        console.log('Calculate Jump checkbox changed to:', checkbox.checked);
-        if (checkbox.checked) {
-            if (isFeatureUnlocked('calculateJump')) {
-                enableCalculateJump(checkbox);
-            } else {
-                showPasswordModal('calculateJump', () => {
-                    enableCalculateJump(checkbox);
-                }, () => {
-                    disableCalculateJump(checkbox);
-                });
+    setupCheckbox('showExitAreaCheckbox', 'showExitArea', (checkbox) => {
+        userSettings.showExitArea = checkbox.checked;
+        saveSettings();
+        checkbox.checked = userSettings.showExitArea;
+        console.log('Show Exit Area set to:', userSettings.showExitArea);
+        if (checkbox.checked && weatherData && lastLat && lastLng) {
+            const exitResult = calculateExitCircle();
+            if (exitResult) {
+                updateJumpCircle(
+                    exitResult.darkGreenLat, exitResult.darkGreenLng,
+                    exitResult.greenLat, exitResult.greenLng,
+                    exitResult.darkGreenRadius, exitResult.greenRadius,
+                    [], [], [], [],
+                    0, 0, 0, 0,
+                    exitResult.freeFallDirection, exitResult.freeFallDistance, exitResult.freeFallTime,
+                    true, false
+                );
             }
+            calculateCutAway();
         } else {
-            disableCalculateJump(checkbox);
+            clearJumpCircles();
+            calculateJump(); // Re-render active circles
+            console.log('Cleared exit circles and re-rendered active circles');
+        }
+    });
+
+    setupCheckbox('showCanopyAreaCheckbox', 'showCanopyArea', (checkbox) => {
+        userSettings.showCanopyArea = checkbox.checked;
+        saveSettings();
+        checkbox.checked = userSettings.showCanopyArea;
+        console.log('Show Canopy Area set to:', userSettings.showCanopyArea);
+        if (checkbox.checked && weatherData && lastLat && lastLng) {
+            const canopyResult = calculateCanopyCircles();
+            if (canopyResult) {
+                updateJumpCircle(
+                    canopyResult.blueLat, canopyResult.blueLng,
+                    canopyResult.redLat, canopyResult.redLng,
+                    canopyResult.radius, canopyResult.radiusFull,
+                    canopyResult.additionalBlueRadii, canopyResult.additionalBlueDisplacements,
+                    canopyResult.additionalBlueDirections, canopyResult.additionalBlueUpperLimits,
+                    canopyResult.displacement, canopyResult.displacementFull,
+                    canopyResult.direction, canopyResult.directionFull,
+                    canopyResult.freeFallDirection, canopyResult.freeFallDistance, canopyResult.freeFallTime,
+                    false, true
+                );
+            }
+            calculateCutAway();
+        } else {
+            if (jumpCircle) {
+                map.removeLayer(jumpCircle);
+                jumpCircle = null;
+            }
+            if (jumpCircleFull) {
+                map.removeLayer(jumpCircleFull);
+                jumpCircleFull = null;
+            }
+            if (window.additionalBlueCircles) {
+                window.additionalBlueCircles.forEach(circle => map.removeLayer(circle));
+                window.additionalBlueCircles = [];
+            }
+            if (window.additionalBlueLabels) {
+                window.additionalBlueLabels.forEach(label => map.removeLayer(label));
+                window.additionalBlueLabels = [];
+            }
+            console.log('Cleared blue and red circles and labels');
+        }
+    });
+
+    setupCheckbox('showJumpRunTrack', 'showJumpRunTrack', (checkbox) => {
+        userSettings.showJumpRunTrack = checkbox.checked;
+        saveSettings();
+        checkbox.checked = userSettings.showJumpRunTrack;
+        console.log('showJumpRunTrack changed:', checkbox.checked);
+        if (checkbox.checked && weatherData && lastLat && lastLng) {
+            calculateJumpRunTrack();
+        } else {
+            if (jumpRunTrackLayer) {
+                if (jumpRunTrackLayer.airplaneMarker) {
+                    map.removeLayer(jumpRunTrackLayer.airplaneMarker);
+                    jumpRunTrackLayer.airplaneMarker = null;
+                }
+                if (jumpRunTrackLayer.approachLayer) {
+                    map.removeLayer(jumpRunTrackLayer.approachLayer);
+                    jumpRunTrackLayer.approachLayer = null;
+                }
+                map.removeLayer(jumpRunTrackLayer);
+                jumpRunTrackLayer = null;
+                console.log('Removed JRT polyline');
+            }
+            const directionInput = document.getElementById('jumpRunTrackDirection');
+            if (directionInput) {
+                const trackData = jumpRunTrack();
+                directionInput.value = trackData ? trackData.direction : '';
+                console.log('Updated jumpRunTrackDirection value:', trackData?.direction || '');
+            }
+        }
+    });
+
+    setupCheckbox('showCutAwayFinder', 'showCutAwayFinder', (checkbox) => {
+        console.log('showCutAwayFinder checkbox changed to:', checkbox.checked);
+        userSettings.showCutAwayFinder = checkbox.checked;
+        saveSettings();
+        toggleSubmenu('showCutAwayFinder', checkbox.checked);
+        if (checkbox.checked && weatherData && cutAwayLat !== null && cutAwayLng !== null) {
+            console.log('Show Cut Away Finder enabled, running calculateCutAway');
+            calculateCutAway();
+        } else {
+            if (cutAwayCircle) {
+                map.removeLayer(cutAwayCircle);
+                cutAwayCircle = null;
+                console.log('Cleared cut-away circle');
+            }
+            if (cutAwayMarker) {
+                map.removeLayer(cutAwayMarker);
+                cutAwayMarker = null;
+                console.log('Cleared cut-away marker');
+            }
+            cutAwayLat = null;
+            cutAwayLng = null;
+            console.log('Cleared cutAwayLat and cutAwayLng');
         }
     });
 
@@ -6482,130 +5858,6 @@ function setupCheckboxEvents() {
             }
         } else {
             disableFeature();
-        }
-    });
-
-    setupCheckbox('showJumpRunTrack', 'showJumpRunTrack', (checkbox) => {
-        userSettings.showJumpRunTrack = checkbox.checked;
-        saveSettings();
-        checkbox.checked = userSettings.showJumpRunTrack;
-        console.log('showJumpRunTrack changed:', checkbox.checked);
-        if (checkbox.checked && userSettings.calculateJump && weatherData && lastLat && lastLng) {
-            calculateJumpRunTrack();
-        } else {
-            if (jumpRunTrackLayer) {
-                if (jumpRunTrackLayer.airplaneMarker) {
-                    map.removeLayer(jumpRunTrackLayer.airplaneMarker);
-                    jumpRunTrackLayer.airplaneMarker = null;
-                }
-                if (jumpRunTrackLayer.approachLayer) {
-                    map.removeLayer(jumpRunTrackLayer.approachLayer);
-                    jumpRunTrackLayer.approachLayer = null;
-                }
-                map.removeLayer(jumpRunTrackLayer);
-                jumpRunTrackLayer = null;
-                console.log('Removed JRT polyline');
-            }
-            const directionInput = document.getElementById('jumpRunTrackDirection');
-            if (directionInput) {
-                const trackData = jumpRunTrack();
-                directionInput.value = trackData ? trackData.direction : '';
-                console.log('Updated jumpRunTrackDirection value:', trackData?.direction || '');
-            }
-        }
-    });
-
-    setupCheckbox('showExitAreaCheckbox', 'showExitArea', (checkbox) => {
-        userSettings.showExitArea = checkbox.checked;
-        saveSettings();
-        checkbox.checked = userSettings.showExitArea;
-        console.log('Show Exit Area set to:', userSettings.showExitArea);
-        if (checkbox.checked && userSettings.calculateJump && weatherData && lastLat && lastLng) {
-            const exitResult = calculateExitCircle();
-            if (exitResult) {
-                updateJumpCircle(
-                    exitResult.darkGreenLat, exitResult.darkGreenLng,
-                    exitResult.greenLat, exitResult.greenLng,
-                    exitResult.darkGreenRadius, exitResult.greenRadius,
-                    [], [], [], [],
-                    0, 0, 0, 0,
-                    exitResult.freeFallDirection, exitResult.freeFallDistance, exitResult.freeFallTime,
-                    true, false
-                );
-            }
-            calculateCutAway();
-        } else {
-            // Clear all circles and re-render active ones
-            clearJumpCircles();
-            calculateJump(); // Re-render canopy circles if active
-            console.log('Cleared exit circles and re-rendered active circles');
-        }
-    });
-
-    setupCheckbox('showCanopyAreaCheckbox', 'showCanopyArea', (checkbox) => {
-        userSettings.showCanopyArea = checkbox.checked;
-        saveSettings();
-        checkbox.checked = userSettings.showCanopyArea;
-        console.log('Show Canopy Area set to:', userSettings.showCanopyArea);
-        if (checkbox.checked && userSettings.calculateJump && weatherData && lastLat && lastLng) {
-            const canopyResult = calculateCanopyCircles();
-            if (canopyResult) {
-                updateJumpCircle(
-                    canopyResult.blueLat, canopyResult.blueLng,
-                    canopyResult.redLat, canopyResult.redLng,
-                    canopyResult.radius, canopyResult.radiusFull,
-                    canopyResult.additionalBlueRadii, canopyResult.additionalBlueDisplacements,
-                    canopyResult.additionalBlueDirections, canopyResult.additionalBlueUpperLimits,
-                    canopyResult.displacement, canopyResult.displacementFull,
-                    canopyResult.direction, canopyResult.directionFull,
-                    canopyResult.freeFallDirection, canopyResult.freeFallDistance, canopyResult.freeFallTime,
-                    false, true
-                );
-            }
-            calculateCutAway();
-        } else {
-            if (jumpCircle) {
-                map.removeLayer(jumpCircle);
-                jumpCircle = null;
-            }
-            if (jumpCircleFull) {
-                map.removeLayer(jumpCircleFull);
-                jumpCircleFull = null;
-            }
-            if (window.additionalBlueCircles) {
-                window.additionalBlueCircles.forEach(circle => map.removeLayer(circle));
-                window.additionalBlueCircles = [];
-            }
-            if (window.additionalBlueLabels) {
-                window.additionalBlueLabels.forEach(label => map.removeLayer(label));
-                window.additionalBlueLabels = [];
-            }
-            console.log('Cleared blue and red circles and labels');
-        }
-    });
-
-    setupCheckbox('showCutAwayFinder', 'showCutAwayFinder', (checkbox) => {
-        console.log('showCutAwayFinder checkbox changed to:', checkbox.checked);
-        userSettings.showCutAwayFinder = checkbox.checked;
-        saveSettings();
-        toggleSubmenu('showCutAwayFinder', checkbox.checked);
-        if (checkbox.checked && userSettings.calculateJump && weatherData && cutAwayLat !== null && cutAwayLng !== null) {
-            console.log('Show Cut Away Finder enabled, running calculateCutAway');
-            calculateCutAway();
-        } else {
-            if (cutAwayCircle) {
-                map.removeLayer(cutAwayCircle);
-                cutAwayCircle = null;
-                console.log('Cleared cut-away circle');
-            }
-            if (cutAwayMarker) {
-                map.removeLayer(cutAwayMarker);
-                cutAwayMarker = null;
-                console.log('Cleared cut-away marker');
-            }
-            cutAwayLat = null;
-            cutAwayLng = null;
-            console.log('Cleared cutAwayLat and cutAwayLng');
         }
     });
 
