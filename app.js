@@ -4937,12 +4937,8 @@ function initializeApp() {
     console.log('Initializing app');
 
     console.log('Initial userSettings:', userSettings);
-    if (userSettings.showJumpRunTrack || userSettings.showExitArea) {
-        console.warn('Resetting potentially problematic settings');
-        userSettings.showJumpRunTrack = false;
-        userSettings.showExitArea = false;
-        saveSettings();
-    }
+    userSettings.calculateJump = true;
+    saveSettings();
 
     setupCheckboxEvents();
     setupSliderEvents();
