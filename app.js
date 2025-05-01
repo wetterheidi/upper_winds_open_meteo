@@ -4609,11 +4609,13 @@ function updateLandingPattern() {
         finalArrowColor = '#ffcccc';
     }
 
-    const finalCourse = (effectiveLandingWindDir + 180) % 360;
-    const finalWindAngle = Utils.calculateWindAngle(effectiveLandingWindDir, finalWindDir);
+    const finalCourse = effectiveLandingWindDir;
+    const finalWindAngle = Utils.calculateWindAngle(finalCourse, finalWindDir);
     const { crosswind: finalCrosswind, headwind: finalHeadwind } = Utils.calculateWindComponents(finalWindSpeedKt, finalWindAngle);
     const finalWca = Utils.calculateWCA(finalCrosswind, CANOPY_SPEED_KT) * (finalCrosswind >= 0 ? 1 : -1);
-    const finalGroundSpeedKt = Utils.calculateGroundSpeed(CANOPY_SPEED_KT, finalHeadwind);
+    const finalHeading = Utils.normalizeAngle(finalCourse - finalWca);
+    const finalCourseObj = Utils.calculateCourseFromHeading(finalHeading, finalWindDir, finalWindSpeedKt, CANOPY_SPEED_KT);
+    const finalGroundSpeedKt = finalCourseObj.groundSpeed;
     const finalTime = LEG_HEIGHT_FINAL / DESCENT_RATE_MPS;
     const finalLength = finalGroundSpeedKt * 1.852 / 3.6 * finalTime;
     const finalBearing = (effectiveLandingWindDir + 180) % 360;
@@ -4671,19 +4673,21 @@ function updateLandingPattern() {
         console.log('Base Heading:', baseHeading);
     }
 
-    const baseCourse = Utils.calculateCourseFromHeading(baseHeading, baseWindDir, baseWindSpeedKt, CANOPY_SPEED_KT).trueCourse;
+    const baseCourseObj = Utils.calculateCourseFromHeading(baseHeading, baseWindDir, baseWindSpeedKt, CANOPY_SPEED_KT);
+    const baseCourse = baseCourseObj.trueCourse;
+    const baseGroundSpeedKt = baseCourseObj.groundSpeed;
+    if (baseGroundSpeedKt < 0) {
+        baseBearing = (baseBearing + 180) % 360; // Reverse the course
+        console.log('Base ground speed is negative:', baseGroundSpeedKt, 'New course:', baseBearing);
+    }
+    const baseTime = (LEG_HEIGHT_BASE - LEG_HEIGHT_FINAL) / DESCENT_RATE_MPS;
+    const baseLength = baseGroundSpeedKt * 1.852 / 3.6 * baseTime;
     console.log('Base Course:', baseCourse);
     const baseWindAngle = Utils.calculateWindAngle(baseCourse, baseWindDir);
     const { crosswind: baseCrosswind, headwind: baseHeadwind } = Utils.calculateWindComponents(baseWindSpeedKt, baseWindAngle);
     const baseWca = Utils.calculateWCA(baseCrosswind, CANOPY_SPEED_KT) * (baseCrosswind >= 0 ? 1 : -1);
     let baseBearing = (baseCourse + 180) % 360;
-    const baseTime = (LEG_HEIGHT_BASE - LEG_HEIGHT_FINAL) / DESCENT_RATE_MPS;
-    const baseGroundSpeedKt = CANOPY_SPEED_KT - baseHeadwind;
-    if (baseGroundSpeedKt < 0) {
-        baseBearing = (baseBearing + 180) % 360; // Reverse the course
-        console.log('Base ground speed is negative:', baseGroundSpeedKt, 'New course:', baseBearing);
-    }
-    const baseLength = baseGroundSpeedKt * 1.852 / 3.6 * baseTime;
+
     const baseEnd = calculateLegEndpoint(finalEnd[0], finalEnd[1], baseBearing, baseGroundSpeedKt, baseTime);
 
     secondlandingPatternPolygon = L.polyline([finalEnd, baseEnd], {
@@ -4727,15 +4731,18 @@ function updateLandingPattern() {
     } else {
         downwindArrowColor = '#ffcccc';
     }
+
     const downwindCourse = effectiveLandingWindDir;
     const downwindWindAngle = Utils.calculateWindAngle(downwindCourse, downwindWindDir);
     const { crosswind: downwindCrosswind, headwind: downwindHeadwind } = Utils.calculateWindComponents(downwindWindSpeedKt, downwindWindAngle);
     const downwindWca = Utils.calculateWCA(downwindCrosswind, CANOPY_SPEED_KT) * (downwindCrosswind >= 0 ? 1 : -1);
-    const downwindGroundSpeedKt = CANOPY_SPEED_KT + downwindHeadwind; // Corrected to use raw headwind
+    const downwindHeading = Utils.normalizeAngle((downwindCourse - downwindWca+180) % 360);
+    const downwindCourseObj = Utils.calculateCourseFromHeading(downwindHeading, downwindWindDir, downwindWindSpeedKt, CANOPY_SPEED_KT);
+    const downwindGroundSpeedKt = downwindCourseObj.groundSpeed;
     const downwindTime = (LEG_HEIGHT_DOWNWIND - LEG_HEIGHT_BASE) / DESCENT_RATE_MPS;
     const downwindLength = downwindGroundSpeedKt * 1.852 / 3.6 * downwindTime;
     const downwindEnd = calculateLegEndpoint(baseEnd[0], baseEnd[1], downwindCourse, downwindGroundSpeedKt, downwindTime);
-
+    
     thirdLandingPatternLine = L.polyline([baseEnd, downwindEnd], {
         color: 'red',
         weight: 3,
