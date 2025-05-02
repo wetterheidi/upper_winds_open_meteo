@@ -700,9 +700,12 @@ function initMap() {
         });
     });
 
-    map.on('movestart', () => {
-        isManualPanning = true;
-        console.log('Manual panning detected, isManualPanning set to true');
+    map.on('movestart', (e) => {
+        // Only set isManualPanning if not dragging a marker
+        if (!e.target.dragging || !e.target.dragging._marker) {
+            isManualPanning = true;
+            console.log('Manual panning detected, isManualPanning set to true');
+        }
     });
 
     map.on('mouseout', function () {
@@ -787,6 +790,22 @@ function initMap() {
             currentMarker.setLatLng([lastLat, lastLng]);
             updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, currentMarker.getPopup()?.isOpen() || false);
         }
+
+        if (jumpRunTrackLayer && userSettings.showJumpRunTrack) {
+            const anchorMarker = jumpRunTrackLayer.getLayers().find(layer => layer.options.icon?.options.className === 'jrt-anchor-marker');
+            if (anchorMarker) {
+                const baseSize = currentZoom <= 11 ? 10 : currentZoom <= 12 ? 12 : currentZoom <= 13 ? 14 : 16;
+                const newIcon = L.divIcon({
+                    className: 'jrt-anchor-marker',
+                    html: `<div style="background-color: orange; width: ${baseSize}px; height: ${baseSize}px; border-radius: 50%; border: 2px solid white; opacity: 0.8;"></div>`,
+                    iconSize: [baseSize, baseSize],
+                    iconAnchor: [baseSize / 2, baseSize / 2],
+                    tooltipAnchor: [0, -(baseSize / 2 + 5)]
+                });
+                anchorMarker.setIcon(newIcon);
+                console.log('Updated anchor marker size for zoom:', { zoom: currentZoom, size: baseSize });
+            }
+        }
     });
 
     let lastTapTime = 0;
@@ -794,7 +813,12 @@ function initMap() {
     const mapContainer = map.getContainer();
 
     mapContainer.addEventListener('touchstart', async (e) => {
-        if (e.touches.length !== 1) return;
+        console.log('Map touchstart event, target:', e.target, 'touches:', e.touches.length);
+        if (e.touches.length !== 1 || e.target.closest('.leaflet-marker-icon')) {
+            console.log('Ignoring map touchstart: multiple touches or marker target');
+            return;
+        }
+
         const currentTime = new Date().getTime();
         const timeSinceLastTap = currentTime - lastTapTime;
         if (timeSinceLastTap < tapThreshold && timeSinceLastTap > 0) {
@@ -825,12 +849,11 @@ function initMap() {
     }, { passive: false });
 
     map.on('click', (e) => {
-        L.DomEvent.stopPropagation(e);
-        console.log('Map click event stopped from propagating');
+        console.log('Map click event, target:', e.originalEvent.target);
     });
+
     map.on('mousedown', (e) => {
-        L.DomEvent.stopPropagation(e);
-        console.log('Map mousedown event stopped from propagating');
+        console.log('Map mousedown event, target:', e.originalEvent.target);
     });
 
     const hamburgerBtn = document.getElementById('hamburgerBtn');
@@ -843,7 +866,6 @@ function initMap() {
         });
     }
 
-    // Initialize app after map setup
     initializeApp();
 }
 function handleHarpPlacement(e) {
@@ -3922,20 +3944,11 @@ function updateJumpRunTrack() {
     const currentZoom = map.getZoom();
     const isZoomInRange = currentZoom >= minZoom && currentZoom <= maxZoom;
 
+    // Remove existing jump run track layer
     if (jumpRunTrackLayer) {
-        if (jumpRunTrackLayer.airplaneMarker) {
-            map.removeLayer(jumpRunTrackLayer.airplaneMarker);
-            jumpRunTrackLayer.airplaneMarker = null;
-            console.log('Removed airplane marker');
-        }
-        if (jumpRunTrackLayer.approachLayer) {
-            map.removeLayer(jumpRunTrackLayer.approachLayer);
-            jumpRunTrackLayer.approachLayer = null;
-            console.log('Removed approach path');
-        }
         map.removeLayer(jumpRunTrackLayer);
         jumpRunTrackLayer = null;
-        console.log('Removed JRT polyline');
+        console.log('Removed existing JRT layer group');
     }
 
     if (!userSettings.showJumpRunTrack || !weatherData || !lastLat || !lastLng || !isZoomInRange) {
@@ -3978,42 +3991,59 @@ function updateJumpRunTrack() {
         console.log('Updating approach path with:', { approachLatLngs, approachLength });
     }
 
-    jumpRunTrackLayer = L.polyline(latlngs, {
+    // Create a LayerGroup to hold all components
+    jumpRunTrackLayer = L.layerGroup().addTo(map);
+
+    // Create polyline for the jump run track (interactive for tooltips)
+    const trackPolyline = L.polyline(latlngs, {
         color: 'orange',
         weight: 4,
         opacity: 0.9,
-        interactive: true,
-        draggable: true
-    }).addTo(map);
+        interactive: true
+    }).addTo(jumpRunTrackLayer);
 
-    jumpRunTrackLayer.bindTooltip(`Jump Run: ${Math.round(direction)}°, ${Math.round(trackLength)} m`, {
+    trackPolyline.bindTooltip(`Jump Run: ${Math.round(direction)}°, ${Math.round(trackLength)} m`, {
         permanent: false,
         direction: 'top',
         offset: [0, -10]
     });
 
+    // Prevent drag events on the polyline
+    trackPolyline.on('mousedown touchstart', (e) => {
+        L.DomEvent.stopPropagation(e);
+    });
+
+    // Create polyline for the approach path (interactive for tooltips)
+    let approachPolyline = null;
     if (approachLatLngs && Array.isArray(approachLatLngs) && approachLatLngs.length === 2) {
         const isValidApproachLatLngs = approachLatLngs.every(ll => Array.isArray(ll) && ll.length === 2 && !isNaN(ll[0]) && !isNaN(ll[1]));
         if (isValidApproachLatLngs) {
-            jumpRunTrackLayer.approachLayer = L.polyline(approachLatLngs, {
+            approachPolyline = L.polyline(approachLatLngs, {
                 color: 'orange',
                 weight: 3,
                 opacity: 0.9,
                 dashArray: '10, 10',
-                interactive: true,
-                draggable: true
-            }).addTo(map);
+                interactive: true
+            }).addTo(jumpRunTrackLayer);
 
-            jumpRunTrackLayer.approachLayer.bindTooltip(`Approach: ${Math.round(direction)}°, ${Math.round(approachLength)} m, ${Math.round(approachTime / 60)} min`, {
+            approachPolyline.bindTooltip(`Approach: ${Math.round(direction)}°, ${Math.round(approachLength)} m, ${Math.round(approachTime / 60)} min`, {
                 permanent: false,
                 direction: 'top',
                 offset: [0, -10]
             });
+
+            // Prevent drag events on the approach polyline
+            approachPolyline.on('mousedown touchstart', (e) => {
+                L.DomEvent.stopPropagation(e);
+            });
         } else {
             console.warn('Invalid approachLatLngs format:', approachLatLngs);
         }
+    } else {
+        console.warn('approachLatLngs is null or invalid:', approachLatLngs);
     }
 
+    // Add airplane marker at the front end (now draggable)
     const frontEnd = latlngs[1];
     const airplaneIcon = L.icon({
         iconUrl: 'airplane_orange.png',
@@ -4025,84 +4055,143 @@ function updateJumpRunTrack() {
         shadowAnchor: [13, 32]
     });
 
-    jumpRunTrackLayer.airplaneMarker = L.marker(frontEnd, {
+    const airplaneMarker = L.marker(frontEnd, {
         icon: airplaneIcon,
         rotationAngle: direction,
         rotationOrigin: 'center center',
-        draggable: false
-    }).addTo(map);
+        draggable: true, // Make the airplane marker draggable
+        zIndexOffset: 2000 // Ensure it's above other layers
+    }).addTo(jumpRunTrackLayer);
 
+    // Add tooltip to indicate draggability
+    airplaneMarker.bindTooltip('Drag to move Jump Run Track', {
+        permanent: false,
+        direction: 'top',
+        offset: [0, -20]
+    });
+
+    // Store original positions for drag calculations
+    let originalTrackLatLngs = latlngs.map(ll => [...ll]);
+    let originalApproachLatLngs = approachLatLngs ? approachLatLngs.map(ll => [...ll]) : null;
+    let originalAirplaneLatLng = [...frontEnd];
+    let originalCenterLat = lastLat;
+    let originalCenterLng = lastLng;
+    if (userSettings.jumpRunTrackForwardOffset !== 0) {
+        const forwardDistance = Math.abs(userSettings.jumpRunTrackForwardOffset);
+        const forwardBearing = userSettings.jumpRunTrackForwardOffset >= 0 ? direction : (direction + 180) % 360;
+        [originalCenterLat, originalCenterLng] = calculateNewCenter(lastLat, lastLng, forwardDistance, forwardBearing);
+    }
+    if (userSettings.jumpRunTrackOffset !== 0) {
+        const lateralDistance = Math.abs(userSettings.jumpRunTrackOffset);
+        const lateralBearing = userSettings.jumpRunTrackOffset >= 0
+            ? (direction + 90) % 360
+            : (direction - 90 + 360) % 360;
+        [originalCenterLat, originalCenterLng] = calculateNewCenter(originalCenterLat, originalCenterLng, lateralDistance, lateralBearing);
+    }
+
+    // Update direction input
     const directionInput = document.getElementById('jumpRunTrackDirection');
     if (directionInput) {
         setInputValueSilently('jumpRunTrackDirection', Math.round(direction));
     }
 
-    jumpRunTrackLayer.on('dragstart', () => {
+    // Dragging handlers for the airplane marker
+    airplaneMarker.on('mousedown', (e) => {
+        console.log('Airplane marker mousedown:', e);
         map.dragging.disable();
-        console.log('Map dragging disabled for JRT drag');
+        L.DomEvent.stopPropagation(e);
     });
 
-    jumpRunTrackLayer.on('dragend', () => {
-        map.dragging.enable();
-        console.log('Map dragging re-enabled');
+    airplaneMarker.on('dragstart', () => {
+        console.log('Airplane marker dragstart');
+        map.dragging.disable();
+    });
 
-        const newCoords = jumpRunTrackLayer.getLatLngs();
-        if (newCoords.length < 2) {
-            console.error('Invalid dragged coordinates:', newCoords);
-            return;
+    airplaneMarker.on('drag', () => {
+        console.log('Airplane marker drag');
+        const newLatLng = airplaneMarker.getLatLng();
+        // Calculate delta from the original center (lastLat, lastLng) to new center
+        const originalCenter = L.latLng(originalCenterLat, originalCenterLng);
+        const newCenter = L.latLng(originalTrackLatLngs[1][0], originalTrackLatLngs[1][1]); // Front end of JRT
+        const deltaLat = newLatLng.lat - newCenter.lat;
+        const deltaLng = newLatLng.lng - newCenter.lng;
+
+        // Update track polyline
+        const newTrackLatLngs = originalTrackLatLngs.map(ll => [ll[0] + deltaLat, ll[1] + deltaLng]);
+        trackPolyline.setLatLngs(newTrackLatLngs);
+        originalTrackLatLngs = newTrackLatLngs;
+
+        // Update approach polyline if it exists
+        if (approachPolyline && originalApproachLatLngs) {
+            const newApproachLatLngs = originalApproachLatLngs.map(ll => [ll[0] + deltaLat, ll[1] + deltaLng]);
+            approachPolyline.setLatLngs(newApproachLatLngs);
+            originalApproachLatLngs = newApproachLatLngs;
         }
 
-        const startPoint = newCoords[0];
-        const endPoint = newCoords[1];
+        // Update airplane marker position (already handled by Leaflet)
+        originalAirplaneLatLng = [newLatLng.lat, newLatLng.lng];
+        originalCenterLat += deltaLat;
+        originalCenterLng += deltaLng;
+    });
 
-        // Calculate new direction
-        const newDirection = calculateBearing(startPoint.lat, startPoint.lng, endPoint.lat, endPoint.lng);
-        customJumpRunDirection = Math.round(newDirection);
-        console.log('JRT dragged, set custom direction:', customJumpRunDirection);
+    airplaneMarker.on('dragend', () => {
+        console.log('Airplane marker dragend');
+        map.dragging.enable();
 
-        // Calculate new center point
-        const centerPoint = [
-            (startPoint.lat + endPoint.lat) / 2,
-            (startPoint.lng + endPoint.lng) / 2
-        ];
+        const newLatLng = airplaneMarker.getLatLng();
 
-        // Calculate lateral and forward offsets
+        // Calculate displacement from original center (lastLat, lastLng)
         const originalCenter = L.latLng(lastLat, lastLng);
-        const newCenter = L.latLng(centerPoint[0], centerPoint[1]);
+        const newCenter = L.latLng(newLatLng.lat - (originalAirplaneLatLng[0] - originalCenterLat), newLatLng.lng - (originalAirplaneLatLng[1] - originalCenterLng));
         const distance = map.distance(originalCenter, newCenter);
         const bearing = calculateBearing(originalCenter.lat, originalCenter.lng, newCenter.lat, newCenter.lng);
 
-        // Lateral offset (perpendicular to track direction)
-        const rightBearing = (newDirection + 90) % 360;
-        const leftBearing = (newDirection - 90 + 360) % 360;
-        const angleToRight = Math.abs(((bearing - rightBearing + 540) % 360) - 180);
-        const angleToLeft = Math.abs(((bearing - leftBearing + 540) % 360) - 180);
-        const lateralOffsetSign = angleToRight < angleToLeft ? 1 : -1;
-        const lateralAngle = Math.min(angleToRight, angleToLeft);
-        const lateralDistance = distance * Math.cos(lateralAngle * Math.PI / 180);
-        let newLateralOffset = Math.round(lateralDistance * lateralOffsetSign / 100) * 100;
-        newLateralOffset = Math.max(-50000, Math.min(50000, newLateralOffset));
+        // Calculate lateral and forward components
+        const trackDirectionRad = direction * Math.PI / 180;
+        const bearingRad = bearing * Math.PI / 180;
 
-        // Forward offset (along track direction)
-        const forwardAngle = Math.abs(((bearing - newDirection + 540) % 360) - 180);
-        const backwardAngle = Math.abs(((bearing - (newDirection + 180) % 360 + 540) % 360) - 180);
-        const forwardOffsetSign = forwardAngle < backwardAngle ? 1 : -1;
-        const forwardDistance = distance * Math.cos(Math.min(forwardAngle, backwardAngle) * Math.PI / 180);
-        let newForwardOffset = Math.round(forwardDistance * forwardOffsetSign / 100) * 100;
-        newForwardOffset = Math.max(-50000, Math.min(50000, newForwardOffset));
+        let angle = Math.abs(((bearing - direction + 540) % 360) - 180);
+        if (angle > 90) {
+            angle = 180 - angle;
+        }
+        const angleRad = angle * Math.PI / 180;
 
-        userSettings.jumpRunTrackOffset = newLateralOffset;
-        userSettings.jumpRunTrackForwardOffset = newForwardOffset;
+        const forwardDistance = distance * Math.cos(angleRad);
+        const lateralDistance = distance * Math.sin(angleRad);
+
+        let forwardOffsetSign = 1;
+        const forwardAngle = Math.abs(((bearing - direction + 540) % 360) - 180);
+        const backwardAngle = Math.abs(((bearing - (direction + 180) % 360 + 540) % 360) - 180);
+        if (backwardAngle < forwardAngle) {
+            forwardOffsetSign = -1;
+        }
+
+        let lateralOffsetSign = 1;
+        const rightAngle = Math.abs(((bearing - (direction + 90) % 360 + 540) % 360) - 180);
+        const leftAngle = Math.abs(((bearing - (direction - 90 + 360) % 360 + 540) % 360) - 180);
+        if (leftAngle < rightAngle) {
+            lateralOffsetSign = -1;
+        }
+
+        const newForwardOffset = Math.round((forwardDistance * forwardOffsetSign) / 100) * 100;
+        const newLateralOffset = Math.round((lateralDistance * lateralOffsetSign) / 100) * 100;
+
+        const clampedForwardOffset = Math.max(-50000, Math.min(50000, newForwardOffset));
+        const clampedLateralOffset = Math.max(-50000, Math.min(50000, newLateralOffset));
+
+        userSettings.jumpRunTrackOffset = clampedLateralOffset;
+        userSettings.jumpRunTrackForwardOffset = clampedForwardOffset;
         saveSettings();
         console.log('JRT dragged, new offsets:', {
             lateralOffset: userSettings.jumpRunTrackOffset,
-            forwardOffset: userSettings.jumpRunTrackForwardOffset
+            forwardOffset: userSettings.jumpRunTrackForwardOffset,
+            distance,
+            bearing,
+            forwardDistance,
+            lateralDistance,
+            angle
         });
 
-        // Update UI inputs
-        if (directionInput && customJumpRunDirection !== null) {
-            setInputValueSilently('jumpRunTrackDirection', Math.round(customJumpRunDirection));
-        }
         const lateralOffsetInput = document.getElementById('jumpRunTrackOffset');
         if (lateralOffsetInput) {
             lateralOffsetInput.value = userSettings.jumpRunTrackOffset;
@@ -4111,51 +4200,18 @@ function updateJumpRunTrack() {
         if (forwardOffsetInput) {
             forwardOffsetInput.value = userSettings.jumpRunTrackForwardOffset;
         }
-
-        // Update airplane marker rotation and position
-        if (jumpRunTrackLayer.airplaneMarker) {
-            jumpRunTrackLayer.airplaneMarker.setRotationAngle(newDirection);
-            jumpRunTrackLayer.airplaneMarker.setLatLng(endPoint);
-        }
-
-        // Update approach path if present
-        if (jumpRunTrackLayer.approachLayer) {
-            const approachCoords = jumpRunTrackLayer.approachLayer.getLatLngs();
-            const newApproachCoords = approachCoords.map(coord => {
-                const originalDistance = map.distance([coord.lat, coord.lng], originalCenter);
-                const originalBearing = calculateBearing(originalCenter.lat, originalCenter.lng, coord.lat, coord.lng);
-                return calculateNewCenter(newCenter.lat, newCenter.lng, originalDistance, originalBearing);
-            });
-            jumpRunTrackLayer.approachLayer.setLatLngs(newApproachCoords);
-        }
-
-        // Refresh JRT to align with constraints
-        updateJumpRunTrack();
     });
 
-    if (jumpRunTrackLayer.approachLayer) {
-        jumpRunTrackLayer.approachLayer.on('dragstart', () => {
-            map.dragging.disable();
-            console.log('Map dragging disabled for approach path drag');
-        });
+    airplaneMarker.on('touchstart', (e) => {
+        console.log('Airplane marker touchstart:', e);
+        map.dragging.disable();
+        L.DomEvent.stopPropagation(e);
+    });
 
-        jumpRunTrackLayer.approachLayer.on('dragend', () => {
-            map.dragging.enable();
-            console.log('Map dragging re-enabled for approach path');
-
-            const newApproachCoords = jumpRunTrackLayer.approachLayer.getLatLngs();
-            const deltaLat = newApproachCoords[1].lat - trackData.approachLatLngs[1][0];
-            const deltaLng = newApproachCoords[1].lng - trackData.approachLatLngs[1][1];
-
-            const newJRTCoords = jumpRunTrackLayer.getLatLngs().map(coord => ({
-                lat: coord.lat + deltaLat,
-                lng: coord.lng + deltaLng
-            }));
-            jumpRunTrackLayer.setLatLngs(newJRTCoords);
-
-            jumpRunTrackLayer.fire('dragend');
-        });
-    }
+    airplaneMarker.on('click', (e) => {
+        console.log('Airplane marker click:', e);
+        L.DomEvent.stopPropagation(e);
+    });
 }
 function calculateCutAway() {
     console.log('calculateCutAway called', {
@@ -4753,13 +4809,13 @@ function updateLandingPattern() {
     const downwindWindAngle = Utils.calculateWindAngle(downwindCourse, downwindWindDir);
     const { crosswind: downwindCrosswind, headwind: downwindHeadwind } = Utils.calculateWindComponents(downwindWindSpeedKt, downwindWindAngle);
     const downwindWca = Utils.calculateWCA(downwindCrosswind, CANOPY_SPEED_KT) * (downwindCrosswind >= 0 ? 1 : -1);
-    const downwindHeading = Utils.normalizeAngle((downwindCourse - downwindWca+180) % 360);
+    const downwindHeading = Utils.normalizeAngle((downwindCourse - downwindWca + 180) % 360);
     const downwindCourseObj = Utils.calculateCourseFromHeading(downwindHeading, downwindWindDir, downwindWindSpeedKt, CANOPY_SPEED_KT);
     const downwindGroundSpeedKt = downwindCourseObj.groundSpeed;
     const downwindTime = (LEG_HEIGHT_DOWNWIND - LEG_HEIGHT_BASE) / DESCENT_RATE_MPS;
     const downwindLength = downwindGroundSpeedKt * 1.852 / 3.6 * downwindTime;
     const downwindEnd = calculateLegEndpoint(baseEnd[0], baseEnd[1], downwindCourse, downwindGroundSpeedKt, downwindTime);
-    
+
     thirdLandingPatternLine = L.polyline([baseEnd, downwindEnd], {
         color: 'red',
         weight: 3,
