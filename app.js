@@ -524,16 +524,66 @@ function initMap() {
 
     async function fetchInitialWeather(lat, lng) {
         const lastFullHourUTC = getLastFullHourUTC();
-        console.log('initMap: Last full hour UTC:', lastFullHourUTC.toISOString());
+        let utcIsoString;
+        try {
+            utcIsoString = lastFullHourUTC.toISOString();
+            console.log('initMap: Last full hour UTC:', utcIsoString);
+        } catch (error) {
+            console.error('Failed to get UTC time:', error);
+            // Fallback to current time rounded to the last full hour
+            const now = new Date();
+            now.setMinutes(0, 0, 0); // Round to the last full hour
+            utcIsoString = now.toISOString();
+            console.log('initMap: Fallback to current time:', utcIsoString);
+        }
+
         let initialTime;
         if (userSettings.timeZone === 'Z') {
-            initialTime = lastFullHourUTC.toISOString().replace(':00.000Z', 'Z');
+            initialTime = utcIsoString.replace(':00.000Z', 'Z');
         } else {
-            const localTimeStr = await Utils.formatLocalTime(lastFullHourUTC.toISOString(), lastLat, lastLng);
-            console.log('initMap: Local time string:', localTimeStr);
-            const localDate = new Date(`${localTimeStr}:00Z`);
-            initialTime = new Date(localDate.getTime() - (2 * 60 * 60 * 1000)).toISOString().replace(':00.000Z', 'Z');
+            try {
+                const localTimeStr = await Utils.formatLocalTime(utcIsoString, lat, lng);
+                console.log('initMap: Local time string:', localTimeStr);
+
+                // Validate localTimeStr and parse it (expected format: YYYY-MM-DD HHmm GMT+X)
+                if (!localTimeStr || typeof localTimeStr !== 'string') {
+                    throw new Error(`Invalid local time string: ${localTimeStr}`);
+                }
+
+                // Parse the string: e.g., "2025-05-02 2200 GMT+2"
+                const match = localTimeStr.match(/^(\d{4}-\d{2}-\d{2}) (\d{2})(\d{2}) GMT([+-]\d+)/);
+                if (!match) {
+                    throw new Error(`Local time string format mismatch: ${localTimeStr}`);
+                }
+
+                const [, datePart, hour, minute, offset] = match;
+                // Format offset as +HH:MM (e.g., +2 becomes +02:00)
+                const offsetSign = offset.startsWith('+') ? '+' : '-';
+                const offsetHours = Math.abs(parseInt(offset, 10)).toString().padStart(2, '0');
+                const formattedOffset = `${offsetSign}${offsetHours}:00`;
+                const isoFormatted = `${datePart}T${hour}:${minute}:00${formattedOffset}`;
+                console.log('initMap: ISO formatted local time:', isoFormatted);
+
+                // Create localDate in UTC by accounting for the offset
+                const localDate = new Date(isoFormatted);
+                if (isNaN(localDate.getTime())) {
+                    throw new Error(`Failed to parse localDate from ${isoFormatted}`);
+                }
+
+                // Log the UTC equivalent of the local time
+                const localDateUtc = localDate.toISOString();
+                console.log('initMap: Local time in UTC:', localDateUtc);
+
+                // Do not subtract 2 hours; use the local time as-is (in UTC)
+                initialTime = localDateUtc.replace(':00.000Z', 'Z');
+            } catch (error) {
+                console.error('Error converting to local time:', error);
+                // Fallback to UTC time if local time conversion fails
+                initialTime = utcIsoString.replace(':00.000Z', 'Z');
+                console.log('initMap: Falling back to UTC time:', initialTime);
+            }
         }
+
         console.log('initMap: initialTime:', initialTime);
         await fetchWeatherForLocation(lat, lng, initialTime, true);
     }
