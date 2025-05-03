@@ -437,7 +437,7 @@ function displayMessage(message) {
         messageElement = document.createElement('div');
         messageElement.id = 'message';
         messageElement.style.position = 'fixed';
-        messageElement.style.top = '60px';
+        messageElement.style.top = '0px';
         messageElement.style.left = '0';
         messageElement.style.width = '100%';
         messageElement.style.backgroundColor = '#ccffcc';
@@ -599,15 +599,21 @@ L.TileLayer.Cached = L.TileLayer.extend({
         const url = this.getTileUrl(coords);
         tile.setAttribute('role', 'presentation');
 
+        // Normalize URL by removing subdomain for caching
+        const normalizedUrl = url.replace(/^(https?:\/\/[a-c]\.tile\.openstreetmap\.org)/, 'https://tile.openstreetmap.org')
+                              .replace(/^(https?:\/\/[a-d]\.basemaps\.cartocdn\.com)/, 'https://basemaps.cartocdn.com')
+                              .replace(/^(https?:\/\/[a-c]\.tile\.opentopomap\.org)/, 'https://tile.opentopomap.org');
+
         if (!navigator.onLine) {
-            TileCache.getTile(url).then(blob => {
+            TileCache.getTile(normalizedUrl).then(blob => {
                 if (blob) {
                     tile.src = URL.createObjectURL(blob);
                 } else {
+                    console.warn(`Tile not in cache: ${normalizedUrl}`);
                     done(new Error('Tile not in cache'), tile);
                 }
             }).catch(error => {
-                console.warn('Cache error for offline tile:', url, error);
+                console.warn('Cache error for offline tile:', normalizedUrl, error);
                 done(error, tile);
             });
         } else {
@@ -618,15 +624,15 @@ L.TileLayer.Cached = L.TileLayer.extend({
                     return response.blob();
                 })
                 .then(blob => {
-                    TileCache.storeTile(url, blob).catch(error => console.warn('Failed to cache tile:', url, error));
+                    TileCache.storeTile(normalizedUrl, blob).catch(error => console.warn('Failed to cache tile:', normalizedUrl, error));
                 })
                 .catch(error => {
                     console.warn('Fetch error for tile:', url, error);
-                    TileCache.getTile(url).then(blob => {
+                    TileCache.getTile(normalizedUrl).then(blob => {
                         if (blob) {
                             tile.src = URL.createObjectURL(blob);
                         }
-                    }).catch(err => console.warn('Cache fallback error:', url, err));
+                    }).catch(err => console.warn('Cache fallback error:', normalizedUrl, err));
                 });
         }
 
@@ -640,32 +646,39 @@ L.tileLayer.cached = function (url, options) {
 
 // Calculate tiles within radius (unchanged)
 function getTilesInRadius(lat, lng, radiusKm, zoomLevels) {
-    const tiles = [];
-    const EARTH_RADIUS = 6371000; // meters
+    const tiles = new Set(); // Use Set to avoid duplicates
+    const EARTH_CIRCUMFERENCE = 40075016.686; // Earth's circumference in meters at equator
     const radiusMeters = radiusKm * 1000;
 
     zoomLevels.forEach(zoom => {
+        // Convert center to tile coordinates
         const point = map.project([lat, lng], zoom);
         const tileSize = 256;
-        const centerX = Math.floor(point.x / tileSize);
-        const centerY = Math.floor(point.y / tileSize);
+        const centerX = point.x / tileSize;
+        const centerY = point.y / tileSize;
 
-        const metersPerPixel = (40075016.686 * Math.cos(lat * Math.PI / 180)) / (2 ** zoom);
-        const pixelsPerTile = tileSize;
-        const metersPerTile = metersPerPixel * pixelsPerTile;
-        const tileRadius = Math.ceil(radiusMeters / metersPerTile);
+        // Calculate tile radius more accurately
+        const latRad = lat * Math.PI / 180;
+        const metersPerPixel = EARTH_CIRCUMFERENCE * Math.cos(latRad) / (tileSize * Math.pow(2, zoom));
+        const tileRadius = Math.ceil(radiusMeters / (metersPerPixel * tileSize)) + 1; // Add buffer
 
-        for (let x = centerX - tileRadius; x <= centerX + tileRadius; x++) {
-            for (let y = centerY - tileRadius; y <= centerY + tileRadius; y++) {
-                const numTiles = 2 ** zoom;
+        // Collect tiles within radius
+        const numTiles = Math.pow(2, zoom);
+        for (let x = Math.floor(centerX - tileRadius); x <= Math.ceil(centerX + tileRadius); x++) {
+            for (let y = Math.floor(centerY - tileRadius); y <= Math.ceil(centerY + tileRadius); y++) {
                 if (x >= 0 && x < numTiles && y >= 0 && y < numTiles) {
-                    tiles.push({ zoom, x, y });
+                    tiles.add(`${zoom}/${x}/${y}`);
                 }
             }
         }
     });
 
-    return tiles;
+    const tileArray = Array.from(tiles).map(key => {
+        const [zoom, x, y] = key.split('/').map(Number);
+        return { zoom, x, y };
+    });
+
+    return tileArray;
 }
 
 // Retry mechanism for failed tile fetches
@@ -688,76 +701,91 @@ async function cacheTileWithRetry(url, maxRetries = 3) {
 }
 
 // Cache tiles for DIP with enhanced logging
-async function cacheTilesForDIP() {
-    if (!lastLat || !lastLng) {
-        console.warn('No DIP coordinates for caching, skipping');
-        Utils.handleMessage('Please select a location to cache map tiles.');
+function cacheVisibleTiles() {
+    if (!map || !navigator.onLine) {
+        console.log('Skipping visible tile caching: offline or map not initialized');
         return;
     }
 
-    if (!userSettings.baseMaps || !baseMaps[userSettings.baseMaps]) {
+    const bounds = map.getBounds();
+    const zoom = map.getZoom();
+    if (!userSettings.cacheZoomLevels.includes(zoom)) {
+        console.log(`Skipping caching: zoom ${zoom} not in cacheZoomLevels`, userSettings.cacheZoomLevels);
+        return;
+    }
+
+    const tileSize = 256;
+    const swPoint = map.project(bounds.getSouthWest(), zoom);
+    const nePoint = map.project(bounds.getNorthEast(), zoom);
+    const minX = Math.floor(swPoint.x / tileSize);
+    const maxX = Math.floor(nePoint.x / tileSize);
+    const minY = Math.floor(nePoint.y / tileSize);
+    const maxY = Math.floor(swPoint.y / tileSize);
+
+    const tiles = [];
+    for (let x = minX; x <= maxX; x++) {
+        for (let y = minY; y <= maxY; y++) {
+            const numTiles = 2 ** zoom;
+            if (x >= 0 && x < numTiles && y >= 0 && y < numTiles) {
+                tiles.push({ zoom, x, y });
+            }
+        }
+    }
+
+    console.log(`Caching ${tiles.length} visible tiles at zoom ${zoom} for ${userSettings.baseMaps}`);
+
+    const tileLayers = [];
+    if (!baseMaps[userSettings.baseMaps]) {
         console.warn(`Base map ${userSettings.baseMaps} not found, skipping caching`);
         Utils.handleMessage('Selected base map not available for caching.');
         return;
     }
 
-    const radiusKm = userSettings.cacheRadiusKm || 10;
-    const zoomLevels = userSettings.cacheZoomLevels || [11, 12, 13, 14];
-    const tiles = getTilesInRadius(lastLat, lastLng, radiusKm, zoomLevels);
-
-    console.log(`Caching ${tiles.length} tiles for DIP:`, { lat: lastLat, lng: lastLng, radiusKm, zoomLevels, baseMap: userSettings.baseMaps });
-
-    const tileLayers = [];
     if (userSettings.baseMaps === 'Esri Satellite + OSM') {
         tileLayers.push(
-            { name: 'Esri Satellite', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' },
-            { name: 'OSM Overlay', url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', subdomains: ['a', 'b', 'c'] }
+            { name: 'Esri Satellite', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', normalizedUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' },
+            { name: 'OSM Overlay', url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', subdomains: ['a', 'b', 'c'], normalizedUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png' }
         );
     } else if (userSettings.baseMaps === 'Esri Satellite + Carto Light') {
         tileLayers.push(
-            { name: 'Esri Satellite', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' },
-            { name: 'Carto Light Overlay', url: 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png', subdomains: ['a', 'b', 'c', 'd'] }
+            { name: 'Esri Satellite', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', normalizedUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' },
+            { name: 'Carto Light Overlay', url: 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png', subdomains: ['a', 'b', 'c', 'd'], normalizedUrl: 'https://basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png' }
         );
     } else {
         const layer = baseMaps[userSettings.baseMaps];
         tileLayers.push({
             name: userSettings.baseMaps,
             url: layer.options.url || layer._url,
-            subdomains: layer.options.subdomains
+            subdomains: layer.options.subdomains,
+            normalizedUrl: (layer.options.url || layer._url).replace(/{s}\./, '')
         });
     }
 
-    let cachedCount = 0;
-    let failedCount = 0;
-    Utils.handleMessage('Caching map tiles around DIP...');
-    try {
-        for (const layer of tileLayers) {
-            for (const tile of tiles) {
-                const url = layer.url
-                    .replace('{z}', tile.zoom)
-                    .replace('{x}', tile.x)
-                    .replace('{y}', tile.y)
-                    .replace('{s}', layer.subdomains ? layer.subdomains[Math.floor(Math.random() * layer.subdomains.length)] : '');
-                
-                const success = await cacheTileWithRetry(url);
-                if (success) {
-                    cachedCount++;
-                } else {
-                    console.warn(`Failed to cache tile after retries: ${url}`);
-                    failedCount++;
+    Utils.handleMessage('Caching visible map tiles...');
+    for (const layer of tileLayers) {
+        for (const tile of tiles) {
+            const url = layer.url
+                .replace('{z}', tile.zoom)
+                .replace('{x}', tile.x)
+                .replace('{y}', tile.y)
+                .replace('{s}', layer.subdomains ? layer.subdomains[Math.floor(Math.random() * layer.subdomains.length)] : '');
+            const normalizedUrl = layer.normalizedUrl
+                .replace('{z}', tile.zoom)
+                .replace('{x}', tile.x)
+                .replace('{y}', tile.y);
+
+            TileCache.getTile(normalizedUrl).then(blob => {
+                if (blob) {
+                    console.log(`Tile already cached: ${normalizedUrl}`);
+                    return;
                 }
-            }
+                cacheTileWithRetry(url).catch(error => console.warn(`Failed to cache visible tile: ${url}`, error));
+            }).catch(error => {
+                console.warn(`Error checking cache for ${normalizedUrl}:`, error);
+            });
         }
-    } catch (error) {
-        console.error('Unexpected error in cacheTilesForDIP:', error);
-        Utils.handleError('Failed to cache map tiles: ' + error.message);
     }
-    console.log(`DIP caching complete: ${cachedCount} tiles cached, ${failedCount} failed`);
-    if (failedCount > 0) {
-        Utils.handleMessage(`Cached ${cachedCount} tiles around DIP (${failedCount} failed). Pan or zoom to cache more tiles.`);
-    } else {
-        Utils.handleMessage(`Cached ${cachedCount} tiles around DIP successfully.`);
-    }
+    Utils.handleMessage('Visible map tiles cached.');
 }
 // Cache visible tiles on map movement
 function cacheVisibleTiles() {
@@ -802,20 +830,21 @@ function cacheVisibleTiles() {
 
     if (userSettings.baseMaps === 'Esri Satellite + OSM') {
         tileLayers.push(
-            { name: 'Esri Satellite', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' },
-            { name: 'OSM Overlay', url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', subdomains: ['a', 'b', 'c'] }
+            { name: 'Esri Satellite', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', normalizedUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' },
+            { name: 'OSM Overlay', url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', subdomains: ['a', 'b', 'c'], normalizedUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png' }
         );
     } else if (userSettings.baseMaps === 'Esri Satellite + Carto Light') {
         tileLayers.push(
-            { name: 'Esri Satellite', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' },
-            { name: 'Carto Light Overlay', url: 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png', subdomains: ['a', 'b', 'c', 'd'] }
+            { name: 'Esri Satellite', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', normalizedUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' },
+            { name: 'Carto Light Overlay', url: 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png', subdomains: ['a', 'b', 'c', 'd'], normalizedUrl: 'https://basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png' }
         );
     } else {
         const layer = baseMaps[userSettings.baseMaps];
         tileLayers.push({
             name: userSettings.baseMaps,
             url: layer.options.url || layer._url,
-            subdomains: layer.options.subdomains
+            subdomains: layer.options.subdomains,
+            normalizedUrl: (layer.options.url || layer._url).replace(/{s}\./, '')
         });
     }
 
@@ -827,15 +856,19 @@ function cacheVisibleTiles() {
                 .replace('{x}', tile.x)
                 .replace('{y}', tile.y)
                 .replace('{s}', layer.subdomains ? layer.subdomains[Math.floor(Math.random() * layer.subdomains.length)] : '');
-            
-            TileCache.getTile(url).then(blob => {
+            const normalizedUrl = layer.normalizedUrl
+                .replace('{z}', tile.zoom)
+                .replace('{x}', tile.x)
+                .replace('{y}', tile.y);
+
+            TileCache.getTile(normalizedUrl).then(blob => {
                 if (blob) {
-                    console.log(`Tile already cached: ${url}`);
+                    console.log(`Tile already cached: ${normalizedUrl}`);
                     return;
                 }
                 cacheTileWithRetry(url).catch(error => console.warn(`Failed to cache visible tile: ${url}`, error));
             }).catch(error => {
-                console.warn(`Error checking cache for ${url}:`, error);
+                console.warn(`Error checking cache for ${normalizedUrl}:`, error);
             });
         }
     }
