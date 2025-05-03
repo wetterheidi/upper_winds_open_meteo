@@ -438,13 +438,13 @@ function displayMessage(message) {
         messageElement = document.createElement('div');
         messageElement.id = 'message';
         messageElement.style.position = 'fixed';
-        messageElement.style.top = '0px';
-        messageElement.style.left = '0';
-        messageElement.style.width = '100%';
+        messageElement.style.top = '5px';
+        messageElement.style.right = '5px';
+        messageElement.style.width = '70%';
         messageElement.style.backgroundColor = '#ccffcc';
-        messageElement.style.borderRadius = '0 0 5px 5px';
+        messageElement.style.borderRadius = '5px 5px 5px 5px';
         messageElement.style.color = '#000000';
-        messageElement.style.padding = '10px';
+        messageElement.style.padding = '6px';
         messageElement.style.zIndex = '9998';
         messageElement.style.textAlign = 'center';
         document.body.appendChild(messageElement);

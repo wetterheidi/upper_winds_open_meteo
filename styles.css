@@ -743,13 +743,13 @@ input[type="number"]:focus {
 
 #error-message {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
+    top: 5px;
+    right: 5px;
+    width: 70%;
     background: #ffcccc;
     color: #000000;
-    padding: 10px;
-    border-radius: 0 0 5px 5px;
+    padding: 6px;
+    border-radius: 5px 5px 5px 5px;
     text-align: center;
     z-index: 2000;
     display: none;
@@ -1069,6 +1069,20 @@ input[type="checkbox"][style*="opacity: 1"] {
         grid-column: 1 / -1;
         grid-row: 2;
         margin-top: 5px;
+    }
+
+    #error-message {
+        position: fixed;
+        top: 5px;
+        right: 5px;
+        width: 30%;
+        background: #ffcccc;
+        color: #000000;
+        padding: 6px;
+        border-radius: 5px 5px 5px 5px;
+        text-align: center;
+        z-index: 2000;
+        display: none;
     }
 }
 
