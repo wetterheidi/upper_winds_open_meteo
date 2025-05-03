@@ -458,6 +458,44 @@ function initMap() {
         "Esri Topo": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
             maxZoom: 19,
             attribution: '© Esri, USGS'
+        }),
+        "Esri Satellite + OSM": L.layerGroup([
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                maxZoom: 19,
+                attribution: '© Esri, USDA, USGS',
+                zIndex: 1
+            }),
+            L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', { //Humanitarian OSM
+                //L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {  //OSM
+                maxZoom: 19,
+                attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+                opacity: 0.5, // Adjust for desired transparency
+                zIndex: 2,
+                tileSize: 256,
+                updateWhenIdle: true, // Load tiles only when map is idle
+                keepBuffer: 2 // Reduce memory usage
+            })
+        ], {
+            attribution: '© Esri, USDA, USGS | © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        }),
+        "Esri Satellite + Carto Light": L.layerGroup([
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                maxZoom: 19,
+                attribution: '© Esri, USDA, USGS',
+                zIndex: 1
+            }),
+            //L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png', {
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', { // With labels
+            //L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png', {  // Darker, no labels
+                maxZoom: 20, // Carto supports up to zoom 20
+                attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, © <a href="https://carto.com/attributions">CARTO</a>',
+                opacity: 0.4, // Slightly higher opacity as Carto Light is less dense
+                zIndex: 2,
+                updateWhenIdle: true,
+                keepBuffer: 2
+            })
+        ], {
+            attribution: '© Esri, USDA, USGS | © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, © <a href="https://carto.com/attributions">CARTO</a>'
         })
     };
 
@@ -474,6 +512,7 @@ function initMap() {
             baseMaps[fallbackBaseMap].addTo(map);
             userSettings.baseMaps = fallbackBaseMap;
             saveSettings();
+            Utils.handleError(`${selectedBaseMap} tiles unavailable. Switched to ${fallbackBaseMap}.`);
         }
     });
     layer.addTo(map);
