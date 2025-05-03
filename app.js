@@ -41,12 +41,13 @@ const defaultSettings = {
     jumpMasterLineTarget: 'DIP', // New setting for DIP or HARP
     harpLat: null, // New setting for HARP position
     harpLng: null,
-    cacheRadiusKm: 5, // New setting: radius in km for caching tiles around DIP
+    cacheRadiusKm: 10, // New setting: radius in km for caching tiles around DIP
     cacheZoomLevels: [11, 12, 13, 14] // New setting: zoom levels to cache
 };
 let isInitialized = false;
 let userSettings = JSON.parse(localStorage.getItem('upperWindsSettings')) || { ...defaultSettings };
 let map;
+let baseMaps = {};
 let lastLat = null;
 let lastLng = null;
 let lastAltitude = null;
@@ -426,10 +427,414 @@ function configureMarker(lat, lng, altitude, openPopup = false) {
     return currentMarker;
 }
 
+// == Tile caching ==
+
+// Enhanced message display
+function displayMessage(message) {
+    console.log('displayMessage called with:', message);
+    let messageElement = document.getElementById('message');
+    if (!messageElement) {
+        messageElement = document.createElement('div');
+        messageElement.id = 'message';
+        messageElement.style.position = 'fixed';
+        messageElement.style.top = '60px';
+        messageElement.style.left = '0';
+        messageElement.style.width = '100%';
+        messageElement.style.backgroundColor = '#ccffcc';
+        messageElement.style.borderRadius = '0 0 5px 5px';
+        messageElement.style.color = '#000000';
+        messageElement.style.padding = '10px';
+        messageElement.style.zIndex = '9998';
+        messageElement.style.textAlign = 'center';
+        document.body.appendChild(messageElement);
+    }
+    messageElement.textContent = message;
+    messageElement.style.display = 'block';
+    clearTimeout(window.messageTimeout);
+    window.messageTimeout = setTimeout(() => {
+        messageElement.style.display = 'none';
+    }, 10000);
+}
+
+Utils.handleMessage = displayMessage;
+
+// IndexedDB utility with cache expiration
+const TileCache = {
+    dbName: 'SkydivingTileCache',
+    storeName: 'tiles',
+    db: null,
+
+    async init() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(this.dbName, 1);
+            request.onupgradeneeded = (event) => {
+                const db = event.target.result;
+                db.createObjectStore(this.storeName, { keyPath: 'url' });
+            };
+            request.onsuccess = (event) => {
+                this.db = event.target.result;
+                resolve();
+            };
+            request.onerror = (event) => {
+                console.error('IndexedDB initialization failed:', event);
+                reject(event);
+            };
+        });
+    },
+
+    async storeTile(url, blob) {
+        if (!this.db) await this.init();
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction([this.storeName], 'readwrite');
+            const store = transaction.objectStore(this.storeName);
+            const request = store.put({ url, blob, timestamp: Date.now() });
+            request.onsuccess = () => {
+                console.log(`Stored tile: ${url}`);
+                resolve();
+            };
+            request.onerror = (event) => {
+                console.warn(`Failed to store tile: ${url}`, event);
+                Utils.handleError('Failed to store some tiles. Try clearing cache.');
+                reject(event);
+            };
+        });
+    },
+
+    async getTile(url) {
+        if (!this.db) await this.init();
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction([this.storeName], 'readonly');
+            const store = transaction.objectStore(this.storeName);
+            const request = store.get(url);
+            request.onsuccess = (event) => {
+                const result = event.target.result;
+                resolve(result ? result.blob : null);
+            };
+            request.onerror = (event) => {
+                console.warn(`Failed to retrieve tile: ${url}`, event);
+                reject(event);
+            };
+        });
+    },
+
+    async clearCache() {
+        if (!this.db) await this.init();
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction([this.storeName], 'readwrite');
+            const store = transaction.objectStore(this.storeName);
+            const request = store.clear();
+            request.onsuccess = () => {
+                console.log('Tile cache cleared');
+                resolve();
+            };
+            request.onerror = (event) => {
+                console.error('Failed to clear cache:', event);
+                reject(event);
+            };
+        });
+    },
+
+    async clearOldTiles(maxAgeDays = 7) {
+        if (!this.db) await this.init();
+        const maxAgeMs = maxAgeDays * 24 * 60 * 60 * 1000;
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction([this.storeName], 'readwrite');
+            const store = transaction.objectStore(this.storeName);
+            const request = store.openCursor();
+            let deletedCount = 0;
+            request.onsuccess = (event) => {
+                const cursor = event.target.result;
+                if (cursor) {
+                    if (Date.now() - cursor.value.timestamp > maxAgeMs) {
+                        cursor.delete();
+                        deletedCount++;
+                    }
+                    cursor.continue();
+                } else {
+                    console.log(`Cleared ${deletedCount} old tiles`);
+                    resolve();
+                }
+            };
+            request.onerror = (event) => {
+                console.error('Failed to clear old tiles:', event);
+                reject(event);
+            };
+        });
+    }
+};
+
+// Custom cached tile layer
+L.TileLayer.Cached = L.TileLayer.extend({
+    createTile(coords, done) {
+        const tile = document.createElement('img');
+        L.DomEvent.on(tile, 'load', L.bind(this._tileOnLoad, this, done, tile));
+        L.DomEvent.on(tile, 'error', L.bind(this._tileOnError, this, done, tile));
+
+        const url = this.getTileUrl(coords);
+        tile.setAttribute('role', 'presentation');
+
+        if (!navigator.onLine) {
+            TileCache.getTile(url).then(blob => {
+                if (blob) {
+                    tile.src = URL.createObjectURL(blob);
+                } else {
+                    done(new Error('Tile not in cache'), tile);
+                }
+            }).catch(error => {
+                done(error, tile);
+            });
+        } else {
+            fetch(url)
+                .then(response => {
+                    if (!response.ok) throw new Error('Network error');
+                    return response.blob();
+                })
+                .then(blob => {
+                    TileCache.storeTile(url, blob).catch(error => console.warn('Failed to cache tile:', error));
+                    tile.src = URL.createObjectURL(blob);
+                })
+                .catch(error => {
+                    TileCache.getTile(url).then(blob => {
+                        if (blob) {
+                            tile.src = URL.createObjectURL(blob);
+                        } else {
+                            done(error, tile);
+                        }
+                    }).catch(err => done(err, tile));
+                });
+        }
+
+        return tile;
+    }
+});
+
+L.tileLayer.cached = function(url, options) {
+    return new L.TileLayer.Cached(url, options);
+};
+
+// Calculate tiles within radius (unchanged)
+function getTilesInRadius(lat, lng, radiusKm, zoomLevels) {
+    const tiles = [];
+    const EARTH_RADIUS = 6371000; // meters
+    const radiusMeters = radiusKm * 1000;
+
+    zoomLevels.forEach(zoom => {
+        const point = map.project([lat, lng], zoom);
+        const tileSize = 256;
+        const centerX = Math.floor(point.x / tileSize);
+        const centerY = Math.floor(point.y / tileSize);
+
+        const metersPerPixel = (40075016.686 * Math.cos(lat * Math.PI / 180)) / (2 ** zoom);
+        const pixelsPerTile = tileSize;
+        const metersPerTile = metersPerPixel * pixelsPerTile;
+        const tileRadius = Math.ceil(radiusMeters / metersPerTile);
+
+        for (let x = centerX - tileRadius; x <= centerX + tileRadius; x++) {
+            for (let y = centerY - tileRadius; y <= centerY + tileRadius; y++) {
+                const numTiles = 2 ** zoom;
+                if (x >= 0 && x < numTiles && y >= 0 && y < numTiles) {
+                    tiles.push({ zoom, x, y });
+                }
+            }
+        }
+    });
+
+    return tiles;
+}
+
+// Cache tiles for DIP with enhanced logging
+async function cacheTilesForDIP() {
+    if (!lastLat || !lastLng) {
+        console.warn('No DIP coordinates for caching, skipping');
+        Utils.handleMessage('Please select a location to cache map tiles.');
+        return;
+    }
+
+    if (!userSettings.baseMaps || !baseMaps[userSettings.baseMaps]) {
+        console.warn(`Base map ${userSettings.baseMaps} not found, skipping caching`);
+        Utils.handleMessage('Selected base map not available for caching.');
+        return;
+    }
+
+    const radiusKm = userSettings.cacheRadiusKm || 10;
+    const zoomLevels = userSettings.cacheZoomLevels || [11, 12, 13, 14];
+    const tiles = getTilesInRadius(lastLat, lastLng, radiusKm, zoomLevels);
+
+    console.log(`Caching ${tiles.length} tiles for DIP:`, { lat: lastLat, lng: lastLng, radiusKm, zoomLevels, baseMap: userSettings.baseMaps });
+
+    const tileLayers = [];
+    if (userSettings.baseMaps === 'Esri Satellite + OSM') {
+        tileLayers.push(
+            { name: 'Esri Satellite', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' },
+            { name: 'OSM Overlay', url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', subdomains: ['a', 'b', 'c'] }
+        );
+    } else if (userSettings.baseMaps === 'Esri Satellite + Carto Light') {
+        tileLayers.push(
+            { name: 'Esri Satellite', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' },
+            { name: 'Carto Light Overlay', url: 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png', subdomains: ['a', 'b', 'c', 'd'] }
+        );
+    } else {
+        const layer = baseMaps[userSettings.baseMaps];
+        tileLayers.push({
+            name: userSettings.baseMaps,
+            url: layer.options.url || layer._url,
+            subdomains: layer.options.subdomains
+        });
+    }
+
+    let cachedCount = 0;
+    let failedCount = 0;
+    Utils.handleMessage('Caching map tiles around DIP...');
+    try {
+        for (const layer of tileLayers) {
+            for (const tile of tiles) {
+                const url = layer.url
+                    .replace('{z}', tile.zoom)
+                    .replace('{x}', tile.x)
+                    .replace('{y}', tile.y)
+                    .replace('{s}', layer.subdomains ? layer.subdomains[Math.floor(Math.random() * layer.subdomains.length)] : '');
+                
+                try {
+                    const response = await fetch(url);
+                    if (response.ok) {
+                        const blob = await response.blob();
+                        await TileCache.storeTile(url, blob);
+                        cachedCount++;
+                    } else {
+                        console.warn(`Failed to fetch tile: ${url} (HTTP ${response.status})`);
+                        failedCount++;
+                    }
+                } catch (error) {
+                    console.warn(`Error caching tile ${url}:`, error);
+                    failedCount++;
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Unexpected error in cacheTilesForDIP:', error);
+        Utils.handleError('Failed to cache map tiles: ' + error.message);
+    }
+    console.log(`DIP caching complete: ${cachedCount} tiles cached, ${failedCount} failed`);
+    if (failedCount > 0) {
+        Utils.handleMessage(`Cached ${cachedCount} tiles around DIP (${failedCount} failed). Pan or zoom to cache more tiles.`);
+    } else {
+        Utils.handleMessage(`Cached ${cachedCount} tiles around DIP successfully.`);
+    }
+}
+
+// Cache visible tiles on map movement
+function cacheVisibleTiles() {
+    if (!map || !navigator.onLine) {
+        console.log('Skipping visible tile caching: offline or map not initialized');
+        return;
+    }
+
+    const bounds = map.getBounds();
+    const zoom = map.getZoom();
+    if (!userSettings.cacheZoomLevels.includes(zoom)) {
+        console.log(`Skipping caching: zoom ${zoom} not in cacheZoomLevels`, userSettings.cacheZoomLevels);
+        return;
+    }
+
+    const tileSize = 256;
+    const swPoint = map.project(bounds.getSouthWest(), zoom);
+    const nePoint = map.project(bounds.getNorthEast(), zoom);
+    const minX = Math.floor(swPoint.x / tileSize);
+    const maxX = Math.floor(nePoint.x / tileSize);
+    const minY = Math.floor(nePoint.y / tileSize); // Top of map (smaller y)
+    const maxY = Math.floor(swPoint.y / tileSize); // Bottom of map (larger y)
+
+    const tiles = [];
+    for (let x = minX; x <= maxX; x++) {
+        for (let y = minY; y <= maxY; y++) { // Corrected loop direction
+            const numTiles = 2 ** zoom;
+            if (x >= 0 && x < numTiles && y >= 0 && y < numTiles) {
+                tiles.push({ zoom, x, y });
+            }
+        }
+    }
+
+    console.log(`Caching ${tiles.length} visible tiles at zoom ${zoom} for ${userSettings.baseMaps}`);
+
+    const tileLayers = [];
+    if (!baseMaps[userSettings.baseMaps]) {
+        console.warn(`Base map ${userSettings.baseMaps} not found, skipping caching`);
+        Utils.handleMessage('Selected base map not available for caching.');
+        return;
+    }
+
+    if (userSettings.baseMaps === 'Esri Satellite + OSM') {
+        tileLayers.push(
+            { name: 'Esri Satellite', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' },
+            { name: 'OSM Overlay', url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', subdomains: ['a', 'b', 'c'] }
+        );
+    } else if (userSettings.baseMaps === 'Esri Satellite + Carto Light') {
+        tileLayers.push(
+            { name: 'Esri Satellite', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' },
+            { name: 'Carto Light Overlay', url: 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png', subdomains: ['a', 'b', 'c', 'd'] }
+        );
+    } else {
+        const layer = baseMaps[userSettings.baseMaps];
+        tileLayers.push({
+            name: userSettings.baseMaps,
+            url: layer.options.url || layer._url,
+            subdomains: layer.options.subdomains
+        });
+    }
+
+    Utils.handleMessage('Caching visible map tiles...');
+    for (const layer of tileLayers) {
+        for (const tile of tiles) {
+            const url = layer.url
+                .replace('{z}', tile.zoom)
+                .replace('{x}', tile.x)
+                .replace('{y}', tile.y)
+                .replace('{s}', layer.subdomains ? layer.subdomains[Math.floor(Math.random() * layer.subdomains.length)] : '');
+            
+            TileCache.getTile(url).then(blob => {
+                if (blob) {
+                    console.log(`Tile already cached: ${url}`);
+                    return;
+                }
+                cacheTileWithRetry(url).catch(error => console.warn(`Failed to cache visible tile: ${url}`, error));
+            }).catch(error => {
+                console.warn(`Error checking cache for ${url}:`, error);
+            });
+        }
+    }
+    Utils.handleMessage('Visible map tiles cached.');
+}
+
+// Cache management UI
+function setupCacheManagement() {
+    const clearCacheButton = document.createElement('button');
+    clearCacheButton.textContent = 'Clear Tile Cache';
+    clearCacheButton.style.margin = '10px';
+    document.getElementById('bottom-container').appendChild(clearCacheButton);
+    clearCacheButton.addEventListener('click', async () => {
+        try {
+            await TileCache.clearCache();
+            Utils.handleMessage('Tile cache cleared successfully.');
+            console.log('Tile cache cleared');
+        } catch (error) {
+            Utils.handleError('Failed to clear tile cache: ' + error.message);
+        }
+    });
+}
+
+
+
+
+
+
 // == Map Initialization and Interaction ==
 function initMap() {
     const defaultCenter = [48.0179, 11.1923];
     const defaultZoom = 11;
+
+    // Set default coordinates to ensure caching can proceed
+    lastLat = lastLat || defaultCenter[0];
+    lastLng = lastLng || defaultCenter[1];
 
     map = L.map('map', {
         center: defaultCenter,
@@ -438,128 +843,150 @@ function initMap() {
         doubleClickZoom: false
     });
 
-    const baseMaps = {
-        "OpenStreetMap": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    baseMaps = {
+        "OpenStreetMap": L.tileLayer.cached('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
-            attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+            subdomains: ['a', 'b', 'c']
         }),
-        "OpenTopoMap": L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+        "OpenTopoMap": L.tileLayer.cached('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
             maxZoom: 17,
-            attribution: '© <a href="https://www.openstreetmap.org/copyright">OSM</a>, <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)'
+            attribution: '© <a href="https://www.openstreetmap.org/copyright">OSM</a>, <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)',
+            subdomains: ['a', 'b', 'c']
         }),
-        "Esri Satellite": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        "Esri Satellite": L.tileLayer.cached('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
             maxZoom: 19,
             attribution: '© Esri, USDA, USGS'
         }),
-        "Esri Street": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+        "Esri Street ": L.tileLayer.cached('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
             maxZoom: 19,
             attribution: '© Esri, USGS'
         }),
-        "Esri Topo": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+        "Esri Topo": L.tileLayer.cached('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
             maxZoom: 19,
             attribution: '© Esri, USGS'
         }),
         "Esri Satellite + OSM": L.layerGroup([
-            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            L.tileLayer.cached('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
                 maxZoom: 19,
                 attribution: '© Esri, USDA, USGS',
                 zIndex: 1
             }),
-            L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', { //Humanitarian OSM
-                //L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {  //OSM
+            L.tileLayer.cached('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                //L.tileLayer.cached('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {  //OSM
                 maxZoom: 19,
                 attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-                opacity: 0.5, // Adjust for desired transparency
+                opacity: 0.5,
                 zIndex: 2,
-                tileSize: 256,
-                updateWhenIdle: true, // Load tiles only when map is idle
-                keepBuffer: 2 // Reduce memory usage
+                updateWhenIdle: true,
+                keepBuffer: 2,
+                subdomains: ['a', 'b', 'c']
             })
         ], {
             attribution: '© Esri, USDA, USGS | © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         }),
         "Esri Satellite + Carto Light": L.layerGroup([
-            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            L.tileLayer.cached('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
                 maxZoom: 19,
                 attribution: '© Esri, USDA, USGS',
                 zIndex: 1
             }),
-            //L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png', {
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', { // With labels
-            //L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png', {  // Darker, no labels
-                maxZoom: 20, // Carto supports up to zoom 20
-                attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, © <a href="https://carto.com/attributions">CARTO</a>',
-                opacity: 0.4, // Slightly higher opacity as Carto Light is less dense
-                zIndex: 2,
-                updateWhenIdle: true,
-                keepBuffer: 2
+            //L.tileLayer.cached('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png', {
+                L.tileLayer.cached('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png', {
+                    //L.tileLayer.cached('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png', {  // Darker, no labels
+                    maxZoom: 20,
+                    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, © <a href="https://carto.com/attributions">CARTO</a>',
+                    opacity: 0.6,
+                    zIndex: 2,
+                    updateWhenIdle: true,
+                    keepBuffer: 2,
+                    subdomains: ['a', 'b', 'c', 'd']
+                })
+            ], {
+                attribution: '© Esri, USDA, USGS | © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, © <a href="https://carto.com/attributions">CARTO</a>'
             })
-        ], {
-            attribution: '© Esri, USDA, USGS | © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, © <a href="https://carto.com/attributions">CARTO</a>'
-        })
-    };
+        };
 
-    const openMeteoAttribution = 'Weather data by <a href="https://open-meteo.com">Open-Meteo</a>';
-    map.attributionControl.addAttribution(openMeteoAttribution);
-
-    const selectedBaseMap = userSettings.baseMaps in baseMaps ? userSettings.baseMaps : "Esri Street";
-    const fallbackBaseMap = "OpenStreetMap";
-    const layer = baseMaps[selectedBaseMap];
-    layer.on('tileerror', () => {
-        console.warn(`${selectedBaseMap} tiles failed to load, switching to ${fallbackBaseMap}`);
-        if (map.hasLayer(layer)) {
-            map.removeLayer(layer);
-            baseMaps[fallbackBaseMap].addTo(map);
-            userSettings.baseMaps = fallbackBaseMap;
+        const openMeteoAttribution = 'Weather data by <a href="https://open-meteo.com">Open-Meteo</a>';
+        map.attributionControl.addAttribution(openMeteoAttribution);
+    
+        const selectedBaseMap = userSettings.baseMaps in baseMaps ? userSettings.baseMaps : "Esri Street";
+        const fallbackBaseMap = "OpenStreetMap";
+        const layer = baseMaps[selectedBaseMap];
+        layer.on('tileerror', () => {
+            console.warn(`${selectedBaseMap} tiles failed to load, switching to ${fallbackBaseMap}`);
+            if (map.hasLayer(layer)) {
+                map.removeLayer(layer);
+                baseMaps[fallbackBaseMap].addTo(map);
+                userSettings.baseMaps = fallbackBaseMap;
+                saveSettings();
+                Utils.handleError(`${selectedBaseMap} tiles unavailable. Switched to ${fallbackBaseMap}.`);
+            }
+        });
+        layer.addTo(map);
+    
+        L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
+        map.on('baselayerchange', function (e) {
+            userSettings.baseMaps = e.name;
             saveSettings();
-            Utils.handleError(`${selectedBaseMap} tiles unavailable. Switched to ${fallbackBaseMap}.`);
+            console.log(`Base map changed to: ${e.name}`);
+            if (lastLat && lastLng) {
+                cacheTilesForDIP();
+            }
+        });
+    
+        map.on('moveend', () => {
+            if (lastLat && lastLng) {
+                cacheVisibleTiles();
+            }
+        });
+    
+        L.control.zoom({ position: 'topright' }).addTo(map);
+        L.control.polylineMeasure({
+            position: 'topright',
+            unit: 'kilometres',
+            showBearings: true,
+            clearMeasurementsOnStop: false,
+            showClearControl: true,
+            showUnitControl: true,
+            tooltipTextFinish: 'Click to finish the line<br>',
+            tooltipTextDelete: 'Shift-click to delete point',
+            tooltipTextMove: 'Drag to move point<br>',
+            tooltipTextResume: 'Click to resume line<br>',
+            tooltipTextAdd: 'Click to add point<br>',
+            measureControlTitleOn: 'Start measuring distance and bearing',
+            measureControlTitleOff: 'Stop measuring'
+        }).addTo(map);
+    
+        L.control.scale({
+            position: 'bottomleft',
+            metric: true,
+            imperial: true,
+            maxWidth: 100
+        }).addTo(map);
+    
+        map.createPane('gpxTrackPane');
+        map.getPane('gpxTrackPane').style.zIndex = 650;
+        map.getPane('tooltipPane').style.zIndex = 700;
+        map.getPane('popupPane').style.zIndex = 700;
+
+        livePositionControl = L.control.livePosition({ position: 'bottomright' }).addTo(map);
+        if (livePositionControl._container) {
+            livePositionControl._container.style.display = 'none';
+            console.log('Initialized livePositionControl and hid by default');
+        } else {
+            console.warn('livePositionControl._container not initialized in initMap');
         }
+
+    // Initialize TileCache and clear old tiles, but defer caching until coordinates are confirmed
+    TileCache.init().then(() => {
+        TileCache.clearOldTiles().catch(error => {
+            console.error('Failed to clear old tiles:', error);
+        });
+    }).catch(error => {
+        console.error('Failed to initialize tile cache:', error);
+        Utils.handleError('Tile caching unavailable.');
     });
-    layer.addTo(map);
-
-    L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
-    map.on('baselayerchange', function (e) {
-        userSettings.baseMaps = e.name;
-        saveSettings();
-        console.log(`Base map changed to: ${e.name}`);
-    });
-
-    L.control.zoom({ position: 'topright' }).addTo(map);
-    L.control.polylineMeasure({
-        position: 'topright',
-        unit: 'kilometres',
-        showBearings: true,
-        clearMeasurementsOnStop: false,
-        showClearControl: true,
-        showUnitControl: true,
-        tooltipTextFinish: 'Click to finish the line<br>',
-        tooltipTextDelete: 'Shift-click to delete point',
-        tooltipTextMove: 'Drag to move point<br>',
-        tooltipTextResume: 'Click to resume line<br>',
-        tooltipTextAdd: 'Click to add point<br>',
-        measureControlTitleOn: 'Start measuring distance and bearing',
-        measureControlTitleOff: 'Stop measuring'
-    }).addTo(map);
-
-    L.control.scale({
-        position: 'bottomleft',
-        metric: true,
-        imperial: true,
-        maxWidth: 100
-    }).addTo(map);
-
-    map.createPane('gpxTrackPane');
-    map.getPane('gpxTrackPane').style.zIndex = 650;
-    map.getPane('tooltipPane').style.zIndex = 700;
-    map.getPane('popupPane').style.zIndex = 700;
-
-    livePositionControl = L.control.livePosition({ position: 'bottomright' }).addTo(map);
-    if (livePositionControl._container) {
-        livePositionControl._container.style.display = 'none';
-        console.log('Initialized livePositionControl and hid by default');
-    } else {
-        console.warn('livePositionControl._container not initialized in initMap');
-    }
 
     async function fetchInitialWeather(lat, lng) {
         const lastFullHourUTC = getLastFullHourUTC();
@@ -569,9 +996,8 @@ function initMap() {
             console.log('initMap: Last full hour UTC:', utcIsoString);
         } catch (error) {
             console.error('Failed to get UTC time:', error);
-            // Fallback to current time rounded to the last full hour
             const now = new Date();
-            now.setMinutes(0, 0, 0); // Round to the last full hour
+            now.setMinutes(0, 0, 0);
             utcIsoString = now.toISOString();
             console.log('initMap: Fallback to current time:', utcIsoString);
         }
@@ -583,41 +1009,25 @@ function initMap() {
             try {
                 const localTimeStr = await Utils.formatLocalTime(utcIsoString, lat, lng);
                 console.log('initMap: Local time string:', localTimeStr);
-
-                // Validate localTimeStr and parse it (expected format: YYYY-MM-DD HHmm GMT+X)
-                if (!localTimeStr || typeof localTimeStr !== 'string') {
-                    throw new Error(`Invalid local time string: ${localTimeStr}`);
-                }
-
-                // Parse the string: e.g., "2025-05-02 2200 GMT+2"
                 const match = localTimeStr.match(/^(\d{4}-\d{2}-\d{2}) (\d{2})(\d{2}) GMT([+-]\d+)/);
                 if (!match) {
                     throw new Error(`Local time string format mismatch: ${localTimeStr}`);
                 }
-
                 const [, datePart, hour, minute, offset] = match;
-                // Format offset as +HH:MM (e.g., +2 becomes +02:00)
                 const offsetSign = offset.startsWith('+') ? '+' : '-';
                 const offsetHours = Math.abs(parseInt(offset, 10)).toString().padStart(2, '0');
                 const formattedOffset = `${offsetSign}${offsetHours}:00`;
                 const isoFormatted = `${datePart}T${hour}:${minute}:00${formattedOffset}`;
                 console.log('initMap: ISO formatted local time:', isoFormatted);
-
-                // Create localDate in UTC by accounting for the offset
                 const localDate = new Date(isoFormatted);
                 if (isNaN(localDate.getTime())) {
                     throw new Error(`Failed to parse localDate from ${isoFormatted}`);
                 }
-
-                // Log the UTC equivalent of the local time
                 const localDateUtc = localDate.toISOString();
                 console.log('initMap: Local time in UTC:', localDateUtc);
-
-                // Do not subtract 2 hours; use the local time as-is (in UTC)
                 initialTime = localDateUtc.replace(':00.000Z', 'Z');
             } catch (error) {
                 console.error('Error converting to local time:', error);
-                // Fallback to UTC time if local time conversion fails
                 initialTime = utcIsoString.replace(':00.000Z', 'Z');
                 console.log('initMap: Falling back to UTC time:', initialTime);
             }
@@ -626,6 +1036,7 @@ function initMap() {
         console.log('initMap: initialTime:', initialTime);
         await fetchWeatherForLocation(lat, lng, initialTime, true);
     }
+
 
     const initialAltitude = 'N/A';
     configureMarker(defaultCenter[0], defaultCenter[1], initialAltitude, false);
@@ -655,6 +1066,9 @@ function initMap() {
                     setCheckboxValue('trackPositionCheckbox', true);
                     startPositionTracking();
                 }
+
+                // Cache tiles after setting coordinates
+                cacheTilesForDIP();
             },
             async (error) => {
                 console.warn(`Geolocation error: ${error.message}`);
@@ -675,6 +1089,9 @@ function initMap() {
                     userSettings.trackPosition = false;
                     saveSettings();
                 }
+
+                // Cache tiles for default coordinates
+                cacheTilesForDIP();
             },
             {
                 enableHighAccuracy: true,
@@ -701,6 +1118,9 @@ function initMap() {
             userSettings.trackPosition = false;
             saveSettings();
         }
+
+        // Cache tiles for default coordinates
+        cacheTilesForDIP();
     }
 
     L.Control.Coordinates = L.Control.extend({
@@ -854,6 +1274,7 @@ function initMap() {
             console.log('Updating JRT after weather fetch for double-click');
             updateJumpRunTrack();
         }
+        cacheTilesForDIP(); // Cache tiles for new DIP
     });
 
     map.on('zoomend', () => {
@@ -1100,6 +1521,7 @@ function attachMarkerDragend(marker) {
                 updateJumpRunTrack();
             }
             slider.value = currentIndex;
+            cacheTilesForDIP(); // Cache tiles for new DIP
         } else {
             document.getElementById('info').innerHTML = `No models available.`;
         }
@@ -6758,4 +7180,5 @@ document.addEventListener('DOMContentLoaded', () => {
     setupResetCutAwayMarkerButton();
     setupClearHistoricalDate(); // Add this line
     setupGpxTrackEvents(); // Add this line
+    setupCacheManagement();
 });
