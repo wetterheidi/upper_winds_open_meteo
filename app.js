@@ -491,7 +491,7 @@ const TileCache = {
             const request = store.put({ url, blob, timestamp: Date.now() });
             request.onsuccess = () => {
                 console.log(`Stored tile: ${url}`);
-                resolve();
+                resolve(true);
             };
             request.onerror = (event) => {
                 console.warn(`Failed to store tile: ${url}`, event);
@@ -509,7 +509,43 @@ const TileCache = {
             const request = store.get(url);
             request.onsuccess = (event) => {
                 const result = event.target.result;
-                resolve(result ? result.blob : null);
+                if (result) {
+                    resolve(result.blob);
+                } else {
+                    // Try alternative URL formats (for backward compatibility with previous storage)
+                    const urlVariants = [
+                        url.replace('https://tile.opentopomap.org', 'https://a.tile.opentopomap.org'),
+                        url.replace('https://tile.opentopomap.org', 'https://b.tile.opentopomap.org'),
+                        url.replace('https://tile.opentopomap.org', 'https://c.tile.opentopomap.org'),
+                        url.replace('https://tile.openstreetmap.org', 'https://a.tile.openstreetmap.org'),
+                        url.replace('https://tile.openstreetmap.org', 'https://b.tile.openstreetmap.org'),
+                        url.replace('https://tile.openstreetmap.org', 'https://c.tile.openstreetmap.org'),
+                        url.replace('https://basemaps.cartocdn.com', 'https://a.basemaps.cartocdn.com'),
+                        url.replace('https://basemaps.cartocdn.com', 'https://b.basemaps.cartocdn.com'),
+                        url.replace('https://basemaps.cartocdn.com', 'https://c.basemaps.cartocdn.com'),
+                        url.replace('https://basemaps.cartocdn.com', 'https://d.basemaps.cartocdn.com')
+                    ];
+                    let foundBlob = null;
+                    for (const variant of urlVariants) {
+                        if (variant === url) continue;
+                        const variantRequest = store.get(variant);
+                        variantRequest.onsuccess = (variantEvent) => {
+                            const variantResult = variantEvent.target.result;
+                            if (variantResult) {
+                                foundBlob = variantResult.blob;
+                                resolve(foundBlob);
+                            }
+                        };
+                        variantRequest.onerror = () => {
+                            // Continue to next variant
+                        };
+                    }
+                    setTimeout(() => {
+                        if (!foundBlob) {
+                            resolve(null);
+                        }
+                    }, 100); // Give time for variant requests to complete
+                }
             };
             request.onerror = (event) => {
                 console.warn(`Failed to retrieve tile: ${url}`, event);
@@ -581,6 +617,41 @@ const TileCache = {
             };
             request.onerror = (event) => reject(event);
         });
+    },
+
+    // New method to migrate existing tiles to normalized URLs
+    async migrateTiles() {
+        if (!this.db) await this.init();
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction([this.storeName], 'readwrite');
+            const store = transaction.objectStore(this.storeName);
+            const request = store.openCursor();
+            let migratedCount = 0;
+            request.onsuccess = (event) => {
+                const cursor = event.target.result;
+                if (cursor) {
+                    const { url, blob, timestamp } = cursor.value;
+                    const normalizedUrl = url.replace(/^(https?:\/\/[a-c]\.tile\.openstreetmap\.org)/, 'https://tile.openstreetmap.org')
+                                            .replace(/^(https?:\/\/[a-d]\.basemaps\.cartocdn\.com)/, 'https://basemaps.cartocdn.com')
+                                            .replace(/^(https?:\/\/[a-c]\.tile\.opentopomap\.org)/, 'https://tile.opentopomap.org');
+                    if (url !== normalizedUrl) {
+                        // Delete the old entry
+                        cursor.delete();
+                        // Store with normalized URL
+                        store.put({ url: normalizedUrl, blob, timestamp });
+                        migratedCount++;
+                    }
+                    cursor.continue();
+                } else {
+                    console.log(`Migrated ${migratedCount} tiles to normalized URLs`);
+                    resolve();
+                }
+            };
+            request.onerror = (event) => {
+                console.error('Failed to migrate tiles:', event);
+                reject(event);
+            };
+        });
     }
 };
 
@@ -616,6 +687,7 @@ L.TileLayer.Cached = L.TileLayer.extend({
             TileCache.getTile(normalizedUrl).then(blob => {
                 if (blob) {
                     tile.src = URL.createObjectURL(blob);
+                    console.log(`Tile loaded from cache: ${normalizedUrl}`);
                 } else {
                     console.warn(`Tile not in cache: ${normalizedUrl}`);
                     done(new Error('Tile not in cache'), tile);
@@ -626,21 +698,28 @@ L.TileLayer.Cached = L.TileLayer.extend({
             });
         } else {
             tile.src = url; // Use direct URL for online rendering
-            fetch(url)
+            fetch(url, { signal: AbortSignal.timeout(10000) }) // 10-second timeout
                 .then(response => {
                     if (!response.ok) throw new Error(`HTTP ${response.status}`);
                     return response.blob();
                 })
                 .then(blob => {
-                    TileCache.storeTile(normalizedUrl, blob).catch(error => console.warn('Failed to cache tile:', normalizedUrl, error));
+                    // Store with normalized URL
+                    TileCache.storeTile(normalizedUrl, blob).catch(error => console.warn('Failed to cache tile during rendering:', normalizedUrl, error));
                 })
                 .catch(error => {
-                    console.warn('Fetch error for tile:', url, error);
+                    console.warn('Fetch error for tile during rendering:', url, error);
                     TileCache.getTile(normalizedUrl).then(blob => {
                         if (blob) {
                             tile.src = URL.createObjectURL(blob);
+                            console.log(`Tile loaded from cache (fallback): ${normalizedUrl}`);
+                        } else {
+                            done(error, tile);
                         }
-                    }).catch(err => console.warn('Cache fallback error:', normalizedUrl, err));
+                    }).catch(err => {
+                        console.warn('Cache fallback error:', normalizedUrl, err);
+                        done(err, tile);
+                    });
                 });
         }
 
@@ -691,21 +770,29 @@ function getTilesInRadius(lat, lng, radiusKm, zoomLevels) {
 
 // Retry mechanism for failed tile fetches
 async function cacheTileWithRetry(url, maxRetries = 3) {
+    let lastError = null;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
-            const response = await fetch(url);
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000); // Increased to 15s for OpenTopoMap
+            const response = await fetch(url, { signal: controller.signal });
+            clearTimeout(timeoutId);
             if (response.ok) {
                 const blob = await response.blob();
-                await TileCache.storeTile(url, blob);
-                return true;
+                return { success: true, blob };
             }
             console.warn(`Attempt ${attempt} failed for ${url}: HTTP ${response.status}`);
+            lastError = new Error(`HTTP ${response.status}`);
         } catch (error) {
-            console.warn(`Attempt ${attempt} error for ${url}:`, error);
+            console.warn(`Attempt ${attempt} error for ${url}: ${error.message}`);
+            lastError = error;
+            if (error.name === 'AbortError') {
+                console.warn(`Fetch timeout after 15s for ${url}`);
+            }
         }
-        if (attempt < maxRetries) await new Promise(resolve => setTimeout(resolve, 1000));
+        if (attempt < maxRetries) await new Promise(resolve => setTimeout(resolve, 1000)); // Increased delay to 1s
     }
-    return false;
+    return { success: false, error: lastError };
 }
 
 // Cache tiles for DIP (ensured to run on init)
@@ -751,10 +838,13 @@ async function cacheTilesForDIP() {
 
     let cachedCount = 0;
     let failedCount = 0;
-    Utils.handleMessage('Caching map tiles around DIP...');
+    const totalTiles = tiles.length * tileLayers.length;
+    const failedTiles = []; // Track failed tiles to reduce log noise
+    Utils.handleMessage(`Caching map tiles around DIP (0/${totalTiles})...`);
+
     try {
         for (const layer of tileLayers) {
-            for (const tile of tiles) {
+            const fetchPromises = tiles.map(async (tile, index) => {
                 const url = layer.url
                     .replace('{z}', tile.zoom)
                     .replace('{x}', tile.x)
@@ -765,19 +855,50 @@ async function cacheTilesForDIP() {
                     .replace('{x}', tile.x)
                     .replace('{y}', tile.y);
 
-                const success = await cacheTileWithRetry(url);
-                if (success) {
+                // Check if tile is already in cache
+                const cachedBlob = await TileCache.getTile(normalizedUrl).catch(() => null);
+                if (cachedBlob) {
                     cachedCount++;
-                } else {
-                    console.warn(`Failed to cache tile after retries: ${url}`);
-                    failedCount++;
+                    return;
                 }
+
+                const result = await cacheTileWithRetry(url);
+                if (result.success) {
+                    const stored = await TileCache.storeTile(normalizedUrl, result.blob).catch(() => false);
+                    if (stored) {
+                        cachedCount++;
+                    } else {
+                        failedCount++;
+                        failedTiles.push(url);
+                    }
+                } else {
+                    failedCount++;
+                    failedTiles.push(url);
+                }
+
+                // Update progress every 10 tiles
+                const currentCount = cachedCount + failedCount;
+                if ((index + 1) % 10 === 0 || index === tiles.length - 1) {
+                    Utils.handleMessage(`Caching map tiles around DIP (${currentCount}/${totalTiles})...`);
+                }
+            });
+
+            // Process tiles in batches of 20 to avoid overwhelming the network
+            for (let i = 0; i < fetchPromises.length; i += 20) {
+                const batch = fetchPromises.slice(i, i + 20);
+                await Promise.all(batch);
             }
         }
     } catch (error) {
         console.error('Unexpected error in cacheTilesForDIP:', error);
         Utils.handleError('Failed to cache map tiles: ' + error.message);
     }
+
+    // Log failed tiles only once to reduce noise
+    if (failedTiles.length > 0) {
+        console.warn(`Failed to cache ${failedTiles.length} tiles:`, failedTiles);
+    }
+
     console.log(`DIP caching complete: ${cachedCount} tiles cached, ${failedCount} failed`);
     if (failedCount > 0) {
         Utils.handleMessage(`Cached ${cachedCount} tiles around DIP (${failedCount} failed). Pan or zoom to cache more tiles.`);
@@ -854,9 +975,14 @@ const debouncedCacheVisibleTiles = debounce(async () => {
         });
     }
 
-    Utils.handleMessage('Caching visible map tiles...');
+    let cachedCount = 0;
+    let failedCount = 0;
+    const totalTiles = tiles.length * tileLayers.length;
+    const failedTiles = [];
+    Utils.handleMessage(`Caching visible map tiles (0/${totalTiles})...`);
+
     for (const layer of tileLayers) {
-        for (const tile of tiles) {
+        const fetchPromises = tiles.map(async (tile, index) => {
             const url = layer.url
                 .replace('{z}', tile.zoom)
                 .replace('{x}', tile.x)
@@ -867,44 +993,50 @@ const debouncedCacheVisibleTiles = debounce(async () => {
                 .replace('{x}', tile.x)
                 .replace('{y}', tile.y);
 
-            TileCache.getTile(normalizedUrl).then(blob => {
-                if (blob) {
-                    console.log(`Tile already cached: ${normalizedUrl}`);
-                    return;
+            const cachedBlob = await TileCache.getTile(normalizedUrl).catch(() => null);
+            if (cachedBlob) {
+                cachedCount++;
+                return;
+            }
+
+            const result = await cacheTileWithRetry(url);
+            if (result.success) {
+                const stored = await TileCache.storeTile(normalizedUrl, result.blob).catch(() => false);
+                if (stored) {
+                    cachedCount++;
+                } else {
+                    failedCount++;
+                    failedTiles.push(url);
                 }
-                cacheTileWithRetry(url).catch(error => console.warn(`Failed to cache visible tile: ${url}`, error));
-            }).catch(error => {
-                console.warn(`Error checking cache for ${normalizedUrl}:`, error);
-            });
+            } else {
+                failedCount++;
+                failedTiles.push(url);
+            }
+
+            const currentCount = cachedCount + failedCount;
+            if ((index + 1) % 10 === 0 || index === tiles.length - 1) {
+                Utils.handleMessage(`Caching visible map tiles (${currentCount}/${totalTiles})...`);
+            }
+        });
+
+        for (let i = 0; i < fetchPromises.length; i += 20) {
+            const batch = fetchPromises.slice(i, i + 20);
+            await Promise.all(batch);
         }
     }
+
+    if (failedTiles.length > 0) {
+        console.warn(`Failed to cache ${failedTiles.length} visible tiles:`, failedTiles);
+    }
+
     Utils.handleMessage('Visible map tiles cached.');
 
-    // Check cache size and warn if large
     const size = await TileCache.getCacheSize();
     if (size > 500) {
         Utils.handleError(`Cache size large (${size.toFixed(2)} MB). Consider clearing cache to free up space.`);
     }
     console.log(`Cache size after visible tiles caching: ${size.toFixed(2)} MB`);
 }, 1000);
-
-async function cacheTileWithRetry(url, maxRetries = 3) {
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-            const response = await fetch(url);
-            if (response.ok) {
-                const blob = await response.blob();
-                await TileCache.storeTile(url, blob);
-                return true;
-            }
-            console.warn(`Attempt ${attempt} failed for ${url}: HTTP ${response.status}`);
-        } catch (error) {
-            console.warn(`Attempt ${attempt} error for ${url}:`, error);
-        }
-        if (attempt < maxRetries) await new Promise(resolve => setTimeout(resolve, 1000));
-    }
-    return false;
-}
 
 // Cache management UI
 function setupCacheManagement() {
@@ -1041,13 +1173,15 @@ function initMap() {
         console.log('Back online, restored minZoom to 10');
     });
 
-    map.on('zoomstart', () => {
+    map.on('zoomstart', (e) => {
         if (!navigator.onLine) {
-            const currentZoom = map.getZoom();
-            if (currentZoom < 11) {
+            const targetZoom = e.target._zoom || map.getZoom();
+            if (targetZoom < 11) {
+                e.target._zoom = 11;
                 map.setZoom(11);
                 Utils.handleError('Offline: Zoom restricted to levels 11–14 for cached tiles.');
-            } else if (currentZoom > 14) {
+            } else if (targetZoom > 14) {
+                e.target._zoom = 14;
                 map.setZoom(14);
                 Utils.handleError('Offline: Zoom restricted to levels 11–14 for cached tiles.');
             }
@@ -1163,7 +1297,9 @@ function initMap() {
 
 
     TileCache.init().then(() => {
-        TileCache.clearOldTiles().catch(error => {
+        TileCache.clearOldTiles().then(() => {
+            cacheTilesForDIP(); // Ensure caching runs on init
+        }).catch(error => {
             console.error('Failed to clear old tiles:', error);
         });
     }).catch(error => {
