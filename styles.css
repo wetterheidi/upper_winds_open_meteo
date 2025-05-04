@@ -59,7 +59,7 @@ html {
     font-size: 11px;
     z-index: 900; /* Below the scale control */
     white-space: normal; /* Allow text to wrap */
-    max-width: 50%; /* Limit width to prevent stretching across the map */
+    max-width: 100%; /* Limit width to prevent stretching across the map */
     text-align: right; /* Align text to the right */
 }
 
