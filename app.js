@@ -187,7 +187,8 @@ function initializeSettings() {
     userSettings.harpLng = null;
     userSettings.jumpRunTrackOffset = 0;
     userSettings.jumpRunTrackForwardOffset = 0; // Initialize new setting
-    userSettings.cacheRadiusKm = 10;
+    userSettings.cacheRadiusKm = userSettings.cacheRadiusKm || defaultSettings.cacheRadiusKm;
+    userSettings.cacheZoomLevels = userSettings.cacheZoomLevels || defaultSettings.cacheZoomLevels;
     isJumperSeparationManual = false;
     saveSettings();
     console.log('Initialized settings with Jump Master menu defaults:', {
@@ -568,6 +569,20 @@ function hideProgress() {
     }
 }
 
+// Function to manage the offline indicator
+function updateOfflineIndicator() {
+    console.log('updateOfflineIndicator called, navigator.onLine:', navigator.onLine);
+    let offlineIndicator = document.getElementById('offline-indicator');
+    if (!offlineIndicator) {
+        offlineIndicator = document.createElement('div');
+        offlineIndicator.id = 'offline-indicator';
+        document.body.appendChild(offlineIndicator);
+        console.log('Offline indicator created and appended');
+    }
+    offlineIndicator.style.display = navigator.onLine ? 'none' : 'block';
+    offlineIndicator.textContent = 'Offline Mode';
+}
+
 // IndexedDB utility with cache expiration
 const TileCache = {
     dbName: 'SkydivingTileCache',
@@ -801,12 +816,13 @@ L.TileLayer.Cached = L.TileLayer.extend({
 
         // Normalize URL by removing subdomain for caching
         const normalizedUrl = url.replace(/^(https?:\/\/[a-c]\.tile\.openstreetmap\.org)/, 'https://tile.openstreetmap.org')
-            .replace(/^(https?:\/\/[a-d]\.basemaps\.cartocdn\.com)/, 'https://basemaps.cartocdn.com')
-            .replace(/^(https?:\/\/[a-c]\.tile\.opentopomap\.org)/, 'https://tile.opentopomap.org');
+                              .replace(/^(https?:\/\/[a-d]\.basemaps\.cartocdn\.com)/, 'https://basemaps.cartocdn.com')
+                              .replace(/^(https?:\/\/[a-c]\.tile\.opentopomap\.org)/, 'https://tile.opentopomap.org');
 
         // Skip tile requests outside cached zoom levels when offline
         if (!navigator.onLine && (coords.z < 11 || coords.z > 14)) {
             console.log(`Skipping tile request outside cached zoom levels (11–14): ${url}`);
+            Utils.handleError('Offline: Zoom restricted to levels 11–14 for cached tiles.');
             done(new Error('Zoom level not cached'), tile);
             return tile;
         }
@@ -818,15 +834,17 @@ L.TileLayer.Cached = L.TileLayer.extend({
                     console.log(`Tile loaded from cache: ${normalizedUrl}`);
                 } else {
                     console.warn(`Tile not in cache: ${normalizedUrl}`);
+                    Utils.handleError('This area is not cached. Please cache more tiles while online.');
                     done(new Error('Tile not in cache'), tile);
                 }
             }).catch(error => {
                 console.warn('Cache error for offline tile:', normalizedUrl, error);
+                Utils.handleError('This area is not cached. Please cache more tiles while online.');
                 done(error, tile);
             });
         } else {
             tile.src = url; // Use direct URL for online rendering
-            fetch(url, { signal: AbortSignal.timeout(10000) }) // 10-second timeout
+            fetch(url, { signal: AbortSignal.timeout(15000) })
                 .then(response => {
                     if (!response.ok) throw new Error(`HTTP ${response.status}`);
                     return response.blob();
@@ -923,8 +941,14 @@ async function cacheTileWithRetry(url, maxRetries = 3) {
     return { success: false, error: lastError };
 }
 
-// Cache tiles for DIP (updated to use progress bar)
 async function cacheTilesForDIP() {
+    console.log('cacheTilesForDIP called with:', {
+        lastLat,
+        lastLng,
+        cacheRadiusKm: userSettings.cacheRadiusKm,
+        cacheZoomLevels: userSettings.cacheZoomLevels
+    });
+
     if (!lastLat || !lastLng) {
         console.warn('No DIP coordinates for caching, skipping');
         Utils.handleMessage('Please select a location to cache map tiles.');
@@ -937,8 +961,8 @@ async function cacheTilesForDIP() {
         return;
     }
 
-    const radiusKm = userSettings.cacheRadiusKm || 10;
-    const zoomLevels = userSettings.cacheZoomLevels || [11, 12, 13, 14];
+    const radiusKm = userSettings.cacheRadiusKm || defaultSettings.cacheRadiusKm;
+    const zoomLevels = userSettings.cacheZoomLevels || defaultSettings.cacheZoomLevels;
     const tiles = getTilesInRadius(lastLat, lastLng, radiusKm, zoomLevels);
 
     console.log(`Caching ${tiles.length} tiles for DIP:`, { lat: lastLat, lng: lastLng, radiusKm, zoomLevels, baseMap: userSettings.baseMaps });
@@ -964,6 +988,8 @@ async function cacheTilesForDIP() {
         });
     }
 
+    console.log('tileLayers:', tileLayers); // Log the tileLayers array
+
     let cachedCount = 0;
     let failedCount = 0;
     const totalTiles = tiles.length * tileLayers.length;
@@ -971,18 +997,23 @@ async function cacheTilesForDIP() {
     isCachingCancelled = false; // Reset cancel flag
 
     // Display initial progress
+    console.log('Calling displayProgress with initial values:', { cachedCount, failedCount, totalTiles });
     displayProgress(cachedCount + failedCount, totalTiles, () => {
         isCachingCancelled = true;
     });
 
     try {
         for (const layer of tileLayers) {
+            console.log('Processing layer:', layer.name); // Log each layer being processed
             if (isCachingCancelled) {
                 console.log('Caching cancelled by user');
                 break;
             }
             const fetchPromises = tiles.map(async (tile, index) => {
-                if (isCachingCancelled) return;
+                if (isCachingCancelled) {
+                    console.log('Caching cancelled during tile processing');
+                    return;
+                }
 
                 const url = layer.url
                     .replace('{z}', tile.zoom)
@@ -994,45 +1025,66 @@ async function cacheTilesForDIP() {
                     .replace('{x}', tile.x)
                     .replace('{y}', tile.y);
 
+                console.log(`Processing tile ${index + 1}/${tiles.length} for layer ${layer.name}:`, { url, normalizedUrl });
+
                 // Check if tile is already in cache
-                const cachedBlob = await TileCache.getTile(normalizedUrl).catch(() => null);
+                const cachedBlob = await TileCache.getTile(normalizedUrl).catch(err => {
+                    console.error(`Error retrieving tile from cache: ${normalizedUrl}`, err);
+                    return null;
+                });
                 if (cachedBlob) {
                     cachedCount++;
+                    console.log(`Tile ${index + 1} already in cache`);
                 } else {
                     const result = await cacheTileWithRetry(url);
                     if (result.success) {
-                        const stored = await TileCache.storeTile(normalizedUrl, result.blob).catch(() => false);
+                        const stored = await TileCache.storeTile(normalizedUrl, result.blob).catch(err => {
+                            console.error(`Error storing tile: ${normalizedUrl}`, err);
+                            return false;
+                        });
                         if (stored) {
                             cachedCount++;
+                            console.log(`Tile ${index + 1} cached successfully`);
                         } else {
                             failedCount++;
                             failedTiles.push(url);
+                            console.log(`Tile ${index + 1} failed to store`);
                         }
                     } else {
                         failedCount++;
                         failedTiles.push(url);
+                        console.log(`Tile ${index + 1} failed to fetch:`, result.error.message);
                     }
                 }
 
                 // Update progress every 10 tiles
                 const currentCount = cachedCount + failedCount;
                 if ((index + 1) % 10 === 0 || index === tiles.length - 1) {
+                    console.log('Updating progress:', { currentCount, totalTiles });
                     displayProgress(currentCount, totalTiles, () => {
                         isCachingCancelled = true;
                     });
                 }
             });
 
+            console.log(`Processing batch of ${tiles.length} tiles for layer ${layer.name}`);
             for (let i = 0; i < fetchPromises.length; i += 20) {
-                if (isCachingCancelled) break;
+                if (isCachingCancelled) {
+                    console.log('Caching cancelled during batch processing');
+                    break;
+                }
                 const batch = fetchPromises.slice(i, i + 20);
-                await Promise.all(batch);
+                await Promise.all(batch).catch(err => {
+                    console.error('Error processing batch of tiles:', err);
+                });
+                console.log(`Completed batch ${i / 20 + 1} for layer ${layer.name}`);
             }
         }
     } catch (error) {
         console.error('Unexpected error in cacheTilesForDIP:', error);
         Utils.handleError('Failed to cache map tiles: ' + error.message);
     } finally {
+        console.log('Hiding progress bar');
         hideProgress();
     }
 
@@ -1071,8 +1123,9 @@ const debouncedCacheVisibleTiles = debounce(async () => {
 
     const bounds = map.getBounds();
     const zoom = map.getZoom();
-    if (!userSettings.cacheZoomLevels.includes(zoom)) {
-        console.log(`Skipping caching: zoom ${zoom} not in cacheZoomLevels`, userSettings.cacheZoomLevels);
+    const zoomLevels = userSettings.cacheZoomLevels || defaultSettings.cacheZoomLevels;
+    if (!zoomLevels.includes(zoom)) {
+        console.log(`Skipping caching: zoom ${zoom} not in cacheZoomLevels`, zoomLevels);
         return;
     }
 
@@ -1211,13 +1264,16 @@ const debouncedCacheVisibleTiles = debounce(async () => {
     }
 }, 1000);
 
-// Cache management UI
+// Cache management UI (updated to remove Recache Area button)
 function setupCacheManagement() {
+    const bottomContainer = document.getElementById('bottom-container');
+
+    // Clear Cache button
     const clearCacheButton = document.createElement('button');
     clearCacheButton.textContent = 'Clear Tile Cache';
     clearCacheButton.style.margin = '10px';
     clearCacheButton.title = 'Clears cached map tiles. Pan/zoom to cache more tiles for offline use.';
-    document.getElementById('bottom-container').appendChild(clearCacheButton);
+    bottomContainer.appendChild(clearCacheButton);
     clearCacheButton.addEventListener('click', async () => {
         try {
             const size = await TileCache.getCacheSize();
@@ -1230,9 +1286,54 @@ function setupCacheManagement() {
     });
 }
 
+function setupCacheSettings() {
+    // Event listener for cache radius dropdown
+    const cacheRadiusSelect = document.getElementById('cacheRadiusSelect');
+    if (cacheRadiusSelect) {
+        cacheRadiusSelect.addEventListener('change', () => {
+            userSettings.cacheRadiusKm = parseInt(cacheRadiusSelect.value, 10);
+            saveSettings();
+            console.log('Updated cacheRadiusKm:', userSettings.cacheRadiusKm);
+        });
+        console.log('cacheRadiusSelect listener attached, initial value:', cacheRadiusSelect.value);
+    } else {
+        console.warn('cacheRadiusSelect not found in DOM');
+    }
 
+    // Event listener for cache zoom levels dropdown
+    const cacheZoomLevelsSelect = document.getElementById('cacheZoomLevelsSelect');
+    if (cacheZoomLevelsSelect) {
+        cacheZoomLevelsSelect.addEventListener('change', () => {
+            const [minZoom, maxZoom] = cacheZoomLevelsSelect.value.split('-').map(Number);
+            userSettings.cacheZoomLevels = Array.from(
+                { length: maxZoom - minZoom + 1 },
+                (_, i) => minZoom + i
+            );
+            saveSettings();
+            console.log('Updated cacheZoomLevels:', userSettings.cacheZoomLevels);
+        });
+        console.log('cacheZoomLevelsSelect listener attached, initial value:', cacheZoomLevelsSelect.value);
+    } else {
+        console.warn('cacheZoomLevelsSelect not found in DOM');
+    }
 
-
+    // Event listener for Recache Now button
+    const recacheNowButton = document.getElementById('recacheNowButton');
+    if (recacheNowButton) {
+        recacheNowButton.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent menu from closing due to click event bubbling
+            console.log('Recache Now button clicked');
+            if (!navigator.onLine) {
+                Utils.handleError('Cannot recache while offline.');
+                return;
+            }
+            cacheTilesForDIP();
+        });
+        console.log('recacheNowButton listener attached');
+    } else {
+        console.warn('recacheNowButton not found in DOM');
+    }
+}
 
 // == Map Initialization and Interaction ==
 function initMap() {
@@ -1353,8 +1454,13 @@ function initMap() {
 
     window.addEventListener('online', () => {
         hasSwitched = false;
-        map.options.minZoom = 6;
-        console.log('Back online, restored minZoom to 6');
+        map.options.minZoom = 10;
+        console.log('Back online, restored minZoom to 10');
+        updateOfflineIndicator();
+    });
+
+    window.addEventListener('offline', () => {
+        updateOfflineIndicator();
     });
 
     map.on('zoomstart', (e) => {
@@ -1598,6 +1704,9 @@ function initMap() {
         // Cache tiles for default coordinates
         cacheTilesForDIP();
     }
+
+    // Initialize offline indicator
+    updateOfflineIndicator();
 
     L.Control.Coordinates = L.Control.extend({
         options: { position: 'bottomleft' },
@@ -7652,4 +7761,5 @@ document.addEventListener('DOMContentLoaded', () => {
     setupClearHistoricalDate(); // Add this line
     setupGpxTrackEvents(); // Add this line
     setupCacheManagement();
+    setupCacheSettings(); // Add this call to set up caching settings
 });

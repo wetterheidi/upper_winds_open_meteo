@@ -24,10 +24,12 @@ html {
 }
 
 .leaflet-tooltip {
-    z-index: 800 !important; /* Ensure tooltip is above all map elements */
+    z-index: 800 !important;
+    /* Ensure tooltip is above all map elements */
     background-color: white;
     padding: 2px;
-    pointer-events: none; /* Prevent tooltip from blocking mouse events */
+    pointer-events: none;
+    /* Prevent tooltip from blocking mouse events */
 }
 
 .leaflet-popup-content-wrapper {
@@ -48,7 +50,8 @@ html {
     position: absolute;
     right: 20px;
     bottom: 10px;
-    z-index: 1000; /* Above map tiles but below popups */
+    z-index: 1000;
+    /* Above map tiles but below popups */
     font-size: 12px;
     line-height: 1.4;
     opacity: 1 !important;
@@ -57,13 +60,14 @@ html {
     padding: 10px;
     border: 1px solid rgba(0, 0, 0, 0.2);
     border-radius: 4px;
-    box-shadow: rgba(0,0,0,0.2);
+    box-shadow: rgba(0, 0, 0, 0.2);
     max-width: 300px;
     pointer-events: none;
 }
 
 .leaflet-bottom .leaflet-control-live-position {
-    margin-bottom: 10px; /* Keep vertical spacing */
+    margin-bottom: 10px;
+    /* Keep vertical spacing */
 }
 
 .leaflet-container {
@@ -77,9 +81,9 @@ html {
     pointer-events: none;
 }
 
-.leaflet-overlay-pane > *,
-.leaflet-marker-pane > *,
-.leaflet-popup-pane > * {
+.leaflet-overlay-pane>*,
+.leaflet-marker-pane>*,
+.leaflet-popup-pane>* {
     pointer-events: auto;
 }
 
@@ -120,8 +124,10 @@ html {
     top: 40px;
     left: 0;
     min-width: 200px;
-    max-height: 80vh; /* Limit height to 80% of viewport */
-    overflow-y: auto; /* Enable vertical scrolling */
+    max-height: 80vh;
+    /* Limit height to 80% of viewport */
+    overflow-y: auto;
+    /* Enable vertical scrolling */
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
     z-index: 300;
     border-radius: 8px;
@@ -755,6 +761,19 @@ input[type="number"]:focus {
     display: none;
 }
 
+#offline-indicator {
+    position: fixed;
+    top: 35px;
+    right: 5px;
+    width: 30%;
+    background: #fff3cd;
+    color: #856404;
+    padding: 6px;
+    border-radius: 5px;
+    text-align: center;
+    z-index: 9997;
+}
+
 #coordInputs label {
     display: block;
     margin: 5px 0;
@@ -859,11 +878,15 @@ input[type="checkbox"][style*="opacity: 1"] {
     border: none;
     border-radius: 3px;
     padding: 0;
-    line-height: 1 !important; /* Tighten line height */
+    line-height: 1 !important;
+    /* Tighten line height */
     text-align: center;
-    overflow: hidden !important; /* Clip text if it overflows */
-    z-index: 2100 !important; /* Above other tooltips */
-    pointer-events: none !important; /* Prevent mouse interaction */
+    overflow: hidden !important;
+    /* Clip text if it overflows */
+    z-index: 2100 !important;
+    /* Above other tooltips */
+    pointer-events: none !important;
+    /* Prevent mouse interaction */
 }
 
 .isoline-label span {
@@ -907,6 +930,7 @@ input[type="checkbox"][style*="opacity: 1"] {
     0% {
         transform: rotate(0deg);
     }
+
     100% {
         transform: rotate(360deg);
     }
@@ -1084,6 +1108,19 @@ input[type="checkbox"][style*="opacity: 1"] {
         z-index: 9999;
         display: none;
     }
+
+    #offline-indicator {
+        position: fixed;
+        top: 5px;
+        right: 5px;
+        width: 70%;
+        background: #fff3cd;
+        color: #856404;
+        padding: 6px;
+        border-radius: 5px;
+        text-align: center;
+        z-index: 9997;
+    }
 }
 
 @media (max-width: 400px) {
@@ -1204,20 +1241,25 @@ input[type="checkbox"][style*="opacity: 1"] {
 
 /* New styles for humidity-based row backgrounds */
 #info table tr.humidity-low {
-    background: #FFFFFF !important; /* White for <65% */
+    background: #FFFFFF !important;
+    /* White for <65% */
 }
 
 #info table tr.humidity-moderate {
-    background: #F4F4F4 !important; /* Light grey for 65%-85% */
+    background: #F4F4F4 !important;
+    /* Light grey for 65%-85% */
 }
 
 #info table tr.humidity-high {
-    background: #cdcdcd !important; /* Medium grey for 85%-99% */
+    background: #cdcdcd !important;
+    /* Medium grey for 85%-99% */
 }
 
 #info table tr.humidity-saturated {
-    background: #B9B9B9 !important; /* Dark grey for 100% */
-    color: #FFFFFF !important; /* White text for readability */
+    background: #B9B9B9 !important;
+    /* Dark grey for 100% */
+    color: #FFFFFF !important;
+    /* White text for readability */
 }
 
 /* Wind speed classes for border colors */
@@ -1305,6 +1347,7 @@ input[type="checkbox"][style*="opacity: 1"] {
     0% {
         transform: rotate(0deg);
     }
+
     100% {
         transform: rotate(360deg);
     }
@@ -1314,9 +1357,11 @@ input[type="checkbox"][style*="opacity: 1"] {
     0% {
         transform: scale(1);
     }
+
     50% {
         transform: scale(1.1);
     }
+
     100% {
         transform: scale(1);
     }
