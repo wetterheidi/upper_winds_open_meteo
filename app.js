@@ -688,17 +688,20 @@ const TileCache = {
             const store = transaction.objectStore(this.storeName);
             const request = store.openCursor();
             let deletedCount = 0;
+            let deletedSize = 0;
             request.onsuccess = (event) => {
                 const cursor = event.target.result;
                 if (cursor) {
                     if (Date.now() - cursor.value.timestamp > maxAgeMs) {
+                        deletedSize += cursor.value.blob.size || 0;
                         cursor.delete();
                         deletedCount++;
                     }
                     cursor.continue();
                 } else {
-                    console.log(`Cleared ${deletedCount} old tiles`);
-                    resolve();
+                    const deletedSizeMB = deletedSize / (1024 * 1024);
+                    console.log(`Cleared ${deletedCount} old tiles, freed ${deletedSizeMB.toFixed(2)} MB`);
+                    resolve({ deletedCount, deletedSizeMB });
                 }
             };
             request.onerror = (event) => {
@@ -745,7 +748,6 @@ const TileCache = {
         });
     },
 
-    // New method to migrate existing tiles to normalized URLs
     async migrateTiles() {
         if (!this.db) await this.init();
         return new Promise((resolve, reject) => {
@@ -853,7 +855,7 @@ L.TileLayer.Cached = L.TileLayer.extend({
     }
 });
 
-L.tileLayer.cached = function(url, options) {
+L.tileLayer.cached = function (url, options) {
     return new L.TileLayer.Cached(url, options);
 };
 
@@ -1331,8 +1333,19 @@ function initMap() {
             }
             return;
         }
-        console.warn(`Tile error in ${selectedBaseMap}, attempting to continue`);
-        // Only switch if multiple tiles fail (handled by Leaflet retry logic)
+        if (!hasSwitched && failedCount > totalTiles / 2) { // Switch if more than 50% fail
+            console.warn(`${selectedBaseMap} tiles slow or unavailable, switching to ${fallbackBaseMap}`);
+            if (map.hasLayer(layer)) {
+                map.removeLayer(layer);
+                baseMaps[fallbackBaseMap].addTo(map);
+                userSettings.baseMaps = fallbackBaseMap;
+                saveSettings();
+                Utils.handleError(`${selectedBaseMap} tiles slow or unavailable. Switched to ${fallbackBaseMap}.`);
+                hasSwitched = true;
+            }
+        } else {
+            console.warn(`Tile error in ${selectedBaseMap}, attempting to continue`);
+        }
     });
 
     layer.addTo(map); // Explicitly add layer to map
@@ -1466,12 +1479,39 @@ function initMap() {
     configureMarker(defaultCenter[0], defaultCenter[1], initialAltitude, false);
     isManualPanning = false;
 
-
+    // Migrate existing tiles to normalized URLs on init and perform automated cleanup
     TileCache.init().then(() => {
-        TileCache.clearOldTiles().then(() => {
-            cacheTilesForDIP(); // Ensure caching runs on init
+        TileCache.migrateTiles().then(() => {
+            TileCache.getCacheSize().then(size => {
+                if (size > 500) {
+                    TileCache.clearOldTiles(3).then(result => { // Clear tiles older than 3 days if size > 500 MB
+                        Utils.handleMessage(`Cleared ${result.deletedCount} old tiles to free up space: ${result.deletedSizeMB.toFixed(2)} MB freed.`);
+                    }).catch(error => {
+                        console.error('Failed to clear old tiles during init:', error);
+                        Utils.handleError('Failed to clear old tiles during startup.');
+                    });
+                } else {
+                    TileCache.clearOldTiles().then(() => {
+                        cacheTilesForDIP();
+                    }).catch(error => {
+                        console.error('Failed to clear old tiles:', error);
+                    });
+                }
+            }).catch(error => {
+                console.error('Failed to get cache size during init:', error);
+                TileCache.clearOldTiles().then(() => {
+                    cacheTilesForDIP();
+                }).catch(error => {
+                    console.error('Failed to clear old tiles:', error);
+                });
+            });
         }).catch(error => {
-            console.error('Failed to clear old tiles:', error);
+            console.error('Failed to migrate tiles:', error);
+            TileCache.clearOldTiles().then(() => {
+                cacheTilesForDIP();
+            }).catch(err => {
+                console.error('Failed to clear old tiles:', err);
+            });
         });
     }).catch(error => {
         console.error('Failed to initialize tile cache:', error);
