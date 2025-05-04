@@ -44,6 +44,23 @@ html {
 .leaflet-bottom .leaflet-control-scale {
     margin-bottom: 40px;
     margin-left: 10px;
+    z-index: 1000; /* Ensure scale is above attribution */
+    background-color: rgba(255, 255, 255, 0.9); /* Slightly more opaque for readability */
+    padding: 2px 5px; /* Add padding for better appearance */
+    border-radius: 4px; /* Rounded corners */
+}
+
+/* Style the attribution control */
+.leaflet-bottom .leaflet-control-attribution {
+    margin-bottom: 5px;
+    margin-right: 5px;
+    background-color: rgba(255, 255, 255, 0.8);
+    padding: 2px 5px;
+    font-size: 11px;
+    z-index: 900; /* Below the scale control */
+    white-space: normal; /* Allow text to wrap */
+    max-width: 50%; /* Limit width to prevent stretching across the map */
+    text-align: right; /* Align text to the right */
 }
 
 .leaflet-control-live-position {
@@ -626,6 +643,35 @@ button {
     background: #fff;
 }
 
+/* Style the button wrapper to align buttons horizontally */
+.button-wrapper {
+    display: flex;
+    flex-direction: row;
+    gap: 10px; /* Space between buttons */
+    justify-content: center; /* Center the buttons */
+    margin: 10px 0; /* Add vertical spacing */
+}
+
+/* Style for the buttons */
+#resetButton,
+#clearCacheButton {
+    background-color: #4da8da;
+    color: #ffffff;
+    border: none;
+    border-radius: 4px;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-family: 'Roboto', sans-serif;
+    cursor: pointer;
+    flex: 1; /* Buttons take equal width */
+    text-align: center;
+}
+
+#resetButton:hover,
+#clearCacheButton:hover {
+    background-color: #0056b3;
+}
+
 #info table {
     border-collapse: collapse;
     width: 100%;
@@ -1157,6 +1203,31 @@ input[type="checkbox"][style*="opacity: 1"] {
     #modelInfoButton {
         margin-top: 5px;
     }
+
+    .button-wrapper {
+        flex-direction: column;
+        gap: 8px; /* Reduced gap for mobile */
+    }
+
+    #resetButton,
+    #clearCacheButton {
+        width: 100%; /* Full width on mobile */
+    }
+
+    @media (max-width: 768px) {
+        .leaflet-bottom .leaflet-control-scale {
+            margin-bottom: 30px; /* Ensure enough space above attribution */
+            margin-left: 5px;
+        }
+    
+        .leaflet-bottom .leaflet-control-attribution {
+            margin-bottom: 5px;
+            margin-right: 5px;
+            margin-left: auto; /* Push to the right */
+            max-width: 60%; /* Slightly wider on mobile, but still wraps */
+            box-sizing: border-box;
+        }
+    }
 }
 
 @media (max-width: 480px) {
@@ -1174,7 +1245,7 @@ input[type="checkbox"][style*="opacity: 1"] {
 
     #hamburgerBtn {
         font-size: 20px;
-        padding: 6px 6px;
+        padding: 3px 6px;
     }
 
     .menu {

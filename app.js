@@ -1266,17 +1266,23 @@ const debouncedCacheVisibleTiles = debounce(async () => {
 
 // Cache management UI (updated to remove Recache Area button)
 function setupCacheManagement() {
-    const bottomContainer = document.getElementById('bottom-container');
+    const buttonWrapper = document.getElementById('settings-cache-buttons');
+    if (!buttonWrapper) {
+        console.warn('Button wrapper not found; ensure setupResetButton is called before setupCacheManagement');
+        return;
+    }
 
-    // Clear Cache button
     const clearCacheButton = document.createElement('button');
+    clearCacheButton.id = 'clearCacheButton';
     clearCacheButton.textContent = 'Clear Tile Cache';
-    clearCacheButton.style.margin = '10px';
     clearCacheButton.title = 'Clears cached map tiles. Pan/zoom to cache more tiles for offline use.';
-    bottomContainer.appendChild(clearCacheButton);
+    
+    // Append the clear cache button to the wrapper
+    buttonWrapper.appendChild(clearCacheButton);
+
     clearCacheButton.addEventListener('click', async () => {
         try {
-            const size = await TileCache.getCacheSize();
+            const size = TileCache.lastKnownCacheSize / (1024 * 1024); // Use cached size
             await TileCache.clearCache();
             Utils.handleMessage(`Tile cache cleared successfully (freed ${size.toFixed(2)} MB).`);
             console.log('Tile cache cleared');
@@ -7294,21 +7300,29 @@ function setupCheckbox(id, setting, callback) {
     }
 }
 function setupResetButton() {
+    const bottomContainer = document.getElementById('bottom-container');
     const resetButton = document.createElement('button');
+    resetButton.id = 'resetButton';
     resetButton.textContent = 'Reset Settings';
-    resetButton.style.margin = '10px';
-    document.getElementById('bottom-container').appendChild(resetButton);
+    resetButton.title = 'Resets all settings to their default values';
+
+    // Create a wrapper div for the buttons
+    const buttonWrapper = document.createElement('div');
+    buttonWrapper.id = 'settings-cache-buttons';
+    buttonWrapper.className = 'button-wrapper';
+
+    // Append the reset button to the wrapper
+    buttonWrapper.appendChild(resetButton);
+    bottomContainer.appendChild(buttonWrapper);
+
     resetButton.addEventListener('click', () => {
         userSettings = { ...defaultSettings };
-        isLandingPatternUnlocked = false;
-        isCalculateJumpUnlocked = false;
-        localStorage.setItem('upperWindsSettings', JSON.stringify(userSettings));
-        localStorage.setItem('unlockedFeatures', JSON.stringify({
-            landingPattern: false,
-            calculateJump: false
-        }));
-        console.log('Settings and unlock status reset');
-        location.reload();
+        saveSettings();
+        initializeUIElements();
+        if (lastLat && lastLng) {
+            cacheTilesForDIP();
+        }
+        Utils.handleMessage('Settings reset to default values.');
     });
 }
 function setupResetCutAwayMarkerButton() {
