@@ -95,8 +95,8 @@ html {
 }
 
 #hamburgerBtn {
-    font-size: 20px;
-    padding: 3px 8px;
+    font-size: 25px;
+    padding: 4px 8px;
     background: #4da8da;
     color: white;
     border-color: #4da8da;
@@ -1002,14 +1002,14 @@ input[type="checkbox"][style*="opacity: 1"] {
     }
 
     #slider-container {
-        top: 35px;
+        top: 40px;
         padding: 8px;
         max-width: 90%;
     }
 
     #hamburgerBtn {
-        font-size: 18px;
-        padding: 2px 6px;
+        font-size: 20px;
+        padding: 6px 6px;
     }
 
     .menu {

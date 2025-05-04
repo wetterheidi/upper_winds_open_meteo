@@ -430,7 +430,14 @@ function configureMarker(lat, lng, altitude, openPopup = false) {
 
 // == Tile caching ==
 
-// Enhanced message display
+// Detect if the device is mobile
+function isMobileDevice() {
+    const isMobile = window.innerWidth < 768;
+    console.log(`isMobileDevice check: window.innerWidth=${window.innerWidth}, isMobile=${isMobile}`);
+    return isMobile;
+}
+
+// Updated displayMessage with device-specific width
 function displayMessage(message) {
     console.log('displayMessage called with:', message);
     let messageElement = document.getElementById('message');
@@ -440,7 +447,7 @@ function displayMessage(message) {
         messageElement.style.position = 'fixed';
         messageElement.style.top = '5px';
         messageElement.style.right = '5px';
-        messageElement.style.width = '70%';
+        messageElement.style.width = isMobileDevice() ? '70%' : '30%';
         messageElement.style.backgroundColor = '#ccffcc';
         messageElement.style.borderRadius = '5px 5px 5px 5px';
         messageElement.style.color = '#000000';
@@ -448,6 +455,11 @@ function displayMessage(message) {
         messageElement.style.zIndex = '9998';
         messageElement.style.textAlign = 'center';
         document.body.appendChild(messageElement);
+
+        // Update width on window resize
+        window.addEventListener('resize', () => {
+            messageElement.style.width = isMobileDevice() ? '70%' : '30%';
+        });
     }
     messageElement.textContent = message;
     messageElement.style.display = 'block';
@@ -458,6 +470,103 @@ function displayMessage(message) {
 }
 
 Utils.handleMessage = displayMessage;
+
+// Global flag to track if caching is cancelled
+let isCachingCancelled = false;
+
+// New displayProgress function for progress bar with cancel button
+function displayProgress(current, total, cancelCallback) {
+    const percentage = Math.round((current / total) * 100);
+    let progressElement = document.getElementById('progress');
+    if (!progressElement) {
+        progressElement = document.createElement('div');
+        progressElement.id = 'progress';
+        progressElement.style.position = 'fixed';
+        progressElement.style.top = '5px';
+        progressElement.style.right = '5px';
+        progressElement.style.width = isMobileDevice() ? '70%' : '30%'; // Narrower width: 50% mobile, 20% desktop
+        progressElement.style.backgroundColor = '#ccffcc';
+        progressElement.style.borderRadius = '5px 5px 5px 5px';
+        progressElement.style.color = '#000000';
+        progressElement.style.padding = '6px';
+        progressElement.style.zIndex = '9998';
+        progressElement.style.display = 'flex';
+        progressElement.style.alignItems = 'center';
+        progressElement.style.gap = '10px';
+        document.body.appendChild(progressElement);
+
+        // Update width on window resize
+        window.addEventListener('resize', () => {
+            progressElement.style.width = isMobileDevice() ? '50%' : '20%';
+        });
+    }
+
+    // Progress container (text + bar)
+    const progressContainer = document.createElement('div');
+    progressContainer.style.flex = '1';
+    progressContainer.style.display = 'flex';
+    progressContainer.style.flexDirection = 'column';
+    progressContainer.style.gap = '3px';
+
+    // Progress text
+    const progressText = document.createElement('div');
+    progressText.textContent = `Caching (${current}/${total}, ${percentage}%)`;
+    progressText.style.fontSize = '12px';
+    progressText.style.textAlign = 'center';
+
+    // Progress bar
+    const progressBarContainer = document.createElement('div');
+    progressBarContainer.style.width = '100%';
+    progressBarContainer.style.height = '8px'; // Slightly narrower bar
+    progressBarContainer.style.backgroundColor = '#e0e0e0';
+    progressBarContainer.style.borderRadius = '3px';
+    progressBarContainer.style.overflow = 'hidden';
+
+    const progressBar = document.createElement('div');
+    progressBar.style.width = `${percentage}%`;
+    progressBar.style.height = '100%';
+    progressBar.style.backgroundColor = '#4caf50';
+    progressBar.style.transition = 'width 0.3s ease-in-out';
+
+    progressBarContainer.appendChild(progressBar);
+    progressContainer.appendChild(progressText);
+    progressContainer.appendChild(progressBarContainer);
+
+    // Cancel button (to the right)
+    let cancelButton = document.getElementById('cancel-caching');
+    if (!cancelButton) {
+        cancelButton = document.createElement('button');
+        cancelButton.id = 'cancel-caching';
+        cancelButton.textContent = 'Cancel';
+        cancelButton.style.backgroundColor = '#ff4444';
+        cancelButton.style.color = '#ffffff';
+        cancelButton.style.border = 'none';
+        cancelButton.style.borderRadius = '3px';
+        cancelButton.style.padding = '5px 3px';
+        cancelButton.style.cursor = 'pointer';
+        cancelButton.style.fontSize = '12px';
+        cancelButton.addEventListener('click', () => {
+            isCachingCancelled = true;
+            cancelCallback();
+            progressElement.style.display = 'none';
+            Utils.handleMessage('Caching cancelled.');
+        });
+    }
+
+    // Clear previous content and append new elements
+    progressElement.innerHTML = '';
+    progressElement.appendChild(progressContainer);
+    progressElement.appendChild(cancelButton);
+    progressElement.style.display = 'flex';
+}
+
+// Function to hide the progress bar
+function hideProgress() {
+    const progressElement = document.getElementById('progress');
+    if (progressElement) {
+        progressElement.style.display = 'none';
+    }
+}
 
 // IndexedDB utility with cache expiration
 const TileCache = {
@@ -744,7 +853,7 @@ L.TileLayer.Cached = L.TileLayer.extend({
     }
 });
 
-L.tileLayer.cached = function (url, options) {
+L.tileLayer.cached = function(url, options) {
     return new L.TileLayer.Cached(url, options);
 };
 
@@ -812,7 +921,7 @@ async function cacheTileWithRetry(url, maxRetries = 3) {
     return { success: false, error: lastError };
 }
 
-// Cache tiles for DIP (ensured to run on init)
+// Cache tiles for DIP (updated to use progress bar)
 async function cacheTilesForDIP() {
     if (!lastLat || !lastLng) {
         console.warn('No DIP coordinates for caching, skipping');
@@ -856,12 +965,23 @@ async function cacheTilesForDIP() {
     let cachedCount = 0;
     let failedCount = 0;
     const totalTiles = tiles.length * tileLayers.length;
-    const failedTiles = []; // Track failed tiles to reduce log noise
-    Utils.handleMessage(`Caching map tiles around DIP (0/${totalTiles})...`);
+    const failedTiles = [];
+    isCachingCancelled = false; // Reset cancel flag
+
+    // Display initial progress
+    displayProgress(cachedCount + failedCount, totalTiles, () => {
+        isCachingCancelled = true;
+    });
 
     try {
         for (const layer of tileLayers) {
+            if (isCachingCancelled) {
+                console.log('Caching cancelled by user');
+                break;
+            }
             const fetchPromises = tiles.map(async (tile, index) => {
+                if (isCachingCancelled) return;
+
                 const url = layer.url
                     .replace('{z}', tile.zoom)
                     .replace('{x}', tile.x)
@@ -876,32 +996,33 @@ async function cacheTilesForDIP() {
                 const cachedBlob = await TileCache.getTile(normalizedUrl).catch(() => null);
                 if (cachedBlob) {
                     cachedCount++;
-                    return;
-                }
-
-                const result = await cacheTileWithRetry(url);
-                if (result.success) {
-                    const stored = await TileCache.storeTile(normalizedUrl, result.blob).catch(() => false);
-                    if (stored) {
-                        cachedCount++;
+                } else {
+                    const result = await cacheTileWithRetry(url);
+                    if (result.success) {
+                        const stored = await TileCache.storeTile(normalizedUrl, result.blob).catch(() => false);
+                        if (stored) {
+                            cachedCount++;
+                        } else {
+                            failedCount++;
+                            failedTiles.push(url);
+                        }
                     } else {
                         failedCount++;
                         failedTiles.push(url);
                     }
-                } else {
-                    failedCount++;
-                    failedTiles.push(url);
                 }
 
                 // Update progress every 10 tiles
                 const currentCount = cachedCount + failedCount;
                 if ((index + 1) % 10 === 0 || index === tiles.length - 1) {
-                    Utils.handleMessage(`Caching map tiles around DIP (${currentCount}/${totalTiles})...`);
+                    displayProgress(currentCount, totalTiles, () => {
+                        isCachingCancelled = true;
+                    });
                 }
             });
 
-            // Process tiles in batches of 20 to avoid overwhelming the network
             for (let i = 0; i < fetchPromises.length; i += 20) {
+                if (isCachingCancelled) break;
                 const batch = fetchPromises.slice(i, i + 20);
                 await Promise.all(batch);
             }
@@ -909,29 +1030,37 @@ async function cacheTilesForDIP() {
     } catch (error) {
         console.error('Unexpected error in cacheTilesForDIP:', error);
         Utils.handleError('Failed to cache map tiles: ' + error.message);
+    } finally {
+        hideProgress();
     }
 
-    // Log failed tiles only once to reduce noise
     if (failedTiles.length > 0) {
         console.warn(`Failed to cache ${failedTiles.length} tiles:`, failedTiles);
     }
 
     console.log(`DIP caching complete: ${cachedCount} tiles cached, ${failedCount} failed`);
-    if (failedCount > 0) {
+    if (isCachingCancelled) {
+        Utils.handleMessage(`Caching cancelled: ${cachedCount} tiles cached, ${failedCount} failed.`);
+    } else if (failedCount > 0) {
         Utils.handleMessage(`Cached ${cachedCount} tiles around DIP (${failedCount} failed). Pan or zoom to cache more tiles.`);
     } else {
         Utils.handleMessage(`Cached ${cachedCount} tiles around DIP successfully.`);
     }
 
-    // Check cache size and warn if large
-    const size = await TileCache.getCacheSize();
-    if (size > 500) {
-        Utils.handleError(`Cache size large (${size.toFixed(2)} MB). Consider clearing cache to free up space.`);
+    // Check cache size with error handling
+    try {
+        const size = await TileCache.getCacheSize();
+        console.log(`Cache size after DIP caching: ${size.toFixed(2)} MB`);
+        if (size > 500) {
+            Utils.handleError(`Cache size large (${size.toFixed(2)} MB). Consider clearing cache to free up space.`);
+        }
+    } catch (error) {
+        console.error('Failed to check cache size after DIP caching:', error);
+        Utils.handleError('Unable to check cache size. Consider clearing cache to free up space.');
     }
-    console.log(`Cache size after DIP caching: ${size.toFixed(2)} MB`);
 }
 
-// Cache visible tiles on map movement
+// Cache visible tiles on map movement (updated to use progress bar)
 const debouncedCacheVisibleTiles = debounce(async () => {
     if (!map || !navigator.onLine) {
         console.log('Skipping visible tile caching: offline or map not initialized');
@@ -996,10 +1125,21 @@ const debouncedCacheVisibleTiles = debounce(async () => {
     let failedCount = 0;
     const totalTiles = tiles.length * tileLayers.length;
     const failedTiles = [];
-    Utils.handleMessage(`Caching visible map tiles (0/${totalTiles})...`);
+    isCachingCancelled = false; // Reset cancel flag
+
+    // Display initial progress
+    displayProgress(cachedCount + failedCount, totalTiles, () => {
+        isCachingCancelled = true;
+    });
 
     for (const layer of tileLayers) {
+        if (isCachingCancelled) {
+            console.log('Visible tile caching cancelled by user');
+            break;
+        }
         const fetchPromises = tiles.map(async (tile, index) => {
+            if (isCachingCancelled) return;
+
             const url = layer.url
                 .replace('{z}', tile.zoom)
                 .replace('{x}', tile.x)
@@ -1013,46 +1153,60 @@ const debouncedCacheVisibleTiles = debounce(async () => {
             const cachedBlob = await TileCache.getTile(normalizedUrl).catch(() => null);
             if (cachedBlob) {
                 cachedCount++;
-                return;
-            }
-
-            const result = await cacheTileWithRetry(url);
-            if (result.success) {
-                const stored = await TileCache.storeTile(normalizedUrl, result.blob).catch(() => false);
-                if (stored) {
-                    cachedCount++;
+            } else {
+                const result = await cacheTileWithRetry(url);
+                if (result.success) {
+                    const stored = await TileCache.storeTile(normalizedUrl, result.blob).catch(() => false);
+                    if (stored) {
+                        cachedCount++;
+                    } else {
+                        failedCount++;
+                        failedTiles.push(url);
+                    }
                 } else {
                     failedCount++;
                     failedTiles.push(url);
                 }
-            } else {
-                failedCount++;
-                failedTiles.push(url);
             }
 
             const currentCount = cachedCount + failedCount;
             if ((index + 1) % 10 === 0 || index === tiles.length - 1) {
-                Utils.handleMessage(`Caching visible map tiles (${currentCount}/${totalTiles})...`);
+                displayProgress(currentCount, totalTiles, () => {
+                    isCachingCancelled = true;
+                });
             }
         });
 
         for (let i = 0; i < fetchPromises.length; i += 20) {
+            if (isCachingCancelled) break;
             const batch = fetchPromises.slice(i, i + 20);
             await Promise.all(batch);
         }
     }
 
+    hideProgress();
+
     if (failedTiles.length > 0) {
         console.warn(`Failed to cache ${failedTiles.length} visible tiles:`, failedTiles);
     }
 
-    Utils.handleMessage('Visible map tiles cached.');
-
-    const size = await TileCache.getCacheSize();
-    if (size > 500) {
-        Utils.handleError(`Cache size large (${size.toFixed(2)} MB). Consider clearing cache to free up space.`);
+    if (isCachingCancelled) {
+        Utils.handleMessage(`Visible tile caching cancelled: ${cachedCount} tiles cached.`);
+    } else {
+        Utils.handleMessage('Visible map tiles cached.');
     }
-    console.log(`Cache size after visible tiles caching: ${size.toFixed(2)} MB`);
+
+    // Check cache size with error handling
+    try {
+        const size = await TileCache.getCacheSize();
+        console.log(`Cache size after visible tiles caching: ${size.toFixed(2)} MB`);
+        if (size > 500) {
+            Utils.handleError(`Cache size large (${size.toFixed(2)} MB). Consider clearing cache to free up space.`);
+        }
+    } catch (error) {
+        console.error('Failed to check cache size after visible tiles caching:', error);
+        Utils.handleError('Unable to check cache size. Consider clearing cache to free up space.');
+    }
 }, 1000);
 
 // Cache management UI
