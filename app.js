@@ -430,15 +430,14 @@ function configureMarker(lat, lng, altitude, openPopup = false) {
 }
 
 // == Tile caching ==
+Utils.handleMessage = displayMessage;
+let isCachingCancelled = false;
 
-// Detect if the device is mobile
 function isMobileDevice() {
     const isMobile = window.innerWidth < 768;
     console.log(`isMobileDevice check: window.innerWidth=${window.innerWidth}, isMobile=${isMobile}`);
     return isMobile;
 }
-
-// Updated displayMessage with device-specific width
 function displayMessage(message) {
     console.log('displayMessage called with:', message);
     let messageElement = document.getElementById('message');
@@ -469,13 +468,6 @@ function displayMessage(message) {
         messageElement.style.display = 'none';
     }, 3000);
 }
-
-Utils.handleMessage = displayMessage;
-
-// Global flag to track if caching is cancelled
-let isCachingCancelled = false;
-
-// New displayProgress function for progress bar with cancel button
 function displayProgress(current, total, cancelCallback) {
     const percentage = Math.round((current / total) * 100);
     let progressElement = document.getElementById('progress');
@@ -560,16 +552,12 @@ function displayProgress(current, total, cancelCallback) {
     progressElement.appendChild(cancelButton);
     progressElement.style.display = 'flex';
 }
-
-// Function to hide the progress bar
 function hideProgress() {
     const progressElement = document.getElementById('progress');
     if (progressElement) {
         progressElement.style.display = 'none';
     }
 }
-
-// Function to manage the offline indicator
 function updateOfflineIndicator() {
     console.log('updateOfflineIndicator called, navigator.onLine:', navigator.onLine);
     let offlineIndicator = document.getElementById('offline-indicator');
@@ -582,8 +570,6 @@ function updateOfflineIndicator() {
     offlineIndicator.style.display = navigator.onLine ? 'none' : 'block';
     offlineIndicator.textContent = 'Offline Mode';
 }
-
-// IndexedDB utility with cache expiration
 const TileCache = {
     dbName: 'SkydivingTileCache',
     storeName: 'tiles',
@@ -797,8 +783,6 @@ const TileCache = {
         });
     }
 };
-
-// Custom cached tile layer
 L.TileLayer.Cached = L.TileLayer.extend({
     createTile(coords, done) {
         const tile = document.createElement('img');
@@ -872,12 +856,9 @@ L.TileLayer.Cached = L.TileLayer.extend({
         return tile;
     }
 });
-
 L.tileLayer.cached = function (url, options) {
     return new L.TileLayer.Cached(url, options);
 };
-
-// Calculate tiles within radius (unchanged)
 function getTilesInRadius(lat, lng, radiusKm, zoomLevels) {
     const tiles = new Set(); // Use Set to avoid duplicates
     const EARTH_CIRCUMFERENCE = 40075016.686; // Earth's circumference in meters at equator
@@ -913,8 +894,6 @@ function getTilesInRadius(lat, lng, radiusKm, zoomLevels) {
 
     return tileArray;
 }
-
-// Retry mechanism for failed tile fetches
 async function cacheTileWithRetry(url, maxRetries = 3) {
     let lastError = null;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -940,7 +919,6 @@ async function cacheTileWithRetry(url, maxRetries = 3) {
     }
     return { success: false, error: lastError };
 }
-
 async function cacheTilesForDIP() {
     console.log('cacheTilesForDIP called with:', {
         lastLat,
@@ -1113,8 +1091,6 @@ async function cacheTilesForDIP() {
         Utils.handleError('Unable to check cache size. Consider clearing cache to free up space.');
     }
 }
-
-// Cache visible tiles on map movement (updated to use progress bar)
 const debouncedCacheVisibleTiles = debounce(async () => {
     if (!map || !navigator.onLine) {
         console.log('Skipping visible tile caching: offline or map not initialized');
@@ -1263,8 +1239,6 @@ const debouncedCacheVisibleTiles = debounce(async () => {
         Utils.handleError('Unable to check cache size. Consider clearing cache to free up space.');
     }
 }, 1000);
-
-// Cache management UI (updated to remove Recache Area button)
 function setupCacheManagement() {
     const buttonWrapper = document.getElementById('settings-cache-buttons');
     if (!buttonWrapper) {
@@ -1291,7 +1265,6 @@ function setupCacheManagement() {
         }
     });
 }
-
 function setupCacheSettings() {
     // Event listener for cache radius dropdown
     const cacheRadiusSelect = document.getElementById('cacheRadiusSelect');
