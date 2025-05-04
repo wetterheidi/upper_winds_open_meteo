@@ -497,7 +497,7 @@ function displayProgress(current, total, cancelCallback) {
 
         // Update width on window resize
         window.addEventListener('resize', () => {
-            progressElement.style.width = isMobileDevice() ? '50%' : '20%';
+            progressElement.style.width = isMobileDevice() ? '70%' : '30%';
         });
     }
 
@@ -7205,21 +7205,15 @@ function displayError(message) {
     if (!errorElement) {
         errorElement = document.createElement('div');
         errorElement.id = 'error-message';
-        errorElement.style.position = 'fixed';
-        errorElement.style.top = '0';
-        errorElement.style.left = '0';
-        errorElement.style.width = '100%';
-        errorElement.style.backgroundColor = ' #ffcccc';
-        errorElement.style.borderRadius = '0 0 5px 5px';
-        errorElement.style.color = '#000000';
-        errorElement.style.padding = '10px';
-        errorElement.style.zIndex = '9999';
-        errorElement.style.display = 'block'; // Set initially
         document.body.appendChild(errorElement);
-        console.log('New error element created and appended');
+
+        // Update width on window resize
+        window.addEventListener('resize', () => {
+            errorElement.style.width = isMobileDevice() ? '70%' : '30%';
+        });
     }
     errorElement.textContent = message;
-    errorElement.style.display = 'block'; // Ensure it’s visible
+    errorElement.style.display = 'block';
     console.log('Error element state:', {
         display: errorElement.style.display,
         text: errorElement.textContent,
@@ -7227,11 +7221,11 @@ function displayError(message) {
         zIndex: errorElement.style.zIndex
     });
     // Reset any existing timeout and set a new one
-    clearTimeout(window.errorTimeout); // Prevent overlap from multiple calls
+    clearTimeout(window.errorTimeout);
     window.errorTimeout = setTimeout(() => {
         errorElement.style.display = 'none';
-        console.log('Error hidden after 5s');
-    }, 5000);
+        console.log('Error hidden after 3s');
+    }, 3000);
 }
 function showPasswordModal(feature, onSuccess, onCancel) {
     const modal = document.getElementById('passwordModal');

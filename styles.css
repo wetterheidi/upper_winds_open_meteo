@@ -745,13 +745,13 @@ input[type="number"]:focus {
     position: absolute;
     top: 5px;
     right: 5px;
-    width: 70%;
+    width: 30%;
     background: #ffcccc;
     color: #000000;
     padding: 6px;
     border-radius: 5px 5px 5px 5px;
     text-align: center;
-    z-index: 2000;
+    z-index: 9999;
     display: none;
 }
 
@@ -1075,13 +1075,13 @@ input[type="checkbox"][style*="opacity: 1"] {
         position: fixed;
         top: 5px;
         right: 5px;
-        width: 30%;
+        width: 70%;
         background: #ffcccc;
         color: #000000;
         padding: 6px;
         border-radius: 5px 5px 5px 5px;
         text-align: center;
-        z-index: 2000;
+        z-index: 9999;
         display: none;
     }
 }
