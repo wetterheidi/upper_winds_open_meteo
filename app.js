@@ -1,4 +1,6 @@
 // == Project: Skydiving Weather and Jump Planner ==
+import { t, getUserLanguage } from './i18n.js';
+
 // == Constants and Global Variables ==
 const defaultSettings = {
     model: 'icon_global',
@@ -272,6 +274,22 @@ function updateModelRunInfo() {
     }
     */
 }
+
+// == Translation ==
+// Set initial language and update text
+const initLocalization = () => {
+    const lang = getUserLanguage();
+    
+    // Update HTML elements
+    document.getElementById('welcome').textContent = t('welcome', lang);
+    document.getElementById('jump-run-track').textContent = t('jumpRunTrack', lang);
+    document.getElementById('cache-warning').textContent = t('cacheWarning', lang);
+  };
+  
+  // Show alert with translated text
+  window.showCachingAlert = () => {
+    alert(t('cachingTiles'));
+  };
 
 // == Utility Functions ==
 function calculateNewCenter(lat, lng, distance, bearing) {
@@ -800,8 +818,8 @@ L.TileLayer.Cached = L.TileLayer.extend({
 
         // Normalize URL by removing subdomain for caching
         const normalizedUrl = url.replace(/^(https?:\/\/[a-c]\.tile\.openstreetmap\.org)/, 'https://tile.openstreetmap.org')
-                              .replace(/^(https?:\/\/[a-d]\.basemaps\.cartocdn\.com)/, 'https://basemaps.cartocdn.com')
-                              .replace(/^(https?:\/\/[a-c]\.tile\.opentopomap\.org)/, 'https://tile.opentopomap.org');
+            .replace(/^(https?:\/\/[a-d]\.basemaps\.cartocdn\.com)/, 'https://basemaps.cartocdn.com')
+            .replace(/^(https?:\/\/[a-c]\.tile\.opentopomap\.org)/, 'https://tile.opentopomap.org');
 
         // Skip tile requests outside cached zoom levels when offline
         if (!navigator.onLine && (coords.z < 11 || coords.z > 14)) {
@@ -1250,7 +1268,7 @@ function setupCacheManagement() {
     clearCacheButton.id = 'clearCacheButton';
     clearCacheButton.textContent = 'Clear Tile Cache';
     clearCacheButton.title = 'Clears cached map tiles. Pan/zoom to cache more tiles for offline use.';
-    
+
     // Append the clear cache button to the wrapper
     buttonWrapper.appendChild(clearCacheButton);
 
@@ -7733,6 +7751,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeSettings();
     initializeUIElements();
     initializeMap();
+    initLocalization;
 
     // Setup event listeners
     setupSliderEvents();
