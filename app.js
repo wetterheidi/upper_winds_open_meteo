@@ -187,7 +187,7 @@ function initializeSettings() {
     userSettings.harpLng = null;
     userSettings.jumpRunTrackOffset = 0;
     userSettings.jumpRunTrackForwardOffset = 0; // Initialize new setting
-    userSettings.cacheRadiusKm = 5;
+    userSettings.cacheRadiusKm = 10;
     isJumperSeparationManual = false;
     saveSettings();
     console.log('Initialized settings with Jump Master menu defaults:', {
@@ -606,16 +606,33 @@ const TileCache = {
             const store = transaction.objectStore(this.storeName);
             const request = store.openCursor();
             let size = 0;
+            let tileCount = 0;
             request.onsuccess = (event) => {
                 const cursor = event.target.result;
                 if (cursor) {
-                    size += cursor.value.blob.size;
-                    cursor.continue();
+                    try {
+                        const tileSize = cursor.value.blob?.size || 0;
+                        if (typeof tileSize !== 'number' || isNaN(tileSize)) {
+                            console.warn(`Invalid blob size for tile: ${cursor.value.url}, size: ${tileSize}`);
+                        } else {
+                            size += tileSize;
+                            tileCount++;
+                        }
+                        cursor.continue();
+                    } catch (error) {
+                        console.warn(`Error processing tile during size calculation: ${cursor.value.url}`, error);
+                        cursor.continue();
+                    }
                 } else {
-                    resolve(size / (1024 * 1024)); // Size in MB
+                    const sizeInMB = size / (1024 * 1024);
+                    console.log(`Cache size calculation completed: ${sizeInMB.toFixed(2)} MB, ${tileCount} tiles`);
+                    resolve(sizeInMB);
                 }
             };
-            request.onerror = (event) => reject(event);
+            request.onerror = (event) => {
+                console.error('Failed to calculate cache size:', event);
+                reject(event);
+            };
         });
     },
 
@@ -632,8 +649,8 @@ const TileCache = {
                 if (cursor) {
                     const { url, blob, timestamp } = cursor.value;
                     const normalizedUrl = url.replace(/^(https?:\/\/[a-c]\.tile\.openstreetmap\.org)/, 'https://tile.openstreetmap.org')
-                                            .replace(/^(https?:\/\/[a-d]\.basemaps\.cartocdn\.com)/, 'https://basemaps.cartocdn.com')
-                                            .replace(/^(https?:\/\/[a-c]\.tile\.opentopomap\.org)/, 'https://tile.opentopomap.org');
+                        .replace(/^(https?:\/\/[a-d]\.basemaps\.cartocdn\.com)/, 'https://basemaps.cartocdn.com')
+                        .replace(/^(https?:\/\/[a-c]\.tile\.opentopomap\.org)/, 'https://tile.opentopomap.org');
                     if (url !== normalizedUrl) {
                         // Delete the old entry
                         cursor.delete();
@@ -673,8 +690,8 @@ L.TileLayer.Cached = L.TileLayer.extend({
 
         // Normalize URL by removing subdomain for caching
         const normalizedUrl = url.replace(/^(https?:\/\/[a-c]\.tile\.openstreetmap\.org)/, 'https://tile.openstreetmap.org')
-                              .replace(/^(https?:\/\/[a-d]\.basemaps\.cartocdn\.com)/, 'https://basemaps.cartocdn.com')
-                              .replace(/^(https?:\/\/[a-c]\.tile\.opentopomap\.org)/, 'https://tile.opentopomap.org');
+            .replace(/^(https?:\/\/[a-d]\.basemaps\.cartocdn\.com)/, 'https://basemaps.cartocdn.com')
+            .replace(/^(https?:\/\/[a-c]\.tile\.opentopomap\.org)/, 'https://tile.opentopomap.org');
 
         // Skip tile requests outside cached zoom levels when offline
         if (!navigator.onLine && (coords.z < 11 || coords.z > 14)) {
@@ -1076,7 +1093,7 @@ function initMap() {
         zoomControl: false,
         doubleClickZoom: false,
         maxZoom: 19,
-        minZoom: navigator.onLine ? 10 : 11 // Restrict minZoom to 11 offline
+        minZoom: navigator.onLine ? 6 : 11 // Restrict minZoom to 11 offline
     });
 
     baseMaps = {
@@ -1127,8 +1144,8 @@ function initMap() {
                 attribution: '© Esri, USDA, USGS',
                 zIndex: 1
             }),
-            //L.tileLayer.cached('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png', {
-            L.tileLayer.cached('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png', {
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', {  // With labels
+                //L.tileLayer.cached('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png', {
                 //L.tileLayer.cached('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png', {  // Darker, no labels
                 maxZoom: 20,
                 attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, © <a href="https://carto.com/attributions">CARTO</a>',
@@ -1169,8 +1186,8 @@ function initMap() {
 
     window.addEventListener('online', () => {
         hasSwitched = false;
-        map.options.minZoom = 10;
-        console.log('Back online, restored minZoom to 10');
+        map.options.minZoom = 6;
+        console.log('Back online, restored minZoom to 6');
     });
 
     map.on('zoomstart', (e) => {
