@@ -13,29 +13,32 @@
 
 <body>
     <div id="map" aria-label="Interactive map for selecting weather location"></div>
-    <div id="coords">Move mouse over map</div>
+    <div id="coords" data-i18n="coords">Move mouse over map</div>
     <div class="hamburger-menu">
-        <button id="hamburgerBtn" aria-label="Open menu">☰</button>
+        <button id="hamburgerBtn" aria-label="Open menu" data-i18n-title="openMenuLabel">☰</button>
         <ul id="menu" class="menu hidden">
             <li>
                 <label class="radio-label">
-                    <input type="checkbox" id="showTableCheckbox" name="showTable"> Show Wind Table
+                    <input type="checkbox" id="showTableCheckbox" name="showTable">
+                    <span data-i18n="showWindTableLabel">Show Wind Table</span>
                 </label>
             </li>
             <li>
-                <span>Settings</span>
+                <span data-i18n="settingsLabel">Settings</span>
                 <ul class="submenu hidden">
                     <li>
-                        <span>Reference Level</span>
+                        <span data-i18n="referenceLevelLabel">Reference Level</span>
                         <ul class="submenu hidden">
                             <li>
                                 <label class="radio-label">
-                                    <input type="radio" name="refLevel" value="AGL" checked> AGL
+                                    <input type="radio" name="refLevel" value="AGL" checked>
+                                    <span data-i18n="aglLabel">AGL</span>
                                 </label>
                             </li>
                             <li>
                                 <label class="radio-label">
-                                    <input type="radio" name="refLevel" value="AMSL"> AMSL
+                                    <input type="radio" name="refLevel" value="AMSL">
+                                    <span data-i18n="amslLabel">AMSL</span>
                                 </label>
                             </li>
                         </ul>
@@ -231,7 +234,8 @@
         </li>
         <li>
             <label class="radio-label">
-                <input type="checkbox" id="showLandingPattern" name="showLandingPattern"> Landing Pattern
+                <input type="checkbox" id="showLandingPattern" name="showLandingPattern">
+                <span data-i18n="landingPatternLabel">Landing Pattern</span>
             </label>
             <ul class="submenu hidden">
                 <li>
@@ -270,7 +274,7 @@
         </li>
         <li>
             <span class="menu-label">Calculate Jump</span>
-                <ul class="submenu hidden">
+            <ul class="submenu hidden">
                 <li>
                     <label class="radio-label">
                         Exit Altitude (m AGL):
@@ -320,9 +324,18 @@
                 </li>
                 <li>
                     <label class="radio-label">
-                        <input type="checkbox" id="showJumpRunTrack" /> Show Jump Run Track:
-                        <input type="number" id="jumpRunTrackDirection" min="0" max="359" step="1"
-                            placeholder="Calculated" style="width: 60px;">
+                        <input type="checkbox" id="showJumpRunTrack" />
+                        <span data-i18n="showJumpRunTrackLabel">Show Jump Run Track</span>:
+                        <input
+                            type="number"
+                            id="jumpRunTrackDirection"
+                            min="0"
+                            max="359"
+                            step="1"
+                            data-i18n-placeholder="jumpRunTrackPlaceholder"
+                            placeholder="Calculated"
+                            style="width: 60px;"
+                        >
                         <label>°</label>
                     </label>
                 </li>
@@ -336,8 +349,8 @@
                 <li>
                     <label class="radio-label">
                         Jump Run Forward Offset (m):
-                        <input type="number" id="jumpRunTrackForwardOffset" min="-50000" max="50000" step="100" value="0"
-                            style="width: 80px;">
+                        <input type="number" id="jumpRunTrackForwardOffset" min="-50000" max="50000" step="100"
+                            value="0" style="width: 80px;">
                     </label>
                 </li>
                 <li>
@@ -460,14 +473,14 @@
     </div>
     <div id="passwordModal" class="modal" style="display: none;">
         <div class="modal-content">
-            <h3 id="modalHeader">Restricted Feature</h3>
-            <p id="modalMessage">Please enter the password to enable this feature:</p>
-            <input type="password" id="passwordInput" placeholder="Password">
+            <h3 id="modalHeader" data-i18n="modalHeaderLabel">Restricted Feature</h3>
+            <p id="modalMessage" data-i18n="modalMessageLabel">Please enter the password to enable this feature:</p>
+            <input type="password" id="passwordInput" data-i18n-placeholder="passwordPlaceholder" placeholder="Password">
             <div class="modal-buttons">
-                <button id="passwordSubmit">Submit</button>
-                <button id="passwordCancel">Cancel</button>
+                <button id="passwordSubmit" data-i18n="passwordSubmitButton">Submit</button>
+                <button id="passwordCancel" data-i18n="passwordCancelButton">Cancel</button>
             </div>
-            <p id="passwordError" style="color: red; display: none;">Incorrect password!</p>
+            <p id="passwordError" data-i18n="passwordErrorLabel" style="color: red; display: none;">Incorrect password!</p>
         </div>
     </div>
 

@@ -1,5 +1,6 @@
 // == Project: Skydiving Weather and Jump Planner ==
 import { t, getUserLanguage } from './i18n.js';
+console.log(t('showJumpRunTrackLabel')); // Should log "Show Jump Run Track" (or German/French if browser language is set)
 
 // == Constants and Global Variables ==
 const defaultSettings = {
@@ -276,20 +277,43 @@ function updateModelRunInfo() {
 }
 
 // == Translation ==
-// Set initial language and update text
+
+// Initialize localization
 const initLocalization = () => {
     const lang = getUserLanguage();
-    
-    // Update HTML elements
-    document.getElementById('welcome').textContent = t('welcome', lang);
-    document.getElementById('jump-run-track').textContent = t('jumpRunTrack', lang);
-    document.getElementById('cache-warning').textContent = t('cacheWarning', lang);
-  };
+    console.log('Detected language:', lang);
   
-  // Show alert with translated text
-  window.showCachingAlert = () => {
-    alert(t('cachingTiles'));
+    const textElements = document.querySelectorAll('[data-i18n]');
+    console.log('Found data-i18n elements:', textElements.length);
+    textElements.forEach((element) => {
+      const key = element.getAttribute('data-i18n');
+      const translation = t(key, lang);
+      console.log('Translating key:', key, 'to', translation);
+      element.textContent = translation;
+    });
+  
+    const placeholderElements = document.querySelectorAll('[data-i18n-placeholder]');
+    console.log('Found data-i18n-placeholder elements:', placeholderElements.length);
+    placeholderElements.forEach((element) => {
+      const key = element.getAttribute('data-i18n-placeholder');
+      const translation = t(key, lang);
+      console.log('Translating placeholder key:', key, 'to', translation);
+      element.placeholder = translation;
+    });
   };
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', initLocalization);
+
+// Debug: Check coords after 5 seconds
+setTimeout(() => {
+  const coordsElement = document.querySelector('[data-i18n="coords"]');
+  if (coordsElement) {
+    console.log('Coords text after 5 seconds:', coordsElement.textContent);
+  } else {
+    console.log('Coords element still NOT found after 5 seconds!');
+  }
+}, 5000);
 
 // == Utility Functions ==
 function calculateNewCenter(lat, lng, distance, bearing) {
@@ -1708,19 +1732,19 @@ function initMap() {
     L.Control.Coordinates = L.Control.extend({
         options: { position: 'bottomleft' },
         onAdd: function (map) {
-            var container = L.DomUtil.create('div', 'leaflet-control-coordinates');
-            container.style.background = 'rgba(255, 255, 255, 0.8)';
-            container.style.padding = '5px';
-            container.style.borderRadius = '4px';
-            container.style.boxShadow = '0 2px 5px rgba(0, 0, 0, 0.2)';
-            container.innerHTML = 'Move mouse over map';
-            this._container = container;
-            return container;
+          var container = L.DomUtil.create('div', 'leaflet-control-coordinates');
+          container.style.background = 'rgba(255, 255, 255, 0.8)';
+          container.style.padding = '5px';
+          container.style.borderRadius = '4px';
+          container.style.boxShadow = '0 2px 5px rgba(0, 0, 0, 0.2)';
+          container.innerHTML = t('coords'); // Use translated text
+          this._container = container;
+          return container;
         },
         update: function (content) {
-            this._container.innerHTML = content;
+          this._container.innerHTML = content;
         }
-    });
+      });
 
     var coordsControl = new L.Control.Coordinates();
     coordsControl.addTo(map);
@@ -7751,7 +7775,6 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeSettings();
     initializeUIElements();
     initializeMap();
-    initLocalization;
 
     // Setup event listeners
     setupSliderEvents();
