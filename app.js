@@ -800,8 +800,8 @@ L.TileLayer.Cached = L.TileLayer.extend({
 
         // Normalize URL by removing subdomain for caching
         const normalizedUrl = url.replace(/^(https?:\/\/[a-c]\.tile\.openstreetmap\.org)/, 'https://tile.openstreetmap.org')
-                              .replace(/^(https?:\/\/[a-d]\.basemaps\.cartocdn\.com)/, 'https://basemaps.cartocdn.com')
-                              .replace(/^(https?:\/\/[a-c]\.tile\.opentopomap\.org)/, 'https://tile.opentopomap.org');
+            .replace(/^(https?:\/\/[a-d]\.basemaps\.cartocdn\.com)/, 'https://basemaps.cartocdn.com')
+            .replace(/^(https?:\/\/[a-c]\.tile\.opentopomap\.org)/, 'https://tile.opentopomap.org');
 
         // Skip tile requests outside cached zoom levels when offline
         if (!navigator.onLine && (coords.z < 11 || coords.z > 14)) {
@@ -1250,7 +1250,7 @@ function setupCacheManagement() {
     clearCacheButton.id = 'clearCacheButton';
     clearCacheButton.textContent = 'Clear Tile Cache';
     clearCacheButton.title = 'Clears cached map tiles. Pan/zoom to cache more tiles for offline use.';
-    
+
     // Append the clear cache button to the wrapper
     buttonWrapper.appendChild(clearCacheButton);
 
@@ -2659,7 +2659,11 @@ L.Control.LivePosition = L.Control.extend({
                 content += `<br><span style="font-weight: bold;">Jump Master Line to ${jumpMasterLineData.target}</span><br>`;
                 content += `Bearing: ${jumpMasterLineData.bearing}°<br>`;
                 content += `Distance: ${jumpMasterLineData.distance} ${jumpMasterLineData.heightUnit}<br>`;
-                content += `TOT: X - ${jumpMasterLineData.tot} s`;
+                if (jumpMasterLineData.tot < 1200) {
+                    content += `TOT: X - ${jumpMasterLineData.tot} s`;
+                } else {
+                    content += `TOT: N/A`;
+                }
             }
 
             this._container.innerHTML = content;
@@ -6860,7 +6864,7 @@ function setupCheckboxEvents() {
         saveSettings();
         checkbox.checked = userSettings.showExitArea;
         console.log('Show Exit Area set to:', userSettings.showExitArea);
-        if (checkbox.checked && weatherData && lastLat && lastLng) {
+        if (checkbox.checked && weatherData && lastLat && lastLng && isCalculateJumpUnlocked && userSettings.calculateJump) {
             const exitResult = calculateExitCircle();
             if (exitResult) {
                 updateJumpCircle(
@@ -6876,7 +6880,7 @@ function setupCheckboxEvents() {
             calculateCutAway();
         } else {
             clearJumpCircles();
-            calculateJump(); // Re-render active circles
+            if (isCalculateJumpUnlocked && userSettings.calculateJump) calculateJump();
             console.log('Cleared exit circles and re-rendered active circles');
         }
     });
@@ -6886,7 +6890,7 @@ function setupCheckboxEvents() {
         saveSettings();
         checkbox.checked = userSettings.showCanopyArea;
         console.log('Show Canopy Area set to:', userSettings.showCanopyArea);
-        if (checkbox.checked && weatherData && lastLat && lastLng) {
+        if (checkbox.checked && weatherData && lastLat && lastLng && isCalculateJumpUnlocked && userSettings.calculateJump) {
             const canopyResult = calculateCanopyCircles();
             if (canopyResult) {
                 updateJumpCircle(
@@ -6904,19 +6908,31 @@ function setupCheckboxEvents() {
             calculateCutAway();
         } else {
             if (jumpCircle) {
-                map.removeLayer(jumpCircle);
+                if (map && typeof map.removeLayer === 'function') {
+                    map.removeLayer(jumpCircle);
+                }
                 jumpCircle = null;
             }
             if (jumpCircleFull) {
-                map.removeLayer(jumpCircleFull);
+                if (map && typeof map.removeLayer === 'function') {
+                    map.removeLayer(jumpCircleFull);
+                }
                 jumpCircleFull = null;
             }
             if (window.additionalBlueCircles) {
-                window.additionalBlueCircles.forEach(circle => map.removeLayer(circle));
+                window.additionalBlueCircles.forEach(circle => {
+                    if (map && typeof map.removeLayer === 'function') {
+                        map.removeLayer(circle);
+                    }
+                });
                 window.additionalBlueCircles = [];
             }
             if (window.additionalBlueLabels) {
-                window.additionalBlueLabels.forEach(label => map.removeLayer(label));
+                window.additionalBlueLabels.forEach(label => {
+                    if (map && typeof map.removeLayer === 'function') {
+                        map.removeLayer(label);
+                    }
+                });
                 window.additionalBlueLabels = [];
             }
             console.log('Cleared blue and red circles and labels');
@@ -6928,19 +6944,21 @@ function setupCheckboxEvents() {
         saveSettings();
         checkbox.checked = userSettings.showJumpRunTrack;
         console.log('showJumpRunTrack changed:', checkbox.checked);
-        if (checkbox.checked && weatherData && lastLat && lastLng) {
+        if (checkbox.checked && weatherData && lastLat && lastLng && isCalculateJumpUnlocked && userSettings.calculateJump) {
             calculateJumpRunTrack();
         } else {
             if (jumpRunTrackLayer) {
-                if (jumpRunTrackLayer.airplaneMarker) {
+                if (jumpRunTrackLayer.airplaneMarker && map && typeof map.removeLayer === 'function') {
                     map.removeLayer(jumpRunTrackLayer.airplaneMarker);
                     jumpRunTrackLayer.airplaneMarker = null;
                 }
-                if (jumpRunTrackLayer.approachLayer) {
+                if (jumpRunTrackLayer.approachLayer && map && typeof map.removeLayer === 'function') {
                     map.removeLayer(jumpRunTrackLayer.approachLayer);
                     jumpRunTrackLayer.approachLayer = null;
                 }
-                map.removeLayer(jumpRunTrackLayer);
+                if (map && typeof map.removeLayer === 'function') {
+                    map.removeLayer(jumpRunTrackLayer);
+                }
                 jumpRunTrackLayer = null;
                 console.log('Removed JRT polyline');
             }
@@ -6957,18 +6975,29 @@ function setupCheckboxEvents() {
         console.log('showCutAwayFinder checkbox changed to:', checkbox.checked);
         userSettings.showCutAwayFinder = checkbox.checked;
         saveSettings();
-        toggleSubmenu('showCutAwayFinder', checkbox.checked);
-        if (checkbox.checked && weatherData && cutAwayLat !== null && cutAwayLng !== null) {
+        // Find the submenu within the same <li> as the checkbox
+        const submenu = checkbox.closest('li')?.querySelector('ul');
+        console.log('Submenu lookup for showCutAwayFinder:', { submenu: submenu ? 'Found' : 'Not found', submenuClasses: submenu?.classList.toString() });
+        toggleSubmenu(checkbox, submenu, checkbox.checked);
+        if (checkbox.checked && weatherData && cutAwayLat !== null && cutAwayLng !== null && isCalculateJumpUnlocked && userSettings.calculateJump) {
             console.log('Show Cut Away Finder enabled, running calculateCutAway');
             calculateCutAway();
         } else {
             if (cutAwayCircle) {
-                map.removeLayer(cutAwayCircle);
+                if (map && typeof map.removeLayer === 'function') {
+                    map.removeLayer(cutAwayCircle);
+                } else {
+                    console.warn('Map not initialized, cannot remove cutAwayCircle');
+                }
                 cutAwayCircle = null;
                 console.log('Cleared cut-away circle');
             }
             if (cutAwayMarker) {
-                map.removeLayer(cutAwayMarker);
+                if (map && typeof map.removeLayer === 'function') {
+                    map.removeLayer(cutAwayMarker);
+                } else {
+                    console.warn('Map not initialized, cannot remove cutAwayMarker');
+                }
                 cutAwayMarker = null;
                 console.log('Cleared cut-away marker');
             }
@@ -6983,7 +7012,9 @@ function setupCheckboxEvents() {
         const enableFeature = () => {
             userSettings.showLandingPattern = true;
             saveSettings();
-            toggleSubmenu('showLandingPattern', true);
+            const submenu = checkbox.closest('li')?.querySelector('ul');
+            console.log('Submenu lookup for showLandingPattern:', { submenu: submenu ? 'Found' : 'Not found', submenuClasses: submenu?.classList.toString() });
+            toggleSubmenu(checkbox, submenu, true);
             if (weatherData && lastLat && lastLng) {
                 updateLandingPattern();
                 recenterMap();
@@ -6994,30 +7025,44 @@ function setupCheckboxEvents() {
             userSettings.showLandingPattern = false;
             saveSettings();
             checkbox.checked = false;
-            toggleSubmenu('showLandingPattern', false);
+            const submenu = checkbox.closest('li')?.querySelector('ul');
+            console.log('Submenu lookup for showLandingPattern:', { submenu: submenu ? 'Found' : 'Not found', submenuClasses: submenu?.classList.toString() });
+            toggleSubmenu(checkbox, submenu, false);
             console.log('Clearing landing pattern');
             if (landingPatternPolygon) {
-                map.removeLayer(landingPatternPolygon);
+                if (map && typeof map.removeLayer === 'function') {
+                    map.removeLayer(landingPatternPolygon);
+                }
                 landingPatternPolygon = null;
             }
             if (secondlandingPatternPolygon) {
-                map.removeLayer(secondlandingPatternPolygon);
+                if (map && typeof map.removeLayer === 'function') {
+                    map.removeLayer(secondlandingPatternPolygon);
+                }
                 secondlandingPatternPolygon = null;
             }
             if (thirdLandingPatternLine) {
-                map.removeLayer(thirdLandingPatternLine);
+                if (map && typeof map.removeLayer === 'function') {
+                    map.removeLayer(thirdLandingPatternLine);
+                }
                 thirdLandingPatternLine = null;
             }
             if (finalArrow) {
-                map.removeLayer(finalArrow);
+                if (map && typeof map.removeLayer === 'function') {
+                    map.removeLayer(finalArrow);
+                }
                 finalArrow = null;
             }
             if (baseArrow) {
-                map.removeLayer(baseArrow);
+                if (map && typeof map.removeLayer === 'function') {
+                    map.removeLayer(baseArrow);
+                }
                 baseArrow = null;
             }
             if (downwindArrow) {
-                map.removeLayer(downwindArrow);
+                if (map && typeof map.removeLayer === 'function') {
+                    map.removeLayer(downwindArrow);
+                }
                 downwindArrow = null;
             }
         };
@@ -7041,7 +7086,9 @@ function setupCheckboxEvents() {
         console.log('trackPositionCheckbox changed to:', checkbox.checked);
         userSettings.trackPosition = checkbox.checked;
         saveSettings();
-        toggleSubmenu('trackPositionCheckbox', checkbox.checked);
+        const submenu = checkbox.closest('li')?.querySelector('ul');
+        console.log('Submenu lookup for trackPositionCheckbox:', { submenu: submenu ? 'Found' : 'Not found', submenuClasses: submenu?.classList.toString() });
+        toggleSubmenu(checkbox, submenu, checkbox.checked);
         if (checkbox.checked) {
             startPositionTracking();
         } else {
@@ -7069,10 +7116,16 @@ function setupCheckboxEvents() {
         console.log('showJumpMasterLine checkbox changed to:', checkbox.checked);
         userSettings.showJumpMasterLine = checkbox.checked;
         saveSettings();
-        toggleSubmenu('showJumpMasterLine', checkbox.checked);
+        const submenu = checkbox.closest('li')?.querySelector('ul');
+        console.log('Submenu lookup for showJumpMasterLine:', { submenu: submenu ? 'Found' : 'Not found', submenuClasses: submenu?.classList.toString() });
+        toggleSubmenu(checkbox, submenu, checkbox.checked);
         if (!checkbox.checked) {
             if (jumpMasterLine) {
-                map.removeLayer(jumpMasterLine);
+                if (map && typeof map.removeLayer === 'function') {
+                    map.removeLayer(jumpMasterLine);
+                } else {
+                    console.warn('Map not initialized, cannot remove jumpMasterLine');
+                }
                 jumpMasterLine = null;
                 console.log('Removed Jump Master Line: unchecked');
             }
@@ -7268,34 +7321,170 @@ function setupCheckbox(id, setting, callback) {
         });
         console.log(`Attached change and click listeners to ${id}`);
         checkbox.checked = userSettings[setting];
+        // Apply visual indication for locked features
+        if ((id === 'showLandingPattern' && !isLandingPatternUnlocked)) {
+            checkbox.style.opacity = '0.5';
+            checkbox.title = 'Feature locked. Click to enter password.';
+        }
     } else {
         console.warn(`Checkbox ${id} not found`);
     }
+}
+function setupMenuItemEvents() {
+    // Find the "Calculate Jump" menu item by its text content and class
+    const calculateJumpMenuItem = Array.from(document.querySelectorAll('.menu-label'))
+        .find(item => item.textContent.trim() === 'Calculate Jump');
+
+    if (!calculateJumpMenuItem) {
+        console.error('Calculate Jump menu item not found');
+        const menuItems = document.querySelectorAll('.hamburger-menu .menu-label');
+        console.log('Available menu labels:', Array.from(menuItems).map(item => item.textContent.trim()));
+        return;
+    }
+
+    // Add a data-label attribute to use in toggleSubmenu and showPasswordModal
+    calculateJumpMenuItem.setAttribute('data-label', 'calculateJump');
+    console.log('Found Calculate Jump menu item:', calculateJumpMenuItem);
+
+    // Initialize visual state based on lock status
+    if (!isCalculateJumpUnlocked) {
+        calculateJumpMenuItem.style.opacity = '0.5';
+        calculateJumpMenuItem.title = 'Feature locked. Click to enter password.';
+    } else {
+        calculateJumpMenuItem.style.opacity = '1';
+        calculateJumpMenuItem.title = '';
+    }
+
+    // Remove any existing click handlers to prevent duplicates
+    calculateJumpMenuItem.removeEventListener('click', calculateJumpMenuItem._clickHandler);
+    calculateJumpMenuItem._clickHandler = (event) => {
+        try {
+            console.log('Click handler start');
+            event.stopPropagation();
+            event.preventDefault();
+            console.log('Clicked menu item: Calculate Jump', { isCalculateJumpUnlocked });
+
+            // Re-evaluate submenu inside the handler to ensure a fresh reference
+            // Use a more reliable method: find the <ul> within the same <li>
+            const parentLi = calculateJumpMenuItem.closest('li');
+            const submenu = parentLi?.querySelector('ul');
+            console.log('Submenu lookup:', { submenu: submenu ? 'Found' : 'Not found', hasSubmenuClass: submenu?.classList.contains('submenu'), submenuClasses: submenu?.classList.toString() });
+
+            // Debug DOM structure around Calculate Jump and Jump Master
+            const nextSibling = parentLi?.nextElementSibling;
+            console.log('DOM structure check:', {
+                parentLiTag: parentLi?.tagName,
+                parentLiChildren: Array.from(parentLi?.children || []).map(child => child.tagName + (child.className ? `.${child.className}` : '')),
+                nextSiblingTag: nextSibling?.tagName,
+                nextSiblingText: nextSibling?.querySelector('.menu-label')?.textContent,
+                nextSiblingChildren: Array.from(nextSibling?.children || []).map(child => child.tagName + (child.className ? `.${child.className}` : ''))
+            });
+
+            const enableFeature = () => {
+                console.log('Enabling Calculate Jump');
+                userSettings.calculateJump = true;
+                saveSettings();
+                toggleSubmenu(calculateJumpMenuItem, submenu, true);
+                if (weatherData && lastLat && lastLng) {
+                    debouncedCalculateJump();
+                    calculateCutAway();
+                }
+                calculateJumpMenuItem.style.opacity = '1';
+                calculateJumpMenuItem.title = '';
+                console.log('Calculate Jump enabled');
+            };
+
+            const disableFeature = () => {
+                console.log('Disabling Calculate Jump');
+                userSettings.calculateJump = false;
+                saveSettings();
+                toggleSubmenu(calculateJumpMenuItem, submenu, false);
+                clearJumpCircles();
+                calculateJumpMenuItem.style.opacity = isCalculateJumpUnlocked ? '1' : '0.5';
+                calculateJumpMenuItem.title = isCalculateJumpUnlocked ? '' : 'Feature locked. Click to enter password.';
+                console.log('Calculate Jump disabled');
+            };
+
+            console.log('Checking if feature is locked:', { isCalculateJumpUnlocked });
+            if (!isFeatureUnlocked('calculateJump')) {
+                console.log('Feature is locked, attempting to show password modal for Calculate Jump');
+                showPasswordModal('calculateJump', () => {
+                    console.log('Password modal success, enabling feature');
+                    enableFeature();
+                }, () => {
+                    console.log('Password modal cancelled');
+                    if (submenu) {
+                        toggleSubmenu(calculateJumpMenuItem, submenu, false);
+                        console.log('Password modal cancelled, submenu remains closed');
+                    }
+                });
+            } else {
+                console.log('Feature is unlocked, toggling submenu visibility');
+                if (submenu) {
+                    const isSubmenuHidden = submenu.classList.contains('hidden');
+                    console.log('Submenu state:', { isSubmenuHidden });
+                    if (isSubmenuHidden) {
+                        enableFeature();
+                    } else {
+                        disableFeature();
+                    }
+                } else {
+                    console.warn('Submenu for Calculate Jump not found during toggle');
+                }
+            }
+            console.log('Click handler end');
+        } catch (error) {
+            console.error('Error in Calculate Jump click handler:', error);
+        }
+    };
+    // Use capture phase to ensure our handler runs first
+    calculateJumpMenuItem.addEventListener('click', calculateJumpMenuItem._clickHandler, { capture: true });
+    console.log('Attached click handler to Calculate Jump menu item with capture phase');
 }
 function setupResetButton() {
     const bottomContainer = document.getElementById('bottom-container');
     const resetButton = document.createElement('button');
     resetButton.id = 'resetButton';
     resetButton.textContent = 'Reset Settings';
-    resetButton.title = 'Resets all settings to their default values';
+    resetButton.title = 'Resets all settings to their default values and locks all features';
 
-    // Create a wrapper div for the buttons
     const buttonWrapper = document.createElement('div');
     buttonWrapper.id = 'settings-cache-buttons';
     buttonWrapper.className = 'button-wrapper';
 
-    // Append the reset button to the wrapper
     buttonWrapper.appendChild(resetButton);
     bottomContainer.appendChild(buttonWrapper);
 
     resetButton.addEventListener('click', () => {
         userSettings = { ...defaultSettings };
+        // Reset feature unlock status
+        isLandingPatternUnlocked = false;
+        isCalculateJumpUnlocked = false;
+        localStorage.removeItem('unlockedFeatures');
+        console.log('Reset feature unlock status:', { isLandingPatternUnlocked, isCalculateJumpUnlocked });
+        // Update UI to reflect locked state
+        const landingPatternCheckbox = document.getElementById('showLandingPattern');
+        if (landingPatternCheckbox) {
+            landingPatternCheckbox.checked = false;
+            landingPatternCheckbox.style.opacity = '0.5';
+            landingPatternCheckbox.title = 'Feature locked. Click to enter password.';
+        }
+        const calculateJumpMenuItem = document.getElementById('calculateJumpCheckbox');
+        if (calculateJumpMenuItem) {
+            calculateJumpMenuItem.style.opacity = '0.5';
+            calculateJumpMenuItem.title = 'Feature locked. Click to enter password.';
+            // Hide submenu
+            const submenu = calculateJumpMenuItem.parentElement.nextElementSibling;
+            if (submenu && submenu.classList.contains('submenu')) {
+                submenu.classList.add('hidden');
+            }
+        }
         saveSettings();
         initializeUIElements();
         if (lastLat && lastLng) {
             cacheTilesForDIP();
         }
-        Utils.handleMessage('Settings reset to default values.');
+        Utils.handleMessage('Settings and feature locks reset to default values.');
     });
 }
 function setupResetCutAwayMarkerButton() {
@@ -7364,6 +7553,7 @@ function displayError(message) {
     }, 3000);
 }
 function showPasswordModal(feature, onSuccess, onCancel) {
+    console.log('Entering showPasswordModal for feature:', feature);
     const modal = document.getElementById('passwordModal');
     const input = document.getElementById('passwordInput');
     const error = document.getElementById('passwordError');
@@ -7373,7 +7563,7 @@ function showPasswordModal(feature, onSuccess, onCancel) {
     const message = document.getElementById('modalMessage');
 
     if (!modal || !input || !submitBtn || !cancelBtn || !header || !message) {
-        console.error('Modal elements not found');
+        console.error('Modal elements not found:', { modal, input, submitBtn, cancelBtn, header, message });
         return;
     }
 
@@ -7384,34 +7574,33 @@ function showPasswordModal(feature, onSuccess, onCancel) {
     input.value = '';
     error.style.display = 'none';
     modal.style.display = 'flex';
+    console.log('Password modal should now be visible:', { modalDisplay: modal.style.display, modalStyle: modal.style.cssText });
 
     const submitHandler = () => {
+        console.log('Password modal submit clicked, entered value:', input.value);
         if (input.value === FEATURE_PASSWORD) {
             modal.style.display = 'none';
             if (feature === 'landingPattern') {
                 isLandingPatternUnlocked = true;
                 const checkbox = document.getElementById('showLandingPattern');
                 if (checkbox) {
-                    checkbox.style.opacity = '1'; // Visual feedback
-                    checkbox.title = ''; // Clear tooltip
+                    checkbox.style.opacity = '1';
+                    checkbox.title = '';
                 }
-            }
-            if (feature === 'calculateJump') {
+            } else if (feature === 'calculateJump') {
                 isCalculateJumpUnlocked = true;
-                const checkbox = document.getElementById('calculateJumpCheckbox');
-                if (checkbox) {
-                    checkbox.style.opacity = '1'; // Visual feedback
-                    checkbox.title = ''; // Clear tooltip
+                const menuItem = document.querySelector('.menu-label[data-label="calculateJump"]');
+                if (menuItem) {
+                    menuItem.style.opacity = '1';
+                    menuItem.title = '';
                 }
             }
-            localStorage.setItem('unlockedFeatures', JSON.stringify({
-                landingPattern: isLandingPatternUnlocked,
-                calculateJump: isCalculateJumpUnlocked
-            }));
+            saveUnlockStatus();
             console.log('Feature unlocked and saved:', feature);
             onSuccess();
         } else {
             error.style.display = 'block';
+            console.log('Incorrect password entered');
         }
     };
 
@@ -7419,6 +7608,7 @@ function showPasswordModal(feature, onSuccess, onCancel) {
     input.onkeypress = (e) => { if (e.key === 'Enter') submitHandler(); };
     cancelBtn.onclick = () => {
         modal.style.display = 'none';
+        console.log('Password modal cancelled');
         onCancel();
     };
 }
@@ -7455,22 +7645,41 @@ function setCheckboxValue(id, value) {
     const element = document.getElementById(id);
     if (element) element.checked = value;
 }
-function toggleSubmenu(id, isVisible) {
-    const checkbox = document.getElementById(id);
-    if (!checkbox) {
-        console.warn(`Checkbox ${id} not found`);
-        return;
-    }
-    let submenu = checkbox.parentElement.nextElementSibling;
-    if (!submenu || !submenu.classList.contains('submenu')) {
-        submenu = checkbox.closest('li')?.querySelector(':scope > ul.submenu');
-    }
+function toggleSubmenu(element, submenu, isVisible) {
+    console.log(`toggleSubmenu called for ${element.textContent || element.id}: ${isVisible ? 'show' : 'hide'}`);
     if (submenu) {
+        // Ensure the submenu element has the 'submenu' class
+        if (!submenu.classList.contains('submenu')) {
+            submenu.classList.add('submenu');
+            console.log(`Added 'submenu' class to element:`, { submenuClasses: submenu.classList.toString() });
+        }
         submenu.classList.toggle('hidden', !isVisible);
-        checkbox.setAttribute('aria-expanded', isVisible);
-        console.log(`Submenu for ${id} visibility:`, !submenu.classList.contains('hidden'));
+        element.setAttribute('aria-expanded', isVisible);
+        console.log(`Submenu toggled for ${element.textContent || element.id}: ${isVisible ? 'shown' : 'hidden'}`, { submenuClassList: submenu.classList.toString() });
+        // Debug submenu state after toggle with a delay to detect interference
+        let attempts = 0;
+        const maxAttempts = 5;
+        const forceVisibility = () => {
+            const currentState = {
+                isHidden: submenu.classList.contains('hidden'),
+                submenuClassList: submenu.classList.toString(),
+                displayStyle: window.getComputedStyle(submenu).display
+            };
+            console.log(`Submenu state after toggle for ${element.textContent || element.id} (attempt ${attempts + 1}):`, currentState);
+            // Force visibility if opening and submenu is hidden
+            if (isVisible && (submenu.classList.contains('hidden') || currentState.displayStyle === 'none')) {
+                submenu.classList.remove('hidden');
+                submenu.style.display = 'block'; // Force display to counteract interference
+                console.log(`Forced submenu to stay open for ${element.textContent || element.id}`, { submenuClassList: submenu.classList.toString(), displayStyle: window.getComputedStyle(submenu).display });
+                attempts++;
+                if (attempts < maxAttempts) {
+                    setTimeout(forceVisibility, 100);
+                }
+            }
+        };
+        setTimeout(forceVisibility, 100);
     } else {
-        console.warn(`Submenu for ${id} not found`);
+        console.warn(`Submenu for ${element.textContent || element.id} not found`);
     }
 }
 function clearJumpCircles() {
@@ -7735,6 +7944,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeMap();
 
     // Setup event listeners
+    setupMenuItemEvents();
     setupSliderEvents();
     setupModelSelectEvents();
     setupDownloadEvents();
