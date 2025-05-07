@@ -951,11 +951,6 @@ async function cacheTilesForDIP() {
             { name: 'Esri Satellite', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', normalizedUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' },
             { name: 'OSM Overlay', url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', subdomains: ['a', 'b', 'c'], normalizedUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png' }
         );
-    } else if (userSettings.baseMaps === 'Esri Satellite + Carto Light') {
-        tileLayers.push(
-            { name: 'Esri Satellite', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', normalizedUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' },
-            { name: 'Carto Light Overlay', url: 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png', subdomains: ['a', 'b', 'c', 'd'], normalizedUrl: 'https://basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png' }
-        );
     } else {
         const layer = baseMaps[userSettings.baseMaps];
         tileLayers.push({
@@ -1136,11 +1131,6 @@ const debouncedCacheVisibleTiles = debounce(async () => {
         tileLayers.push(
             { name: 'Esri Satellite', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', normalizedUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' },
             { name: 'OSM Overlay', url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', subdomains: ['a', 'b', 'c'], normalizedUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png' }
-        );
-    } else if (userSettings.baseMaps === 'Esri Satellite + Carto Light') {
-        tileLayers.push(
-            { name: 'Esri Satellite', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', normalizedUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' },
-            { name: 'Carto Light Overlay', url: 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png', subdomains: ['a', 'b', 'c', 'd'], normalizedUrl: 'https://basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png' }
         );
     } else {
         const layer = baseMaps[userSettings.baseMaps];
@@ -1373,26 +1363,6 @@ function initMap() {
             })
         ], {
             attribution: '© Esri, USDA, USGS | © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        }),
-        "Esri Satellite + Carto Light": L.layerGroup([
-            L.tileLayer.cached('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                maxZoom: 19,
-                attribution: '© Esri, USDA, USGS',
-                zIndex: 1
-            }),
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', {  // With labels
-                //L.tileLayer.cached('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png', {
-                //L.tileLayer.cached('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png', {  // Darker, no labels
-                maxZoom: 20,
-                attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, © <a href="https://carto.com/attributions">CARTO</a>',
-                opacity: 0.6,
-                zIndex: 2,
-                updateWhenIdle: true,
-                keepBuffer: 2,
-                subdomains: ['a', 'b', 'c', 'd']
-            })
-        ], {
-            attribution: '© Esri, USDA, USGS | © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, © <a href="https://carto.com/attributions">CARTO</a>'
         })
     };
 
