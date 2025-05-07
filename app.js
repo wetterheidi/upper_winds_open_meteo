@@ -1839,6 +1839,12 @@ function initMap() {
             updateJumpRunTrack();
         }
         cacheTilesForDIP(); // Cache tiles for new DIP
+
+        // Update Jump Master Line if active
+        if (userSettings.showJumpMasterLine && userSettings.trackPosition) {
+            console.log('Updating Jump Master Line for double-click');
+            updateJumpMasterLine();
+        }
     });
 
     map.on('zoomend', () => {
@@ -1919,6 +1925,11 @@ function initMap() {
             const currentTime = weatherData?.time?.[currentIndex] || null;
             await fetchWeatherForLocation(lastLat, lastLng, currentTime);
             cacheTilesForDIP();
+            // Update Jump Master Line if active
+            if (userSettings.showJumpMasterLine && userSettings.trackPosition) {
+                console.log('Updating Jump Master Line for double-tap');
+                updateJumpMasterLine();
+            }
         }
         lastTapTime = currentTime;
     }, { passive: false });
@@ -2087,6 +2098,11 @@ function attachMarkerDragend(marker) {
             }
             slider.value = currentIndex;
             cacheTilesForDIP(); // Cache tiles for new DIP
+            // Update Jump Master Line if active
+            if (userSettings.showJumpMasterLine && userSettings.trackPosition) {
+                console.log('Updating Jump Master Line for marker dragend');
+                updateJumpMasterLine();
+            }
         } else {
             document.getElementById('info').innerHTML = `No models available.`;
         }
@@ -2908,6 +2924,77 @@ function updateAccuracyCircle(lat, lng, accuracy) {
             map.removeLayer(window.accuracyCircle);
             window.accuracyCircle = null;
         }
+    }
+}
+function updateJumpMasterLine() {
+    if (!userSettings.showJumpMasterLine || !userSettings.trackPosition || !liveMarker || !map) {
+        if (jumpMasterLine) {
+            map.removeLayer(jumpMasterLine);
+            jumpMasterLine = null;
+            console.log('Removed Jump Master Line: preconditions not met');
+        }
+        return;
+    }
+
+    const liveLatLng = liveMarker.getLatLng();
+    let targetLat, targetLng;
+
+    if (userSettings.jumpMasterLineTarget === 'HARP' && userSettings.harpLat && userSettings.harpLng) {
+        targetLat = userSettings.harpLat;
+        targetLng = userSettings.harpLng;
+        console.log('Drawing Jump Master Line to HARP:', { targetLat, targetLng });
+    } else if (userSettings.jumpMasterLineTarget === 'DIP') {
+        if (currentMarker) {
+            const dipLatLng = currentMarker.getLatLng();
+            targetLat = dipLatLng.lat;
+            targetLng = dipLatLng.lng;
+            console.log('Drawing Jump Master Line to DIP using currentMarker:', { targetLat, targetLng });
+        } else if (lastLat !== null && lastLng !== null) {
+            targetLat = lastLat;
+            targetLng = lastLng;
+            console.log('Drawing Jump Master Line to DIP using lastLat/lastLng:', { targetLat, targetLng });
+        } else {
+            console.log('Cannot draw Jump Master Line: no DIP position set');
+            return;
+        }
+    } else {
+        console.log('Cannot draw Jump Master Line: invalid target');
+        return;
+    }
+
+    const bearing = calculateBearing(liveLatLng.lat, liveLatLng.lng, targetLat, targetLng).toFixed(0);
+    const distanceMeters = map.distance(liveLatLng, [targetLat, targetLng]);
+    const heightUnit = getHeightUnit();
+    const convertedDistance = Utils.convertHeight(distanceMeters, heightUnit);
+    const roundedDistance = Math.round(convertedDistance);
+
+    if (jumpMasterLine) {
+        jumpMasterLine.setLatLngs([[liveLatLng.lat, liveLatLng.lng], [targetLat, targetLng]]);
+        jumpMasterLine.setPopupContent(`<b>Jump Master Line</b><br>Bearing: ${bearing}°<br>Distance: ${roundedDistance} ${heightUnit}`);
+        console.log('Updated Jump Master Line:', { bearing, distance: roundedDistance, unit: heightUnit });
+    } else {
+        jumpMasterLine = L.polyline([[liveLatLng.lat, liveLatLng.lng], [targetLat, targetLng]], {
+            color: 'blue',
+            weight: 3,
+            dashArray: '5, 10'
+        }).addTo(map);
+        jumpMasterLine.bindPopup(`<b>Jump Master Line</b><br>Bearing: ${bearing}°<br>Distance: ${roundedDistance} ${heightUnit}`);
+        console.log('Created Jump Master Line:', { bearing, distance: roundedDistance, unit: heightUnit });
+    }
+
+    if (livePositionControl) {
+        livePositionControl.update(
+            liveLatLng.lat,
+            liveLatLng.lng,
+            lastDeviceAltitude,
+            lastAltitudeAccuracy,
+            lastAccuracy,
+            lastSpeed,
+            lastEffectiveWindUnit,
+            lastDirection,
+            true,
+            { bearing, distance: roundedDistance, unit: heightUnit }
+        );
     }
 }
 
@@ -7091,8 +7178,39 @@ function setupCheckboxEvents() {
         toggleSubmenu(checkbox, submenu, checkbox.checked);
         if (checkbox.checked) {
             startPositionTracking();
+            // Enable Jump Master Line checkbox if it exists
+            const jumpMasterCheckbox = document.getElementById('showJumpMasterLine');
+            if (jumpMasterCheckbox) {
+                jumpMasterCheckbox.disabled = false;
+                jumpMasterCheckbox.style.opacity = '1';
+                jumpMasterCheckbox.title = '';
+                console.log('Enabled showJumpMasterLine checkbox due to trackPosition being enabled');
+            }
         } else {
             stopPositionTracking();
+            // Disable and uncheck Jump Master Line checkbox
+            const jumpMasterCheckbox = document.getElementById('showJumpMasterLine');
+            if (jumpMasterCheckbox) {
+                jumpMasterCheckbox.disabled = true;
+                jumpMasterCheckbox.checked = false;
+                jumpMasterCheckbox.style.opacity = '0.5';
+                jumpMasterCheckbox.title = 'Enable Live Tracking to use Jump Master Line';
+                userSettings.showJumpMasterLine = false;
+                saveSettings();
+                const jumpMasterSubmenu = jumpMasterCheckbox.closest('li')?.querySelector('ul');
+                toggleSubmenu(jumpMasterCheckbox, jumpMasterSubmenu, false);
+                console.log('Disabled and unchecked showJumpMasterLine checkbox, hid submenu');
+            }
+            // Remove Jump Master Line from map
+            if (jumpMasterLine) {
+                if (map && typeof map.removeLayer === 'function') {
+                    map.removeLayer(jumpMasterLine);
+                } else {
+                    console.warn('Map not initialized, cannot remove jumpMasterLine');
+                }
+                jumpMasterLine = null;
+                console.log('Removed Jump Master Line due to trackPosition disabled');
+            }
             if (livePositionControl) {
                 livePositionControl.update(
                     0,
@@ -7114,6 +7232,29 @@ function setupCheckboxEvents() {
 
     setupCheckbox('showJumpMasterLine', 'showJumpMasterLine', (checkbox) => {
         console.log('showJumpMasterLine checkbox changed to:', checkbox.checked);
+        // Only allow changes if trackPosition is enabled
+        if (!userSettings.trackPosition) {
+            checkbox.checked = false;
+            checkbox.disabled = true;
+            checkbox.style.opacity = '0.5';
+            checkbox.title = 'Enable Live Tracking to use Jump Master Line';
+            userSettings.showJumpMasterLine = false;
+            saveSettings();
+            Utils.handleMessage('Enable Live Tracking to use Jump Master Line.');
+            const submenu = checkbox.closest('li')?.querySelector('ul');
+            toggleSubmenu(checkbox, submenu, false);
+            return;
+        }
+        // If targeting DIP, ensure a position is set
+        if (checkbox.checked && userSettings.jumpMasterLineTarget === 'DIP' && lastLat === null && lastLng === null && !currentMarker) {
+            checkbox.checked = false;
+            userSettings.showJumpMasterLine = false;
+            saveSettings();
+            Utils.handleMessage('Please select a DIP position on the map first.');
+            const submenu = checkbox.closest('li')?.querySelector('ul');
+            toggleSubmenu(checkbox, submenu, false);
+            return;
+        }
         userSettings.showJumpMasterLine = checkbox.checked;
         saveSettings();
         const submenu = checkbox.closest('li')?.querySelector('ul');
@@ -7145,6 +7286,9 @@ function setupCheckboxEvents() {
                 console.log('Cleared jump master line data from livePositionControl');
             }
         } else if (liveMarker && livePositionControl) {
+            // Immediately draw the Jump Master Line if conditions are met
+            updateJumpMasterLine();
+            // Update live position control with current data
             livePositionControl.update(
                 lastLatitude || 0,
                 lastLongitude || 0,
@@ -7157,6 +7301,7 @@ function setupCheckboxEvents() {
                 true,
                 null
             );
+            // Trigger position update to ensure line is drawn if position data is fresh
             debouncedPositionUpdate({
                 coords: {
                     latitude: lastLatitude || 0,
