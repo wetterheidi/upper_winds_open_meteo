@@ -1545,6 +1545,10 @@ function initMap() {
         if (coordFormat === 'MGRS') {
             const mgrs = Utils.decimalToMgrs(lat, lng);
             coordText = `MGRS: ${mgrs}`;
+        } else if (coordFormat === 'DMS') {
+            const latDMS = Utils.decimalToDms(lat, true);
+            const lngDMS = Utils.decimalToDms(lng, false);
+            coordText = `Lat: ${latDMS}, Lng: ${lngDMS}`;
         } else {
             coordText = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
         }
