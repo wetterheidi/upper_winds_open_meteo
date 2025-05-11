@@ -1539,7 +1539,7 @@ function initMap() {
     let lastMouseLatLng = null;
 
     map.on('mousemove', function(e) {
-        console.log('Map mousemove fired:', { lat: e.latlng.lat, lng: e.latlng.lng });
+        //console.log('Map mousemove fired:', { lat: e.latlng.lat, lng: e.latlng.lng });
         const coordFormat = getCoordinateFormat();
         const lat = e.latlng.lat;
         const lng = e.latlng.lng;
@@ -1983,19 +1983,26 @@ async function updateMarkerPopup(marker, lat, lng, altitude, open = false) {
         });
     }
 
-    // Unbind existing popup to avoid conflicts
+    // Unbind and bind new popup content
     marker.unbindPopup();
     marker.bindPopup(popupContent);
     console.log('Popup rebound with content:', popupContent);
 
-    if (open) {
+    // If the popup is open, update its content immediately
+    const popup = marker.getPopup();
+    const isOpen = popup?.isOpen();
+    if (isOpen) {
+        popup.setContent(popupContent);
+        popup.update(); // Ensure the popup layout is refreshed
+        console.log('Updated open popup content:', popupContent);
+    } else if (open) {
         console.log('Attempting to open popup');
         marker.openPopup();
-        const isOpen = marker.getPopup()?.isOpen();
-        console.log('Popup open status after openPopup():', isOpen);
-        if (!isOpen) {
+        const isNowOpen = marker.getPopup()?.isOpen();
+        console.log('Popup open status after openPopup():', isNowOpen);
+        if (!isNowOpen) {
             console.warn('Popup failed to open, retrying');
-            marker.openPopup(); // Retry to ensure visibility
+            marker.openPopup();
         }
     }
 }
@@ -6439,7 +6446,9 @@ function setupRadioEvents() {
     setupRadioGroup('coordFormat', () => {
         updateCoordInputs(Settings.state.userSettings.coordFormat);
         if (currentMarker && lastLat && lastLng) {
-            updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude);
+            // Check if popup is open to preserve its state
+            const isPopupOpen = currentMarker.getPopup()?.isOpen() || false;
+            updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, isPopupOpen);
         }
     });
     setupRadioGroup('downloadFormat', () => {
