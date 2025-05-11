@@ -91,11 +91,19 @@ html {
     z-index: 1;
 }
 
-.leaflet-overlay-pane,
-.leaflet-marker-pane,
+.leaflet-overlay-pane {
+    z-index: 400; /* Leaflet default */
+    pointer-events: none; /* Overlays don’t need clicks */
+}
+
+.leaflet-marker-pane {
+    z-index: 600; /* Leaflet default ~600 */
+    pointer-events: auto; /* Allow marker clicks */
+}
+
 .leaflet-popup-pane {
-    z-index: 100;
-    pointer-events: none;
+    z-index: 700; /* Leaflet default ~700 */
+    pointer-events: auto; /* Allow popup interactions */
 }
 
 .leaflet-overlay-pane>*,
@@ -113,6 +121,11 @@ html {
     top: 5px;
     left: 5px;
     z-index: 4000;
+    pointer-events: auto; /* Only interactive elements should capture events */
+}
+
+.hamburger-menu-overlay {
+    pointer-events: none; /* Allow events to pass through to the map */
 }
 
 #hamburgerBtn {

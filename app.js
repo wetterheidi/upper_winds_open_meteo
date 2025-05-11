@@ -4,6 +4,8 @@
 let isInitialized = false;
 let userSettings = JSON.parse(localStorage.getItem('upperWindsSettings')) || { ...defaultSettings };
 let map;
+let coordsControl;
+let lastMouseLatLng;
 let baseMaps = {};
 let lastLat = null;
 let lastLng = null;
@@ -1141,6 +1143,23 @@ function setupCacheSettings() {
 }
 
 // == Map Initialization and Interaction ==
+// Define custom Coordinates control globally
+L.Control.Coordinates = L.Control.extend({
+    options: { position: 'bottomleft' },
+    onAdd: function (map) {
+        var container = L.DomUtil.create('div', 'leaflet-control-coordinates');
+        container.style.background = 'rgba(255, 255, 255, 0.8)';
+        container.style.padding = '5px';
+        container.style.borderRadius = '4px';
+        container.style.boxShadow = '0 2px 5px rgba(0, 0, 0, 0.2)';
+        container.innerHTML = 'Move mouse over map';
+        this._container = container;
+        return container;
+    },
+    update: function (content) {
+        this._container.innerHTML = content;
+    }
+});
 function initMap() {
     const defaultCenter = [48.0179, 11.1923];
     const defaultZoom = 11;
@@ -1493,25 +1512,9 @@ function initMap() {
     // Initialize offline indicator
     updateOfflineIndicator();
 
-    L.Control.Coordinates = L.Control.extend({
-        options: { position: 'bottomleft' },
-        onAdd: function (map) {
-            var container = L.DomUtil.create('div', 'leaflet-control-coordinates');
-            container.style.background = 'rgba(255, 255, 255, 0.8)';
-            container.style.padding = '5px';
-            container.style.borderRadius = '4px';
-            container.style.boxShadow = '0 2px 5px rgba(0, 0, 0, 0.2)';
-            container.innerHTML = 'Move mouse over map';
-            this._container = container;
-            return container;
-        },
-        update: function (content) {
-            this._container.innerHTML = content;
-        }
-    });
-
-    var coordsControl = new L.Control.Coordinates();
+    coordsControl = new L.Control.Coordinates();
     coordsControl.addTo(map);
+    console.log('coordsControl initialized:', coordsControl);
 
     const elevationCache = new Map();
 
@@ -1535,7 +1538,8 @@ function initMap() {
 
     let lastMouseLatLng = null;
 
-    map.on('mousemove', function (e) {
+    map.on('mousemove', function(e) {
+        console.log('Map mousemove fired:', { lat: e.latlng.lat, lng: e.latlng.lng });
         const coordFormat = getCoordinateFormat();
         const lat = e.latlng.lat;
         const lng = e.latlng.lng;
@@ -1756,13 +1760,22 @@ function initMap() {
     const menu = document.getElementById('menu');
     if (hamburgerBtn && menu) {
         hamburgerBtn.addEventListener('click', () => {
-            const isMenuOpen = !menu.classList.contains('hidden');
-            document.querySelector('.leaflet-container').style.pointerEvents = isMenuOpen ? 'none' : 'auto';
-            console.log('Map pointer events set to:', isMenuOpen ? 'none' : 'auto');
+            console.log('Hamburger menu clicked, menu visibility toggled');
+            // Rely on setupMenuEvents for toggle logic
         });
     }
 
     initializeApp();
+}
+function reinitializeCoordsControl() {
+    console.log('Before reinitialize - coordsControl:', coordsControl);
+    if (coordsControl) {
+        coordsControl.remove();
+        console.log('Removed existing coordsControl');
+    }
+    coordsControl = new L.Control.Coordinates();
+    coordsControl.addTo(map);
+    console.log('After reinitialize - coordsControl:', coordsControl);
 }
 function handleHarpPlacement(e) {
     if (!isPlacingHarp) return;
@@ -6266,26 +6279,23 @@ function setupMenuEvents() {
         menu.classList.add('hidden');
         console.log('Menu initialized as hidden on load');
 
-        const computedStyle = window.getComputedStyle(menu);
-        console.log('Initial menu styles:', {
-            display: computedStyle.display,
-            visibility: computedStyle.visibility,
-            opacity: computedStyle.opacity,
-            hasHiddenClass: menu.classList.contains('hidden')
-        });
-
         hamburgerBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             e.preventDefault();
             menu.classList.toggle('hidden');
             const isHidden = menu.classList.contains('hidden');
-            const currentStyle = window.getComputedStyle(menu);
-            console.log('Main menu toggled:', isHidden ? 'hidden' : 'shown', {
-                display: currentStyle.display,
-                visibility: currentStyle.visibility,
-                opacity: currentStyle.opacity,
-                hasHiddenClass: isHidden
-            });
+            if (isHidden) {
+                map.dragging.enable();
+                map.touchZoom.enable();
+                map.doubleClickZoom.enable();
+                map.scrollWheelZoom.enable();
+                map.boxZoom.enable();
+                map.keyboard.enable();
+                // Ensure map is interactive
+                document.querySelector('.leaflet-container').style.pointerEvents = 'auto';
+                reinitializeCoordsControl();
+                console.log('Map interactions restored and coordsControl reinitialized');
+            }
         });
 
         const menuItems = menu.querySelectorAll('li span');
@@ -6293,7 +6303,6 @@ function setupMenuEvents() {
             item.addEventListener('click', (e) => {
                 const submenu = item.nextElementSibling;
                 if (submenu && submenu.classList.contains('submenu')) {
-                    console.log('Clicked menu item:', item.textContent);
                     const isSubmenuHidden = submenu.classList.contains('hidden');
                     const parentUl = item.closest('ul');
                     parentUl.querySelectorAll('.submenu').forEach(otherSubmenu => {
@@ -6303,8 +6312,6 @@ function setupMenuEvents() {
                     });
                     submenu.classList.toggle('hidden', !isSubmenuHidden);
                     console.log('Submenu toggled:', isSubmenuHidden ? 'shown' : 'hidden');
-                } else {
-                    console.log('No submenu for item:', item.textContent);
                 }
                 e.stopPropagation();
             });
@@ -6314,16 +6321,18 @@ function setupMenuEvents() {
             e.stopPropagation();
         });
 
-        menu.addEventListener('click', (e) => {
-            const target = e.target;
-            if ((target.type === 'checkbox' || target.type === 'number' || target.type === 'text') && target.disabled) {
-                console.warn('Click ignored on disabled element:', {
-                    id: target.id,
-                    type: target.type,
-                    disabled: target.disabled,
-                    menuVisible: !menu.classList.contains('hidden')
-                });
-                displayError('Cannot interact with disabled menu item');
+        document.addEventListener('click', (e) => {
+            if (!menu.contains(e.target) && !hamburgerBtn.contains(e.target) && !menu.classList.contains('hidden')) {
+                menu.classList.add('hidden');
+                map.dragging.enable();
+                map.touchZoom.enable();
+                map.doubleClickZoom.enable();
+                map.scrollWheelZoom.enable();
+                map.boxZoom.enable();
+                map.keyboard.enable();
+                document.querySelector('.leaflet-container').style.pointerEvents = 'auto';
+                reinitializeCoordsControl();
+                console.log('Menu closed, map interactions restored, coordsControl reinitialized');
             }
         });
     } else {
@@ -6971,7 +6980,7 @@ function setupCheckboxEvents() {
                 recenterMap();
             }
         };
-    
+
         const disableFeature = () => {
             Settings.state.userSettings.showLandingPattern = false;
             Settings.save();
@@ -7017,7 +7026,7 @@ function setupCheckboxEvents() {
                 downwindArrow = null;
             }
         };
-    
+
         if (checkbox.checked) {
             if (Settings.isFeatureUnlocked('landingPattern') && isLandingPatternUnlocked) {
                 enableFeature();
