@@ -1,0 +1,294 @@
+// === Settings Module ===
+const Settings = {
+    // Constants
+    FEATURE_PASSWORD: 'skydiver2025',
+
+    defaultSettings: {
+        model: 'icon_global',
+        refLevel: 'AGL',
+        heightUnit: 'm',
+        temperatureUnit: 'C',
+        windUnit: 'kt',
+        timeZone: 'Z',
+        coordFormat: 'Decimal',
+        downloadFormat: 'HEIDIS',
+        showTable: false,
+        canopySpeed: 20,
+        descentRate: 3.5,
+        showLandingPattern: false,
+        landingDirection: 'LL',
+        customLandingDirectionLL: '',
+        customLandingDirectionRR: '',
+        legHeightDownwind: 300,
+        legHeightBase: 200,
+        legHeightFinal: 100,
+        interpStep: '200',
+        lowerLimit: 0,
+        upperLimit: 3000,
+        baseMaps: 'Esri Street',
+        calculateJump: true,
+        openingAltitude: 1200,
+        exitAltitude: 3000,
+        showJumpRunTrack: false,
+        showExitArea: false,
+        showCanopyArea: false,
+        jumpRunTrackOffset: 0,
+        jumpRunTrackForwardOffset: 0,
+        aircraftSpeedKt: 90,
+        jumperSeparation: 5,
+        numberOfJumpers: 5,
+        cutAwayAltitude: 1000,
+        cutAwayState: 'Partially',
+        trackPosition: false,
+        showJumpMasterLine: false,
+        jumpMasterLineTarget: 'DIP',
+        harpLat: null,
+        harpLng: null,
+        cacheRadiusKm: 10,
+        cacheZoomLevels: [11, 12, 13, 14]
+    },
+
+    // State
+    state: {
+        userSettings: null,
+        unlockedFeatures: {
+            landingPattern: false,
+            calculateJump: false
+        },
+        isJumperSeparationManual: false
+    },
+
+    /**
+     * Initializes settings from localStorage or defaults.
+     * Ensures stored settings are merged correctly with defaults.
+     */
+    initialize() {
+        let storedSettings = {};
+        let storedUnlockedFeatures = { landingPattern: false, calculateJump: false };
+
+        // Load settings from localStorage
+        try {
+            const settingsRaw = localStorage.getItem('upperWindsSettings');
+            if (settingsRaw) {
+                storedSettings = JSON.parse(settingsRaw);
+                console.log('Loaded settings from localStorage:', storedSettings);
+            } else {
+                console.log('No settings found in localStorage, using defaults');
+            }
+        } catch (error) {
+            this.handleError(error, 'Failed to load settings. Using defaults.');
+        }
+
+        // Load unlocked features from localStorage
+        try {
+            const featuresRaw = localStorage.getItem('unlockedFeatures');
+            if (featuresRaw) {
+                storedUnlockedFeatures = JSON.parse(featuresRaw);
+                console.log('Loaded unlocked features:', storedUnlockedFeatures);
+            }
+        } catch (error) {
+            this.handleError(error, 'Failed to load feature unlock status. Using defaults.');
+        }
+
+        // Merge stored settings with defaults
+        this.state.userSettings = { ...this.defaultSettings, ...storedSettings };
+
+        // Apply transient settings
+        this.state.userSettings.trackPosition = false;
+        this.state.userSettings.showJumpMasterLine = false;
+        this.state.userSettings.harpLat = null;
+        this.state.userSettings.harpLng = null;
+        this.state.userSettings.jumpRunTrackOffset = 0;
+        this.state.userSettings.jumpRunTrackForwardOffset = 0;
+        this.state.userSettings.cacheRadiusKm = this.state.userSettings.cacheRadiusKm || this.defaultSettings.cacheRadiusKm;
+        this.state.userSettings.cacheZoomLevels = this.state.userSettings.cacheZoomLevels || this.defaultSettings.cacheZoomLevels;
+        this.state.isJumperSeparationManual = false;
+
+        // Set unlocked features and sync globals
+        this.state.unlockedFeatures = storedUnlockedFeatures;
+        isLandingPatternUnlocked = storedUnlockedFeatures.landingPattern;
+        isCalculateJumpUnlocked = storedUnlockedFeatures.calculateJump;
+
+        // Save to ensure consistency
+        this.save();
+        console.log('Settings initialized:', this.state.userSettings);
+        console.log('Unlocked features:', this.state.unlockedFeatures);
+    },
+
+    /**
+     * Saves settings and feature unlock status to localStorage.
+     * Includes validation to ensure data is serializable.
+     */
+    save() {
+        try {
+            // Validate serializability
+            const settingsString = JSON.stringify(this.state.userSettings);
+            const featuresString = JSON.stringify(this.state.unlockedFeatures);
+            localStorage.setItem('upperWindsSettings', settingsString);
+            localStorage.setItem('unlockedFeatures', featuresString);
+            console.log('Settings saved to localStorage:', JSON.parse(settingsString));
+            console.log('Unlocked features saved:', JSON.parse(featuresString));
+        } catch (error) {
+            this.handleError(error, 'Failed to save settings to localStorage.');
+        }
+    },
+
+    /**
+     * Retrieves the value of a setting from a UI element or returns a default.
+     * @param {string} name - The name of the setting.
+     * @param {string} type - The UI element type ('radio', 'select').
+     * @param {*} defaultValue - The default value if not found.
+     * @returns {*} The setting value.
+     */
+    getValue(name, type = 'radio', defaultValue) {
+        const selector = type === 'radio' ? `input[name="${name}"]:checked` : `#${name}`;
+        const element = document.querySelector(selector);
+        if (!element) {
+            console.warn(`Setting element not found: ${selector}`);
+            return defaultValue;
+        }
+        const value = type === 'select' ? element.value : element.value;
+        console.log(`Retrieved setting ${name}: ${value}`);
+        return value;
+    },
+
+    /**
+     * Updates unit-related labels (height, wind, reference) in the UI.
+     */
+    updateUnitLabels() {
+        const heightUnit = this.getValue('heightUnit', 'radio', 'm');
+        const windUnit = this.getValue('windUnit', 'radio', 'kt');
+        const refLevel = this.getValue('refLevel', 'radio', 'AGL');
+
+        // Update step label
+        const stepLabel = document.querySelector('#controls-row label[for="interpStepSelect"]');
+        if (stepLabel) {
+            stepLabel.textContent = `Step (${heightUnit}):`;
+            console.log(`Updated step label to: Step (${heightUnit})`);
+        }
+
+        // Update limit labels
+        const lowerLabel = document.querySelector('label[for="lowerLimit"]');
+        const upperLabel = document.querySelector('label[for="upperLimit"]');
+        if (lowerLabel) {
+            lowerLabel.textContent = `Lower Limit (${heightUnit}):`;
+            console.log(`Updated lower limit label to: Lower Limit (${heightUnit})`);
+        }
+        if (upperLabel) {
+            upperLabel.textContent = `Upper Limit (${heightUnit}):`;
+            console.log(`Updated upper limit label to: Upper Limit (${heightUnit})`);
+        }
+
+        // Update mean wind result
+        const meanWindResult = document.getElementById('meanWindResult');
+        if (meanWindResult?.innerHTML) {
+            let updatedText = meanWindResult.innerHTML;
+
+            // Update height and reference
+            const heightRegex = /\((\d+)-(\d+) m\b[^)]*\)/;
+            if (heightRegex.test(updatedText)) {
+                const [_, lower, upper] = updatedText.match(heightRegex);
+                const newLower = this.convertHeight(parseFloat(lower), heightUnit);
+                const newUpper = this.convertHeight(parseFloat(upper), heightUnit);
+                updatedText = updatedText.replace(heightRegex, `(${Math.round(newLower)}-${Math.round(newUpper)} ${heightUnit} ${refLevel})`);
+                console.log(`Updated mean wind height: (${Math.round(newLower)}-${Math.round(newUpper)} ${heightUnit} ${refLevel})`);
+            }
+
+            // Update wind speed
+            const windRegex = /: (\d+(?:\.\d+)?)\s*([a-zA-Z\/]+)$/;
+            if (windRegex.test(updatedText)) {
+                const [_, speedValue, currentUnit] = updatedText.match(windRegex);
+                const numericSpeed = parseFloat(speedValue);
+                if (!isNaN(numericSpeed)) {
+                    const newSpeed = this.convertWind(numericSpeed, windUnit, currentUnit);
+                    const formattedSpeed = newSpeed === 'N/A' ? 'N/A' : (windUnit === 'bft' ? Math.round(newSpeed) : newSpeed.toFixed(1));
+                    updatedText = updatedText.replace(windRegex, `: ${formattedSpeed} ${windUnit}`);
+                    console.log(`Updated mean wind speed: ${formattedSpeed} ${windUnit}`);
+                }
+            }
+
+            meanWindResult.innerHTML = updatedText;
+        }
+    },
+
+    /**
+     * Updates the model run information label.
+     * @param {string} lastModelRun - The last model run timestamp.
+     * @param {number} lastLat - Last latitude.
+     * @param {number} lastLng - Last longitude.
+     */
+    updateModelRunInfo(lastModelRun, lastLat, lastLng) {
+        const modelLabel = document.getElementById('modelLabel');
+        const modelSelect = document.getElementById('modelSelect');
+        if (!modelLabel || !modelSelect) {
+            console.warn('Model run info elements missing:', { modelLabel, modelSelect });
+            return;
+        }
+        if (!lastModelRun) {
+            console.log('lastModelRun undefined, setting default model run info');
+            modelLabel.title = `Model: ${modelSelect.value.replace('_', ' ').toUpperCase()}\nRun: Not available`;
+            return;
+        }
+        const model = modelSelect.value;
+        const titleContent = `Model: ${model.replace('_', ' ').toUpperCase()}\nRun: ${lastModelRun}`;
+        modelLabel.title = titleContent;
+        console.log(`Updated model run info: ${titleContent}`);
+    },
+
+    /**
+     * Centralized error handler for settings operations.
+     * @param {Error|string} error - The error object or message.
+     * @param {string} userMessage - The message to display to the user.
+     */
+    handleError(error, userMessage = 'An error occurred. Please try again.') {
+        console.error('Settings Error:', error);
+        Utils.handleError(userMessage);
+    },
+
+    /**
+     * Converts height between units.
+     * @param {number} value - Height value.
+     * @param {string} targetUnit - Target unit ('m', 'ft').
+     * @returns {number} Converted height.
+     */
+    convertHeight(value, targetUnit) {
+        if (isNaN(value)) return value;
+        return targetUnit === 'ft' ? value * 3.28084 : value;
+    },
+
+    /**
+     * Converts wind speed between units.
+     * @param {number} value - Wind speed.
+     * @param {string} targetUnit - Target unit ('kt', 'm/s', 'km/h', 'mph', 'bft').
+     * @param {string} currentUnit - Current unit.
+     * @returns {number|string} Converted speed or 'N/A'.
+     */
+    convertWind(value, targetUnit, currentUnit) {
+        if (isNaN(value)) return 'N/A';
+        const conversions = {
+            'kt': { 'm/s': value => value * 0.514444, 'km/h': value => value * 1.852, 'mph': value => value * 1.15078, 'bft': value => this.ktToBeaufort(value) },
+            'm/s': { 'kt': value => value / 0.514444, 'km/h': value => value * 3.6, 'mph': value => value * 2.23694, 'bft': value => this.ktToBeaufort(value / 0.514444) },
+            // Add other conversions as needed
+        };
+        return conversions[currentUnit]?.[targetUnit]?.(value) || value;
+    },
+
+    /**
+     * Converts knots to Beaufort scale (stub).
+     * @param {number} kt - Speed in knots.
+     * @returns {number} Beaufort scale value.
+     */
+    ktToBeaufort(kt) {
+        // Implement Beaufort conversion logic
+        return Math.round(kt / 5); // Placeholder
+    },
+
+    /**
+     * Checks if a feature is unlocked.
+     * @param {string} feature - Feature name ('landingPattern', 'calculateJump').
+     * @returns {boolean} True if unlocked.
+     */
+    isFeatureUnlocked(feature) {
+        return !!this.state.unlockedFeatures[feature];
+    }
+};
