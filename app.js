@@ -3298,7 +3298,8 @@ async function updateWeatherDisplay(index, originalTime = null) {
         const spd = parseFloat(data.spd);
         let windClass = '';
         if (windSpeedUnit === 'bft') {
-            const bft = Math.round(spd);
+            const spdInKt = Utils.convertWind(spd, 'kt', 'km/h');
+            const bft = Utils.knotsToBeaufort(spdInKt);
             if (bft <= 1) windClass = 'wind-low';
             else if (bft <= 3) windClass = 'wind-moderate';
             else if (bft <= 4) windClass = 'wind-high';
@@ -3325,7 +3326,7 @@ async function updateWeatherDisplay(index, originalTime = null) {
                 humidityClass = 'humidity-saturated';
             }
         }
-        //console.log(`Row ${idx}: RH=${humidity}, windClass=${windClass}, humidityClass=${humidityClass}`);
+        console.log(`Row ${idx}: RH=${humidity}, windClass=${windClass}, humidityClass=${humidityClass}`);
 
         const displayHeight = refLevel === 'AMSL' ? data.displayHeight + (heightUnit === 'ft' ? Math.round(surfaceHeight * 3.28084) : surfaceHeight) : data.displayHeight;
         const displayTemp = Utils.convertTemperature(data.temp, temperatureUnit === 'C' ? '°C' : '°F');
