@@ -2,7 +2,15 @@
 // == Constants and Global Variables ==
 
 let isInitialized = false;
-let userSettings = JSON.parse(localStorage.getItem('upperWindsSettings')) || { ...defaultSettings };
+Settings.initialize();
+let userSettings;
+try {
+    const storedSettings = localStorage.getItem('upperWindsSettings');
+    userSettings = storedSettings ? JSON.parse(storedSettings) : { ...Settings.defaultSettings };
+} catch (error) {
+    console.error('Failed to parse upperWindsSettings from localStorage:', error);
+    userSettings = { ...Settings.defaultSettings };
+}
 let map;
 let coordsControl;
 let lastMouseLatLng;

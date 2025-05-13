@@ -65,7 +65,7 @@ const Settings = {
     initialize() {
         let storedSettings = {};
         let storedUnlockedFeatures = { landingPattern: false, calculateJump: false };
-
+    
         // Load settings from localStorage
         try {
             const settingsRaw = localStorage.getItem('upperWindsSettings');
@@ -78,41 +78,18 @@ const Settings = {
         } catch (error) {
             this.handleError(error, 'Failed to load settings. Using defaults.');
         }
-
-        // Load unlocked features from localStorage
-        try {
-            const featuresRaw = localStorage.getItem('unlockedFeatures');
-            if (featuresRaw) {
-                storedUnlockedFeatures = JSON.parse(featuresRaw);
-                console.log('Loaded unlocked features:', storedUnlockedFeatures);
-            }
-        } catch (error) {
-            this.handleError(error, 'Failed to load feature unlock status. Using defaults.');
-        }
-
+    
         // Merge stored settings with defaults
         this.state.userSettings = { ...this.defaultSettings, ...storedSettings };
-
-        // Apply transient settings
-        this.state.userSettings.trackPosition = false;
-        this.state.userSettings.showJumpMasterLine = false;
-        this.state.userSettings.harpLat = null;
-        this.state.userSettings.harpLng = null;
-        this.state.userSettings.jumpRunTrackOffset = 0;
-        this.state.userSettings.jumpRunTrackForwardOffset = 0;
-        this.state.userSettings.cacheRadiusKm = this.state.userSettings.cacheRadiusKm || this.defaultSettings.cacheRadiusKm;
-        this.state.userSettings.cacheZoomLevels = this.state.userSettings.cacheZoomLevels || this.defaultSettings.cacheZoomLevels;
-        this.state.isJumperSeparationManual = false;
-
-        // Set unlocked features and sync globals
-        this.state.unlockedFeatures = storedUnlockedFeatures;
-        isLandingPatternUnlocked = storedUnlockedFeatures.landingPattern;
-        isCalculateJumpUnlocked = storedUnlockedFeatures.calculateJump;
-
-        // Save to ensure consistency
-        this.save();
-        console.log('Settings initialized:', this.state.userSettings);
-        console.log('Unlocked features:', this.state.unlockedFeatures);
+    
+        // Validate baseMaps
+        const validBaseMaps = ['OpenStreetMap', 'OpenTopoMap', 'Esri Satellite', 'Esri Street', 'Esri Topo', 'Esri Satellite + OSM'];
+        if (!validBaseMaps.includes(this.state.userSettings.baseMaps)) {
+            console.warn(`Invalid baseMaps setting: ${this.state.userSettings.baseMaps}, resetting to default`);
+            this.state.userSettings.baseMaps = this.defaultSettings.baseMaps;
+        }
+    
+        // ... (rest of the initialize function)
     },
 
     /**
