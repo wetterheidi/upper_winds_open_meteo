@@ -1,5 +1,5 @@
 // === Settings Module ===
-const Settings = {
+export const Settings = {
     // Constants
     FEATURE_PASSWORD: 'skydiver2025',
 
