@@ -1266,8 +1266,8 @@ function initMap() {
 
     window.addEventListener('online', () => {
         hasSwitched = false;
-        map.options.minZoom = 10;
-        console.log('Back online, restored minZoom to 10');
+        map.options.minZoom = 6;
+        console.log('Back online, restored minZoom to 6');
         updateOfflineIndicator();
     });
 
