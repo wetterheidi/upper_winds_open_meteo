@@ -16,7 +16,18 @@ const AppState = {
     isInitialized: false,
     coordsControl: null,
     lastMouseLatLng: null,
-    lastSmoothedSpeedMs: 0
+    landingPatternPolygon: null,
+    secondlandingPatternPolygon: null,
+    thirdLandingPatternLine: null,
+    finalArrow: null,
+    baseArrow: null,
+    downwindArrow: null,
+    landingWindDir: null,
+    cutAwayMarker: null,
+    cutAwayLat: null,
+    cutAwayLng: null,
+    cutAwayCircle: null,
+
 };
 
 let map;
@@ -36,13 +47,6 @@ let gpxPoints = [];
 let isLoadingGpx = false;
 let weatherData = null;
 let lastModelRun = null;
-let landingPatternPolygon = null;
-let secondlandingPatternPolygon = null;
-let thirdLandingPatternLine = null;
-let finalArrow = null;
-let baseArrow = null;
-let downwindArrow = null;
-let landingWindDir = null;
 let jumpRunTrackLayer = null;
 let customJumpRunDirection = null; // Temporary storage for custom direction during session
 let isJumperSeparationManual = false; // Tracks if jumperSeparation is manually set
@@ -53,10 +57,7 @@ let jumpCircleGreenLight = null;
 let blueCircleLayer = null;
 let greenCircleLayer = null;
 let redCircleLayer = null;
-let cutAwayMarker = null;
-let cutAwayLat = null;
-let cutAwayLng = null;
-let cutAwayCircle = null;
+
 let prevLat = null;
 let prevLng = null;
 let prevTime = null;
@@ -71,6 +72,7 @@ let lastSpeed = 'N/A';
 let lastEffectiveWindUnit = 'kt';
 let lastDirection = 'N/A';
 let lastTerrainAltitude = 'N/A';
+let lastSmoothedSpeedMs = 0; // Store last smoothed speed for EMA
 
 
 const minZoom = 11;
@@ -1617,17 +1619,17 @@ function initMap() {
         const { lat, lng } = e.latlng;
         console.log('Right-click: Placing/moving cut-away marker at:', { lat, lng });
 
-        if (cutAwayMarker) {
-            cutAwayMarker.setLatLng([lat, lng]);
+        if (AppState.cutAwayMarker) {
+            AppState.cutAwayMarker.setLatLng([lat, lng]);
         } else {
-            cutAwayMarker = createCutAwayMarker(lat, lng).addTo(map);
-            attachCutAwayMarkerDragend(cutAwayMarker);
+            AppState.cutAwayMarker = createCutAwayMarker(lat, lng).addTo(map);
+            attachCutAwayMarkerDragend(AppState.cutAwayMarker);
         }
 
-        cutAwayLat = lat;
-        cutAwayLng = lng;
+        AppState.cutAwayLat = lat;
+        AppState.cutAwayLng = lng;
 
-        updateCutAwayMarkerPopup(cutAwayMarker, lat, lng);
+        updateCutAwayMarkerPopup(AppState.cutAwayMarker, lat, lng);
 
         if (weatherData && Settings.state.userSettings.calculateJump) {
             console.log('Recalculating cut-away for marker placement');
@@ -1944,10 +1946,10 @@ function attachMarkerDragend(marker) {
 function attachCutAwayMarkerDragend(marker) {
     marker.on('dragend', (e) => {
         const position = marker.getLatLng();
-        cutAwayLat = position.lat;
-        cutAwayLng = position.lng;
-        console.log('Cut-away marker dragged to:', { lat: cutAwayLat, lng: cutAwayLng });
-        updateCutAwayMarkerPopup(marker, cutAwayLat, cutAwayLng);
+        AppState.cutAwayLat = position.lat;
+        AppState.cutAwayLng = position.lng;
+        console.log('Cut-away marker dragged to:', { lat: AppState.cutAwayLat, lng: AppState.cutAwayLng });
+        updateCutAwayMarkerPopup(marker, AppState.cutAwayLat, AppState.cutAwayLng);
         if (Settings.state.userSettings.showCutAwayFinder && Settings.state.userSettings.calculateJump && weatherData) {
             console.log('Recalculating cut-away for marker drag');
             debouncedCalculateJump(); // Use debounced version
@@ -2309,15 +2311,15 @@ const debouncedPositionUpdate = debounce(async (position) => {
             speedMs = distance / timeDiff; // Speed in meters/second
             // Apply EMA smoothing with dynamic alpha
             const alpha = speedMs < 25 ? 0.5 : 0.2; // Responsive at low speeds, stable at high speeds
-            AppState.lastSmoothedSpeedMsbaseMaps = alpha * speedMs + (1 - alpha) * AppState.lastSmoothedSpeedMsbaseMaps;
-            speed = Utils.convertWind(AppState.lastSmoothedSpeedMsbaseMaps, effectiveWindUnit, 'm/s');
+            lastSmoothedSpeedMs = alpha * speedMs + (1 - alpha) * lastSmoothedSpeedMs;
+            speed = Utils.convertWind(lastSmoothedSpeedMs, effectiveWindUnit, 'm/s');
             speed = effectiveWindUnit === 'bft' ? Math.round(speed) : speed.toFixed(1);
             direction = calculateBearing(prevLat, prevLng, latitude, longitude).toFixed(0);
             //Direction smoothing (optional)
             /*let lastSmoothedDirection = 0; // Global variable
             direction = alpha * calculateBearing(...) + (1 - alpha) * lastSmoothedDirection;
             lastSmoothedDirection = direction;*/
-            console.log('Calculated speed:', { rawSpeedMs: speedMs, smoothedSpeedMs: AppState.lastSmoothedSpeedMsbaseMaps, convertedSpeed: speed, unit: effectiveWindUnit, alpha });
+            console.log('Calculated speed:', { rawSpeedMs: speedMs, smoothedSpeedMs: lastSmoothedSpeedMs, convertedSpeed: speed, unit: effectiveWindUnit, alpha });
         }
     }
 
@@ -2372,12 +2374,12 @@ const debouncedPositionUpdate = debounce(async (position) => {
                 const roundedDistance = Math.round(convertedDistance);
 
                 let totDisplay = 'N/A';
-                if (AppState.lastSmoothedSpeedMsbaseMaps > 0) {
-                    const totSeconds = distanceMeters / AppState.lastSmoothedSpeedMsbaseMaps;
+                if (lastSmoothedSpeedMs > 0) {
+                    const totSeconds = distanceMeters / lastSmoothedSpeedMs;
                     totDisplay = Math.round(totSeconds);
-                    console.log('Calculated TOT:', { distanceMeters, smoothedSpeedMs: AppState.lastSmoothedSpeedMsbaseMaps, totSeconds, totDisplay });
+                    console.log('Calculated TOT:', { distanceMeters, smoothedSpeedMs: lastSmoothedSpeedMs, totSeconds, totDisplay });
                 } else {
-                    console.log('TOT set to N/A: invalid or zero speed', { smoothedSpeedMs: AppState.lastSmoothedSpeedMsbaseMaps });
+                    console.log('TOT set to N/A: invalid or zero speed', { smoothedSpeedMs: lastSmoothedSpeedMs });
                 }
 
                 jumpMasterLineData = {
@@ -3202,14 +3204,14 @@ async function updateWeatherDisplayOLD(index, originalTime = null) {
         return;
     }
 
-    landingWindDir = weatherData.wind_direction_10m[index] || null;
-    console.log('landingWindDir updated to:', landingWindDir);
+    AppState.landingWindDir = weatherData.wind_direction_10m[index] || null;
+    console.log('landingWindDir updated to:', AppState.landingWindDir);
 
     const customLandingDirectionLLInput = document.getElementById('customLandingDirectionLL');
     const customLandingDirectionRRInput = document.getElementById('customLandingDirectionRR');
-    if (customLandingDirectionLLInput && customLandingDirectionRRInput && landingWindDir !== null) {
-        customLandingDirectionLLInput.value = Math.round(landingWindDir);
-        customLandingDirectionRRInput.value = Math.round(landingWindDir);
+    if (customLandingDirectionLLInput && customLandingDirectionRRInput && AppState.landingWindDir !== null) {
+        customLandingDirectionLLInput.value = Math.round(AppState.landingWindDir);
+        customLandingDirectionRRInput.value = Math.round(AppState.landingWindDir);
     }
 
     const refLevel = document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL';
@@ -3278,14 +3280,14 @@ async function updateWeatherDisplay(index, originalTime = null) {
         return;
     }
 
-    landingWindDir = weatherData.wind_direction_10m[index] || null;
-    console.log('landingWindDir updated to:', landingWindDir);
+    AppState.landingWindDir = weatherData.wind_direction_10m[index] || null;
+    console.log('landingWindDir updated to:', AppState.landingWindDir);
 
     const customLandingDirectionLLInput = document.getElementById('customLandingDirectionLL');
     const customLandingDirectionRRInput = document.getElementById('customLandingDirectionRR');
-    if (customLandingDirectionLLInput && customLandingDirectionRRInput && landingWindDir !== null) {
-        customLandingDirectionLLInput.value = Math.round(landingWindDir);
-        customLandingDirectionRRInput.value = Math.round(landingWindDir);
+    if (customLandingDirectionLLInput && customLandingDirectionRRInput && AppState.landingWindDir !== null) {
+        customLandingDirectionLLInput.value = Math.round(AppState.landingWindDir);
+        customLandingDirectionRRInput.value = Math.round(AppState.landingWindDir);
     }
 
     const refLevel = document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL';
@@ -4645,7 +4647,7 @@ function clearIsolineMarkers() {
         map.eachLayer(layer => {
             if (layer instanceof L.Marker &&
                 layer !== currentMarker &&
-                layer !== cutAwayMarker &&
+                layer !== AppState.cutAwayMarker &&
                 layer !== liveMarker &&
                 layer !== harpMarker && // Skip harpMarker
                 layer.options.icon &&
@@ -4658,7 +4660,7 @@ function clearIsolineMarkers() {
                 markerCount++;
             } else if (layer === currentMarker) {
                 console.log('Skipping currentMarker:', layer, 'className:', layer.options?.icon?.options?.className || 'none');
-            } else if (layer === cutAwayMarker) {
+            } else if (layer === AppState.cutAwayMarker) {
                 console.log('Skipping cutAwayMarker:', layer, 'className:', layer.options?.icon?.options?.className || 'none');
             } else if (layer === liveMarker) {
                 console.log('Skipping liveMarker:', layer, 'className:', layer.options?.icon?.options?.className || 'none');
@@ -4673,12 +4675,12 @@ function clearIsolineMarkers() {
             }
         });
         console.log('Cleared', markerCount, 'isoline-label markers');
-        // Fallback: Remove only markers that are not currentMarker, cutAwayMarker, liveMarker, or harpMarker
+        // Fallback: Remove only markers that are not currentMarker, AppState.cutAwayMarker, liveMarker, or harpMarker
         if (markerCount === 0) {
             map.eachLayer(layer => {
                 if (layer instanceof L.Marker &&
                     layer !== currentMarker &&
-                    layer !== cutAwayMarker &&
+                    layer !== AppState.cutAwayMarker &&
                     layer !== liveMarker &&
                     layer !== harpMarker &&
                     (!layer.options.icon ||
@@ -5229,15 +5231,15 @@ function calculateCutAway() {
         calculateJump: Settings.state.userSettings.calculateJump,
         showCanopyArea: Settings.state.userSettings.showCanopyArea,
         showCutAwayFinder: Settings.state.userSettings.showCutAwayFinder,
-        cutAwayLat,
-        cutAwayLng,
-        cutAwayMarkerExists: !!cutAwayMarker,
-        cutAwayMarkerClassName: cutAwayMarker?.options?.icon?.options?.className || 'none',
-        cutAwayCircleExists: !!cutAwayCircle
+        cutAwayLat: AppState.cutAwayLat,
+        cutAwayLng: AppState.cutAwayLng,
+        cutAwayMarkerExists: !!AppState.cutAwayMarker,
+        cutAwayMarkerClassName: AppState.cutAwayMarker?.options?.icon?.options?.className || 'none',
+        cutAwayCircleExists: !!AppState.cutAwayCircle
     });
 
     // Silently skip if cut-away marker is not placed
-    if (cutAwayLat === null || cutAwayLng === null) {
+    if (AppState.cutAwayLat === null || AppState.cutAwayLng === null) {
         console.log('Skipping calculateCutAway: cutAwayLat or cutAwayLng is null');
         return;
     }
@@ -5337,9 +5339,9 @@ function calculateCutAway() {
 
     // Calculate landing positions
     const adjustedWindDirection = ((meanWindDirection + 180) % 360);
-    const [newLatMin, newLngMin] = calculateNewCenter(cutAwayLat, cutAwayLng, displacementDistanceMin, adjustedWindDirection);
-    const [newLatMean, newLngMean] = calculateNewCenter(cutAwayLat, cutAwayLng, displacementDistanceMean, adjustedWindDirection);
-    const [newLatMax, newLngMax] = calculateNewCenter(cutAwayLat, cutAwayLng, displacementDistanceMax, adjustedWindDirection);
+    const [newLatMin, newLngMin] = calculateNewCenter(AppState.cutAwayLat, AppState.cutAwayLng, displacementDistanceMin, adjustedWindDirection);
+    const [newLatMean, newLngMean] = calculateNewCenter(AppState.cutAwayLat, AppState.cutAwayLng, displacementDistanceMean, adjustedWindDirection);
+    const [newLatMax, newLngMax] = calculateNewCenter(AppState.cutAwayLat, AppState.cutAwayLng, displacementDistanceMax, adjustedWindDirection);
 
     // Log all calculations
     console.log('Cut-away canopy calculation:', {
@@ -5368,9 +5370,9 @@ function calculateCutAway() {
     });
 
     // Remove existing cut-away circle if present
-    if (cutAwayCircle) {
-        map.removeLayer(cutAwayCircle);
-        cutAwayCircle = null;
+    if (AppState.cutAwayCircle) {
+        map.removeLayer(AppState.cutAwayCircle);
+        AppState.cutAwayCircle = null;
         console.log('Cleared existing cut-away circle');
     }
 
@@ -5413,7 +5415,7 @@ function calculateCutAway() {
         `;
 
         // Add circle to map
-        cutAwayCircle = L.circle(center, {
+        AppState.cutAwayCircle = L.circle(center, {
             radius: radius,
             color: 'purple',
             fillColor: 'purple',
@@ -5422,7 +5424,7 @@ function calculateCutAway() {
         }).addTo(map);
 
         // Bind tooltip
-        cutAwayCircle.bindTooltip(tooltipContent, {
+        AppState.cutAwayCircle.bindTooltip(tooltipContent, {
             permanent: false,
             direction: 'center',
             className: 'cutaway-tooltip'
@@ -5430,8 +5432,8 @@ function calculateCutAway() {
         console.log('Added cut-away circle:', { center, radius, stateLabel });
     }
     console.log('calculateCutAway completed', {
-        cutAwayMarkerExists: !!cutAwayMarker,
-        cutAwayCircleExists: !!cutAwayCircle
+        cutAwayMarkerExists: !!AppState.cutAwayMarker,
+        cutAwayCircleExists: !!AppState.cutAwayCircle
     });
 }
 
@@ -5461,7 +5463,7 @@ function calculateLandingPatternCoords(lat, lng, interpolatedData, sliderIndex) 
         effectiveLandingWindDir = customLandingDirRR;
     } else {
         // Only use calculated wind direction if no valid custom direction exists
-        effectiveLandingWindDir = Number.isFinite(landingWindDir) ? landingWindDir : dirs[0];
+        effectiveLandingWindDir = Number.isFinite(AppState.landingWindDir) ? AppState.landingWindDir : dirs[0];
     }
 
     if (!Number.isFinite(effectiveLandingWindDir)) {
@@ -5526,29 +5528,29 @@ function updateLandingPattern() {
     if (!map || !Settings.state.userSettings.showLandingPattern || !weatherData || !lastLat || !lastLng || lastAltitude === null || lastAltitude === 'N/A') {
         console.log('Landing pattern not updated: missing data or feature disabled');
         // Clear existing layers
-        if (landingPatternPolygon) {
-            map.removeLayer(landingPatternPolygon);
-            landingPatternPolygon = null;
+        if (AppState.landingPatternPolygon) {
+            map.removeLayer(AppState.landingPatternPolygon);
+            AppState.landingPatternPolygon = null;
         }
-        if (secondlandingPatternPolygon) {
-            map.removeLayer(secondlandingPatternPolygon);
-            secondlandingPatternPolygon = null;
+        if (AppState.secondlandingPatternPolygon) {
+            map.removeLayer(AppState.secondlandingPatternPolygon);
+            AppState.secondlandingPatternPolygon = null;
         }
-        if (thirdLandingPatternLine) {
-            map.removeLayer(thirdLandingPatternLine);
-            thirdLandingPatternLine = null;
+        if (AppState.thirdLandingPatternLine) {
+            map.removeLayer(AppState.thirdLandingPatternLine);
+            AppState.thirdLandingPatternLine = null;
         }
-        if (finalArrow) {
-            map.removeLayer(finalArrow);
-            finalArrow = null;
+        if (AppState.finalArrow) {
+            map.removeLayer(AppState.finalArrow);
+            AppState.finalArrow = null;
         }
-        if (baseArrow) {
-            map.removeLayer(baseArrow);
-            baseArrow = null;
+        if (AppState.baseArrow) {
+            map.removeLayer(AppState.baseArrow);
+            AppState.baseArrow = null;
         }
-        if (downwindArrow) {
-            map.removeLayer(downwindArrow);
-            downwindArrow = null;
+        if (AppState.downwindArrow) {
+            map.removeLayer(AppState.downwindArrow);
+            AppState.downwindArrow = null;
         }
         return;
     }
@@ -5558,29 +5560,29 @@ function updateLandingPattern() {
     console.log('Landing pattern zoom check:', { currentZoom, landingPatternMinZoom, isVisible });
 
     // Clear existing layers to prevent duplicates
-    if (landingPatternPolygon) {
-        map.removeLayer(landingPatternPolygon);
-        landingPatternPolygon = null;
+    if (AppState.landingPatternPolygon) {
+        map.removeLayer(AppState.landingPatternPolygon);
+        AppState.landingPatternPolygon = null;
     }
-    if (secondlandingPatternPolygon) {
-        map.removeLayer(secondlandingPatternPolygon);
-        secondlandingPatternPolygon = null;
+    if (AppState.secondlandingPatternPolygon) {
+        map.removeLayer(AppState.secondlandingPatternPolygon);
+        AppState.secondlandingPatternPolygon = null;
     }
-    if (thirdLandingPatternLine) {
-        map.removeLayer(thirdLandingPatternLine);
-        thirdLandingPatternLine = null;
+    if (AppState.thirdLandingPatternLine) {
+        map.removeLayer(AppState.thirdLandingPatternLine);
+        AppState.thirdLandingPatternLine = null;
     }
-    if (finalArrow) {
-        map.removeLayer(finalArrow);
-        finalArrow = null;
+    if (AppState.finalArrow) {
+        map.removeLayer(AppState.finalArrow);
+        AppState.finalArrow = null;
     }
-    if (baseArrow) {
-        map.removeLayer(baseArrow);
-        baseArrow = null;
+    if (AppState.baseArrow) {
+        map.removeLayer(AppState.baseArrow);
+        AppState.baseArrow = null;
     }
-    if (downwindArrow) {
-        map.removeLayer(downwindArrow);
-        downwindArrow = null;
+    if (AppState.downwindArrow) {
+        map.removeLayer(AppState.downwindArrow);
+        AppState.downwindArrow = null;
     }
 
     if (!isVisible) {
@@ -5603,7 +5605,7 @@ function updateLandingPattern() {
     const LEG_HEIGHT_DOWNWIND = parseInt(document.getElementById('legHeightDownwind').value) || 300;
 
     // Remove existing layers
-    [landingPatternPolygon, secondlandingPatternPolygon, thirdLandingPatternLine, finalArrow, baseArrow, downwindArrow].forEach(layer => {
+    [AppState.landingPatternPolygon, AppState.secondlandingPatternPolygon, AppState.thirdLandingPatternLine, AppState.finalArrow, AppState.baseArrow, AppState.downwindArrow].forEach(layer => {
         if (layer) {
             layer.remove();
             layer = null;
@@ -5642,7 +5644,7 @@ function updateLandingPattern() {
     } else if (landingDirection === 'RR' && Number.isFinite(customLandingDirRR) && customLandingDirRR >= 0 && customLandingDirRR <= 359) {
         effectiveLandingWindDir = customLandingDirRR;
     } else {
-        effectiveLandingWindDir = Number.isFinite(landingWindDir) ? landingWindDir : dirs[0];
+        effectiveLandingWindDir = Number.isFinite(AppState.landingWindDir) ? AppState.landingWindDir : dirs[0];
     }
 
     if (!Number.isFinite(effectiveLandingWindDir)) {
@@ -5705,7 +5707,7 @@ function updateLandingPattern() {
     const finalBearing = (effectiveLandingWindDir + 180) % 360;
     const finalEnd = calculateLegEndpoint(lat, lng, finalBearing, finalGroundSpeedKt, finalTime);
 
-    landingPatternPolygon = L.polyline([[lat, lng], finalEnd], {
+    AppState.landingPatternPolygon = L.polyline([[lat, lng], finalEnd], {
         color: 'red',
         weight: 3,
         opacity: 0.8,
@@ -5717,10 +5719,10 @@ function updateLandingPattern() {
     const finalMidLng = (lng + finalEnd[1]) / 2;
     const finalArrowBearing = (finalWindDir - 90 + 180) % 360; // Points in direction of the mean wind at final
 
-    finalArrow = L.marker([finalMidLat, finalMidLng], {
+    AppState.finalArrow = L.marker([finalMidLat, finalMidLng], {
         icon: createArrowIcon(finalMidLat, finalMidLng, finalArrowBearing, finalArrowColor)
     }).addTo(map);
-    finalArrow.bindTooltip(`${Math.round(finalWindDir)}° ${formatWindSpeed(finalWindSpeedKt)}${getWindSpeedUnit()}`, {
+    AppState.finalArrow.bindTooltip(`${Math.round(finalWindDir)}° ${formatWindSpeed(finalWindSpeedKt)}${getWindSpeedUnit()}`, {
         offset: [10, 0], // Slight offset to avoid overlap
         direction: 'right',
         className: 'wind-tooltip'
@@ -5774,7 +5776,7 @@ function updateLandingPattern() {
 
     const baseEnd = calculateLegEndpoint(finalEnd[0], finalEnd[1], baseBearing, baseGroundSpeedKt, baseTime);
 
-    secondlandingPatternPolygon = L.polyline([finalEnd, baseEnd], {
+    AppState.secondlandingPatternPolygon = L.polyline([finalEnd, baseEnd], {
         color: 'red',
         weight: 3,
         opacity: 0.8,
@@ -5786,10 +5788,10 @@ function updateLandingPattern() {
     const baseMidLng = (finalEnd[1] + baseEnd[1]) / 2;
     const baseArrowBearing = (baseWindDir - 90 + 180) % 360; // Points in direction of the mean wind at base
 
-    baseArrow = L.marker([baseMidLat, baseMidLng], {
+    AppState.baseArrow = L.marker([baseMidLat, baseMidLng], {
         icon: createArrowIcon(baseMidLat, baseMidLng, baseArrowBearing, baseArrowColor)
     }).addTo(map);
-    baseArrow.bindTooltip(`${Math.round(baseWindDir)}° ${formatWindSpeed(baseWindSpeedKt)}${getWindSpeedUnit()}`, {
+    AppState.baseArrow.bindTooltip(`${Math.round(baseWindDir)}° ${formatWindSpeed(baseWindSpeedKt)}${getWindSpeedUnit()}`, {
         offset: [10, 0],
         direction: 'right',
         className: 'wind-tooltip'
@@ -5827,7 +5829,7 @@ function updateLandingPattern() {
     const downwindLength = downwindGroundSpeedKt * 1.852 / 3.6 * downwindTime;
     const downwindEnd = calculateLegEndpoint(baseEnd[0], baseEnd[1], downwindCourse, downwindGroundSpeedKt, downwindTime);
 
-    thirdLandingPatternLine = L.polyline([baseEnd, downwindEnd], {
+    AppState.thirdLandingPatternLine = L.polyline([baseEnd, downwindEnd], {
         color: 'red',
         weight: 3,
         opacity: 0.8,
@@ -5840,10 +5842,10 @@ function updateLandingPattern() {
     const downwindArrowBearing = (downwindWindDir - 90 + 180) % 360; // Points in direction of the mean wind at downwind
 
     // Create a custom arrow icon using Leaflet’s DivIcon
-    downwindArrow = L.marker([downwindMidLat, downwindMidLng], {
+    AppState.downwindArrow = L.marker([downwindMidLat, downwindMidLng], {
         icon: createArrowIcon(downwindMidLat, downwindMidLng, downwindArrowBearing, downwindArrowColor)
     }).addTo(map);
-    downwindArrow.bindTooltip(`${Math.round(downwindWindDir)}° ${formatWindSpeed(downwindWindSpeedKt)}${getWindSpeedUnit()}`, {
+    AppState.downwindArrow.bindTooltip(`${Math.round(downwindWindDir)}° ${formatWindSpeed(downwindWindSpeedKt)}${getWindSpeedUnit()}`, {
         offset: [10, 0],
         direction: 'right',
         className: 'wind-tooltip'
@@ -6275,10 +6277,10 @@ function setupModelSelectEvents() {
                 const wasOpen = currentMarker.getPopup()?.isOpen() || false;
                 await updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, wasOpen);
             }
-            if (cutAwayMarker && cutAwayLat && cutAwayLng) {
+            if (AppState.cutAwayMarker && AppState.cutAwayLat && AppState.cutAwayLng) {
                 console.log('Updating cut-away marker popup for model change');
-                const wasOpen = cutAwayMarker.getPopup()?.isOpen() || false;
-                updateCutAwayMarkerPopup(cutAwayMarker, cutAwayLat, cutAwayLng, wasOpen);
+                const wasOpen = AppState.cutAwayMarker.getPopup()?.isOpen() || false;
+                updateCutAwayMarkerPopup(AppState.cutAwayMarker, AppState.cutAwayLat, AppState.cutAwayLng, wasOpen);
             }
         } else {
             Utils.handleError('Please select a position on the map first.');
@@ -6478,16 +6480,16 @@ function setupRadioEvents() {
         console.log('landingDirection changed:', { landingDirection, customLL: customLL?.value, customRR: customRR?.value });
         if (customLL) {
             customLL.disabled = landingDirection !== 'LL';
-            if (landingDirection === 'LL' && !customLL.value && landingWindDir !== null) {
-                customLL.value = Math.round(landingWindDir);
+            if (landingDirection === 'LL' && !customLL.value && AppState.landingWindDir !== null) {
+                customLL.value = Math.round(AppState.landingWindDir);
                 Settings.state.userSettings.customLandingDirectionLL = parseInt(customLL.value);
                 Settings.save();
             }
         }
         if (customRR) {
             customRR.disabled = landingDirection !== 'RR';
-            if (landingDirection === 'RR' && !customRR.value && landingWindDir !== null) {
-                customRR.value = Math.round(landingWindDir);
+            if (landingDirection === 'RR' && !customRR.value && AppState.landingWindDir !== null) {
+                customRR.value = Math.round(AppState.landingWindDir);
                 Settings.state.userSettings.customLandingDirectionRR = parseInt(customRR.value);
                 Settings.save();
             }
@@ -6808,7 +6810,7 @@ function setupInputEvents() {
         if (!isNaN(value) && value >= 400 && value <= 15000) {
             Settings.state.userSettings.cutAwayAltitude = value;
             Settings.save();
-            if (Settings.state.userSettings.showCutAwayFinder && Settings.state.userSettings.calculateJump && weatherData && cutAwayLat !== null && cutAwayLng !== null) {
+            if (Settings.state.userSettings.showCutAwayFinder && Settings.state.userSettings.calculateJump && weatherData && cutAwayLat !== null && AppState.cutAwayLng !== null) {
                 console.log('Recalculating jump for cut-away altitude change');
                 debouncedCalculateJump(); // Use debounced version
                 calculateCutAway();
@@ -6965,30 +6967,30 @@ function setupCheckboxEvents() {
         const submenu = checkbox.closest('li')?.querySelector('ul');
         console.log('Submenu lookup for showCutAwayFinder:', { submenu: submenu ? 'Found' : 'Not found', submenuClasses: submenu?.classList.toString() });
         toggleSubmenu(checkbox, submenu, checkbox.checked);
-        if (checkbox.checked && weatherData && cutAwayLat !== null && cutAwayLng !== null && isCalculateJumpUnlocked && Settings.state.userSettings.calculateJump) {
+        if (checkbox.checked && weatherData && AppState.cutAwayLat !== null && AppState.cutAwayLng !== null && isCalculateJumpUnlocked && Settings.state.userSettings.calculateJump) {
             console.log('Show Cut Away Finder enabled, running calculateCutAway');
             calculateCutAway();
         } else {
-            if (cutAwayCircle) {
+            if (AppState.cutAwayCircle) {
                 if (map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(cutAwayCircle);
+                    map.removeLayer(AppState.cutAwayCircle);
                 } else {
                     console.warn('Map not initialized, cannot remove cutAwayCircle');
                 }
-                cutAwayCircle = null;
+                AppState.cutAwayCircle = null;
                 console.log('Cleared cut-away circle');
             }
-            if (cutAwayMarker) {
+            if (AppState.cutAwayMarker) {
                 if (map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(cutAwayMarker);
+                    map.removeLayer(AppState.cutAwayMarker);
                 } else {
                     console.warn('Map not initialized, cannot remove cutAwayMarker');
                 }
-                cutAwayMarker = null;
+                AppState.cutAwayMarker = null;
                 console.log('Cleared cut-away marker');
             }
-            cutAwayLat = null;
-            cutAwayLng = null;
+            AppState.cutAwayLat = null;
+            AppState.cutAwayLng = null;
             console.log('Cleared cutAwayLat and cutAwayLng');
         }
     });
@@ -7015,41 +7017,41 @@ function setupCheckboxEvents() {
             console.log('Submenu lookup for showLandingPattern:', { submenu: submenu ? 'Found' : 'Not found', submenuClasses: submenu?.classList.toString() });
             toggleSubmenu(checkbox, submenu, false);
             console.log('Clearing landing pattern');
-            if (landingPatternPolygon) {
+            if (AppState.landingPatternPolygon) {
                 if (map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(landingPatternPolygon);
+                    map.removeLayer(AppState.landingPatternPolygon);
                 }
-                landingPatternPolygon = null;
+                AppState.landingPatternPolygon = null;
             }
-            if (secondlandingPatternPolygon) {
+            if (AppState.secondlandingPatternPolygon) {
                 if (map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(secondlandingPatternPolygon);
+                    map.removeLayer(AppState.secondlandingPatternPolygon);
                 }
-                secondlandingPatternPolygon = null;
+                AppState.secondlandingPatternPolygon = null;
             }
-            if (thirdLandingPatternLine) {
+            if (AppState.thirdLandingPatternLine) {
                 if (map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(thirdLandingPatternLine);
+                    map.removeLayer(AppState.thirdLandingPatternLine);
                 }
-                thirdLandingPatternLine = null;
+                AppState.thirdLandingPatternLine = null;
             }
-            if (finalArrow) {
+            if (AppState.finalArrow) {
                 if (map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(finalArrow);
+                    map.removeLayer(AppState.finalArrow);
                 }
-                finalArrow = null;
+                AppState.finalArrow = null;
             }
-            if (baseArrow) {
+            if (AppState.baseArrow) {
                 if (map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(baseArrow);
+                    map.removeLayer(AppState.baseArrow);
                 }
-                baseArrow = null;
+                AppState.baseArrow = null;
             }
-            if (downwindArrow) {
+            if (AppState.downwindArrow) {
                 if (map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(downwindArrow);
+                    map.removeLayer(AppState.downwindArrow);
                 }
-                downwindArrow = null;
+                AppState.downwindArrow = null;
             }
         };
 
@@ -7537,15 +7539,15 @@ function setupResetCutAwayMarkerButton() {
     const resetButton = document.getElementById('resetCutAwayMarker');
     if (resetButton) {
         resetButton.addEventListener('click', () => {
-            if (cutAwayMarker) {
-                map.removeLayer(cutAwayMarker);
-                cutAwayMarker = null;
-                cutAwayLat = null;
-                cutAwayLng = null;
+            if (AppState.cutAwayMarker) {
+                map.removeLayer(AppState.cutAwayMarker);
+                AppState.cutAwayMarker = null;
+                AppState.cutAwayLat = null;
+                AppState.cutAwayLng = null;
                 console.log('Cut-away marker reset');
-                if (cutAwayCircle) {
-                    map.removeLayer(cutAwayCircle);
-                    cutAwayCircle = null;
+                if (AppState.cutAwayCircle) {
+                    map.removeLayer(AppState.cutAwayCircle);
+                    AppState.cutAwayCircle = null;
                     console.log('Cleared cut-away circle');
                 }
                 document.getElementById('info').innerHTML = 'Right-click map to place cut-away marker';
@@ -7885,9 +7887,8 @@ function setupRadioGroup(name, callback) {
             const newValue = Settings.getValue(name, 'radio', Settings.defaultSettings[name]);
             Settings.state.userSettings[name] = newValue;
             Settings.save();
-            console.log(`${name} changed to: ${newValue}`);
+            console.log(`${name} changed to: ${newValue} and saved to localStorage`);
 
-            // Only for landingDirection, handle custom inputs
             if (name === 'landingDirection') {
                 const customLL = document.getElementById('customLandingDirectionLL');
                 const customRR = document.getElementById('customLandingDirectionRR');
@@ -7896,17 +7897,17 @@ function setupRadioGroup(name, callback) {
                 if (customLL) customLL.disabled = landingDirection !== 'LL';
                 if (customRR) customRR.disabled = landingDirection !== 'RR';
 
-                // Do NOT overwrite custom direction with calculated value here
-                // Only set it if the field is empty AND no stored value exists
                 if (landingDirection === 'LL' && customLL && !customLL.value && Settings.state.userSettings.customLandingDirectionLL === '') {
-                    customLL.value = Math.round(landingWindDir || 0);
+                    customLL.value = Math.round(AppState.landingWindDir || 0);
                     Settings.state.userSettings.customLandingDirectionLL = parseInt(customLL.value);
                     Settings.save();
+                    console.log(`Set customLandingDirectionLL to ${customLL.value}`);
                 }
                 if (landingDirection === 'RR' && customRR && !customRR.value && Settings.state.userSettings.customLandingDirectionRR === '') {
-                    customRR.value = Math.round(landingWindDir || 0);
+                    customRR.value = Math.round(AppState.landingWindDir || 0);
                     Settings.state.userSettings.customLandingDirectionRR = parseInt(customRR.value);
                     Settings.save();
+                    console.log(`Set customLandingDirectionRR to ${customRR.value}`);
                 }
             }
             callback();
@@ -7915,12 +7916,15 @@ function setupRadioGroup(name, callback) {
 }
 function setupInput(id, eventType, debounceTime, callback) {
     const input = document.getElementById(id);
-    if (!input) return;
+    if (!input) {
+        console.warn(`Input element ${id} not found`);
+        return;
+    }
     input.addEventListener(eventType, debounce(() => {
         const value = input.type === 'number' ? parseFloat(input.value) : input.value;
-        userSettings[id] = value;
+        Settings.state.userSettings[id] = value;
         Settings.save();
-        console.log(`${id} changed to:`, value);
+        console.log(`${id} changed to: ${value} and saved to localStorage`);
         callback(value);
     }, debounceTime));
 }
@@ -7941,28 +7945,40 @@ function validateLegHeights(final, base, downwind) {
 }
 function setupLegHeightInput(id, defaultValue) {
     const input = document.getElementById(id);
-    if (!input) return;
+    if (!input) {
+        console.warn(`Input element ${id} not found`);
+        return;
+    }
     input.addEventListener('blur', () => {
         const value = parseInt(input.value) || defaultValue;
-        userSettings[id] = value;
+        console.log(`Attempting to update ${id} to ${value}`);
+        Settings.state.userSettings[id] = value;
         Settings.save();
+
         const finalInput = document.getElementById('legHeightFinal');
         const baseInput = document.getElementById('legHeightBase');
         const downwindInput = document.getElementById('legHeightDownwind');
+
         if (!isNaN(value) && value >= 50 && value <= 1000 && validateLegHeights(finalInput, baseInput, downwindInput)) {
+            console.log(`Valid ${id}: ${value}, updating displays`);
             updateAllDisplays();
-            weatherData && lastLat && lastLng && id === 'legHeightDownwind' && Settings.state.userSettings.calculateJump && debouncedCalculateJump(); // Use debounced version
+            if (AppState.weatherData && AppState.lastLat && AppState.lastLng && id === 'legHeightDownwind' && Settings.state.userSettings.calculateJump) {
+                debouncedCalculateJump();
+            }
         } else {
             let adjustedValue = defaultValue;
             const finalVal = parseInt(finalInput?.value) || 100;
             const baseVal = parseInt(baseInput?.value) || 200;
             const downwindVal = parseInt(downwindInput?.value) || 300;
+
             if (id === 'legHeightFinal') adjustedValue = Math.min(baseVal - 1, 100);
             if (id === 'legHeightBase') adjustedValue = Math.max(finalVal + 1, Math.min(downwindVal - 1, 200));
             if (id === 'legHeightDownwind') adjustedValue = Math.max(baseVal + 1, 300);
+
             input.value = adjustedValue;
-            userSettings[id] = adjustedValue;
+            Settings.state.userSettings[id] = adjustedValue;
             Settings.save();
+            console.log(`Adjusted ${id} to ${adjustedValue} due to invalid input`);
             Utils.handleError(`Adjusted ${id} to ${adjustedValue} to maintain valid leg order.`);
         }
     });
