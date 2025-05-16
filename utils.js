@@ -1,4 +1,6 @@
-class Utils {
+//import { displayError } from './app.js';
+
+export class Utils {
     // Format ISO time string to UTC (e.g., "2025-03-15T00:00Z" -> "2025-03-15 0000Z")
     static formatTime(timeStr) {
         if (!window.luxon) return timeStr; // Fallback
@@ -212,49 +214,58 @@ class Utils {
 
     // Calculate mean wind over a height layer (renamed from Mittelwind for clarity)
     static calculateMeanWind(heights, xComponents, yComponents, lowerLimit, upperLimit) {
-        const dddff = new Array(4);
-        let hLayer = [upperLimit];
-        let xLayer = [Number(Utils.LIP(heights, xComponents, upperLimit))];
-        let yLayer = [Number(Utils.LIP(heights, yComponents, upperLimit))];
-
-        const xLower = Number(Utils.LIP(heights, xComponents, lowerLimit));
-        const yLower = Number(Utils.LIP(heights, yComponents, lowerLimit));
-
-        for (let i = 0; i < heights.length; i++) {
-            if (heights[i] < upperLimit && heights[i] > lowerLimit) {
-                hLayer.push(heights[i]);
-                xLayer.push(xComponents[i]);
-                yLayer.push(yComponents[i]);
+        try {
+            if (!heights || !xComponents || !yComponents || heights.length < 2) {
+                throw new Error('Invalid input data for calculateMeanWind');
             }
+            const dddff = new Array(4);
+            let hLayer = [upperLimit];
+            let xLayer = [Number(Utils.LIP(heights, xComponents, upperLimit))];
+            let yLayer = [Number(Utils.LIP(heights, yComponents, upperLimit))];
+
+            const xLower = Number(Utils.LIP(heights, xComponents, lowerLimit));
+            const yLower = Number(Utils.LIP(heights, yComponents, lowerLimit));
+
+            for (let i = 0; i < heights.length; i++) {
+                if (heights[i] < upperLimit && heights[i] > lowerLimit) {
+                    hLayer.push(heights[i]);
+                    xLayer.push(xComponents[i]);
+                    yLayer.push(yComponents[i]);
+                }
+            }
+
+            hLayer.push(lowerLimit);
+            xLayer.push(xLower);
+            yLayer.push(yLower);
+
+            // Sort arrays in descending order of height
+            const indices = hLayer.map((_, idx) => idx);
+            indices.sort((a, b) => hLayer[b] - hLayer[a]);
+            hLayer = indices.map(i => hLayer[i]);
+            xLayer = indices.map(i => xLayer[i]);
+            yLayer = indices.map(i => yLayer[i]);
+
+            let xTrapez = 0;
+            let yTrapez = 0;
+            for (let i = 0; i < hLayer.length - 1; i++) {
+                xTrapez += 0.5 * (xLayer[i] + xLayer[i + 1]) * (hLayer[i] - hLayer[i + 1]);
+                yTrapez += 0.5 * (yLayer[i] + yLayer[i + 1]) * (hLayer[i] - hLayer[i + 1]);
+            }
+
+            const xMean = xTrapez / (hLayer[0] - hLayer[hLayer.length - 1]);
+            const yMean = yTrapez / (hLayer[0] - hLayer[hLayer.length - 1]);
+
+            dddff[2] = xMean; // u component
+            dddff[3] = yMean; // v component
+            dddff[1] = Utils.windSpeed(xMean, yMean); // Speed
+            dddff[0] = Utils.windDirection(xMean, yMean); // Direction
+
+            return dddff;
+        } catch (error) {
+            console.error('Error in calculateMeanWind:', error, { heights, xComponents, yComponents, lowerLimit, upperLimit });
+            Utils.handleError('Failed to calculate mean wind: ' + error.message);
+            return null;
         }
-
-        hLayer.push(lowerLimit);
-        xLayer.push(xLower);
-        yLayer.push(yLower);
-
-        // Sort arrays in descending order of height
-        const indices = hLayer.map((_, idx) => idx);
-        indices.sort((a, b) => hLayer[b] - hLayer[a]);
-        hLayer = indices.map(i => hLayer[i]);
-        xLayer = indices.map(i => xLayer[i]);
-        yLayer = indices.map(i => yLayer[i]);
-
-        let xTrapez = 0;
-        let yTrapez = 0;
-        for (let i = 0; i < hLayer.length - 1; i++) {
-            xTrapez += 0.5 * (xLayer[i] + xLayer[i + 1]) * (hLayer[i] - hLayer[i + 1]);
-            yTrapez += 0.5 * (yLayer[i] + yLayer[i + 1]) * (hLayer[i] - hLayer[i + 1]);
-        }
-
-        const xMean = xTrapez / (hLayer[0] - hLayer[hLayer.length - 1]);
-        const yMean = yTrapez / (hLayer[0] - hLayer[hLayer.length - 1]);
-
-        dddff[2] = xMean; // u component
-        dddff[3] = yMean; // v component
-        dddff[1] = Utils.windSpeed(xMean, yMean); // Speed
-        dddff[0] = Utils.windDirection(xMean, yMean); // Direction
-
-        return dddff;
     }
 
     // Cache for time zones and elevations
@@ -400,7 +411,12 @@ class Utils {
 
     static handleError(message, log = true) {
         if (log) console.error(message);
-        displayError(message);
+        if (typeof displayError === 'function') {
+            displayError(message);
+        } else {
+            console.warn('displayError not available, logging to console');
+            console.error('Error message:', message);
+        }
     }
 
     static dmsToDecimal(degrees, minutes, seconds, direction) {
@@ -484,24 +500,24 @@ class Utils {
             console.warn('Invalid inputs for calculateTAS:', { ias, heightFt });
             return 'N/A';
         }
-    
+
         const seaLevelDensity = 1.225;
         const lapseRate = 0.0065;
         const seaLevelTemp = 288.15;
         const gravity = 9.80665;
         const gasConstant = 287.05;
         const metersPerFoot = 0.3048;
-    
+
         const heightM = heightFt * metersPerFoot;
         const tempAtAltitude = seaLevelTemp - lapseRate * heightM;
         const tempRatio = tempAtAltitude / seaLevelTemp;
-    
+
         // Simplified density ratio: (1 - L*h/T0)^(g/(L*R) - 1)
         const base = 1 - (lapseRate * heightM) / seaLevelTemp;
         const exponent = (gravity / (lapseRate * gasConstant)) - 1;
         const densityRatio = Math.pow(base, exponent);
         const tas = ias / Math.sqrt(densityRatio);
-    
+
         console.log('calculateTAS debug:', {
             ias,
             heightFt,
@@ -514,10 +530,10 @@ class Utils {
             tas,
             tasRounded: Number(tas.toFixed(2))
         });
-    
+
         return Number(tas.toFixed(2));
     }
-    
+
     static calculateTASFromGroundSpeed(groundSpeed, windSpeed, windDirection, trueCourse, heightFt) {
         if (isNaN(groundSpeed) || isNaN(windSpeed) || isNaN(windDirection) || isNaN(trueCourse)) {
             return 'N/A';

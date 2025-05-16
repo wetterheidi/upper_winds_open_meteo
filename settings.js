@@ -1,5 +1,5 @@
 // === Settings Module ===
-const Settings = {
+export const Settings = {
     // Constants
     FEATURE_PASSWORD: 'skydiver2025',
 
@@ -79,8 +79,27 @@ const Settings = {
             this.handleError(error, 'Failed to load settings. Using defaults.');
         }
     
+        // Load unlocked features from localStorage
+        try {
+            const featuresRaw = localStorage.getItem('unlockedFeatures');
+            if (featuresRaw) {
+                storedUnlockedFeatures = JSON.parse(featuresRaw);
+                console.log('Loaded unlocked features from localStorage:', storedUnlockedFeatures);
+            } else {
+                console.log('No unlocked features found in localStorage, using defaults');
+            }
+        } catch (error) {
+            this.handleError(error, 'Failed to load unlocked features. Using defaults.');
+        }
+    
         // Merge stored settings with defaults
         this.state.userSettings = { ...this.defaultSettings, ...storedSettings };
+    
+        // Update unlocked features
+        this.state.unlockedFeatures = {
+            landingPattern: storedUnlockedFeatures.landingPattern || false,
+            calculateJump: storedUnlockedFeatures.calculateJump || false
+        };
     
         // Validate baseMaps
         const validBaseMaps = ['OpenStreetMap', 'OpenTopoMap', 'Esri Satellite', 'Esri Street', 'Esri Topo', 'Esri Satellite + OSM'];
@@ -88,8 +107,6 @@ const Settings = {
             console.warn(`Invalid baseMaps setting: ${this.state.userSettings.baseMaps}, resetting to default`);
             this.state.userSettings.baseMaps = this.defaultSettings.baseMaps;
         }
-    
-        // ... (rest of the initialize function)
     },
 
     /**
@@ -100,13 +117,20 @@ const Settings = {
         try {
             // Validate serializability
             const settingsString = JSON.stringify(this.state.userSettings);
-            const featuresString = JSON.stringify(this.state.unlockedFeatures);
             localStorage.setItem('upperWindsSettings', settingsString);
-            localStorage.setItem('unlockedFeatures', featuresString);
             console.log('Settings saved to localStorage:', JSON.parse(settingsString));
-            console.log('Unlocked features saved:', JSON.parse(featuresString));
         } catch (error) {
             this.handleError(error, 'Failed to save settings to localStorage.');
+        }
+    },
+    
+    saveUnlockedFeatures() {
+        try {
+            const featuresString = JSON.stringify(this.state.unlockedFeatures);
+            localStorage.setItem('unlockedFeatures', featuresString);
+            console.log('Unlocked features saved:', JSON.parse(featuresString));
+        } catch (error) {
+            this.handleError(error, 'Failed to save unlocked features to localStorage.');
         }
     },
 
@@ -255,9 +279,21 @@ const Settings = {
      * @param {number} kt - Speed in knots.
      * @returns {number} Beaufort scale value.
      */
-    ktToBeaufort(kt) {
+    ktToBeaufort(knots) {
         // Implement Beaufort conversion logic
-        return Math.round(kt / 5); // Placeholder
+        if (knots < 1) return 0;
+        if (knots <= 3) return 1;
+        if (knots <= 6) return 2;
+        if (knots <= 10) return 3;
+        if (knots <= 16) return 4;
+        if (knots <= 21) return 5;
+        if (knots <= 27) return 6;
+        if (knots <= 33) return 7;
+        if (knots <= 40) return 8;
+        if (knots <= 47) return 9;
+        if (knots <= 55) return 10;
+        if (knots <= 63) return 11;
+        return 12;
     },
 
     /**

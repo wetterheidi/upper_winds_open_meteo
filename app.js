@@ -1,8 +1,9 @@
 // == Project: Skydiving Weather and Jump Planner ==
 // == Constants and Global Variables ==
+import { Settings } from './settings.js';
+import { Utils } from './utils.js';
 
 let isInitialized = false;
-Settings.initialize();
 let userSettings;
 try {
     const storedSettings = localStorage.getItem('upperWindsSettings');
@@ -6018,6 +6019,12 @@ function populateCoordInputs(lat, lng) {
 
 // == UI and Event Handling ==
 function initializeApp() {
+    Settings.initialize();
+    // Synchronize global variables with Settings.state.unlockedFeatures
+    isLandingPatternUnlocked = Settings.state.unlockedFeatures.landingPattern;
+    isCalculateJumpUnlocked = Settings.state.unlockedFeatures.calculateJump;
+    console.log('Initial unlock status:', { isLandingPatternUnlocked, isCalculateJumpUnlocked });
+
     if (isInitialized) {
         console.log('App already initialized, skipping');
         return;
@@ -7591,13 +7598,14 @@ function displayError(message) {
     }, 3000);
 }
 function saveUnlockStatus() {
-    const unlockStatus = {
-        landingPattern: isLandingPatternUnlocked,
-        calculateJump: isCalculateJumpUnlocked
-    };
     try {
-        localStorage.setItem('unlockedFeatures', JSON.stringify(unlockStatus));
-        console.log('Saved unlock status:', unlockStatus);
+        Settings.state.unlockedFeatures.landingPattern = isLandingPatternUnlocked;
+        Settings.state.unlockedFeatures.calculateJump = isCalculateJumpUnlocked;
+        Settings.saveUnlockedFeatures();
+        console.log('Saved unlock status:', {
+            landingPattern: isLandingPatternUnlocked,
+            calculateJump: isCalculateJumpUnlocked
+        });
     } catch (error) {
         Utils.handleError('Failed to save unlock status.');
     }
@@ -7648,7 +7656,6 @@ function showPasswordModal(feature, onSuccess, onCancel) {
                 }
             }
             saveUnlockStatus();
-            Settings.save();
             console.log('Feature unlocked and saved:', feature, { isLandingPatternUnlocked, isCalculateJumpUnlocked, unlockedFeatures: Settings.state.unlockedFeatures });
             onSuccess();
         } else {
@@ -7994,6 +8001,7 @@ async function updateAllDisplays() {
 
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize settings and UI
+    initializeApp();
     Settings.initialize();
     initializeUIElements();
     initializeMap();
