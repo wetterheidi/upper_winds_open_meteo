@@ -163,6 +163,9 @@ export class Utils {
 
     // Linear interpolation (LIP)
     static LIP(xVector, yVector, xValue) {
+        if (!xVector?.length || !yVector?.length || xVector.length !== yVector.length) {
+            return "invalid input for LIP";
+        }
         let reversed = false;
         if (xVector[1] > xVector[0]) {
             yVector = [...yVector].reverse();

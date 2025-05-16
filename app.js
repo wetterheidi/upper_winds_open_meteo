@@ -3,7 +3,6 @@
 import { Settings } from './settings.js';
 import { Utils } from './utils.js';
 
-let isInitialized = false;
 let userSettings;
 try {
     const storedSettings = localStorage.getItem('upperWindsSettings');
@@ -12,9 +11,15 @@ try {
     console.error('Failed to parse upperWindsSettings from localStorage:', error);
     userSettings = { ...Settings.defaultSettings };
 }
+
+const AppState = {
+    isInitialized: false,
+    coordsControl: null,
+    lastMouseLatLng: null,
+    lastSmoothedSpeedMs: 0
+};
+
 let map;
-let coordsControl;
-let lastMouseLatLng;
 let baseMaps = {};
 let lastLat = null;
 let lastLng = null;
@@ -66,8 +71,6 @@ let lastSpeed = 'N/A';
 let lastEffectiveWindUnit = 'kt';
 let lastDirection = 'N/A';
 let lastTerrainAltitude = 'N/A';
-let lastSmoothedSpeedMs = 0; // Store last smoothed speed for EMA
-
 
 
 const minZoom = 11;
@@ -1521,9 +1524,9 @@ function initMap() {
     // Initialize offline indicator
     updateOfflineIndicator();
 
-    coordsControl = new L.Control.Coordinates();
-    coordsControl.addTo(map);
-    console.log('coordsControl initialized:', coordsControl);
+    AppState.coordsControl = new L.Control.Coordinates();
+    AppState.coordsControl.addTo(map);
+    console.log('coordsControl initialized:', AppState.coordsControl);
 
     const elevationCache = new Map();
 
@@ -1545,14 +1548,12 @@ function initMap() {
         }
     }, 500);
 
-    let lastMouseLatLng = null;
-
     map.on('mousemove', function(e) {
         //console.log('Map mousemove fired:', { lat: e.latlng.lat, lng: e.latlng.lng });
         const coordFormat = getCoordinateFormat();
         const lat = e.latlng.lat;
         const lng = e.latlng.lng;
-        lastMouseLatLng = { lat, lng };
+        AppState.lastMouseLatLng = { lat, lng };
 
         let coordText;
         if (coordFormat === 'MGRS') {
@@ -1566,12 +1567,12 @@ function initMap() {
             coordText = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
         }
 
-        coordsControl.update(`${coordText}<br>Elevation: Fetching...`);
+        AppState.coordsControl.update(`${coordText}<br>Elevation: Fetching...`);
 
         debouncedGetElevation(lat, lng, { lat, lng }, (elevation, requestLatLng) => {
-            if (lastMouseLatLng) {
-                const deltaLat = Math.abs(lastMouseLatLng.lat - requestLatLng.lat);
-                const deltaLng = Math.abs(lastMouseLatLng.lng - requestLatLng.lng);
+            if (AppState.lastMouseLatLng) {
+                const deltaLat = Math.abs(AppState.lastMouseLatLng.lat - requestLatLng.lat);
+                const deltaLng = Math.abs(AppState.lastMouseLatLng.lng - requestLatLng.lng);
                 const threshold = 0.05;
                 if (deltaLat < threshold && deltaLng < threshold) {
                     const heightUnit = getHeightUnit();
@@ -1581,13 +1582,13 @@ function initMap() {
                         displayElevation = Math.round(displayElevation);
                     }
                     console.log('Updating elevation display:', { lat: requestLatLng.lat, lng: requestLatLng.lng, elevation, heightUnit, displayElevation });
-                    coordsControl.update(`${coordText}<br>Elevation: ${displayElevation} ${displayElevation === 'N/A' ? '' : heightUnit}`);
+                    AppState.coordsControl.update(`${coordText}<br>Elevation: ${displayElevation} ${displayElevation === 'N/A' ? '' : heightUnit}`);
                 } else {
                     console.log('Discarded elevation update: mouse moved too far', {
                         requestLat: requestLatLng.lat,
                         requestLng: requestLatLng.lng,
-                        currentLat: lastMouseLatLng.lat,
-                        currentLng: lastMouseLatLng.lng
+                        currentLat: AppState.lastMouseLatLng.lat,
+                        currentLng: AppState.lastMouseLatLng.lng
                     });
                 }
             } else {
@@ -1605,7 +1606,7 @@ function initMap() {
     });
 
     map.on('mouseout', function () {
-        coordsControl.getContainer().innerHTML = 'Move mouse over map';
+        AppState.coordsControl.getContainer().innerHTML = 'Move mouse over map';
     });
 
     map.on('contextmenu', (e) => {
@@ -1777,14 +1778,14 @@ function initMap() {
     initializeApp();
 }
 function reinitializeCoordsControl() {
-    console.log('Before reinitialize - coordsControl:', coordsControl);
-    if (coordsControl) {
-        coordsControl.remove();
+    console.log('Before reinitialize - coordsControl:', AppState.coordsControl);
+    if (AppState.coordsControl) {
+        AppState.coordsControl.remove();
         console.log('Removed existing coordsControl');
     }
-    coordsControl = new L.Control.Coordinates();
-    coordsControl.addTo(map);
-    console.log('After reinitialize - coordsControl:', coordsControl);
+    AppState.coordsControl = new L.Control.Coordinates();
+    AppState.coordsControl.addTo(map);
+    console.log('After reinitialize - coordsControl:', AppState.coordsControl);
 }
 function handleHarpPlacement(e) {
     if (!isPlacingHarp) return;
@@ -2308,15 +2309,15 @@ const debouncedPositionUpdate = debounce(async (position) => {
             speedMs = distance / timeDiff; // Speed in meters/second
             // Apply EMA smoothing with dynamic alpha
             const alpha = speedMs < 25 ? 0.5 : 0.2; // Responsive at low speeds, stable at high speeds
-            lastSmoothedSpeedMs = alpha * speedMs + (1 - alpha) * lastSmoothedSpeedMs;
-            speed = Utils.convertWind(lastSmoothedSpeedMs, effectiveWindUnit, 'm/s');
+            AppState.lastSmoothedSpeedMsbaseMaps = alpha * speedMs + (1 - alpha) * AppState.lastSmoothedSpeedMsbaseMaps;
+            speed = Utils.convertWind(AppState.lastSmoothedSpeedMsbaseMaps, effectiveWindUnit, 'm/s');
             speed = effectiveWindUnit === 'bft' ? Math.round(speed) : speed.toFixed(1);
             direction = calculateBearing(prevLat, prevLng, latitude, longitude).toFixed(0);
             //Direction smoothing (optional)
             /*let lastSmoothedDirection = 0; // Global variable
             direction = alpha * calculateBearing(...) + (1 - alpha) * lastSmoothedDirection;
             lastSmoothedDirection = direction;*/
-            console.log('Calculated speed:', { rawSpeedMs: speedMs, smoothedSpeedMs: lastSmoothedSpeedMs, convertedSpeed: speed, unit: effectiveWindUnit, alpha });
+            console.log('Calculated speed:', { rawSpeedMs: speedMs, smoothedSpeedMs: AppState.lastSmoothedSpeedMsbaseMaps, convertedSpeed: speed, unit: effectiveWindUnit, alpha });
         }
     }
 
@@ -2371,12 +2372,12 @@ const debouncedPositionUpdate = debounce(async (position) => {
                 const roundedDistance = Math.round(convertedDistance);
 
                 let totDisplay = 'N/A';
-                if (lastSmoothedSpeedMs > 0) {
-                    const totSeconds = distanceMeters / lastSmoothedSpeedMs;
+                if (AppState.lastSmoothedSpeedMsbaseMaps > 0) {
+                    const totSeconds = distanceMeters / AppState.lastSmoothedSpeedMsbaseMaps;
                     totDisplay = Math.round(totSeconds);
-                    console.log('Calculated TOT:', { distanceMeters, smoothedSpeedMs: lastSmoothedSpeedMs, totSeconds, totDisplay });
+                    console.log('Calculated TOT:', { distanceMeters, smoothedSpeedMs: AppState.lastSmoothedSpeedMsbaseMaps, totSeconds, totDisplay });
                 } else {
-                    console.log('TOT set to N/A: invalid or zero speed', { smoothedSpeedMs: lastSmoothedSpeedMs });
+                    console.log('TOT set to N/A: invalid or zero speed', { smoothedSpeedMs: AppState.lastSmoothedSpeedMsbaseMaps });
                 }
 
                 jumpMasterLineData = {
@@ -6025,11 +6026,11 @@ function initializeApp() {
     isCalculateJumpUnlocked = Settings.state.unlockedFeatures.calculateJump;
     console.log('Initial unlock status:', { isLandingPatternUnlocked, isCalculateJumpUnlocked });
 
-    if (isInitialized) {
+    if (AppState.isInitialized) {
         console.log('App already initialized, skipping');
         return;
     }
-    isInitialized = true;
+    AppState.isInitialized = true;
     console.log('Initializing app');
 
     console.log('Initial userSettings:', userSettings);
@@ -6371,10 +6372,10 @@ function setupRadioEvents() {
     setupRadioGroup('heightUnit', () => {
         Settings.updateUnitLabels();
         updateAllDisplays();
-        if (lastMouseLatLng && coordsControl) {
+        if (AppState.lastMouseLatLng && AppState.coordsControl) {
             const coordFormat = getCoordinateFormat();
-            const lat = lastMouseLatLng.lat;
-            const lng = lastMouseLatLng.lng;
+            const lat = AppState.lastMouseLatLng.lat;
+            const lng = AppState.lastMouseLatLng.lng;
             let coordText;
             if (coordFormat === 'MGRS') {
                 const mgrs = Utils.decimalToMgrs(lat, lng);
@@ -6383,9 +6384,9 @@ function setupRadioEvents() {
                 coordText = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
             }
             debouncedGetElevation(lat, lng, { lat, lng }, (elevation, requestLatLng) => {
-                if (lastMouseLatLng) {
-                    const deltaLat = Math.abs(lastMouseLatLng.lat - requestLatLng.lat);
-                    const deltaLng = Math.abs(lastMouseLatLng.lng - requestLatLng.lng);
+                if (AppState.lastMouseLatLng) {
+                    const deltaLat = Math.abs(AppState.lastMouseLatLng.lat - requestLatLng.lat);
+                    const deltaLng = Math.abs(AppState.lastMouseLatLng.lng - requestLatLng.lng);
                     const threshold = 0.05;
                     if (deltaLat < threshold && deltaLng < threshold) {
                         const heightUnit = getHeightUnit();
