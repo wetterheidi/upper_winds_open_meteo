@@ -223,18 +223,18 @@ export const Settings = {
         const modelLabel = document.getElementById('modelLabel');
         const modelSelect = document.getElementById('modelSelect');
         if (!modelLabel || !modelSelect) {
-            console.warn('Model run info elements missing:', { modelLabel, modelSelect });
+            console.warn('Model run info elements missing:', { modelLabel, modelSelect, lastModelRun, lastLat, lastLng });
             return;
         }
         if (!lastModelRun) {
-            console.log('lastModelRun undefined, setting default model run info');
+            console.log('lastModelRun is falsy, setting default model run info:', { lastModelRun, lastLat, lastLng });
             modelLabel.title = `Model: ${modelSelect.value.replace('_', ' ').toUpperCase()}\nRun: Not available`;
             return;
         }
         const model = modelSelect.value;
         const titleContent = `Model: ${model.replace('_', ' ').toUpperCase()}\nRun: ${lastModelRun}`;
         modelLabel.title = titleContent;
-        console.log(`Updated model run info: ${titleContent}`);
+        console.log(`Updated model run info: ${titleContent}`, { lastModelRun, model, lastLat, lastLng });
     },
 
     /**
