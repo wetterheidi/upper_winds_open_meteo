@@ -39,6 +39,11 @@ const AppState = {
     gpxLayer: null,
     gpxPoints: [],
     isLoadingGpx: false,
+    liveMarker: null,
+    jumpMasterLine: null,
+    isPlacingHarp: false,
+    harpMarker: null,
+    watchId: null,
 };
 
 let map;
@@ -48,11 +53,6 @@ let lastLng = null;
 let lastAltitude = null;
 let currentMarker = null;
 let isManualPanning = false; // New flag to track manual panning
-let liveMarker = null; // New marker for live position
-let jumpMasterLine = null; // New global for Jump Master Line
-let isPlacingHarp = false; // Flag for HARP placement mode
-let harpMarker = null;
-let watchId = null;
 let prevLat = null;
 let prevLng = null;
 let prevTime = null;
@@ -1785,19 +1785,19 @@ function reinitializeCoordsControl() {
     console.log('After reinitialize - coordsControl:', AppState.coordsControl);
 }
 function handleHarpPlacement(e) {
-    if (!isPlacingHarp) return;
+    if (!AppState.isPlacingHarp) return;
     const { lat, lng } = e.latlng;
-    if (harpMarker) {
-        harpMarker.setLatLng([lat, lng]);
+    if (AppState.harpMarker) {
+        AppState.harpMarker.setLatLng([lat, lng]);
         console.log('Updated HARP marker position:', { lat, lng });
     } else {
-        harpMarker = createHarpMarker(lat, lng).addTo(map);
+        AppState.harpMarker = createHarpMarker(lat, lng).addTo(map);
         console.log('Placed new HARP marker:', { lat, lng });
     }
     Settings.state.userSettings.harpLat = lat;
     Settings.state.userSettings.harpLng = lng;
     Settings.save();
-    isPlacingHarp = false;
+    AppState.isPlacingHarp = false;
     map.off('click', handleHarpPlacement);
     console.log('HARP placement mode deactivated');
     // Enable HARP radio button
@@ -1852,9 +1852,9 @@ function createHarpMarker(latitude, longitude) {
     return marker;
 }
 function clearHarpMarker() {
-    if (harpMarker) {
-        map.removeLayer(harpMarker);
-        harpMarker = null;
+    if (AppState.harpMarker) {
+        map.removeLayer(AppState.harpMarker);
+        AppState.harpMarker = null;
         console.log('Removed HARP marker');
     }
     Settings.state.userSettings.harpLat = null;
@@ -1867,9 +1867,9 @@ function clearHarpMarker() {
     }
     // If Jump Master Line is set to HARP, remove it or switch to DIP
     if (Settings.state.userSettings.jumpMasterLineTarget === 'HARP' && Settings.state.userSettings.showJumpMasterLine) {
-        if (jumpMasterLine) {
-            map.removeLayer(jumpMasterLine);
-            jumpMasterLine = null;
+        if (AppState.jumpMasterLine) {
+            map.removeLayer(AppState.jumpMasterLine);
+            AppState.jumpMasterLine = null;
             console.log('Removed Jump Master Line: HARP marker cleared');
         }
         // Switch to DIP
@@ -1881,7 +1881,7 @@ function clearHarpMarker() {
         }
         Settings.save();
         // Update line if live tracking is active
-        if (liveMarker && currentMarker && lastLat !== null && lastLng !== null) {
+        if (AppState.liveMarker && currentMarker && lastLat !== null && lastLng !== null) {
             debouncedPositionUpdate({
                 coords: {
                     latitude: lastLatitude,
@@ -2318,16 +2318,16 @@ const debouncedPositionUpdate = debounce(async (position) => {
         }
     }
 
-    if (!liveMarker) {
-        liveMarker = createLiveMarker(latitude, longitude).addTo(map);
+    if (!AppState.liveMarker) {
+        AppState.liveMarker = createLiveMarker(latitude, longitude).addTo(map);
         console.log('Created new liveMarker at:', { latitude, longitude });
     } else {
-        if (!map.hasLayer(liveMarker)) {
-            liveMarker.addTo(map);
+        if (!map.hasLayer(AppState.liveMarker)) {
+            AppState.liveMarker.addTo(map);
             console.log('Re-added liveMarker to map:', { latitude, longitude });
         }
         requestAnimationFrame(() => {
-            liveMarker.setLatLng([latitude, longitude]);
+            AppState.liveMarker.setLatLng([latitude, longitude]);
             console.log('Updated liveMarker to:', { latitude, longitude });
         });
     }
@@ -2344,7 +2344,7 @@ const debouncedPositionUpdate = debounce(async (position) => {
     }
 
     let jumpMasterLineData = null;
-    if (Settings.state.userSettings.showJumpMasterLine && liveMarker) {
+    if (Settings.state.userSettings.showJumpMasterLine && AppState.liveMarker) {
         let targetMarker = null;
         let targetLat = null;
         let targetLng = null;
@@ -2352,15 +2352,15 @@ const debouncedPositionUpdate = debounce(async (position) => {
             targetMarker = currentMarker;
             targetLat = lastLat;
             targetLng = lastLng;
-        } else if (Settings.state.userSettings.jumpMasterLineTarget === 'HARP' && harpMarker && Settings.state.userSettings.harpLat !== null && Settings.state.userSettings.harpLng !== null) {
-            targetMarker = harpMarker;
+        } else if (Settings.state.userSettings.jumpMasterLineTarget === 'HARP' && AppState.harpMarker && Settings.state.userSettings.harpLat !== null && Settings.state.userSettings.harpLng !== null) {
+            targetMarker = AppState.harpMarker;
             targetLat = Settings.state.userSettings.harpLat;
             targetLng = Settings.state.userSettings.harpLng;
         }
 
         if (targetMarker) {
             try {
-                const liveLatLng = liveMarker.getLatLng();
+                const liveLatLng = AppState.liveMarker.getLatLng();
                 const targetLatLng = targetMarker.getLatLng();
                 const bearing = calculateBearing(liveLatLng.lat, liveLatLng.lng, targetLatLng.lat, targetLatLng.lng).toFixed(0);
                 const distanceMeters = map.distance(liveLatLng, targetLatLng);
@@ -2385,11 +2385,11 @@ const debouncedPositionUpdate = debounce(async (position) => {
                     heightUnit
                 };
 
-                if (jumpMasterLine) {
-                    jumpMasterLine.setLatLngs([[liveLatLng.lat, liveLatLng.lng], [targetLatLng.lat, targetLatLng.lng]]);
+                if (AppState.jumpMasterLine) {
+                    AppState.jumpMasterLine.setLatLngs([[liveLatLng.lat, liveLatLng.lng], [targetLatLng.lat, targetLatLng.lng]]);
                     console.log(`Updated Jump Master Line to ${Settings.state.userSettings.jumpMasterLineTarget}:`, { bearing, distance: roundedDistance, unit: heightUnit, tot: totDisplay });
                 } else {
-                    jumpMasterLine = L.polyline([[liveLatLng.lat, liveLatLng.lng], [targetLatLng.lat, targetLatLng.lng]], {
+                    AppState.jumpMasterLine = L.polyline([[liveLatLng.lat, liveLatLng.lng], [targetLatLng.lat, targetLatLng.lng]], {
                         color: 'blue',
                         weight: 3,
                         opacity: 0.8,
@@ -2401,16 +2401,16 @@ const debouncedPositionUpdate = debounce(async (position) => {
                 console.error('Error updating Jump Master Line:', error);
             }
         } else {
-            if (jumpMasterLine) {
-                map.removeLayer(jumpMasterLine);
-                jumpMasterLine = null;
+            if (AppState.jumpMasterLine) {
+                map.removeLayer(AppState.jumpMasterLine);
+                AppState.jumpMasterLine = null;
                 console.log(`Removed Jump Master Line: no valid target (${Settings.state.userSettings.jumpMasterLineTarget})`);
             }
         }
     } else {
-        if (jumpMasterLine) {
-            map.removeLayer(jumpMasterLine);
-            jumpMasterLine = null;
+        if (AppState.jumpMasterLine) {
+            map.removeLayer(AppState.jumpMasterLine);
+            AppState.jumpMasterLine = null;
             console.log('Removed Jump Master Line: disabled or no liveMarker');
         }
     }
@@ -2661,14 +2661,14 @@ function startPositionTracking() {
     }
 
     // Clear any existing watch to prevent conflicts
-    if (watchId !== null) {
-        navigator.geolocation.clearWatch(watchId);
-        watchId = null;
+    if (AppState.watchId !== null) {
+        navigator.geolocation.clearWatch(AppState.watchId);
+        AppState.watchId = null;
         console.log('Cleared existing geolocation watch');
     }
 
     try {
-        watchId = navigator.geolocation.watchPosition(
+        AppState.watchId = navigator.geolocation.watchPosition(
             (position) => {
                 console.log('Geolocation position received:', position);
                 debouncedPositionUpdate(position);
@@ -2687,7 +2687,7 @@ function startPositionTracking() {
                 timeout: 10000
             }
         );
-        console.log('Started geolocation watch with watchId:', watchId);
+        console.log('Started geolocation watch with watchId:', AppState.watchId);
 
         // Ensure livePositionControl is visible
         if (livePositionControl) {
@@ -2710,14 +2710,14 @@ function startPositionTracking() {
     }
 }
 function stopPositionTracking() {
-    if (watchId !== null) {
-        navigator.geolocation.clearWatch(watchId);
-        watchId = null;
+    if (AppState.watchId !== null) {
+        navigator.geolocation.clearWatch(AppState.watchId);
+        AppState.watchId = null;
         console.log('Stopped geolocation watch');
     }
-    if (liveMarker) {
-        map.removeLayer(liveMarker);
-        liveMarker = null;
+    if (AppState.liveMarker) {
+        map.removeLayer(AppState.liveMarker);
+        AppState.liveMarker = null;
         console.log('Removed liveMarker');
     }
     if (window.accuracyCircle) {
@@ -2764,16 +2764,16 @@ function updateAccuracyCircle(lat, lng, accuracy) {
     }
 }
 function updateJumpMasterLine() {
-    if (!Settings.state.userSettings.showJumpMasterLine || !Settings.state.userSettings.trackPosition || !liveMarker || !map) {
-        if (jumpMasterLine) {
-            map.removeLayer(jumpMasterLine);
-            jumpMasterLine = null;
+    if (!Settings.state.userSettings.showJumpMasterLine || !Settings.state.userSettings.trackPosition || !AppState.liveMarker || !map) {
+        if (AppState.jumpMasterLine) {
+            map.removeLayer(AppState.jumpMasterLine);
+            AppState.jumpMasterLine = null;
             console.log('Removed Jump Master Line: preconditions not met');
         }
         return;
     }
 
-    const liveLatLng = liveMarker.getLatLng();
+    const liveLatLng = AppState.liveMarker.getLatLng();
     let targetLat, targetLng;
 
     if (Settings.state.userSettings.jumpMasterLineTarget === 'HARP' && Settings.state.userSettings.harpLat && Settings.state.userSettings.harpLng) {
@@ -2805,17 +2805,17 @@ function updateJumpMasterLine() {
     const convertedDistance = Utils.convertHeight(distanceMeters, heightUnit);
     const roundedDistance = Math.round(convertedDistance);
 
-    if (jumpMasterLine) {
-        jumpMasterLine.setLatLngs([[liveLatLng.lat, liveLatLng.lng], [targetLat, targetLng]]);
-        jumpMasterLine.setPopupContent(`<b>Jump Master Line</b><br>Bearing: ${bearing}°<br>Distance: ${roundedDistance} ${heightUnit}`);
+    if (AppState.jumpMasterLine) {
+        AppState.jumpMasterLine.setLatLngs([[liveLatLng.lat, liveLatLng.lng], [targetLat, targetLng]]);
+        AppState.jumpMasterLine.setPopupContent(`<b>Jump Master Line</b><br>Bearing: ${bearing}°<br>Distance: ${roundedDistance} ${heightUnit}`);
         console.log('Updated Jump Master Line:', { bearing, distance: roundedDistance, unit: heightUnit });
     } else {
-        jumpMasterLine = L.polyline([[liveLatLng.lat, liveLatLng.lng], [targetLat, targetLng]], {
+        AppState.jumpMasterLine = L.polyline([[liveLatLng.lat, liveLatLng.lng], [targetLat, targetLng]], {
             color: 'blue',
             weight: 3,
             dashArray: '5, 10'
         }).addTo(map);
-        jumpMasterLine.bindPopup(`<b>Jump Master Line</b><br>Bearing: ${bearing}°<br>Distance: ${roundedDistance} ${heightUnit}`);
+        AppState.jumpMasterLine.bindPopup(`<b>Jump Master Line</b><br>Bearing: ${bearing}°<br>Distance: ${roundedDistance} ${heightUnit}`);
         console.log('Created Jump Master Line:', { bearing, distance: roundedDistance, unit: heightUnit });
     }
 
@@ -3513,82 +3513,6 @@ async function fetchWeather(lat, lon, currentTime = null, isInitialLoad = false)
         document.getElementById('loading').style.display = 'none';
         Utils.handleError(`Failed to fetch weather data: ${error.message}`);
     }
-}
-async function updateWeatherDisplayOLD(index, originalTime = null) {
-    console.log(`updateWeatherDisplay called with index: ${index}, Time: ${AppState.weatherData.time[index]}`);
-    if (!AppState.weatherData || !AppState.weatherData.time || index < 0 || index >= AppState.weatherData.time.length) {
-        console.error('No weather data available or index out of bounds:', index);
-        document.getElementById('info').innerHTML = 'No weather data available';
-        document.getElementById('selectedTime').innerHTML = 'Selected Time: ';
-        const slider = document.getElementById('timeSlider');
-        if (slider) slider.value = 0;
-        return;
-    }
-
-    AppState.landingWindDir = AppState.weatherData.wind_direction_10m[index] || null;
-    console.log('landingWindDir updated to:', AppState.landingWindDir);
-
-    const customLandingDirectionLLInput = document.getElementById('customLandingDirectionLL');
-    const customLandingDirectionRRInput = document.getElementById('customLandingDirectionRR');
-    if (customLandingDirectionLLInput && customLandingDirectionRRInput && AppState.landingWindDir !== null) {
-        customLandingDirectionLLInput.value = Math.round(AppState.landingWindDir);
-        customLandingDirectionRRInput.value = Math.round(AppState.landingWindDir);
-    }
-
-    const refLevel = document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL';
-    const heightUnit = getHeightUnit();
-    const windSpeedUnit = getWindSpeedUnit();
-    const temperatureUnit = getTemperatureUnit();
-    const time = await getDisplayTime(AppState.weatherData.time[index]);
-    const interpolatedData = interpolateWeatherData(index);
-    const surfaceHeight = refLevel === 'AMSL' && lastAltitude !== 'N/A' ? Math.round(lastAltitude) : 0; // Surface height in meters
-
-    let output = `<table>`;
-    output += `<tr><th>Height (${heightUnit} ${refLevel})</th><th>Dir (deg)</th><th>Spd (${windSpeedUnit})</th><th>Wind</th><th>T (${temperatureUnit === 'C' ? '°C' : '°F'})</th></tr>`;
-    interpolatedData.forEach((data, idx) => {
-        const spd = parseFloat(data.spd); // spd is in km/h from Open-Meteo
-        let rowClass = '';
-        if (windSpeedUnit === 'bft') {
-            const bft = Math.round(spd);
-            if (bft <= 1) rowClass = 'wind-low';
-            else if (bft <= 3) rowClass = 'wind-moderate';
-            else if (bft <= 4) rowClass = 'wind-high';
-            else rowClass = 'wind-very-high';
-        } else {
-            const spdInKt = Utils.convertWind(spd, 'kt', 'km/h');
-            if (spdInKt <= 3) rowClass = 'wind-low';
-            else if (spdInKt <= 10) rowClass = 'wind-moderate';
-            else if (spdInKt <= 16) rowClass = 'wind-high';
-            else rowClass = 'wind-very-high';
-        }
-        // Adjust display height for AMSL by adding surface height in user's unit
-        const displayHeight = refLevel === 'AMSL' ? data.displayHeight + (heightUnit === 'ft' ? Math.round(surfaceHeight * 3.28084) : surfaceHeight) : data.displayHeight;
-        const displayTemp = Utils.convertTemperature(data.temp, temperatureUnit === 'C' ? '°C' : '°F');
-        const formattedTemp = displayTemp === 'N/A' ? 'N/A' : displayTemp.toFixed(0);
-
-        const convertedSpd = Utils.convertWind(spd, windSpeedUnit, 'km/h');
-        let formattedWind;
-        //console.log('Debug: displayHeight:', displayHeight, 'wind_gusts_10m:', AppState.weatherData.wind_gusts_10m[index]);
-        const surfaceDisplayHeight = refLevel === 'AMSL' ? (heightUnit === 'ft' ? Math.round(surfaceHeight * 3.28084) : surfaceHeight) : 0;
-        if (Math.round(displayHeight) === surfaceDisplayHeight && AppState.weatherData.wind_gusts_10m[index] !== undefined && Number.isFinite(AppState.weatherData.wind_gusts_10m[index])) {
-            const gustSpd = AppState.weatherData.wind_gusts_10m[index]; // Gusts in km/h
-            const convertedGust = Utils.convertWind(gustSpd, windSpeedUnit, 'km/h');
-            const spdValue = windSpeedUnit === 'bft' ? Math.round(convertedSpd) : convertedSpd.toFixed(0);
-            const gustValue = windSpeedUnit === 'bft' ? Math.round(convertedGust) : convertedGust.toFixed(0);
-            formattedWind = `${spdValue} G ${gustValue}`;
-        } else {
-            formattedWind = convertedSpd === 'N/A' ? 'N/A' : (windSpeedUnit === 'bft' ? Math.round(convertedSpd) : convertedSpd.toFixed(0));
-        }
-
-        const speedKt = Math.round(Utils.convertWind(spd, 'kt', 'km/h') / 5) * 5;
-        const windBarbSvg = data.dir === 'N/A' || isNaN(speedKt) ? 'N/A' : generateWindBarb(data.dir, speedKt);
-
-        output += `<tr class="${rowClass}"><td>${Math.round(displayHeight)}</td><td>${Utils.roundToTens(data.dir)}</td><td>${formattedWind}</td><td>${windBarbSvg}</td><td>${formattedTemp}</td></tr>`;
-    });
-    output += `</table>`;
-    document.getElementById('info').innerHTML = output;
-    document.getElementById('selectedTime').innerHTML = `Selected Time: ${time}`;
-    updateLandingPattern();
 }
 async function updateWeatherDisplay(index, originalTime = null) {
     console.log(`updateWeatherDisplay called with index: ${index}, Time: ${AppState.weatherData.time[index]}`);
@@ -4969,8 +4893,8 @@ function clearIsolineMarkers() {
             if (layer instanceof L.Marker &&
                 layer !== currentMarker &&
                 layer !== AppState.cutAwayMarker &&
-                layer !== liveMarker &&
-                layer !== harpMarker && // Skip harpMarker
+                layer !== AppState.liveMarker &&
+                layer !== AppState.harpMarker && // Skip harpMarker
                 layer.options.icon &&
                 layer.options.icon.options &&
                 typeof layer.options.icon.options.className === 'string' &&
@@ -4983,9 +4907,9 @@ function clearIsolineMarkers() {
                 console.log('Skipping currentMarker:', layer, 'className:', layer.options?.icon?.options?.className || 'none');
             } else if (layer === AppState.cutAwayMarker) {
                 console.log('Skipping cutAwayMarker:', layer, 'className:', layer.options?.icon?.options?.className || 'none');
-            } else if (layer === liveMarker) {
+            } else if (layer === AppState.liveMarker) {
                 console.log('Skipping liveMarker:', layer, 'className:', layer.options?.icon?.options?.className || 'none');
-            } else if (layer === harpMarker) {
+            } else if (layer === AppState.harpMarker) {
                 console.log('Skipping harpMarker:', layer, 'className:', layer.options?.icon?.options?.className || 'none');
             } else if (layer instanceof L.Marker &&
                 layer.options.icon &&
@@ -4996,14 +4920,14 @@ function clearIsolineMarkers() {
             }
         });
         console.log('Cleared', markerCount, 'isoline-label markers');
-        // Fallback: Remove only markers that are not currentMarker, AppState.cutAwayMarker, liveMarker, or harpMarker
+        // Fallback: Remove only markers that are not currentMarker, AppState.cutAwayMarker, AppState.liveMarker, or AppState.harpMarker
         if (markerCount === 0) {
             map.eachLayer(layer => {
                 if (layer instanceof L.Marker &&
                     layer !== currentMarker &&
                     layer !== AppState.cutAwayMarker &&
-                    layer !== liveMarker &&
-                    layer !== harpMarker &&
+                    layer !== AppState.liveMarker &&
+                    layer !== AppState.harpMarker &&
                     (!layer.options.icon ||
                         !layer.options.icon.options ||
                         !layer.options.icon.options.className ||
@@ -6832,7 +6756,7 @@ function setupRadioEvents() {
         Settings.state.userSettings.jumpMasterLineTarget = Settings.getValue('jumpMasterLineTarget', 'radio', 'DIP');
         Settings.save();
         console.log('jumpMasterLineTarget changed:', Settings.state.userSettings.jumpMasterLineTarget);
-        if (Settings.state.userSettings.showJumpMasterLine && liveMarker) {
+        if (Settings.state.userSettings.showJumpMasterLine && AppState.liveMarker) {
             debouncedPositionUpdate({
                 coords: {
                     latitude: lastLatitude,
@@ -6846,7 +6770,7 @@ function setupRadioEvents() {
         // Disable HARP if no marker
         const harpRadio = document.querySelector('input[name="jumpMasterLineTarget"][value="HARP"]');
         if (harpRadio) {
-            harpRadio.disabled = !harpMarker || Settings.state.userSettings.harpLat === null || Settings.state.userSettings.harpLng === null;
+            harpRadio.disabled = !AppState.harpMarker || Settings.state.userSettings.harpLat === null || Settings.state.userSettings.harpLng === null;
             console.log('HARP radio button disabled:', harpRadio.disabled);
         }
     });
@@ -7437,13 +7361,13 @@ function setupCheckboxEvents() {
             }
         }
         // Remove Jump Master Line from map
-        if (jumpMasterLine) {
+        if (AppState.jumpMasterLine) {
             if (map && typeof map.removeLayer === 'function') {
-                map.removeLayer(jumpMasterLine);
+                map.removeLayer(AppState.jumpMasterLine);
             } else {
                 console.warn('Map not initialized, cannot remove jumpMasterLine');
             }
-            jumpMasterLine = null;
+            AppState.jumpMasterLine = null;
             console.log('Removed Jump Master Line due to trackPosition disabled');
         }
         if (livePositionControl) {
@@ -7496,13 +7420,13 @@ function setupCheckboxEvents() {
         console.log('Submenu lookup for showJumpMasterLine:', { submenu: submenu ? 'Found' : 'Not found', submenuClasses: submenu?.classList.toString() });
         toggleSubmenu(checkbox, submenu, checkbox.checked);
         if (!checkbox.checked) {
-            if (jumpMasterLine) {
+            if (AppState.jumpMasterLine) {
                 if (map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(jumpMasterLine);
+                    map.removeLayer(AppState.jumpMasterLine);
                 } else {
                     console.warn('Map not initialized, cannot remove jumpMasterLine');
                 }
-                jumpMasterLine = null;
+                AppState.jumpMasterLine = null;
                 console.log('Removed Jump Master Line: unchecked');
             }
             if (livePositionControl) {
@@ -7520,7 +7444,7 @@ function setupCheckboxEvents() {
                 );
                 console.log('Cleared jump master line data from livePositionControl');
             }
-        } else if (liveMarker && livePositionControl) {
+        } else if (AppState.liveMarker && livePositionControl) {
             // Immediately draw the Jump Master Line if conditions are met
             updateJumpMasterLine();
             // Update live position control with current data
@@ -7558,7 +7482,7 @@ function setupCheckboxEvents() {
     const placeHarpButton = document.getElementById('placeHarpButton');
     if (placeHarpButton) {
         placeHarpButton.addEventListener('click', () => {
-            isPlacingHarp = true;
+            AppState.isPlacingHarp = true;
             console.log('HARP placement mode activated');
             map.on('click', handleHarpPlacement);
             Utils.handleMessage('Click the map to place the HARP marker');
@@ -8334,15 +8258,15 @@ async function updateAllDisplays() {
         }
         updateLivePositionControl();
         // Update Jump Master Line distance unit if active
-        if (jumpMasterLine && liveMarker && currentMarker && lastLat !== null && lastLng !== null) {
-            const liveLatLng = liveMarker.getLatLng();
+        if (AppState.jumpMasterLine && AppState.liveMarker && currentMarker && lastLat !== null && lastLng !== null) {
+            const liveLatLng = AppState.liveMarker.getLatLng();
             const dipLatLng = currentMarker.getLatLng();
             const bearing = calculateBearing(liveLatLng.lat, liveLatLng.lng, dipLatLng.lat, dipLatLng.lng).toFixed(0);
             const distanceMeters = map.distance(liveLatLng, dipLatLng);
             const heightUnit = getHeightUnit();
             const convertedDistance = Utils.convertHeight(distanceMeters, heightUnit);
             const roundedDistance = Math.round(convertedDistance);
-            jumpMasterLine.setPopupContent(`<b>Jump Master Line</b><br>Bearing: ${bearing}°<br>Distance: ${roundedDistance} ${heightUnit}`);
+            AppState.jumpMasterLine.setPopupContent(`<b>Jump Master Line</b><br>Bearing: ${bearing}°<br>Distance: ${roundedDistance} ${heightUnit}`);
             console.log('Updated Jump Master Line popup for heightUnit:', { bearing, distance: roundedDistance, unit: heightUnit });
         }
     } catch (error) {
