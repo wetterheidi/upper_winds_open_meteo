@@ -36,6 +36,9 @@ const AppState = {
     jumpCircleGreenLight: null,
     weatherData: null,
     lastModelRun: null,
+    gpxLayer: null,
+    gpxPoints: [],
+    isLoadingGpx: false,
 };
 
 let map;
@@ -50,9 +53,6 @@ let jumpMasterLine = null; // New global for Jump Master Line
 let isPlacingHarp = false; // Flag for HARP placement mode
 let harpMarker = null;
 let watchId = null;
-let gpxLayer = null;
-let gpxPoints = [];
-let isLoadingGpx = false;
 let prevLat = null;
 let prevLng = null;
 let prevTime = null;
@@ -2032,7 +2032,7 @@ function updateCutAwayMarkerPopup(marker, lat, lng, open = false) {
     }
 }
 function recenterMap(force = false) {
-    if (isLoadingGpx) {
+    if (AppState.isLoadingGpx) {
         console.log('Skipping recenterMap during GPX loading');
         return;
     }
@@ -2074,7 +2074,7 @@ function interpolateColor(aglHeight, minHeight = 0, maxHeight = 3000) {
 function getTooltipContent(point, index, points, groundAltitude, windUnit, heightUnit) {
     const coordFormat = getCoordinateFormat();
     const coords = Utils.convertCoords(point.lat, point.lng, coordFormat);
-    //let tooltipContent = coordFormat === 'MGRS' ? `MGRS: ${coords.lat}` : `Lat: ${coords.lat}<br>Lng: ${coords.lng}`;
+    let tooltipContent = coordFormat === 'MGRS' ? `MGRS: ${coords.lat}` : `Lat: ${coords.lat}<br>Lng: ${coords.lng}`;
     const elevation = point.ele;
     let aglHeight = (elevation !== null && groundAltitude !== null) ? (elevation - groundAltitude) : null;
     if (aglHeight !== null) {
@@ -2108,16 +2108,16 @@ function loadGpxTrack(file) {
         Utils.handleError('No file selected.');
         return;
     }
-    isLoadingGpx = true;
+    AppState.isLoadingGpx = true;
     const reader = new FileReader();
     reader.onload = async function (e) {
         try {
             const gpxData = e.target.result;
-            if (gpxLayer) {
-                map.removeLayer(gpxLayer);
-                gpxLayer = null;
+            if (AppState.gpxLayer) {
+                map.removeLayer(AppState.gpxLayer);
+                AppState.gpxLayer = null;
             }
-            gpxPoints = [];
+            AppState.gpxPoints = [];
             const parser = new DOMParser();
             const xml = parser.parseFromString(gpxData, 'text/xml');
             const trackpoints = xml.getElementsByTagName('trkpt');
@@ -2141,7 +2141,7 @@ function loadGpxTrack(file) {
             if (points.length < 2) {
                 throw new Error('GPX track has insufficient points.');
             }
-            gpxPoints = points;
+            AppState.gpxPoints = points;
 
             // Move marker to final point and update lastAltitude
             if (points.length > 0) {
@@ -2201,7 +2201,7 @@ function loadGpxTrack(file) {
             }
 
             // Create GPX layer with custom pane
-            gpxLayer = L.layerGroup({ pane: 'gpxTrackPane' });
+            AppState.gpxLayer = L.layerGroup({ pane: 'gpxTrackPane' });
             const groundAltitude = lastAltitude !== 'N/A' && !isNaN(lastAltitude) ? parseFloat(lastAltitude) : null;
             const windUnit = getWindSpeedUnit();
             const heightUnit = getHeightUnit();
@@ -2238,10 +2238,10 @@ function loadGpxTrack(file) {
                     });
                     segment.setTooltipContent(getTooltipContent(closestPoint, closestIndex, points, groundAltitude, getWindSpeedUnit(), getHeightUnit())).openTooltip(latlng);
                 });
-                gpxLayer.addLayer(segment);
+                AppState.gpxLayer.addLayer(segment);
             }
-            gpxLayer.addTo(map);
-            console.log('GPX layer added:', { gpxLayer });
+            AppState.gpxLayer.addTo(map);
+            console.log('GPX layer added:', { gpxLayer: AppState.gpxLayer });
 
             // Center map to track bounds
             if (points.length > 0) {
@@ -2270,12 +2270,12 @@ function loadGpxTrack(file) {
             console.error('Error in loadGpxTrack:', error);
             Utils.handleError('Error parsing GPX file: ' + error.message);
         } finally {
-            isLoadingGpx = false;
+            AppState.isLoadingGpx = false;
         }
     };
     reader.onerror = function () {
         Utils.handleError('Error reading GPX file.');
-        isLoadingGpx = false;
+        AppState.isLoadingGpx = false;
     };
     reader.readAsText(file);
 }
@@ -4942,8 +4942,8 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
         additionalBlueLabels: window.additionalBlueLabels?.length || 0
     });
 
-    if (gpxLayer) {
-        gpxLayer.bringToFront();
+    if (AppState.gpxLayer) {
+        AppState.gpxLayer.bringToFront();
     }
 
     ['showExitAreaCheckbox', 'showCanopyAreaCheckbox', 'showJumpRunTrack'].forEach(id => {
@@ -6724,18 +6724,18 @@ function setupRadioEvents() {
                 }
             });
         }
-        if (gpxLayer && gpxPoints.length > 0) {
+        if (AppState.gpxLayer && AppState.gpxPoints.length > 0) {
             const groundAltitude = lastAltitude !== 'N/A' && !isNaN(lastAltitude) ? parseFloat(lastAltitude) : null;
             const windUnit = getWindSpeedUnit();
             const heightUnit = getHeightUnit();
-            gpxLayer.eachLayer(layer => {
+            AppState.gpxLayer.eachLayer(layer => {
                 if (layer instanceof L.Polyline) {
                     layer.on('mousemove', function (e) {
                         const latlng = e.latlng;
-                        let closestPoint = gpxPoints[0];
+                        let closestPoint = AppState.gpxPoints[0];
                         let minDist = Infinity;
                         let closestIndex = 0;
-                        gpxPoints.forEach((p, index) => {
+                        AppState.gpxPoints.forEach((p, index) => {
                             const dist = Math.sqrt(Math.pow(p.lat - latlng.lat, 2) + Math.pow(p.lng - latlng.lng, 2));
                             if (dist < minDist) {
                                 minDist = dist;
@@ -6743,7 +6743,7 @@ function setupRadioEvents() {
                                 closestIndex = index;
                             }
                         });
-                        layer.setTooltipContent(getTooltipContent(closestPoint, closestIndex, gpxPoints, groundAltitude, windUnit, heightUnit)).openTooltip(latlng);
+                        layer.setTooltipContent(getTooltipContent(closestPoint, closestIndex, AppState.gpxPoints, groundAltitude, windUnit, heightUnit)).openTooltip(latlng);
                     });
                 }
             });
@@ -6755,18 +6755,18 @@ function setupRadioEvents() {
     setupRadioGroup('windUnit', () => {
         Settings.updateUnitLabels();
         updateAllDisplays();
-        if (gpxLayer && gpxPoints.length > 0) {
+        if (AppState.gpxLayer && AppState.gpxPoints.length > 0) {
             const groundAltitude = lastAltitude !== 'N/A' && !isNaN(lastAltitude) ? parseFloat(lastAltitude) : null;
             const windUnit = getWindSpeedUnit();
             const heightUnit = getHeightUnit();
-            gpxLayer.eachLayer(layer => {
+            AppState.gpxLayer.eachLayer(layer => {
                 if (layer instanceof L.Polyline) {
                     layer.on('mousemove', function (e) {
                         const latlng = e.latlng;
-                        let closestPoint = gpxPoints[0];
+                        let closestPoint = AppState.gpxPoints[0];
                         let minDist = Infinity;
                         let closestIndex = 0;
-                        gpxPoints.forEach((p, index) => {
+                        AppState.gpxPoints.forEach((p, index) => {
                             const dist = Math.sqrt(Math.pow(p.lat - latlng.lat, 2) + Math.pow(p.lng - latlng.lng, 2));
                             if (dist < minDist) {
                                 minDist = dist;
@@ -6774,7 +6774,7 @@ function setupRadioEvents() {
                                 closestIndex = index;
                             }
                         });
-                        layer.setTooltipContent(getTooltipContent(closestPoint, closestIndex, gpxPoints, groundAltitude, windUnit, heightUnit)).openTooltip(latlng);
+                        layer.setTooltipContent(getTooltipContent(closestPoint, closestIndex, AppState.gpxPoints, groundAltitude, windUnit, heightUnit)).openTooltip(latlng);
                     });
                 }
             });
@@ -6851,18 +6851,18 @@ function setupRadioEvents() {
         }
     });
     // Trigger initial tooltip refresh for heightUnit
-    if (gpxLayer && gpxPoints.length > 0) {
+    if (AppState.gpxLayer && AppState.gpxPoints.length > 0) {
         const groundAltitude = lastAltitude !== 'N/A' && !isNaN(lastAltitude) ? parseFloat(lastAltitude) : null;
         const windUnit = getWindSpeedUnit();
         const heightUnit = getHeightUnit();
-        gpxLayer.eachLayer(layer => {
+        AppState.gpxLayer.eachLayer(layer => {
             if (layer instanceof L.Polyline) {
                 layer.on('mousemove', function (e) {
                     const latlng = e.latlng;
-                    let closestPoint = gpxPoints[0];
+                    let closestPoint = AppState.gpxPoints[0];
                     let minDist = Infinity;
                     let closestIndex = 0;
-                    gpxPoints.forEach((p, index) => {
+                    AppState.gpxPoints.forEach((p, index) => {
                         const dist = Math.sqrt(Math.pow(p.lat - latlng.lat, 2) + Math.pow(p.lng - latlng.lng, 2));
                         if (dist < minDist) {
                             minDist = dist;
@@ -6870,7 +6870,7 @@ function setupRadioEvents() {
                             closestIndex = index;
                         }
                     });
-                    layer.setTooltipContent(getTooltipContent(closestPoint, closestIndex, gpxPoints, groundAltitude, windUnit, heightUnit)).openTooltip(latlng);
+                    layer.setTooltipContent(getTooltipContent(closestPoint, closestIndex, AppState.gpxPoints, groundAltitude, windUnit, heightUnit)).openTooltip(latlng);
                 });
             }
         });
@@ -7651,11 +7651,11 @@ function setupGpxTrackEvents() {
     if (clearGpxButton) {
         clearGpxButton.addEventListener('click', () => {
             console.log('Clear GPX button clicked');
-            if (gpxLayer) {
+            if (AppState.gpxLayer) {
                 try {
-                    map.removeLayer(gpxLayer);
-                    gpxLayer = null;
-                    gpxPoints = [];
+                    map.removeLayer(AppState.gpxLayer);
+                    AppState.gpxLayer = null;
+                    AppState.gpxPoints = [];
                     console.log('Cleared GPX track');
                     const infoElement = document.getElementById('info');
                     if (infoElement) {
