@@ -27,6 +27,13 @@ const AppState = {
     cutAwayLat: null,
     cutAwayLng: null,
     cutAwayCircle: null,
+    jumpRunTrackLayer: null,
+    customJumpRunDirection: null,
+    isJumperSeparationManual: false,
+    jumpCircle: null,
+    jumpCircleFull: null,
+    jumpCircleGreen: null,
+    jumpCircleGreenLight: null,
 
 };
 
@@ -47,18 +54,6 @@ let gpxPoints = [];
 let isLoadingGpx = false;
 let weatherData = null;
 let lastModelRun = null;
-
-let jumpRunTrackLayer = null;
-let customJumpRunDirection = null; // Temporary storage for custom direction during session
-let isJumperSeparationManual = false; // Tracks if jumperSeparation is manually set
-
-let jumpCircle = null;
-let jumpCircleFull = null;
-let jumpCircleGreen = null;
-let jumpCircleGreenLight = null;
-let blueCircleLayer = null;
-let greenCircleLayer = null;
-let redCircleLayer = null;
 
 let prevLat = null;
 let prevLng = null;
@@ -1699,8 +1694,8 @@ function initMap() {
             updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, currentMarker.getPopup()?.isOpen() || false);
         }
 
-        if (jumpRunTrackLayer && Settings.state.userSettings.showJumpRunTrack) {
-            const anchorMarker = jumpRunTrackLayer.getLayers().find(layer => layer.options.icon?.options.className === 'jrt-anchor-marker');
+        if (AppState.jumpRunTrackLayer && Settings.state.userSettings.showJumpRunTrack) {
+            const anchorMarker = AppState.jumpRunTrackLayer.getLayers().find(layer => layer.options.icon?.options.className === 'jrt-anchor-marker');
             if (anchorMarker) {
                 const baseSize = currentZoom <= 11 ? 10 : currentZoom <= 12 ? 12 : currentZoom <= 13 ? 14 : 16;
                 const newIcon = L.divIcon({
@@ -4329,10 +4324,10 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
     };
 
     console.log('Before cleanup:', {
-        blueCircle: !!jumpCircle,
-        redCircle: !!jumpCircleFull,
-        greenCircle: !!jumpCircleGreen,
-        darkGreenCircle: !!jumpCircleGreenLight,
+        blueCircle: !!AppState.jumpCircle,
+        redCircle: !!AppState.jumpCircleFull,
+        greenCircle: !!AppState.jumpCircleGreen,
+        darkGreenCircle: !!AppState.jumpCircleGreenLight,
         additionalBlueCircles: window.additionalBlueCircles?.length || 0,
         additionalBlueLabels: window.additionalBlueLabels?.length || 0
     });
@@ -4340,12 +4335,12 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
     // Cleanup based on mode
     if (showExitAreaOnly) {
         // Only clear exit circles
-        removeLayer(jumpCircleGreen, 'green circle');
-        removeLayer(jumpCircleGreenLight, 'dark green circle');
+        removeLayer(AppState.jumpCircleGreen, 'green circle');
+        removeLayer(AppState.jumpCircleGreenLight, 'dark green circle');
     } else if (showCanopyAreaOnly) {
         // Only clear canopy circles
-        removeLayer(jumpCircle, 'blue circle');
-        removeLayer(jumpCircleFull, 'red circle');
+        removeLayer(AppState.jumpCircle, 'blue circle');
+        removeLayer(AppState.jumpCircleFull, 'red circle');
         if (window.additionalBlueCircles) {
             window.additionalBlueCircles.forEach(circle => removeLayer(circle, 'additional blue circle'));
             window.additionalBlueCircles = [];
@@ -4404,22 +4399,22 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
 
     // Render exit circles
     if (showExitAreaOnly && Settings.state.userSettings.showExitArea && Number.isFinite(blueLat) && Number.isFinite(blueLng) && Number.isFinite(radius) && Number.isFinite(radiusFull)) {
-        jumpCircleGreen = L.circle([redLat, redLng], {
+        AppState.jumpCircleGreen = L.circle([redLat, redLng], {
             radius: radiusFull,
             color: 'green',
             fillColor: 'green',
             fillOpacity: 0.2,
             weight: 2
         }).addTo(map);
-        jumpCircleGreenLight = L.circle([blueLat, blueLng], {
+        AppState.jumpCircleGreenLight = L.circle([blueLat, blueLng], {
             radius: radius,
             color: 'darkgreen',
             fillColor: 'darkgreen',
             fillOpacity: 0.2,
             weight: 2
         }).addTo(map);
-        if (jumpCircleGreen.setZIndex) jumpCircleGreen.setZIndex(600);
-        if (jumpCircleGreenLight.setZIndex) jumpCircleGreenLight.setZIndex(600);
+        if (AppState.jumpCircleGreen.setZIndex) AppState.jumpCircleGreen.setZIndex(600);
+        if (AppState.jumpCircleGreenLight.setZIndex) AppState.jumpCircleGreenLight.setZIndex(600);
         console.log('Added green and dark green circles:', {
             greenCenter: [redLat, redLng],
             greenRadius: radiusFull,
@@ -4432,7 +4427,7 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
             Throw/Drift: ${Number.isFinite(freeFallDirection) ? Math.round(freeFallDirection) : 'N/A'}° ${Number.isFinite(freeFallDistance) ? Math.round(freeFallDistance) : 'N/A'} m<br>
             Free Fall Time: ${freeFallTime != null && !isNaN(freeFallTime) ? Math.round(freeFallTime) : 'N/A'} sec
         `;
-        jumpCircleGreenLight.bindTooltip(tooltipContent, {
+        AppState.jumpCircleGreenLight.bindTooltip(tooltipContent, {
             direction: 'top',
             offset: [0, 0],
             className: 'wind-tooltip'
@@ -4445,7 +4440,7 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
         const newCenterBlue = calculateNewCenter(blueLat, blueLng, displacement, direction);
         const newCenterRed = calculateNewCenter(redLat, redLng, displacementFull, directionFull);
 
-        jumpCircle = L.circle(newCenterBlue, {
+        AppState.jumpCircle = L.circle(newCenterBlue, {
             radius: radius,
             color: 'blue',
             fillColor: 'blue',
@@ -4453,10 +4448,10 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
             weight: 2,
             opacity: 0.1
         }).addTo(map);
-        if (jumpCircle.setZIndex) jumpCircle.setZIndex(1000);
+        if (AppState.jumpCircle.setZIndex) AppState.jumpCircle.setZIndex(1000);
         console.log('Added main blue circle at:', { center: newCenterBlue, radius });
 
-        jumpCircleFull = L.circle(newCenterRed, {
+        AppState.jumpCircleFull = L.circle(newCenterRed, {
             radius: radiusFull,
             color: 'red',
             fillColor: 'red',
@@ -4464,7 +4459,7 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
             weight: 2,
             opacity: 0.8
         }).addTo(map);
-        if (jumpCircleFull.setZIndex) jumpCircleFull.setZIndex(400);
+        if (AppState.jumpCircleFull.setZIndex) AppState.jumpCircleFull.setZIndex(400);
         console.log('Added red circle at:', { center: newCenterRed, radius: radiusFull });
 
         if (Array.isArray(additionalBlueRadii) && Array.isArray(additionalBlueDisplacements) && Array.isArray(additionalBlueDirections) && Array.isArray(additionalBlueUpperLimits)) {
@@ -4530,8 +4525,8 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
             const newCenterBlue = calculateNewCenter(canopyResult.blueLat, canopyResult.blueLng, canopyResult.displacement, canopyResult.direction);
             const newCenterRed = calculateNewCenter(canopyResult.redLat, canopyResult.redLng, canopyResult.displacementFull, canopyResult.directionFull);
 
-            removeLayer(jumpCircle, 'blue circle');
-            removeLayer(jumpCircleFull, 'red circle');
+            removeLayer(AppState.jumpCircle, 'blue circle');
+            removeLayer(AppState.jumpCircleFull, 'red circle');
             if (window.additionalBlueCircles) {
                 window.additionalBlueCircles.forEach(circle => removeLayer(circle, 'additional blue circle'));
                 window.additionalBlueCircles = [];
@@ -4541,7 +4536,7 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
                 window.additionalBlueLabels = [];
             }
 
-            jumpCircle = L.circle(newCenterBlue, {
+            AppState.jumpCircle = L.circle(newCenterBlue, {
                 radius: canopyResult.radius,
                 color: 'blue',
                 fillColor: 'blue',
@@ -4549,10 +4544,10 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
                 weight: 2,
                 opacity: 0.1
             }).addTo(map);
-            if (jumpCircle.setZIndex) jumpCircle.setZIndex(1000);
+            if (AppState.jumpCircle.setZIndex) AppState.jumpCircle.setZIndex(1000);
             console.log('Re-added main blue circle at:', { center: newCenterBlue, radius: canopyResult.radius });
 
-            jumpCircleFull = L.circle(newCenterRed, {
+            AppState.jumpCircleFull = L.circle(newCenterRed, {
                 radius: canopyResult.radiusFull,
                 color: 'red',
                 fillColor: 'red',
@@ -4560,7 +4555,7 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
                 weight: 2,
                 opacity: 0.8
             }).addTo(map);
-            if (jumpCircleFull.setZIndex) jumpCircleFull.setZIndex(400);
+            if (AppState.jumpCircleFull.setZIndex) AppState.jumpCircleFull.setZIndex(400);
             console.log('Re-added red circle at:', { center: newCenterRed, radius: canopyResult.radiusFull });
 
             if (Array.isArray(canopyResult.additionalBlueRadii)) {
@@ -4615,10 +4610,10 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
     }
 
     console.log('Jump circles added at zoom:', currentZoom, 'Layers on map:', {
-        blue: !!jumpCircle,
-        red: !!jumpCircleFull,
-        green: !!jumpCircleGreen,
-        darkGreen: !!jumpCircleGreenLight,
+        blue: !!AppState.jumpCircle,
+        red: !!AppState.jumpCircleFull,
+        green: !!AppState.jumpCircleGreen,
+        darkGreen: !!AppState.jumpCircleGreenLight,
         additionalBlue: window.additionalBlueCircles?.length || 0,
         additionalBlueLabels: window.additionalBlueLabels?.length || 0
     });
@@ -4699,7 +4694,7 @@ function clearIsolineMarkers() {
     }
 }
 function resetJumpRunDirection(triggerUpdate = true) {
-    customJumpRunDirection = null;
+    AppState.customJumpRunDirection = null;
     const directionInput = document.getElementById('jumpRunTrackDirection');
     if (directionInput) {
         directionInput.value = '';
@@ -4717,7 +4712,7 @@ function jumpRunTrack() {
         lastLat,
         lastLng,
         lastAltitude,
-        customJumpRunDirection,
+        customJumpRunDirection: AppState.customJumpRunDirection,
         jumpRunTrackOffset: Settings.state.userSettings.jumpRunTrackOffset,
         jumpRunTrackForwardOffset: Settings.state.userSettings.jumpRunTrackForwardOffset
     });
@@ -4771,12 +4766,12 @@ function jumpRunTrack() {
     }
 
     let jumpRunTrackDirection;
-    if (customJumpRunDirection !== null && !isNaN(customJumpRunDirection) && customJumpRunDirection >= 0 && customJumpRunDirection <= 359) {
-        jumpRunTrackDirection = customJumpRunDirection;
+    if (AppState.customJumpRunDirection !== null && !isNaN(AppState.customJumpRunDirection) && AppState.customJumpRunDirection >= 0 && AppState.customJumpRunDirection <= 359) {
+        jumpRunTrackDirection = AppState.customJumpRunDirection;
         console.log(`Using custom jump run direction: ${jumpRunTrackDirection}°`);
     } else {
         jumpRunTrackDirection = Math.round(meanWindDirection);
-        customJumpRunDirection = null;
+        AppState.customJumpRunDirection = null;
         console.log(`Using calculated jump run direction: ${jumpRunTrackDirection}°`, {
             meanWindDirection: meanWindDirection.toFixed(1),
             inputValue: document.getElementById('jumpRunTrackDirection')?.value
@@ -4950,7 +4945,7 @@ function updateJumpRunTrack() {
         weatherData: !!weatherData,
         lastLat,
         lastLng,
-        customJumpRunDirection,
+        customJumpRunDirection: AppState.customJumpRunDirection,
         currentZoom: map.getZoom(),
         jumpRunTrackOffset: Settings.state.userSettings.jumpRunTrackOffset,
         jumpRunTrackForwardOffset: Settings.state.userSettings.jumpRunTrackForwardOffset
@@ -4960,9 +4955,9 @@ function updateJumpRunTrack() {
     const isZoomInRange = currentZoom >= minZoom && currentZoom <= maxZoom;
 
     // Remove existing jump run track layer
-    if (jumpRunTrackLayer) {
-        map.removeLayer(jumpRunTrackLayer);
-        jumpRunTrackLayer = null;
+    if (AppState.jumpRunTrackLayer) {
+        map.removeLayer(AppState.jumpRunTrackLayer);
+        AppState.jumpRunTrackLayer = null;
         console.log('Removed existing JRT layer group');
     }
 
@@ -5007,7 +5002,7 @@ function updateJumpRunTrack() {
     }
 
     // Create a LayerGroup to hold all components
-    jumpRunTrackLayer = L.layerGroup().addTo(map);
+    AppState.jumpRunTrackLayer = L.layerGroup().addTo(map);
 
     // Create polyline for the jump run track (interactive for tooltips)
     const trackPolyline = L.polyline(latlngs, {
@@ -5015,7 +5010,7 @@ function updateJumpRunTrack() {
         weight: 4,
         opacity: 0.9,
         interactive: true
-    }).addTo(jumpRunTrackLayer);
+    }).addTo(AppState.jumpRunTrackLayer);
 
     trackPolyline.bindTooltip(`Jump Run: ${Math.round(direction)}°, ${Math.round(trackLength)} m`, {
         permanent: false,
@@ -5039,7 +5034,7 @@ function updateJumpRunTrack() {
                 opacity: 0.9,
                 dashArray: '10, 10',
                 interactive: true
-            }).addTo(jumpRunTrackLayer);
+            }).addTo(AppState.jumpRunTrackLayer);
 
             approachPolyline.bindTooltip(`Approach: ${Math.round(direction)}°, ${Math.round(approachLength)} m, ${Math.round(approachTime / 60)} min`, {
                 permanent: false,
@@ -5076,7 +5071,7 @@ function updateJumpRunTrack() {
         rotationOrigin: 'center center',
         draggable: true, // Make the airplane marker draggable
         zIndexOffset: 2000 // Ensure it's above other layers
-    }).addTo(jumpRunTrackLayer);
+    }).addTo(AppState.jumpRunTrackLayer);
 
     // Add tooltip to indicate draggability
     airplaneMarker.bindTooltip('Drag to move Jump Run Track', {
@@ -6658,7 +6653,7 @@ function setupInputEvents() {
                 displayError('jump run track rotation only works at the original position. Reset offset to 0 or rotate before moving.');
                 return;
             }
-            customJumpRunDirection = customDir;
+            AppState.customJumpRunDirection = customDir;
             console.log('Set custom direction from input:', customDir);
             if (weatherData && lastLat && lastLng) {
                 if (Settings.state.userSettings.showJumpRunTrack) {
@@ -6680,7 +6675,7 @@ function setupInputEvents() {
         } else {
             console.log('Invalid direction input, resetting to calculated');
             Utils.handleError('Jump run direction must be between 0 and 359°.');
-            customJumpRunDirection = null;
+            AppState.customJumpRunDirection = null;
             const directionInput = document.getElementById('jumpRunTrackDirection');
             if (directionInput) {
                 setInputValueSilently('jumpRunTrackDirection', '');
@@ -6752,7 +6747,7 @@ function setupInputEvents() {
             Settings.state.userSettings.aircraftSpeedKt = speed;
             Settings.save();
             // Update jumperSeparation if not manually set
-            if (!isJumperSeparationManual) {
+            if (!AppState.isJumperSeparationManual) {
                 const separation = getSeparationFromTAS(speed);
                 setInputValue('jumperSeparation', separation);
                 Settings.state.userSettings.jumperSeparation = separation;
@@ -6792,7 +6787,7 @@ function setupInputEvents() {
         const separation = parseFloat(value);
         if (!isNaN(separation) && separation >= 1 && separation <= 50) {
             Settings.state.userSettings.jumperSeparation = separation;
-            isJumperSeparationManual = true; // Mark as manually set
+            AppState.isJumperSeparationManual = true; // Mark as manually set
             Settings.save();
             console.log(`jumperSeparation manually set to ${separation}s`);
             if (Settings.state.userSettings.calculateJump && weatherData && lastLat && lastLng) {
@@ -6804,7 +6799,7 @@ function setupInputEvents() {
             Utils.handleError('Jumper separation must be between 1 and 50 seconds.');
             setInputValue('jumperSeparation', defaultSettings.jumperSeparation);
             Settings.state.userSettings.jumperSeparation = defaultSettings.jumperSeparation;
-            isJumperSeparationManual = false; // Reset to auto on invalid input
+            AppState.isJumperSeparationManual = false; // Reset to auto on invalid input
             Settings.save();
         }
     });
@@ -6897,17 +6892,17 @@ function setupCheckboxEvents() {
             }
             calculateCutAway();
         } else {
-            if (jumpCircle) {
+            if (AppState.jumpCircle) {
                 if (map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(jumpCircle);
+                    map.removeLayer(AppState.jumpCircle);
                 }
-                jumpCircle = null;
+                AppState.jumpCircle = null;
             }
-            if (jumpCircleFull) {
+            if (AppState.jumpCircleFull) {
                 if (map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(jumpCircleFull);
+                    map.removeLayer(AppState.jumpCircleFull);
                 }
-                jumpCircleFull = null;
+                AppState.jumpCircleFull = null;
             }
             if (window.additionalBlueCircles) {
                 window.additionalBlueCircles.forEach(circle => {
@@ -6937,19 +6932,19 @@ function setupCheckboxEvents() {
         if (checkbox.checked && weatherData && lastLat && lastLng && isCalculateJumpUnlocked && Settings.state.userSettings.calculateJump) {
             calculateJumpRunTrack();
         } else {
-            if (jumpRunTrackLayer) {
-                if (jumpRunTrackLayer.airplaneMarker && map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(jumpRunTrackLayer.airplaneMarker);
-                    jumpRunTrackLayer.airplaneMarker = null;
+            if (AppState.jumpRunTrackLayer) {
+                if (AppState.jumpRunTrackLayer.airplaneMarker && map && typeof map.removeLayer === 'function') {
+                    map.removeLayer(AppState.jumpRunTrackLayer.airplaneMarker);
+                    AppState.jumpRunTrackLayer.airplaneMarker = null;
                 }
-                if (jumpRunTrackLayer.approachLayer && map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(jumpRunTrackLayer.approachLayer);
-                    jumpRunTrackLayer.approachLayer = null;
+                if (AppState.jumpRunTrackLayer.approachLayer && map && typeof map.removeLayer === 'function') {
+                    map.removeLayer(AppState.jumpRunTrackLayer.approachLayer);
+                    AppState.jumpRunTrackLayer.approachLayer = null;
                 }
                 if (map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(jumpRunTrackLayer);
+                    map.removeLayer(AppState.jumpRunTrackLayer);
                 }
-                jumpRunTrackLayer = null;
+                AppState.jumpRunTrackLayer = null;
                 console.log('Removed JRT polyline');
             }
             const directionInput = document.getElementById('jumpRunTrackDirection');
@@ -7772,10 +7767,10 @@ function clearJumpCircles() {
         }
     };
 
-    removeLayer(jumpCircle, 'blue circle');
-    removeLayer(jumpCircleFull, 'red circle');
-    removeLayer(jumpCircleGreen, 'green circle');
-    removeLayer(jumpCircleGreenLight, 'dark green circle');
+    removeLayer(AppState.jumpCircle, 'blue circle');
+    removeLayer(AppState.jumpCircleFull, 'red circle');
+    removeLayer(AppState.jumpCircleGreen, 'green circle');
+    removeLayer(AppState.jumpCircleGreenLight, 'dark green circle');
 
     if (window.additionalBlueCircles) {
         window.additionalBlueCircles.forEach((circle, i) => removeLayer(circle, `additional blue circle ${i}`));
@@ -7786,15 +7781,15 @@ function clearJumpCircles() {
         window.additionalBlueLabels = [];
     }
 
-    jumpCircle = null;
-    jumpCircleFull = null;
-    jumpCircleGreen = null;
-    jumpCircleGreenLight = null;
+    AppState.jumpCircle = null;
+    AppState.jumpCircleFull = null;
+    AppState.jumpCircleGreen = null;
+    AppState.jumpCircleGreenLight = null;
     console.log('All jump circles cleared', {
-        blue: !!jumpCircle,
-        red: !!jumpCircleFull,
-        green: !!jumpCircleGreen,
-        darkGreen: !!jumpCircleGreenLight,
+        blue: !!AppState.jumpCircle,
+        red: !!AppState.jumpCircleFull,
+        green: !!AppState.jumpCircleGreen,
+        darkGreen: !!AppState.jumpCircleGreenLight,
         additionalBlueCircles: window.additionalBlueCircles?.length || 0,
         additionalBlueLabels: window.additionalBlueLabels?.length || 0
     });
