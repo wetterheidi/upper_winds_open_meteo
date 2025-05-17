@@ -57,16 +57,17 @@ const AppState = {
     lastEffectiveWindUnit: 'kt',
     lastDirection: 'N/A',
     lastTerrainAltitude: 'N/A',
-    lastSmoothedSpeedMs: 0
+    lastSmoothedSpeedMs: 0,
+    //map: null,
+    baseMaps: {},
+    lastLat: null,
+    lastLng: null,
+    lastAltitude: null,
+    currentMarker: null,
+    isManualPanning: false,
 };
 
 let map;
-let baseMaps = {};
-let lastLat = null;
-let lastLng = null;
-let lastAltitude = null;
-let currentMarker = null;
-let isManualPanning = false; // New flag to track manual panning
 
 const minZoom = 11;
 const maxZoom = 14;
@@ -153,7 +154,7 @@ function generateWindBarb(direction, speedKt) {
     const staffLength = 20;
 
     // Determine hemisphere based on latitude (lastLat)
-    const isNorthernHemisphere = typeof lastLat === 'number' && !isNaN(lastLat) ? lastLat >= 0 : true;
+    const isNorthernHemisphere = typeof AppState.lastLat === 'number' && !isNaN(AppState.lastLat) ? AppState.lastLat >= 0 : true;
     const barbSide = isNorthernHemisphere ? -1 : 1; // -1 for left (Northern), 1 for right (Southern)
 
     // Calculate barb components
@@ -226,10 +227,10 @@ function getLastFullHourUTC() {
 }
 async function getDisplayTime(utcTimeStr) {
     const timeZone = document.querySelector('input[name="timeZone"]:checked')?.value || 'Z';
-    if (timeZone === 'Z' || !lastLat || !lastLng) {
+    if (timeZone === 'Z' || !AppState.lastLat || !AppState.lastLng) {
         return Utils.formatTime(utcTimeStr); // Synchronous
     } else {
-        return await Utils.formatLocalTime(utcTimeStr, lastLat, lastLng); // Async
+        return await Utils.formatLocalTime(utcTimeStr, AppState.lastLat, AppState.lastLng); // Async
     }
 }
 function calculateBearing(lat1, lng1, lat2, lng2) {
@@ -252,26 +253,26 @@ function debounce(func, wait) {
     };
 }
 function configureMarker(lat, lng, altitude, openPopup = false) {
-    if (currentMarker) {
-        currentMarker.remove();
+    if (AppState.currentMarker) {
+        AppState.currentMarker.remove();
     }
-    currentMarker = createCustomMarker(lat, lng).addTo(map);
-    attachMarkerDragend(currentMarker);
-    currentMarker.on('click', (e) => {
+    AppState.currentMarker = createCustomMarker(lat, lng).addTo(map);
+    attachMarkerDragend(AppState.currentMarker);
+    AppState.currentMarker.on('click', (e) => {
         L.DomEvent.stopPropagation(e); // Prevent map click events from interfering
-        const popup = currentMarker.getPopup();
+        const popup = AppState.currentMarker.getPopup();
         console.log('Marker click event, popup state:', { hasPopup: !!popup, isOpen: popup?.isOpen() });
         if (popup?.isOpen()) {
-            currentMarker.closePopup();
+            AppState.currentMarker.closePopup();
             console.log('Closed popup on marker click');
         } else {
-            updateMarkerPopup(currentMarker, lat, lng, altitude, true);
+            updateMarkerPopup(AppState.currentMarker, lat, lng, altitude, true);
             console.log('Requested popup open on marker click');
         }
     });
-    updateMarkerPopup(currentMarker, lat, lng, altitude, openPopup);
+    updateMarkerPopup(AppState.currentMarker, lat, lng, altitude, openPopup);
     console.log('Configured marker at:', { lat, lng, openPopup });
-    return currentMarker;
+    return AppState.currentMarker;
 }
 
 // == Tile caching ==
@@ -766,19 +767,19 @@ async function cacheTileWithRetry(url, maxRetries = 3) {
 }
 async function cacheTilesForDIP() {
     console.log('cacheTilesForDIP called with:', {
-        lastLat,
-        lastLng,
+        lastLat: AppState.lastLat,
+        lastLng: AppState.lastLng,
         cacheRadiusKm: Settings.state.userSettings.cacheRadiusKm,
         cacheZoomLevels: Settings.state.userSettings.cacheZoomLevels
     });
 
-    if (!lastLat || !lastLng) {
+    if (!AppState.lastLat || !AppState.lastLng) {
         console.warn('No DIP coordinates for caching, skipping');
         Utils.handleMessage('Please select a location to cache map tiles.');
         return;
     }
 
-    if (!Settings.state.userSettings.baseMaps || !baseMaps[Settings.state.userSettings.baseMaps]) {
+    if (!Settings.state.userSettings.baseMaps || !AppState.baseMaps[Settings.state.userSettings.baseMaps]) {
         console.warn(`Base map ${Settings.state.userSettings.baseMaps} not found, skipping caching`);
         Utils.handleMessage('Selected base map not available for caching.');
         return;
@@ -786,9 +787,9 @@ async function cacheTilesForDIP() {
 
     const radiusKm = Settings.state.userSettings.cacheRadiusKm || defaultSettings.cacheRadiusKm;
     const zoomLevels = Settings.state.userSettings.cacheZoomLevels || defaultSettings.cacheZoomLevels;
-    const tiles = getTilesInRadius(lastLat, lastLng, radiusKm, zoomLevels);
+    const tiles = getTilesInRadius(AppState.lastLat, AppState.lastLng, radiusKm, zoomLevels);
 
-    console.log(`Caching ${tiles.length} tiles for DIP:`, { lat: lastLat, lng: lastLng, radiusKm, zoomLevels, baseMap: Settings.state.userSettings.baseMaps });
+    console.log(`Caching ${tiles.length} tiles for DIP:`, { lat: AppState.lastLat, lng: AppState.lastLng, radiusKm, zoomLevels, baseMap: Settings.state.userSettings.baseMaps });
 
     const tileLayers = [];
     if (Settings.state.userSettings.baseMaps === 'Esri Satellite + OSM') {
@@ -797,7 +798,7 @@ async function cacheTilesForDIP() {
             { name: 'OSM Overlay', url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', subdomains: ['a', 'b', 'c'], normalizedUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png' }
         );
     } else {
-        const layer = baseMaps[Settings.state.userSettings.baseMaps];
+        const layer = AppState.baseMaps[Settings.state.userSettings.baseMaps];
         tileLayers.push({
             name: Settings.state.userSettings.baseMaps,
             url: layer.options.url || layer._url,
@@ -966,7 +967,7 @@ const debouncedCacheVisibleTiles = debounce(async () => {
     console.log(`Caching ${tiles.length} visible tiles at zoom ${zoom} for ${Settings.state.userSettings.baseMaps}`);
 
     const tileLayers = [];
-    if (!baseMaps[Settings.state.userSettings.baseMaps]) {
+    if (!AppState.baseMaps[Settings.state.userSettings.baseMaps]) {
         console.warn(`Base map ${Settings.state.userSettings.baseMaps} not found, skipping caching`);
         Utils.handleMessage('Selected base map not available for caching.');
         return;
@@ -978,7 +979,7 @@ const debouncedCacheVisibleTiles = debounce(async () => {
             { name: 'OSM Overlay', url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', subdomains: ['a', 'b', 'c'], normalizedUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png' }
         );
     } else {
-        const layer = baseMaps[Settings.state.userSettings.baseMaps];
+        const layer = AppState.baseMaps[Settings.state.userSettings.baseMaps];
         tileLayers.push({
             name: Settings.state.userSettings.baseMaps,
             url: layer.options.url || layer._url,
@@ -1172,8 +1173,8 @@ function initMap() {
     const defaultZoom = 11;
 
     // Set default coordinates to ensure caching can proceed
-    lastLat = lastLat || defaultCenter[0];
-    lastLng = lastLng || defaultCenter[1];
+    AppState.lastLat = AppState.lastLat || defaultCenter[0];
+    AppState.lastLng = AppState.lastLng || defaultCenter[1];
 
     map = L.map('map', {
         center: defaultCenter,
@@ -1184,7 +1185,7 @@ function initMap() {
         minZoom: navigator.onLine ? 6 : 11 // Restrict minZoom to 11 offline
     });
 
-    baseMaps = {
+    AppState.baseMaps = {
         "OpenStreetMap": L.tileLayer.cached('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
             attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
@@ -1231,9 +1232,9 @@ function initMap() {
     const openMeteoAttribution = 'Weather data by <a href="https://open-meteo.com">Open-Meteo</a>';
     map.attributionControl.addAttribution(openMeteoAttribution);
 
-    const selectedBaseMap = Settings.state.userSettings.baseMaps in baseMaps ? Settings.state.userSettings.baseMaps : "Esri Street";
+    const selectedBaseMap = Settings.state.userSettings.baseMaps in AppState.baseMaps ? Settings.state.userSettings.baseMaps : "Esri Street";
     const fallbackBaseMap = "OpenStreetMap";
-    const layer = baseMaps[selectedBaseMap];
+    const layer = AppState.baseMaps[selectedBaseMap];
     let hasSwitched = false; // Track if fallback has been attempted
 
     layer.on('tileerror', () => {
@@ -1249,7 +1250,7 @@ function initMap() {
             console.warn(`${selectedBaseMap} tiles slow or unavailable, switching to ${fallbackBaseMap}`);
             if (map.hasLayer(layer)) {
                 map.removeLayer(layer);
-                baseMaps[fallbackBaseMap].addTo(map);
+                AppState.baseMaps[fallbackBaseMap].addTo(map);
                 Settings.state.userSettings.baseMaps = fallbackBaseMap;
                 Settings.save();
                 Utils.handleError(`${selectedBaseMap} tiles slow or unavailable. Switched to ${fallbackBaseMap}.`);
@@ -1289,19 +1290,19 @@ function initMap() {
         }
     });
 
-    L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
+    L.control.layers(AppState.baseMaps, null, { position: 'topright' }).addTo(map);
     map.on('baselayerchange', function (e) {
         Settings.state.userSettings.baseMaps = e.name;
         Settings.save();
         console.log(`Base map changed to: ${e.name}`);
         hasSwitched = false;
-        if (lastLat && lastLng) {
+        if (AppState.lastLat && AppState.lastLng) {
             cacheTilesForDIP();
         }
     });
 
     map.on('moveend', () => {
-        if (lastLat && lastLng) {
+        if (AppState.lastLat && AppState.lastLng) {
             debouncedCacheVisibleTiles();
         }
     });
@@ -1394,7 +1395,7 @@ function initMap() {
 
     const initialAltitude = 'N/A';
     configureMarker(defaultCenter[0], defaultCenter[1], initialAltitude, false);
-    isManualPanning = false;
+    AppState.isManualPanning = false;
 
     // Migrate existing tiles to normalized URLs on init and perform automated cleanup
     TileCache.init().then(() => {
@@ -1439,11 +1440,11 @@ function initMap() {
         navigator.geolocation.getCurrentPosition(
             async (position) => {
                 const userCoords = [position.coords.latitude, position.coords.longitude];
-                lastLat = position.coords.latitude;
-                lastLng = position.coords.longitude;
-                lastAltitude = await getAltitude(lastLat, lastLng);
+                AppState.lastLat = position.coords.latitude;
+                AppState.lastLng = position.coords.longitude;
+                AppState.lastAltitude = await getAltitude(AppState.lastLat, AppState.lastLng);
 
-                configureMarker(lastLat, lastLng, lastAltitude, false);
+                configureMarker(AppState.lastLat, AppState.lastLng, AppState.lastAltitude, false);
                 map.setView(userCoords, defaultZoom);
 
                 if (Settings.state.userSettings.calculateJump) {
@@ -1451,9 +1452,9 @@ function initMap() {
                     calculateCutAway();
                 }
                 recenterMap(true);
-                isManualPanning = false;
+                AppState.isManualPanning = false;
 
-                await fetchInitialWeather(lastLat, lastLng);
+                await fetchInitialWeather(AppState.lastLat, AppState.lastLng);
 
                 if (Settings.state.userSettings.trackPosition) {
                     setCheckboxValue('trackPositionCheckbox', true);
@@ -1466,15 +1467,15 @@ function initMap() {
             async (error) => {
                 console.warn(`Geolocation error: ${error.message}`);
                 Utils.handleError('Unable to retrieve your location. Using default location.');
-                lastLat = defaultCenter[0];
-                lastLng = defaultCenter[1];
-                lastAltitude = await getAltitude(lastLat, lastLng);
-                configureMarker(lastLat, lastLng, lastAltitude, false);
+                AppState.lastLat = defaultCenter[0];
+                AppState.lastLng = defaultCenter[1];
+                AppState.lastAltitude = await getAltitude(AppState.lastLat, AppState.lastLng);
+                configureMarker(AppState.lastLat, AppState.lastLng, AppState.lastAltitude, false);
                 map.setView(defaultCenter, defaultZoom);
                 recenterMap(true);
-                isManualPanning = false;
+                AppState.isManualPanning = false;
 
-                await fetchInitialWeather(lastLat, lastLng);
+                await fetchInitialWeather(AppState.lastLat, AppState.lastLng);
 
                 if (Settings.state.userSettings.trackPosition) {
                     Utils.handleError('Tracking disabled due to geolocation failure.');
@@ -1495,15 +1496,15 @@ function initMap() {
     } else {
         console.warn('Geolocation not supported.');
         Utils.handleError('Geolocation not supported. Using default location.');
-        lastLat = defaultCenter[0];
-        lastLng = defaultCenter[1];
-        lastAltitude = getAltitude(lastLat, lastLng);
-        configureMarker(lastLat, lastLng, initialAltitude, false);
+        AppState.lastLat = defaultCenter[0];
+        AppState.lastLng = defaultCenter[1];
+        AppState.lastAltitude = getAltitude(AppState.lastLat, AppState.lastLng);
+        configureMarker(AppState.lastLat, AppState.lastLng, initialAltitude, false);
         map.setView(defaultCenter, defaultZoom);
         recenterMap(true);
-        isManualPanning = false;
+        AppState.isManualPanning = false;
 
-        fetchInitialWeather(lastLat, lastLng);
+        fetchInitialWeather(AppState.lastLat, AppState.lastLng);
 
         if (Settings.state.userSettings.trackPosition) {
             Utils.handleError('Tracking disabled: Geolocation not supported.');
@@ -1595,7 +1596,7 @@ function initMap() {
     map.on('movestart', (e) => {
         // Only set isManualPanning if not dragging a marker
         if (!e.target.dragging || !e.target.dragging._marker) {
-            isManualPanning = true;
+            AppState.isManualPanning = true;
             console.log('Manual panning detected, isManualPanning set to true');
         }
     });
@@ -1632,12 +1633,12 @@ function initMap() {
 
     map.on('dblclick', async (e) => {
         const { lat, lng } = e.latlng;
-        lastLat = lat;
-        lastLng = lng;
-        lastAltitude = await getAltitude(lat, lng);
+        AppState.lastLat = lat;
+        AppState.lastLng = lng;
+        AppState.lastAltitude = await getAltitude(lat, lng);
         console.log('Map double-clicked, moving marker to:', { lat, lng });
 
-        configureMarker(lastLat, lastLng, lastAltitude, false);
+        configureMarker(AppState.lastLat, AppState.lastLng, AppState.lastAltitude, false);
         resetJumpRunDirection(true);
         if (Settings.state.userSettings.calculateJump) {
             console.log('Recalculating jump for marker click');
@@ -1645,7 +1646,7 @@ function initMap() {
             calculateCutAway();
         }
         recenterMap(true);
-        isManualPanning = false;
+        AppState.isManualPanning = false;
 
         const slider = document.getElementById('timeSlider');
         const currentIndex = parseInt(slider.value) || 0;
@@ -1670,7 +1671,7 @@ function initMap() {
         const currentZoom = map.getZoom();
         console.log('Zoom level changed to:', currentZoom);
 
-        if (Settings.state.userSettings.calculateJump && AppState.weatherData && lastLat && lastLng) {
+        if (Settings.state.userSettings.calculateJump && AppState.weatherData && AppState.lastLat && AppState.lastLng) {
             console.log('Recalculating jump for zoom:', currentZoom);
             calculateJump();
         }
@@ -1685,9 +1686,9 @@ function initMap() {
             updateLandingPattern();
         }
 
-        if (currentMarker && lastLat && lastLng) {
-            currentMarker.setLatLng([lastLat, lastLng]);
-            updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, currentMarker.getPopup()?.isOpen() || false);
+        if (AppState.currentMarker && AppState.lastLat && AppState.lastLng) {
+            AppState.currentMarker.setLatLng([AppState.lastLat, AppState.lastLng]);
+            updateMarkerPopup(AppState.currentMarker, AppState.lastLat, AppState.lastLng, AppState.lastAltitude, AppState.currentMarker.getPopup()?.isOpen() || false);
         }
 
         if (AppState.jumpRunTrackLayer && Settings.state.userSettings.showJumpRunTrack) {
@@ -1727,22 +1728,22 @@ function initMap() {
             const touchY = e.touches[0].clientY - rect.top;
             const latlng = map.containerPointToLatLng([touchX, touchY]);
             const { lat, lng } = latlng;
-            lastLat = lat;
-            lastLng = lng;
-            lastAltitude = await getAltitude(lat, lng);
-            configureMarker(lastLat, lastLng, lastAltitude, false);
+            AppState.lastLat = lat;
+            AppState.lastLng = lng;
+            AppState.lastAltitude = await getAltitude(lat, lng);
+            configureMarker(AppState.lastLat, AppState.lastLng, AppState.lastAltitude, false);
             resetJumpRunDirection(true);
             if (Settings.state.userSettings.calculateJump) {
                 calculateJump();
                 calculateCutAway();
             }
             recenterMap(true);
-            isManualPanning = false;
+            AppState.isManualPanning = false;
 
             const slider = document.getElementById('timeSlider');
             const currentIndex = parseInt(slider.value) || 0;
             const currentTime = AppState.weatherData?.time?.[currentIndex] || null;
-            await fetchWeatherForLocation(lastLat, lastLng, currentTime);
+            await fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, currentTime);
             cacheTilesForDIP();
             // Update Jump Master Line if active
             if (Settings.state.userSettings.showJumpMasterLine && Settings.state.userSettings.trackPosition) {
@@ -1879,7 +1880,7 @@ function clearHarpMarker() {
         }
         Settings.save();
         // Update line if live tracking is active
-        if (AppState.liveMarker && currentMarker && lastLat !== null && lastLng !== null) {
+        if (AppState.liveMarker && AppState.currentMarker && AppState.lastLat !== null && AppState.lastLng !== null) {
             debouncedPositionUpdate({
                 coords: {
                     latitude: AppState.lastLatitude,
@@ -1896,12 +1897,12 @@ function clearHarpMarker() {
 function attachMarkerDragend(marker) {
     marker.on('dragend', async (e) => {
         const position = marker.getLatLng();
-        lastLat = position.lat;
-        lastLng = position.lng;
-        lastAltitude = await getAltitude(lastLat, lastLng);
+        AppState.lastLat = position.lat;
+        AppState.lastLng = position.lng;
+        AppState.lastAltitude = await getAltitude(AppState.lastLat, AppState.lastLng);
         const wasOpen = marker.getPopup()?.isOpen() || false;
-        updateMarkerPopup(marker, lastLat, lastLng, lastAltitude, wasOpen);
-        console.log('Marker dragged to:', { lat: lastLat, lng: lastLng });
+        updateMarkerPopup(marker, AppState.lastLat, AppState.lastLng, AppState.lastAltitude, wasOpen);
+        console.log('Marker dragged to:', { lat: AppState.lastLat, lng: AppState.lastLng });
         resetJumpRunDirection(true);
         if (Settings.state.userSettings.calculateJump) {
             console.log('Recalculating jump for marker drag');
@@ -1909,16 +1910,16 @@ function attachMarkerDragend(marker) {
             calculateCutAway();
         }
         recenterMap(true); // Force recenter after fallback
-        isManualPanning = false; // Reset after marker placement
+        AppState.isManualPanning = false; // Reset after marker placement
         const slider = document.getElementById('timeSlider');
         const currentIndex = parseInt(slider.value) || 0;
         const currentTime = AppState.weatherData?.time?.[currentIndex] || null;
         document.getElementById('info').innerHTML = `Fetching weather and models...`;
-        const availableModels = await checkAvailableModels(lastLat, lastLng);
+        const availableModels = await checkAvailableModels(AppState.lastLat, AppState.lastLng);
         if (availableModels.length > 0) {
-            await fetchWeatherForLocation(lastLat, lastLng, currentTime);
+            await fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, currentTime);
             Settings.updateModelRunInfo();
-            if (lastAltitude !== 'N/A') calculateMeanWind();
+            if (AppState.lastAltitude !== 'N/A') calculateMeanWind();
             updateLandingPattern();
             if (Settings.state.userSettings.showJumpRunTrack) {
                 console.log('Updating JRT after weather fetch for marker drag');
@@ -2034,14 +2035,14 @@ function recenterMap(force = false) {
         console.log('Skipping recenterMap during GPX loading');
         return;
     }
-    if (isManualPanning && !force) {
+    if (AppState.isManualPanning && !force) {
         console.log('Skipping recenterMap due to manual panning');
         return;
     }
-    if (map && currentMarker) {
+    if (map && AppState.currentMarker) {
         map.invalidateSize();
-        map.panTo(currentMarker.getLatLng());
-        console.log('Map recentered on marker at:', currentMarker.getLatLng());
+        map.panTo(AppState.currentMarker.getLatLng());
+        console.log('Map recentered on marker at:', AppState.currentMarker.getLatLng());
     } else {
         console.warn('Cannot recenter map: map or marker not defined');
     }
@@ -2144,14 +2145,14 @@ function loadGpxTrack(file) {
             // Move marker to final point and update lastAltitude
             if (points.length > 0) {
                 const finalPoint = points[points.length - 1];
-                lastLat = finalPoint.lat;
-                lastLng = finalPoint.lng;
-                lastAltitude = await getAltitude(lastLat, lastLng); // Fetch terrain altitude for final point
-                console.log('Moved marker to final GPX point:', { lat: lastLat, lng: lastLng, lastAltitude });
+                AppState.lastLat = finalPoint.lat;
+                AppState.lastLng = finalPoint.lng;
+                AppState.lastAltitude = await getAltitude(AppState.lastLat, AppState.lastLng); // Fetch terrain altitude for final point
+                console.log('Moved marker to final GPX point:', { lat: AppState.lastLat, lng: AppState.lastLng, lastAltitude: AppState.lastAltitude });
 
                 // Update marker position
-                configureMarker(lastLat, lastLng, lastAltitude, false);
-                isManualPanning = false;
+                configureMarker(AppState.lastLat, AppState.lastLng, AppState.lastAltitude, false);
+                AppState.isManualPanning = false;
 
                 // Trigger weather fetch and jump calculations
                 let timestampToUse = null;
@@ -2185,7 +2186,7 @@ function loadGpxTrack(file) {
                     console.warn('No valid timestamp in GPX track, using current time for weather');
                 }
 
-                await fetchWeatherForLocation(lastLat, lastLng, timestampToUse);
+                await fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, timestampToUse);
                 if (Settings.state.userSettings.calculateJump) {
                     debouncedCalculateJump();
                     calculateCutAway();
@@ -2200,7 +2201,7 @@ function loadGpxTrack(file) {
 
             // Create GPX layer with custom pane
             AppState.gpxLayer = L.layerGroup({ pane: 'gpxTrackPane' });
-            const groundAltitude = lastAltitude !== 'N/A' && !isNaN(lastAltitude) ? parseFloat(lastAltitude) : null;
+            const groundAltitude = AppState.lastAltitude !== 'N/A' && !isNaN(AppState.lastAltitude) ? parseFloat(AppState.lastAltitude) : null;
             const windUnit = getWindSpeedUnit();
             const heightUnit = getHeightUnit();
             for (let i = 0; i < points.length - 1; i++) {
@@ -2346,10 +2347,10 @@ const debouncedPositionUpdate = debounce(async (position) => {
         let targetMarker = null;
         let targetLat = null;
         let targetLng = null;
-        if (Settings.state.userSettings.jumpMasterLineTarget === 'DIP' && currentMarker && lastLat !== null && lastLng !== null) {
-            targetMarker = currentMarker;
-            targetLat = lastLat;
-            targetLng = lastLng;
+        if (Settings.state.userSettings.jumpMasterLineTarget === 'DIP' && AppState.currentMarker && AppState.lastLat !== null && AppState.lastLng !== null) {
+            targetMarker = AppState.currentMarker;
+            targetLat = AppState.lastLat;
+            targetLng = AppState.lastLng;
         } else if (Settings.state.userSettings.jumpMasterLineTarget === 'HARP' && AppState.harpMarker && Settings.state.userSettings.harpLat !== null && Settings.state.userSettings.harpLng !== null) {
             targetMarker = AppState.harpMarker;
             targetLat = Settings.state.userSettings.harpLat;
@@ -2487,8 +2488,8 @@ L.Control.LivePosition = L.Control.extend({
             if (deviceAltitude !== null && deviceAltitude !== undefined) {
                 let displayAltitude;
                 let displayRefLevel = refLevel;
-                if (refLevel === 'AGL' && lastAltitude !== null && !isNaN(lastAltitude)) {
-                    displayAltitude = deviceAltitude - parseFloat(lastAltitude);
+                if (refLevel === 'AGL' && AppState.lastAltitude !== null && !isNaN(AppState.lastAltitude)) {
+                    displayAltitude = deviceAltitude - parseFloat(AppState.lastAltitude);
                     displayRefLevel = 'abv DIP';
                 } else {
                     displayAltitude = deviceAltitude;
@@ -2779,14 +2780,14 @@ function updateJumpMasterLine() {
         targetLng = Settings.state.userSettings.harpLng;
         console.log('Drawing Jump Master Line to HARP:', { targetLat, targetLng });
     } else if (Settings.state.userSettings.jumpMasterLineTarget === 'DIP') {
-        if (currentMarker) {
-            const dipLatLng = currentMarker.getLatLng();
+        if (AppState.currentMarker) {
+            const dipLatLng = AppState.currentMarker.getLatLng();
             targetLat = dipLatLng.lat;
             targetLng = dipLatLng.lng;
             console.log('Drawing Jump Master Line to DIP using currentMarker:', { targetLat, targetLng });
-        } else if (lastLat !== null && lastLng !== null) {
-            targetLat = lastLat;
-            targetLng = lastLng;
+        } else if (AppState.lastLat !== null && AppState.lastLng !== null) {
+            targetLat = AppState.lastLat;
+            targetLng = AppState.lastLng;
             console.log('Drawing Jump Master Line to DIP using lastLat/lastLng:', { targetLat, targetLng });
         } else {
             console.log('Cannot draw Jump Master Line: no DIP position set');
@@ -2882,7 +2883,7 @@ async function fetchWeatherForLocationOLD(lat, lng, currentTime = null, isInitia
     if (availableModels.length > 0) {
         await fetchWeather(lat, lng, currentTime, isInitialLoad);
         Settings.updateModelRunInfo();
-        if (lastAltitude !== 'N/A') {
+        if (AppState.lastAltitude !== 'N/A') {
             calculateMeanWind();
             if (Settings.state.userSettings.calculateJump) {
                 console.log('Recalculating jump for location change');
@@ -2903,7 +2904,7 @@ async function fetchWeatherForLocation(lat, lng, currentTime = null, isInitialLo
         document.getElementById('info').innerHTML = `Fetching weather and models...`;
         const availableModels = await checkAvailableModels(lat, lng);
         if (availableModels.length > 0) {
-            // Set AppState.lastLat and AppState.lastLng before fetchWeather
+            // Set lastLat and lastLng before fetchWeather
             AppState.lastLat = lat;
             AppState.lastLng = lng;
             console.log('Set AppState coordinates:', { lastLat: AppState.lastLat, lastLng: AppState.lastLng });
@@ -3539,7 +3540,7 @@ async function updateWeatherDisplay(index, originalTime = null) {
     const temperatureUnit = getTemperatureUnit();
     const time = await getDisplayTime(AppState.weatherData.time[index]);
     const interpolatedData = interpolateWeatherData(index);
-    const surfaceHeight = refLevel === 'AMSL' && lastAltitude !== 'N/A' ? Math.round(lastAltitude) : 0;
+    const surfaceHeight = refLevel === 'AMSL' && AppState.lastAltitude !== 'N/A' ? Math.round(AppState.lastAltitude) : 0;
 
     if (!Settings.state.userSettings.showTable) {
         document.getElementById('info').innerHTML = '';
@@ -3625,9 +3626,9 @@ function calculateMeanWind() {
     const refLevel = document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL';
     const heightUnit = getHeightUnit();
     const windSpeedUnit = getWindSpeedUnit();
-    const baseHeight = Math.round(lastAltitude);
+    const baseHeight = Math.round(AppState.lastAltitude);
 
-    if (!AppState.weatherData || lastAltitude === 'N/A') {
+    if (!AppState.weatherData || AppState.lastAltitude === 'N/A') {
         handleError('Cannot calculate mean wind: missing data or altitude');
         return;
     }
@@ -3682,7 +3683,7 @@ function interpolateWeatherData(sliderIndex) {
         return [];
     }
 
-    const baseHeight = Math.round(lastAltitude);
+    const baseHeight = Math.round(AppState.lastAltitude);
     const interpStep = parseInt(getInterpolationStep()) || 100;
     const heightUnit = getHeightUnit();
 
@@ -3930,7 +3931,7 @@ function downloadTableAsAscii(format) {
     if (format === 'ATAK') {
         content = `Alt Dir Spd\n${heightUnit}${refLevel}\n`;
     } else if (format === 'Windwatch') {
-        const elevation = heightUnit === 'ft' ? Math.round(lastAltitude * 3.28084) : Math.round(lastAltitude);
+        const elevation = heightUnit === 'ft' ? Math.round(AppState.lastAltitude * 3.28084) : Math.round(AppState.lastAltitude);
         content = `Version 1.0, ID = 9999999999\n${time}, Ground Level: ${elevation} ft\nWindsond ${model}\n AGL[ft] Wind[°] Speed[km/h]\n`;
     } else if (format === 'HEIDIS') {
         const heightHeader = refLevel === 'AGL' ? `h(${heightUnit}AGL)` : `h(${heightUnit}AMSL)`;
@@ -3945,7 +3946,7 @@ function downloadTableAsAscii(format) {
     }
 
     // Generate surface data with fetched surface_pressure
-    const baseHeight = Math.round(lastAltitude);
+    const baseHeight = Math.round(AppState.lastAltitude);
     const surfaceHeight = refLevel === 'AGL' ? 0 : baseHeight;
     const surfaceTemp = AppState.weatherData.temperature_2m?.[index];
     const surfaceRH = AppState.weatherData.relative_humidity_2m?.[index];
@@ -4227,14 +4228,14 @@ function visualizeFreeFallPath(path) {
 
 // Isolated calculation functions
 function calculateExitCircle() {
-    if (!Settings.state.userSettings.showExitArea || !Settings.state.userSettings.calculateJump || !AppState.weatherData || !lastLat || !lastLng) {
+    if (!Settings.state.userSettings.showExitArea || !Settings.state.userSettings.calculateJump || !AppState.weatherData || !AppState.lastLat || !AppState.lastLng) {
         console.log('Skipping calculateExitCircle: conditions not met');
         return null;
     }
     console.log('Calculating exit circle...', {
-        lastLat,
-        lastLng,
-        lastAltitude,
+        lastLat: AppState.lastLat,
+        lastLng: AppState.lastLng,
+        lastAltitude: AppState.lastAltitude,
         sliderIndex: parseInt(document.getElementById('timeSlider')?.value) || 0
     });
 
@@ -4265,7 +4266,7 @@ function calculateExitCircle() {
     const flyTimeFull = heightDistanceFull / descentRate;
     const horizontalCanopyDistanceFull = flyTimeFull * canopySpeedMps;
 
-    const elevation = Math.round(lastAltitude);
+    const elevation = Math.round(AppState.lastAltitude);
     const upperLimit = elevation + openingAltitude - 200;
     const lowerLimit = elevation + legHeightDownwind;
     const meanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, lowerLimit, upperLimit);
@@ -4280,21 +4281,21 @@ function calculateExitCircle() {
     const displacementDirection = meanWindDirection;
     const displacementDirectionFull = meanWindDirectionFull;
 
-    const landingPatternCoords = calculateLandingPatternCoords(lastLat, lastLng, interpolatedData, sliderIndex);
+    const landingPatternCoords = calculateLandingPatternCoords(AppState.lastLat, AppState.lastLng, interpolatedData, sliderIndex);
     let blueLat = landingPatternCoords.downwindLat;
     let blueLng = landingPatternCoords.downwindLng;
     if (!Number.isFinite(blueLat) || !Number.isFinite(blueLng)) {
         console.warn('Downwind coordinates invalid, using lastLat, lastLng as fallback');
-        blueLat = lastLat;
-        blueLng = lastLng;
+        blueLat = AppState.lastLat;
+        blueLng = AppState.lastLng;
     }
-    const redLat = lastLat;
-    const redLng = lastLng;
+    const redLat = AppState.lastLat;
+    const redLng = AppState.lastLng;
 
     const newCenterBlue = calculateNewCenter(blueLat, blueLng, centerDisplacement, displacementDirection);
     const newCenterRed = calculateNewCenter(redLat, redLng, centerDisplacementFull, displacementDirectionFull);
 
-    const freeFallResult = calculateFreeFall(AppState.weatherData, exitAltitude, openingAltitude, sliderIndex, lastLat, lastLng, lastAltitude);
+    const freeFallResult = calculateFreeFall(AppState.weatherData, exitAltitude, openingAltitude, sliderIndex, AppState.lastLat, AppState.lastLng, AppState.lastAltitude);
     if (!freeFallResult) {
         console.warn('Free fall calculation failed for exit circle');
         return null;
@@ -4326,14 +4327,14 @@ function calculateExitCircle() {
     };
 }
 function calculateCanopyCircles() {
-    if (!Settings.state.userSettings.showCanopyArea || !Settings.state.userSettings.calculateJump || !AppState.weatherData || !lastLat || !lastLng) {
+    if (!Settings.state.userSettings.showCanopyArea || !Settings.state.userSettings.calculateJump || !AppState.weatherData || !AppState.lastLat || !AppState.lastLng) {
         console.log('Skipping calculateCanopyCircles: conditions not met');
         return null;
     }
     console.log('Calculating canopy circles...', {
-        lastLat,
-        lastLng,
-        lastAltitude,
+        lastLat: AppState.lastLat,
+        lastLng: AppState.lastLng,
+        lastAltitude: AppState.lastAltitude,
         sliderIndex: parseInt(document.getElementById('timeSlider')?.value) || 0
     });
 
@@ -4364,7 +4365,7 @@ function calculateCanopyCircles() {
     const flyTimeFull = heightDistanceFull / descentRate;
     const horizontalCanopyDistanceFull = flyTimeFull * canopySpeedMps;
 
-    const elevation = Math.round(lastAltitude);
+    const elevation = Math.round(AppState.lastAltitude);
     const upperLimit = elevation + openingAltitude - 200;
     const lowerLimit = elevation + legHeightDownwind;
     const additionalBlueRadii = [];
@@ -4404,7 +4405,7 @@ function calculateCanopyCircles() {
         currentUpper -= decrement;
     }
 
-    const freeFallResult = calculateFreeFall(AppState.weatherData, exitAltitude, openingAltitude, sliderIndex, lastLat, lastLng, lastAltitude);
+    const freeFallResult = calculateFreeFall(AppState.weatherData, exitAltitude, openingAltitude, sliderIndex, AppState.lastLat, AppState.lastLng, AppState.lastAltitude);
     if (!freeFallResult) {
         console.warn('Free fall calculation failed for canopy circles');
         return null;
@@ -4422,16 +4423,16 @@ function calculateCanopyCircles() {
     const displacementDirection = meanWindDirection;
     const displacementDirectionFull = meanWindDirectionFull;
 
-    const landingPatternCoords = calculateLandingPatternCoords(lastLat, lastLng, interpolatedData, sliderIndex);
+    const landingPatternCoords = calculateLandingPatternCoords(AppState.lastLat, AppState.lastLng, interpolatedData, sliderIndex);
     let blueLat = landingPatternCoords.downwindLat;
     let blueLng = landingPatternCoords.downwindLng;
     if (!Number.isFinite(blueLat) || !Number.isFinite(blueLng)) {
         console.warn('Downwind coordinates invalid, using lastLat, lastLng as fallback');
-        blueLat = lastLat;
-        blueLng = lastLng;
+        blueLat = AppState.lastLat;
+        blueLng = AppState.lastLng;
     }
-    const redLat = lastLat;
-    const redLng = lastLng;
+    const redLat = AppState.lastLat;
+    const redLng = AppState.lastLng;
 
     console.log('Canopy circles calculated:', {
         blueLat,
@@ -4467,7 +4468,7 @@ function calculateCanopyCircles() {
     };
 }
 function calculateJumpRunTrack() {
-    if (!Settings.state.userSettings.showJumpRunTrack || !Settings.state.userSettings.calculateJump || !AppState.weatherData || !lastLat || !lastLng) {
+    if (!Settings.state.userSettings.showJumpRunTrack || !Settings.state.userSettings.calculateJump || !AppState.weatherData || !AppState.lastLat || !AppState.lastLng) {
         console.log('Skipping calculateJumpRunTrack: conditions not met');
         return null;
     }
@@ -4483,7 +4484,7 @@ function calculateJump() {
         showJumpRunTrack: Settings.state.userSettings.showJumpRunTrack
     });
 
-    if (!AppState.weatherData || !lastLat || !lastLng) {
+    if (!AppState.weatherData || !AppState.lastLat || !AppState.lastLng) {
         console.warn('Missing required data for calculateJump');
         clearJumpCircles();
         return null;
@@ -4531,9 +4532,9 @@ function calculateJump() {
         }
     }
 
-    if (currentMarker && lastLat && lastLng) {
-        currentMarker.setLatLng([lastLat, lastLng]);
-        updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, currentMarker.getPopup()?.isOpen() || false);
+    if (AppState.currentMarker && AppState.lastLat && AppState.lastLng) {
+        AppState.currentMarker.setLatLng([AppState.lastLat, AppState.lastLng]);
+        updateMarkerPopup(AppState.currentMarker, AppState.lastLat, AppState.lastLng, AppState.lastAltitude, AppState.currentMarker.getPopup()?.isOpen() || false);
     }
 
     console.log('calculateJump completed', result);
@@ -4889,7 +4890,7 @@ function clearIsolineMarkers() {
         let markerCount = 0;
         map.eachLayer(layer => {
             if (layer instanceof L.Marker &&
-                layer !== currentMarker &&
+                layer !== AppState.currentMarker &&
                 layer !== AppState.cutAwayMarker &&
                 layer !== AppState.liveMarker &&
                 layer !== AppState.harpMarker && // Skip harpMarker
@@ -4901,7 +4902,7 @@ function clearIsolineMarkers() {
                 console.log('Removing isoline-label marker:', layer, 'className:', layer.options.icon.options.className);
                 layer.remove();
                 markerCount++;
-            } else if (layer === currentMarker) {
+            } else if (layer === AppState.currentMarker) {
                 console.log('Skipping currentMarker:', layer, 'className:', layer.options?.icon?.options?.className || 'none');
             } else if (layer === AppState.cutAwayMarker) {
                 console.log('Skipping cutAwayMarker:', layer, 'className:', layer.options?.icon?.options?.className || 'none');
@@ -4922,7 +4923,7 @@ function clearIsolineMarkers() {
         if (markerCount === 0) {
             map.eachLayer(layer => {
                 if (layer instanceof L.Marker &&
-                    layer !== currentMarker &&
+                    layer !== AppState.currentMarker &&
                     layer !== AppState.cutAwayMarker &&
                     layer !== AppState.liveMarker &&
                     layer !== AppState.harpMarker &&
@@ -4947,7 +4948,7 @@ function resetJumpRunDirection(triggerUpdate = true) {
         console.log('Cleared jumpRunTrackDirection input');
     }
     console.log('Reset JRT direction to calculated');
-    if (triggerUpdate && Settings.state.userSettings.showJumpRunTrack && AppState.weatherData && lastLat && lastLng) {
+    if (triggerUpdate && Settings.state.userSettings.showJumpRunTrack && AppState.weatherData && AppState.lastLat && AppState.lastLng) {
         console.log('Triggering JRT update after reset');
         updateJumpRunTrack();
     }
@@ -4955,9 +4956,9 @@ function resetJumpRunDirection(triggerUpdate = true) {
 function jumpRunTrack() {
     console.log('Starting jumpRunTrack...', {
         weatherData: !!AppState.weatherData,
-        lastLat,
-        lastLng,
-        lastAltitude,
+        lastLat: AppState.lastLat,
+        lastLng: AppState.lastLng,
+        lastAltitude: AppState.lastAltitude,
         customJumpRunDirection: AppState.customJumpRunDirection,
         jumpRunTrackOffset: Settings.state.userSettings.jumpRunTrackOffset,
         jumpRunTrackForwardOffset: Settings.state.userSettings.jumpRunTrackForwardOffset
@@ -4969,12 +4970,12 @@ function jumpRunTrack() {
     const lateralOffset = parseInt(document.getElementById('jumpRunTrackOffset')?.value) || Settings.state.userSettings.jumpRunTrackOffset || 0;
     const forwardOffset = parseInt(document.getElementById('jumpRunTrackForwardOffset')?.value) || Settings.state.userSettings.jumpRunTrackForwardOffset || 0;
 
-    if (!AppState.weatherData || !lastLat || !lastLng || lastAltitude === null || lastAltitude === 'N/A') {
+    if (!AppState.weatherData || !AppState.lastLat || !AppState.lastLng || AppState.lastAltitude === null || AppState.lastAltitude === 'N/A') {
         console.warn('Cannot calculate jump run track: missing data', {
             weatherData: !!AppState.weatherData,
-            lastLat,
-            lastLng,
-            lastAltitude
+            lastLat: AppState.lastLat,
+            lastLng: AppState.lastLng,
+            lastAltitude: AppState.lastAltitude
         });
         return null;
     }
@@ -4985,7 +4986,7 @@ function jumpRunTrack() {
         return null;
     }
 
-    const elevation = Math.round(lastAltitude);
+    const elevation = Math.round(AppState.lastAltitude);
     const lowerLimit = elevation;
     const upperLimit = elevation + openingAltitude;
     console.log('Jump run track limits:', { lowerLimit, upperLimit, elevation });
@@ -5109,12 +5110,12 @@ function jumpRunTrack() {
     const halfLength = trackLength / 2;
 
     // Apply forward/backward offset along the track direction
-    let centerLat = lastLat;
-    let centerLng = lastLng;
+    let centerLat = AppState.lastLat;
+    let centerLng = AppState.lastLng;
     if (forwardOffset !== 0) {
         const forwardDistance = Math.abs(forwardOffset);
         const forwardBearing = forwardOffset >= 0 ? jumpRunTrackDirection : (jumpRunTrackDirection + 180) % 360;
-        [centerLat, centerLng] = calculateNewCenter(lastLat, lastLng, forwardDistance, forwardBearing);
+        [centerLat, centerLng] = calculateNewCenter(AppState.lastLat, AppState.lastLng, forwardDistance, forwardBearing);
         console.log('Applied forward/backward offset:', {
             forwardOffset,
             forwardBearing,
@@ -5189,8 +5190,8 @@ function updateJumpRunTrack() {
     console.log('updateJumpRunTrack called', {
         showJumpRunTrack: Settings.state.userSettings.showJumpRunTrack,
         weatherData: !!AppState.weatherData,
-        lastLat,
-        lastLng,
+        lastLat: AppState.lastLat,
+        lastLng: AppState.lastLng,
         customJumpRunDirection: AppState.customJumpRunDirection,
         currentZoom: map.getZoom(),
         jumpRunTrackOffset: Settings.state.userSettings.jumpRunTrackOffset,
@@ -5207,12 +5208,12 @@ function updateJumpRunTrack() {
         console.log('Removed existing JRT layer group');
     }
 
-    if (!Settings.state.userSettings.showJumpRunTrack || !AppState.weatherData || !lastLat || !lastLng || !isZoomInRange) {
+    if (!Settings.state.userSettings.showJumpRunTrack || !AppState.weatherData || !AppState.lastLat || !AppState.lastLng || !isZoomInRange) {
         console.log('Jump run track not drawn', {
             showJumpRunTrack: Settings.state.userSettings.showJumpRunTrack,
             weatherData: !!AppState.weatherData,
-            lastLat,
-            lastLng,
+            lastLat: AppState.lastLat,
+            lastLng: AppState.lastLng,
             isZoomInRange
         });
         const directionInput = document.getElementById('jumpRunTrackDirection');
@@ -5330,12 +5331,12 @@ function updateJumpRunTrack() {
     let originalTrackLatLngs = latlngs.map(ll => [...ll]);
     let originalApproachLatLngs = approachLatLngs ? approachLatLngs.map(ll => [...ll]) : null;
     let originalAirplaneLatLng = [...frontEnd];
-    let originalCenterLat = lastLat;
-    let originalCenterLng = lastLng;
+    let originalCenterLat = AppState.lastLat;
+    let originalCenterLng = AppState.lastLng;
     if (Settings.state.userSettings.jumpRunTrackForwardOffset !== 0) {
         const forwardDistance = Math.abs(Settings.state.userSettings.jumpRunTrackForwardOffset);
         const forwardBearing = Settings.state.userSettings.jumpRunTrackForwardOffset >= 0 ? direction : (direction + 180) % 360;
-        [originalCenterLat, originalCenterLng] = calculateNewCenter(lastLat, lastLng, forwardDistance, forwardBearing);
+        [originalCenterLat, originalCenterLng] = calculateNewCenter(AppState.lastLat, AppState.lastLng, forwardDistance, forwardBearing);
     }
     if (Settings.state.userSettings.jumpRunTrackOffset !== 0) {
         const lateralDistance = Math.abs(Settings.state.userSettings.jumpRunTrackOffset);
@@ -5397,7 +5398,7 @@ function updateJumpRunTrack() {
         const newLatLng = airplaneMarker.getLatLng();
 
         // Calculate displacement from original center (lastLat, lastLng)
-        const originalCenter = L.latLng(lastLat, lastLng);
+        const originalCenter = L.latLng(AppState.lastLat, AppState.lastLng);
         const newCenter = L.latLng(newLatLng.lat - (originalAirplaneLatLng[0] - originalCenterLat), newLatLng.lng - (originalAirplaneLatLng[1] - originalCenterLng));
         const distance = map.distance(originalCenter, newCenter);
         const bearing = calculateBearing(originalCenter.lat, originalCenter.lng, newCenter.lat, newCenter.lng);
@@ -5488,10 +5489,10 @@ function calculateCutAway() {
     }
 
     // Validate other required data
-    if (!AppState.weatherData || lastAltitude === 'N/A' || !Settings.state.userSettings.cutAwayAltitude) {
+    if (!AppState.weatherData || AppState.lastAltitude === 'N/A' || !Settings.state.userSettings.cutAwayAltitude) {
         console.log('Cannot calculate cut-away: missing data', {
             weatherData: !!AppState.weatherData,
-            lastAltitude,
+            lastAltitude: AppState.lastAltitude,
             cutAwayAltitude: Settings.state.userSettings.cutAwayAltitude
         });
         Utils.handleError('Cannot calculate cut-away: missing required data.');
@@ -5524,7 +5525,7 @@ function calculateCutAway() {
     }
 
     // Prepare altitude range for mean wind calculation
-    const elevation = Math.round(lastAltitude); // Surface altitude in meters
+    const elevation = Math.round(AppState.lastAltitude); // Surface altitude in meters
     const lowerLimit = elevation;
     const upperLimit = elevation + Settings.state.userSettings.cutAwayAltitude; // Surface + cutAwayAltitude
     console.log('Cut-away wind limits:', { lowerLimit, upperLimit, elevation });
@@ -5556,7 +5557,7 @@ function calculateCutAway() {
 
     // Vertical speed calculations
     const cutAwayAltitude = Settings.state.userSettings.cutAwayAltitude; // meters
-    const surfaceAltitude = lastAltitude; // meters
+    const surfaceAltitude = AppState.lastAltitude; // meters
     const verticalSpeedMax = Math.sqrt((2 * 9.81 * 5) / (1.2 * 13 * 2.6)).toFixed(1); // m/s, Fully Open
     const verticalSpeedMean = Math.sqrt((2 * 9.81 * 5) / (1.2 * 2 * 1.5)).toFixed(1); // m/s, Partially Collapsed
     const verticalSpeedMin = Math.sqrt((2 * 9.81 * 5) / (1.2 * 0.1 * 1)).toFixed(1); // m/s, Fully Collapsed
@@ -5687,7 +5688,7 @@ function calculateLandingPatternCoords(lat, lng, interpolatedData, sliderIndex) 
     const LEG_HEIGHT_FINAL = parseInt(document.getElementById('legHeightFinal').value) || 100;
     const LEG_HEIGHT_BASE = parseInt(document.getElementById('legHeightBase').value) || 200;
     const LEG_HEIGHT_DOWNWIND = parseInt(document.getElementById('legHeightDownwind').value) || 300;
-    const baseHeight = Math.round(lastAltitude);
+    const baseHeight = Math.round(AppState.lastAltitude);
 
     const landingDirection = document.querySelector('input[name="landingDirection"]:checked')?.value || 'LL';
     const customLandingDirLL = parseInt(document.getElementById('customLandingDirectionLL')?.value, 10) || null;
@@ -5768,7 +5769,7 @@ function calculateLandingPatternCoords(lat, lng, interpolatedData, sliderIndex) 
 }
 function updateLandingPattern() {
     console.log('updateLandingPattern called');
-    if (!map || !Settings.state.userSettings.showLandingPattern || !AppState.weatherData || !lastLat || !lastLng || lastAltitude === null || lastAltitude === 'N/A') {
+    if (!map || !Settings.state.userSettings.showLandingPattern || !AppState.weatherData || !AppState.lastLat || !AppState.lastLng || AppState.lastAltitude === null || AppState.lastAltitude === 'N/A') {
         console.log('Landing pattern not updated: missing data or feature disabled');
         // Clear existing layers
         if (AppState.landingPatternPolygon) {
@@ -5855,15 +5856,15 @@ function updateLandingPattern() {
         }
     });
 
-    if (!showLandingPattern || !AppState.weatherData || !AppState.weatherData.time || !currentMarker || sliderIndex >= AppState.weatherData.time.length) {
+    if (!showLandingPattern || !AppState.weatherData || !AppState.weatherData.time || !AppState.currentMarker || sliderIndex >= AppState.weatherData.time.length) {
         console.log('Landing pattern not updated: missing data or not enabled');
         return;
     }
 
-    const markerLatLng = currentMarker.getLatLng();
+    const markerLatLng = AppState.currentMarker.getLatLng();
     const lat = markerLatLng.lat;
     const lng = markerLatLng.lng;
-    const baseHeight = Math.round(lastAltitude);
+    const baseHeight = Math.round(AppState.lastAltitude);
 
     const interpolatedData = interpolateWeatherData(sliderIndex);
     if (!interpolatedData || interpolatedData.length === 0) {
@@ -6401,9 +6402,9 @@ function setupSliderEvents() {
         const sliderIndex = parseInt(slider.value) || 0;
         console.log('Time slider moved to index:', sliderIndex);
 
-        if (AppState.weatherData && lastLat && lastLng) {
+        if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
             await updateWeatherDisplay(sliderIndex);
-            if (lastAltitude !== 'N/A') calculateMeanWind();
+            if (AppState.lastAltitude !== 'N/A') calculateMeanWind();
             if (Settings.state.userSettings.showLandingPattern) {
                 console.log('Updating landing pattern for slider index:', sliderIndex);
                 updateLandingPattern();
@@ -6423,8 +6424,8 @@ function setupSliderEvents() {
         } else {
             console.warn('Cannot update displays: missing data', {
                 weatherData: !!AppState.weatherData,
-                lastLat,
-                lastLng
+                lastLat: AppState.lastLat,
+                lastLng: AppState.lastLng
             });
         }
     });
@@ -6493,17 +6494,17 @@ function setupModelSelectEvents() {
     // Handle changes
     modelSelect.addEventListener('change', async () => {
         console.log('Model select changed to:', modelSelect.value);
-        if (lastLat && lastLng) {
+        if (AppState.lastLat && AppState.lastLng) {
             const currentIndex = getSliderValue();
             const currentTime = AppState.weatherData?.time?.[currentIndex] || null;
             document.getElementById('info').innerHTML = `Fetching weather with ${modelSelect.value}...`;
             resetJumpRunDirection(false);
-            await fetchWeather(lastLat, lastLng, currentTime);
-            Settings.updateModelRunInfo(AppState.lastModelRun, lastLat, lastLng);
+            await fetchWeather(AppState.lastLat, AppState.lastLng, currentTime);
+            Settings.updateModelRunInfo(AppState.lastModelRun, AppState.lastLat, AppState.lastLng);
             await updateWeatherDisplay(currentIndex);
             Settings.updateUnitLabels();
 
-            if (lastAltitude !== 'N/A') {
+            if (AppState.lastAltitude !== 'N/A') {
                 calculateMeanWind();
                 if (Settings.state.userSettings.calculateJump) {
                     console.log('Recalculating jump for model change');
@@ -6515,10 +6516,10 @@ function setupModelSelectEvents() {
                 console.log('Updating JRT for model change');
                 updateJumpRunTrack();
             }
-            if (currentMarker) {
+            if (AppState.currentMarker) {
                 console.log('Updating marker popup for model change');
-                const wasOpen = currentMarker.getPopup()?.isOpen() || false;
-                await updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, wasOpen);
+                const wasOpen = AppState.currentMarker.getPopup()?.isOpen() || false;
+                await updateMarkerPopup(AppState.currentMarker, AppState.lastLat, AppState.lastLng, AppState.lastAltitude, wasOpen);
             }
             if (AppState.cutAwayMarker && AppState.cutAwayLat && AppState.cutAwayLng) {
                 console.log('Updating cut-away marker popup for model change');
@@ -6647,7 +6648,7 @@ function setupRadioEvents() {
             });
         }
         if (AppState.gpxLayer && AppState.gpxPoints.length > 0) {
-            const groundAltitude = lastAltitude !== 'N/A' && !isNaN(lastAltitude) ? parseFloat(lastAltitude) : null;
+            const groundAltitude = AppState.lastAltitude !== 'N/A' && !isNaN(AppState.lastAltitude) ? parseFloat(AppState.lastAltitude) : null;
             const windUnit = getWindSpeedUnit();
             const heightUnit = getHeightUnit();
             AppState.gpxLayer.eachLayer(layer => {
@@ -6678,7 +6679,7 @@ function setupRadioEvents() {
         Settings.updateUnitLabels();
         updateAllDisplays();
         if (AppState.gpxLayer && AppState.gpxPoints.length > 0) {
-            const groundAltitude = lastAltitude !== 'N/A' && !isNaN(lastAltitude) ? parseFloat(lastAltitude) : null;
+            const groundAltitude = AppState.lastAltitude !== 'N/A' && !isNaN(AppState.lastAltitude) ? parseFloat(AppState.lastAltitude) : null;
             const windUnit = getWindSpeedUnit();
             const heightUnit = getHeightUnit();
             AppState.gpxLayer.eachLayer(layer => {
@@ -6707,10 +6708,10 @@ function setupRadioEvents() {
     });
     setupRadioGroup('coordFormat', () => {
         updateCoordInputs(Settings.state.userSettings.coordFormat);
-        if (currentMarker && lastLat && lastLng) {
+        if (AppState.currentMarker && AppState.lastLat && AppState.lastLng) {
             // Check if popup is open to preserve its state
-            const isPopupOpen = currentMarker.getPopup()?.isOpen() || false;
-            updateMarkerPopup(currentMarker, lastLat, lastLng, lastAltitude, isPopupOpen);
+            const isPopupOpen = AppState.currentMarker.getPopup()?.isOpen() || false;
+            updateMarkerPopup(AppState.currentMarker, AppState.lastLat, AppState.lastLng, AppState.lastAltitude, isPopupOpen);
         }
     });
     setupRadioGroup('downloadFormat', () => {
@@ -6744,7 +6745,7 @@ function setupRadioEvents() {
         Settings.state.userSettings.cutAwayState = Settings.getValue('cutAwayState', 'radio', 'Partially');
         Settings.save();
         console.log('cutAwayState changed:', Settings.state.userSettings.cutAwayState);
-        if (Settings.state.userSettings.showCutAwayFinder && Settings.state.userSettings.calculateJump && AppState.weatherData && lastLat && lastLng) {
+        if (Settings.state.userSettings.showCutAwayFinder && Settings.state.userSettings.calculateJump && AppState.weatherData && AppState.lastLat && AppState.lastLng) {
             console.log('Recalculating cut-away for state change');
             debouncedCalculateJump(); // Use debounced version
             calculateCutAway();
@@ -6774,7 +6775,7 @@ function setupRadioEvents() {
     });
     // Trigger initial tooltip refresh for heightUnit
     if (AppState.gpxLayer && AppState.gpxPoints.length > 0) {
-        const groundAltitude = lastAltitude !== 'N/A' && !isNaN(lastAltitude) ? parseFloat(lastAltitude) : null;
+        const groundAltitude = AppState.lastAltitude !== 'N/A' && !isNaN(AppState.lastAltitude) ? parseFloat(AppState.lastAltitude) : null;
         const windUnit = getWindSpeedUnit();
         const heightUnit = getHeightUnit();
         AppState.gpxLayer.eachLayer(layer => {
@@ -6800,14 +6801,14 @@ function setupRadioEvents() {
 }
 function setupInputEvents() {
     setupInput('lowerLimit', 'change', 300, (value) => {
-        if (AppState.weatherData && lastLat && lastLng && lastAltitude !== 'N/A') calculateMeanWind();
+        if (AppState.weatherData && AppState.lastLat && AppState.lastLng && AppState.lastAltitude !== 'N/A') calculateMeanWind();
     });
     setupInput('upperLimit', 'change', 300, (value) => {
-        if (AppState.weatherData && lastLat && lastLng && lastAltitude !== 'N/A') calculateMeanWind();
+        if (AppState.weatherData && AppState.lastLat && AppState.lastLng && AppState.lastAltitude !== 'N/A') calculateMeanWind();
     });
     setupInput('openingAltitude', 'change', 300, (value) => {
         if (!isNaN(value) && value >= 500 && value <= 15000) {
-            if (Settings.state.userSettings.calculateJump && AppState.weatherData && lastLat && lastLng) {
+            if (Settings.state.userSettings.calculateJump && AppState.weatherData && AppState.lastLat && AppState.lastLng) {
                 debouncedCalculateJump(); // Use debounced version
                 calculateCutAway();
             }
@@ -6820,7 +6821,7 @@ function setupInputEvents() {
     });
     setupInput('exitAltitude', 'change', 300, (value) => {
         if (!isNaN(value) && value >= 500 && value <= 15000) {
-            if (Settings.state.userSettings.calculateJump && AppState.weatherData && lastLat && lastLng) debouncedCalculateJump(); // Use debounced version
+            if (Settings.state.userSettings.calculateJump && AppState.weatherData && AppState.lastLat && AppState.lastLng) debouncedCalculateJump(); // Use debounced version
         } else {
             Utils.handleError('Exit altitude must be between 500 and 15000 meters.');
             setInputValue('exitAltitude', 3000);
@@ -6860,7 +6861,7 @@ function setupInputEvents() {
         if (!isNaN(customDir) && customDir >= 0 && customDir <= 359) {
             Settings.state.userSettings.customLandingDirectionLL = customDir;
             Settings.save();
-            if (Settings.state.userSettings.landingDirection === 'LL' && AppState.weatherData && lastLat && lastLng) {
+            if (Settings.state.userSettings.landingDirection === 'LL' && AppState.weatherData && AppState.lastLat && AppState.lastLng) {
                 console.log('Updating landing pattern for LL:', customDir);
                 updateLandingPattern();
                 recenterMap();
@@ -6876,7 +6877,7 @@ function setupInputEvents() {
         if (!isNaN(customDir) && customDir >= 0 && customDir <= 359) {
             Settings.state.userSettings.customLandingDirectionRR = customDir;
             Settings.save();
-            if (Settings.state.userSettings.landingDirection === 'RR' && AppState.weatherData && lastLat && lastLng) {
+            if (Settings.state.userSettings.landingDirection === 'RR' && AppState.weatherData && AppState.lastLat && AppState.lastLng) {
                 console.log('Updating landing pattern for RR:', customDir);
                 updateLandingPattern();
                 recenterMap();
@@ -6901,7 +6902,7 @@ function setupInputEvents() {
             }
             AppState.customJumpRunDirection = customDir;
             console.log('Set custom direction from input:', customDir);
-            if (AppState.weatherData && lastLat && lastLng) {
+            if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
                 if (Settings.state.userSettings.showJumpRunTrack) {
                     console.log('Updating JRT for custom direction input');
                     updateJumpRunTrack();
@@ -6914,8 +6915,8 @@ function setupInputEvents() {
             } else {
                 console.warn('Cannot update JRT or jump: missing conditions', {
                     weatherData: !!AppState.weatherData,
-                    lastLat,
-                    lastLng
+                    lastLat: AppState.lastLat,
+                    lastLng: AppState.lastLng
                 });
             }
         } else {
@@ -6926,7 +6927,7 @@ function setupInputEvents() {
             if (directionInput) {
                 setInputValueSilently('jumpRunTrackDirection', '');
             }
-            if (AppState.weatherData && lastLat && lastLng) {
+            if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
                 if (Settings.state.userSettings.showJumpRunTrack) {
                     console.log('Updating JRT for invalid direction input');
                     updateJumpRunTrack();
@@ -6945,7 +6946,7 @@ function setupInputEvents() {
         if (!isNaN(offset) && offset >= -50000 && offset <= 50000 && offset % 100 === 0) {
             Settings.state.userSettings.jumpRunTrackOffset = offset;
             Settings.save();
-            if (Settings.state.userSettings.calculateJump && Settings.state.userSettings.showJumpRunTrack && AppState.weatherData && lastLat && lastLng) {
+            if (Settings.state.userSettings.calculateJump && Settings.state.userSettings.showJumpRunTrack && AppState.weatherData && AppState.lastLat && AppState.lastLng) {
                 console.log('Updating JRT for offset change');
                 updateJumpRunTrack();
             }
@@ -6969,7 +6970,7 @@ function setupInputEvents() {
         if (!isNaN(offset) && offset >= -50000 && offset <= 50000 && offset % 100 === 0) {
             Settings.state.userSettings.jumpRunTrackForwardOffset = offset;
             Settings.save();
-            if (Settings.state.userSettings.calculateJump && Settings.state.userSettings.showJumpRunTrack && AppState.weatherData && lastLat && lastLng) {
+            if (Settings.state.userSettings.calculateJump && Settings.state.userSettings.showJumpRunTrack && AppState.weatherData && AppState.lastLat && AppState.lastLng) {
                 console.log('Updating JRT for forward offset change');
                 updateJumpRunTrack();
             }
@@ -7000,7 +7001,7 @@ function setupInputEvents() {
                 Settings.save();
                 console.log(`Auto-updated jumperSeparation to ${separation}s for IAS ${speed}kt`);
             }
-            if (Settings.state.userSettings.calculateJump && AppState.weatherData && lastLat && lastLng) {
+            if (Settings.state.userSettings.calculateJump && AppState.weatherData && AppState.lastLat && AppState.lastLng) {
                 console.log('Recalculating jump for aircraft speed change');
                 debouncedCalculateJump(); // Use debounced version
                 calculateCutAway();
@@ -7017,7 +7018,7 @@ function setupInputEvents() {
         if (!isNaN(number) && number >= 1 && number <= 50) {
             Settings.state.userSettings.numberOfJumpers = number;
             Settings.save();
-            if (Settings.state.userSettings.calculateJump && AppState.weatherData && lastLat && lastLng) {
+            if (Settings.state.userSettings.calculateJump && AppState.weatherData && AppState.lastLat && AppState.lastLng) {
                 console.log('Recalculating jump for jumper number change');
                 debouncedCalculateJump(); // Use debounced version
                 calculateCutAway();
@@ -7036,7 +7037,7 @@ function setupInputEvents() {
             AppState.isJumperSeparationManual = true; // Mark as manually set
             Settings.save();
             console.log(`jumperSeparation manually set to ${separation}s`);
-            if (Settings.state.userSettings.calculateJump && AppState.weatherData && lastLat && lastLng) {
+            if (Settings.state.userSettings.calculateJump && AppState.weatherData && AppState.lastLat && AppState.lastLng) {
                 console.log('Recalculating jump for jumper separation change');
                 debouncedCalculateJump(); // Use debounced version
                 calculateCutAway();
@@ -7067,8 +7068,8 @@ function setupInputEvents() {
     });
     setupInput('historicalDatePicker', 'change', 300, (value) => {
         console.log('historicalDatePicker changed to:', value);
-        if (lastLat && lastLng) {
-            fetchWeatherForLocation(lastLat, lastLng, value ? `${value}T00:00:00Z` : null);
+        if (AppState.lastLat && AppState.lastLng) {
+            fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, value ? `${value}T00:00:00Z` : null);
         } else {
             Utils.handleError('Please select a position on the map first.');
         }
@@ -7084,7 +7085,7 @@ function setupCheckboxEvents() {
             info.style.display = checkbox.checked ? 'block' : 'none';
             console.log('Info display set to:', info.style.display);
         }
-        if (checkbox.checked && AppState.weatherData && lastLat && lastLng) {
+        if (checkbox.checked && AppState.weatherData && AppState.lastLat && AppState.lastLng) {
             updateWeatherDisplay(getSliderValue());
         }
         recenterMap();
@@ -7095,7 +7096,7 @@ function setupCheckboxEvents() {
         Settings.save();
         checkbox.checked = Settings.state.userSettings.showExitArea;
         console.log('Show Exit Area set to:', Settings.state.userSettings.showExitArea);
-        if (checkbox.checked && AppState.weatherData && lastLat && lastLng && isCalculateJumpUnlocked && Settings.state.userSettings.calculateJump) {
+        if (checkbox.checked && AppState.weatherData && AppState.lastLat && AppState.lastLng && isCalculateJumpUnlocked && Settings.state.userSettings.calculateJump) {
             const exitResult = calculateExitCircle();
             if (exitResult) {
                 updateJumpCircle(
@@ -7121,7 +7122,7 @@ function setupCheckboxEvents() {
         Settings.save();
         checkbox.checked = Settings.state.userSettings.showCanopyArea;
         console.log('Show Canopy Area set to:', Settings.state.userSettings.showCanopyArea);
-        if (checkbox.checked && AppState.weatherData && lastLat && lastLng && isCalculateJumpUnlocked && Settings.state.userSettings.calculateJump) {
+        if (checkbox.checked && AppState.weatherData && AppState.lastLat && AppState.lastLng && isCalculateJumpUnlocked && Settings.state.userSettings.calculateJump) {
             const canopyResult = calculateCanopyCircles();
             if (canopyResult) {
                 updateJumpCircle(
@@ -7175,7 +7176,7 @@ function setupCheckboxEvents() {
         Settings.save();
         checkbox.checked = Settings.state.userSettings.showJumpRunTrack;
         console.log('showJumpRunTrack changed:', checkbox.checked);
-        if (checkbox.checked && AppState.weatherData && lastLat && lastLng && isCalculateJumpUnlocked && Settings.state.userSettings.calculateJump) {
+        if (checkbox.checked && AppState.weatherData && AppState.lastLat && AppState.lastLng && isCalculateJumpUnlocked && Settings.state.userSettings.calculateJump) {
             calculateJumpRunTrack();
         } else {
             if (AppState.jumpRunTrackLayer) {
@@ -7246,7 +7247,7 @@ function setupCheckboxEvents() {
             const submenu = checkbox.closest('li')?.querySelector('ul');
             console.log('Submenu lookup for showLandingPattern:', { submenu: submenu ? 'Found' : 'Not found', submenuClasses: submenu?.classList.toString() });
             toggleSubmenu(checkbox, submenu, true);
-            if (AppState.weatherData && lastLat && lastLng) {
+            if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
                 updateLandingPattern();
                 recenterMap();
             }
@@ -7403,7 +7404,7 @@ function setupCheckboxEvents() {
             return;
         }
         // If targeting DIP, ensure a position is set
-        if (checkbox.checked && Settings.state.userSettings.jumpMasterLineTarget === 'DIP' && lastLat === null && lastLng === null && !currentMarker) {
+        if (checkbox.checked && Settings.state.userSettings.jumpMasterLineTarget === 'DIP' && AppState.lastLat === null && AppState.lastLng === null && !AppState.currentMarker) {
             checkbox.checked = false;
             Settings.state.userSettings.showJumpMasterLine = false;
             Settings.save();
@@ -7513,11 +7514,11 @@ function setupCoordinateEvents() {
         moveMarkerBtn.addEventListener('click', async () => {
             try {
                 const [lat, lng] = parseCoordinates();
-                lastLat = lat;
-                lastLng = lng;
-                lastAltitude = await getAltitude(lat, lng);
+                AppState.lastLat = lat;
+                AppState.lastLng = lng;
+                AppState.lastAltitude = await getAltitude(lat, lng);
                 console.log('Coordinate input, moving marker to:', { lat, lng });
-                configureMarker(lat, lng, lastAltitude, false);
+                configureMarker(lat, lng, AppState.lastAltitude, false);
                 resetJumpRunDirection(true);
                 addCoordToHistory(lat, lng);
                 if (Settings.state.userSettings.calculateJump) {
@@ -7526,7 +7527,7 @@ function setupCoordinateEvents() {
                     calculateCutAway();
                 }
                 recenterMap(true);
-                isManualPanning = false;
+                AppState.isManualPanning = false;
                 await fetchWeatherForLocation(lat, lng);
             } catch (error) {
                 Utils.handleError(error.message);
@@ -7672,7 +7673,7 @@ function setupMenuItemEvents() {
                 Settings.state.userSettings.calculateJump = true;
                 Settings.save();
                 toggleSubmenu(calculateJumpMenuItem, submenu, true);
-                if (AppState.weatherData && lastLat && lastLng) {
+                if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
                     debouncedCalculateJump();
                     calculateCutAway();
                 }
@@ -7783,7 +7784,7 @@ function setupResetButton() {
         console.log('Reinitialized UI elements after reset');
 
         // Trigger tile caching if position is available
-        if (lastLat && lastLng) {
+        if (AppState.lastLat && AppState.lastLng) {
             cacheTilesForDIP();
             console.log('Triggered tile caching after reset');
         }
@@ -7819,8 +7820,8 @@ function setupClearHistoricalDate() {
             if (datePicker) {
                 datePicker.value = ''; // Clear the date picker
                 console.log('Cleared historical date, refetching forecast data');
-                if (lastLat && lastLng) {
-                    fetchWeatherForLocation(lastLat, lastLng, null); // Refetch forecast data
+                if (AppState.lastLat && AppState.lastLng) {
+                    fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, null); // Refetch forecast data
                 } else {
                     Utils.handleError('Please select a position on the map first.');
                 }
@@ -8243,9 +8244,9 @@ async function updateAllDisplays() {
     console.log('updateAllDisplays called');
     try {
         const sliderIndex = getSliderValue();
-        if (AppState.weatherData && lastLat && lastLng) {
+        if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
             await updateWeatherDisplay(sliderIndex);
-            if (lastAltitude !== 'N/A') calculateMeanWind();
+            if (AppState.lastAltitude !== 'N/A') calculateMeanWind();
             if (Settings.state.userSettings.showLandingPattern) updateLandingPattern();
             if (Settings.state.userSettings.calculateJump) {
                 debouncedCalculateJump();
@@ -8256,9 +8257,9 @@ async function updateAllDisplays() {
         }
         updateLivePositionControl();
         // Update Jump Master Line distance unit if active
-        if (AppState.jumpMasterLine && AppState.liveMarker && currentMarker && lastLat !== null && lastLng !== null) {
+        if (AppState.jumpMasterLine && AppState.liveMarker && AppState.currentMarker && AppState.lastLat !== null && AppState.lastLng !== null) {
             const liveLatLng = AppState.liveMarker.getLatLng();
-            const dipLatLng = currentMarker.getLatLng();
+            const dipLatLng = AppState.currentMarker.getLatLng();
             const bearing = calculateBearing(liveLatLng.lat, liveLatLng.lng, dipLatLng.lat, dipLatLng.lng).toFixed(0);
             const distanceMeters = map.distance(liveLatLng, dipLatLng);
             const heightUnit = getHeightUnit();
