@@ -44,6 +44,20 @@ const AppState = {
     isPlacingHarp: false,
     harpMarker: null,
     watchId: null,
+    prevLat: null,
+    prevLng: null,
+    prevTime: null,
+    livePositionControl: null,
+    lastLatitude: null,
+    lastLongitude: null,
+    lastDeviceAltitude: null,
+    lastAltitudeAccuracy: null,
+    lastAccuracy: null,
+    lastSpeed: 'N/A',
+    lastEffectiveWindUnit: 'kt',
+    lastDirection: 'N/A',
+    lastTerrainAltitude: 'N/A',
+    lastSmoothedSpeedMs: 0
 };
 
 let map;
@@ -53,22 +67,6 @@ let lastLng = null;
 let lastAltitude = null;
 let currentMarker = null;
 let isManualPanning = false; // New flag to track manual panning
-let prevLat = null;
-let prevLng = null;
-let prevTime = null;
-let livePositionControl = null;
-// New: Store last position data for instant unit updates
-let lastLatitude = null;
-let lastLongitude = null;
-let lastDeviceAltitude = null;
-let lastAltitudeAccuracy = null;
-let lastAccuracy = null;
-let lastSpeed = 'N/A';
-let lastEffectiveWindUnit = 'kt';
-let lastDirection = 'N/A';
-let lastTerrainAltitude = 'N/A';
-let lastSmoothedSpeedMs = 0; // Store last smoothed speed for EMA
-
 
 const minZoom = 11;
 const maxZoom = 14;
@@ -1337,9 +1335,9 @@ function initMap() {
     map.getPane('tooltipPane').style.zIndex = 700;
     map.getPane('popupPane').style.zIndex = 700;
 
-    livePositionControl = L.control.livePosition({ position: 'bottomright' }).addTo(map);
-    if (livePositionControl._container) {
-        livePositionControl._container.style.display = 'none';
+    AppState.livePositionControl = L.control.livePosition({ position: 'bottomright' }).addTo(map);
+    if (AppState.livePositionControl._container) {
+        AppState.livePositionControl._container.style.display = 'none';
         console.log('Initialized livePositionControl and hid by default');
     } else {
         console.warn('livePositionControl._container not initialized in initMap');
@@ -1884,11 +1882,11 @@ function clearHarpMarker() {
         if (AppState.liveMarker && currentMarker && lastLat !== null && lastLng !== null) {
             debouncedPositionUpdate({
                 coords: {
-                    latitude: lastLatitude,
-                    longitude: lastLongitude,
-                    accuracy: lastAccuracy,
-                    altitude: lastDeviceAltitude,
-                    altitudeAccuracy: lastAltitudeAccuracy
+                    latitude: AppState.lastLatitude,
+                    longitude: AppState.lastLongitude,
+                    accuracy: AppState.lastAccuracy,
+                    altitude: AppState.lastDeviceAltitude,
+                    altitudeAccuracy: AppState.lastAltitudeAccuracy
                 }
             });
         }
@@ -2299,22 +2297,22 @@ const debouncedPositionUpdate = debounce(async (position) => {
         effectiveWindUnit = 'kt';
     }
     let direction = 'N/A';
-    if (prevLat !== null && prevLng !== null && prevTime !== null) {
-        const distance = map.distance([prevLat, prevLng], [latitude, longitude]);
-        const timeDiff = currentTime - prevTime;
+    if (AppState.prevLat !== null && AppState.prevLng !== null && AppState.prevTime !== null) {
+        const distance = map.distance([AppState.prevLat, AppState.prevLng], [latitude, longitude]);
+        const timeDiff = currentTime - AppState.prevTime;
         if (timeDiff > 0) {
             speedMs = distance / timeDiff; // Speed in meters/second
             // Apply EMA smoothing with dynamic alpha
             const alpha = speedMs < 25 ? 0.5 : 0.2; // Responsive at low speeds, stable at high speeds
-            lastSmoothedSpeedMs = alpha * speedMs + (1 - alpha) * lastSmoothedSpeedMs;
-            speed = Utils.convertWind(lastSmoothedSpeedMs, effectiveWindUnit, 'm/s');
+            AppState.lastSmoothedSpeedMs = alpha * speedMs + (1 - alpha) * AppState.lastSmoothedSpeedMs;
+            speed = Utils.convertWind(AppState.lastSmoothedSpeedMs, effectiveWindUnit, 'm/s');
             speed = effectiveWindUnit === 'bft' ? Math.round(speed) : speed.toFixed(1);
-            direction = calculateBearing(prevLat, prevLng, latitude, longitude).toFixed(0);
+            direction = calculateBearing(AppState.prevLat, AppState.prevLng, latitude, longitude).toFixed(0);
             //Direction smoothing (optional)
             /*let lastSmoothedDirection = 0; // Global variable
             direction = alpha * calculateBearing(...) + (1 - alpha) * lastSmoothedDirection;
             lastSmoothedDirection = direction;*/
-            console.log('Calculated speed:', { rawSpeedMs: speedMs, smoothedSpeedMs: lastSmoothedSpeedMs, convertedSpeed: speed, unit: effectiveWindUnit, alpha });
+            console.log('Calculated speed:', { rawSpeedMs: speedMs, smoothedSpeedMs: AppState.lastSmoothedSpeedMs, convertedSpeed: speed, unit: effectiveWindUnit, alpha });
         }
     }
 
@@ -2369,12 +2367,12 @@ const debouncedPositionUpdate = debounce(async (position) => {
                 const roundedDistance = Math.round(convertedDistance);
 
                 let totDisplay = 'N/A';
-                if (lastSmoothedSpeedMs > 0) {
-                    const totSeconds = distanceMeters / lastSmoothedSpeedMs;
+                if (AppState.lastSmoothedSpeedMs > 0) {
+                    const totSeconds = distanceMeters / AppState.lastSmoothedSpeedMs;
                     totDisplay = Math.round(totSeconds);
-                    console.log('Calculated TOT:', { distanceMeters, smoothedSpeedMs: lastSmoothedSpeedMs, totSeconds, totDisplay });
+                    console.log('Calculated TOT:', { distanceMeters, smoothedSpeedMs: AppState.lastSmoothedSpeedMs, totSeconds, totDisplay });
                 } else {
-                    console.log('TOT set to N/A: invalid or zero speed', { smoothedSpeedMs: lastSmoothedSpeedMs });
+                    console.log('TOT set to N/A: invalid or zero speed', { smoothedSpeedMs: AppState.lastSmoothedSpeedMs });
                 }
 
                 jumpMasterLineData = {
@@ -2415,8 +2413,8 @@ const debouncedPositionUpdate = debounce(async (position) => {
         }
     }
 
-    if (livePositionControl) {
-        livePositionControl.update(
+    if (AppState.livePositionControl) {
+        AppState.livePositionControl.update(
             latitude,
             longitude,
             deviceAltitude,
@@ -2440,26 +2438,26 @@ const debouncedPositionUpdate = debounce(async (position) => {
             showJumpMasterLine: Settings.state.userSettings.showJumpMasterLine,
             jumpMasterLineData
         });
-        livePositionControl._container.style.display = 'block';
-        livePositionControl._container.style.opacity = '1';
-        livePositionControl._container.style.visibility = 'visible';
+        AppState.livePositionControl._container.style.display = 'block';
+        AppState.livePositionControl._container.style.opacity = '1';
+        AppState.livePositionControl._container.style.visibility = 'visible';
     } else {
         console.warn('livePositionControl not initialized in debouncedPositionUpdate');
     }
 
-    lastLatitude = latitude;
-    lastLongitude = longitude;
-    lastDeviceAltitude = deviceAltitude;
-    lastAltitudeAccuracy = altitudeAccuracy;
-    lastAccuracy = accuracy;
-    lastSpeed = speed;
-    lastEffectiveWindUnit = effectiveWindUnit;
-    lastDirection = direction;
-    console.log('Stored last position data:', { lastLatitude, lastLongitude, lastDeviceAltitude, lastAltitudeAccuracy, lastAccuracy, lastSpeed, lastEffectiveWindUnit, lastDirection });
+    AppState.lastLatitude = latitude;
+    AppState.lastLongitude = longitude;
+    AppState.lastDeviceAltitude = deviceAltitude;
+    AppState.lastAltitudeAccuracy = altitudeAccuracy;
+    AppState.lastAccuracy = accuracy;
+    AppState.lastSpeed = speed;
+    AppState.lastEffectiveWindUnit = effectiveWindUnit;
+    AppState.lastDirection = direction;
+    console.log('Stored last position data:', { lastLatitude: AppState.lastLatitude, lastLongitude: AppState.lastLongitude, lastDeviceAltitude: AppState.lastDeviceAltitude, lastAltitudeAccuracy: AppState.lastAltitudeAccuracy, lastAccuracy: AppState.lastAccuracy, lastSpeed: AppState.lastSpeed, lastEffectiveWindUnit: AppState.lastEffectiveWindUnit, lastDirection: AppState.lastDirection });
 
-    prevLat = latitude;
-    prevLng = longitude;
-    prevTime = currentTime;
+    AppState.prevLat = latitude;
+    AppState.prevLng = longitude;
+    AppState.prevTime = currentTime;
 }, 300);
 L.Control.LivePosition = L.Control.extend({
     options: {
@@ -2606,35 +2604,35 @@ function updateLiveMarkerPopup(marker, lat, lng, terrainAltitude, deviceAltitude
     }
 }
 function updateLivePositionControl() {
-    if (!livePositionControl || lastLatitude === null || lastLongitude === null) {
-        console.log('Skipping livePositionControl update: no control or position data', { livePositionControl: !!livePositionControl, lastLatitude });
+    if (!AppState.livePositionControl || AppState.lastLatitude === null || AppState.lastLongitude === null) {
+        console.log('Skipping livePositionControl update: no control or position data', { livePositionControl: !!AppState.livePositionControl, lastLatitude: AppState.lastLatitude });
         return;
     }
     try {
         console.log('Updating livePositionControl with last position data');
         // Recalculate speed for current windUnit
-        let newSpeed = lastSpeed;
+        let newSpeed = AppState.lastSpeed;
         let newEffectiveWindUnit = getWindSpeedUnit();
         if (newEffectiveWindUnit === 'bft') {
             newEffectiveWindUnit = 'kt';
         }
-        if (lastSpeed !== 'N/A' && Number.isFinite(parseFloat(lastSpeed))) {
-            const speedMs = Utils.convertWind(parseFloat(lastSpeed), 'm/s', lastEffectiveWindUnit);
+        if (AppState.lastSpeed !== 'N/A' && Number.isFinite(parseFloat(AppState.lastSpeed))) {
+            const speedMs = Utils.convertWind(parseFloat(AppState.lastSpeed), 'm/s', AppState.lastEffectiveWindUnit);
             newSpeed = Utils.convertWind(speedMs, newEffectiveWindUnit, 'm/s');
             newSpeed = newEffectiveWindUnit === 'bft' ? Math.round(newSpeed) : newSpeed.toFixed(1);
         }
-        livePositionControl.update(
-            lastLatitude,
-            lastLongitude,
-            lastDeviceAltitude,
-            lastAltitudeAccuracy,
-            lastAccuracy,
+        AppState.livePositionControl.update(
+            AppState.lastLatitude,
+            AppState.lastLongitude,
+            AppState.lastDeviceAltitude,
+            AppState.lastAltitudeAccuracy,
+            AppState.lastAccuracy,
             newSpeed,
             newEffectiveWindUnit,
-            lastDirection
+            AppState.lastDirection
         );
-        lastSpeed = newSpeed;
-        lastEffectiveWindUnit = newEffectiveWindUnit;
+        AppState.lastSpeed = newSpeed;
+        AppState.lastEffectiveWindUnit = newEffectiveWindUnit;
         console.log('Updated livePositionControl:', { newSpeed, newEffectiveWindUnit });
     } catch (error) {
         console.error('Error updating livePositionControl:', error);
@@ -2690,14 +2688,14 @@ function startPositionTracking() {
         console.log('Started geolocation watch with watchId:', AppState.watchId);
 
         // Ensure livePositionControl is visible
-        if (livePositionControl) {
-            livePositionControl._container.style.display = 'block';
-            livePositionControl._container.style.opacity = '1';
-            livePositionControl._container.style.visibility = 'visible';
+        if (AppState.livePositionControl) {
+            AppState.livePositionControl._container.style.display = 'block';
+            AppState.livePositionControl._container.style.opacity = '1';
+            AppState.livePositionControl._container.style.visibility = 'visible';
             console.log('Ensured livePositionControl is visible');
         } else {
             console.warn('livePositionControl not initialized in startPositionTracking');
-            livePositionControl = L.control.livePosition({ position: 'bottomright' }).addTo(map);
+            AppState.livePositionControl = L.control.livePosition({ position: 'bottomright' }).addTo(map);
             console.log('Reinitialized livePositionControl');
         }
     } catch (error) {
@@ -2725,18 +2723,18 @@ function stopPositionTracking() {
         window.accuracyCircle = null;
         console.log('Removed accuracy circle');
     }
-    if (livePositionControl) {
-        livePositionControl._container.innerHTML = 'Initializing live position...';
-        livePositionControl._container.style.display = 'none';
+    if (AppState.livePositionControl) {
+        AppState.livePositionControl._container.innerHTML = 'Initializing live position...';
+        AppState.livePositionControl._container.style.display = 'none';
         console.log('Hid livePositionControl and reset content');
     } else {
         console.warn('livePositionControl not found in stopPositionTracking');
     }
-    prevLat = null;
-    prevLng = null;
-    prevTime = null;
-    lastSpeed = 'N/A';
-    lastDirection = 'N/A';
+    AppState.prevLat = null;
+    AppState.prevLng = null;
+    AppState.prevTime = null;
+    AppState.lastSpeed = 'N/A';
+    AppState.lastDirection = 'N/A';
     console.log('Cleared tracking data');
 }
 function updateAccuracyCircle(lat, lng, accuracy) {
@@ -2819,16 +2817,16 @@ function updateJumpMasterLine() {
         console.log('Created Jump Master Line:', { bearing, distance: roundedDistance, unit: heightUnit });
     }
 
-    if (livePositionControl) {
-        livePositionControl.update(
+    if (AppState.livePositionControl) {
+        AppState.livePositionControl.update(
             liveLatLng.lat,
             liveLatLng.lng,
-            lastDeviceAltitude,
-            lastAltitudeAccuracy,
-            lastAccuracy,
-            lastSpeed,
-            lastEffectiveWindUnit,
-            lastDirection,
+            AppState.lastDeviceAltitude,
+            AppState.lastAltitudeAccuracy,
+            AppState.lastAccuracy,
+            AppState.lastSpeed,
+            AppState.lastEffectiveWindUnit,
+            AppState.lastDirection,
             true,
             { bearing, distance: roundedDistance, unit: heightUnit }
         );
@@ -6759,11 +6757,11 @@ function setupRadioEvents() {
         if (Settings.state.userSettings.showJumpMasterLine && AppState.liveMarker) {
             debouncedPositionUpdate({
                 coords: {
-                    latitude: lastLatitude,
-                    longitude: lastLongitude,
-                    accuracy: lastAccuracy,
-                    altitude: lastDeviceAltitude,
-                    altitudeAccuracy: lastAltitudeAccuracy
+                    latitude: AppState.lastLatitude,
+                    longitude: AppState.lastLongitude,
+                    accuracy: AppState.lastAccuracy,
+                    altitude: AppState.lastDeviceAltitude,
+                    altitudeAccuracy: AppState.lastAltitudeAccuracy
                 }
             });
         }
@@ -7370,8 +7368,8 @@ function setupCheckboxEvents() {
             AppState.jumpMasterLine = null;
             console.log('Removed Jump Master Line due to trackPosition disabled');
         }
-        if (livePositionControl) {
-            livePositionControl.update(
+        if (AppState.livePositionControl) {
+            AppState.livePositionControl.update(
                 0,
                 0,
                 null,
@@ -7383,7 +7381,7 @@ function setupCheckboxEvents() {
                 false,
                 null
             );
-            livePositionControl._container.style.display = 'none';
+            AppState.livePositionControl._container.style.display = 'none';
             console.log('Cleared livePositionControl content and hid panel');
 
         }
@@ -7429,45 +7427,45 @@ function setupCheckboxEvents() {
                 AppState.jumpMasterLine = null;
                 console.log('Removed Jump Master Line: unchecked');
             }
-            if (livePositionControl) {
-                livePositionControl.update(
-                    lastLatitude || 0,
-                    lastLongitude || 0,
-                    lastDeviceAltitude,
-                    lastAltitudeAccuracy,
-                    lastAccuracy,
-                    lastSpeed,
-                    lastEffectiveWindUnit,
-                    lastDirection,
+            if (AppState.livePositionControl) {
+                AppState.livePositionControl.update(
+                    AppState.lastLatitude || 0,
+                    AppState.lastLongitude || 0,
+                    AppState.lastDeviceAltitude,
+                    AppState.lastAltitudeAccuracy,
+                    AppState.lastAccuracy,
+                    AppState.lastSpeed,
+                    AppState.lastEffectiveWindUnit,
+                    AppState.lastDirection,
                     false,
                     null
                 );
                 console.log('Cleared jump master line data from livePositionControl');
             }
-        } else if (AppState.liveMarker && livePositionControl) {
+        } else if (AppState.liveMarker && AppState.livePositionControl) {
             // Immediately draw the Jump Master Line if conditions are met
             updateJumpMasterLine();
             // Update live position control with current data
-            livePositionControl.update(
-                lastLatitude || 0,
-                lastLongitude || 0,
-                lastDeviceAltitude,
-                lastAltitudeAccuracy,
-                lastAccuracy,
-                lastSpeed,
-                lastEffectiveWindUnit,
-                lastDirection,
+            AppState.livePositionControl.update(
+                AppState.lastLatitude || 0,
+                AppState.lastLongitude || 0,
+                AppState.lastDeviceAltitude,
+                AppState.lastAltitudeAccuracy,
+                AppState.lastAccuracy,
+                AppState.lastSpeed,
+                AppState.lastEffectiveWindUnit,
+                AppState.lastDirection,
                 true,
                 null
             );
             // Trigger position update to ensure line is drawn if position data is fresh
             debouncedPositionUpdate({
                 coords: {
-                    latitude: lastLatitude || 0,
-                    longitude: lastLongitude || 0,
-                    accuracy: lastAccuracy || 0,
-                    altitude: lastDeviceAltitude,
-                    altitudeAccuracy: lastAltitudeAccuracy
+                    latitude: AppState.lastLatitude || 0,
+                    longitude: AppState.lastLongitude || 0,
+                    accuracy: AppState.lastAccuracy || 0,
+                    altitude: AppState.lastDeviceAltitude,
+                    altitudeAccuracy: AppState.lastAltitudeAccuracy
                 }
             });
         }
