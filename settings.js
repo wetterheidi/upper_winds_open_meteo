@@ -94,7 +94,8 @@ export const Settings = {
     
         // Merge stored settings with defaults
         this.state.userSettings = { ...this.defaultSettings, ...storedSettings };
-    
+        console.log('Initialized userSettings:', this.state.userSettings);
+
         // Update unlocked features
         this.state.unlockedFeatures = {
             landingPattern: storedUnlockedFeatures.landingPattern || false,
@@ -123,7 +124,7 @@ export const Settings = {
             this.handleError(error, 'Failed to save settings to localStorage.');
         }
     },
-    
+
     saveUnlockedFeatures() {
         try {
             const featuresString = JSON.stringify(this.state.unlockedFeatures);

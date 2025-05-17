@@ -47,9 +47,11 @@ let gpxPoints = [];
 let isLoadingGpx = false;
 let weatherData = null;
 let lastModelRun = null;
+
 let jumpRunTrackLayer = null;
 let customJumpRunDirection = null; // Temporary storage for custom direction during session
 let isJumperSeparationManual = false; // Tracks if jumperSeparation is manually set
+
 let jumpCircle = null;
 let jumpCircleFull = null;
 let jumpCircleGreen = null;
@@ -1550,7 +1552,7 @@ function initMap() {
         }
     }, 500);
 
-    map.on('mousemove', function(e) {
+    map.on('mousemove', function (e) {
         //console.log('Map mousemove fired:', { lat: e.latlng.lat, lng: e.latlng.lng });
         const coordFormat = getCoordinateFormat();
         const lat = e.latlng.lat;
@@ -2292,7 +2294,7 @@ const debouncedPositionUpdate = debounce(async (position) => {
     console.log('Debounced position update:', { latitude, longitude, accuracy, deviceAltitude, altitudeAccuracy, currentTime });
 
     // Optional: Filter out low-accuracy updates
-    if (accuracy > 30) {
+    if (accuracy > 50) {
         console.log('Skipping position update due to low accuracy:', { accuracy });
         return;
     }
@@ -7074,9 +7076,19 @@ function setupCheckboxEvents() {
         console.log('trackPositionCheckbox changed to:', checkbox.checked);
         Settings.state.userSettings.trackPosition = checkbox.checked;
         Settings.save();
-        const submenu = checkbox.closest('li')?.querySelector('ul');
-        console.log('Submenu lookup for trackPositionCheckbox:', { submenu: submenu ? 'Found' : 'Not found', submenuClasses: submenu?.classList.toString() });
-        toggleSubmenu(checkbox, submenu, checkbox.checked);
+        const parentLi = checkbox.closest('li');
+        const submenu = parentLi?.querySelector('ul');
+        console.log('Submenu lookup for trackPositionCheckbox:', {
+            parentLi: parentLi ? 'Found' : 'Not found',
+            submenu: submenu ? 'Found' : 'Not found',
+            submenuClasses: submenu?.classList.toString(),
+            parentLiInnerHTML: parentLi?.innerHTML
+        });
+        if (submenu) {
+            toggleSubmenu(checkbox, submenu, checkbox.checked);
+        } else {
+            console.log('No submenu for trackPositionCheckbox, skipping toggleSubmenu');
+        }
         if (checkbox.checked) {
             startPositionTracking();
             // Enable Jump Master Line checkbox if it exists
@@ -7099,35 +7111,38 @@ function setupCheckboxEvents() {
                 Settings.state.userSettings.showJumpMasterLine = false;
                 Settings.save();
                 const jumpMasterSubmenu = jumpMasterCheckbox.closest('li')?.querySelector('ul');
-                toggleSubmenu(jumpMasterCheckbox, jumpMasterSubmenu, false);
-                console.log('Disabled and unchecked showJumpMasterLine checkbox, hid submenu');
-            }
-            // Remove Jump Master Line from map
-            if (jumpMasterLine) {
-                if (map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(jumpMasterLine);
-                } else {
-                    console.warn('Map not initialized, cannot remove jumpMasterLine');
+                if (jumpMasterSubmenu) {
+                    toggleSubmenu(jumpMasterCheckbox, jumpMasterSubmenu, false);
                 }
-                jumpMasterLine = null;
-                console.log('Removed Jump Master Line due to trackPosition disabled');
+                console.log('Disabled and unchecked showJumpMasterLine checkbox');
             }
-            if (livePositionControl) {
-                livePositionControl.update(
-                    0,
-                    0,
-                    null,
-                    null,
-                    0,
-                    'N/A',
-                    'kt',
-                    'N/A',
-                    false,
-                    null
-                );
-                livePositionControl._container.style.display = 'none';
-                console.log('Cleared livePositionControl content and hid panel');
+        }
+        // Remove Jump Master Line from map
+        if (jumpMasterLine) {
+            if (map && typeof map.removeLayer === 'function') {
+                map.removeLayer(jumpMasterLine);
+            } else {
+                console.warn('Map not initialized, cannot remove jumpMasterLine');
             }
+            jumpMasterLine = null;
+            console.log('Removed Jump Master Line due to trackPosition disabled');
+        }
+        if (livePositionControl) {
+            livePositionControl.update(
+                0,
+                0,
+                null,
+                null,
+                0,
+                'N/A',
+                'kt',
+                'N/A',
+                false,
+                null
+            );
+            livePositionControl._container.style.display = 'none';
+            console.log('Cleared livePositionControl content and hid panel');
+
         }
     });
 
