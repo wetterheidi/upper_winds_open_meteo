@@ -65,7 +65,7 @@ html {
 
 .leaflet-control-live-position {
     position: absolute;
-    right: 20px;
+    right: 0px;
     bottom: 10px;
     z-index: 1000;
     /* Above map tiles but below popups */
