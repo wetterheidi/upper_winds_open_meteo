@@ -69,9 +69,9 @@ const AppState = {
 };
 
 const Constants = {
-    //minZoom: 11,
-    //maxZoom: 14,
-    //landingPatternMinZoom: 14,
+    minZoom: 11,
+    maxZoom: 14,
+    landingPatternMinZoom: 14,
     jumperSeparationTable: {
         135: 5, 130: 5, 125: 5, 120: 5, 115: 5, 110: 5, 105: 5,
         100: 6, 95: 7, 90: 7, 85: 7, 80: 8, 75: 8, 70: 9,
@@ -80,9 +80,6 @@ const Constants = {
     }
 };
 
-const minZoom = 11;
-const maxZoom = 14;
-const landingPatternMinZoom = 14;
 const debouncedCalculateJump = debounce(calculateJump, 300);
 const getTemperatureUnit = () => Settings.getValue('temperatureUnit', 'radio', 'C');
 const getHeightUnit = () => Settings.getValue('heightUnit', 'radio', 'm');
@@ -4619,10 +4616,8 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
     }
 
     const currentZoom = AppState.map.getZoom();
-    const minZoom = 11;
-    const maxZoom = 14;
-    const isVisible = currentZoom >= minZoom && currentZoom <= maxZoom;
-    console.log('Zoom check:', { currentZoom, minZoom, maxZoom, isVisible });
+    const isVisible = currentZoom >= Constants.minZoom && currentZoom <= Constants.maxZoom;
+    console.log('Zoom check:', { currentZoom, minZoom: Constants.minZoom, maxZoom: Constants.maxZoom, isVisible });
 
     const blueCircleMetadata = [];
 
@@ -5268,7 +5263,7 @@ function updateJumpRunTrack() {
     });
 
     const currentZoom = AppState.map.getZoom();
-    const isZoomInRange = currentZoom >= minZoom && currentZoom <= maxZoom;
+    const isZoomInRange = currentZoom >= Constants.minZoom && currentZoom <= Constants.maxZoom;
 
     // Remove existing jump run track layer
     if (AppState.jumpRunTrackLayer) {
@@ -5896,8 +5891,8 @@ function updateLandingPattern() {
     }
 
     const currentZoom = AppState.map.getZoom();
-    const isVisible = currentZoom >= landingPatternMinZoom;
-    console.log('Landing pattern zoom check:', { currentZoom, landingPatternMinZoom, isVisible });
+    const isVisible = currentZoom >= Constants.landingPatternMinZoom;
+    console.log('Landing pattern zoom check:', { currentZoom, landingPatternMinZoom: Constants.landingPatternMinZoom, isVisible });
 
     // Clear existing layers to prevent duplicates
     if (AppState.landingPatternPolygon) {
