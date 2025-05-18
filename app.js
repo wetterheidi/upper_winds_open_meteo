@@ -1215,7 +1215,6 @@ function initMap() {
                 zIndex: 1
             }),
             L.tileLayer.cached('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                //L.tileLayer.cached('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {  //OSM
                 maxZoom: 19,
                 attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
                 opacity: 0.5,
@@ -1235,7 +1234,7 @@ function initMap() {
     const selectedBaseMap = Settings.state.userSettings.baseMaps in AppState.baseMaps ? Settings.state.userSettings.baseMaps : "Esri Street";
     const fallbackBaseMap = "OpenStreetMap";
     const layer = AppState.baseMaps[selectedBaseMap];
-    let hasSwitched = false; // Track if fallback has been attempted
+    let hasSwitched = false;
 
     layer.on('tileerror', () => {
         if (!navigator.onLine) {
@@ -1246,7 +1245,7 @@ function initMap() {
             }
             return;
         }
-        if (!hasSwitched && failedCount > totalTiles / 2) { // Switch if more than 50% fail
+        if (!hasSwitched && failedCount > totalTiles / 2) {
             console.warn(`${selectedBaseMap} tiles slow or unavailable, switching to ${fallbackBaseMap}`);
             if (map.hasLayer(layer)) {
                 map.removeLayer(layer);
@@ -1261,8 +1260,8 @@ function initMap() {
         }
     });
 
-    layer.addTo(map); // Explicitly add layer to map
-    map.invalidateSize(); // Ensure map renders correctly
+    layer.addTo(map);
+    map.invalidateSize();
 
     window.addEventListener('online', () => {
         hasSwitched = false;
@@ -1397,12 +1396,11 @@ function initMap() {
     configureMarker(defaultCenter[0], defaultCenter[1], initialAltitude, false);
     AppState.isManualPanning = false;
 
-    // Migrate existing tiles to normalized URLs on init and perform automated cleanup
     TileCache.init().then(() => {
         TileCache.migrateTiles().then(() => {
             TileCache.getCacheSize().then(size => {
                 if (size > 500) {
-                    TileCache.clearOldTiles(3).then(result => { // Clear tiles older than 3 days if size > 500 MB
+                    TileCache.clearOldTiles(3).then(result => {
                         Utils.handleMessage(`Cleared ${result.deletedCount} old tiles to free up space: ${result.deletedSizeMB.toFixed(2)} MB freed.`);
                     }).catch(error => {
                         console.error('Failed to clear old tiles during init:', error);
@@ -1461,7 +1459,6 @@ function initMap() {
                     startPositionTracking();
                 }
 
-                // Cache tiles after setting coordinates
                 cacheTilesForDIP();
             },
             async (error) => {
@@ -1484,7 +1481,6 @@ function initMap() {
                     Settings.save();
                 }
 
-                // Cache tiles for default coordinates
                 cacheTilesForDIP();
             },
             {
@@ -1513,11 +1509,9 @@ function initMap() {
             Settings.save();
         }
 
-        // Cache tiles for default coordinates
         cacheTilesForDIP();
     }
 
-    // Initialize offline indicator
     updateOfflineIndicator();
 
     AppState.coordsControl = new L.Control.Coordinates();
@@ -1525,27 +1519,62 @@ function initMap() {
     console.log('coordsControl initialized:', AppState.coordsControl);
 
     const elevationCache = new Map();
+    const qfeCache = new Map();
 
-    const debouncedGetElevation = debounce(async (lat, lng, requestLatLng, callback) => {
+    const debouncedGetElevationAndQFE = debounce(async (lat, lng, requestLatLng, callback) => {
         const cacheKey = `${lat.toFixed(5)},${lng.toFixed(5)}`;
+        const sliderIndex = getSliderValue();
+        const weatherCacheKey = `${cacheKey}-${sliderIndex}`;
+
+        let elevation, qfe;
+
+        // Check elevation cache
         if (elevationCache.has(cacheKey)) {
-            console.log('Using cached elevation:', { lat, lng, elevation: elevationCache.get(cacheKey) });
-            callback(elevationCache.get(cacheKey), requestLatLng);
-            return;
+            elevation = elevationCache.get(cacheKey);
+            console.log('Using cached elevation:', { lat, lng, elevation });
+        } else {
+            try {
+                elevation = await getAltitude(lat, lng);
+                elevationCache.set(cacheKey, elevation);
+                console.log('Fetched elevation:', { lat, lng, elevation });
+            } catch (error) {
+                console.warn('Failed to fetch elevation:', error);
+                elevation = 'N/A';
+            }
         }
-        try {
-            const elevation = await getAltitude(lat, lng);
-            elevationCache.set(cacheKey, elevation);
-            console.log('Fetched elevation:', { lat, lng, elevation });
-            callback(elevation, requestLatLng);
-        } catch (error) {
-            console.warn('Failed to fetch elevation:', error);
-            callback('N/A', requestLatLng);
+
+        // Check QFE cache
+        if (qfeCache.has(weatherCacheKey)) {
+            qfe = qfeCache.get(weatherCacheKey);
+            console.log('Using cached QFE:', { lat, lng, qfe });
+        } else {
+            // Fetch weather data if not available
+            if (!AppState.weatherData || !AppState.weatherData.surface_pressure) {
+                console.log('No weather data for QFE, fetching for:', { lat, lng });
+                await fetchWeatherForLocation(lat, lng, null, false);
+            }
+
+            if (AppState.weatherData && AppState.weatherData.surface_pressure && sliderIndex >= 0 && sliderIndex < AppState.weatherData.surface_pressure.length) {
+                const surfacePressure = AppState.weatherData.surface_pressure[sliderIndex];
+                const temperature = AppState.weatherData.temperature_2m?.[sliderIndex] || 16.1; // Use DIP's temperature as default
+                const referenceElevation = AppState.lastAltitude || 339; // Use DIP's elevation as reference
+                qfe = Utils.calculateQFE(surfacePressure, elevation, referenceElevation, temperature);
+                qfeCache.set(weatherCacheKey, qfe);
+                console.log('Calculated QFE:', { lat, lng, surfacePressure, elevation, referenceElevation, temperature, qfe });
+            } else {
+                console.warn('Surface pressure not available for QFE:', {
+                    hasWeatherData: !!AppState.weatherData,
+                    hasSurfacePressure: !!AppState.weatherData?.surface_pressure,
+                    sliderIndexValid: sliderIndex >= 0 && sliderIndex < (AppState.weatherData?.surface_pressure?.length || 0)
+                });
+                qfe = 'N/A';
+            }
         }
+
+        callback({ elevation, qfe }, requestLatLng);
     }, 500);
 
     map.on('mousemove', function (e) {
-        //console.log('Map mousemove fired:', { lat: e.latlng.lat, lng: e.latlng.lng });
         const coordFormat = getCoordinateFormat();
         const lat = e.latlng.lat;
         const lng = e.latlng.lng;
@@ -1563,9 +1592,9 @@ function initMap() {
             coordText = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
         }
 
-        AppState.coordsControl.update(`${coordText}<br>Elevation: Fetching...`);
+        AppState.coordsControl.update(`${coordText}<br>Elevation: Fetching...<br>QFE: Fetching...`);
 
-        debouncedGetElevation(lat, lng, { lat, lng }, (elevation, requestLatLng) => {
+        debouncedGetElevationAndQFE(lat, lng, { lat, lng }, ({ elevation, qfe }, requestLatLng) => {
             if (AppState.lastMouseLatLng) {
                 const deltaLat = Math.abs(AppState.lastMouseLatLng.lat - requestLatLng.lat);
                 const deltaLng = Math.abs(AppState.lastMouseLatLng.lng - requestLatLng.lng);
@@ -1577,10 +1606,11 @@ function initMap() {
                         displayElevation = Utils.convertHeight(displayElevation, heightUnit);
                         displayElevation = Math.round(displayElevation);
                     }
-                    console.log('Updating elevation display:', { lat: requestLatLng.lat, lng: requestLatLng.lng, elevation, heightUnit, displayElevation });
-                    AppState.coordsControl.update(`${coordText}<br>Elevation: ${displayElevation} ${displayElevation === 'N/A' ? '' : heightUnit}`);
+                    const qfeText = qfe === 'N/A' ? 'N/A' : `${qfe} hPa`;
+                    console.log('Updating elevation and QFE display:', { lat: requestLatLng.lat, lng: requestLatLng.lng, elevation, qfe, heightUnit, displayElevation });
+                    AppState.coordsControl.update(`${coordText}<br>Elevation: ${displayElevation} ${displayElevation === 'N/A' ? '' : heightUnit}<br>QFE: ${qfeText}`);
                 } else {
-                    console.log('Discarded elevation update: mouse moved too far', {
+                    console.log('Discarded elevation and QFE update: mouse moved too far', {
                         requestLat: requestLatLng.lat,
                         requestLng: requestLatLng.lng,
                         currentLat: AppState.lastMouseLatLng.lat,
@@ -1588,13 +1618,12 @@ function initMap() {
                     });
                 }
             } else {
-                console.warn('No lastMouseLatLng, skipping elevation update');
+                console.warn('No lastMouseLatLng, skipping elevation and QFE update');
             }
         });
     });
 
     map.on('movestart', (e) => {
-        // Only set isManualPanning if not dragging a marker
         if (!e.target.dragging || !e.target.dragging._marker) {
             AppState.isManualPanning = true;
             console.log('Manual panning detected, isManualPanning set to true');
@@ -1658,9 +1687,8 @@ function initMap() {
             console.log('Updating JRT after weather fetch for double-click');
             updateJumpRunTrack();
         }
-        cacheTilesForDIP(); // Cache tiles for new DIP
+        cacheTilesForDIP();
 
-        // Update Jump Master Line if active
         if (Settings.state.userSettings.showJumpMasterLine && Settings.state.userSettings.trackPosition) {
             console.log('Updating Jump Master Line for double-click');
             updateJumpMasterLine();
@@ -1745,7 +1773,6 @@ function initMap() {
             const currentTime = AppState.weatherData?.time?.[currentIndex] || null;
             await fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, currentTime);
             cacheTilesForDIP();
-            // Update Jump Master Line if active
             if (Settings.state.userSettings.showJumpMasterLine && Settings.state.userSettings.trackPosition) {
                 console.log('Updating Jump Master Line for double-tap');
                 updateJumpMasterLine();
@@ -1767,7 +1794,6 @@ function initMap() {
     if (hamburgerBtn && menu) {
         hamburgerBtn.addEventListener('click', () => {
             console.log('Hamburger menu clicked, menu visibility toggled');
-            // Rely on setupMenuEvents for toggle logic
         });
     }
 

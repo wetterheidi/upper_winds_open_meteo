@@ -564,6 +564,39 @@ export class Utils {
             alert(message);
         }
     }
+
+    /**
+     * Calculate QFE (pressure at a specific altitude) using the barometric formula
+     * @param {number} surfacePressure - Pressure at reference elevation in hPa
+     * @param {number} elevation - Target elevation in meters
+     * @param {number} referenceElevation - Reference elevation (e.g., DIP elevation) in meters
+     * @param {number} temperature - Temperature in Celsius (optional, defaults to 15°C)
+     * @returns {number} QFE in hPa
+     */
+    static calculateQFE(surfacePressure, elevation, referenceElevation, temperature = 15) {
+        if (!surfacePressure || elevation === 'N/A' || referenceElevation === 'N/A' || isNaN(surfacePressure) || isNaN(elevation) || isNaN(referenceElevation)) {
+            return 'N/A';
+        }
+        console.log('QFE reference elevation: ', referenceElevation);
+        // Constants for barometric formula
+        const g = 9.80665; // Gravitational acceleration (m/s²)
+        const M = 0.0289644; // Molar mass of air (kg/mol)
+        const R = 8.31447; // Universal gas constant (J/(mol·K))
+        const T = temperature + 273.15; // Temperature in Kelvin
+        const L = 0.0065; // Standard temperature lapse rate (K/m)
+
+        // Calculate pressure at target elevation relative to reference elevation
+        const P0 = surfacePressure * 100; // Convert hPa to Pa
+        const h = elevation - referenceElevation; // Elevation difference in meters
+        const exponent = (g * M) / (R * L);
+        const qfePa = P0 * Math.pow(1 - (L * h) / T, exponent);
+
+        console.log(surfacePressure, elevation, referenceElevation);
+        // Convert back to hPa and round to nearest integer
+        const qfe = Math.round(qfePa / 100);
+        return isNaN(qfe) ? 'N/A' : qfe;
+    }
+
 }
 
 window.Utils = Utils;
