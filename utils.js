@@ -414,8 +414,8 @@ export class Utils {
 
     static handleError(message, log = true) {
         if (log) console.error(message);
-        if (typeof displayError === 'function') {
-            displayError(message);
+        if (typeof window.displayError === 'function') {
+            window.displayError(message);
         } else {
             console.warn('displayError not available, logging to console');
             console.error('Error message:', message);

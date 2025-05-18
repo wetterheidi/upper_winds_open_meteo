@@ -10,7 +10,24 @@
     <link rel="stylesheet" href="styles.css">
     <link rel="icon" type="image/x-icon" href="favicon.ico">
 </head>
-
+<style>
+    button#autoupdateButton[data-autoupdate="on"][data-style-version] {
+        background-color: #4caf50 !important;
+        color: white !important;
+        opacity: 1 !important;
+        z-index: 1000 !important;
+        display: inline-block !important;
+        visibility: visible !important;
+    }
+    button#autoupdateButton[data-autoupdate="off"][data-style-version] {
+        background-color: #ccc !important;
+        color: black !important;
+        opacity: 1 !important;
+        z-index: 1000 !important;
+        display: inline-block !important;
+        visibility: visible !important;
+    }
+</style>
 <body>
     <div id="map" aria-label="Interactive map for selecting weather location"></div>
     <div id="coords">Move mouse over map</div>
@@ -485,6 +502,7 @@
     <script type="module" src="settings.js"></script>
     <script type="module" src="utils.js"></script>
     <script type="module" src="app.js"></script>
+    <script src="autoupdate.js"></script>
     <!-- Remove Cloudflare script for local development -->
     <!-- <script>(function () { function c() { var b = a.contentDocument || a.contentWindow.document; if (b) { var d = b.createElement('script'); d.innerHTML = "window.__CF$cv$params={r:'91ce572bdae4bd03',t:'MTc0MTM5NTA0OC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);"; b.getElementsByTagName('head')[0].appendChild(d) } } if (document.body) { var a = document.createElement('iframe'); a.height = 1; a.width = 1; a.style.position = 'absolute'; a.style.top = 0; a.style.left = 0; a.style.border = 'none'; a.style.visibility = 'hidden'; document.body.appendChild(a); if ('loading' !== document.readyState) c(); else if (window.addEventListener) document.addEventListener('DOMContentLoaded', c); else { var e = document.onreadystatechange || function () { }; document.onreadystatechange = function (b) { e(b); 'loading' !== document.readyState && (document.onreadystatechange = e, c()) } } } })();</script> -->
 </body>

@@ -67,7 +67,9 @@ const AppState = {
     isManualPanning: false,
     autoupdateIntervalId: null,
     lastManualSliderChange: null,
-    styleIntervalId: null // Track style polling interval
+    stylePollingActive: false,
+    autoupdateIntervalActive: false,
+    sliderState: { value: 0, min: 0, max: 167 }, // Persist slider state
 };
 
 let map;
@@ -112,6 +114,7 @@ const jumperSeparationTable = {
     5: 119
 };
 
+window.displayError = displayError;
 
 // == Password handling ==
 let isLandingPatternUnlocked = false;   // Track unlock state during session
@@ -3278,7 +3281,6 @@ async function fetchWeather(lat, lon, currentTime = null, isInitialLoad = false)
         };
         const model = modelMap[modelSelect.value] || modelSelect.value;
 
-        // Fetch model run time
         console.log('Fetching meta for model:', model);
         const metaResponse = await fetch(`https://api.open-meteo.com/data/${model}/static/meta.json`);
         if (!metaResponse.ok) {
@@ -3303,18 +3305,18 @@ async function fetchWeather(lat, lon, currentTime = null, isInitialLoad = false)
         if (isHistorical) {
             baseUrl = 'https://historical-forecast-api.open-meteo.com/v1/forecast';
             startDateStr = selectedDate.toFormat('yyyy-MM-dd');
-            endDateStr = startDateStr; // Single day for historical data
+            endDateStr = startDateStr;
         } else {
-            // Start from current day's midnight to include current hour
-            const now = luxon.DateTime.utc().startOf('day');
-            let startDate = now;
-            const modelRunPlus6 = luxon.DateTime.fromJSDate(runDate, { zone: 'utc' }).plus({ hours: 6 }).startOf('hour');
-            if (modelRunPlus6 > now) {
-                startDate = modelRunPlus6; // Use model run + 6 hours if later
+            // Use latest model run to ensure current hour
+            const now = luxon.DateTime.utc();
+            const currentHour = now.startOf('hour');
+            const modelRunDate = luxon.DateTime.fromJSDate(runDate, { zone: 'utc' });
+            let startDate = modelRunDate.startOf('day');
+            if (currentHour < modelRunDate) {
+                startDate = currentHour.minus({ days: 1 }).startOf('day');
             }
             startDateStr = startDate.toFormat('yyyy-MM-dd');
 
-            // Set end_date based on model (2 days for icon_d2, 7 days for others)
             const forecastDays = modelSelect.value === 'icon_d2' ? 2 : 7;
             const endDate = startDate.plus({ days: forecastDays }).startOf('day');
             endDateStr = endDate.toFormat('yyyy-MM-dd');
@@ -3427,9 +3429,13 @@ async function fetchWeather(lat, lon, currentTime = null, isInitialLoad = false)
             geopotential_height_200hPa: data.hourly.geopotential_height_200hPa?.slice(0, lastValidIndex + 1) || []
         };
 
+        console.log('Fetched weather data times:', AppState.weatherData.time);
+
         const slider = document.getElementById('timeSlider');
         slider.min = 0;
         slider.max = AppState.weatherData.time.length - 1;
+        AppState.sliderState.min = 0;
+        AppState.sliderState.max = AppState.weatherData.time.length - 1;
 
         if (AppState.weatherData.time.length <= 1) {
             slider.disabled = true;
@@ -3442,7 +3448,6 @@ async function fetchWeather(lat, lon, currentTime = null, isInitialLoad = false)
             slider.style.cursor = 'pointer';
         }
 
-        // Set slider to closest time based on currentTime
         console.log('fetchWeather: currentTime received:', currentTime);
         console.log('Luxon available:', typeof luxon !== 'undefined' ? luxon.VERSION : 'Not loaded');
         let initialIndex = 0;
@@ -3482,7 +3487,6 @@ async function fetchWeather(lat, lon, currentTime = null, isInitialLoad = false)
                 console.warn('fetchWeather: Failed to parse currentTime, defaulting to index 0');
             }
         } else if (isHistorical && AppState.weatherData.time.length > 0) {
-            // For historical data, default to midnight of the selected date
             const targetDate = selectedDate.startOf('day');
             const targetTimestamp = targetDate.toMillis();
             let minDiff = Infinity;
@@ -3496,7 +3500,6 @@ async function fetchWeather(lat, lon, currentTime = null, isInitialLoad = false)
             });
             console.log(`fetchWeather: Historical mode, slider set to index ${initialIndex} for time ${AppState.weatherData.time[initialIndex]}`);
         } else {
-            // Default to closest current or future time for forecast
             const now = luxon.DateTime.utc().startOf('hour');
             console.log('fetchWeather: No currentTime provided, using current UTC time:', now.toISO());
             let minDiff = Infinity;
@@ -3511,14 +3514,37 @@ async function fetchWeather(lat, lon, currentTime = null, isInitialLoad = false)
             console.log(`fetchWeather: Slider set to index ${initialIndex} for time ${AppState.weatherData.time[initialIndex]}`);
         }
         slider.value = initialIndex;
+        AppState.sliderState.value = initialIndex;
         await updateWeatherDisplay(initialIndex);
         document.getElementById('loading').style.display = 'none';
 
         // Reattach slider event listener
         slider.oninput = function () {
             console.log('Slider oninput triggered, new value:', this.value);
+            AppState.sliderState.value = parseInt(this.value);
             updateWeatherDisplay(this.value);
         };
+
+        // Reapply button styles after fetchWeather with delay
+        const autoupdateButton = document.getElementById('autoupdateButton');
+        if (autoupdateButton && Settings.state.userSettings.autoupdateTimeSlider) {
+            setTimeout(() => {
+                const uniqueId = `autoupdate-button-${Date.now()}`;
+                autoupdateButton.classList.remove('autoupdate-off');
+                autoupdateButton.classList.add('autoupdate-on');
+                autoupdateButton.setAttribute('data-autoupdate', 'on');
+                autoupdateButton.setAttribute('data-autoupdate-id', uniqueId);
+                autoupdateButton.style.background = '#4caf50';
+                autoupdateButton.style.border = '1px solid #2e7d32';
+                autoupdateButton.style.outline = '1px solid #ffffff';
+                console.log('Reapplied autoupdate-on styles after fetchWeather');
+                // Update dynamic CSS
+                const styleSheet = document.getElementById('autoupdate-button-styles');
+                if (styleSheet) {
+                    styleSheet.textContent = `#autoupdateButton[data-autoupdate-id="${uniqueId}"] { background: #4caf50 !important; border: 1px solid #2e7d32 !important; outline: 1px solid #ffffff !important; }`;
+                }
+            }, 1000);
+        }
     } catch (error) {
         document.getElementById('loading').style.display = 'none';
         Utils.handleError(`Failed to fetch weather data: ${error.message}`);
@@ -4046,168 +4072,6 @@ function downloadTableAsAscii(format) {
     Settings.updateUnitLabels();
 
 }
-
-// == Autoupdate logic ==
-function startTimeSliderAutoupdate() {
-    if (AppState.autoupdateIntervalId) {
-        console.log('Autoupdate already running, skipping');
-        return;
-    }
-
-    const updateSlider = async () => {
-        if (!Settings.state.userSettings.autoupdateTimeSlider) {
-            console.log('Autoupdate disabled, stopping interval');
-            clearInterval(AppState.autoupdateIntervalId);
-            AppState.autoupdateIntervalId = null;
-            return;
-        }
-
-        if (AppState.lastManualSliderChange && (Date.now() - AppState.lastManualSliderChange < 5 * 60 * 1000)) {
-            console.log('Skipping autoupdate due to recent manual slider change');
-            return;
-        }
-
-        const currentHour = getLastFullHourUTC();
-        const currentHourStr = currentHour.toISOString().replace(':00.000Z', 'Z');
-        console.log('Autoupdate checking current hour:', currentHourStr);
-
-        if (!AppState.weatherData || !AppState.weatherData.time) {
-            console.warn('No weather data available for autoupdate');
-            if (AppState.lastLat && AppState.lastLng) {
-                await fetchWeather(AppState.lastLat, AppState.lastLng, currentHourStr, false);
-            }
-            return;
-        }
-
-        const timeIndex = AppState.weatherData.time.indexOf(currentHourStr);
-        const slider = document.getElementById('timeSlider');
-        if (timeIndex === -1) {
-            console.warn('Current hour not in weather data, refetching with current time');
-            if (AppState.lastLat && AppState.lastLng) {
-                await fetchWeather(AppState.lastLat, AppState.lastLng, currentHourStr, false);
-                const newTimeIndex = AppState.weatherData?.time?.indexOf(currentHourStr) ?? -1;
-                if (newTimeIndex !== -1) {
-                    if (slider && parseInt(slider.value) !== newTimeIndex) {
-                        setSliderValue(newTimeIndex);
-                        console.log('Updated slider to current hour after refetch:', newTimeIndex);
-                    }
-                } else {
-                    const now = luxon.DateTime.utc().startOf('hour');
-                    let minDiff = Infinity;
-                    let closestIndex = 0;
-                    AppState.weatherData.time.forEach((time, index) => {
-                        const timeTimestamp = luxon.DateTime.fromISO(time, { zone: 'utc' }).toMillis();
-                        const nowTimestamp = now.toMillis();
-                        if (timeTimestamp >= nowTimestamp) {
-                            const diff = timeTimestamp - nowTimestamp;
-                            if (diff < minDiff) {
-                                minDiff = diff;
-                                closestIndex = index;
-                            }
-                        }
-                    });
-                    if (slider && parseInt(slider.value) !== closestIndex) {
-                        setSliderValue(closestIndex);
-                        console.log('Fallback to closest future time:', AppState.weatherData.time[closestIndex], 'index:', closestIndex);
-                        Utils.handleMessage('Current hour not available, using closest future forecast time.');
-                    }
-                }
-            }
-        } else {
-            if (slider && parseInt(slider.value) !== timeIndex) {
-                setSliderValue(timeIndex);
-                console.log('Updated slider to current hour:', timeIndex);
-            }
-        }
-
-        // Reapply button styles to counteract redraw
-        const autoupdateButton = document.getElementById('autoupdateButton');
-        if (autoupdateButton && Settings.state.userSettings.autoupdateTimeSlider) {
-            autoupdateButton.classList.remove('autoupdate-off');
-            autoupdateButton.classList.add('autoupdate-on');
-            autoupdateButton.setAttribute('data-autoupdate', 'on');
-            autoupdateButton.style.background = '#4caf50';
-            autoupdateButton.style.border = '1px solid #2e7d32';
-            autoupdateButton.style.outline = '1px solid #ffffff';
-            console.log('Reapplied autoupdate-on styles in updateSlider');
-        }
-    };
-
-    // Start mutation observer to detect button changes
-    const autoupdateButton = document.getElementById('autoupdateButton');
-    if (autoupdateButton) {
-        const observer = new MutationObserver((mutations) => {
-            mutations.forEach((mutation) => {
-                if (mutation.type === 'attributes') {
-                    console.log(`Button attribute changed: ${mutation.attributeName} = ${autoupdateButton.getAttribute(mutation.attributeName)}`);
-                    console.log('Current button classes:', autoupdateButton.classList.toString());
-                    console.log('Current button styles:', {
-                        background: autoupdateButton.style.background,
-                        border: autoupdateButton.style.border,
-                        outline: autoupdateButton.style.outline
-                    });
-                    console.log('Button connected to DOM:', autoupdateButton.isConnected);
-                }
-            });
-        });
-        observer.observe(autoupdateButton, {
-            attributes: true,
-            attributeFilter: ['class', 'style', 'data-autoupdate']
-        });
-    }
-
-    // Start style polling to persist button appearance
-    if (autoupdateButton) {
-        AppState.styleIntervalId = setInterval(() => {
-            if (Settings.state.userSettings.autoupdateTimeSlider) {
-                autoupdateButton.classList.remove('autoupdate-off');
-                autoupdateButton.classList.add('autoupdate-on');
-                autoupdateButton.setAttribute('data-autoupdate', 'on');
-                autoupdateButton.style.background = '#4caf50';
-                autoupdateButton.style.border = '1px solid #2e7d32';
-                autoupdateButton.style.outline = '1px solid #ffffff';
-                console.log('Polled and reapplied autoupdate-on styles');
-            } else {
-                autoupdateButton.classList.remove('autoupdate-on');
-                autoupdateButton.classList.add('autoupdate-off');
-                autoupdateButton.setAttribute('data-autoupdate', 'off');
-                autoupdateButton.style.background = '#ccc';
-                autoupdateButton.style.border = 'none';
-                autoupdateButton.style.outline = 'none';
-            }
-        }, 100);
-    }
-
-    updateSlider();
-    AppState.autoupdateIntervalId = setInterval(updateSlider, 60 * 1000);
-    console.log('Started time slider autoupdate');
-}
-
-function stopTimeSliderAutoupdate() {
-    if (AppState.autoupdateIntervalId) {
-        clearInterval(AppState.autoupdateIntervalId);
-        AppState.autoupdateIntervalId = null;
-        console.log('Stopped time slider autoupdate');
-    }
-    if (AppState.styleIntervalId) {
-        clearInterval(AppState.styleIntervalId);
-        AppState.styleIntervalId = null;
-        console.log('Stopped style polling');
-    }
-}
-
-function setSliderValue(index) {
-    const slider = document.getElementById('timeSlider');
-    if (slider) {
-        slider.value = index;
-        console.log('Set timeSlider value:', index);
-        const inputEvent = new Event('input', { bubbles: true });
-        slider.dispatchEvent(inputEvent);
-        const changeEvent = new Event('change', { bubbles: true });
-        slider.dispatchEvent(changeEvent);
-    }
-}
-
 
 // == Jump and Free Fall Calculations ==
 function getSeparationFromTAS(ias) {

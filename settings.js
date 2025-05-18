@@ -50,12 +50,14 @@ export const Settings = {
 
     // State
     state: {
-        userSettings: null,
-        unlockedFeatures: {
-            landingPattern: false,
-            calculateJump: false
-        },
-        isJumperSeparationManual: false
+        userSettings: {
+            autoupdateTimeSlider: false,
+            model: 'ecmwf_ifs025',
+            refLevel: 'AGL',
+            heightUnit: 'm',
+            temperatureUnit: 'C',
+            windUnit: 'kt'
+        }
     },
 
     /**
