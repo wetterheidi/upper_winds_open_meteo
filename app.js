@@ -65,8 +65,9 @@ const AppState = {
     lastAltitude: null,
     currentMarker: null,
     isManualPanning: false,
-    autoupdateIntervalId: null, // Track the setInterval ID
-    lastManualSliderChange: null // Track time of last manual slider change
+    autoupdateIntervalId: null,
+    lastManualSliderChange: null,
+    styleIntervalId: null // Track style polling interval
 };
 
 let map;
@@ -3304,8 +3305,8 @@ async function fetchWeather(lat, lon, currentTime = null, isInitialLoad = false)
             startDateStr = selectedDate.toFormat('yyyy-MM-dd');
             endDateStr = startDateStr; // Single day for historical data
         } else {
-            // Ensure start_date includes the current hour
-            const now = luxon.DateTime.utc().startOf('hour');
+            // Start from current day's midnight to include current hour
+            const now = luxon.DateTime.utc().startOf('day');
             let startDate = now;
             const modelRunPlus6 = luxon.DateTime.fromJSDate(runDate, { zone: 'utc' }).plus({ hours: 6 }).startOf('hour');
             if (modelRunPlus6 > now) {
@@ -4061,7 +4062,6 @@ function startTimeSliderAutoupdate() {
             return;
         }
 
-        // Check if manual slider change was recent (within 5 minutes)
         if (AppState.lastManualSliderChange && (Date.now() - AppState.lastManualSliderChange < 5 * 60 * 1000)) {
             console.log('Skipping autoupdate due to recent manual slider change');
             return;
@@ -4080,42 +4080,104 @@ function startTimeSliderAutoupdate() {
         }
 
         const timeIndex = AppState.weatherData.time.indexOf(currentHourStr);
+        const slider = document.getElementById('timeSlider');
         if (timeIndex === -1) {
             console.warn('Current hour not in weather data, refetching with current time');
             if (AppState.lastLat && AppState.lastLng) {
                 await fetchWeather(AppState.lastLat, AppState.lastLng, currentHourStr, false);
                 const newTimeIndex = AppState.weatherData?.time?.indexOf(currentHourStr) ?? -1;
                 if (newTimeIndex !== -1) {
-                    setSliderValue(newTimeIndex);
-                    console.log('Updated slider to current hour after refetch:', newTimeIndex);
+                    if (slider && parseInt(slider.value) !== newTimeIndex) {
+                        setSliderValue(newTimeIndex);
+                        console.log('Updated slider to current hour after refetch:', newTimeIndex);
+                    }
                 } else {
-                    // Fallback to closest available time
                     const now = luxon.DateTime.utc().startOf('hour');
                     let minDiff = Infinity;
                     let closestIndex = 0;
                     AppState.weatherData.time.forEach((time, index) => {
                         const timeTimestamp = luxon.DateTime.fromISO(time, { zone: 'utc' }).toMillis();
-                        const diff = Math.abs(timeTimestamp - now.toMillis());
-                        if (diff < minDiff) {
-                            minDiff = diff;
-                            closestIndex = index;
+                        const nowTimestamp = now.toMillis();
+                        if (timeTimestamp >= nowTimestamp) {
+                            const diff = timeTimestamp - nowTimestamp;
+                            if (diff < minDiff) {
+                                minDiff = diff;
+                                closestIndex = index;
+                            }
                         }
                     });
-                    setSliderValue(closestIndex);
-                    console.log('Fallback to closest time:', AppState.weatherData.time[closestIndex], 'index:', closestIndex);
-                    Utils.handleError('Current hour not available, using closest forecast time.');
+                    if (slider && parseInt(slider.value) !== closestIndex) {
+                        setSliderValue(closestIndex);
+                        console.log('Fallback to closest future time:', AppState.weatherData.time[closestIndex], 'index:', closestIndex);
+                        Utils.handleMessage('Current hour not available, using closest future forecast time.');
+                    }
                 }
             }
         } else {
-            const slider = document.getElementById('timeSlider');
             if (slider && parseInt(slider.value) !== timeIndex) {
                 setSliderValue(timeIndex);
                 console.log('Updated slider to current hour:', timeIndex);
             }
         }
+
+        // Reapply button styles to counteract redraw
+        const autoupdateButton = document.getElementById('autoupdateButton');
+        if (autoupdateButton && Settings.state.userSettings.autoupdateTimeSlider) {
+            autoupdateButton.classList.remove('autoupdate-off');
+            autoupdateButton.classList.add('autoupdate-on');
+            autoupdateButton.setAttribute('data-autoupdate', 'on');
+            autoupdateButton.style.background = '#4caf50';
+            autoupdateButton.style.border = '1px solid #2e7d32';
+            autoupdateButton.style.outline = '1px solid #ffffff';
+            console.log('Reapplied autoupdate-on styles in updateSlider');
+        }
     };
 
-    // Run immediately and then every minute
+    // Start mutation observer to detect button changes
+    const autoupdateButton = document.getElementById('autoupdateButton');
+    if (autoupdateButton) {
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.type === 'attributes') {
+                    console.log(`Button attribute changed: ${mutation.attributeName} = ${autoupdateButton.getAttribute(mutation.attributeName)}`);
+                    console.log('Current button classes:', autoupdateButton.classList.toString());
+                    console.log('Current button styles:', {
+                        background: autoupdateButton.style.background,
+                        border: autoupdateButton.style.border,
+                        outline: autoupdateButton.style.outline
+                    });
+                    console.log('Button connected to DOM:', autoupdateButton.isConnected);
+                }
+            });
+        });
+        observer.observe(autoupdateButton, {
+            attributes: true,
+            attributeFilter: ['class', 'style', 'data-autoupdate']
+        });
+    }
+
+    // Start style polling to persist button appearance
+    if (autoupdateButton) {
+        AppState.styleIntervalId = setInterval(() => {
+            if (Settings.state.userSettings.autoupdateTimeSlider) {
+                autoupdateButton.classList.remove('autoupdate-off');
+                autoupdateButton.classList.add('autoupdate-on');
+                autoupdateButton.setAttribute('data-autoupdate', 'on');
+                autoupdateButton.style.background = '#4caf50';
+                autoupdateButton.style.border = '1px solid #2e7d32';
+                autoupdateButton.style.outline = '1px solid #ffffff';
+                console.log('Polled and reapplied autoupdate-on styles');
+            } else {
+                autoupdateButton.classList.remove('autoupdate-on');
+                autoupdateButton.classList.add('autoupdate-off');
+                autoupdateButton.setAttribute('data-autoupdate', 'off');
+                autoupdateButton.style.background = '#ccc';
+                autoupdateButton.style.border = 'none';
+                autoupdateButton.style.outline = 'none';
+            }
+        }, 100);
+    }
+
     updateSlider();
     AppState.autoupdateIntervalId = setInterval(updateSlider, 60 * 1000);
     console.log('Started time slider autoupdate');
@@ -4127,6 +4189,11 @@ function stopTimeSliderAutoupdate() {
         AppState.autoupdateIntervalId = null;
         console.log('Stopped time slider autoupdate');
     }
+    if (AppState.styleIntervalId) {
+        clearInterval(AppState.styleIntervalId);
+        AppState.styleIntervalId = null;
+        console.log('Stopped style polling');
+    }
 }
 
 function setSliderValue(index) {
@@ -4134,10 +4201,8 @@ function setSliderValue(index) {
     if (slider) {
         slider.value = index;
         console.log('Set timeSlider value:', index);
-        // Trigger input event to update weather display, jump calculations, etc.
         const inputEvent = new Event('input', { bubbles: true });
         slider.dispatchEvent(inputEvent);
-        // Trigger change event to update time label
         const changeEvent = new Event('change', { bubbles: true });
         slider.dispatchEvent(changeEvent);
     }
@@ -6585,7 +6650,9 @@ function setupSliderEvents() {
                 console.log('Autoupdate button clicked, current state:', {
                     autoupdateEnabled: Settings.state.userSettings.autoupdateTimeSlider,
                     online: navigator.onLine,
-                    historicalDate: document.getElementById('historicalDatePicker')?.value
+                    historicalDate: document.getElementById('historicalDatePicker')?.value,
+                    sliderContainerExists: !!document.getElementById('slider-container'),
+                    buttonClasses: autoupdateButton.classList.toString()
                 });
 
                 if (!navigator.onLine) {
@@ -6609,6 +6676,12 @@ function setupSliderEvents() {
                     autoupdateButton.title = 'Disable time slider autoupdate';
                     Utils.handleMessage('Time slider autoupdate enabled.');
                     console.log('Autoupdate enabled, button classes:', autoupdateButton.classList.toString());
+                    // Log computed style to debug CSS
+                    console.log('Button computed background:', window.getComputedStyle(autoupdateButton).background);
+                    // Check classes after delay to detect interference
+                    setTimeout(() => {
+                        console.log('Button classes after 100ms:', autoupdateButton.classList.toString());
+                    }, 100);
                 } else {
                     stopTimeSliderAutoupdate();
                     autoupdateButton.classList.remove('autoupdate-on');
@@ -6616,6 +6689,8 @@ function setupSliderEvents() {
                     autoupdateButton.title = 'Enable time slider autoupdate';
                     Utils.handleMessage('Time slider autoupdate disabled.');
                     console.log('Autoupdate disabled, button classes:', autoupdateButton.classList.toString());
+                    // Log computed style to debug CSS
+                    console.log('Button computed background:', window.getComputedStyle(autoupdateButton).background);
                 }
             } catch (error) {
                 console.error('Error in autoupdate button click handler:', error);
@@ -6628,24 +6703,28 @@ function setupSliderEvents() {
                 autoupdateButton.title = 'Enable time slider autoupdate';
             }
         });
-        // Initialize button state
-        console.log('Initializing autoupdate button, saved state:', Settings.state.userSettings.autoupdateTimeSlider);
-        if (Settings.state.userSettings.autoupdateTimeSlider) {
-            autoupdateButton.classList.remove('autoupdate-off');
-            autoupdateButton.classList.add('autoupdate-on');
-            autoupdateButton.title = 'Disable time slider autoupdate';
-            if (navigator.onLine && !document.getElementById('historicalDatePicker')?.value) {
-                startTimeSliderAutoupdate();
-                console.log('Autoupdate initialized as enabled');
-            } else {
-                Settings.state.userSettings.autoupdateTimeSlider = false;
-                Settings.save();
-                autoupdateButton.classList.remove('autoupdate-on');
-                autoupdateButton.classList.add('autoupdate-off');
-                autoupdateButton.title = 'Enable time slider autoupdate';
-                console.log('Autoupdate disabled on init due to offline or historical date');
+        // Initialize button state with delay to ensure DOM is ready
+        setTimeout(() => {
+            console.log('Initializing autoupdate button, saved state:', Settings.state.userSettings.autoupdateTimeSlider);
+            if (Settings.state.userSettings.autoupdateTimeSlider) {
+                autoupdateButton.classList.remove('autoupdate-off');
+                autoupdateButton.classList.add('autoupdate-on');
+                autoupdateButton.title = 'Disable time slider autoupdate';
+                if (navigator.onLine && !document.getElementById('historicalDatePicker')?.value) {
+                    startTimeSliderAutoupdate();
+                    console.log('Autoupdate initialized as enabled');
+                } else {
+                    Settings.state.userSettings.autoupdateTimeSlider = false;
+                    Settings.save();
+                    autoupdateButton.classList.remove('autoupdate-on');
+                    autoupdateButton.classList.add('autoupdate-off');
+                    autoupdateButton.title = 'Enable time slider autoupdate';
+                    console.log('Autoupdate disabled on init due to offline or historical date');
+                }
+                // Log computed style to debug CSS
+                console.log('Button computed background on init:', window.getComputedStyle(autoupdateButton).background);
             }
-        }
+        }, 100);
     } else {
         console.error('Autoupdate button not found in DOM');
         Utils.handleError('Autoupdate button not found. Please check HTML.');
