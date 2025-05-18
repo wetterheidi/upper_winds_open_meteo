@@ -65,6 +65,9 @@ const AppState = {
     lastAltitude: null,
     currentMarker: null,
     isManualPanning: false,
+    globalMap: null,
+    tileFailedCount: 0,
+    tileTotalCount: 0
 };
 
 let map;
@@ -256,7 +259,7 @@ function configureMarker(lat, lng, altitude, openPopup = false) {
     if (AppState.currentMarker) {
         AppState.currentMarker.remove();
     }
-    AppState.currentMarker = createCustomMarker(lat, lng).addTo(map);
+    AppState.currentMarker = createCustomMarker(lat, lng).addTo(AppState.globalMap);
     attachMarkerDragend(AppState.currentMarker);
     AppState.currentMarker.on('click', (e) => {
         L.DomEvent.stopPropagation(e); // Prevent map click events from interfering
@@ -712,7 +715,7 @@ function getTilesInRadius(lat, lng, radiusKm, zoomLevels) {
 
     zoomLevels.forEach(zoom => {
         // Convert center to tile coordinates
-        const point = map.project([lat, lng], zoom);
+        const point = AppState.globalMap.project([lat, lng], zoom);
         const tileSize = 256;
         const centerX = point.x / tileSize;
         const centerY = point.y / tileSize;
@@ -933,13 +936,13 @@ async function cacheTilesForDIP() {
     }
 }
 const debouncedCacheVisibleTiles = debounce(async () => {
-    if (!map || !navigator.onLine) {
+    if (!AppState.globalMap || !navigator.onLine) {
         console.log('Skipping visible tile caching: offline or map not initialized');
         return;
     }
 
-    const bounds = map.getBounds();
-    const zoom = map.getZoom();
+    const bounds = AppState.globalMap.getBounds();
+    const zoom = AppState.globalMap.getZoom();
     const zoomLevels = Settings.state.userSettings.cacheZoomLevels || defaultSettings.cacheZoomLevels;
     if (!zoomLevels.includes(zoom)) {
         console.log(`Skipping caching: zoom ${zoom} not in cacheZoomLevels`, zoomLevels);
@@ -947,8 +950,8 @@ const debouncedCacheVisibleTiles = debounce(async () => {
     }
 
     const tileSize = 256;
-    const swPoint = map.project(bounds.getSouthWest(), zoom);
-    const nePoint = map.project(bounds.getNorthEast(), zoom);
+    const swPoint = AppState.globalMap.project(bounds.getSouthWest(), zoom);
+    const nePoint = AppState.globalMap.project(bounds.getNorthEast(), zoom);
     const minX = Math.floor(swPoint.x / tileSize);
     const maxX = Math.floor(nePoint.x / tileSize);
     const minY = Math.floor(nePoint.y / tileSize);
@@ -1119,7 +1122,7 @@ function setupCacheSettings() {
     const cacheZoomLevelsSelect = document.getElementById('cacheZoomLevelsSelect');
     if (cacheZoomLevelsSelect) {
         cacheZoomLevelsSelect.addEventListener('change', () => {
-            const [minZoom, maxZoom] = cacheZoomLevelsSelect.value.split('-').map(Number);
+            const [minZoom, maxZoom] = cacheZoomLevelsSelect.value.split('-').AppState.globalMap(Number);
             Settings.state.userSettings.cacheZoomLevels = Array.from(
                 { length: maxZoom - minZoom + 1 },
                 (_, i) => minZoom + i
@@ -1168,7 +1171,7 @@ L.Control.Coordinates = L.Control.extend({
         this._container.innerHTML = content;
     }
 });
-function initMap() {
+function initMapOLD() {
     const defaultCenter = [48.0179, 11.1923];
     const defaultZoom = 11;
 
@@ -1176,7 +1179,7 @@ function initMap() {
     AppState.lastLat = AppState.lastLat || defaultCenter[0];
     AppState.lastLng = AppState.lastLng || defaultCenter[1];
 
-    map = L.map('map', {
+    AppState.globalMap = L.map('map', {
         center: defaultCenter,
         zoom: defaultZoom,
         zoomControl: false,
@@ -1230,7 +1233,7 @@ function initMap() {
     };
 
     const openMeteoAttribution = 'Weather data by <a href="https://open-meteo.com">Open-Meteo</a>';
-    map.attributionControl.addAttribution(openMeteoAttribution);
+    AppState.globalMap.attributionControl.addAttribution(openMeteoAttribution);
 
     const selectedBaseMap = Settings.state.userSettings.baseMaps in AppState.baseMaps ? Settings.state.userSettings.baseMaps : "Esri Street";
     const fallbackBaseMap = "OpenStreetMap";
@@ -1248,9 +1251,9 @@ function initMap() {
         }
         if (!hasSwitched && failedCount > totalTiles / 2) { // Switch if more than 50% fail
             console.warn(`${selectedBaseMap} tiles slow or unavailable, switching to ${fallbackBaseMap}`);
-            if (map.hasLayer(layer)) {
-                map.removeLayer(layer);
-                AppState.baseMaps[fallbackBaseMap].addTo(map);
+            if (AppState.globalMap.hasLayer(layer)) {
+                AppState.globalMap.removeLayer(layer);
+                AppState.baseMaps[fallbackBaseMap].addTo(AppState.globalMap);
                 Settings.state.userSettings.baseMaps = fallbackBaseMap;
                 Settings.save();
                 Utils.handleError(`${selectedBaseMap} tiles slow or unavailable. Switched to ${fallbackBaseMap}.`);
@@ -1261,12 +1264,12 @@ function initMap() {
         }
     });
 
-    layer.addTo(map); // Explicitly add layer to map
-    map.invalidateSize(); // Ensure map renders correctly
+    layer.addTo(AppState.globalMap); // Explicitly add layer to map
+    AppState.globalMap.invalidateSize(); // Ensure map renders correctly
 
     window.addEventListener('online', () => {
         hasSwitched = false;
-        map.options.minZoom = 6;
+        AppState.globalMap.options.minZoom = 6;
         console.log('Back online, restored minZoom to 6');
         updateOfflineIndicator();
     });
@@ -1275,23 +1278,23 @@ function initMap() {
         updateOfflineIndicator();
     });
 
-    map.on('zoomstart', (e) => {
+    AppState.globalMap.on('zoomstart', (e) => {
         if (!navigator.onLine) {
-            const targetZoom = e.target._zoom || map.getZoom();
+            const targetZoom = e.target._zoom || AppState.globalMap.getZoom();
             if (targetZoom < 11) {
                 e.target._zoom = 11;
-                map.setZoom(11);
+                AppState.globalMap.setZoom(11);
                 Utils.handleError('Offline: Zoom restricted to levels 11–14 for cached tiles.');
             } else if (targetZoom > 14) {
                 e.target._zoom = 14;
-                map.setZoom(14);
+                AppState.globalMap.setZoom(14);
                 Utils.handleError('Offline: Zoom restricted to levels 11–14 for cached tiles.');
             }
         }
     });
 
-    L.control.layers(AppState.baseMaps, null, { position: 'topright' }).addTo(map);
-    map.on('baselayerchange', function (e) {
+    L.control.layers(AppState.baseMaps, null, { position: 'topright' }).addTo(AppState.globalMap);
+    AppState.globalMap.on('baselayerchange', function (e) {
         Settings.state.userSettings.baseMaps = e.name;
         Settings.save();
         console.log(`Base map changed to: ${e.name}`);
@@ -1301,13 +1304,13 @@ function initMap() {
         }
     });
 
-    map.on('moveend', () => {
+    AppState.globalMap.on('moveend', () => {
         if (AppState.lastLat && AppState.lastLng) {
             debouncedCacheVisibleTiles();
         }
     });
 
-    L.control.zoom({ position: 'topright' }).addTo(map);
+    L.control.zoom({ position: 'topright' }).addTo(AppState.globalMap);
     L.control.polylineMeasure({
         position: 'topright',
         unit: 'kilometres',
@@ -1322,21 +1325,21 @@ function initMap() {
         tooltipTextAdd: 'Click to add point<br>',
         measureControlTitleOn: 'Start measuring distance and bearing',
         measureControlTitleOff: 'Stop measuring'
-    }).addTo(map);
+    }).addTo(AppState.globalMap);
 
     L.control.scale({
         position: 'bottomleft',
         metric: true,
         imperial: true,
         maxWidth: 100
-    }).addTo(map);
+    }).addTo(AppState.globalMap);
 
-    map.createPane('gpxTrackPane');
-    map.getPane('gpxTrackPane').style.zIndex = 650;
-    map.getPane('tooltipPane').style.zIndex = 700;
-    map.getPane('popupPane').style.zIndex = 700;
+    AppState.globalMap.createPane('gpxTrackPane');
+    AppState.globalMap.getPane('gpxTrackPane').style.zIndex = 650;
+    AppState.globalMap.getPane('tooltipPane').style.zIndex = 700;
+    AppState.globalMap.getPane('popupPane').style.zIndex = 700;
 
-    AppState.livePositionControl = L.control.livePosition({ position: 'bottomright' }).addTo(map);
+    AppState.livePositionControl = L.control.livePosition({ position: 'bottomright' }).addTo(AppState.globalMap);
     if (AppState.livePositionControl._container) {
         AppState.livePositionControl._container.style.display = 'none';
         console.log('Initialized livePositionControl and hid by default');
@@ -1445,7 +1448,7 @@ function initMap() {
                 AppState.lastAltitude = await getAltitude(AppState.lastLat, AppState.lastLng);
 
                 configureMarker(AppState.lastLat, AppState.lastLng, AppState.lastAltitude, false);
-                map.setView(userCoords, defaultZoom);
+                AppState.globalMap.setView(userCoords, defaultZoom);
 
                 if (Settings.state.userSettings.calculateJump) {
                     calculateJump();
@@ -1471,7 +1474,7 @@ function initMap() {
                 AppState.lastLng = defaultCenter[1];
                 AppState.lastAltitude = await getAltitude(AppState.lastLat, AppState.lastLng);
                 configureMarker(AppState.lastLat, AppState.lastLng, AppState.lastAltitude, false);
-                map.setView(defaultCenter, defaultZoom);
+                AppState.globalMap.setView(defaultCenter, defaultZoom);
                 recenterMap(true);
                 AppState.isManualPanning = false;
 
@@ -1500,7 +1503,7 @@ function initMap() {
         AppState.lastLng = defaultCenter[1];
         AppState.lastAltitude = getAltitude(AppState.lastLat, AppState.lastLng);
         configureMarker(AppState.lastLat, AppState.lastLng, initialAltitude, false);
-        map.setView(defaultCenter, defaultZoom);
+        AppState.globalMap.setView(defaultCenter, defaultZoom);
         recenterMap(true);
         AppState.isManualPanning = false;
 
@@ -1521,7 +1524,7 @@ function initMap() {
     updateOfflineIndicator();
 
     AppState.coordsControl = new L.Control.Coordinates();
-    AppState.coordsControl.addTo(map);
+    AppState.coordsControl.addTo(AppState.globalMap);
     console.log('coordsControl initialized:', AppState.coordsControl);
 
     const elevationCache = new Map();
@@ -1544,7 +1547,7 @@ function initMap() {
         }
     }, 500);
 
-    map.on('mousemove', function (e) {
+    AppState.globalMap.on('mousemove', function (e) {
         //console.log('Map mousemove fired:', { lat: e.latlng.lat, lng: e.latlng.lng });
         const coordFormat = getCoordinateFormat();
         const lat = e.latlng.lat;
@@ -1593,7 +1596,7 @@ function initMap() {
         });
     });
 
-    map.on('movestart', (e) => {
+    AppState.globalMap.on('movestart', (e) => {
         // Only set isManualPanning if not dragging a marker
         if (!e.target.dragging || !e.target.dragging._marker) {
             AppState.isManualPanning = true;
@@ -1601,11 +1604,11 @@ function initMap() {
         }
     });
 
-    map.on('mouseout', function () {
+    AppState.globalMap.on('mouseout', function () {
         AppState.coordsControl.getContainer().innerHTML = 'Move mouse over map';
     });
 
-    map.on('contextmenu', (e) => {
+    AppState.globalMap.on('contextmenu', (e) => {
         if (!Settings.state.userSettings.showCutAwayFinder || !Settings.state.userSettings.calculateJump) {
             console.log('Cut-away marker placement ignored: showCutAwayFinder or calculateJump not enabled');
             return;
@@ -1616,7 +1619,7 @@ function initMap() {
         if (AppState.cutAwayMarker) {
             AppState.cutAwayMarker.setLatLng([lat, lng]);
         } else {
-            AppState.cutAwayMarker = createCutAwayMarker(lat, lng).addTo(map);
+            AppState.cutAwayMarker = createCutAwayMarker(lat, lng).addTo(AppState.globalMap);
             attachCutAwayMarkerDragend(AppState.cutAwayMarker);
         }
 
@@ -1631,7 +1634,7 @@ function initMap() {
         }
     });
 
-    map.on('dblclick', async (e) => {
+    AppState.globalMap.on('dblclick', async (e) => {
         const { lat, lng } = e.latlng;
         AppState.lastLat = lat;
         AppState.lastLng = lng;
@@ -1667,8 +1670,8 @@ function initMap() {
         }
     });
 
-    map.on('zoomend', () => {
-        const currentZoom = map.getZoom();
+    AppState.globalMap.on('zoomend', () => {
+        const currentZoom = AppState.globalMap.getZoom();
         console.log('Zoom level changed to:', currentZoom);
 
         if (Settings.state.userSettings.calculateJump && AppState.weatherData && AppState.lastLat && AppState.lastLng) {
@@ -1710,7 +1713,7 @@ function initMap() {
 
     let lastTapTime = 0;
     const tapThreshold = 300;
-    const mapContainer = map.getContainer();
+    const mapContainer = AppState.globalMap.getContainer();
 
     mapContainer.addEventListener('touchstart', async (e) => {
         console.log('Map touchstart event, target:', e.target, 'touches:', e.touches.length);
@@ -1726,7 +1729,7 @@ function initMap() {
             const rect = mapContainer.getBoundingClientRect();
             const touchX = e.touches[0].clientX - rect.left;
             const touchY = e.touches[0].clientY - rect.top;
-            const latlng = map.containerPointToLatLng([touchX, touchY]);
+            const latlng = AppState.globalMap.containerPointToLatLng([touchX, touchY]);
             const { lat, lng } = latlng;
             AppState.lastLat = lat;
             AppState.lastLng = lng;
@@ -1754,11 +1757,11 @@ function initMap() {
         lastTapTime = currentTime;
     }, { passive: false });
 
-    map.on('click', (e) => {
+    AppState.globalMap.on('click', (e) => {
         console.log('Map click event, target:', e.originalEvent.target);
     });
 
-    map.on('mousedown', (e) => {
+    AppState.globalMap.on('mousedown', (e) => {
         console.log('Map mousedown event, target:', e.originalEvent.target);
     });
 
@@ -1771,7 +1774,609 @@ function initMap() {
         });
     }
 
-    initializeApp();
+    //initializeApp();
+}
+function initMap() {
+    const defaultCenter = [48.0179, 11.1923];
+    const defaultZoom = 11;
+
+    AppState.lastLat = AppState.lastLat || defaultCenter[0];
+    AppState.lastLng = AppState.lastLng || defaultCenter[1];
+
+    AppState.globalMap = L.map('map', {
+        center: defaultCenter,
+        zoom: defaultZoom,
+        zoomControl: false,
+        doubleClickZoom: false,
+        maxZoom: 19,
+        minZoom: navigator.onLine ? 6 : 11
+    });
+
+    AppState.baseMaps = {
+        "OpenStreetMap": L.tileLayer.cached('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+            subdomains: ['a', 'b', 'c']
+        }),
+        "OpenTopoMap": L.tileLayer.cached('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+            maxZoom: 17,
+            attribution: '© <a href="https://www.openstreetmap.org/copyright">OSM</a>, <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)',
+            subdomains: ['a', 'b', 'c']
+        }),
+        "Esri Satellite": L.tileLayer.cached('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 19,
+            attribution: '© Esri, USDA, USGS'
+        }),
+        "Esri Street": L.tileLayer.cached('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 19,
+            attribution: '© Esri, USGS'
+        }),
+        "Esri Topo": L.tileLayer.cached('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 19,
+            attribution: '© Esri, USGS'
+        }),
+        "Esri Satellite + OSM": L.layerGroup([
+            L.tileLayer.cached('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                maxZoom: 19,
+                attribution: '© Esri, USDA, USGS',
+                zIndex: 1
+            }),
+            L.tileLayer.cached('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+                opacity: 0.5,
+                zIndex: 2,
+                updateWhenIdle: true,
+                keepBuffer: 2,
+                subdomains: ['a', 'b', 'c']
+            })
+        ], {
+            attribution: '© Esri, USDA, USGS | © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        })
+    };
+
+    const openMeteoAttribution = 'Weather data by <a href="https://open-meteo.com">Open-Meteo</a>';
+    AppState.globalMap.attributionControl.addAttribution(openMeteoAttribution);
+
+    const selectedBaseMap = Settings.state.userSettings.baseMaps in AppState.baseMaps ? Settings.state.userSettings.baseMaps : "Esri Street";
+    const fallbackBaseMap = "OpenStreetMap";
+    const layer = AppState.baseMaps[selectedBaseMap];
+    let hasSwitched = false;
+
+    AppState.tileFailedCount = 0;
+    AppState.tileTotalCount = 0;
+
+    layer.on('tileloadstart', () => {
+        AppState.tileTotalCount++;
+        console.log('Tile load started, total:', AppState.tileTotalCount);
+    });
+
+    layer.on('tileerror', () => {
+        AppState.tileFailedCount++;
+        console.log('Tile error, failed:', AppState.tileFailedCount);
+        if (!navigator.onLine) {
+            if (!hasSwitched) {
+                console.warn(`${selectedBaseMap} tiles unavailable offline. Zoom restricted to levels 11–14.`);
+                Utils.handleError('Offline: Zoom restricted to levels 11–14 for cached tiles.');
+                hasSwitched = true;
+            }
+            return;
+        }
+        if (!hasSwitched && AppState.tileFailedCount > AppState.tileTotalCount / 2) {
+            console.warn(`${selectedBaseMap} tiles slow or unavailable, switching to ${fallbackBaseMap}`);
+            if (AppState.globalMap.hasLayer(layer)) {
+                AppState.globalMap.removeLayer(layer);
+                AppState.baseMaps[fallbackBaseMap].addTo(AppState.globalMap);
+                Settings.state.userSettings.baseMaps = fallbackBaseMap;
+                Settings.save();
+                Utils.handleError(`${selectedBaseMap} tiles slow or unavailable. Switched to ${fallbackBaseMap}.`);
+                hasSwitched = true;
+            }
+        } else {
+            console.warn(`Tile error in ${selectedBaseMap}, attempting to continue`);
+        }
+    });
+
+    layer.addTo(AppState.globalMap);
+    AppState.globalMap.invalidateSize();
+
+    window.addEventListener('online', () => {
+        hasSwitched = false;
+        AppState.globalMap.options.minZoom = 6;
+        console.log('Back online, restored minZoom to 6');
+        updateOfflineIndicator();
+    });
+
+    window.addEventListener('offline', () => {
+        updateOfflineIndicator();
+    });
+
+    AppState.globalMap.on('zoomstart', (e) => {
+        if (!navigator.onLine) {
+            const targetZoom = e.target._zoom || AppState.globalMap.getZoom();
+            if (targetZoom < 11) {
+                e.target._zoom = 11;
+                AppState.globalMap.setZoom(11);
+                Utils.handleError('Offline: Zoom restricted to levels 11–14 for cached tiles.');
+            } else if (targetZoom > 14) {
+                e.target._zoom = 14;
+                AppState.globalMap.setZoom(14);
+                Utils.handleError('Offline: Zoom restricted to levels 11–14 for cached tiles.');
+            }
+        }
+    });
+
+    L.control.layers(AppState.baseMaps, null, { position: 'topright' }).addTo(AppState.globalMap);
+    AppState.globalMap.on('baselayerchange', function (e) {
+        Settings.state.userSettings.baseMaps = e.name;
+        Settings.save();
+        console.log(`Base map changed to: ${e.name}`);
+        hasSwitched = false;
+        if (AppState.lastLat && AppState.lastLng) {
+            cacheTilesForDIP();
+        }
+    });
+
+    AppState.globalMap.on('moveend', () => {
+        if (AppState.lastLat && AppState.lastLng) {
+            debouncedCacheVisibleTiles();
+        }
+    });
+
+    L.control.zoom({ position: 'topright' }).addTo(AppState.globalMap);
+    L.control.polylineMeasure({
+        position: 'topright',
+        unit: 'kilometres',
+        showBearings: true,
+        clearMeasurementsOnStop: false,
+        showClearControl: true,
+        showUnitControl: true,
+        tooltipTextFinish: 'Click to finish the line<br>',
+        tooltipTextDelete: 'Shift-click to delete point',
+        tooltipTextMove: 'Drag to move point<br>',
+        tooltipTextResume: 'Click to resume line<br>',
+        tooltipTextAdd: 'Click to add point<br>',
+        measureControlTitleOn: 'Start measuring distance and bearing',
+        measureControlTitleOff: 'Stop measuring'
+    }).addTo(AppState.globalMap);
+
+    L.control.scale({
+        position: 'bottomleft',
+        metric: true,
+        imperial: true,
+        maxWidth: 100
+    }).addTo(AppState.globalMap);
+
+    AppState.globalMap.createPane('gpxTrackPane');
+    AppState.globalMap.getPane('gpxTrackPane').style.zIndex = 650;
+    AppState.globalMap.getPane('tooltipPane').style.zIndex = 700;
+    AppState.globalMap.getPane('popupPane').style.zIndex = 700;
+
+    AppState.livePositionControl = L.control.livePosition({ position: 'bottomright' }).addTo(AppState.globalMap);
+    if (AppState.livePositionControl._container) {
+        AppState.livePositionControl._container.style.display = 'none';
+        console.log('Initialized livePositionControl and hid by default');
+    } else {
+        console.warn('livePositionControl._container not initialized in initMap');
+    }
+
+    async function fetchInitialWeather(lat, lng) {
+        const lastFullHourUTC = getLastFullHourUTC();
+        let utcIsoString;
+        try {
+            utcIsoString = lastFullHourUTC.toISOString();
+            console.log('initMap: Last full hour UTC:', utcIsoString);
+        } catch (error) {
+            console.error('Failed to get UTC time:', error);
+            const now = new Date();
+            now.setMinutes(0, 0, 0);
+            utcIsoString = now.toISOString();
+            console.log('initMap: Fallback to current time:', utcIsoString);
+        }
+
+        let initialTime;
+        if (Settings.state.userSettings.timeZone === 'Z') {
+            initialTime = utcIsoString.replace(':00.000Z', 'Z');
+        } else {
+            try {
+                const localTimeStr = await Utils.formatLocalTime(utcIsoString, lat, lng);
+                console.log('initMap: Local time string:', localTimeStr);
+                const match = localTimeStr.match(/^(\d{4}-\d{2}-\d{2}) (\d{2})(\d{2}) GMT([+-]\d+)/);
+                if (!match) {
+                    throw new Error(`Local time string format mismatch: ${localTimeStr}`);
+                }
+                const [, datePart, hour, minute, offset] = match;
+                const offsetSign = offset.startsWith('+') ? '+' : '-';
+                const offsetHours = Math.abs(parseInt(offset, 10)).toString().padStart(2, '0');
+                const formattedOffset = `${offsetSign}${offsetHours}:00`;
+                const isoFormatted = `${datePart}T${hour}:${minute}:00${formattedOffset}`;
+                console.log('initMap: ISO formatted local time:', isoFormatted);
+                const localDate = new Date(isoFormatted);
+                if (isNaN(localDate.getTime())) {
+                    throw new Error(`Failed to parse localDate from ${isoFormatted}`);
+                }
+                const localDateUtc = localDate.toISOString();
+                console.log('initMap: Local time in UTC:', localDateUtc);
+                initialTime = localDateUtc.replace(':00.000Z', 'Z');
+            } catch (error) {
+                console.error('Error converting to local time:', error);
+                initialTime = utcIsoString.replace(':00.000Z', 'Z');
+                console.log('initMap: Falling back to UTC time:', initialTime);
+            }
+        }
+
+        console.log('initMap: initialTime:', initialTime);
+        await fetchWeatherForLocation(lat, lng, initialTime, true);
+    }
+
+    const initialAltitude = 'N/A';
+    configureMarker(defaultCenter[0], defaultCenter[1], initialAltitude, false);
+    AppState.isManualPanning = false;
+
+    // Migrate existing tiles to normalized URLs on init and perform automated cleanup
+    TileCache.init().then(() => {
+        TileCache.migrateTiles().then(() => {
+            TileCache.getCacheSize().then(size => {
+                if (size > 500) {
+                    TileCache.clearOldTiles(3).then(result => {
+                        Utils.handleMessage(`Cleared ${result.deletedCount} old tiles to free up space: ${result.deletedSizeMB.toFixed(2)} MB freed.`);
+                    }).catch(error => {
+                        console.error('Failed to clear old tiles during init:', error);
+                        Utils.handleError('Failed to clear old tiles during startup.');
+                    });
+                } else {
+                    TileCache.clearOldTiles().then(() => {
+                        cacheTilesForDIP();
+                    }).catch(error => {
+                        console.error('Failed to clear old tiles:', error);
+                    });
+                }
+            }).catch(error => {
+                console.error('Failed to get cache size during init:', error);
+                TileCache.clearOldTiles().then(() => {
+                    cacheTilesForDIP();
+                }).catch(error => {
+                    console.error('Failed to clear old tiles:', error);
+                });
+            });
+        }).catch(error => {
+            console.error('Failed to migrate tiles:', error);
+            TileCache.clearOldTiles().then(() => {
+                cacheTilesForDIP();
+            }).catch(err => {
+                console.error('Failed to clear old tiles:', err);
+            });
+        });
+    }).catch(error => {
+        console.error('Failed to initialize tile cache:', error);
+        Utils.handleError('Tile caching unavailable.');
+    });
+
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            async (position) => {
+                const userCoords = [position.coords.latitude, position.coords.longitude];
+                AppState.lastLat = position.coords.latitude;
+                AppState.lastLng = position.coords.longitude;
+                AppState.lastAltitude = await getAltitude(AppState.lastLat, AppState.lastLng);
+
+                configureMarker(AppState.lastLat, AppState.lastLng, AppState.lastAltitude, false);
+                AppState.globalMap.setView(userCoords, defaultZoom);
+
+                if (Settings.state.userSettings.calculateJump) {
+                    calculateJump();
+                    calculateCutAway();
+                }
+                recenterMap(true);
+                AppState.isManualPanning = false;
+
+                await fetchInitialWeather(AppState.lastLat, AppState.lastLng);
+
+                if (Settings.state.userSettings.trackPosition) {
+                    setCheckboxValue('trackPositionCheckbox', true);
+                    startPositionTracking();
+                }
+
+                cacheTilesForDIP();
+            },
+            async (error) => {
+                console.warn(`Geolocation error: ${error.message}`);
+                Utils.handleError('Unable to retrieve your location. Using default location.');
+                AppState.lastLat = defaultCenter[0];
+                AppState.lastLng = defaultCenter[1];
+                AppState.lastAltitude = await getAltitude(AppState.lastLat, AppState.lastLng);
+                configureMarker(AppState.lastLat, AppState.lastLng, AppState.lastAltitude, false);
+                AppState.globalMap.setView(defaultCenter, defaultZoom);
+                recenterMap(true);
+                AppState.isManualPanning = false;
+
+                await fetchInitialWeather(AppState.lastLat, AppState.lastLng);
+
+                if (Settings.state.userSettings.trackPosition) {
+                    Utils.handleError('Tracking disabled due to geolocation failure.');
+                    setCheckboxValue('trackPositionCheckbox', false);
+                    Settings.state.userSettings.trackPosition = false;
+                    Settings.save();
+                }
+
+                cacheTilesForDIP();
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 20000,
+                maximumAge: 0
+            }
+        );
+    } else {
+        console.warn('Geolocation not supported.');
+        Utils.handleError('Geolocation not supported. Using default location.');
+        AppState.lastLat = defaultCenter[0];
+        AppState.lastLng = defaultCenter[1];
+        AppState.lastAltitude = getAltitude(AppState.lastLat, AppState.lastLng);
+        configureMarker(AppState.lastLat, AppState.lastLng, initialAltitude, false);
+        AppState.globalMap.setView(defaultCenter, defaultZoom);
+        recenterMap(true);
+        AppState.isManualPanning = false;
+
+        fetchInitialWeather(AppState.lastLat, AppState.lastLng);
+
+        if (Settings.state.userSettings.trackPosition) {
+            Utils.handleError('Tracking disabled: Geolocation not supported.');
+            setCheckboxValue('trackPositionCheckbox', false);
+            Settings.state.userSettings.trackPosition = false;
+            Settings.save();
+        }
+
+        cacheTilesForDIP();
+    }
+
+    updateOfflineIndicator();
+
+    AppState.coordsControl = new L.Control.Coordinates();
+    AppState.coordsControl.addTo(AppState.globalMap);
+    console.log('coordsControl initialized:', AppState.coordsControl);
+
+    const elevationCache = new Map();
+
+    const debouncedGetElevation = debounce(async (lat, lng, requestLatLng, callback) => {
+        const cacheKey = `${lat.toFixed(5)},${lng.toFixed(5)}`;
+        if (elevationCache.has(cacheKey)) {
+            console.log('Using cached elevation:', { lat, lng, elevation: elevationCache.get(cacheKey) });
+            callback(elevationCache.get(cacheKey), requestLatLng);
+            return;
+        }
+        try {
+            const elevation = await getAltitude(lat, lng);
+            elevationCache.set(cacheKey, elevation);
+            console.log('Fetched elevation:', { lat, lng, elevation });
+            callback(elevation, requestLatLng);
+        } catch (error) {
+            console.warn('Failed to fetch elevation:', error);
+            callback('N/A', requestLatLng);
+        }
+    }, 500);
+
+    AppState.globalMap.on('mousemove', function (e) {
+        const coordFormat = getCoordinateFormat();
+        const lat = e.latlng.lat;
+        const lng = e.latlng.lng;
+        AppState.lastMouseLatLng = { lat, lng };
+
+        let coordText;
+        if (coordFormat === 'MGRS') {
+            const mgrs = Utils.decimalToMgrs(lat, lng);
+            coordText = `MGRS: ${mgrs}`;
+        } else if (coordFormat === 'DMS') {
+            const latDMS = Utils.decimalToDms(lat, true);
+            const lngDMS = Utils.decimalToDms(lng, false);
+            coordText = `Lat: ${latDMS}, Lng: ${lngDMS}`;
+        } else {
+            coordText = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
+        }
+
+        AppState.coordsControl.update(`${coordText}<br>Elevation: Fetching...`);
+
+        debouncedGetElevation(lat, lng, { lat, lng }, (elevation, requestLatLng) => {
+            if (AppState.lastMouseLatLng) {
+                const deltaLat = Math.abs(AppState.lastMouseLatLng.lat - requestLatLng.lat);
+                const deltaLng = Math.abs(AppState.lastMouseLatLng.lng - requestLatLng.lng);
+                const threshold = 0.05;
+                if (deltaLat < threshold && deltaLng < threshold) {
+                    const heightUnit = getHeightUnit();
+                    let displayElevation = elevation === 'N/A' ? 'N/A' : elevation;
+                    if (displayElevation !== 'N/A') {
+                        displayElevation = Utils.convertHeight(displayElevation, heightUnit);
+                        displayElevation = Math.round(displayElevation);
+                    }
+                    console.log('Updating elevation display:', { lat: requestLatLng.lat, lng: requestLatLng.lng, elevation, heightUnit, displayElevation });
+                    AppState.coordsControl.update(`${coordText}<br>Elevation: ${displayElevation} ${displayElevation === 'N/A' ? '' : heightUnit}`);
+                } else {
+                    console.log('Discarded elevation update: mouse moved too far', {
+                        requestLat: requestLatLng.lat,
+                        requestLng: requestLatLng.lng,
+                        currentLat: AppState.lastMouseLatLng.lat,
+                        currentLng: AppState.lastMouseLatLng.lng
+                    });
+                }
+            } else {
+                console.warn('No lastMouseLatLng, skipping elevation update');
+            }
+        });
+    });
+
+    AppState.globalMap.on('movestart', (e) => {
+        if (!e.target.dragging || !e.target.dragging._marker) {
+            AppState.isManualPanning = true;
+            console.log('Manual panning detected, isManualPanning set to true');
+        }
+    });
+
+    AppState.globalMap.on('mouseout', function () {
+        AppState.coordsControl.getContainer().innerHTML = 'Move mouse over map';
+    });
+
+    AppState.globalMap.on('contextmenu', (e) => {
+        if (!Settings.state.userSettings.showCutAwayFinder || !Settings.state.userSettings.calculateJump) {
+            console.log('Cut-away marker placement ignored: showCutAwayFinder or calculateJump not enabled');
+            return;
+        }
+        const { lat, lng } = e.latlng;
+        console.log('Right-click: Placing/moving cut-away marker at:', { lat, lng });
+
+        if (AppState.cutAwayMarker) {
+            AppState.cutAwayMarker.setLatLng([lat, lng]);
+        } else {
+            AppState.cutAwayMarker = createCutAwayMarker(lat, lng).addTo(AppState.globalMap);
+            attachCutAwayMarkerDragend(AppState.cutAwayMarker);
+        }
+
+        AppState.cutAwayLat = lat;
+        AppState.cutAwayLng = lng;
+
+        updateCutAwayMarkerPopup(AppState.cutAwayMarker, lat, lng);
+
+        if (AppState.weatherData && Settings.state.userSettings.calculateJump) {
+            console.log('Recalculating cut-away for marker placement');
+            calculateCutAway();
+        }
+    });
+
+    AppState.globalMap.on('dblclick', async (e) => {
+        const { lat, lng } = e.latlng;
+        AppState.lastLat = lat;
+        AppState.lastLng = lng;
+        AppState.lastAltitude = await getAltitude(lat, lng);
+        console.log('Map double-clicked, moving marker to:', { lat, lng });
+
+        configureMarker(AppState.lastLat, AppState.lastLng, AppState.lastAltitude, false);
+        resetJumpRunDirection(true);
+        if (Settings.state.userSettings.calculateJump) {
+            console.log('Recalculating jump for marker click');
+            calculateJump();
+            calculateCutAway();
+        }
+        recenterMap(true);
+        AppState.isManualPanning = false;
+
+        const slider = document.getElementById('timeSlider');
+        const currentIndex = parseInt(slider.value) || 0;
+        const currentTime = AppState.weatherData?.time?.[currentIndex] || null;
+
+        await fetchWeatherForLocation(lat, lng, currentTime);
+
+        if (Settings.state.userSettings.showJumpRunTrack) {
+            console.log('Updating JRT after weather fetch for double-click');
+            updateJumpRunTrack();
+        }
+        cacheTilesForDIP();
+
+        if (Settings.state.userSettings.showJumpMasterLine && Settings.state.userSettings.trackPosition) {
+            console.log('Updating Jump Master Line for double-click');
+            updateJumpMasterLine();
+        }
+    });
+
+    AppState.globalMap.on('zoomend', () => {
+        const currentZoom = AppState.globalMap.getZoom();
+        console.log('Zoom level changed to:', currentZoom);
+
+        if (Settings.state.userSettings.calculateJump && AppState.weatherData && AppState.lastLat && AppState.lastLng) {
+            console.log('Recalculating jump for zoom:', currentZoom);
+            calculateJump();
+        }
+
+        if (Settings.state.userSettings.showJumpRunTrack) {
+            console.log('Updating jump run track for zoom:', currentZoom);
+            updateJumpRunTrack();
+        }
+
+        if (Settings.state.userSettings.showLandingPattern) {
+            console.log('Updating landing pattern for zoom:', currentZoom);
+            updateLandingPattern();
+        }
+
+        if (AppState.currentMarker && AppState.lastLat && AppState.lastLng) {
+            AppState.currentMarker.setLatLng([AppState.lastLat, AppState.lastLng]);
+            updateMarkerPopup(AppState.currentMarker, AppState.lastLat, AppState.lastLng, AppState.lastAltitude, AppState.currentMarker.getPopup()?.isOpen() || false);
+        }
+
+        if (AppState.jumpRunTrackLayer && Settings.state.userSettings.showJumpRunTrack) {
+            const anchorMarker = AppState.jumpRunTrackLayer.getLayers().find(layer => layer.options.icon?.options.className === 'jrt-anchor-marker');
+            if (anchorMarker) {
+                const baseSize = currentZoom <= 11 ? 10 : currentZoom <= 12 ? 12 : currentZoom <= 13 ? 14 : 16;
+                const newIcon = L.divIcon({
+                    className: 'jrt-anchor-marker',
+                    html: `<div style="background-color: orange; width: ${baseSize}px; height: ${baseSize}px; border-radius: 50%; border: 2px solid white; opacity: 0.8;"></div>`,
+                    iconSize: [baseSize, baseSize],
+                    iconAnchor: [baseSize / 2, baseSize / 2],
+                    tooltipAnchor: [0, -(baseSize / 2 + 5)]
+                });
+                anchorMarker.setIcon(newIcon);
+                console.log('Updated anchor marker size for zoom:', { zoom: currentZoom, size: baseSize });
+            }
+        }
+    });
+
+    let lastTapTime = 0;
+    const tapThreshold = 300;
+    const mapContainer = AppState.globalMap.getContainer();
+
+    mapContainer.addEventListener('touchstart', async (e) => {
+        console.log('Map touchstart event, target:', e.target, 'touches:', e.touches.length);
+        if (e.touches.length !== 1 || e.target.closest('.leaflet-marker-icon')) {
+            console.log('Ignoring map touchstart: multiple touches or marker target');
+            return;
+        }
+
+        const currentTime = new Date().getTime();
+        const timeSinceLastTap = currentTime - lastTapTime;
+        if (timeSinceLastTap < tapThreshold && timeSinceLastTap > 0) {
+            e.preventDefault();
+            const rect = mapContainer.getBoundingClientRect();
+            const touchX = e.touches[0].clientX - rect.left;
+            const touchY = e.touches[0].clientY - rect.top;
+            const latlng = AppState.globalMap.containerPointToLatLng([touchX, touchY]);
+            const { lat, lng } = latlng;
+            AppState.lastLat = lat;
+            AppState.lastLng = lng;
+            AppState.lastAltitude = await getAltitude(lat, lng);
+            configureMarker(AppState.lastLat, AppState.lastLng, AppState.lastAltitude, false);
+            resetJumpRunDirection(true);
+            if (Settings.state.userSettings.calculateJump) {
+                calculateJump();
+                calculateCutAway();
+            }
+            recenterMap(true);
+            AppState.isManualPanning = false;
+
+            const slider = document.getElementById('timeSlider');
+            const currentIndex = parseInt(slider.value) || 0;
+            const currentTime = AppState.weatherData?.time?.[currentIndex] || null;
+            await fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, currentTime);
+            cacheTilesForDIP();
+            if (Settings.state.userSettings.showJumpMasterLine && Settings.state.userSettings.trackPosition) {
+                console.log('Updating Jump Master Line for double-tap');
+                updateJumpMasterLine();
+            }
+        }
+        lastTapTime = currentTime;
+    }, { passive: false });
+
+    AppState.globalMap.on('click', (e) => {
+        console.log('Map click event, target:', e.originalEvent.target);
+    });
+
+    AppState.globalMap.on('mousedown', (e) => {
+        console.log('Map mousedown event, target:', e.originalEvent.target);
+    });
+
+    const hamburgerBtn = document.getElementById('hamburgerBtn');
+    const menu = document.getElementById('menu');
+    if (hamburgerBtn && menu) {
+        hamburgerBtn.addEventListener('click', () => {
+            console.log('Hamburger menu clicked, menu visibility toggled');
+        });
+    }
 }
 function reinitializeCoordsControl() {
     console.log('Before reinitialize - coordsControl:', AppState.coordsControl);
@@ -1780,7 +2385,7 @@ function reinitializeCoordsControl() {
         console.log('Removed existing coordsControl');
     }
     AppState.coordsControl = new L.Control.Coordinates();
-    AppState.coordsControl.addTo(map);
+    AppState.coordsControl.addTo(AppState.globalMap);
     console.log('After reinitialize - coordsControl:', AppState.coordsControl);
 }
 function handleHarpPlacement(e) {
@@ -1790,14 +2395,14 @@ function handleHarpPlacement(e) {
         AppState.harpMarker.setLatLng([lat, lng]);
         console.log('Updated HARP marker position:', { lat, lng });
     } else {
-        AppState.harpMarker = createHarpMarker(lat, lng).addTo(map);
+        AppState.harpMarker = createHarpMarker(lat, lng).addTo(AppState.globalMap);
         console.log('Placed new HARP marker:', { lat, lng });
     }
     Settings.state.userSettings.harpLat = lat;
     Settings.state.userSettings.harpLng = lng;
     Settings.save();
     AppState.isPlacingHarp = false;
-    map.off('click', handleHarpPlacement);
+    AppState.globalMap.off('click', handleHarpPlacement);
     console.log('HARP placement mode deactivated');
     // Enable HARP radio button
     const harpRadio = document.querySelector('input[name="jumpMasterLineTarget"][value="HARP"]');
@@ -1852,7 +2457,7 @@ function createHarpMarker(latitude, longitude) {
 }
 function clearHarpMarker() {
     if (AppState.harpMarker) {
-        map.removeLayer(AppState.harpMarker);
+        AppState.globalMap.removeLayer(AppState.harpMarker);
         AppState.harpMarker = null;
         console.log('Removed HARP marker');
     }
@@ -1867,7 +2472,7 @@ function clearHarpMarker() {
     // If Jump Master Line is set to HARP, remove it or switch to DIP
     if (Settings.state.userSettings.jumpMasterLineTarget === 'HARP' && Settings.state.userSettings.showJumpMasterLine) {
         if (AppState.jumpMasterLine) {
-            map.removeLayer(AppState.jumpMasterLine);
+            AppState.globalMap.removeLayer(AppState.jumpMasterLine);
             AppState.jumpMasterLine = null;
             console.log('Removed Jump Master Line: HARP marker cleared');
         }
@@ -2039,9 +2644,9 @@ function recenterMap(force = false) {
         console.log('Skipping recenterMap due to manual panning');
         return;
     }
-    if (map && AppState.currentMarker) {
-        map.invalidateSize();
-        map.panTo(AppState.currentMarker.getLatLng());
+    if (AppState.globalMap && AppState.currentMarker) {
+        AppState.globalMap.invalidateSize();
+        AppState.globalMap.panTo(AppState.currentMarker.getLatLng());
         console.log('Map recentered on marker at:', AppState.currentMarker.getLatLng());
     } else {
         console.warn('Cannot recenter map: map or marker not defined');
@@ -2090,7 +2695,7 @@ function getTooltipContent(point, index, points, groundAltitude, windUnit, heigh
     if (index > 0 && point.time && points[index - 1].time && point.ele !== null && points[index - 1].ele !== null) {
         const timeDiff = (point.time.toMillis() - points[index - 1].time.toMillis()) / 1000; // seconds
         if (timeDiff > 0) {
-            const distance = map.distance([points[index - 1].lat, points[index - 1].lng], [point.lat, point.lng]);
+            const distance = AppState.globalMap.distance([points[index - 1].lat, points[index - 1].lng], [point.lat, point.lng]);
             const speedMs = distance / timeDiff;
             speed = Utils.convertWind(speedMs, windUnit, 'm/s');
             speed = windUnit === 'bft' ? Math.round(speed) : speed.toFixed(1);
@@ -2113,7 +2718,7 @@ function loadGpxTrack(file) {
         try {
             const gpxData = e.target.result;
             if (AppState.gpxLayer) {
-                map.removeLayer(AppState.gpxLayer);
+                AppState.globalMap.removeLayer(AppState.gpxLayer);
                 AppState.gpxLayer = null;
             }
             AppState.gpxPoints = [];
@@ -2239,15 +2844,15 @@ function loadGpxTrack(file) {
                 });
                 AppState.gpxLayer.addLayer(segment);
             }
-            AppState.gpxLayer.addTo(map);
+            AppState.gpxLayer.addTo(AppState.globalMap);
             console.log('GPX layer added:', { gpxLayer: AppState.gpxLayer });
 
             // Center map to track bounds
             if (points.length > 0) {
-                const bounds = L.latLngBounds(points.map(p => [p.lat, p.lng]));
+                const bounds = L.latLngBounds(points.AppState.globalMap(p => [p.lat, p.lng]));
                 if (bounds.isValid()) {
-                    map.invalidateSize();
-                    map.fitBounds(bounds, { padding: [50, 50], maxZoom: maxZoom });
+                    AppState.globalMap.invalidateSize();
+                    AppState.globalMap.fitBounds(bounds, { padding: [50, 50], maxZoom: maxZoom });
                     console.log('Map fitted to GPX track bounds:', { bounds: bounds.toBBoxString() });
                 } else {
                     console.warn('Invalid GPX track bounds:', { points });
@@ -2259,9 +2864,9 @@ function loadGpxTrack(file) {
             const distance = (points.reduce((dist, p, i) => {
                 if (i === 0) return 0;
                 const prev = points[i - 1];
-                return dist + map.distance([prev.lat, prev.lng], [p.lat, p.lng]);
+                return dist + AppState.globalMap.distance([prev.lat, prev.lng], [p.lat, p.lng]);
             }, 0) / 1000).toFixed(2);
-            const elevations = points.map(p => p.ele).filter(e => e !== null);
+            const elevations = points.AppState.globalMap(p => p.ele).filter(e => e !== null);
             const elevationMin = elevations.length ? Math.min(...elevations).toFixed(0) : 'N/A';
             const elevationMax = elevations.length ? Math.max(...elevations).toFixed(0) : 'N/A';
             document.getElementById('info').innerHTML += `<br><strong>GPX Track:</strong> Distance: ${distance} km, Min Elevation: ${elevationMin} m, Max Elevation: ${elevationMax} m`;
@@ -2299,7 +2904,7 @@ const debouncedPositionUpdate = debounce(async (position) => {
     }
     let direction = 'N/A';
     if (AppState.prevLat !== null && AppState.prevLng !== null && AppState.prevTime !== null) {
-        const distance = map.distance([AppState.prevLat, AppState.prevLng], [latitude, longitude]);
+        const distance = AppState.globalMap.distance([AppState.prevLat, AppState.prevLng], [latitude, longitude]);
         const timeDiff = currentTime - AppState.prevTime;
         if (timeDiff > 0) {
             speedMs = distance / timeDiff; // Speed in meters/second
@@ -2318,11 +2923,11 @@ const debouncedPositionUpdate = debounce(async (position) => {
     }
 
     if (!AppState.liveMarker) {
-        AppState.liveMarker = createLiveMarker(latitude, longitude).addTo(map);
+        AppState.liveMarker = createLiveMarker(latitude, longitude).addTo(AppState.globalMap);
         console.log('Created new liveMarker at:', { latitude, longitude });
     } else {
-        if (!map.hasLayer(AppState.liveMarker)) {
-            AppState.liveMarker.addTo(map);
+        if (!AppState.globalMap.hasLayer(AppState.liveMarker)) {
+            AppState.liveMarker.addTo(AppState.globalMap);
             console.log('Re-added liveMarker to map:', { latitude, longitude });
         }
         requestAnimationFrame(() => {
@@ -2336,7 +2941,7 @@ const debouncedPositionUpdate = debounce(async (position) => {
     } else {
         console.warn('Skipping accuracy circle update: invalid accuracy', { accuracy });
         if (window.accuracyCircle) {
-            map.removeLayer(window.accuracyCircle);
+            AppState.globalMap.removeLayer(window.accuracyCircle);
             window.accuracyCircle = null;
             console.log('Removed accuracy circle');
         }
@@ -2362,7 +2967,7 @@ const debouncedPositionUpdate = debounce(async (position) => {
                 const liveLatLng = AppState.liveMarker.getLatLng();
                 const targetLatLng = targetMarker.getLatLng();
                 const bearing = calculateBearing(liveLatLng.lat, liveLatLng.lng, targetLatLng.lat, targetLatLng.lng).toFixed(0);
-                const distanceMeters = map.distance(liveLatLng, targetLatLng);
+                const distanceMeters = AppState.globalMap.distance(liveLatLng, targetLatLng);
                 const heightUnit = getHeightUnit();
                 const convertedDistance = Utils.convertHeight(distanceMeters, heightUnit);
                 const roundedDistance = Math.round(convertedDistance);
@@ -2393,7 +2998,7 @@ const debouncedPositionUpdate = debounce(async (position) => {
                         weight: 3,
                         opacity: 0.8,
                         dashArray: '5, 5'
-                    }).addTo(map);
+                    }).addTo(AppState.globalMap);
                     console.log(`Created Jump Master Line to ${Settings.state.userSettings.jumpMasterLineTarget}:`, { bearing, distance: roundedDistance, unit: heightUnit, tot: totDisplay });
                 }
             } catch (error) {
@@ -2401,14 +3006,14 @@ const debouncedPositionUpdate = debounce(async (position) => {
             }
         } else {
             if (AppState.jumpMasterLine) {
-                map.removeLayer(AppState.jumpMasterLine);
+                AppState.globalMap.removeLayer(AppState.jumpMasterLine);
                 AppState.jumpMasterLine = null;
                 console.log(`Removed Jump Master Line: no valid target (${Settings.state.userSettings.jumpMasterLineTarget})`);
             }
         }
     } else {
         if (AppState.jumpMasterLine) {
-            map.removeLayer(AppState.jumpMasterLine);
+            AppState.globalMap.removeLayer(AppState.jumpMasterLine);
             AppState.jumpMasterLine = null;
             console.log('Removed Jump Master Line: disabled or no liveMarker');
         }
@@ -2650,7 +3255,7 @@ function startPositionTracking() {
         return;
     }
 
-    if (!map) {
+    if (!AppState.globalMap) {
         Utils.handleError('Map not initialized. Please try again.');
         setCheckboxValue('trackPositionCheckbox', false);
         Settings.state.userSettings.trackPosition = false;
@@ -2696,7 +3301,7 @@ function startPositionTracking() {
             console.log('Ensured livePositionControl is visible');
         } else {
             console.warn('livePositionControl not initialized in startPositionTracking');
-            AppState.livePositionControl = L.control.livePosition({ position: 'bottomright' }).addTo(map);
+            AppState.livePositionControl = L.control.livePosition({ position: 'bottomright' }).addTo(AppState.globalMap);
             console.log('Reinitialized livePositionControl');
         }
     } catch (error) {
@@ -2715,12 +3320,12 @@ function stopPositionTracking() {
         console.log('Stopped geolocation watch');
     }
     if (AppState.liveMarker) {
-        map.removeLayer(AppState.liveMarker);
+        AppState.globalMap.removeLayer(AppState.liveMarker);
         AppState.liveMarker = null;
         console.log('Removed liveMarker');
     }
     if (window.accuracyCircle) {
-        map.removeLayer(window.accuracyCircle);
+        AppState.globalMap.removeLayer(window.accuracyCircle);
         window.accuracyCircle = null;
         console.log('Removed accuracy circle');
     }
@@ -2741,7 +3346,7 @@ function stopPositionTracking() {
 function updateAccuracyCircle(lat, lng, accuracy) {
     try {
         if (window.accuracyCircle) {
-            map.removeLayer(window.accuracyCircle);
+            AppState.globalMap.removeLayer(window.accuracyCircle);
             window.accuracyCircle = null;
             console.log('Removed previous accuracy circle');
         }
@@ -2752,20 +3357,20 @@ function updateAccuracyCircle(lat, lng, accuracy) {
             weight: 1,
             dashArray: '5, 5',
             zIndexOffset: 200 // Ensure above other layers
-        }).addTo(map);
+        }).addTo(AppState.globalMap);
         console.log('Updated accuracy circle:', { lat, lng, radius: accuracy });
     } catch (error) {
         console.error('Error updating accuracy circle:', error);
         if (window.accuracyCircle) {
-            map.removeLayer(window.accuracyCircle);
+            AppState.globalMap.removeLayer(window.accuracyCircle);
             window.accuracyCircle = null;
         }
     }
 }
 function updateJumpMasterLine() {
-    if (!Settings.state.userSettings.showJumpMasterLine || !Settings.state.userSettings.trackPosition || !AppState.liveMarker || !map) {
+    if (!Settings.state.userSettings.showJumpMasterLine || !Settings.state.userSettings.trackPosition || !AppState.liveMarker || !AppState.globalMap) {
         if (AppState.jumpMasterLine) {
-            map.removeLayer(AppState.jumpMasterLine);
+            AppState.globalMap.removeLayer(AppState.jumpMasterLine);
             AppState.jumpMasterLine = null;
             console.log('Removed Jump Master Line: preconditions not met');
         }
@@ -2799,7 +3404,7 @@ function updateJumpMasterLine() {
     }
 
     const bearing = calculateBearing(liveLatLng.lat, liveLatLng.lng, targetLat, targetLng).toFixed(0);
-    const distanceMeters = map.distance(liveLatLng, [targetLat, targetLng]);
+    const distanceMeters = AppState.globalMap.distance(liveLatLng, [targetLat, targetLng]);
     const heightUnit = getHeightUnit();
     const convertedDistance = Utils.convertHeight(distanceMeters, heightUnit);
     const roundedDistance = Math.round(convertedDistance);
@@ -2813,7 +3418,7 @@ function updateJumpMasterLine() {
             color: 'blue',
             weight: 3,
             dashArray: '5, 10'
-        }).addTo(map);
+        }).addTo(AppState.globalMap);
         AppState.jumpMasterLine.bindPopup(`<b>Jump Master Line</b><br>Bearing: ${bearing}°<br>Distance: ${roundedDistance} ${heightUnit}`);
         console.log('Created Jump Master Line:', { bearing, distance: roundedDistance, unit: heightUnit });
     }
@@ -2869,7 +3474,7 @@ async function checkAvailableModels(lat, lon) {
     });
 
     const modelDisplay = availableModels.length > 0
-        ? `<br><strong>Available Models:</strong><ul>${availableModels.map(m => `<li>${m.replace('_', ' ').toUpperCase()}</li>`).join('')}</ul>`
+        ? `<br><strong>Available Models:</strong><ul>${availableModels.AppState.globalMap(m => `<li>${m.replace('_', ' ').toUpperCase()}</li>`).join('')}</ul>`
         : '<br><strong>Available Models:</strong> None';
 
     const currentContent = document.getElementById('info').innerHTML;
@@ -3662,8 +4267,8 @@ function calculateMeanWind() {
     const dirs = interpolatedData.map(d => parseFloat(d.dir) || 0);
     const spds = interpolatedData.map(d => Utils.convertWind(parseFloat(d.spd) || 0, windSpeedUnit, 'km/h')); // Fixed order
 
-    const xKomponente = spds.map((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
-    const yKomponente = spds.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
+    const xKomponente = spds.AppState.globalMap((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
+    const yKomponente = spds.AppState.globalMap((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
 
     const meanWind = Utils.calculateMeanWind(heights, xKomponente, yKomponente, lowerLimit, upperLimit);
     const [dir, spd] = meanWind;
@@ -4196,7 +4801,7 @@ function calculateFreeFall(weatherData, exitAltitude, openingAltitude, sliderInd
         vz: final.vz,
         xDisplacement: final.x,
         yDisplacement: final.y,
-        path: trajectory.map(point => ({
+        path: trajectory.AppState.globalMap(point => ({
             latLng: calculateNewCenter(startLat, startLng, Math.sqrt(point.x * point.x + point.y * point.y), Math.atan2(point.y, point.x) * 180 / Math.PI),
             point_x: point.x,
             point_y: point.y,
@@ -4213,15 +4818,15 @@ function calculateFreeFall(weatherData, exitAltitude, openingAltitude, sliderInd
     return result;
 }
 function visualizeFreeFallPath(path) {
-    if (!map || !Settings.state.userSettings.calculateJump) return;
+    if (!AppState.globalMap || !Settings.state.userSettings.calculateJump) return;
 
-    const latLngs = path.map(point => point.latLng);
+    const latLngs = path.AppState.globalMap(point => point.latLng);
     const freeFallPolyline = L.polyline(latLngs, {
         color: 'purple',
         weight: 3,
         opacity: 0.7,
         dashArray: '10, 10'
-    }).addTo(map);
+    }).addTo(AppState.globalMap);
 
     freeFallPolyline.bindPopup(`Free Fall Path<br>Duration: ${path[path.length - 1].time.toFixed(1)}s<br>Distance: ${Math.sqrt(path[path.length - 1].latLng[0] ** 2 + path[path.length - 1].latLng[1] ** 2).toFixed(1)}m`);
 }
@@ -4255,8 +4860,8 @@ function calculateExitCircle() {
     const heights = interpolatedData.map(d => d.height);
     const dirs = interpolatedData.map(d => Number.isFinite(d.dir) ? parseFloat(d.dir) : 0);
     const spdsMps = interpolatedData.map(d => Utils.convertWind(parseFloat(d.spd) || 0, 'm/s', 'km/h'));
-    const uComponents = spdsMps.map((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
-    const vComponents = spdsMps.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
+    const uComponents = spdsMps.AppState.globalMap((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
+    const vComponents = spdsMps.AppState.globalMap((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
 
     const canopySpeedMps = canopySpeed * 0.514444;
     const heightDistance = openingAltitude - 200 - legHeightDownwind;
@@ -4354,8 +4959,8 @@ function calculateCanopyCircles() {
     const heights = interpolatedData.map(d => d.height);
     const dirs = interpolatedData.map(d => Number.isFinite(d.dir) ? parseFloat(d.dir) : 0);
     const spdsMps = interpolatedData.map(d => Utils.convertWind(parseFloat(d.spd) || 0, 'm/s', 'km/h'));
-    const uComponents = spdsMps.map((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
-    const vComponents = spdsMps.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
+    const uComponents = spdsMps.AppState.globalMap((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
+    const vComponents = spdsMps.AppState.globalMap((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
 
     const canopySpeedMps = canopySpeed * 0.514444;
     const heightDistance = openingAltitude - 200 - legHeightDownwind;
@@ -4550,12 +5155,12 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
         showExitAreaOnly, showCanopyAreaOnly
     });
 
-    if (!map) {
+    if (!AppState.globalMap) {
         console.warn('Map not available to update jump circles');
         return false;
     }
 
-    const currentZoom = map.getZoom();
+    const currentZoom = AppState.globalMap.getZoom();
     const minZoom = 11;
     const maxZoom = 14;
     const isVisible = currentZoom >= minZoom && currentZoom <= maxZoom;
@@ -4564,9 +5169,9 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
     const blueCircleMetadata = [];
 
     const removeLayer = (layer, name) => {
-        if (layer && typeof layer === 'object' && '_leaflet_id' in layer && map.hasLayer(layer)) {
+        if (layer && typeof layer === 'object' && '_leaflet_id' in layer && AppState.globalMap.hasLayer(layer)) {
             console.log(`Removing existing ${name}`);
-            map.removeLayer(layer);
+            AppState.globalMap.removeLayer(layer);
         }
     };
 
@@ -4609,8 +5214,8 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
         const earthRadius = 6378137;
         const deltaLat = (radius / earthRadius) * (180 / Math.PI);
         const topEdgeLatLng = L.latLng(center[0] + deltaLat, center[1]);
-        const centerPoint = map.latLngToLayerPoint(centerLatLng);
-        const topEdgePoint = map.latLngToLayerPoint(topEdgeLatLng);
+        const centerPoint = AppState.globalMap.latLngToLayerPoint(centerLatLng);
+        const topEdgePoint = AppState.globalMap.latLngToLayerPoint(topEdgeLatLng);
         const offsetY = centerPoint.y - topEdgePoint.y + 10;
         console.log('calculateLabelAnchor:', { center, radius, anchor: [25, offsetY] });
         return [25, offsetY];
@@ -4621,7 +5226,7 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
             console.log('No blue circle metadata to update labels');
             return;
         }
-        const zoom = map.getZoom();
+        const zoom = AppState.globalMap.getZoom();
         blueCircleMetadata.forEach(({ circle, label, center, radius, content }) => {
             label.setIcon(L.divIcon({
                 className: `isoline-label isoline-label-${zoom <= 11 ? 'small' : 'large'}`,
@@ -4634,7 +5239,7 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
     }
 
     try {
-        map.off('zoomend', updateBlueCircleLabels);
+        AppState.globalMap.off('zoomend', updateBlueCircleLabels);
     } catch (e) {
         console.warn('Failed to remove zoomend listener:', e.message);
     }
@@ -4652,14 +5257,14 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
             fillColor: 'green',
             fillOpacity: 0.2,
             weight: 2
-        }).addTo(map);
+        }).addTo(AppState.globalMap);
         AppState.jumpCircleGreenLight = L.circle([blueLat, blueLng], {
             radius: radius,
             color: 'darkgreen',
             fillColor: 'darkgreen',
             fillOpacity: 0.2,
             weight: 2
-        }).addTo(map);
+        }).addTo(AppState.globalMap);
         if (AppState.jumpCircleGreen.setZIndex) AppState.jumpCircleGreen.setZIndex(600);
         if (AppState.jumpCircleGreenLight.setZIndex) AppState.jumpCircleGreenLight.setZIndex(600);
         console.log('Added green and dark green circles:', {
@@ -4694,7 +5299,7 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
             fillOpacity: 0,
             weight: 2,
             opacity: 0.1
-        }).addTo(map);
+        }).addTo(AppState.globalMap);
         if (AppState.jumpCircle.setZIndex) AppState.jumpCircle.setZIndex(1000);
         console.log('Added main blue circle at:', { center: newCenterBlue, radius });
 
@@ -4705,7 +5310,7 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
             fillOpacity: 0,
             weight: 2,
             opacity: 0.8
-        }).addTo(map);
+        }).addTo(AppState.globalMap);
         if (AppState.jumpCircleFull.setZIndex) AppState.jumpCircleFull.setZIndex(400);
         console.log('Added red circle at:', { center: newCenterRed, radius: radiusFull });
 
@@ -4724,7 +5329,7 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
                         fillColor: 'blue',
                         fillOpacity: 0.1,
                         weight: 1
-                    }).addTo(map);
+                    }).addTo(AppState.globalMap);
                     if (circle.setZIndex) circle.setZIndex(1000);
 
                     const label = L.marker(addCenter, {
@@ -4735,7 +5340,7 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
                             iconAnchor: calculateLabelAnchor(addCenter, addRadius)
                         }),
                         zIndexOffset: 2100
-                    }).addTo(map);
+                    }).addTo(AppState.globalMap);
 
                     window.additionalBlueCircles.push(circle);
                     window.additionalBlueLabels.push(label);
@@ -4790,7 +5395,7 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
                 fillOpacity: 0,
                 weight: 2,
                 opacity: 0.1
-            }).addTo(map);
+            }).addTo(AppState.globalMap);
             if (AppState.jumpCircle.setZIndex) AppState.jumpCircle.setZIndex(1000);
             console.log('Re-added main blue circle at:', { center: newCenterBlue, radius: canopyResult.radius });
 
@@ -4801,7 +5406,7 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
                 fillOpacity: 0,
                 weight: 2,
                 opacity: 0.8
-            }).addTo(map);
+            }).addTo(AppState.globalMap);
             if (AppState.jumpCircleFull.setZIndex) AppState.jumpCircleFull.setZIndex(400);
             console.log('Re-added red circle at:', { center: newCenterRed, radius: canopyResult.radiusFull });
 
@@ -4821,7 +5426,7 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
                             fillColor: 'blue',
                             fillOpacity: 0.1,
                             weight: 1
-                        }).addTo(map);
+                        }).addTo(AppState.globalMap);
                         if (circle.setZIndex) circle.setZIndex(1000);
 
                         const label = L.marker(addCenter, {
@@ -4832,7 +5437,7 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
                                 iconAnchor: calculateLabelAnchor(addCenter, addRadius)
                             }),
                             zIndexOffset: 2100
-                        }).addTo(map);
+                        }).addTo(AppState.globalMap);
 
                         window.additionalBlueCircles.push(circle);
                         window.additionalBlueLabels.push(label);
@@ -4851,7 +5456,7 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
 
     if (blueCircleMetadata.length) {
         updateBlueCircleLabels();
-        map.on('zoomend', updateBlueCircleLabels);
+        AppState.globalMap.on('zoomend', updateBlueCircleLabels);
     } else {
         console.log('No blue circles created, skipping label update and zoom listener');
     }
@@ -4886,9 +5491,9 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
 }
 function clearIsolineMarkers() {
     console.log('clearIsolineMarkers called');
-    if (map) {
+    if (AppState.globalMap) {
         let markerCount = 0;
-        map.eachLayer(layer => {
+        AppState.globalMap.eachLayer(layer => {
             if (layer instanceof L.Marker &&
                 layer !== AppState.currentMarker &&
                 layer !== AppState.cutAwayMarker &&
@@ -4921,7 +5526,7 @@ function clearIsolineMarkers() {
         console.log('Cleared', markerCount, 'isoline-label markers');
         // Fallback: Remove only markers that are not currentMarker, AppState.cutAwayMarker, AppState.liveMarker, or AppState.harpMarker
         if (markerCount === 0) {
-            map.eachLayer(layer => {
+            AppState.globalMap.eachLayer(layer => {
                 if (layer instanceof L.Marker &&
                     layer !== AppState.currentMarker &&
                     layer !== AppState.cutAwayMarker &&
@@ -5000,8 +5605,8 @@ function jumpRunTrack() {
 
     console.log('Interpolated data:', { heights, dirs, spdsMps });
 
-    const uComponents = spdsMps.map((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
-    const vComponents = spdsMps.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
+    const uComponents = spdsMps.AppState.globalMap((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
+    const vComponents = spdsMps.AppState.globalMap((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
 
     const meanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, lowerLimit, upperLimit);
     const meanWindDirection = meanWind[0];
@@ -5193,17 +5798,17 @@ function updateJumpRunTrack() {
         lastLat: AppState.lastLat,
         lastLng: AppState.lastLng,
         customJumpRunDirection: AppState.customJumpRunDirection,
-        currentZoom: map.getZoom(),
+        currentZoom: AppState.globalMap.getZoom(),
         jumpRunTrackOffset: Settings.state.userSettings.jumpRunTrackOffset,
         jumpRunTrackForwardOffset: Settings.state.userSettings.jumpRunTrackForwardOffset
     });
 
-    const currentZoom = map.getZoom();
+    const currentZoom = AppState.globalMap.getZoom();
     const isZoomInRange = currentZoom >= minZoom && currentZoom <= maxZoom;
 
     // Remove existing jump run track layer
     if (AppState.jumpRunTrackLayer) {
-        map.removeLayer(AppState.jumpRunTrackLayer);
+        AppState.globalMap.removeLayer(AppState.jumpRunTrackLayer);
         AppState.jumpRunTrackLayer = null;
         console.log('Removed existing JRT layer group');
     }
@@ -5249,7 +5854,7 @@ function updateJumpRunTrack() {
     }
 
     // Create a LayerGroup to hold all components
-    AppState.jumpRunTrackLayer = L.layerGroup().addTo(map);
+    AppState.jumpRunTrackLayer = L.layerGroup().addTo(AppState.globalMap);
 
     // Create polyline for the jump run track (interactive for tooltips)
     const trackPolyline = L.polyline(latlngs, {
@@ -5328,8 +5933,8 @@ function updateJumpRunTrack() {
     });
 
     // Store original positions for drag calculations
-    let originalTrackLatLngs = latlngs.map(ll => [...ll]);
-    let originalApproachLatLngs = approachLatLngs ? approachLatLngs.map(ll => [...ll]) : null;
+    let originalTrackLatLngs = latlngs.AppState.globalMap(ll => [...ll]);
+    let originalApproachLatLngs = approachLatLngs ? approachLatLngs.AppState.globalMap(ll => [...ll]) : null;
     let originalAirplaneLatLng = [...frontEnd];
     let originalCenterLat = AppState.lastLat;
     let originalCenterLng = AppState.lastLng;
@@ -5355,13 +5960,13 @@ function updateJumpRunTrack() {
     // Dragging handlers for the airplane marker
     airplaneMarker.on('mousedown', (e) => {
         console.log('Airplane marker mousedown:', e);
-        map.dragging.disable();
+        AppState.globalMap.dragging.disable();
         L.DomEvent.stopPropagation(e);
     });
 
     airplaneMarker.on('dragstart', () => {
         console.log('Airplane marker dragstart');
-        map.dragging.disable();
+        AppState.globalMap.dragging.disable();
     });
 
     airplaneMarker.on('drag', () => {
@@ -5374,13 +5979,13 @@ function updateJumpRunTrack() {
         const deltaLng = newLatLng.lng - newCenter.lng;
 
         // Update track polyline
-        const newTrackLatLngs = originalTrackLatLngs.map(ll => [ll[0] + deltaLat, ll[1] + deltaLng]);
+        const newTrackLatLngs = originalTrackLatLngs.AppState.globalMap(ll => [ll[0] + deltaLat, ll[1] + deltaLng]);
         trackPolyline.setLatLngs(newTrackLatLngs);
         originalTrackLatLngs = newTrackLatLngs;
 
         // Update approach polyline if it exists
         if (approachPolyline && originalApproachLatLngs) {
-            const newApproachLatLngs = originalApproachLatLngs.map(ll => [ll[0] + deltaLat, ll[1] + deltaLng]);
+            const newApproachLatLngs = originalApproachLatLngs.AppState.globalMap(ll => [ll[0] + deltaLat, ll[1] + deltaLng]);
             approachPolyline.setLatLngs(newApproachLatLngs);
             originalApproachLatLngs = newApproachLatLngs;
         }
@@ -5393,14 +5998,14 @@ function updateJumpRunTrack() {
 
     airplaneMarker.on('dragend', () => {
         console.log('Airplane marker dragend');
-        map.dragging.enable();
+        AppState.globalMap.dragging.enable();
 
         const newLatLng = airplaneMarker.getLatLng();
 
         // Calculate displacement from original center (lastLat, lastLng)
         const originalCenter = L.latLng(AppState.lastLat, AppState.lastLng);
         const newCenter = L.latLng(newLatLng.lat - (originalAirplaneLatLng[0] - originalCenterLat), newLatLng.lng - (originalAirplaneLatLng[1] - originalCenterLng));
-        const distance = map.distance(originalCenter, newCenter);
+        const distance = AppState.globalMap.distance(originalCenter, newCenter);
         const bearing = calculateBearing(originalCenter.lat, originalCenter.lng, newCenter.lat, newCenter.lng);
 
         // Calculate lateral and forward components
@@ -5461,7 +6066,7 @@ function updateJumpRunTrack() {
 
     airplaneMarker.on('touchstart', (e) => {
         console.log('Airplane marker touchstart:', e);
-        map.dragging.disable();
+        AppState.globalMap.dragging.disable();
         L.DomEvent.stopPropagation(e);
     });
 
@@ -5541,8 +6146,8 @@ function calculateCutAway() {
     console.log('Interpolated data for cut-away:', { heights, dirs, spdsMps });
 
     // Calculate U and V components
-    const uComponents = spdsMps.map((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
-    const vComponents = spdsMps.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
+    const uComponents = spdsMps.AppState.globalMap((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
+    const vComponents = spdsMps.AppState.globalMap((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
 
     // Compute mean wind
     const meanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, lowerLimit, upperLimit);
@@ -5615,7 +6220,7 @@ function calculateCutAway() {
 
     // Remove existing cut-away circle if present
     if (AppState.cutAwayCircle) {
-        map.removeLayer(AppState.cutAwayCircle);
+        AppState.globalMap.removeLayer(AppState.cutAwayCircle);
         AppState.cutAwayCircle = null;
         console.log('Cleared existing cut-away circle');
     }
@@ -5665,7 +6270,7 @@ function calculateCutAway() {
             fillColor: 'purple',
             fillOpacity: 0.2,
             weight: 2
-        }).addTo(map);
+        }).addTo(AppState.globalMap);
 
         // Bind tooltip
         AppState.cutAwayCircle.bindTooltip(tooltipContent, {
@@ -5769,63 +6374,63 @@ function calculateLandingPatternCoords(lat, lng, interpolatedData, sliderIndex) 
 }
 function updateLandingPattern() {
     console.log('updateLandingPattern called');
-    if (!map || !Settings.state.userSettings.showLandingPattern || !AppState.weatherData || !AppState.lastLat || !AppState.lastLng || AppState.lastAltitude === null || AppState.lastAltitude === 'N/A') {
+    if (!AppState.globalMap || !Settings.state.userSettings.showLandingPattern || !AppState.weatherData || !AppState.lastLat || !AppState.lastLng || AppState.lastAltitude === null || AppState.lastAltitude === 'N/A') {
         console.log('Landing pattern not updated: missing data or feature disabled');
         // Clear existing layers
         if (AppState.landingPatternPolygon) {
-            map.removeLayer(AppState.landingPatternPolygon);
+            AppState.globalMap.removeLayer(AppState.landingPatternPolygon);
             AppState.landingPatternPolygon = null;
         }
         if (AppState.secondlandingPatternPolygon) {
-            map.removeLayer(AppState.secondlandingPatternPolygon);
+            AppState.globalMap.removeLayer(AppState.secondlandingPatternPolygon);
             AppState.secondlandingPatternPolygon = null;
         }
         if (AppState.thirdLandingPatternLine) {
-            map.removeLayer(AppState.thirdLandingPatternLine);
+            AppState.globalMap.removeLayer(AppState.thirdLandingPatternLine);
             AppState.thirdLandingPatternLine = null;
         }
         if (AppState.finalArrow) {
-            map.removeLayer(AppState.finalArrow);
+            AppState.globalMap.removeLayer(AppState.finalArrow);
             AppState.finalArrow = null;
         }
         if (AppState.baseArrow) {
-            map.removeLayer(AppState.baseArrow);
+            AppState.globalMap.removeLayer(AppState.baseArrow);
             AppState.baseArrow = null;
         }
         if (AppState.downwindArrow) {
-            map.removeLayer(AppState.downwindArrow);
+            AppState.globalMap.removeLayer(AppState.downwindArrow);
             AppState.downwindArrow = null;
         }
         return;
     }
 
-    const currentZoom = map.getZoom();
+    const currentZoom = AppState.globalMap.getZoom();
     const isVisible = currentZoom >= landingPatternMinZoom;
     console.log('Landing pattern zoom check:', { currentZoom, landingPatternMinZoom, isVisible });
 
     // Clear existing layers to prevent duplicates
     if (AppState.landingPatternPolygon) {
-        map.removeLayer(AppState.landingPatternPolygon);
+        AppState.globalMap.removeLayer(AppState.landingPatternPolygon);
         AppState.landingPatternPolygon = null;
     }
     if (AppState.secondlandingPatternPolygon) {
-        map.removeLayer(AppState.secondlandingPatternPolygon);
+        AppState.globalMap.removeLayer(AppState.secondlandingPatternPolygon);
         AppState.secondlandingPatternPolygon = null;
     }
     if (AppState.thirdLandingPatternLine) {
-        map.removeLayer(AppState.thirdLandingPatternLine);
+        AppState.globalMap.removeLayer(AppState.thirdLandingPatternLine);
         AppState.thirdLandingPatternLine = null;
     }
     if (AppState.finalArrow) {
-        map.removeLayer(AppState.finalArrow);
+        AppState.globalMap.removeLayer(AppState.finalArrow);
         AppState.finalArrow = null;
     }
     if (AppState.baseArrow) {
-        map.removeLayer(AppState.baseArrow);
+        AppState.globalMap.removeLayer(AppState.baseArrow);
         AppState.baseArrow = null;
     }
     if (AppState.downwindArrow) {
-        map.removeLayer(AppState.downwindArrow);
+        AppState.globalMap.removeLayer(AppState.downwindArrow);
         AppState.downwindArrow = null;
     }
 
@@ -5956,7 +6561,7 @@ function updateLandingPattern() {
         weight: 3,
         opacity: 0.8,
         dashArray: '5, 10'
-    }).addTo(map);
+    }).addTo(AppState.globalMap);
 
     // Add a fat blue arrow in the middle of the final leg pointing to landing direction
     const finalMidLat = (lat + finalEnd[0]) / 2;
@@ -5965,7 +6570,7 @@ function updateLandingPattern() {
 
     AppState.finalArrow = L.marker([finalMidLat, finalMidLng], {
         icon: createArrowIcon(finalMidLat, finalMidLng, finalArrowBearing, finalArrowColor)
-    }).addTo(map);
+    }).addTo(AppState.globalMap);
     AppState.finalArrow.bindTooltip(`${Math.round(finalWindDir)}° ${formatWindSpeed(finalWindSpeedKt)}${getWindSpeedUnit()}`, {
         offset: [10, 0], // Slight offset to avoid overlap
         direction: 'right',
@@ -6025,7 +6630,7 @@ function updateLandingPattern() {
         weight: 3,
         opacity: 0.8,
         dashArray: '5, 10'
-    }).addTo(map);
+    }).addTo(AppState.globalMap);
 
     // Add a fat blue arrow in the middle of the base leg pointing to landing direction
     const baseMidLat = (finalEnd[0] + baseEnd[0]) / 2;
@@ -6034,7 +6639,7 @@ function updateLandingPattern() {
 
     AppState.baseArrow = L.marker([baseMidLat, baseMidLng], {
         icon: createArrowIcon(baseMidLat, baseMidLng, baseArrowBearing, baseArrowColor)
-    }).addTo(map);
+    }).addTo(AppState.globalMap);
     AppState.baseArrow.bindTooltip(`${Math.round(baseWindDir)}° ${formatWindSpeed(baseWindSpeedKt)}${getWindSpeedUnit()}`, {
         offset: [10, 0],
         direction: 'right',
@@ -6078,7 +6683,7 @@ function updateLandingPattern() {
         weight: 3,
         opacity: 0.8,
         dashArray: '5, 10'
-    }).addTo(map);
+    }).addTo(AppState.globalMap);
 
     // Add a fat blue arrow in the middle of the downwind leg pointing to landing direction
     const downwindMidLat = (baseEnd[0] + downwindEnd[0]) / 2;
@@ -6088,7 +6693,7 @@ function updateLandingPattern() {
     // Create a custom arrow icon using Leaflet’s DivIcon
     AppState.downwindArrow = L.marker([downwindMidLat, downwindMidLng], {
         icon: createArrowIcon(downwindMidLat, downwindMidLng, downwindArrowBearing, downwindArrowColor)
-    }).addTo(map);
+    }).addTo(AppState.globalMap);
     AppState.downwindArrow.bindTooltip(`${Math.round(downwindWindDir)}° ${formatWindSpeed(downwindWindSpeedKt)}${getWindSpeedUnit()}`, {
         offset: [10, 0],
         direction: 'right',
@@ -6109,7 +6714,7 @@ function updateLandingPattern() {
     console.log('Coordinates downwind end: ', downwindEnd[0], downwindEnd[1], 'Leg Height:', baseHeight + LEG_HEIGHT_DOWNWIND);
 
 
-    //map.fitBounds([[lat, lng], finalEnd, baseEnd, downwindEnd], { padding: [50, 50] });
+    //AppState.globalMap.fitBounds([[lat, lng], finalEnd, baseEnd, downwindEnd], { padding: [50, 50] });
 }
 function createArrowIcon(lat, lng, bearing, color) {
     // Normalize bearing to 0-360
@@ -6555,12 +7160,12 @@ function setupMenuEvents() {
             menu.classList.toggle('hidden');
             const isHidden = menu.classList.contains('hidden');
             if (isHidden) {
-                map.dragging.enable();
-                map.touchZoom.enable();
-                map.doubleClickZoom.enable();
-                map.scrollWheelZoom.enable();
-                map.boxZoom.enable();
-                map.keyboard.enable();
+                AppState.globalMap.dragging.enable();
+                AppState.globalMap.touchZoom.enable();
+                AppState.globalMap.doubleClickZoom.enable();
+                AppState.globalMap.scrollWheelZoom.enable();
+                AppState.globalMap.boxZoom.enable();
+                AppState.globalMap.keyboard.enable();
                 // Ensure map is interactive
                 document.querySelector('.leaflet-container').style.pointerEvents = 'auto';
                 reinitializeCoordsControl();
@@ -6594,12 +7199,12 @@ function setupMenuEvents() {
         document.addEventListener('click', (e) => {
             if (!menu.contains(e.target) && !hamburgerBtn.contains(e.target) && !menu.classList.contains('hidden')) {
                 menu.classList.add('hidden');
-                map.dragging.enable();
-                map.touchZoom.enable();
-                map.doubleClickZoom.enable();
-                map.scrollWheelZoom.enable();
-                map.boxZoom.enable();
-                map.keyboard.enable();
+                AppState.globalMap.dragging.enable();
+                AppState.globalMap.touchZoom.enable();
+                AppState.globalMap.doubleClickZoom.enable();
+                AppState.globalMap.scrollWheelZoom.enable();
+                AppState.globalMap.boxZoom.enable();
+                AppState.globalMap.keyboard.enable();
                 document.querySelector('.leaflet-container').style.pointerEvents = 'auto';
                 reinitializeCoordsControl();
                 console.log('Menu closed, map interactions restored, coordsControl reinitialized');
@@ -7140,29 +7745,29 @@ function setupCheckboxEvents() {
             calculateCutAway();
         } else {
             if (AppState.jumpCircle) {
-                if (map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(AppState.jumpCircle);
+                if (AppState.globalMap && typeof AppState.globalMap.removeLayer === 'function') {
+                    AppState.globalMap.removeLayer(AppState.jumpCircle);
                 }
                 AppState.jumpCircle = null;
             }
             if (AppState.jumpCircleFull) {
-                if (map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(AppState.jumpCircleFull);
+                if (AppState.globalMap && typeof AppState.globalMap.removeLayer === 'function') {
+                    AppState.globalMap.removeLayer(AppState.jumpCircleFull);
                 }
                 AppState.jumpCircleFull = null;
             }
             if (window.additionalBlueCircles) {
                 window.additionalBlueCircles.forEach(circle => {
-                    if (map && typeof map.removeLayer === 'function') {
-                        map.removeLayer(circle);
+                    if (AppState.globalMap && typeof AppState.globalMap.removeLayer === 'function') {
+                        AppState.globalMap.removeLayer(circle);
                     }
                 });
                 window.additionalBlueCircles = [];
             }
             if (window.additionalBlueLabels) {
                 window.additionalBlueLabels.forEach(label => {
-                    if (map && typeof map.removeLayer === 'function') {
-                        map.removeLayer(label);
+                    if (AppState.globalMap && typeof AppState.globalMap.removeLayer === 'function') {
+                        AppState.globalMap.removeLayer(label);
                     }
                 });
                 window.additionalBlueLabels = [];
@@ -7180,16 +7785,16 @@ function setupCheckboxEvents() {
             calculateJumpRunTrack();
         } else {
             if (AppState.jumpRunTrackLayer) {
-                if (AppState.jumpRunTrackLayer.airplaneMarker && map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(AppState.jumpRunTrackLayer.airplaneMarker);
+                if (AppState.jumpRunTrackLayer.airplaneMarker && AppState.globalMap && typeof AppState.globalMap.removeLayer === 'function') {
+                    AppState.globalMap.removeLayer(AppState.jumpRunTrackLayer.airplaneMarker);
                     AppState.jumpRunTrackLayer.airplaneMarker = null;
                 }
-                if (AppState.jumpRunTrackLayer.approachLayer && map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(AppState.jumpRunTrackLayer.approachLayer);
+                if (AppState.jumpRunTrackLayer.approachLayer && AppState.globalMap && typeof AppState.globalMap.removeLayer === 'function') {
+                    AppState.globalMap.removeLayer(AppState.jumpRunTrackLayer.approachLayer);
                     AppState.jumpRunTrackLayer.approachLayer = null;
                 }
-                if (map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(AppState.jumpRunTrackLayer);
+                if (AppState.globalMap && typeof AppState.globalMap.removeLayer === 'function') {
+                    AppState.globalMap.removeLayer(AppState.jumpRunTrackLayer);
                 }
                 AppState.jumpRunTrackLayer = null;
                 console.log('Removed JRT polyline');
@@ -7216,8 +7821,8 @@ function setupCheckboxEvents() {
             calculateCutAway();
         } else {
             if (AppState.cutAwayCircle) {
-                if (map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(AppState.cutAwayCircle);
+                if (AppState.globalMap && typeof AppState.globalMap.removeLayer === 'function') {
+                    AppState.globalMap.removeLayer(AppState.cutAwayCircle);
                 } else {
                     console.warn('Map not initialized, cannot remove cutAwayCircle');
                 }
@@ -7225,8 +7830,8 @@ function setupCheckboxEvents() {
                 console.log('Cleared cut-away circle');
             }
             if (AppState.cutAwayMarker) {
-                if (map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(AppState.cutAwayMarker);
+                if (AppState.globalMap && typeof AppState.globalMap.removeLayer === 'function') {
+                    AppState.globalMap.removeLayer(AppState.cutAwayMarker);
                 } else {
                     console.warn('Map not initialized, cannot remove cutAwayMarker');
                 }
@@ -7262,38 +7867,38 @@ function setupCheckboxEvents() {
             toggleSubmenu(checkbox, submenu, false);
             console.log('Clearing landing pattern');
             if (AppState.landingPatternPolygon) {
-                if (map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(AppState.landingPatternPolygon);
+                if (AppState.globalMap && typeof AppState.globalMap.removeLayer === 'function') {
+                    AppState.globalMap.removeLayer(AppState.landingPatternPolygon);
                 }
                 AppState.landingPatternPolygon = null;
             }
             if (AppState.secondlandingPatternPolygon) {
-                if (map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(AppState.secondlandingPatternPolygon);
+                if (AppState.globalMap && typeof AppState.globalMap.removeLayer === 'function') {
+                    AppState.globalMap.removeLayer(AppState.secondlandingPatternPolygon);
                 }
                 AppState.secondlandingPatternPolygon = null;
             }
             if (AppState.thirdLandingPatternLine) {
-                if (map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(AppState.thirdLandingPatternLine);
+                if (AppState.globalMap && typeof AppState.globalMap.removeLayer === 'function') {
+                    AppState.globalMap.removeLayer(AppState.thirdLandingPatternLine);
                 }
                 AppState.thirdLandingPatternLine = null;
             }
             if (AppState.finalArrow) {
-                if (map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(AppState.finalArrow);
+                if (AppState.globalMap && typeof AppState.globalMap.removeLayer === 'function') {
+                    AppState.globalMap.removeLayer(AppState.finalArrow);
                 }
                 AppState.finalArrow = null;
             }
             if (AppState.baseArrow) {
-                if (map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(AppState.baseArrow);
+                if (AppState.globalMap && typeof AppState.globalMap.removeLayer === 'function') {
+                    AppState.globalMap.removeLayer(AppState.baseArrow);
                 }
                 AppState.baseArrow = null;
             }
             if (AppState.downwindArrow) {
-                if (map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(AppState.downwindArrow);
+                if (AppState.globalMap && typeof AppState.globalMap.removeLayer === 'function') {
+                    AppState.globalMap.removeLayer(AppState.downwindArrow);
                 }
                 AppState.downwindArrow = null;
             }
@@ -7361,8 +7966,8 @@ function setupCheckboxEvents() {
         }
         // Remove Jump Master Line from map
         if (AppState.jumpMasterLine) {
-            if (map && typeof map.removeLayer === 'function') {
-                map.removeLayer(AppState.jumpMasterLine);
+            if (AppState.globalMap && typeof AppState.globalMap.removeLayer === 'function') {
+                AppState.globalMap.removeLayer(AppState.jumpMasterLine);
             } else {
                 console.warn('Map not initialized, cannot remove jumpMasterLine');
             }
@@ -7420,8 +8025,8 @@ function setupCheckboxEvents() {
         toggleSubmenu(checkbox, submenu, checkbox.checked);
         if (!checkbox.checked) {
             if (AppState.jumpMasterLine) {
-                if (map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(AppState.jumpMasterLine);
+                if (AppState.globalMap && typeof AppState.globalMap.removeLayer === 'function') {
+                    AppState.globalMap.removeLayer(AppState.jumpMasterLine);
                 } else {
                     console.warn('Map not initialized, cannot remove jumpMasterLine');
                 }
@@ -7483,7 +8088,7 @@ function setupCheckboxEvents() {
         placeHarpButton.addEventListener('click', () => {
             AppState.isPlacingHarp = true;
             console.log('HARP placement mode activated');
-            map.on('click', handleHarpPlacement);
+            AppState.globalMap.on('click', handleHarpPlacement);
             Utils.handleMessage('Click the map to place the HARP marker');
         });
     }
@@ -7539,7 +8144,7 @@ function setupCoordinateEvents() {
     if (coordHistory) {
         coordHistory.addEventListener('change', (e) => {
             if (e.target.value) {
-                const [lat, lng] = e.target.value.split(',').map(parseFloat);
+                const [lat, lng] = e.target.value.split(',').AppState.globalMap(parseFloat);
                 populateCoordInputs(lat, lng);
                 moveMarkerBtn.click();
             }
@@ -7576,7 +8181,7 @@ function setupGpxTrackEvents() {
             console.log('Clear GPX button clicked');
             if (AppState.gpxLayer) {
                 try {
-                    map.removeLayer(AppState.gpxLayer);
+                    AppState.globalMap.removeLayer(AppState.gpxLayer);
                     AppState.gpxLayer = null;
                     AppState.gpxPoints = [];
                     console.log('Cleared GPX track');
@@ -7639,7 +8244,7 @@ function setupMenuItemEvents() {
     if (!calculateJumpMenuItem) {
         console.error('Calculate Jump menu item not found');
         const menuItems = document.querySelectorAll('.hamburger-menu .menu-label');
-        console.log('Available menu labels:', Array.from(menuItems).map(item => item.textContent.trim()));
+        console.log('Available menu labels:', Array.from(menuItems).AppState.globalMap(item => item.textContent.trim()));
         return;
     }
 
@@ -7797,13 +8402,13 @@ function setupResetCutAwayMarkerButton() {
     if (resetButton) {
         resetButton.addEventListener('click', () => {
             if (AppState.cutAwayMarker) {
-                map.removeLayer(AppState.cutAwayMarker);
+                AppState.globalMap.removeLayer(AppState.cutAwayMarker);
                 AppState.cutAwayMarker = null;
                 AppState.cutAwayLat = null;
                 AppState.cutAwayLng = null;
                 console.log('Cut-away marker reset');
                 if (AppState.cutAwayCircle) {
-                    map.removeLayer(AppState.cutAwayCircle);
+                    AppState.globalMap.removeLayer(AppState.cutAwayCircle);
                     AppState.cutAwayCircle = null;
                     console.log('Cleared cut-away circle');
                 }
@@ -8006,9 +8611,9 @@ function toggleSubmenu(element, submenu, isVisible) {
 function clearJumpCircles() {
     console.log('Clearing all jump circles');
     const removeLayer = (layer, name) => {
-        if (layer && typeof layer === 'object' && '_leaflet_id' in layer && map.hasLayer(layer)) {
+        if (layer && typeof layer === 'object' && '_leaflet_id' in layer && AppState.globalMap.hasLayer(layer)) {
             console.log(`Removing ${name}`);
-            map.removeLayer(layer);
+            AppState.globalMap.removeLayer(layer);
         } else if (layer) {
             console.warn(`Layer ${name} not removed: not on map or invalid`, { layer });
         }
@@ -8261,7 +8866,7 @@ async function updateAllDisplays() {
             const liveLatLng = AppState.liveMarker.getLatLng();
             const dipLatLng = AppState.currentMarker.getLatLng();
             const bearing = calculateBearing(liveLatLng.lat, liveLatLng.lng, dipLatLng.lat, dipLatLng.lng).toFixed(0);
-            const distanceMeters = map.distance(liveLatLng, dipLatLng);
+            const distanceMeters = AppState.globalMap.distance(liveLatLng, dipLatLng);
             const heightUnit = getHeightUnit();
             const convertedDistance = Utils.convertHeight(distanceMeters, heightUnit);
             const roundedDistance = Math.round(convertedDistance);
