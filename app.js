@@ -2,6 +2,7 @@
 // == Constants and Global Variables ==
 import { Settings } from './settings.js';
 import { Utils } from './utils.js';
+"use strict";
 
 let userSettings;
 try {
@@ -58,7 +59,7 @@ const AppState = {
     lastDirection: 'N/A',
     lastTerrainAltitude: 'N/A',
     lastSmoothedSpeedMs: 0,
-    //map: null,
+    map: null,
     baseMaps: {},
     lastLat: null,
     lastLng: null,
@@ -67,7 +68,17 @@ const AppState = {
     isManualPanning: false,
 };
 
-let map;
+const Constants = {
+    //minZoom: 11,
+    //maxZoom: 14,
+    //landingPatternMinZoom: 14,
+    jumperSeparationTable: {
+        135: 5, 130: 5, 125: 5, 120: 5, 115: 5, 110: 5, 105: 5,
+        100: 6, 95: 7, 90: 7, 85: 7, 80: 8, 75: 8, 70: 9,
+        65: 10, 60: 10, 55: 11, 50: 12, 45: 14, 40: 15,
+        35: 17, 30: 20, 25: 24, 20: 30, 15: 40, 10: 60, 5: 119
+    }
+};
 
 const minZoom = 11;
 const maxZoom = 14;
@@ -79,35 +90,7 @@ const getWindSpeedUnit = () => Settings.getValue('windUnit', 'radio', 'kt');
 const getCoordinateFormat = () => Settings.getValue('coordFormat', 'radio', 'Decimal');
 const getInterpolationStep = () => Settings.getValue('interpStepSelect', 'select', 200);
 const getDownloadFormat = () => Settings.getValue('downloadFormat', 'radio', 'csv');
-const jumperSeparationTable = {
-    135: 5,
-    130: 5,
-    125: 5,
-    120: 5,
-    115: 5,
-    110: 5,
-    105: 5,
-    100: 6,
-    95: 7,
-    90: 7,
-    85: 7,
-    80: 8,
-    75: 8,
-    70: 9,
-    65: 10,
-    60: 10,
-    55: 11,
-    50: 12,
-    45: 14,
-    40: 15,
-    35: 17,
-    30: 20,
-    25: 24,
-    20: 30,
-    15: 40,
-    10: 60,
-    5: 119
-};
+
 
 
 // == Password handling ==
@@ -253,10 +236,14 @@ function debounce(func, wait) {
     };
 }
 function configureMarker(lat, lng, altitude, openPopup = false) {
+    if (!AppState.map) {
+        console.warn('Map not initialized, cannot configure marker');
+        return null;
+    }
     if (AppState.currentMarker) {
         AppState.currentMarker.remove();
     }
-    AppState.currentMarker = createCustomMarker(lat, lng).addTo(map);
+    AppState.currentMarker = createCustomMarker(lat, lng).addTo(AppState.map);
     attachMarkerDragend(AppState.currentMarker);
     AppState.currentMarker.on('click', (e) => {
         L.DomEvent.stopPropagation(e); // Prevent map click events from interfering
@@ -706,13 +693,18 @@ L.tileLayer.cached = function (url, options) {
     return new L.TileLayer.Cached(url, options);
 };
 function getTilesInRadius(lat, lng, radiusKm, zoomLevels) {
+    if (!AppState.map) {
+        console.warn('Map not initialized, cannot calculate tiles');
+        return [];
+    }
+
     const tiles = new Set(); // Use Set to avoid duplicates
     const EARTH_CIRCUMFERENCE = 40075016.686; // Earth's circumference in meters at equator
     const radiusMeters = radiusKm * 1000;
 
     zoomLevels.forEach(zoom => {
         // Convert center to tile coordinates
-        const point = map.project([lat, lng], zoom);
+        const point = AppState.map.project([lat, lng], zoom);
         const tileSize = 256;
         const centerX = point.x / tileSize;
         const centerY = point.y / tileSize;
@@ -739,7 +731,7 @@ function getTilesInRadius(lat, lng, radiusKm, zoomLevels) {
     });
 
     return tileArray;
-}
+}   
 async function cacheTileWithRetry(url, maxRetries = 3) {
     let lastError = null;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -766,6 +758,12 @@ async function cacheTileWithRetry(url, maxRetries = 3) {
     return { success: false, error: lastError };
 }
 async function cacheTilesForDIP() {
+    if (!AppState.map) {
+        console.warn('Map not initialized, cannot cache tiles');
+        Utils.handleMessage('Map not initialized, cannot cache tiles.');
+        return;
+    }
+
     console.log('cacheTilesForDIP called with:', {
         lastLat: AppState.lastLat,
         lastLng: AppState.lastLng,
@@ -933,13 +931,13 @@ async function cacheTilesForDIP() {
     }
 }
 const debouncedCacheVisibleTiles = debounce(async () => {
-    if (!map || !navigator.onLine) {
+    if (!AppState.map || !navigator.onLine) {
         console.log('Skipping visible tile caching: offline or map not initialized');
         return;
     }
 
-    const bounds = map.getBounds();
-    const zoom = map.getZoom();
+    const bounds = AppState.map.getBounds();
+    const zoom = AppState.map.getZoom();
     const zoomLevels = Settings.state.userSettings.cacheZoomLevels || defaultSettings.cacheZoomLevels;
     if (!zoomLevels.includes(zoom)) {
         console.log(`Skipping caching: zoom ${zoom} not in cacheZoomLevels`, zoomLevels);
@@ -947,8 +945,8 @@ const debouncedCacheVisibleTiles = debounce(async () => {
     }
 
     const tileSize = 256;
-    const swPoint = map.project(bounds.getSouthWest(), zoom);
-    const nePoint = map.project(bounds.getNorthEast(), zoom);
+    const swPoint = AppState.map.project(bounds.getSouthWest(), zoom);
+    const nePoint = AppState.map.project(bounds.getNorthEast(), zoom);
     const minX = Math.floor(swPoint.x / tileSize);
     const maxX = Math.floor(nePoint.x / tileSize);
     const minY = Math.floor(nePoint.y / tileSize);
@@ -1032,7 +1030,7 @@ const debouncedCacheVisibleTiles = debounce(async () => {
                     }
                 } else {
                     failedCount++;
-                    failedTiles.push(url);
+                        failedTiles.push(url);
                 }
             }
 
@@ -1142,6 +1140,11 @@ function setupCacheSettings() {
                 Utils.handleError('Cannot recache while offline.');
                 return;
             }
+            if (!AppState.map) {
+                console.warn('Map not initialized, cannot recache tiles');
+                Utils.handleMessage('Map not initialized, cannot recache tiles.');
+                return;
+            }
             cacheTilesForDIP();
         });
         console.log('recacheNowButton listener attached');
@@ -1169,6 +1172,11 @@ L.Control.Coordinates = L.Control.extend({
     }
 });
 function initMap() {
+    if (AppState.map) {
+        console.warn('Map already initialized, skipping initMap');
+        return;
+    }
+
     const defaultCenter = [48.0179, 11.1923];
     const defaultZoom = 11;
 
@@ -1176,7 +1184,7 @@ function initMap() {
     AppState.lastLat = AppState.lastLat || defaultCenter[0];
     AppState.lastLng = AppState.lastLng || defaultCenter[1];
 
-    map = L.map('map', {
+    AppState.map = L.map('map', {
         center: defaultCenter,
         zoom: defaultZoom,
         zoomControl: false,
@@ -1229,7 +1237,7 @@ function initMap() {
     };
 
     const openMeteoAttribution = 'Weather data by <a href="https://open-meteo.com">Open-Meteo</a>';
-    map.attributionControl.addAttribution(openMeteoAttribution);
+    AppState.map.attributionControl.addAttribution(openMeteoAttribution);
 
     const selectedBaseMap = Settings.state.userSettings.baseMaps in AppState.baseMaps ? Settings.state.userSettings.baseMaps : "Esri Street";
     const fallbackBaseMap = "OpenStreetMap";
@@ -1247,9 +1255,9 @@ function initMap() {
         }
         if (!hasSwitched && failedCount > totalTiles / 2) {
             console.warn(`${selectedBaseMap} tiles slow or unavailable, switching to ${fallbackBaseMap}`);
-            if (map.hasLayer(layer)) {
-                map.removeLayer(layer);
-                AppState.baseMaps[fallbackBaseMap].addTo(map);
+            if (AppState.map.hasLayer(layer)) {
+                AppState.map.removeLayer(layer);
+                AppState.baseMaps[fallbackBaseMap].addTo(AppState.map);
                 Settings.state.userSettings.baseMaps = fallbackBaseMap;
                 Settings.save();
                 Utils.handleError(`${selectedBaseMap} tiles slow or unavailable. Switched to ${fallbackBaseMap}.`);
@@ -1260,12 +1268,12 @@ function initMap() {
         }
     });
 
-    layer.addTo(map);
-    map.invalidateSize();
+    layer.addTo(AppState.map);
+    AppState.map.invalidateSize();
 
     window.addEventListener('online', () => {
         hasSwitched = false;
-        map.options.minZoom = 6;
+        AppState.map.options.minZoom = 6;
         console.log('Back online, restored minZoom to 6');
         updateOfflineIndicator();
     });
@@ -1274,23 +1282,23 @@ function initMap() {
         updateOfflineIndicator();
     });
 
-    map.on('zoomstart', (e) => {
+    AppState.map.on('zoomstart', (e) => {
         if (!navigator.onLine) {
-            const targetZoom = e.target._zoom || map.getZoom();
+            const targetZoom = e.target._zoom || AppState.map.getZoom();
             if (targetZoom < 11) {
                 e.target._zoom = 11;
-                map.setZoom(11);
+                AppState.map.setZoom(11);
                 Utils.handleError('Offline: Zoom restricted to levels 11–14 for cached tiles.');
             } else if (targetZoom > 14) {
                 e.target._zoom = 14;
-                map.setZoom(14);
+                AppState.map.setZoom(14);
                 Utils.handleError('Offline: Zoom restricted to levels 11–14 for cached tiles.');
             }
         }
     });
 
-    L.control.layers(AppState.baseMaps, null, { position: 'topright' }).addTo(map);
-    map.on('baselayerchange', function (e) {
+    L.control.layers(AppState.baseMaps, null, { position: 'topright' }).addTo(AppState.map);
+    AppState.map.on('baselayerchange', function (e) {
         Settings.state.userSettings.baseMaps = e.name;
         Settings.save();
         console.log(`Base map changed to: ${e.name}`);
@@ -1300,13 +1308,13 @@ function initMap() {
         }
     });
 
-    map.on('moveend', () => {
+    AppState.map.on('moveend', () => {
         if (AppState.lastLat && AppState.lastLng) {
             debouncedCacheVisibleTiles();
         }
     });
 
-    L.control.zoom({ position: 'topright' }).addTo(map);
+    L.control.zoom({ position: 'topright' }).addTo(AppState.map);
     L.control.polylineMeasure({
         position: 'topright',
         unit: 'kilometres',
@@ -1321,21 +1329,21 @@ function initMap() {
         tooltipTextAdd: 'Click to add point<br>',
         measureControlTitleOn: 'Start measuring distance and bearing',
         measureControlTitleOff: 'Stop measuring'
-    }).addTo(map);
+    }).addTo(AppState.map);
 
     L.control.scale({
         position: 'bottomleft',
         metric: true,
         imperial: true,
         maxWidth: 100
-    }).addTo(map);
+    }).addTo(AppState.map);
 
-    map.createPane('gpxTrackPane');
-    map.getPane('gpxTrackPane').style.zIndex = 650;
-    map.getPane('tooltipPane').style.zIndex = 700;
-    map.getPane('popupPane').style.zIndex = 700;
+    AppState.map.createPane('gpxTrackPane');
+    AppState.map.getPane('gpxTrackPane').style.zIndex = 650;
+    AppState.map.getPane('tooltipPane').style.zIndex = 700;
+    AppState.map.getPane('popupPane').style.zIndex = 700;
 
-    AppState.livePositionControl = L.control.livePosition({ position: 'bottomright' }).addTo(map);
+    AppState.livePositionControl = L.control.livePosition({ position: 'bottomright' }).addTo(AppState.map);
     if (AppState.livePositionControl._container) {
         AppState.livePositionControl._container.style.display = 'none';
         console.log('Initialized livePositionControl and hid by default');
@@ -1443,7 +1451,7 @@ function initMap() {
                 AppState.lastAltitude = await getAltitude(AppState.lastLat, AppState.lastLng);
 
                 configureMarker(AppState.lastLat, AppState.lastLng, AppState.lastAltitude, false);
-                map.setView(userCoords, defaultZoom);
+                AppState.map.setView(userCoords, defaultZoom);
 
                 if (Settings.state.userSettings.calculateJump) {
                     calculateJump();
@@ -1468,7 +1476,7 @@ function initMap() {
                 AppState.lastLng = defaultCenter[1];
                 AppState.lastAltitude = await getAltitude(AppState.lastLat, AppState.lastLng);
                 configureMarker(AppState.lastLat, AppState.lastLng, AppState.lastAltitude, false);
-                map.setView(defaultCenter, defaultZoom);
+                AppState.map.setView(defaultCenter, defaultZoom);
                 recenterMap(true);
                 AppState.isManualPanning = false;
 
@@ -1496,7 +1504,7 @@ function initMap() {
         AppState.lastLng = defaultCenter[1];
         AppState.lastAltitude = getAltitude(AppState.lastLat, AppState.lastLng);
         configureMarker(AppState.lastLat, AppState.lastLng, initialAltitude, false);
-        map.setView(defaultCenter, defaultZoom);
+        AppState.map.setView(defaultCenter, defaultZoom);
         recenterMap(true);
         AppState.isManualPanning = false;
 
@@ -1515,7 +1523,7 @@ function initMap() {
     updateOfflineIndicator();
 
     AppState.coordsControl = new L.Control.Coordinates();
-    AppState.coordsControl.addTo(map);
+    AppState.coordsControl.addTo(AppState.map);
     console.log('coordsControl initialized:', AppState.coordsControl);
 
     const elevationCache = new Map();
@@ -1574,7 +1582,7 @@ function initMap() {
         callback({ elevation, qfe }, requestLatLng);
     }, 500);
 
-    map.on('mousemove', function (e) {
+    AppState.map.on('mousemove', function (e) {
         const coordFormat = getCoordinateFormat();
         const lat = e.latlng.lat;
         const lng = e.latlng.lng;
@@ -1583,7 +1591,8 @@ function initMap() {
         let coordText;
         if (coordFormat === 'MGRS') {
             const mgrs = Utils.decimalToMgrs(lat, lng);
-            coordText = `MGRS: ${mgrs}`;
+            const formattedMgrs = mgrs ? mgrs : 'N/A';
+            coordText = `MGRS: ${formattedMgrs}`;
         } else if (coordFormat === 'DMS') {
             const latDMS = Utils.decimalToDms(lat, true);
             const lngDMS = Utils.decimalToDms(lng, false);
@@ -1623,18 +1632,18 @@ function initMap() {
         });
     });
 
-    map.on('movestart', (e) => {
+    AppState.map.on('movestart', (e) => {
         if (!e.target.dragging || !e.target.dragging._marker) {
             AppState.isManualPanning = true;
             console.log('Manual panning detected, isManualPanning set to true');
         }
     });
 
-    map.on('mouseout', function () {
+    AppState.map.on('mouseout', function () {
         AppState.coordsControl.getContainer().innerHTML = 'Move mouse over map';
     });
 
-    map.on('contextmenu', (e) => {
+    AppState.map.on('contextmenu', (e) => {
         if (!Settings.state.userSettings.showCutAwayFinder || !Settings.state.userSettings.calculateJump) {
             console.log('Cut-away marker placement ignored: showCutAwayFinder or calculateJump not enabled');
             return;
@@ -1645,7 +1654,7 @@ function initMap() {
         if (AppState.cutAwayMarker) {
             AppState.cutAwayMarker.setLatLng([lat, lng]);
         } else {
-            AppState.cutAwayMarker = createCutAwayMarker(lat, lng).addTo(map);
+            AppState.cutAwayMarker = createCutAwayMarker(lat, lng).addTo(AppState.map);
             attachCutAwayMarkerDragend(AppState.cutAwayMarker);
         }
 
@@ -1660,7 +1669,7 @@ function initMap() {
         }
     });
 
-    map.on('dblclick', async (e) => {
+    AppState.map.on('dblclick', async (e) => {
         const { lat, lng } = e.latlng;
         AppState.lastLat = lat;
         AppState.lastLng = lng;
@@ -1695,8 +1704,8 @@ function initMap() {
         }
     });
 
-    map.on('zoomend', () => {
-        const currentZoom = map.getZoom();
+    AppState.map.on('zoomend', () => {
+        const currentZoom = AppState.map.getZoom();
         console.log('Zoom level changed to:', currentZoom);
 
         if (Settings.state.userSettings.calculateJump && AppState.weatherData && AppState.lastLat && AppState.lastLng) {
@@ -1738,7 +1747,7 @@ function initMap() {
 
     let lastTapTime = 0;
     const tapThreshold = 300;
-    const mapContainer = map.getContainer();
+    const mapContainer = AppState.map.getContainer();
 
     mapContainer.addEventListener('touchstart', async (e) => {
         console.log('Map touchstart event, target:', e.target, 'touches:', e.touches.length);
@@ -1754,7 +1763,7 @@ function initMap() {
             const rect = mapContainer.getBoundingClientRect();
             const touchX = e.touches[0].clientX - rect.left;
             const touchY = e.touches[0].clientY - rect.top;
-            const latlng = map.containerPointToLatLng([touchX, touchY]);
+            const latlng = AppState.map.containerPointToLatLng([touchX, touchY]);
             const { lat, lng } = latlng;
             AppState.lastLat = lat;
             AppState.lastLng = lng;
@@ -1781,11 +1790,11 @@ function initMap() {
         lastTapTime = currentTime;
     }, { passive: false });
 
-    map.on('click', (e) => {
+    AppState.map.on('click', (e) => {
         console.log('Map click event, target:', e.originalEvent.target);
     });
 
-    map.on('mousedown', (e) => {
+    AppState.map.on('mousedown', (e) => {
         console.log('Map mousedown event, target:', e.originalEvent.target);
     });
 
@@ -1800,13 +1809,18 @@ function initMap() {
     initializeApp();
 }
 function reinitializeCoordsControl() {
+    if (!AppState.map) {
+        console.warn('Map not initialized, cannot reinitialize coords control');
+        return;
+    }
+
     console.log('Before reinitialize - coordsControl:', AppState.coordsControl);
     if (AppState.coordsControl) {
         AppState.coordsControl.remove();
         console.log('Removed existing coordsControl');
     }
     AppState.coordsControl = new L.Control.Coordinates();
-    AppState.coordsControl.addTo(map);
+    AppState.coordsControl.addTo(AppState.map);
     console.log('After reinitialize - coordsControl:', AppState.coordsControl);
 }
 function handleHarpPlacement(e) {
@@ -1877,8 +1891,14 @@ function createHarpMarker(latitude, longitude) {
     return marker;
 }
 function clearHarpMarker() {
+    if (!AppState.map) {
+        console.warn('Map not initialized, cannot clear HARP marker');
+        Utils.handleMessage('Map not initialized, cannot clear HARP marker.');
+        return;
+    }
+
     if (AppState.harpMarker) {
-        map.removeLayer(AppState.harpMarker);
+        AppState.map.removeLayer(AppState.harpMarker);
         AppState.harpMarker = null;
         console.log('Removed HARP marker');
     }
@@ -1893,7 +1913,7 @@ function clearHarpMarker() {
     // If Jump Master Line is set to HARP, remove it or switch to DIP
     if (Settings.state.userSettings.jumpMasterLineTarget === 'HARP' && Settings.state.userSettings.showJumpMasterLine) {
         if (AppState.jumpMasterLine) {
-            map.removeLayer(AppState.jumpMasterLine);
+            AppState.map.removeLayer(AppState.jumpMasterLine);
             AppState.jumpMasterLine = null;
             console.log('Removed Jump Master Line: HARP marker cleared');
         }
@@ -2065,9 +2085,9 @@ function recenterMap(force = false) {
         console.log('Skipping recenterMap due to manual panning');
         return;
     }
-    if (map && AppState.currentMarker) {
-        map.invalidateSize();
-        map.panTo(AppState.currentMarker.getLatLng());
+    if (AppState.map && AppState.currentMarker) {
+        AppState.map.invalidateSize();
+        AppState.map.panTo(AppState.currentMarker.getLatLng());
         console.log('Map recentered on marker at:', AppState.currentMarker.getLatLng());
     } else {
         console.warn('Cannot recenter map: map or marker not defined');
@@ -2097,6 +2117,11 @@ function interpolateColor(aglHeight, minHeight = 0, maxHeight = 3000) {
     }
 }
 function getTooltipContent(point, index, points, groundAltitude, windUnit, heightUnit) {
+    if (!AppState.map) {
+        console.warn('Map not initialized, cannot calculate tooltip content distance');
+        return 'Map not initialized';
+    }
+
     const coordFormat = getCoordinateFormat();
     const coords = Utils.convertCoords(point.lat, point.lng, coordFormat);
     let tooltipContent = coordFormat === 'MGRS' ? `MGRS: ${coords.lat}` : `Lat: ${coords.lat}<br>Lng: ${coords.lng}`;
@@ -2116,7 +2141,7 @@ function getTooltipContent(point, index, points, groundAltitude, windUnit, heigh
     if (index > 0 && point.time && points[index - 1].time && point.ele !== null && points[index - 1].ele !== null) {
         const timeDiff = (point.time.toMillis() - points[index - 1].time.toMillis()) / 1000; // seconds
         if (timeDiff > 0) {
-            const distance = map.distance([points[index - 1].lat, points[index - 1].lng], [point.lat, point.lng]);
+            const distance = AppState.map.distance([points[index - 1].lat, points[index - 1].lng], [point.lat, point.lng]);
             const speedMs = distance / timeDiff;
             speed = Utils.convertWind(speedMs, windUnit, 'm/s');
             speed = windUnit === 'bft' ? Math.round(speed) : speed.toFixed(1);
@@ -2129,6 +2154,12 @@ function getTooltipContent(point, index, points, groundAltitude, windUnit, heigh
     return tooltipContent;
 }
 function loadGpxTrack(file) {
+    if (!AppState.map) {
+        console.warn('Map not initialized, cannot load GPX track');
+        Utils.handleError('Map not initialized, cannot load GPX track.');
+        return;
+    }
+
     if (!file) {
         Utils.handleError('No file selected.');
         return;
@@ -2139,7 +2170,7 @@ function loadGpxTrack(file) {
         try {
             const gpxData = e.target.result;
             if (AppState.gpxLayer) {
-                map.removeLayer(AppState.gpxLayer);
+                AppState.map.removeLayer(AppState.gpxLayer);
                 AppState.gpxLayer = null;
             }
             AppState.gpxPoints = [];
@@ -2265,15 +2296,15 @@ function loadGpxTrack(file) {
                 });
                 AppState.gpxLayer.addLayer(segment);
             }
-            AppState.gpxLayer.addTo(map);
+            AppState.gpxLayer.addTo(AppState.map);
             console.log('GPX layer added:', { gpxLayer: AppState.gpxLayer });
 
             // Center map to track bounds
             if (points.length > 0) {
                 const bounds = L.latLngBounds(points.map(p => [p.lat, p.lng]));
                 if (bounds.isValid()) {
-                    map.invalidateSize();
-                    map.fitBounds(bounds, { padding: [50, 50], maxZoom: maxZoom });
+                    AppState.map.invalidateSize();
+                    AppState.map.fitBounds(bounds, { padding: [50, 50], maxZoom: maxZoom });
                     console.log('Map fitted to GPX track bounds:', { bounds: bounds.toBBoxString() });
                 } else {
                     console.warn('Invalid GPX track bounds:', { points });
@@ -2285,7 +2316,7 @@ function loadGpxTrack(file) {
             const distance = (points.reduce((dist, p, i) => {
                 if (i === 0) return 0;
                 const prev = points[i - 1];
-                return dist + map.distance([prev.lat, prev.lng], [p.lat, p.lng]);
+                return dist + AppState.map.distance([prev.lat, prev.lng], [p.lat, p.lng]);
             }, 0) / 1000).toFixed(2);
             const elevations = points.map(p => p.ele).filter(e => e !== null);
             const elevationMin = elevations.length ? Math.min(...elevations).toFixed(0) : 'N/A';
@@ -2307,6 +2338,11 @@ function loadGpxTrack(file) {
 
 // == Live Tracking Handling ==
 const debouncedPositionUpdate = debounce(async (position) => {
+    if (!AppState.map) {
+        console.warn('Map not initialized, cannot update position');
+        return;
+    }
+
     const { latitude, longitude, accuracy, altitude: deviceAltitude, altitudeAccuracy } = position.coords;
     const currentTime = new Date().getTime() / 1000;
     console.log('Debounced position update:', { latitude, longitude, accuracy, deviceAltitude, altitudeAccuracy, currentTime });
@@ -2325,7 +2361,7 @@ const debouncedPositionUpdate = debounce(async (position) => {
     }
     let direction = 'N/A';
     if (AppState.prevLat !== null && AppState.prevLng !== null && AppState.prevTime !== null) {
-        const distance = map.distance([AppState.prevLat, AppState.prevLng], [latitude, longitude]);
+        const distance = AppState.map.distance([AppState.prevLat, AppState.prevLng], [latitude, longitude]);
         const timeDiff = currentTime - AppState.prevTime;
         if (timeDiff > 0) {
             speedMs = distance / timeDiff; // Speed in meters/second
@@ -2335,20 +2371,16 @@ const debouncedPositionUpdate = debounce(async (position) => {
             speed = Utils.convertWind(AppState.lastSmoothedSpeedMs, effectiveWindUnit, 'm/s');
             speed = effectiveWindUnit === 'bft' ? Math.round(speed) : speed.toFixed(1);
             direction = calculateBearing(AppState.prevLat, AppState.prevLng, latitude, longitude).toFixed(0);
-            //Direction smoothing (optional)
-            /*let lastSmoothedDirection = 0; // Global variable
-            direction = alpha * calculateBearing(...) + (1 - alpha) * lastSmoothedDirection;
-            lastSmoothedDirection = direction;*/
             console.log('Calculated speed:', { rawSpeedMs: speedMs, smoothedSpeedMs: AppState.lastSmoothedSpeedMs, convertedSpeed: speed, unit: effectiveWindUnit, alpha });
         }
     }
 
     if (!AppState.liveMarker) {
-        AppState.liveMarker = createLiveMarker(latitude, longitude).addTo(map);
+        AppState.liveMarker = createLiveMarker(latitude, longitude).addTo(AppState.map);
         console.log('Created new liveMarker at:', { latitude, longitude });
     } else {
-        if (!map.hasLayer(AppState.liveMarker)) {
-            AppState.liveMarker.addTo(map);
+        if (!AppState.map.hasLayer(AppState.liveMarker)) {
+            AppState.liveMarker.addTo(AppState.map);
             console.log('Re-added liveMarker to map:', { latitude, longitude });
         }
         requestAnimationFrame(() => {
@@ -2362,7 +2394,7 @@ const debouncedPositionUpdate = debounce(async (position) => {
     } else {
         console.warn('Skipping accuracy circle update: invalid accuracy', { accuracy });
         if (window.accuracyCircle) {
-            map.removeLayer(window.accuracyCircle);
+            AppState.map.removeLayer(window.accuracyCircle);
             window.accuracyCircle = null;
             console.log('Removed accuracy circle');
         }
@@ -2388,7 +2420,7 @@ const debouncedPositionUpdate = debounce(async (position) => {
                 const liveLatLng = AppState.liveMarker.getLatLng();
                 const targetLatLng = targetMarker.getLatLng();
                 const bearing = calculateBearing(liveLatLng.lat, liveLatLng.lng, targetLatLng.lat, targetLatLng.lng).toFixed(0);
-                const distanceMeters = map.distance(liveLatLng, targetLatLng);
+                const distanceMeters = AppState.map.distance(liveLatLng, targetLatLng);
                 const heightUnit = getHeightUnit();
                 const convertedDistance = Utils.convertHeight(distanceMeters, heightUnit);
                 const roundedDistance = Math.round(convertedDistance);
@@ -2419,7 +2451,7 @@ const debouncedPositionUpdate = debounce(async (position) => {
                         weight: 3,
                         opacity: 0.8,
                         dashArray: '5, 5'
-                    }).addTo(map);
+                    }).addTo(AppState.map);
                     console.log(`Created Jump Master Line to ${Settings.state.userSettings.jumpMasterLineTarget}:`, { bearing, distance: roundedDistance, unit: heightUnit, tot: totDisplay });
                 }
             } catch (error) {
@@ -2427,14 +2459,14 @@ const debouncedPositionUpdate = debounce(async (position) => {
             }
         } else {
             if (AppState.jumpMasterLine) {
-                map.removeLayer(AppState.jumpMasterLine);
+                AppState.map.removeLayer(AppState.jumpMasterLine);
                 AppState.jumpMasterLine = null;
                 console.log(`Removed Jump Master Line: no valid target (${Settings.state.userSettings.jumpMasterLineTarget})`);
             }
         }
     } else {
         if (AppState.jumpMasterLine) {
-            map.removeLayer(AppState.jumpMasterLine);
+            AppState.map.removeLayer(AppState.jumpMasterLine);
             AppState.jumpMasterLine = null;
             console.log('Removed Jump Master Line: disabled or no liveMarker');
         }
@@ -2676,7 +2708,7 @@ function startPositionTracking() {
         return;
     }
 
-    if (!map) {
+    if (!AppState.map) {
         Utils.handleError('Map not initialized. Please try again.');
         setCheckboxValue('trackPositionCheckbox', false);
         Settings.state.userSettings.trackPosition = false;
@@ -2722,7 +2754,7 @@ function startPositionTracking() {
             console.log('Ensured livePositionControl is visible');
         } else {
             console.warn('livePositionControl not initialized in startPositionTracking');
-            AppState.livePositionControl = L.control.livePosition({ position: 'bottomright' }).addTo(map);
+            AppState.livePositionControl = L.control.livePosition({ position: 'bottomright' }).addTo(AppState.map);
             console.log('Reinitialized livePositionControl');
         }
     } catch (error) {
@@ -2735,18 +2767,23 @@ function startPositionTracking() {
     }
 }
 function stopPositionTracking() {
+    if (!AppState.map) {
+        console.warn('Map not initialized, cannot stop position tracking');
+        return;
+    }
+
     if (AppState.watchId !== null) {
         navigator.geolocation.clearWatch(AppState.watchId);
         AppState.watchId = null;
         console.log('Stopped geolocation watch');
     }
     if (AppState.liveMarker) {
-        map.removeLayer(AppState.liveMarker);
+        AppState.map.removeLayer(AppState.liveMarker);
         AppState.liveMarker = null;
         console.log('Removed liveMarker');
     }
     if (window.accuracyCircle) {
-        map.removeLayer(window.accuracyCircle);
+        AppState.map.removeLayer(window.accuracyCircle);
         window.accuracyCircle = null;
         console.log('Removed accuracy circle');
     }
@@ -2763,7 +2800,7 @@ function stopPositionTracking() {
     AppState.lastSpeed = 'N/A';
     AppState.lastDirection = 'N/A';
     console.log('Cleared tracking data');
-}
+}       
 function updateAccuracyCircle(lat, lng, accuracy) {
     try {
         if (window.accuracyCircle) {
@@ -2789,9 +2826,9 @@ function updateAccuracyCircle(lat, lng, accuracy) {
     }
 }
 function updateJumpMasterLine() {
-    if (!Settings.state.userSettings.showJumpMasterLine || !Settings.state.userSettings.trackPosition || !AppState.liveMarker || !map) {
+    if (!Settings.state.userSettings.showJumpMasterLine || !Settings.state.userSettings.trackPosition || !AppState.liveMarker || !AppState.map) {
         if (AppState.jumpMasterLine) {
-            map.removeLayer(AppState.jumpMasterLine);
+            AppState.map.removeLayer(AppState.jumpMasterLine);
             AppState.jumpMasterLine = null;
             console.log('Removed Jump Master Line: preconditions not met');
         }
@@ -2825,7 +2862,7 @@ function updateJumpMasterLine() {
     }
 
     const bearing = calculateBearing(liveLatLng.lat, liveLatLng.lng, targetLat, targetLng).toFixed(0);
-    const distanceMeters = map.distance(liveLatLng, [targetLat, targetLng]);
+    const distanceMeters = AppState.map.distance(liveLatLng, [targetLat, targetLng]);
     const heightUnit = getHeightUnit();
     const convertedDistance = Utils.convertHeight(distanceMeters, heightUnit);
     const roundedDistance = Math.round(convertedDistance);
@@ -2839,7 +2876,7 @@ function updateJumpMasterLine() {
             color: 'blue',
             weight: 3,
             dashArray: '5, 10'
-        }).addTo(map);
+        }).addTo(AppState.map);
         AppState.jumpMasterLine.bindPopup(`<b>Jump Master Line</b><br>Bearing: ${bearing}°<br>Distance: ${roundedDistance} ${heightUnit}`);
         console.log('Created Jump Master Line:', { bearing, distance: roundedDistance, unit: heightUnit });
     }
@@ -4075,7 +4112,7 @@ function getSeparationFromTAS(ias) {
     }
 
     // Round TAS to nearest table key
-    const speeds = Object.keys(jumperSeparationTable).map(Number).sort((a, b) => b - a);
+    const speeds = Object.keys(Constants.jumperSeparationTable).map(Number).sort((a, b) => b - a);
     let closestSpeed = speeds[0]; // Default to highest speed
     for (const speed of speeds) {
         if (tas <= speed) closestSpeed = speed;
@@ -4083,7 +4120,7 @@ function getSeparationFromTAS(ias) {
     }
 
     // Return separation from table, default to 7 seconds if not found
-    const separation = jumperSeparationTable[closestSpeed] || 7;
+    const separation = Constants.jumperSeparationTable[closestSpeed] || 7;
     console.log(`Calculated TAS: ${tas}kt, Closest speed: ${closestSpeed}kt, Separation: ${separation}s`);
     return separation;
 }
@@ -4239,7 +4276,7 @@ function calculateFreeFall(weatherData, exitAltitude, openingAltitude, sliderInd
     return result;
 }
 function visualizeFreeFallPath(path) {
-    if (!map || !Settings.state.userSettings.calculateJump) return;
+    if (!AppState.map || !Settings.state.userSettings.calculateJump) return;
 
     const latLngs = path.map(point => point.latLng);
     const freeFallPolyline = L.polyline(latLngs, {
@@ -4247,7 +4284,7 @@ function visualizeFreeFallPath(path) {
         weight: 3,
         opacity: 0.7,
         dashArray: '10, 10'
-    }).addTo(map);
+    }).addTo(AppState.map);
 
     freeFallPolyline.bindPopup(`Free Fall Path<br>Duration: ${path[path.length - 1].time.toFixed(1)}s<br>Distance: ${Math.sqrt(path[path.length - 1].latLng[0] ** 2 + path[path.length - 1].latLng[1] ** 2).toFixed(1)}m`);
 }
@@ -4576,12 +4613,12 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
         showExitAreaOnly, showCanopyAreaOnly
     });
 
-    if (!map) {
+    if (!AppState.map) {
         console.warn('Map not available to update jump circles');
         return false;
     }
 
-    const currentZoom = map.getZoom();
+    const currentZoom = AppState.map.getZoom();
     const minZoom = 11;
     const maxZoom = 14;
     const isVisible = currentZoom >= minZoom && currentZoom <= maxZoom;
@@ -4590,9 +4627,9 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
     const blueCircleMetadata = [];
 
     const removeLayer = (layer, name) => {
-        if (layer && typeof layer === 'object' && '_leaflet_id' in layer && map.hasLayer(layer)) {
+        if (layer && typeof layer === 'object' && '_leaflet_id' in layer && AppState.map.hasLayer(layer)) {
             console.log(`Removing existing ${name}`);
-            map.removeLayer(layer);
+            AppState.map.removeLayer(layer);
         }
     };
 
@@ -4635,8 +4672,8 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
         const earthRadius = 6378137;
         const deltaLat = (radius / earthRadius) * (180 / Math.PI);
         const topEdgeLatLng = L.latLng(center[0] + deltaLat, center[1]);
-        const centerPoint = map.latLngToLayerPoint(centerLatLng);
-        const topEdgePoint = map.latLngToLayerPoint(topEdgeLatLng);
+        const centerPoint = AppState.map.latLngToLayerPoint(centerLatLng);
+        const topEdgePoint = AppState.map.latLngToLayerPoint(topEdgeLatLng);
         const offsetY = centerPoint.y - topEdgePoint.y + 10;
         console.log('calculateLabelAnchor:', { center, radius, anchor: [25, offsetY] });
         return [25, offsetY];
@@ -4647,7 +4684,7 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
             console.log('No blue circle metadata to update labels');
             return;
         }
-        const zoom = map.getZoom();
+        const zoom = AppState.map.getZoom();
         blueCircleMetadata.forEach(({ circle, label, center, radius, content }) => {
             label.setIcon(L.divIcon({
                 className: `isoline-label isoline-label-${zoom <= 11 ? 'small' : 'large'}`,
@@ -4660,7 +4697,7 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
     }
 
     try {
-        map.off('zoomend', updateBlueCircleLabels);
+        AppState.map.off('zoomend', updateBlueCircleLabels);
     } catch (e) {
         console.warn('Failed to remove zoomend listener:', e.message);
     }
@@ -4678,14 +4715,14 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
             fillColor: 'green',
             fillOpacity: 0.2,
             weight: 2
-        }).addTo(map);
+        }).addTo(AppState.map);
         AppState.jumpCircleGreenLight = L.circle([blueLat, blueLng], {
             radius: radius,
             color: 'darkgreen',
             fillColor: 'darkgreen',
             fillOpacity: 0.2,
             weight: 2
-        }).addTo(map);
+        }).addTo(AppState.map);
         if (AppState.jumpCircleGreen.setZIndex) AppState.jumpCircleGreen.setZIndex(600);
         if (AppState.jumpCircleGreenLight.setZIndex) AppState.jumpCircleGreenLight.setZIndex(600);
         console.log('Added green and dark green circles:', {
@@ -4720,7 +4757,7 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
             fillOpacity: 0,
             weight: 2,
             opacity: 0.1
-        }).addTo(map);
+        }).addTo(AppState.map);
         if (AppState.jumpCircle.setZIndex) AppState.jumpCircle.setZIndex(1000);
         console.log('Added main blue circle at:', { center: newCenterBlue, radius });
 
@@ -4731,7 +4768,7 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
             fillOpacity: 0,
             weight: 2,
             opacity: 0.8
-        }).addTo(map);
+        }).addTo(AppState.map);
         if (AppState.jumpCircleFull.setZIndex) AppState.jumpCircleFull.setZIndex(400);
         console.log('Added red circle at:', { center: newCenterRed, radius: radiusFull });
 
@@ -4750,7 +4787,7 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
                         fillColor: 'blue',
                         fillOpacity: 0.1,
                         weight: 1
-                    }).addTo(map);
+                    }).addTo(AppState.map);
                     if (circle.setZIndex) circle.setZIndex(1000);
 
                     const label = L.marker(addCenter, {
@@ -4761,7 +4798,7 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
                             iconAnchor: calculateLabelAnchor(addCenter, addRadius)
                         }),
                         zIndexOffset: 2100
-                    }).addTo(map);
+                    }).addTo(AppState.map);
 
                     window.additionalBlueCircles.push(circle);
                     window.additionalBlueLabels.push(label);
@@ -4816,7 +4853,7 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
                 fillOpacity: 0,
                 weight: 2,
                 opacity: 0.1
-            }).addTo(map);
+            }).addTo(AppState.map);
             if (AppState.jumpCircle.setZIndex) AppState.jumpCircle.setZIndex(1000);
             console.log('Re-added main blue circle at:', { center: newCenterBlue, radius: canopyResult.radius });
 
@@ -4827,7 +4864,7 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
                 fillOpacity: 0,
                 weight: 2,
                 opacity: 0.8
-            }).addTo(map);
+            }).addTo(AppState.map);
             if (AppState.jumpCircleFull.setZIndex) AppState.jumpCircleFull.setZIndex(400);
             console.log('Re-added red circle at:', { center: newCenterRed, radius: canopyResult.radiusFull });
 
@@ -4847,7 +4884,7 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
                             fillColor: 'blue',
                             fillOpacity: 0.1,
                             weight: 1
-                        }).addTo(map);
+                        }).addTo(AppState.map);
                         if (circle.setZIndex) circle.setZIndex(1000);
 
                         const label = L.marker(addCenter, {
@@ -4858,7 +4895,7 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
                                 iconAnchor: calculateLabelAnchor(addCenter, addRadius)
                             }),
                             zIndexOffset: 2100
-                        }).addTo(map);
+                        }).addTo(AppState.map);
 
                         window.additionalBlueCircles.push(circle);
                         window.additionalBlueLabels.push(label);
@@ -4877,7 +4914,7 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
 
     if (blueCircleMetadata.length) {
         updateBlueCircleLabels();
-        map.on('zoomend', updateBlueCircleLabels);
+        AppState.map.on('zoomend', updateBlueCircleLabels);
     } else {
         console.log('No blue circles created, skipping label update and zoom listener');
     }
@@ -4912,58 +4949,59 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
 }
 function clearIsolineMarkers() {
     console.log('clearIsolineMarkers called');
-    if (map) {
-        let markerCount = 0;
-        map.eachLayer(layer => {
+    if (!AppState.map) {
+        console.warn('Map not available in clearIsolineMarkers');
+        return;
+    }
+
+    let markerCount = 0;
+    AppState.map.eachLayer(layer => {
+        if (layer instanceof L.Marker &&
+            layer !== AppState.currentMarker &&
+            layer !== AppState.cutAwayMarker &&
+            layer !== AppState.liveMarker &&
+            layer !== AppState.harpMarker && // Skip harpMarker
+            layer.options.icon &&
+            layer.options.icon.options &&
+            typeof layer.options.icon.options.className === 'string' &&
+            layer.options.icon.options.className.match(/isoline-label/) &&
+            !layer.options.icon.options.className.match(/landing-pattern-arrow|wind-arrow-icon/)) {
+            console.log('Removing isoline-label marker:', layer, 'className:', layer.options.icon.options.className);
+            layer.remove();
+            markerCount++;
+        } else if (layer === AppState.currentMarker) {
+            console.log('Skipping currentMarker:', layer, 'className:', layer.options?.icon?.options?.className || 'none');
+        } else if (layer === AppState.cutAwayMarker) {
+            console.log('Skipping cutAwayMarker:', layer, 'className:', layer.options?.icon?.options?.className || 'none');
+        } else if (layer === AppState.liveMarker) {
+            console.log('Skipping liveMarker:', layer, 'className:', layer.options?.icon?.options?.className || 'none');
+        } else if (layer === AppState.harpMarker) {
+            console.log('Skipping harpMarker:', layer, 'className:', layer.options?.icon?.options?.className || 'none');
+        } else if (layer instanceof L.Marker &&
+            layer.options.icon &&
+            layer.options.icon.options &&
+            typeof layer.options.icon.options.className === 'string' &&
+            layer.options.icon.options.className.match(/landing-pattern-arrow|wind-arrow-icon/)) {
+            console.log('Skipping landing pattern arrow marker:', layer, 'className:', layer.options.icon.options.className);
+        }
+    });
+    console.log('Cleared', markerCount, 'isoline-label markers');
+    // Fallback: Remove only markers that are not currentMarker, AppState.cutAwayMarker, AppState.liveMarker, or AppState.harpMarker
+    if (markerCount === 0) {
+        AppState.map.eachLayer(layer => {
             if (layer instanceof L.Marker &&
                 layer !== AppState.currentMarker &&
                 layer !== AppState.cutAwayMarker &&
                 layer !== AppState.liveMarker &&
-                layer !== AppState.harpMarker && // Skip harpMarker
-                layer.options.icon &&
-                layer.options.icon.options &&
-                typeof layer.options.icon.options.className === 'string' &&
-                layer.options.icon.options.className.match(/isoline-label/) &&
-                !layer.options.icon.options.className.match(/landing-pattern-arrow|wind-arrow-icon/)) {
-                console.log('Removing isoline-label marker:', layer, 'className:', layer.options.icon.options.className);
+                layer !== AppState.harpMarker &&
+                (!layer.options.icon ||
+                    !layer.options.icon.options ||
+                    !layer.options.icon.options.className ||
+                    !layer.options.icon.options.className.match(/landing-pattern-arrow|wind-arrow-icon/))) {
+                console.log('Fallback: Removing marker:', layer, 'className:', layer.options?.icon?.options?.className || 'none');
                 layer.remove();
-                markerCount++;
-            } else if (layer === AppState.currentMarker) {
-                console.log('Skipping currentMarker:', layer, 'className:', layer.options?.icon?.options?.className || 'none');
-            } else if (layer === AppState.cutAwayMarker) {
-                console.log('Skipping cutAwayMarker:', layer, 'className:', layer.options?.icon?.options?.className || 'none');
-            } else if (layer === AppState.liveMarker) {
-                console.log('Skipping liveMarker:', layer, 'className:', layer.options?.icon?.options?.className || 'none');
-            } else if (layer === AppState.harpMarker) {
-                console.log('Skipping harpMarker:', layer, 'className:', layer.options?.icon?.options?.className || 'none');
-            } else if (layer instanceof L.Marker &&
-                layer.options.icon &&
-                layer.options.icon.options &&
-                typeof layer.options.icon.options.className === 'string' &&
-                layer.options.icon.options.className.match(/landing-pattern-arrow|wind-arrow-icon/)) {
-                console.log('Skipping landing pattern arrow marker:', layer, 'className:', layer.options.icon.options.className);
             }
         });
-        console.log('Cleared', markerCount, 'isoline-label markers');
-        // Fallback: Remove only markers that are not currentMarker, AppState.cutAwayMarker, AppState.liveMarker, or AppState.harpMarker
-        if (markerCount === 0) {
-            map.eachLayer(layer => {
-                if (layer instanceof L.Marker &&
-                    layer !== AppState.currentMarker &&
-                    layer !== AppState.cutAwayMarker &&
-                    layer !== AppState.liveMarker &&
-                    layer !== AppState.harpMarker &&
-                    (!layer.options.icon ||
-                        !layer.options.icon.options ||
-                        !layer.options.icon.options.className ||
-                        !layer.options.icon.options.className.match(/landing-pattern-arrow|wind-arrow-icon/))) {
-                    console.log('Fallback: Removing marker:', layer, 'className:', layer.options?.icon?.options?.className || 'none');
-                    layer.remove();
-                }
-            });
-        }
-    } else {
-        console.warn('Map not available in clearIsolineMarkers');
     }
 }
 function resetJumpRunDirection(triggerUpdate = true) {
@@ -5213,25 +5251,34 @@ function jumpRunTrack() {
     };
 }
 function updateJumpRunTrack() {
+    if (!AppState.map) {
+        console.warn('Map not initialized, cannot update jump run track');
+        return;
+    }
+
     console.log('updateJumpRunTrack called', {
         showJumpRunTrack: Settings.state.userSettings.showJumpRunTrack,
         weatherData: !!AppState.weatherData,
         lastLat: AppState.lastLat,
         lastLng: AppState.lastLng,
         customJumpRunDirection: AppState.customJumpRunDirection,
-        currentZoom: map.getZoom(),
+        currentZoom: AppState.map.getZoom(),
         jumpRunTrackOffset: Settings.state.userSettings.jumpRunTrackOffset,
         jumpRunTrackForwardOffset: Settings.state.userSettings.jumpRunTrackForwardOffset
     });
 
-    const currentZoom = map.getZoom();
+    const currentZoom = AppState.map.getZoom();
     const isZoomInRange = currentZoom >= minZoom && currentZoom <= maxZoom;
 
     // Remove existing jump run track layer
     if (AppState.jumpRunTrackLayer) {
-        map.removeLayer(AppState.jumpRunTrackLayer);
+        try {
+            AppState.map.removeLayer(AppState.jumpRunTrackLayer);
+            console.log('Removed existing JRT layer group');
+        } catch (error) {
+            console.warn('Error removing JRT layer group:', error);
+        }
         AppState.jumpRunTrackLayer = null;
-        console.log('Removed existing JRT layer group');
     }
 
     if (!Settings.state.userSettings.showJumpRunTrack || !AppState.weatherData || !AppState.lastLat || !AppState.lastLng || !isZoomInRange) {
@@ -5275,7 +5322,7 @@ function updateJumpRunTrack() {
     }
 
     // Create a LayerGroup to hold all components
-    AppState.jumpRunTrackLayer = L.layerGroup().addTo(map);
+    AppState.jumpRunTrackLayer = L.layerGroup().addTo(AppState.map);
 
     // Create polyline for the jump run track (interactive for tooltips)
     const trackPolyline = L.polyline(latlngs, {
@@ -5381,13 +5428,17 @@ function updateJumpRunTrack() {
     // Dragging handlers for the airplane marker
     airplaneMarker.on('mousedown', (e) => {
         console.log('Airplane marker mousedown:', e);
-        map.dragging.disable();
+        if (AppState.map) {
+            AppState.map.dragging.disable();
+        }
         L.DomEvent.stopPropagation(e);
     });
 
     airplaneMarker.on('dragstart', () => {
         console.log('Airplane marker dragstart');
-        map.dragging.disable();
+        if (AppState.map) {
+            AppState.map.dragging.disable();
+        }
     });
 
     airplaneMarker.on('drag', () => {
@@ -5419,14 +5470,20 @@ function updateJumpRunTrack() {
 
     airplaneMarker.on('dragend', () => {
         console.log('Airplane marker dragend');
-        map.dragging.enable();
+        if (AppState.map) {
+            AppState.map.dragging.enable();
+        }
 
         const newLatLng = airplaneMarker.getLatLng();
 
         // Calculate displacement from original center (lastLat, lastLng)
         const originalCenter = L.latLng(AppState.lastLat, AppState.lastLng);
         const newCenter = L.latLng(newLatLng.lat - (originalAirplaneLatLng[0] - originalCenterLat), newLatLng.lng - (originalAirplaneLatLng[1] - originalCenterLng));
-        const distance = map.distance(originalCenter, newCenter);
+        if (!AppState.map) {
+            console.warn('Map not initialized, cannot calculate distance for dragend');
+            return;
+        }
+        const distance = AppState.map.distance(originalCenter, newCenter);
         const bearing = calculateBearing(originalCenter.lat, originalCenter.lng, newCenter.lat, newCenter.lng);
 
         // Calculate lateral and forward components
@@ -5487,7 +5544,9 @@ function updateJumpRunTrack() {
 
     airplaneMarker.on('touchstart', (e) => {
         console.log('Airplane marker touchstart:', e);
-        map.dragging.disable();
+        if (AppState.map) {
+            AppState.map.dragging.disable();
+        }
         L.DomEvent.stopPropagation(e);
     });
 
@@ -5497,6 +5556,12 @@ function updateJumpRunTrack() {
     });
 }
 function calculateCutAway() {
+    if (!AppState.map) {
+        console.warn('Map not initialized, cannot calculate cut-away');
+        Utils.handleError('Cannot calculate cut-away: map not initialized.');
+        return;
+    }
+
     console.log('calculateCutAway called', {
         calculateJump: Settings.state.userSettings.calculateJump,
         showCanopyArea: Settings.state.userSettings.showCanopyArea,
@@ -5641,7 +5706,7 @@ function calculateCutAway() {
 
     // Remove existing cut-away circle if present
     if (AppState.cutAwayCircle) {
-        map.removeLayer(AppState.cutAwayCircle);
+        AppState.map.removeLayer(AppState.cutAwayCircle);
         AppState.cutAwayCircle = null;
         console.log('Cleared existing cut-away circle');
     }
@@ -5691,7 +5756,7 @@ function calculateCutAway() {
             fillColor: 'purple',
             fillOpacity: 0.2,
             weight: 2
-        }).addTo(map);
+        }).addTo(AppState.map);
 
         // Bind tooltip
         AppState.cutAwayCircle.bindTooltip(tooltipContent, {
@@ -5794,64 +5859,69 @@ function calculateLandingPatternCoords(lat, lng, interpolatedData, sliderIndex) 
     return { downwindLat: downwindEnd[0], downwindLng: downwindEnd[1] };
 }
 function updateLandingPattern() {
+    if (!AppState.map) {
+        console.warn('Map not initialized, cannot update landing pattern');
+        return;
+    }
+
     console.log('updateLandingPattern called');
-    if (!map || !Settings.state.userSettings.showLandingPattern || !AppState.weatherData || !AppState.lastLat || !AppState.lastLng || AppState.lastAltitude === null || AppState.lastAltitude === 'N/A') {
+    if (!Settings.state.userSettings.showLandingPattern || !AppState.weatherData || !AppState.lastLat || !AppState.lastLng || AppState.lastAltitude === null || AppState.lastAltitude === 'N/A') {
         console.log('Landing pattern not updated: missing data or feature disabled');
         // Clear existing layers
         if (AppState.landingPatternPolygon) {
-            map.removeLayer(AppState.landingPatternPolygon);
+            AppState.map.removeLayer(AppState.landingPatternPolygon);
             AppState.landingPatternPolygon = null;
         }
         if (AppState.secondlandingPatternPolygon) {
-            map.removeLayer(AppState.secondlandingPatternPolygon);
+            AppState.map.removeLayer(AppState.secondlandingPatternPolygon);
             AppState.secondlandingPatternPolygon = null;
         }
         if (AppState.thirdLandingPatternLine) {
-            map.removeLayer(AppState.thirdLandingPatternLine);
+            AppState.map.removeLayer(AppState.thirdLandingPatternLine);
             AppState.thirdLandingPatternLine = null;
         }
         if (AppState.finalArrow) {
-            map.removeLayer(AppState.finalArrow);
+            AppState.map.removeLayer(AppState.finalArrow);
             AppState.finalArrow = null;
         }
         if (AppState.baseArrow) {
-            map.removeLayer(AppState.baseArrow);
+            AppState.map.removeLayer(AppState.baseArrow);
             AppState.baseArrow = null;
         }
         if (AppState.downwindArrow) {
-            map.removeLayer(AppState.downwindArrow);
+            AppState.map.removeLayer(AppState.downwindArrow);
             AppState.downwindArrow = null;
         }
         return;
     }
 
-    const currentZoom = map.getZoom();
+    const currentZoom = AppState.map.getZoom();
     const isVisible = currentZoom >= landingPatternMinZoom;
     console.log('Landing pattern zoom check:', { currentZoom, landingPatternMinZoom, isVisible });
 
     // Clear existing layers to prevent duplicates
     if (AppState.landingPatternPolygon) {
-        map.removeLayer(AppState.landingPatternPolygon);
+        AppState.map.removeLayer(AppState.landingPatternPolygon);
         AppState.landingPatternPolygon = null;
     }
     if (AppState.secondlandingPatternPolygon) {
-        map.removeLayer(AppState.secondlandingPatternPolygon);
+        AppState.map.removeLayer(AppState.secondlandingPatternPolygon);
         AppState.secondlandingPatternPolygon = null;
     }
     if (AppState.thirdLandingPatternLine) {
-        map.removeLayer(AppState.thirdLandingPatternLine);
+        AppState.map.removeLayer(AppState.thirdLandingPatternLine);
         AppState.thirdLandingPatternLine = null;
     }
     if (AppState.finalArrow) {
-        map.removeLayer(AppState.finalArrow);
+        AppState.map.removeLayer(AppState.finalArrow);
         AppState.finalArrow = null;
     }
     if (AppState.baseArrow) {
-        map.removeLayer(AppState.baseArrow);
+        AppState.map.removeLayer(AppState.baseArrow);
         AppState.baseArrow = null;
     }
     if (AppState.downwindArrow) {
-        map.removeLayer(AppState.downwindArrow);
+        AppState.map.removeLayer(AppState.downwindArrow);
         AppState.downwindArrow = null;
     }
 
@@ -5982,7 +6052,7 @@ function updateLandingPattern() {
         weight: 3,
         opacity: 0.8,
         dashArray: '5, 10'
-    }).addTo(map);
+    }).addTo(AppState.map);
 
     // Add a fat blue arrow in the middle of the final leg pointing to landing direction
     const finalMidLat = (lat + finalEnd[0]) / 2;
@@ -5991,7 +6061,7 @@ function updateLandingPattern() {
 
     AppState.finalArrow = L.marker([finalMidLat, finalMidLng], {
         icon: createArrowIcon(finalMidLat, finalMidLng, finalArrowBearing, finalArrowColor)
-    }).addTo(map);
+    }).addTo(AppState.map);
     AppState.finalArrow.bindTooltip(`${Math.round(finalWindDir)}° ${formatWindSpeed(finalWindSpeedKt)}${getWindSpeedUnit()}`, {
         offset: [10, 0], // Slight offset to avoid overlap
         direction: 'right',
@@ -6032,6 +6102,7 @@ function updateLandingPattern() {
     const baseCourseObj = Utils.calculateCourseFromHeading(baseHeading, baseWindDir, baseWindSpeedKt, CANOPY_SPEED_KT);
     const baseCourse = baseCourseObj.trueCourse;
     const baseGroundSpeedKt = baseCourseObj.groundSpeed;
+    let baseBearing = (baseCourse + 180) % 360;
     if (baseGroundSpeedKt < 0) {
         baseBearing = (baseBearing + 180) % 360; // Reverse the course
         console.log('Base ground speed is negative:', baseGroundSpeedKt, 'New course:', baseBearing);
@@ -6042,7 +6113,6 @@ function updateLandingPattern() {
     const baseWindAngle = Utils.calculateWindAngle(baseCourse, baseWindDir);
     const { crosswind: baseCrosswind, headwind: baseHeadwind } = Utils.calculateWindComponents(baseWindSpeedKt, baseWindAngle);
     const baseWca = Utils.calculateWCA(baseCrosswind, CANOPY_SPEED_KT) * (baseCrosswind >= 0 ? 1 : -1);
-    let baseBearing = (baseCourse + 180) % 360;
 
     const baseEnd = calculateLegEndpoint(finalEnd[0], finalEnd[1], baseBearing, baseGroundSpeedKt, baseTime);
 
@@ -6051,7 +6121,7 @@ function updateLandingPattern() {
         weight: 3,
         opacity: 0.8,
         dashArray: '5, 10'
-    }).addTo(map);
+    }).addTo(AppState.map);
 
     // Add a fat blue arrow in the middle of the base leg pointing to landing direction
     const baseMidLat = (finalEnd[0] + baseEnd[0]) / 2;
@@ -6060,7 +6130,7 @@ function updateLandingPattern() {
 
     AppState.baseArrow = L.marker([baseMidLat, baseMidLng], {
         icon: createArrowIcon(baseMidLat, baseMidLng, baseArrowBearing, baseArrowColor)
-    }).addTo(map);
+    }).addTo(AppState.map);
     AppState.baseArrow.bindTooltip(`${Math.round(baseWindDir)}° ${formatWindSpeed(baseWindSpeedKt)}${getWindSpeedUnit()}`, {
         offset: [10, 0],
         direction: 'right',
@@ -6104,9 +6174,9 @@ function updateLandingPattern() {
         weight: 3,
         opacity: 0.8,
         dashArray: '5, 10'
-    }).addTo(map);
+    }).addTo(AppState.map);
 
-    // Add a fat blue arrow in the middle of the downwind leg pointing to landing direction
+    // Add a fat blue arrow in знак middle of the downwind leg pointing to landing direction
     const downwindMidLat = (baseEnd[0] + downwindEnd[0]) / 2;
     const downwindMidLng = (baseEnd[1] + downwindEnd[1]) / 2;
     const downwindArrowBearing = (downwindWindDir - 90 + 180) % 360; // Points in direction of the mean wind at downwind
@@ -6114,7 +6184,7 @@ function updateLandingPattern() {
     // Create a custom arrow icon using Leaflet’s DivIcon
     AppState.downwindArrow = L.marker([downwindMidLat, downwindMidLng], {
         icon: createArrowIcon(downwindMidLat, downwindMidLng, downwindArrowBearing, downwindArrowColor)
-    }).addTo(map);
+    }).addTo(AppState.map);
     AppState.downwindArrow.bindTooltip(`${Math.round(downwindWindDir)}° ${formatWindSpeed(downwindWindSpeedKt)}${getWindSpeedUnit()}`, {
         offset: [10, 0],
         direction: 'right',
@@ -6133,7 +6203,6 @@ function updateLandingPattern() {
     console.log('Coordinates final end: ', finalEnd[0], finalEnd[1], 'Leg Height:', baseHeight + LEG_HEIGHT_FINAL);
     console.log('Coordinates base end: ', baseEnd[0], baseEnd[1], 'Leg Height:', baseHeight + LEG_HEIGHT_BASE);
     console.log('Coordinates downwind end: ', downwindEnd[0], downwindEnd[1], 'Leg Height:', baseHeight + LEG_HEIGHT_DOWNWIND);
-
 
     //map.fitBounds([[lat, lng], finalEnd, baseEnd, downwindEnd], { padding: [50, 50] });
 }
@@ -6569,6 +6638,11 @@ function setupDownloadEvents() {
     }
 }
 function setupMenuEvents() {
+    if (!AppState.map) {
+        console.warn('Map not initialized, skipping setupMenuEvents');
+        return;
+    }
+
     const hamburgerBtn = document.getElementById('hamburgerBtn');
     const menu = document.getElementById('menu');
     if (hamburgerBtn && menu) {
@@ -6581,12 +6655,12 @@ function setupMenuEvents() {
             menu.classList.toggle('hidden');
             const isHidden = menu.classList.contains('hidden');
             if (isHidden) {
-                map.dragging.enable();
-                map.touchZoom.enable();
-                map.doubleClickZoom.enable();
-                map.scrollWheelZoom.enable();
-                map.boxZoom.enable();
-                map.keyboard.enable();
+                AppState.map.dragging.enable();
+                AppState.map.touchZoom.enable();
+                AppState.map.doubleClickZoom.enable();
+                AppState.map.scrollWheelZoom.enable();
+                AppState.map.boxZoom.enable();
+                AppState.map.keyboard.enable();
                 // Ensure map is interactive
                 document.querySelector('.leaflet-container').style.pointerEvents = 'auto';
                 reinitializeCoordsControl();
@@ -6620,12 +6694,12 @@ function setupMenuEvents() {
         document.addEventListener('click', (e) => {
             if (!menu.contains(e.target) && !hamburgerBtn.contains(e.target) && !menu.classList.contains('hidden')) {
                 menu.classList.add('hidden');
-                map.dragging.enable();
-                map.touchZoom.enable();
-                map.doubleClickZoom.enable();
-                map.scrollWheelZoom.enable();
-                map.boxZoom.enable();
-                map.keyboard.enable();
+                AppState.map.dragging.enable();
+                AppState.map.touchZoom.enable();
+                AppState.map.doubleClickZoom.enable();
+                AppState.map.scrollWheelZoom.enable();
+                AppState.map.boxZoom.enable();
+                AppState.map.keyboard.enable();
                 document.querySelector('.leaflet-container').style.pointerEvents = 'auto';
                 reinitializeCoordsControl();
                 console.log('Menu closed, map interactions restored, coordsControl reinitialized');
@@ -7102,6 +7176,11 @@ function setupInputEvents() {
     });
 }
 function setupCheckboxEvents() {
+    if (!AppState.map) {
+        console.warn('Map not initialized, skipping setupCheckboxEvents');
+        return;
+    }
+
     setupCheckbox('showTableCheckbox', 'showTable', (checkbox) => {
         Settings.state.userSettings.showTable = checkbox.checked;
         Settings.save();
@@ -7166,29 +7245,29 @@ function setupCheckboxEvents() {
             calculateCutAway();
         } else {
             if (AppState.jumpCircle) {
-                if (map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(AppState.jumpCircle);
+                if (AppState.map && typeof AppState.map.removeLayer === 'function') {
+                    AppState.map.removeLayer(AppState.jumpCircle);
                 }
                 AppState.jumpCircle = null;
             }
             if (AppState.jumpCircleFull) {
-                if (map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(AppState.jumpCircleFull);
+                if (AppState.map && typeof AppState.map.removeLayer === 'function') {
+                    AppState.map.removeLayer(AppState.jumpCircleFull);
                 }
                 AppState.jumpCircleFull = null;
             }
             if (window.additionalBlueCircles) {
                 window.additionalBlueCircles.forEach(circle => {
-                    if (map && typeof map.removeLayer === 'function') {
-                        map.removeLayer(circle);
+                    if (AppState.map && typeof AppState.map.removeLayer === 'function') {
+                        AppState.map.removeLayer(circle);
                     }
                 });
                 window.additionalBlueCircles = [];
             }
             if (window.additionalBlueLabels) {
                 window.additionalBlueLabels.forEach(label => {
-                    if (map && typeof map.removeLayer === 'function') {
-                        map.removeLayer(label);
+                    if (AppState.map && typeof AppState.map.removeLayer === 'function') {
+                        AppState.map.removeLayer(label);
                     }
                 });
                 window.additionalBlueLabels = [];
@@ -7206,16 +7285,16 @@ function setupCheckboxEvents() {
             calculateJumpRunTrack();
         } else {
             if (AppState.jumpRunTrackLayer) {
-                if (AppState.jumpRunTrackLayer.airplaneMarker && map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(AppState.jumpRunTrackLayer.airplaneMarker);
+                if (AppState.jumpRunTrackLayer.airplaneMarker && AppState.map && typeof AppState.map.removeLayer === 'function') {
+                    AppState.map.removeLayer(AppState.jumpRunTrackLayer.airplaneMarker);
                     AppState.jumpRunTrackLayer.airplaneMarker = null;
                 }
-                if (AppState.jumpRunTrackLayer.approachLayer && map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(AppState.jumpRunTrackLayer.approachLayer);
+                if (AppState.jumpRunTrackLayer.approachLayer && AppState.map && typeof AppState.map.removeLayer === 'function') {
+                    AppState.map.removeLayer(AppState.jumpRunTrackLayer.approachLayer);
                     AppState.jumpRunTrackLayer.approachLayer = null;
                 }
-                if (map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(AppState.jumpRunTrackLayer);
+                if (AppState.map && typeof AppState.map.removeLayer === 'function') {
+                    AppState.map.removeLayer(AppState.jumpRunTrackLayer);
                 }
                 AppState.jumpRunTrackLayer = null;
                 console.log('Removed JRT polyline');
@@ -7242,8 +7321,8 @@ function setupCheckboxEvents() {
             calculateCutAway();
         } else {
             if (AppState.cutAwayCircle) {
-                if (map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(AppState.cutAwayCircle);
+                if (AppState.map && typeof AppState.map.removeLayer === 'function') {
+                    AppState.map.removeLayer(AppState.cutAwayCircle);
                 } else {
                     console.warn('Map not initialized, cannot remove cutAwayCircle');
                 }
@@ -7251,8 +7330,8 @@ function setupCheckboxEvents() {
                 console.log('Cleared cut-away circle');
             }
             if (AppState.cutAwayMarker) {
-                if (map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(AppState.cutAwayMarker);
+                if (AppState.map && typeof AppState.map.removeLayer === 'function') {
+                    AppState.map.removeLayer(AppState.cutAwayMarker);
                 } else {
                     console.warn('Map not initialized, cannot remove cutAwayMarker');
                 }
@@ -7288,38 +7367,38 @@ function setupCheckboxEvents() {
             toggleSubmenu(checkbox, submenu, false);
             console.log('Clearing landing pattern');
             if (AppState.landingPatternPolygon) {
-                if (map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(AppState.landingPatternPolygon);
+                if (AppState.map && typeof AppState.map.removeLayer === 'function') {
+                    AppState.map.removeLayer(AppState.landingPatternPolygon);
                 }
                 AppState.landingPatternPolygon = null;
             }
             if (AppState.secondlandingPatternPolygon) {
-                if (map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(AppState.secondlandingPatternPolygon);
+                if (AppState.map && typeof AppState.map.removeLayer === 'function') {
+                    AppState.map.removeLayer(AppState.secondlandingPatternPolygon);
                 }
                 AppState.secondlandingPatternPolygon = null;
             }
             if (AppState.thirdLandingPatternLine) {
-                if (map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(AppState.thirdLandingPatternLine);
+                if (AppState.map && typeof AppState.map.removeLayer === 'function') {
+                    AppState.map.removeLayer(AppState.thirdLandingPatternLine);
                 }
                 AppState.thirdLandingPatternLine = null;
             }
             if (AppState.finalArrow) {
-                if (map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(AppState.finalArrow);
+                if (AppState.map && typeof AppState.map.removeLayer === 'function') {
+                    AppState.map.removeLayer(AppState.finalArrow);
                 }
                 AppState.finalArrow = null;
             }
             if (AppState.baseArrow) {
-                if (map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(AppState.baseArrow);
+                if (AppState.map && typeof AppState.map.removeLayer === 'function') {
+                    AppState.map.removeLayer(AppState.baseArrow);
                 }
                 AppState.baseArrow = null;
             }
             if (AppState.downwindArrow) {
-                if (map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(AppState.downwindArrow);
+                if (AppState.map && typeof AppState.map.removeLayer === 'function') {
+                    AppState.map.removeLayer(AppState.downwindArrow);
                 }
                 AppState.downwindArrow = null;
             }
@@ -7387,8 +7466,8 @@ function setupCheckboxEvents() {
         }
         // Remove Jump Master Line from map
         if (AppState.jumpMasterLine) {
-            if (map && typeof map.removeLayer === 'function') {
-                map.removeLayer(AppState.jumpMasterLine);
+            if (AppState.map && typeof AppState.map.removeLayer === 'function') {
+                AppState.map.removeLayer(AppState.jumpMasterLine);
             } else {
                 console.warn('Map not initialized, cannot remove jumpMasterLine');
             }
@@ -7410,7 +7489,6 @@ function setupCheckboxEvents() {
             );
             AppState.livePositionControl._container.style.display = 'none';
             console.log('Cleared livePositionControl content and hid panel');
-
         }
     });
 
@@ -7446,8 +7524,8 @@ function setupCheckboxEvents() {
         toggleSubmenu(checkbox, submenu, checkbox.checked);
         if (!checkbox.checked) {
             if (AppState.jumpMasterLine) {
-                if (map && typeof map.removeLayer === 'function') {
-                    map.removeLayer(AppState.jumpMasterLine);
+                if (AppState.map && typeof AppState.map.removeLayer === 'function') {
+                    AppState.map.removeLayer(AppState.jumpMasterLine);
                 } else {
                     console.warn('Map not initialized, cannot remove jumpMasterLine');
                 }
@@ -7509,7 +7587,7 @@ function setupCheckboxEvents() {
         placeHarpButton.addEventListener('click', () => {
             AppState.isPlacingHarp = true;
             console.log('HARP placement mode activated');
-            map.on('click', handleHarpPlacement);
+            AppState.map.on('click', handleHarpPlacement);
             Utils.handleMessage('Click the map to place the HARP marker');
         });
     }
@@ -7584,52 +7662,6 @@ function setupCoordinateEvents() {
         });
     }
 }
-function setupGpxTrackEvents() {
-    console.log('Setting up GPX track events');
-    const gpxFileInput = document.getElementById('gpxFileInput');
-    if (gpxFileInput) {
-        gpxFileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            console.log('GPX file selected:', file?.name);
-            loadGpxTrack(file);
-        });
-    } else {
-        console.warn('GPX file input not found:', { id: 'gpxFileInput' });
-    }
-    const clearGpxButton = document.getElementById('clearGpxTrack'); // Fixed ID
-    if (clearGpxButton) {
-        clearGpxButton.addEventListener('click', () => {
-            console.log('Clear GPX button clicked');
-            if (AppState.gpxLayer) {
-                try {
-                    map.removeLayer(AppState.gpxLayer);
-                    AppState.gpxLayer = null;
-                    AppState.gpxPoints = [];
-                    console.log('Cleared GPX track');
-                    const infoElement = document.getElementById('info');
-                    if (infoElement) {
-                        infoElement.innerHTML = 'Click on the map to fetch weather data.';
-                    } else {
-                        console.warn('Info element not found:', { id: 'info' });
-                    }
-                    if (gpxFileInput) {
-                        gpxFileInput.value = '';
-                    } else {
-                        console.warn('GPX file input not found for clearing:', { id: 'gpxFileInput' });
-                    }
-                } catch (error) {
-                    console.error('Error clearing GPX track:', error);
-                    Utils.handleError('Failed to clear GPX track: ' + error.message);
-                }
-            } else {
-                console.log('No GPX track to clear');
-                Utils.handleError('No GPX track to clear.');
-            }
-        });
-    } else {
-        console.warn('Clear GPX button not found:', { id: 'clearGpxTrack' });
-    }
-}
 function setupCheckbox(id, setting, callback) {
     console.log(`setupCheckbox called for id: ${id}`);
     const checkbox = document.getElementById(id);
@@ -7658,101 +7690,56 @@ function setupCheckbox(id, setting, callback) {
         console.warn(`Checkbox ${id} not found`);
     }
 }
-function setupMenuItemEvents() {
-    const calculateJumpMenuItem = Array.from(document.querySelectorAll('.menu-label'))
-        .find(item => item.textContent.trim() === 'Calculate Jump');
-
-    if (!calculateJumpMenuItem) {
-        console.error('Calculate Jump menu item not found');
-        const menuItems = document.querySelectorAll('.hamburger-menu .menu-label');
-        console.log('Available menu labels:', Array.from(menuItems).map(item => item.textContent.trim()));
-        return;
-    }
-
-    calculateJumpMenuItem.setAttribute('data-label', 'calculateJump');
-    console.log('Found Calculate Jump menu item:', calculateJumpMenuItem);
-
-    // Initialize visual state based on lock status
-    if (!(Settings.isFeatureUnlocked('calculateJump') && isCalculateJumpUnlocked)) {
-        calculateJumpMenuItem.style.opacity = '0.5';
-        calculateJumpMenuItem.title = 'Feature locked. Click to enter password.';
+function setupGpxTrackEvents() {
+    console.log('Setting up GPX track events');
+    const gpxFileInput = document.getElementById('gpxFileInput');
+    if (gpxFileInput) {
+        gpxFileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            console.log('GPX file selected:', file?.name);
+            loadGpxTrack(file);
+        });
     } else {
-        calculateJumpMenuItem.style.opacity = '1';
-        calculateJumpMenuItem.title = '';
+        console.warn('GPX file input not found:', { id: 'gpxFileInput' });
     }
-
-    // Remove any existing click handlers to prevent duplicates
-    calculateJumpMenuItem.removeEventListener('click', calculateJumpMenuItem._clickHandler);
-    calculateJumpMenuItem._clickHandler = (event) => {
-        try {
-            console.log('Click handler start');
-            event.stopPropagation();
-            event.preventDefault();
-            console.log('Clicked menu item: Calculate Jump', { isCalculateJumpUnlocked, isFeatureUnlocked: Settings.isFeatureUnlocked('calculateJump') });
-
-            const parentLi = calculateJumpMenuItem.closest('li');
-            const submenu = parentLi?.querySelector('ul');
-            console.log('Submenu lookup:', { submenu: submenu ? 'Found' : 'Not found', hasSubmenuClass: submenu?.classList.contains('submenu'), submenuClasses: submenu?.classList.toString() });
-
-            const enableFeature = () => {
-                console.log('Enabling Calculate Jump');
-                Settings.state.userSettings.calculateJump = true;
-                Settings.save();
-                toggleSubmenu(calculateJumpMenuItem, submenu, true);
-                if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
-                    debouncedCalculateJump();
-                    calculateCutAway();
-                }
-                calculateJumpMenuItem.style.opacity = '1';
-                calculateJumpMenuItem.title = '';
-                console.log('Calculate Jump enabled');
-            };
-
-            const disableFeature = () => {
-                console.log('Disabling Calculate Jump');
-                Settings.state.userSettings.calculateJump = false;
-                Settings.save();
-                toggleSubmenu(calculateJumpMenuItem, submenu, false);
-                clearJumpCircles();
-                calculateJumpMenuItem.style.opacity = (Settings.isFeatureUnlocked('calculateJump') && isCalculateJumpUnlocked) ? '1' : '0.5';
-                calculateJumpMenuItem.title = (Settings.isFeatureUnlocked('calculateJump') && isCalculateJumpUnlocked) ? '' : 'Feature locked. Click to enter password.';
-                console.log('Calculate Jump disabled');
-            };
-
-            console.log('Checking if feature is locked:', { isCalculateJumpUnlocked, isFeatureUnlocked: Settings.isFeatureUnlocked('calculateJump') });
-            if (!(Settings.isFeatureUnlocked('calculateJump') && isCalculateJumpUnlocked)) {
-                console.log('Feature is locked, attempting to show password modal for Calculate Jump');
-                showPasswordModal('calculateJump', () => {
-                    console.log('Password modal success, enabling feature');
-                    enableFeature();
-                }, () => {
-                    console.log('Password modal cancelled');
-                    if (submenu) {
-                        toggleSubmenu(calculateJumpMenuItem, submenu, false);
-                        console.log('Password modal cancelled, submenu remains closed');
-                    }
-                });
-            } else {
-                console.log('Feature is unlocked, toggling submenu visibility');
-                if (submenu) {
-                    const isSubmenuHidden = submenu.classList.contains('hidden');
-                    console.log('Submenu state:', { isSubmenuHidden });
-                    if (isSubmenuHidden) {
-                        enableFeature();
-                    } else {
-                        disableFeature();
-                    }
-                } else {
-                    console.warn('Submenu for Calculate Jump not found during toggle');
-                }
+    const clearGpxButton = document.getElementById('clearGpxTrack');
+    if (clearGpxButton) {
+        clearGpxButton.addEventListener('click', () => {
+            console.log('Clear GPX button clicked');
+            if (!AppState.map) {
+                console.warn('Map not initialized, cannot clear GPX track');
+                Utils.handleError('Cannot clear GPX track: map not initialized.');
+                return;
             }
-            console.log('Click handler end');
-        } catch (error) {
-            console.error('Error in Calculate Jump click handler:', error);
-        }
-    };
-    calculateJumpMenuItem.addEventListener('click', calculateJumpMenuItem._clickHandler, { capture: true });
-    console.log('Attached click handler to Calculate Jump menu item with capture phase');
+            if (AppState.gpxLayer) {
+                try {
+                    AppState.map.removeLayer(AppState.gpxLayer);
+                    AppState.gpxLayer = null;
+                    AppState.gpxPoints = [];
+                    console.log('Cleared GPX track');
+                    const infoElement = document.getElementById('info');
+                    if (infoElement) {
+                        infoElement.innerHTML = 'Click on the map to fetch weather data.';
+                    } else {
+                        console.warn('Info element not found:', { id: 'info' });
+                    }
+                    if (gpxFileInput) {
+                        gpxFileInput.value = '';
+                    } else {
+                        console.warn('GPX file input not found for clearing:', { id: 'gpxFileInput' });
+                    }
+                } catch (error) {
+                    console.error('Error clearing GPX track:', error);
+                    Utils.handleError('Failed to clear GPX track: ' + error.message);
+                }
+            } else {
+                console.log('No GPX track to clear');
+                Utils.handleError('No GPX track to clear.');
+            }
+        });
+    } else {
+        console.warn('Clear GPX button not found:', { id: 'clearGpxTrack' });
+    }
 }
 function setupResetButton() {
     const bottomContainer = document.getElementById('bottom-container');
@@ -7822,14 +7809,18 @@ function setupResetCutAwayMarkerButton() {
     const resetButton = document.getElementById('resetCutAwayMarker');
     if (resetButton) {
         resetButton.addEventListener('click', () => {
+            if (!AppState.map) {
+                console.warn('Map not initialized, cannot reset cut-away marker');
+                return;
+            }
             if (AppState.cutAwayMarker) {
-                map.removeLayer(AppState.cutAwayMarker);
+                AppState.map.removeLayer(AppState.cutAwayMarker);
                 AppState.cutAwayMarker = null;
                 AppState.cutAwayLat = null;
                 AppState.cutAwayLng = null;
                 console.log('Cut-away marker reset');
                 if (AppState.cutAwayCircle) {
-                    map.removeLayer(AppState.cutAwayCircle);
+                    AppState.map.removeLayer(AppState.cutAwayCircle);
                     AppState.cutAwayCircle = null;
                     console.log('Cleared cut-away circle');
                 }
@@ -8029,12 +8020,113 @@ function toggleSubmenu(element, submenu, isVisible) {
         console.warn(`Submenu for ${element.textContent || element.id} not found`);
     }
 }
+function setupMenuItemEvents() {
+    const calculateJumpMenuItem = Array.from(document.querySelectorAll('.menu-label'))
+        .find(item => item.textContent.trim() === 'Calculate Jump');
+
+    if (!calculateJumpMenuItem) {
+        console.error('Calculate Jump menu item not found');
+        const menuItems = document.querySelectorAll('.hamburger-menu .menu-label');
+        console.log('Available menu labels:', Array.from(menuItems).map(item => item.textContent.trim()));
+        return;
+    }
+
+    calculateJumpMenuItem.setAttribute('data-label', 'calculateJump');
+    console.log('Found Calculate Jump menu item:', calculateJumpMenuItem);
+
+    // Initialize visual state based on lock status
+    if (!(Settings.isFeatureUnlocked('calculateJump') && isCalculateJumpUnlocked)) {
+        calculateJumpMenuItem.style.opacity = '0.5';
+        calculateJumpMenuItem.title = 'Feature locked. Click to enter password.';
+    } else {
+        calculateJumpMenuItem.style.opacity = '1';
+        calculateJumpMenuItem.title = '';
+    }
+
+    // Remove any existing click handlers to prevent duplicates
+    calculateJumpMenuItem.removeEventListener('click', calculateJumpMenuItem._clickHandler);
+    calculateJumpMenuItem._clickHandler = (event) => {
+        try {
+            console.log('Click handler start');
+            event.stopPropagation();
+            event.preventDefault();
+            console.log('Clicked menu item: Calculate Jump', { isCalculateJumpUnlocked, isFeatureUnlocked: Settings.isFeatureUnlocked('calculateJump') });
+
+            const parentLi = calculateJumpMenuItem.closest('li');
+            const submenu = parentLi?.querySelector('ul');
+            console.log('Submenu lookup:', { submenu: submenu ? 'Found' : 'Not found', hasSubmenuClass: submenu?.classList.contains('submenu'), submenuClasses: submenu?.classList.toString() });
+
+            const enableFeature = () => {
+                console.log('Enabling Calculate Jump');
+                Settings.state.userSettings.calculateJump = true;
+                Settings.save();
+                toggleSubmenu(calculateJumpMenuItem, submenu, true);
+                if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
+                    debouncedCalculateJump();
+                    calculateCutAway();
+                }
+                calculateJumpMenuItem.style.opacity = '1';
+                calculateJumpMenuItem.title = '';
+                console.log('Calculate Jump enabled');
+            };
+
+            const disableFeature = () => {
+                console.log('Disabling Calculate Jump');
+                Settings.state.userSettings.calculateJump = false;
+                Settings.save();
+                toggleSubmenu(calculateJumpMenuItem, submenu, false);
+                clearJumpCircles();
+                calculateJumpMenuItem.style.opacity = (Settings.isFeatureUnlocked('calculateJump') && isCalculateJumpUnlocked) ? '1' : '0.5';
+                calculateJumpMenuItem.title = (Settings.isFeatureUnlocked('calculateJump') && isCalculateJumpUnlocked) ? '' : 'Feature locked. Click to enter password.';
+                console.log('Calculate Jump disabled');
+            };
+
+            console.log('Checking if feature is locked:', { isCalculateJumpUnlocked, isFeatureUnlocked: Settings.isFeatureUnlocked('calculateJump') });
+            if (!(Settings.isFeatureUnlocked('calculateJump') && isCalculateJumpUnlocked)) {
+                console.log('Feature is locked, attempting to show password modal for Calculate Jump');
+                showPasswordModal('calculateJump', () => {
+                    console.log('Password modal success, enabling feature');
+                    enableFeature();
+                }, () => {
+                    console.log('Password modal cancelled');
+                    if (submenu) {
+                        toggleSubmenu(calculateJumpMenuItem, submenu, false);
+                        console.log('Password modal cancelled, submenu remains closed');
+                    }
+                });
+            } else {
+                console.log('Feature is unlocked, toggling submenu visibility');
+                if (submenu) {
+                    const isSubmenuHidden = submenu.classList.contains('hidden');
+                    console.log('Submenu state:', { isSubmenuHidden });
+                    if (isSubmenuHidden) {
+                        enableFeature();
+                    } else {
+                        disableFeature();
+                    }
+                } else {
+                    console.warn('Submenu for Calculate Jump not found during toggle');
+                }
+            }
+            console.log('Click handler end');
+        } catch (error) {
+            console.error('Error in Calculate Jump click handler:', error);
+        }
+    };
+    calculateJumpMenuItem.addEventListener('click', calculateJumpMenuItem._clickHandler, { capture: true });
+    console.log('Attached click handler to Calculate Jump menu item with capture phase');
+}
 function clearJumpCircles() {
+    if (!AppState.map) {
+        console.warn('Map not initialized, cannot clear jump circles');
+        return;
+    }
+
     console.log('Clearing all jump circles');
     const removeLayer = (layer, name) => {
-        if (layer && typeof layer === 'object' && '_leaflet_id' in layer && map.hasLayer(layer)) {
+        if (layer && typeof layer === 'object' && '_leaflet_id' in layer && AppState.map.hasLayer(layer)) {
             console.log(`Removing ${name}`);
-            map.removeLayer(layer);
+            AppState.map.removeLayer(layer);
         } else if (layer) {
             console.warn(`Layer ${name} not removed: not on map or invalid`, { layer });
         }
@@ -8284,10 +8376,14 @@ async function updateAllDisplays() {
         updateLivePositionControl();
         // Update Jump Master Line distance unit if active
         if (AppState.jumpMasterLine && AppState.liveMarker && AppState.currentMarker && AppState.lastLat !== null && AppState.lastLng !== null) {
+            if (!AppState.map) {
+                console.warn('Map not initialized, cannot update Jump Master Line popup');
+                return;
+            }
             const liveLatLng = AppState.liveMarker.getLatLng();
             const dipLatLng = AppState.currentMarker.getLatLng();
             const bearing = calculateBearing(liveLatLng.lat, liveLatLng.lng, dipLatLng.lat, dipLatLng.lng).toFixed(0);
-            const distanceMeters = map.distance(liveLatLng, dipLatLng);
+            const distanceMeters = AppState.map.distance(liveLatLng, dipLatLng);
             const heightUnit = getHeightUnit();
             const convertedDistance = Utils.convertHeight(distanceMeters, heightUnit);
             const roundedDistance = Math.round(convertedDistance);
