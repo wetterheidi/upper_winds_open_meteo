@@ -256,13 +256,14 @@ function debounce(func, wait) {
     };
 }
 function configureMarker(lat, lng, altitude, openPopup = false) {
+    console.log('configureMarker called:', { lat, lng, altitude, openPopup });
     if (AppState.currentMarker) {
         AppState.currentMarker.remove();
     }
     AppState.currentMarker = createCustomMarker(lat, lng).addTo(AppState.globalMap);
     attachMarkerDragend(AppState.currentMarker);
     AppState.currentMarker.on('click', (e) => {
-        L.DomEvent.stopPropagation(e); // Prevent map click events from interfering
+        L.DomEvent.stopPropagation(e);
         const popup = AppState.currentMarker.getPopup();
         console.log('Marker click event, popup state:', { hasPopup: !!popup, isOpen: popup?.isOpen() });
         if (popup?.isOpen()) {
@@ -1122,7 +1123,7 @@ function setupCacheSettings() {
     const cacheZoomLevelsSelect = document.getElementById('cacheZoomLevelsSelect');
     if (cacheZoomLevelsSelect) {
         cacheZoomLevelsSelect.addEventListener('change', () => {
-            const [minZoom, maxZoom] = cacheZoomLevelsSelect.value.split('-').AppState.globalMap(Number);
+            const [minZoom, maxZoom] = cacheZoomLevelsSelect.value.split('-').map(Number);
             Settings.state.userSettings.cacheZoomLevels = Array.from(
                 { length: maxZoom - minZoom + 1 },
                 (_, i) => minZoom + i
@@ -1280,14 +1281,14 @@ function initMapOLD() {
 
     AppState.globalMap.on('zoomstart', (e) => {
         if (!navigator.onLine) {
-            const targetZoom = e.target._zoom || AppState.globalMap.getZoom();
+            const targetZoom = e.target._zoom || map.getZoom();
             if (targetZoom < 11) {
                 e.target._zoom = 11;
-                AppState.globalMap.setZoom(11);
+                map.setZoom(11);
                 Utils.handleError('Offline: Zoom restricted to levels 11–14 for cached tiles.');
             } else if (targetZoom > 14) {
                 e.target._zoom = 14;
-                AppState.globalMap.setZoom(14);
+                map.setZoom(14);
                 Utils.handleError('Offline: Zoom restricted to levels 11–14 for cached tiles.');
             }
         }
@@ -1671,7 +1672,7 @@ function initMapOLD() {
     });
 
     AppState.globalMap.on('zoomend', () => {
-        const currentZoom = AppState.globalMap.getZoom();
+        const currentZoom = map.getZoom();
         console.log('Zoom level changed to:', currentZoom);
 
         if (Settings.state.userSettings.calculateJump && AppState.weatherData && AppState.lastLat && AppState.lastLng) {
@@ -1843,17 +1844,7 @@ function initMap() {
     const layer = AppState.baseMaps[selectedBaseMap];
     let hasSwitched = false;
 
-    AppState.tileFailedCount = 0;
-    AppState.tileTotalCount = 0;
-
-    layer.on('tileloadstart', () => {
-        AppState.tileTotalCount++;
-        console.log('Tile load started, total:', AppState.tileTotalCount);
-    });
-
     layer.on('tileerror', () => {
-        AppState.tileFailedCount++;
-        console.log('Tile error, failed:', AppState.tileFailedCount);
         if (!navigator.onLine) {
             if (!hasSwitched) {
                 console.warn(`${selectedBaseMap} tiles unavailable offline. Zoom restricted to levels 11–14.`);
@@ -1862,19 +1853,7 @@ function initMap() {
             }
             return;
         }
-        if (!hasSwitched && AppState.tileFailedCount > AppState.tileTotalCount / 2) {
-            console.warn(`${selectedBaseMap} tiles slow or unavailable, switching to ${fallbackBaseMap}`);
-            if (AppState.globalMap.hasLayer(layer)) {
-                AppState.globalMap.removeLayer(layer);
-                AppState.baseMaps[fallbackBaseMap].addTo(AppState.globalMap);
-                Settings.state.userSettings.baseMaps = fallbackBaseMap;
-                Settings.save();
-                Utils.handleError(`${selectedBaseMap} tiles slow or unavailable. Switched to ${fallbackBaseMap}.`);
-                hasSwitched = true;
-            }
-        } else {
-            console.warn(`Tile error in ${selectedBaseMap}, attempting to continue`);
-        }
+        console.warn(`Tile error in ${selectedBaseMap}, attempting to continue`);
     });
 
     layer.addTo(AppState.globalMap);
@@ -2012,45 +1991,6 @@ function initMap() {
     const initialAltitude = 'N/A';
     configureMarker(defaultCenter[0], defaultCenter[1], initialAltitude, false);
     AppState.isManualPanning = false;
-
-    // Migrate existing tiles to normalized URLs on init and perform automated cleanup
-    TileCache.init().then(() => {
-        TileCache.migrateTiles().then(() => {
-            TileCache.getCacheSize().then(size => {
-                if (size > 500) {
-                    TileCache.clearOldTiles(3).then(result => {
-                        Utils.handleMessage(`Cleared ${result.deletedCount} old tiles to free up space: ${result.deletedSizeMB.toFixed(2)} MB freed.`);
-                    }).catch(error => {
-                        console.error('Failed to clear old tiles during init:', error);
-                        Utils.handleError('Failed to clear old tiles during startup.');
-                    });
-                } else {
-                    TileCache.clearOldTiles().then(() => {
-                        cacheTilesForDIP();
-                    }).catch(error => {
-                        console.error('Failed to clear old tiles:', error);
-                    });
-                }
-            }).catch(error => {
-                console.error('Failed to get cache size during init:', error);
-                TileCache.clearOldTiles().then(() => {
-                    cacheTilesForDIP();
-                }).catch(error => {
-                    console.error('Failed to clear old tiles:', error);
-                });
-            });
-        }).catch(error => {
-            console.error('Failed to migrate tiles:', error);
-            TileCache.clearOldTiles().then(() => {
-                cacheTilesForDIP();
-            }).catch(err => {
-                console.error('Failed to clear old tiles:', err);
-            });
-        });
-    }).catch(error => {
-        console.error('Failed to initialize tile cache:', error);
-        Utils.handleError('Tile caching unavailable.');
-    });
 
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
@@ -2594,17 +2534,15 @@ async function updateMarkerPopup(marker, lat, lng, altitude, open = false) {
         });
     }
 
-    // Unbind and bind new popup content
     marker.unbindPopup();
     marker.bindPopup(popupContent);
     console.log('Popup rebound with content:', popupContent);
 
-    // If the popup is open, update its content immediately
     const popup = marker.getPopup();
     const isOpen = popup?.isOpen();
     if (isOpen) {
         popup.setContent(popupContent);
-        popup.update(); // Ensure the popup layout is refreshed
+        popup.update();
         console.log('Updated open popup content:', popupContent);
     } else if (open) {
         console.log('Attempting to open popup');
@@ -3441,46 +3379,32 @@ function updateJumpMasterLine() {
 
 
 // == Weather Data Handling ==
-async function checkAvailableModels(lat, lon) {
-    const modelList = [
-        'icon_seamless', 'icon_global', 'icon_eu', 'icon_d2', 'ecmwf_ifs025', 'ecmwf_aifs025_single', 'gfs_seamless', 'gfs_global', 'gfs_hrrr', 'arome_france', 'gem_hrdps_continental', 'gem_regional'
-    ];
-
-    let availableModels = [];
-    for (const model of modelList) {
-        try {
-            const response = await fetch(
-                `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m&models=${model}`
-            );
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-            const data = await response.json();
-            if (data.hourly && data.hourly.temperature_2m && data.hourly.temperature_2m.length > 0) {
+async function checkAvailableModels(lat, lng) {
+    console.log('checkAvailableModels called:', { lat, lng });
+    try {
+        const models = [
+            'icon_seamless', 'icon_global', 'icon_eu', 'icon_d2',
+            'ecmwf_ifs025', 'ecmwf_aifs025', 'gfs_seamless', 'gfs_global',
+            'gfs_hrrr', 'arome_france', 'gem_hrdps_continental', 'gem_regional'
+        ];
+        const availableModels = [];
+        for (const model of models) { // Fixed: Removed incorrect AppState.globalMap
+            const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&hourly=temperature_2m&models=${model}`;
+            console.log('Checking model availability:', { model, url });
+            const response = await fetch(url);
+            if (response.ok) {
                 availableModels.push(model);
+                console.log(`Model ${model} is available`);
+            } else {
+                console.log(`Model ${model} is not available: ${response.status}`);
             }
-        } catch (error) {
-            console.log(`${model} not available: ${error.message}`);
         }
+        console.log('Available models:', availableModels);
+        return availableModels;
+    } catch (error) {
+        console.error('Error in checkAvailableModels:', error);
+        return [];
     }
-
-    const modelSelect = document.getElementById('modelSelect');
-    modelSelect.innerHTML = '';
-    availableModels.forEach(model => {
-        const option = document.createElement('option');
-        option.value = model;
-        option.textContent = model.replace('_', ' ').toUpperCase();
-        modelSelect.appendChild(option);
-    });
-
-    const modelDisplay = availableModels.length > 0
-        ? `<br><strong>Available Models:</strong><ul>${availableModels.AppState.globalMap(m => `<li>${m.replace('_', ' ').toUpperCase()}</li>`).join('')}</ul>`
-        : '<br><strong>Available Models:</strong> None';
-
-    const currentContent = document.getElementById('info').innerHTML;
-    document.getElementById('info').innerHTML = currentContent + modelDisplay;
-
-    return availableModels;
 }
 async function fetchWeatherForLocationOLD(lat, lng, currentTime = null, isInitialLoad = false) {
     document.getElementById('info').innerHTML = `Fetching weather and models...`;
@@ -3507,35 +3431,50 @@ async function fetchWeatherForLocation(lat, lng, currentTime = null, isInitialLo
     console.log('fetchWeatherForLocation called:', { lat, lng, currentTime, isInitialLoad });
     try {
         document.getElementById('info').innerHTML = `Fetching weather and models...`;
-        const availableModels = await checkAvailableModels(lat, lng);
-        if (availableModels.length > 0) {
-            // Set lastLat and lastLng before fetchWeather
-            AppState.lastLat = lat;
-            AppState.lastLng = lng;
-            console.log('Set AppState coordinates:', { lastLat: AppState.lastLat, lastLng: AppState.lastLng });
+        const modelSelect = document.getElementById('modelSelect');
+        const originalModel = modelSelect.value;
+        let availableModels = await checkAvailableModels(lat, lng);
 
-            await fetchWeather(lat, lng, currentTime, isInitialLoad);
-            console.log('Calling updateModelRunInfo with:', { lastModelRun: AppState.lastModelRun, lastLat: AppState.lastLat, lastLng: AppState.lastLng });
-            Settings.updateModelRunInfo(AppState.lastModelRun, AppState.lastLat, AppState.lastLng);
-
-            if (AppState.lastAltitude !== 'N/A') {
-                calculateMeanWind();
-                if (Settings.state.userSettings.calculateJump) {
-                    console.log('Recalculating jump for location change');
-                    debouncedCalculateJump();
-                    calculateCutAway();
-                }
+        if (availableModels.length === 0) {
+            console.warn(`No models available for coordinates (${lat}, ${lng}), falling back to icon_global`);
+            modelSelect.value = 'icon_global';
+            Settings.state.userSettings.model = 'icon_global';
+            Settings.save();
+            availableModels = await checkAvailableModels(lat, lng);
+            if (availableModels.length === 0) {
+                throw new Error('No weather models available, including fallback');
             }
-            updateLandingPattern();
-            restoreUIInteractivity();
-        } else {
-            document.getElementById('info').innerHTML = `No models available.`;
-            Settings.updateModelRunInfo(null, AppState.lastLat, AppState.lastLng);
-            restoreUIInteractivity();
         }
+
+        if (!availableModels.includes(originalModel)) {
+            console.warn(`Selected model ${originalModel} not available, using ${availableModels[0]}`);
+            modelSelect.value = availableModels[0];
+            Settings.state.userSettings.model = availableModels[0];
+            Settings.save();
+        }
+
+        AppState.lastLat = lat;
+        AppState.lastLng = lng;
+        console.log('Set AppState coordinates:', { lastLat: AppState.lastLat, lastLng: AppState.lastLng });
+
+        await fetchWeather(lat, lng, currentTime, isInitialLoad);
+        console.log('Calling updateModelRunInfo with:', { lastModelRun: AppState.lastModelRun, lastLat: AppState.lastLat, lastLng: AppState.lastLng });
+        Settings.updateModelRunInfo(AppState.lastModelRun, AppState.lastLat, AppState.lastLng);
+
+        if (AppState.lastAltitude !== 'N/A') {
+            calculateMeanWind();
+            if (Settings.state.userSettings.calculateJump) {
+                console.log('Recalculating jump for location change');
+                debouncedCalculateJump();
+                calculateCutAway();
+            }
+        }
+        updateLandingPattern();
+        restoreUIInteractivity();
     } catch (error) {
+        console.error('Error in fetchWeatherForLocation:', error);
         Utils.handleError('Failed to fetch weather data', { error: error.message, lat, lng });
-        document.getElementById('info').innerHTML = `Failed to fetch weather data.`;
+        document.getElementById('info').innerHTML = `Failed to fetch weather data: ${error.message}`;
         Settings.updateModelRunInfo(null, AppState.lastLat, AppState.lastLng);
         restoreUIInteractivity();
     }
@@ -4238,7 +4177,6 @@ function calculateMeanWind() {
         return;
     }
 
-    // Convert inputs to meters
     lowerLimitInput = heightUnit === 'ft' ? lowerLimitInput / 3.28084 : lowerLimitInput;
     upperLimitInput = heightUnit === 'ft' ? upperLimitInput / 3.28084 : upperLimitInput;
 
@@ -4256,19 +4194,17 @@ function calculateMeanWind() {
         return;
     }
 
-    // Check if interpolatedData is valid
     if (!interpolatedData || interpolatedData.length === 0) {
         Utils.handleError('No valid weather data available to calculate mean wind.');
         return;
     }
 
-    // Use raw heights and speeds in knots
     const heights = interpolatedData.map(d => d.height);
     const dirs = interpolatedData.map(d => parseFloat(d.dir) || 0);
-    const spds = interpolatedData.map(d => Utils.convertWind(parseFloat(d.spd) || 0, windSpeedUnit, 'km/h')); // Fixed order
+    const spds = interpolatedData.map(d => Utils.convertWind(parseFloat(d.spd) || 0, windSpeedUnit, 'km/h'));
 
-    const xKomponente = spds.AppState.globalMap((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
-    const yKomponente = spds.AppState.globalMap((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
+    const xKomponente = spds.map((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
+    const yKomponente = spds.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
 
     const meanWind = Utils.calculateMeanWind(heights, xKomponente, yKomponente, lowerLimit, upperLimit);
     const [dir, spd] = meanWind;
@@ -4292,10 +4228,8 @@ function interpolateWeatherData(sliderIndex) {
     const interpStep = parseInt(getInterpolationStep()) || 100;
     const heightUnit = getHeightUnit();
 
-    // Define all possible pressure levels
     const allPressureLevels = [1000, 950, 925, 900, 850, 800, 700, 600, 500, 400, 300, 250, 200];
 
-    // Filter pressure levels with valid geopotential height data
     const validPressureLevels = allPressureLevels.filter(hPa => {
         const height = AppState.weatherData[`geopotential_height_${hPa}hPa`]?.[sliderIndex];
         return height !== null && height !== undefined;
@@ -4306,7 +4240,6 @@ function interpolateWeatherData(sliderIndex) {
         return [];
     }
 
-    // Collect data for valid pressure levels
     let heightData = validPressureLevels.map(hPa => AppState.weatherData[`geopotential_height_${hPa}hPa`][sliderIndex]);
     let tempData = validPressureLevels.map(hPa => AppState.weatherData[`temperature_${hPa}hPa`][sliderIndex]);
     let rhData = validPressureLevels.map(hPa => AppState.weatherData[`relative_humidity_${hPa}hPa`][sliderIndex]);
@@ -4319,23 +4252,19 @@ function interpolateWeatherData(sliderIndex) {
         return [];
     }
 
-    // Calculate wind components at valid pressure levels
     let uComponents = spdData.map((spd, i) => -spd * Math.sin(dirData[i] * Math.PI / 180));
     let vComponents = spdData.map((spd, i) => -spd * Math.cos(dirData[i] * Math.PI / 180));
 
-    // Add surface and intermediate points if surfacePressure > lowest valid pressure level
     const lowestPressureLevel = Math.max(...validPressureLevels);
     const hLowest = AppState.weatherData[`geopotential_height_${lowestPressureLevel}hPa`][sliderIndex];
     if (surfacePressure > lowestPressureLevel && Number.isFinite(hLowest) && hLowest > baseHeight) {
         const stepsBetween = Math.floor((hLowest - baseHeight) / interpStep);
 
-        // Surface wind components
         const uSurface = -AppState.weatherData.wind_speed_10m[sliderIndex] * Math.sin(AppState.weatherData.wind_direction_10m[sliderIndex] * Math.PI / 180);
         const vSurface = -AppState.weatherData.wind_speed_10m[sliderIndex] * Math.cos(AppState.weatherData.wind_direction_10m[sliderIndex] * Math.PI / 180);
         const uLowest = uComponents[validPressureLevels.indexOf(lowestPressureLevel)];
         const vLowest = vComponents[validPressureLevels.indexOf(lowestPressureLevel)];
 
-        // Add intermediate points with logarithmic interpolation
         for (let i = stepsBetween - 1; i >= 1; i--) {
             const h = baseHeight + i * interpStep;
             if (h >= hLowest) continue;
@@ -4363,7 +4292,6 @@ function interpolateWeatherData(sliderIndex) {
             vComponents.unshift(v);
         }
 
-        // Add surface data
         heightData.unshift(baseHeight);
         validPressureLevels.unshift(surfacePressure);
         tempData.unshift(AppState.weatherData.temperature_2m[sliderIndex]);
@@ -4374,7 +4302,6 @@ function interpolateWeatherData(sliderIndex) {
         vComponents.unshift(vSurface);
     }
 
-    // Determine the maximum height using the lowest pressure level (highest altitude)
     const minPressureIndex = validPressureLevels.indexOf(Math.min(...validPressureLevels));
     const maxHeightASL = heightData[minPressureIndex];
     const maxHeightAGL = maxHeightASL - baseHeight;
@@ -4383,7 +4310,6 @@ function interpolateWeatherData(sliderIndex) {
         return [];
     }
 
-    // Convert maxHeightAGL to user's unit for step calculation
     const maxHeightInUnit = heightUnit === 'ft' ? maxHeightAGL * 3.28084 : maxHeightAGL;
     const steps = Math.floor(maxHeightInUnit / interpStep);
     const heightsInUnit = Array.from({ length: steps + 1 }, (_, i) => i * interpStep);
