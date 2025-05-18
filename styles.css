@@ -628,6 +628,37 @@ button {
     z-index: 200;
 }
 
+#autoupdateButton {
+    width: 22px;
+    height: 22px;
+    border: none;
+    border-radius: 4px;
+    background: #ccc;
+    color: #fff;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.3s, transform 0.3s;
+}
+
+#autoupdateButton.autoupdate-on {
+    background: #4caf50;
+}
+
+#autoupdateButton.autoupdate-off {
+    background: #ccc;
+}
+
+#autoupdateButton:hover {
+    transform: scale(1.1);
+}
+
+#autoupdateButton.autoupdate-on:active {
+    animation: rotate 1s linear;
+}
+
 #bottom-container {
     background: #fff;
     padding: 10px;
@@ -1165,6 +1196,12 @@ input[type="checkbox"][style*="opacity: 1"] {
         transform: translateX(-50%);
     }
 
+    #autoupdateButton {
+        width: 18px;
+        height: 18px;
+        font-size: 12px;
+    }
+    
     #map {
         margin-top: 90px;
     }
