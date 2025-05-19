@@ -1803,7 +1803,7 @@ function initMap() {
         });
     }
 
-    initializeApp();
+    //initializeApp();
 }
 function reinitializeCoordsControl() {
     if (!AppState.map) {
@@ -3728,12 +3728,12 @@ function calculateMeanWind() {
     const meanWind = Utils.calculateMeanWind(heights, xKomponente, yKomponente, lowerLimit, upperLimit);
     const [dir, spd] = meanWind;
 
-    const roundedDir = Utils.roundToTens(dir);
+    const roundedDir = Utils.roundToTens(dir) === 0 && dir >= 0 && dir < 5 ? 360 : Utils.roundToTens(dir);
     const displayLower = Math.round(Utils.convertHeight(lowerLimitInput, heightUnit));
     const displayUpper = Math.round(Utils.convertHeight(upperLimitInput, heightUnit));
     const displaySpd = Utils.convertWind(spd, windSpeedUnit, 'kt');
     const formattedSpd = Number.isFinite(spd) ? (windSpeedUnit === 'bft' ? Math.round(spd) : spd.toFixed(1)) : 'N/A';
-    const result = `Mean wind (${displayLower}-${displayUpper} ${heightUnit} ${refLevel}): ${Utils.roundToTens(dir)}° ${formattedSpd} ${windSpeedUnit}`;
+    const result = `Mean wind (${displayLower}-${displayUpper} ${heightUnit} ${refLevel}): ${roundedDir}° ${formattedSpd} ${windSpeedUnit}`;
     document.getElementById('meanWindResult').innerHTML = result;
     console.log('Calculated Mean Wind:', result, 'u:', meanWind[2], 'v:', meanWind[3]);
 }
