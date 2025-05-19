@@ -3737,6 +3737,7 @@ function calculateMeanWind() {
     document.getElementById('meanWindResult').innerHTML = result;
     console.log('Calculated Mean Wind:', result, 'u:', meanWind[2], 'v:', meanWind[3]);
 }
+
 function interpolateWeatherData(sliderIndex) {
     if (!AppState.weatherData || !AppState.weatherData.time || sliderIndex >= AppState.weatherData.time.length) {
         console.warn('No weather data available for interpolation');
