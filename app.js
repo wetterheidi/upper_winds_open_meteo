@@ -1827,14 +1827,14 @@ function handleHarpPlacement(e) {
         AppState.harpMarker.setLatLng([lat, lng]);
         console.log('Updated HARP marker position:', { lat, lng });
     } else {
-        AppState.harpMarker = createHarpMarker(lat, lng).addTo(map);
+        AppState.harpMarker = createHarpMarker(lat, lng).addTo(AppState.map);
         console.log('Placed new HARP marker:', { lat, lng });
     }
     Settings.state.userSettings.harpLat = lat;
     Settings.state.userSettings.harpLng = lng;
     Settings.save();
     AppState.isPlacingHarp = false;
-    map.off('click', handleHarpPlacement);
+    AppState.map.off('click', handleHarpPlacement);
     console.log('HARP placement mode deactivated');
     // Enable HARP radio button
     const harpRadio = document.querySelector('input[name="jumpMasterLineTarget"][value="HARP"]');
@@ -2801,7 +2801,7 @@ function stopPositionTracking() {
 function updateAccuracyCircle(lat, lng, accuracy) {
     try {
         if (window.accuracyCircle) {
-            map.removeLayer(window.accuracyCircle);
+            AppState.map.removeLayer(window.accuracyCircle);
             window.accuracyCircle = null;
             console.log('Removed previous accuracy circle');
         }
@@ -2812,18 +2812,24 @@ function updateAccuracyCircle(lat, lng, accuracy) {
             weight: 1,
             dashArray: '5, 5',
             zIndexOffset: 200 // Ensure above other layers
-        }).addTo(map);
+        }).addTo(AppState.map);
         console.log('Updated accuracy circle:', { lat, lng, radius: accuracy });
     } catch (error) {
         console.error('Error updating accuracy circle:', error);
         if (window.accuracyCircle) {
-            map.removeLayer(window.accuracyCircle);
+            AppState.map.removeLayer(window.accuracyCircle);
             window.accuracyCircle = null;
         }
     }
 }
 function updateJumpMasterLine() {
-    if (!Settings.state.userSettings.showJumpMasterLine || !Settings.state.userSettings.trackPosition || !AppState.liveMarker || !AppState.map) {
+    // Check preconditions
+    if (
+        !Settings.state.userSettings.showJumpMasterLine ||
+        !Settings.state.userSettings.trackPosition ||
+        !AppState.liveMarker ||
+        !AppState.map
+    ) {
         if (AppState.jumpMasterLine) {
             AppState.map.removeLayer(AppState.jumpMasterLine);
             AppState.jumpMasterLine = null;
@@ -2834,12 +2840,34 @@ function updateJumpMasterLine() {
 
     const liveLatLng = AppState.liveMarker.getLatLng();
     let targetLat, targetLng;
+    let targetType = Settings.state.userSettings.jumpMasterLineTarget;
 
-    if (Settings.state.userSettings.jumpMasterLineTarget === 'HARP' && Settings.state.userSettings.harpLat && Settings.state.userSettings.harpLng) {
+    // Check if HARP is selected but coordinates are invalid
+    if (targetType === 'HARP') {
+        const { harpLat, harpLng } = Settings.state.userSettings;
+        if (
+            harpLat === null ||
+            harpLng === null ||
+            typeof harpLat !== 'number' ||
+            typeof harpLng !== 'number' ||
+            harpLat < -90 ||
+            harpLat > 90 ||
+            harpLng < -180 ||
+            harpLng > 180
+        ) {
+            console.log('HARP coordinates invalid, falling back to DIP');
+            targetType = 'DIP';
+            // Optionally update settings to reflect fallback
+            Settings.state.userSettings.jumpMasterLineTarget = 'DIP';
+            Settings.save();
+        }
+    }
+
+    if (targetType === 'HARP') {
         targetLat = Settings.state.userSettings.harpLat;
         targetLng = Settings.state.userSettings.harpLng;
         console.log('Drawing Jump Master Line to HARP:', { targetLat, targetLng });
-    } else if (Settings.state.userSettings.jumpMasterLineTarget === 'DIP') {
+    } else if (targetType === 'DIP') {
         if (AppState.currentMarker) {
             const dipLatLng = AppState.currentMarker.getLatLng();
             targetLat = dipLatLng.lat;
@@ -2866,7 +2894,9 @@ function updateJumpMasterLine() {
 
     if (AppState.jumpMasterLine) {
         AppState.jumpMasterLine.setLatLngs([[liveLatLng.lat, liveLatLng.lng], [targetLat, targetLng]]);
-        AppState.jumpMasterLine.setPopupContent(`<b>Jump Master Line</b><br>Bearing: ${bearing}°<br>Distance: ${roundedDistance} ${heightUnit}`);
+        AppState.jumpMasterLine.setPopupContent(
+            `<b>Jump Master Line</b><br>Bearing: ${bearing}°<br>Distance: ${roundedDistance} ${heightUnit}`
+        );
         console.log('Updated Jump Master Line:', { bearing, distance: roundedDistance, unit: heightUnit });
     } else {
         AppState.jumpMasterLine = L.polyline([[liveLatLng.lat, liveLatLng.lng], [targetLat, targetLng]], {
@@ -2874,7 +2904,9 @@ function updateJumpMasterLine() {
             weight: 3,
             dashArray: '5, 10'
         }).addTo(AppState.map);
-        AppState.jumpMasterLine.bindPopup(`<b>Jump Master Line</b><br>Bearing: ${bearing}°<br>Distance: ${roundedDistance} ${heightUnit}`);
+        AppState.jumpMasterLine.bindPopup(
+            `<b>Jump Master Line</b><br>Bearing: ${bearing}°<br>Distance: ${roundedDistance} ${heightUnit}`
+        );
         console.log('Created Jump Master Line:', { bearing, distance: roundedDistance, unit: heightUnit });
     }
 

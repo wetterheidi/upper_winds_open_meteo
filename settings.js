@@ -65,7 +65,7 @@ export const Settings = {
     initialize() {
         let storedSettings = {};
         let storedUnlockedFeatures = { landingPattern: false, calculateJump: false };
-    
+
         // Load settings from localStorage
         try {
             const settingsRaw = localStorage.getItem('upperWindsSettings');
@@ -78,7 +78,7 @@ export const Settings = {
         } catch (error) {
             this.handleError(error, 'Failed to load settings. Using defaults.');
         }
-    
+
         // Load unlocked features from localStorage
         try {
             const featuresRaw = localStorage.getItem('unlockedFeatures');
@@ -91,23 +91,47 @@ export const Settings = {
         } catch (error) {
             this.handleError(error, 'Failed to load unlocked features. Using defaults.');
         }
-    
+
         // Merge stored settings with defaults
         this.state.userSettings = { ...this.defaultSettings, ...storedSettings };
         console.log('Initialized userSettings:', this.state.userSettings);
+
+        // Reset jumpMasterLineTarget to DIP unless valid HARP coordinates exist
+        if (this.state.userSettings.jumpMasterLineTarget === 'HARP') {
+            const { harpLat, harpLng } = this.state.userSettings;
+            // Validate HARP coordinates (e.g., reasonable lat/lng ranges)
+            if (
+                harpLat === null ||
+                harpLng === null ||
+                typeof harpLat !== 'number' ||
+                typeof harpLng !== 'number' ||
+                harpLat < -90 ||
+                harpLat > 90 ||
+                harpLng < -180 ||
+                harpLng > 180
+            ) {
+                console.log('Invalid or missing HARP coordinates, resetting jumpMasterLineTarget to DIP');
+                this.state.userSettings.jumpMasterLineTarget = 'DIP';
+                this.state.userSettings.harpLat = null;
+                this.state.userSettings.harpLng = null;
+            }
+        }
 
         // Update unlocked features
         this.state.unlockedFeatures = {
             landingPattern: storedUnlockedFeatures.landingPattern || false,
             calculateJump: storedUnlockedFeatures.calculateJump || false
         };
-    
+
         // Validate baseMaps
         const validBaseMaps = ['OpenStreetMap', 'OpenTopoMap', 'Esri Satellite', 'Esri Street', 'Esri Topo', 'Esri Satellite + OSM'];
         if (!validBaseMaps.includes(this.state.userSettings.baseMaps)) {
             console.warn(`Invalid baseMaps setting: ${this.state.userSettings.baseMaps}, resetting to default`);
             this.state.userSettings.baseMaps = this.defaultSettings.baseMaps;
         }
+
+        // Save updated settings to persist the reset
+        this.save();
     },
 
     /**
