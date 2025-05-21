@@ -45,7 +45,8 @@ export const Settings = {
         harpLat: null,
         harpLng: null,
         cacheRadiusKm: 10,
-        cacheZoomLevels: [11, 12, 13, 14]
+        cacheZoomLevels: [11, 12, 13, 14],
+        autoupdate: false
     },
 
     // State

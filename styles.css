@@ -377,74 +377,6 @@ html {
     white-space: nowrap;
 }
 
-Thanks for sharing the updated screenshot of the "Cache Settings" submenu! I can see that the dropdowns have improved somewhat, but there are still a few styling issues to address to make them look polished and consistent with the rest of your Skydiving Weather and Jump Planner app. Let’s analyze the current state and make the necessary adjustments.
-
-1. Current State Analysis
-From the screenshot:
-
-Labels ("Cache Radius (km):" and "Zoom Levels:"):
-The labels are aligned to the left, which is good, but they don’t have consistent spacing or padding compared to other menu items.
-The labels appear slightly cramped, and there’s no clear visual separation between the label and the dropdown.
-Dropdowns:
-The "Zoom Levels" dropdown shows the selected value ("11–14"), but the styling is still very basic (default browser appearance with a border).
-The custom arrow we added (background-image) isn’t visible, suggesting the appearance: none or background-image CSS might not be applied correctly.
-The dropdowns lack padding and a consistent width, making them look misaligned with the "Recache Now" button.
-There’s no hover or focus state visible (e.g., no blue border on hover/focus as intended).
-Recache Now Button:
-The button looks good with the blue background (#4da8da) and white text, but its width doesn’t match the dropdowns, causing visual inconsistency.
-Overall Layout:
-The spacing between items (label + dropdown pairs and the button) is inconsistent, making the submenu look uneven.
-The dropdowns and button don’t align vertically in a cohesive way.
-Goals for Improvement:
-Fix the Custom Arrow: Ensure the custom dropdown arrow is visible by verifying the CSS background-image and appearance properties.
-Align and Space Elements: Adjust the layout to ensure consistent spacing between labels, dropdowns, and the button, with proper alignment.
-Match Widths: Make the dropdowns and button the same width for visual consistency.
-Enhance Hover/Focus States: Ensure the dropdowns show a blue border and shadow on hover/focus, matching the app’s theme.
-Consistent Padding and Font: Apply the same padding and font styling (Roboto, 13px) as other menu items.
-2. Implementation Plan
-We’ll update the CSS in styles.css to address these issues. We’ll also double-check the HTML structure in index.html to ensure it’s optimized for the styling changes.
-
-Step 1: Verify HTML Structure in index.html
-The HTML structure you’re using looks correct based on the previous update, but let’s ensure it matches exactly:
-
-html
-
-Kopieren
-<li>
-    <span>Cache Settings</span>
-    <ul class="submenu hidden">
-        <li>
-            <label class="radio-label cache-setting-label">
-                Cache Radius (km):
-                <select id="cacheRadiusSelect" class="cache-setting-select">
-                    <option value="5" selected>5 km</option>
-                    <option value="10">10 km</option>
-                    <option value="15">15 km</option>
-                </select>
-            </label>
-        </li>
-        <li>
-            <label class="radio-label cache-setting-label">
-                Zoom Levels:
-                <select id="cacheZoomLevelsSelect" class="cache-setting-select">
-                    <option value="10-14">10–14</option>
-                    <option value="11-14" selected>11–14</option>
-                    <option value="12-14">12–14</option>
-                </select>
-            </label>
-        </li>
-        <li>
-            <button id="recacheNowButton">Recache Now</button>
-        </li>
-    </ul>
-</li>
-Confirmation: The cache-setting-label and cache-setting-select classes are applied, and the structure is consistent with other menu items. No changes are needed here unless you’ve modified it.
-Step 2: Update styles.css for Improved Styling
-We’ll refine the CSS to fix the issues with the dropdowns, labels, and button alignment. Here’s the updated CSS:
-
-css
-
-Kopieren
 /* Ensure the submenu items have consistent padding and font */
 .submenu li {
     padding: 10px; /* Increased padding for better spacing */
@@ -614,6 +546,9 @@ button {
 }
 
 #slider-container {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
     background: #fff;
     padding: 10px;
     border-radius: 8px;
@@ -626,6 +561,65 @@ button {
     left: 50%;
     transform: translateX(-50%);
     z-index: 200;
+}
+
+.time-row {
+    display: flex;
+    align-items: center; /* Vertically center all items */
+    gap: 5px; /* Consistent spacing between elements */
+}
+
+#selectedTime {
+    line-height: 1; /* Prevent line-height from adding extra space */
+}
+
+#autoupdateToggle {
+    display: flex;
+    align-items: center; /* Ensure internal elements are centered */
+    gap: 5px; /* Space between the "⟳" and checkbox */
+}
+
+#autoupdateToggle label {
+    font-size: 24px;
+    line-height: 1; /* Match the font size to prevent vertical offset */
+    margin-top: -12px; /* Remove any default margins */
+    display: inline-flex; /* Ensure the label behaves consistently in flex */
+    align-items: center; /* Center the symbol vertically */
+    margin-left: 10px;
+    color: #4da8da;
+    font-weight: bold;
+}
+
+#autoupdateToggle input[type="checkbox"] {
+    margin-top: -4px; /* Remove default margins */
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #4da8da;
+    border-radius: 4px;
+    background-color: #fff;
+    cursor: pointer;
+    position: relative;
+    vertical-align: middle; /* Fallback for older browsers */
+}
+
+#autoupdateToggle input[type="checkbox"]:checked::after {
+    content: '✔';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 14px;
+    color: #4da8da;
+}
+
+#autoupdateToggle input[type="checkbox"]:hover:not(:checked) {
+    background: #e6f0fa;
+}
+
+#autoupdateToggle input[type="checkbox"]:focus {
+    outline: none;
+    box-shadow: 0 0 3px rgba(0, 123, 255, 0.5);
 }
 
 #bottom-container {
@@ -943,8 +937,7 @@ input[type="number"]:focus {
 #model-row {
     display: flex;
     align-items: center;
-    margin-top: 10px;
-    font-size: 13px;
+    gap: 5px;
 }
 
 #error-message {
@@ -1422,7 +1415,7 @@ input[type="checkbox"][style*="opacity: 1"] {
 
 #timeSlider {
     width: 100%;
-    margin-bottom: 10px;
+    margin-bottom: 6px;
 }
 
 #modelSelect {
