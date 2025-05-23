@@ -2,6 +2,7 @@
 // == Constants and Global Variables ==
 import { Settings } from './settings.js';
 import { Utils } from './utils.js';
+import { Constants, FEATURE_PASSWORD } from './constants.js';
 "use strict";
 
 let userSettings;
@@ -69,19 +70,7 @@ const AppState = {
     autoupdateInterval: null
 };
 
-const Constants = {
-    minZoom: 11,
-    maxZoom: 14,
-    landingPatternMinZoom: 14,
-    jumperSeparationTable: {
-        135: 5, 130: 5, 125: 5, 120: 5, 115: 5, 110: 5, 105: 5,
-        100: 6, 95: 7, 90: 7, 85: 7, 80: 8, 75: 8, 70: 9,
-        65: 10, 60: 10, 55: 11, 50: 12, 45: 14, 40: 15,
-        35: 17, 30: 20, 25: 24, 20: 30, 15: 40, 10: 60, 5: 119
-    }
-};
-
-const debouncedCalculateJump = debounce(calculateJump, 300);
+const debouncedCalculateJump = Utils.debounce(calculateJump, 300);
 const getTemperatureUnit = () => Settings.getValue('temperatureUnit', 'radio', 'C');
 const getHeightUnit = () => Settings.getValue('heightUnit', 'radio', 'm');
 const getWindSpeedUnit = () => Settings.getValue('windUnit', 'radio', 'kt');
@@ -94,35 +83,12 @@ const getDownloadFormat = () => Settings.getValue('downloadFormat', 'radio', 'cs
 // == Password handling ==
 let isLandingPatternUnlocked = false;   // Track unlock state during session
 let isCalculateJumpUnlocked = false;    // Track unlock state during session
-const FEATURE_PASSWORD = "skydiver2025"; // Hardcoded password 
 const unlockedFeatures = JSON.parse(localStorage.getItem('unlockedFeatures')) || {};
 isLandingPatternUnlocked = unlockedFeatures.landingPattern || false;
 isCalculateJumpUnlocked = unlockedFeatures.calculateJump || false;
 console.log('Initial unlock status:', { isLandingPatternUnlocked, isCalculateJumpUnlocked });
 
 // == Utility Functions ==
-function calculateNewCenter(lat, lng, distance, bearing) {
-    const R = 6371000; // Earth's radius in meters
-    const lat1 = lat * Math.PI / 180; // Convert to radians
-    const lng1 = lng * Math.PI / 180;
-    const bearingRad = bearing * Math.PI / 180; // Wind FROM direction
-
-    const delta = distance / R; // Angular distance
-
-    const lat2 = Math.asin(Math.sin(lat1) * Math.cos(delta) +
-        Math.cos(lat1) * Math.sin(delta) * Math.cos(bearingRad));
-    const lng2 = lng1 + Math.atan2(Math.sin(bearingRad) * Math.sin(delta) * Math.cos(lat1),
-        Math.cos(delta) - Math.sin(lat1) * Math.sin(lat2));
-
-    // Convert back to degrees
-    const newLat = lat2 * 180 / Math.PI;
-    const newLng = lng2 * 180 / Math.PI;
-
-    // Normalize longitude to [-180, 180]
-    const normalizedLng = ((newLng + 540) % 360) - 180;
-
-    return [newLat, normalizedLng];
-}
 function generateWindBarb(direction, speedKt) {
     // Convert speed to knots if not already (assuming speedKt is in knots)
     const speed = Math.round(speedKt);
@@ -213,25 +179,6 @@ async function getDisplayTime(utcTimeStr) {
     } else {
         return await Utils.formatLocalTime(utcTimeStr, AppState.lastLat, AppState.lastLng); // Async
     }
-}
-function calculateBearing(lat1, lng1, lat2, lng2) {
-    const toRad = deg => deg * Math.PI / 180;
-    const toDeg = rad => rad * 180 / Math.PI;
-
-    const dLon = toRad(lng2 - lng1);
-    const y = Math.sin(dLon) * Math.cos(toRad(lat2));
-    const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
-        Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLon);
-    let bearing = toDeg(Math.atan2(y, x));
-    bearing = (bearing + 360) % 360; // Normalize to 0-360
-    return bearing;
-}
-function debounce(func, wait) {
-    let timeout;
-    return function (...args) {
-        clearTimeout(timeout);
-        timeout = setTimeout(() => func.apply(this, args), wait);
-    };
 }
 function configureMarker(lat, lng, altitude, openPopup = false) {
     if (!AppState.map) {
@@ -928,7 +875,7 @@ async function cacheTilesForDIP() {
         Utils.handleError('Unable to check cache size. Consider clearing cache to free up space.');
     }
 }
-const debouncedCacheVisibleTiles = debounce(async () => {
+const debouncedCacheVisibleTiles = Utils.debounce(async () => {
     if (!AppState.map || !navigator.onLine) {
         console.log('Skipping visible tile caching: offline or map not initialized');
         return;
@@ -1527,7 +1474,7 @@ function initMap() {
     const elevationCache = new Map();
     const qfeCache = new Map();
 
-    const debouncedGetElevationAndQFE = debounce(async (lat, lng, requestLatLng, callback) => {
+    const debouncedGetElevationAndQFE = Utils.debounce(async (lat, lng, requestLatLng, callback) => {
         const cacheKey = `${lat.toFixed(5)},${lng.toFixed(5)}`;
         const sliderIndex = getSliderValue();
         const weatherCacheKey = `${cacheKey}-${sliderIndex}`;
@@ -2335,7 +2282,7 @@ function loadGpxTrack(file) {
 }
 
 // == Live Tracking Handling ==
-const debouncedPositionUpdate = debounce(async (position) => {
+const debouncedPositionUpdate = Utils.debounce(async (position) => {
     if (!AppState.map) {
         console.warn('Map not initialized, cannot update position');
         return;
@@ -2368,7 +2315,7 @@ const debouncedPositionUpdate = debounce(async (position) => {
             AppState.lastSmoothedSpeedMs = alpha * speedMs + (1 - alpha) * AppState.lastSmoothedSpeedMs;
             speed = Utils.convertWind(AppState.lastSmoothedSpeedMs, effectiveWindUnit, 'm/s');
             speed = effectiveWindUnit === 'bft' ? Math.round(speed) : speed.toFixed(1);
-            direction = calculateBearing(AppState.prevLat, AppState.prevLng, latitude, longitude).toFixed(0);
+            direction = Utils.calculateBearing(AppState.prevLat, AppState.prevLng, latitude, longitude).toFixed(0);
             console.log('Calculated speed:', { rawSpeedMs: speedMs, smoothedSpeedMs: AppState.lastSmoothedSpeedMs, convertedSpeed: speed, unit: effectiveWindUnit, alpha });
         }
     }
@@ -2417,7 +2364,7 @@ const debouncedPositionUpdate = debounce(async (position) => {
             try {
                 const liveLatLng = AppState.liveMarker.getLatLng();
                 const targetLatLng = targetMarker.getLatLng();
-                const bearing = calculateBearing(liveLatLng.lat, liveLatLng.lng, targetLatLng.lat, targetLatLng.lng).toFixed(0);
+                const bearing = Utils.calculateBearing(liveLatLng.lat, liveLatLng.lng, targetLatLng.lat, targetLatLng.lng).toFixed(0);
                 const distanceMeters = AppState.map.distance(liveLatLng, targetLatLng);
                 const heightUnit = getHeightUnit();
                 const convertedDistance = Utils.convertHeight(distanceMeters, heightUnit);
@@ -2887,7 +2834,7 @@ function updateJumpMasterLine() {
         return;
     }
 
-    const bearing = calculateBearing(liveLatLng.lat, liveLatLng.lng, targetLat, targetLng).toFixed(0);
+    const bearing = Utils.calculateBearing(liveLatLng.lat, liveLatLng.lng, targetLat, targetLng).toFixed(0);
     const distanceMeters = AppState.map.distance(liveLatLng, [targetLat, targetLng]);
     const heightUnit = getHeightUnit();
     const convertedDistance = Utils.convertHeight(distanceMeters, heightUnit);
@@ -4117,7 +4064,7 @@ function calculateFreeFall(weatherData, exitAltitude, openingAltitude, sliderInd
         xDisplacement: final.x,
         yDisplacement: final.y,
         path: trajectory.map(point => ({
-            latLng: calculateNewCenter(startLat, startLng, Math.sqrt(point.x * point.x + point.y * point.y), Math.atan2(point.y, point.x) * 180 / Math.PI),
+            latLng: Utils.calculateNewCenter(startLat, startLng, Math.sqrt(point.x * point.x + point.y * point.y), Math.atan2(point.y, point.x) * 180 / Math.PI),
             point_x: point.x,
             point_y: point.y,
             height: point.height,
@@ -4212,8 +4159,8 @@ function calculateExitCircle() {
     const redLat = AppState.lastLat;
     const redLng = AppState.lastLng;
 
-    const newCenterBlue = calculateNewCenter(blueLat, blueLng, centerDisplacement, displacementDirection);
-    const newCenterRed = calculateNewCenter(redLat, redLng, centerDisplacementFull, displacementDirectionFull);
+    const newCenterBlue = Utils.calculateNewCenter(blueLat, blueLng, centerDisplacement, displacementDirection);
+    const newCenterRed = Utils.calculateNewCenter(redLat, redLng, centerDisplacementFull, displacementDirectionFull);
 
     const freeFallResult = calculateFreeFall(AppState.weatherData, exitAltitude, openingAltitude, sliderIndex, AppState.lastLat, AppState.lastLng, AppState.lastAltitude);
     if (!freeFallResult) {
@@ -4222,8 +4169,8 @@ function calculateExitCircle() {
     }
 
     const greenShiftDirection = (freeFallResult.directionDeg + 180) % 360;
-    const greenCenter = calculateNewCenter(newCenterRed[0], newCenterRed[1], freeFallResult.distance, greenShiftDirection);
-    const darkGreenCenter = calculateNewCenter(newCenterBlue[0], newCenterBlue[1], freeFallResult.distance, greenShiftDirection);
+    const greenCenter = Utils.calculateNewCenter(newCenterRed[0], newCenterRed[1], freeFallResult.distance, greenShiftDirection);
+    const darkGreenCenter = Utils.calculateNewCenter(newCenterBlue[0], newCenterBlue[1], freeFallResult.distance, greenShiftDirection);
 
     console.log('Exit circle calculated:', {
         greenCenter,
@@ -4602,8 +4549,8 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
 
     // Render canopy circles
     if (showCanopyAreaOnly && Settings.state.userSettings.showCanopyArea && Number.isFinite(blueLat) && Number.isFinite(blueLng) && Number.isFinite(redLat) && Number.isFinite(redLng) && Number.isFinite(radius) && Number.isFinite(radiusFull)) {
-        const newCenterBlue = calculateNewCenter(blueLat, blueLng, displacement, direction);
-        const newCenterRed = calculateNewCenter(redLat, redLng, displacementFull, directionFull);
+        const newCenterBlue = Utils.calculateNewCenter(blueLat, blueLng, displacement, direction);
+        const newCenterRed = Utils.calculateNewCenter(redLat, redLng, displacementFull, directionFull);
 
         AppState.jumpCircle = L.circle(newCenterBlue, {
             radius: radius,
@@ -4634,7 +4581,7 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
                 if (Number.isFinite(addRadius) && addRadius > 0 &&
                     Number.isFinite(additionalBlueDisplacements[i]) && Number.isFinite(additionalBlueDirections[i]) &&
                     Number.isFinite(additionalBlueUpperLimits[i])) {
-                    const addCenter = calculateNewCenter(blueLat, blueLng, additionalBlueDisplacements[i], additionalBlueDirections[i]);
+                    const addCenter = Utils.calculateNewCenter(blueLat, blueLng, additionalBlueDisplacements[i], additionalBlueDirections[i]);
                     const blueContent = `${Math.round(additionalBlueUpperLimits[i])}m`;
                     const circle = L.circle(addCenter, {
                         radius: addRadius,
@@ -4687,8 +4634,8 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
     if (!showExitAreaOnly && Settings.state.userSettings.showCanopyArea && !showCanopyAreaOnly) {
         const canopyResult = calculateCanopyCircles();
         if (canopyResult) {
-            const newCenterBlue = calculateNewCenter(canopyResult.blueLat, canopyResult.blueLng, canopyResult.displacement, canopyResult.direction);
-            const newCenterRed = calculateNewCenter(canopyResult.redLat, canopyResult.redLng, canopyResult.displacementFull, canopyResult.directionFull);
+            const newCenterBlue = Utils.calculateNewCenter(canopyResult.blueLat, canopyResult.blueLng, canopyResult.displacement, canopyResult.direction);
+            const newCenterRed = Utils.calculateNewCenter(canopyResult.redLat, canopyResult.redLng, canopyResult.displacementFull, canopyResult.directionFull);
 
             removeLayer(AppState.jumpCircle, 'blue circle');
             removeLayer(AppState.jumpCircleFull, 'red circle');
@@ -4731,7 +4678,7 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
                         Number.isFinite(canopyResult.additionalBlueDisplacements[i]) &&
                         Number.isFinite(canopyResult.additionalBlueDirections[i]) &&
                         Number.isFinite(canopyResult.additionalBlueUpperLimits[i])) {
-                        const addCenter = calculateNewCenter(canopyResult.blueLat, canopyResult.blueLng, canopyResult.additionalBlueDisplacements[i], canopyResult.additionalBlueDirections[i]);
+                        const addCenter = Utils.calculateNewCenter(canopyResult.blueLat, canopyResult.blueLng, canopyResult.additionalBlueDisplacements[i], canopyResult.additionalBlueDirections[i]);
                         const blueContent = `${Math.round(canopyResult.additionalBlueUpperLimits[i])}m`;
                         const circle = L.circle(addCenter, {
                             radius: addRadius,
@@ -5034,7 +4981,7 @@ function jumpRunTrack() {
     if (forwardOffset !== 0) {
         const forwardDistance = Math.abs(forwardOffset);
         const forwardBearing = forwardOffset >= 0 ? jumpRunTrackDirection : (jumpRunTrackDirection + 180) % 360;
-        [centerLat, centerLng] = calculateNewCenter(AppState.lastLat, AppState.lastLng, forwardDistance, forwardBearing);
+        [centerLat, centerLng] = Utils.calculateNewCenter(AppState.lastLat, AppState.lastLng, forwardDistance, forwardBearing);
         console.log('Applied forward/backward offset:', {
             forwardOffset,
             forwardBearing,
@@ -5049,7 +4996,7 @@ function jumpRunTrack() {
         const offsetBearing = lateralOffset >= 0
             ? (jumpRunTrackDirection + 90) % 360
             : (jumpRunTrackDirection - 90 + 360) % 360;
-        [centerLat, centerLng] = calculateNewCenter(centerLat, centerLng, offsetDistance, offsetBearing);
+        [centerLat, centerLng] = Utils.calculateNewCenter(centerLat, centerLng, offsetDistance, offsetBearing);
         console.log('Applied lateral offset:', {
             lateralOffset,
             offsetBearing,
@@ -5069,8 +5016,8 @@ function jumpRunTrack() {
             approachLength
         });
 
-        const startPoint = calculateNewCenter(centerLat, centerLng, trackLength / 2, (jumpRunTrackDirection + 180) % 360);
-        const approachEndPoint = calculateNewCenter(startPoint[0], startPoint[1], approachLength, (jumpRunTrackDirection + 180) % 360);
+        const startPoint = Utils.calculateNewCenter(centerLat, centerLng, trackLength / 2, (jumpRunTrackDirection + 180) % 360);
+        const approachEndPoint = Utils.calculateNewCenter(startPoint[0], startPoint[1], approachLength, (jumpRunTrackDirection + 180) % 360);
         approachLatLngs = [
             [startPoint[0], startPoint[1]],
             [approachEndPoint[0], approachEndPoint[1]]
@@ -5080,8 +5027,8 @@ function jumpRunTrack() {
     }
 
     // Calculate jump run track points
-    const startPoint = calculateNewCenter(centerLat, centerLng, halfLength, (jumpRunTrackDirection + 180) % 360);
-    const endPoint = calculateNewCenter(centerLat, centerLng, halfLength, jumpRunTrackDirection);
+    const startPoint = Utils.calculateNewCenter(centerLat, centerLng, halfLength, (jumpRunTrackDirection + 180) % 360);
+    const endPoint = Utils.calculateNewCenter(centerLat, centerLng, halfLength, jumpRunTrackDirection);
 
     const latlngs = [
         [startPoint[0], startPoint[1]], // Rear
@@ -5264,14 +5211,14 @@ function updateJumpRunTrack() {
     if (Settings.state.userSettings.jumpRunTrackForwardOffset !== 0) {
         const forwardDistance = Math.abs(Settings.state.userSettings.jumpRunTrackForwardOffset);
         const forwardBearing = Settings.state.userSettings.jumpRunTrackForwardOffset >= 0 ? direction : (direction + 180) % 360;
-        [originalCenterLat, originalCenterLng] = calculateNewCenter(AppState.lastLat, AppState.lastLng, forwardDistance, forwardBearing);
+        [originalCenterLat, originalCenterLng] = Utils.calculateNewCenter(AppState.lastLat, AppState.lastLng, forwardDistance, forwardBearing);
     }
     if (Settings.state.userSettings.jumpRunTrackOffset !== 0) {
         const lateralDistance = Math.abs(Settings.state.userSettings.jumpRunTrackOffset);
         const lateralBearing = Settings.state.userSettings.jumpRunTrackOffset >= 0
             ? (direction + 90) % 360
             : (direction - 90 + 360) % 360;
-        [originalCenterLat, originalCenterLng] = calculateNewCenter(originalCenterLat, originalCenterLng, lateralDistance, lateralBearing);
+        [originalCenterLat, originalCenterLng] = Utils.calculateNewCenter(originalCenterLat, originalCenterLng, lateralDistance, lateralBearing);
     }
 
     // Update direction input
@@ -5339,7 +5286,7 @@ function updateJumpRunTrack() {
             return;
         }
         const distance = AppState.map.distance(originalCenter, newCenter);
-        const bearing = calculateBearing(originalCenter.lat, originalCenter.lng, newCenter.lat, newCenter.lng);
+        const bearing = Utils.calculateBearing(originalCenter.lat, originalCenter.lng, newCenter.lat, newCenter.lng);
 
         // Calculate lateral and forward components
         const trackDirectionRad = direction * Math.PI / 180;
@@ -5529,9 +5476,9 @@ function calculateCutAway() {
 
     // Calculate landing positions
     const adjustedWindDirection = ((meanWindDirection + 180) % 360);
-    const [newLatMin, newLngMin] = calculateNewCenter(AppState.cutAwayLat, AppState.cutAwayLng, displacementDistanceMin, adjustedWindDirection);
-    const [newLatMean, newLngMean] = calculateNewCenter(AppState.cutAwayLat, AppState.cutAwayLng, displacementDistanceMean, adjustedWindDirection);
-    const [newLatMax, newLngMax] = calculateNewCenter(AppState.cutAwayLat, AppState.cutAwayLng, displacementDistanceMax, adjustedWindDirection);
+    const [newLatMin, newLngMin] = Utils.calculateNewCenter(AppState.cutAwayLat, AppState.cutAwayLng, displacementDistanceMin, adjustedWindDirection);
+    const [newLatMean, newLngMean] = Utils.calculateNewCenter(AppState.cutAwayLat, AppState.cutAwayLng, displacementDistanceMean, adjustedWindDirection);
+    const [newLatMax, newLngMax] = Utils.calculateNewCenter(AppState.cutAwayLat, AppState.cutAwayLng, displacementDistanceMax, adjustedWindDirection);
 
     // Log all calculations
     console.log('Cut-away canopy calculation:', {
@@ -8174,7 +8121,7 @@ function setupInput(id, eventType, debounceTime, callback) {
         console.warn(`Input element ${id} not found`);
         return;
     }
-    input.addEventListener(eventType, debounce(() => {
+    input.addEventListener(eventType, Utils.debounce(() => {
         const value = input.type === 'number' ? parseFloat(input.value) : input.value;
         Settings.state.userSettings[id] = value;
         Settings.save();
@@ -8261,7 +8208,7 @@ async function updateAllDisplays() {
             }
             const liveLatLng = AppState.liveMarker.getLatLng();
             const dipLatLng = AppState.currentMarker.getLatLng();
-            const bearing = calculateBearing(liveLatLng.lat, liveLatLng.lng, dipLatLng.lat, dipLatLng.lng).toFixed(0);
+            const bearing = Utils.calculateBearing(liveLatLng.lat, liveLatLng.lng, dipLatLng.lat, dipLatLng.lng).toFixed(0);
             const distanceMeters = AppState.map.distance(liveLatLng, dipLatLng);
             const heightUnit = getHeightUnit();
             const convertedDistance = Utils.convertHeight(distanceMeters, heightUnit);

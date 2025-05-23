@@ -1,4 +1,6 @@
 // === Settings Module ===
+import { Constants, FEATURE_PASSWORD } from './constants.js';
+
 export const Settings = {
     // Constants
     FEATURE_PASSWORD: 'skydiver2025',

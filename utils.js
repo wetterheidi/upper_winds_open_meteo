@@ -597,6 +597,50 @@ export class Utils {
         return isNaN(qfe) ? 'N/A' : qfe;
     }
 
+    static calculateNewCenter(lat, lng, distance, bearing) {
+    const R = 6371000; // Earth's radius in meters
+    const lat1 = lat * Math.PI / 180; // Convert to radians
+    const lng1 = lng * Math.PI / 180;
+    const bearingRad = bearing * Math.PI / 180; // Wind FROM direction
+
+    const delta = distance / R; // Angular distance
+
+    const lat2 = Math.asin(Math.sin(lat1) * Math.cos(delta) +
+        Math.cos(lat1) * Math.sin(delta) * Math.cos(bearingRad));
+    const lng2 = lng1 + Math.atan2(Math.sin(bearingRad) * Math.sin(delta) * Math.cos(lat1),
+        Math.cos(delta) - Math.sin(lat1) * Math.sin(lat2));
+
+    // Convert back to degrees
+    const newLat = lat2 * 180 / Math.PI;
+    const newLng = lng2 * 180 / Math.PI;
+
+    // Normalize longitude to [-180, 180]
+    const normalizedLng = ((newLng + 540) % 360) - 180;
+
+    return [newLat, normalizedLng];
+}
+
+static debounce(func, wait) {
+    let timeout;
+    return function (...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+    };
+}
+
+static calculateBearing(lat1, lng1, lat2, lng2) {
+    const toRad = deg => deg * Math.PI / 180;
+    const toDeg = rad => rad * 180 / Math.PI;
+
+    const dLon = toRad(lng2 - lng1);
+    const y = Math.sin(dLon) * Math.cos(toRad(lat2));
+    const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
+        Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLon);
+    let bearing = toDeg(Math.atan2(y, x));
+    bearing = (bearing + 360) % 360; // Normalize to 0-360
+    return bearing;
+}
+
 }
 
 window.Utils = Utils;
