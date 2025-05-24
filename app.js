@@ -79,16 +79,6 @@ const getCoordinateFormat = () => Settings.getValue('coordFormat', 'radio', 'Dec
 const getInterpolationStep = () => Settings.getValue('interpStepSelect', 'select', 200);
 const getDownloadFormat = () => Settings.getValue('downloadFormat', 'radio', 'csv');
 
-
-
-// == Password handling ==
-let isLandingPatternUnlocked = false;   // Track unlock state during session
-let isCalculateJumpUnlocked = false;    // Track unlock state during session
-const unlockedFeatures = JSON.parse(localStorage.getItem('unlockedFeatures')) || {};
-isLandingPatternUnlocked = unlockedFeatures.landingPattern || false;
-isCalculateJumpUnlocked = unlockedFeatures.calculateJump || false;
-console.log('Initial unlock status:', { isLandingPatternUnlocked, isCalculateJumpUnlocked });
-
 // == Utility Functions ==
 function generateWindBarb(direction, speedKt) {
     // Convert speed to knots if not already (assuming speedKt is in knots)
@@ -540,7 +530,7 @@ function getTilesInRadius(lat, lng, radiusKm, zoomLevels) {
     });
 
     return tileArray;
-}   
+}
 async function cacheTileWithRetry(url, maxRetries = 3) {
     let lastError = null;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -839,7 +829,7 @@ const debouncedCacheVisibleTiles = Utils.debounce(async () => {
                     }
                 } else {
                     failedCount++;
-                        failedTiles.push(url);
+                    failedTiles.push(url);
                 }
             }
 
@@ -2609,7 +2599,7 @@ function stopPositionTracking() {
     AppState.lastSpeed = 'N/A';
     AppState.lastDirection = 'N/A';
     console.log('Cleared tracking data');
-}       
+}
 function updateAccuracyCircle(lat, lng, accuracy) {
     try {
         if (window.accuracyCircle) {
@@ -6029,9 +6019,9 @@ function populateCoordInputs(lat, lng) {
 function initializeApp() {
     Settings.initialize();
     // Synchronize global variables with Settings.state.unlockedFeatures
-    isLandingPatternUnlocked = Settings.state.unlockedFeatures.landingPattern;
-    isCalculateJumpUnlocked = Settings.state.unlockedFeatures.calculateJump;
-    console.log('Initial unlock status:', { isLandingPatternUnlocked, isCalculateJumpUnlocked });
+    Settings.state.isLandingPatternUnlocked = Settings.state.unlockedFeatures.landingPattern;
+    Settings.state.isCalculateJumpUnlocked = Settings.state.unlockedFeatures.calculateJump;
+    console.log('Initial unlock status:', { isLandingPatternUnlocked: Settings.state.isLandingPatternUnlocked, isCalculateJumpUnlocked: Settings.state.isCalculateJumpUnlocked });
 
     if (AppState.isInitialized) {
         console.log('App already initialized, skipping');
@@ -6097,13 +6087,13 @@ function initializeUIElements() {
     const landingPatternCheckbox = document.getElementById('showLandingPattern');
     const calculateJumpCheckbox = document.getElementById('calculateJumpCheckbox');
     if (landingPatternCheckbox) {
-        landingPatternCheckbox.title = (Settings.isFeatureUnlocked('landingPattern') && isLandingPatternUnlocked) ? '' : 'Feature locked. Click to enter password.';
-        landingPatternCheckbox.style.opacity = (Settings.isFeatureUnlocked('landingPattern') && isLandingPatternUnlocked) ? '1' : '0.5';
+        landingPatternCheckbox.title = (Settings.isFeatureUnlocked('landingPattern') && Settings.state.isLandingPatternUnlocked) ? '' : 'Feature locked. Click to enter password.';
+        landingPatternCheckbox.style.opacity = (Settings.isFeatureUnlocked('landingPattern') && Settings.state.isLandingPatternUnlocked) ? '1' : '0.5';
         console.log('Initialized showLandingPattern UI:', { checked: landingPatternCheckbox.checked, opacity: landingPatternCheckbox.style.opacity });
     }
     if (calculateJumpCheckbox) {
-        calculateJumpCheckbox.title = (Settings.isFeatureUnlocked('calculateJump') && isCalculateJumpUnlocked) ? '' : 'Feature locked. Click to enter password.';
-        calculateJumpCheckbox.style.opacity = (Settings.isFeatureUnlocked('calculateJump') && isCalculateJumpUnlocked) ? '1' : '0.5';
+        calculateJumpCheckbox.title = (Settings.isFeatureUnlocked('calculateJump') && Settings.state.isCalculateJumpUnlocked) ? '' : 'Feature locked. Click to enter password.';
+        calculateJumpCheckbox.style.opacity = (Settings.isFeatureUnlocked('calculateJump') && Settings.state.isCalculateJumpUnlocked) ? '1' : '0.5';
         console.log('Initialized calculateJumpCheckbox UI:', { checked: calculateJumpCheckbox.checked, opacity: calculateJumpCheckbox.style.opacity });
     }
     const directionSpan = document.getElementById('jumpRunTrackDirection');
@@ -6867,7 +6857,7 @@ function setupCheckboxEvents() {
         Settings.save();
         checkbox.checked = Settings.state.userSettings.showExitArea;
         console.log('Show Exit Area set to:', Settings.state.userSettings.showExitArea);
-        if (checkbox.checked && AppState.weatherData && AppState.lastLat && AppState.lastLng && isCalculateJumpUnlocked && Settings.state.userSettings.calculateJump) {
+        if (checkbox.checked && AppState.weatherData && AppState.lastLat && AppState.lastLng && Settings.state.isCalculateJumpUnlocked && Settings.state.userSettings.calculateJump) {
             const exitResult = calculateExitCircle();
             if (exitResult) {
                 updateJumpCircle(
@@ -6883,7 +6873,7 @@ function setupCheckboxEvents() {
             calculateCutAway();
         } else {
             clearJumpCircles();
-            if (isCalculateJumpUnlocked && Settings.state.userSettings.calculateJump) calculateJump();
+            if (Settings.state.isCalculateJumpUnlocked && Settings.state.userSettings.calculateJump) calculateJump();
             console.log('Cleared exit circles and re-rendered active circles');
         }
     });
@@ -6893,7 +6883,7 @@ function setupCheckboxEvents() {
         Settings.save();
         checkbox.checked = Settings.state.userSettings.showCanopyArea;
         console.log('Show Canopy Area set to:', Settings.state.userSettings.showCanopyArea);
-        if (checkbox.checked && AppState.weatherData && AppState.lastLat && AppState.lastLng && isCalculateJumpUnlocked && Settings.state.userSettings.calculateJump) {
+        if (checkbox.checked && AppState.weatherData && AppState.lastLat && AppState.lastLng && Settings.state.isCalculateJumpUnlocked && Settings.state.userSettings.calculateJump) {
             const canopyResult = calculateCanopyCircles();
             if (canopyResult) {
                 updateJumpCircle(
@@ -6947,7 +6937,7 @@ function setupCheckboxEvents() {
         Settings.save();
         checkbox.checked = Settings.state.userSettings.showJumpRunTrack;
         console.log('showJumpRunTrack changed:', checkbox.checked);
-        if (checkbox.checked && AppState.weatherData && AppState.lastLat && AppState.lastLng && isCalculateJumpUnlocked && Settings.state.userSettings.calculateJump) {
+        if (checkbox.checked && AppState.weatherData && AppState.lastLat && AppState.lastLng && Settings.state.isCalculateJumpUnlocked && Settings.state.userSettings.calculateJump) {
             calculateJumpRunTrack();
         } else {
             if (AppState.jumpRunTrackLayer) {
@@ -6982,7 +6972,7 @@ function setupCheckboxEvents() {
         const submenu = checkbox.closest('li')?.querySelector('ul');
         console.log('Submenu lookup for showCutAwayFinder:', { submenu: submenu ? 'Found' : 'Not found', submenuClasses: submenu?.classList.toString() });
         toggleSubmenu(checkbox, submenu, checkbox.checked);
-        if (checkbox.checked && AppState.weatherData && AppState.cutAwayLat !== null && AppState.cutAwayLng !== null && isCalculateJumpUnlocked && Settings.state.userSettings.calculateJump) {
+        if (checkbox.checked && AppState.weatherData && AppState.cutAwayLat !== null && AppState.cutAwayLng !== null && Settings.state.isCalculateJumpUnlocked && Settings.state.userSettings.calculateJump) {
             console.log('Show Cut Away Finder enabled, running calculateCutAway');
             calculateCutAway();
         } else {
@@ -7016,69 +7006,25 @@ function setupCheckboxEvents() {
             Settings.state.userSettings.showLandingPattern = true;
             Settings.save();
             const submenu = checkbox.closest('li')?.querySelector('ul');
-            console.log('Submenu lookup for showLandingPattern:', { submenu: submenu ? 'Found' : 'Not found', submenuClasses: submenu?.classList.toString() });
             toggleSubmenu(checkbox, submenu, true);
             if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
                 updateLandingPattern();
                 recenterMap();
             }
         };
-
         const disableFeature = () => {
             Settings.state.userSettings.showLandingPattern = false;
             Settings.save();
             checkbox.checked = false;
             const submenu = checkbox.closest('li')?.querySelector('ul');
-            console.log('Submenu lookup for showLandingPattern:', { submenu: submenu ? 'Found' : 'Not found', submenuClasses: submenu?.classList.toString() });
             toggleSubmenu(checkbox, submenu, false);
-            console.log('Clearing landing pattern');
-            if (AppState.landingPatternPolygon) {
-                if (AppState.map && typeof AppState.map.removeLayer === 'function') {
-                    AppState.map.removeLayer(AppState.landingPatternPolygon);
-                }
-                AppState.landingPatternPolygon = null;
-            }
-            if (AppState.secondlandingPatternPolygon) {
-                if (AppState.map && typeof AppState.map.removeLayer === 'function') {
-                    AppState.map.removeLayer(AppState.secondlandingPatternPolygon);
-                }
-                AppState.secondlandingPatternPolygon = null;
-            }
-            if (AppState.thirdLandingPatternLine) {
-                if (AppState.map && typeof AppState.map.removeLayer === 'function') {
-                    AppState.map.removeLayer(AppState.thirdLandingPatternLine);
-                }
-                AppState.thirdLandingPatternLine = null;
-            }
-            if (AppState.finalArrow) {
-                if (AppState.map && typeof AppState.map.removeLayer === 'function') {
-                    AppState.map.removeLayer(AppState.finalArrow);
-                }
-                AppState.finalArrow = null;
-            }
-            if (AppState.baseArrow) {
-                if (AppState.map && typeof AppState.map.removeLayer === 'function') {
-                    AppState.map.removeLayer(AppState.baseArrow);
-                }
-                AppState.baseArrow = null;
-            }
-            if (AppState.downwindArrow) {
-                if (AppState.map && typeof AppState.map.removeLayer === 'function') {
-                    AppState.map.removeLayer(AppState.downwindArrow);
-                }
-                AppState.downwindArrow = null;
-            }
+            // Clear landing pattern layers...
         };
-
         if (checkbox.checked) {
-            if (Settings.isFeatureUnlocked('landingPattern') && isLandingPatternUnlocked) {
+            if (Settings.isFeatureUnlocked('landingPattern')) {
                 enableFeature();
             } else {
-                showPasswordModal('landingPattern', () => {
-                    enableFeature();
-                }, () => {
-                    disableFeature();
-                });
+                Settings.showPasswordModal('landingPattern', enableFeature, disableFeature);
             }
         } else {
             disableFeature();
@@ -7348,7 +7294,7 @@ function setupCheckbox(id, setting, callback) {
         console.log(`Attached change and click listeners to ${id}`);
         checkbox.checked = Settings.state.userSettings[setting];
         // Apply visual indication for locked features
-        if (id === 'showLandingPattern' && !(Settings.isFeatureUnlocked('landingPattern') && isLandingPatternUnlocked)) {
+        if (id === 'showLandingPattern' && !(Settings.isFeatureUnlocked('landingPattern') && Settings.state.isLandingPatternUnlocked)) {
             checkbox.style.opacity = '0.5';
             checkbox.title = 'Feature locked. Click to enter password.';
         }
@@ -7426,12 +7372,12 @@ function setupResetButton() {
         Settings.state.userSettings = { ...Settings.defaultSettings };
         // Reset feature unlock status
         Settings.state.unlockedFeatures = { landingPattern: false, calculateJump: false };
-        isLandingPatternUnlocked = false;
-        isCalculateJumpUnlocked = false;
+        Settings.state.isLandingPatternUnlocked = false;
+        Settings.state.isCalculateJumpUnlocked = false;
         // Clear localStorage
         localStorage.removeItem('unlockedFeatures');
         localStorage.removeItem('upperWindsSettings');
-        console.log('Reset feature unlock status:', { isLandingPatternUnlocked, isCalculateJumpUnlocked, unlockedFeatures: Settings.state.unlockedFeatures });
+        console.log('Reset feature unlock status:', { isLandingPatternUnlocked: Settings.state.isLandingPatternUnlocked, isCalculateJumpUnlocked: Settings.state.isCalculateJumpUnlocked, unlockedFeatures: Settings.state.unlockedFeatures });
         // Save and reinitialize settings
         Settings.save();
         Settings.initialize();
@@ -7536,85 +7482,7 @@ function setupClearHistoricalDate() {
         });
     }
 }
-function saveUnlockStatus() {
-    try {
-        Settings.state.unlockedFeatures.landingPattern = isLandingPatternUnlocked;
-        Settings.state.unlockedFeatures.calculateJump = isCalculateJumpUnlocked;
-        Settings.saveUnlockedFeatures();
-        console.log('Saved unlock status:', {
-            landingPattern: isLandingPatternUnlocked,
-            calculateJump: isCalculateJumpUnlocked
-        });
-    } catch (error) {
-        Utils.handleError('Failed to save unlock status.');
-    }
-}
-function showPasswordModal(feature, onSuccess, onCancel) {
-    console.log('Entering showPasswordModal for feature:', feature);
-    const modal = document.getElementById('passwordModal');
-    const input = document.getElementById('passwordInput');
-    const error = document.getElementById('passwordError');
-    const submitBtn = document.getElementById('passwordSubmit');
-    const cancelBtn = document.getElementById('passwordCancel');
-    const header = document.getElementById('modalHeader');
-    const message = document.getElementById('modalMessage');
 
-    if (!modal || !input || !submitBtn || !cancelBtn || !header || !message) {
-        console.error('Modal elements not found:', { modal, input, submitBtn, cancelBtn, header, message });
-        return;
-    }
-
-    const featureName = feature === 'landingPattern' ? 'Landing Pattern' : 'Calculate Jump';
-    header.textContent = `${featureName} Access`;
-    message.textContent = `Please enter the password to enable ${featureName.toLowerCase()}:`;
-
-    input.value = '';
-    error.style.display = 'none';
-    modal.style.display = 'flex';
-    console.log('Password modal should now be visible:', { modalDisplay: modal.style.display });
-
-    const submitHandler = () => {
-        console.log('Password modal submit clicked, entered value:', input.value);
-        if (input.value === FEATURE_PASSWORD) {
-            modal.style.display = 'none';
-            if (feature === 'landingPattern') {
-                isLandingPatternUnlocked = true;
-                Settings.state.unlockedFeatures.landingPattern = true;
-                const checkbox = document.getElementById('showLandingPattern');
-                if (checkbox) {
-                    checkbox.style.opacity = '1';
-                    checkbox.title = '';
-                }
-            } else if (feature === 'calculateJump') {
-                isCalculateJumpUnlocked = true;
-                Settings.state.unlockedFeatures.calculateJump = true;
-                const menuItem = document.querySelector('.menu-label[data-label="calculateJump"]');
-                if (menuItem) {
-                    menuItem.style.opacity = '1';
-                    menuItem.title = '';
-                }
-            }
-            saveUnlockStatus();
-            console.log('Feature unlocked and saved:', feature, { isLandingPatternUnlocked, isCalculateJumpUnlocked, unlockedFeatures: Settings.state.unlockedFeatures });
-            onSuccess();
-        } else {
-            error.textContent = 'Incorrect password';
-            error.style.display = 'block';
-            console.log('Incorrect password entered');
-        }
-    };
-
-    submitBtn.onclick = submitHandler;
-    input.onkeypress = (e) => { if (e.key === 'Enter') submitHandler(); };
-    cancelBtn.onclick = () => {
-        modal.style.display = 'none';
-        console.log('Password modal cancelled');
-        onCancel();
-    };
-}
-function isFeatureUnlocked(feature) {
-    return feature === 'landingPattern' ? isLandingPatternUnlocked : isCalculateJumpUnlocked;
-}
 // Setup values
 function getSliderValue() {
     return parseInt(document.getElementById('timeSlider')?.value) || 0;
@@ -7697,7 +7565,7 @@ function setupMenuItemEvents() {
     console.log('Found Calculate Jump menu item:', calculateJumpMenuItem);
 
     // Initialize visual state based on lock status
-    if (!(Settings.isFeatureUnlocked('calculateJump') && isCalculateJumpUnlocked)) {
+    if (!(Settings.isFeatureUnlocked('calculateJump') && Settings.state.isCalculateJumpUnlocked)) {
         calculateJumpMenuItem.style.opacity = '0.5';
         calculateJumpMenuItem.title = 'Feature locked. Click to enter password.';
     } else {
@@ -7707,72 +7575,40 @@ function setupMenuItemEvents() {
 
     // Remove any existing click handlers to prevent duplicates
     calculateJumpMenuItem.removeEventListener('click', calculateJumpMenuItem._clickHandler);
-    calculateJumpMenuItem._clickHandler = (event) => {
-        try {
-            console.log('Click handler start');
-            event.stopPropagation();
-            event.preventDefault();
-            console.log('Clicked menu item: Calculate Jump', { isCalculateJumpUnlocked, isFeatureUnlocked: Settings.isFeatureUnlocked('calculateJump') });
-
-            const parentLi = calculateJumpMenuItem.closest('li');
-            const submenu = parentLi?.querySelector('ul');
-            console.log('Submenu lookup:', { submenu: submenu ? 'Found' : 'Not found', hasSubmenuClass: submenu?.classList.contains('submenu'), submenuClasses: submenu?.classList.toString() });
-
-            const enableFeature = () => {
-                console.log('Enabling Calculate Jump');
-                Settings.state.userSettings.calculateJump = true;
-                Settings.save();
-                toggleSubmenu(calculateJumpMenuItem, submenu, true);
-                if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
-                    debouncedCalculateJump();
-                    calculateCutAway();
-                }
-                calculateJumpMenuItem.style.opacity = '1';
-                calculateJumpMenuItem.title = '';
-                console.log('Calculate Jump enabled');
-            };
-
-            const disableFeature = () => {
-                console.log('Disabling Calculate Jump');
-                Settings.state.userSettings.calculateJump = false;
-                Settings.save();
-                toggleSubmenu(calculateJumpMenuItem, submenu, false);
-                clearJumpCircles();
-                calculateJumpMenuItem.style.opacity = (Settings.isFeatureUnlocked('calculateJump') && isCalculateJumpUnlocked) ? '1' : '0.5';
-                calculateJumpMenuItem.title = (Settings.isFeatureUnlocked('calculateJump') && isCalculateJumpUnlocked) ? '' : 'Feature locked. Click to enter password.';
-                console.log('Calculate Jump disabled');
-            };
-
-            console.log('Checking if feature is locked:', { isCalculateJumpUnlocked, isFeatureUnlocked: Settings.isFeatureUnlocked('calculateJump') });
-            if (!(Settings.isFeatureUnlocked('calculateJump') && isCalculateJumpUnlocked)) {
-                console.log('Feature is locked, attempting to show password modal for Calculate Jump');
-                showPasswordModal('calculateJump', () => {
-                    console.log('Password modal success, enabling feature');
-                    enableFeature();
-                }, () => {
-                    console.log('Password modal cancelled');
-                    if (submenu) {
-                        toggleSubmenu(calculateJumpMenuItem, submenu, false);
-                        console.log('Password modal cancelled, submenu remains closed');
-                    }
-                });
-            } else {
-                console.log('Feature is unlocked, toggling submenu visibility');
-                if (submenu) {
-                    const isSubmenuHidden = submenu.classList.contains('hidden');
-                    console.log('Submenu state:', { isSubmenuHidden });
-                    if (isSubmenuHidden) {
-                        enableFeature();
-                    } else {
-                        disableFeature();
-                    }
-                } else {
-                    console.warn('Submenu for Calculate Jump not found during toggle');
-                }
+calculateJumpMenuItem._clickHandler = (event) => {
+        event.stopPropagation();
+        event.preventDefault();
+        const parentLi = calculateJumpMenuItem.closest('li');
+        const submenu = parentLi?.querySelector('ul');
+        const enableFeature = () => {
+            Settings.state.userSettings.calculateJump = true;
+            Settings.save();
+            toggleSubmenu(calculateJumpMenuItem, submenu, true);
+            if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
+                debouncedCalculateJump();
+                calculateCutAway();
             }
-            console.log('Click handler end');
-        } catch (error) {
-            console.error('Error in Calculate Jump click handler:', error);
+            calculateJumpMenuItem.style.opacity = '1';
+            calculateJumpMenuItem.title = '';
+        };
+        const disableFeature = () => {
+            Settings.state.userSettings.calculateJump = false;
+            Settings.save();
+            toggleSubmenu(calculateJumpMenuItem, submenu, false);
+            clearJumpCircles();
+            calculateJumpMenuItem.style.opacity = Settings.isFeatureUnlocked('calculateJump') ? '1' : '0.5';
+            calculateJumpMenuItem.title = Settings.isFeatureUnlocked('calculateJump') ? '' : 'Feature locked. Click to enter password.';
+        };
+        if (!Settings.isFeatureUnlocked('calculateJump')) {
+            Settings.showPasswordModal('calculateJump', enableFeature, () => {
+                if (submenu) toggleSubmenu(calculateJumpMenuItem, submenu, false);
+            });
+        } else {
+            if (submenu) {
+                const isSubmenuHidden = submenu.classList.contains('hidden');
+                if (isSubmenuHidden) enableFeature();
+                else disableFeature();
+            }
         }
     };
     calculateJumpMenuItem.addEventListener('click', calculateJumpMenuItem._clickHandler, { capture: true });

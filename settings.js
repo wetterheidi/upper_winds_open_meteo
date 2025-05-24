@@ -58,7 +58,9 @@ export const Settings = {
             landingPattern: false,
             calculateJump: false
         },
-        isJumperSeparationManual: false
+        isJumperSeparationManual: false,
+        isLandingPatternUnlocked: false,
+        isCalculateJumpUnlocked: false
     },
 
     /**
@@ -150,6 +152,90 @@ export const Settings = {
         } catch (error) {
             this.handleError(error, 'Failed to save settings to localStorage.');
         }
+    },
+
+
+    saveUnlockStatus(feature, isUnlocked) {
+        try {
+            if (feature === 'landingPattern') {
+                this.state.unlockedFeatures.landingPattern = isUnlocked;
+                this.state.isLandingPatternUnlocked = isUnlocked;
+            } else if (feature === 'calculateJump') {
+                this.state.unlockedFeatures.calculateJump = isUnlocked;
+                this.state.isCalculateJumpUnlocked = isUnlocked;
+            }
+            this.saveUnlockedFeatures();
+            console.log('Saved unlock status:', {
+                landingPattern: this.state.isLandingPatternUnlocked,
+                calculateJump: this.state.isCalculateJumpUnlocked
+            });
+        } catch (error) {
+            Utils.handleError('Failed to save unlock status.');
+        }
+    },
+
+    showPasswordModal(feature, onSuccess, onCancel) {
+        console.log('Entering showPasswordModal for feature:', feature);
+        const modal = document.getElementById('passwordModal');
+        const input = document.getElementById('passwordInput');
+        const error = document.getElementById('passwordError');
+        const submitBtn = document.getElementById('passwordSubmit');
+        const cancelBtn = document.getElementById('passwordCancel');
+        const header = document.getElementById('modalHeader');
+        const message = document.getElementById('modalMessage');
+
+        if (!modal || !input || !submitBtn || !cancelBtn || !header || !message) {
+            console.error('Modal elements not found:', { modal, input, submitBtn, cancelBtn, header, message });
+            return;
+        }
+
+        const featureName = feature === 'landingPattern' ? 'Landing Pattern' : 'Calculate Jump';
+        header.textContent = `${featureName} Access`;
+        message.textContent = `Please enter the password to enable ${featureName.toLowerCase()}:`;
+
+        input.value = '';
+        error.style.display = 'none';
+        modal.style.display = 'flex';
+        console.log('Password modal should now be visible:', { modalDisplay: modal.style.display });
+
+        const submitHandler = () => {
+            console.log('Password modal submit clicked, entered value:', input.value);
+            if (input.value === FEATURE_PASSWORD) {
+                modal.style.display = 'none';
+                this.saveUnlockStatus(feature, true);
+                if (feature === 'landingPattern') {
+                    const checkbox = document.getElementById('showLandingPattern');
+                    if (checkbox) {
+                        checkbox.style.opacity = '1';
+                        checkbox.title = '';
+                    }
+                } else if (feature === 'calculateJump') {
+                    const menuItem = document.querySelector('.menu-label[data-label="calculateJump"]');
+                    if (menuItem) {
+                        menuItem.style.opacity = '1';
+                        menuItem.title = '';
+                    }
+                }
+                console.log('Feature unlocked:', feature);
+                onSuccess();
+            } else {
+                error.textContent = 'Incorrect password';
+                error.style.display = 'block';
+                console.log('Incorrect password entered');
+            }
+        };
+
+        submitBtn.onclick = submitHandler;
+        input.onkeypress = (e) => { if (e.key === 'Enter') submitHandler(); };
+        cancelBtn.onclick = () => {
+            modal.style.display = 'none';
+            console.log('Password modal cancelled');
+            onCancel();
+        };
+    },
+
+    isFeatureUnlocked(feature) {
+        return feature === 'landingPattern' ? isLandingPatternUnlocked : isCalculateJumpUnlocked;
     },
 
     saveUnlockedFeatures() {
