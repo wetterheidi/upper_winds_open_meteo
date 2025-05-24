@@ -1,7 +1,7 @@
 // == Project: Skydiving Weather and Jump Planner ==
 // == Constants and Global Variables ==
-import { Settings } from './settings.js';
 import { Utils } from './utils.js';
+import { Settings } from './settings.js';
 import { Constants, FEATURE_PASSWORD } from './constants.js';
 import { displayMessage, displayProgress, displayError, hideProgress, updateOfflineIndicator, isMobileDevice } from './ui.js';
 "use strict";
@@ -15,7 +15,7 @@ try {
     userSettings = { ...Settings.defaultSettings };
 }
 
-const AppState = {
+export const AppState = {
     isInitialized: false,
     coordsControl: null,
     lastMouseLatLng: null,
@@ -78,125 +78,6 @@ const getWindSpeedUnit = () => Settings.getValue('windUnit', 'radio', 'kt');
 const getCoordinateFormat = () => Settings.getValue('coordFormat', 'radio', 'Decimal');
 const getInterpolationStep = () => Settings.getValue('interpStepSelect', 'select', 200);
 const getDownloadFormat = () => Settings.getValue('downloadFormat', 'radio', 'csv');
-
-// == Utility Functions ==
-function generateWindBarb(direction, speedKt) {
-    // Convert speed to knots if not already (assuming speedKt is in knots)
-    const speed = Math.round(speedKt);
-
-    // SVG dimensions
-    const width = 40;
-    const height = 40;
-    const centerX = width / 2;
-    const centerY = height / 2;
-    const staffLength = 20;
-
-    // Determine hemisphere based on latitude (lastLat)
-    const isNorthernHemisphere = typeof AppState.lastLat === 'number' && !isNaN(AppState.lastLat) ? AppState.lastLat >= 0 : true;
-    const barbSide = isNorthernHemisphere ? -1 : 1; // -1 for left (Northern), 1 for right (Southern)
-
-    // Calculate barb components
-    let flags = Math.floor(speed / 50); // 50 kt flags
-    let remaining = speed % 50;
-    let fullBarbs = Math.floor(remaining / 10); // 10 kt full barbs
-    let halfBarbs = Math.floor((remaining % 10) / 5); // 5 kt half barbs
-
-    // Adjust for small speeds
-    if (speed < 5) {
-        fullBarbs = 0;
-        halfBarbs = 0;
-    } else if (speed < 10 && halfBarbs > 0) {
-        halfBarbs = 1; // Ensure at least one half barb for 5-9 kt
-    }
-
-    // Start SVG
-    let svg = `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`;
-
-    // Rotate based on wind direction (wind *from* direction)
-    const rotation = direction + 180; // Staff points toward wind source (tip at origin)
-    svg += `<g transform="translate(${centerX}, ${centerY}) rotate(${rotation})">`;
-
-    // Draw the staff (vertical line, base at bottom, tip at top toward the source)
-    svg += `<line x1="0" y1="${staffLength / 2}" x2="0" y2="${-staffLength / 2}" stroke="black" stroke-width="1"/>`;
-
-    // Draw barbs on the appropriate side, at the base of the staff
-    let yPos = staffLength / 2; // Start at the base (wind blowing toward this end)
-    const barbSpacing = 4;
-
-    // Flags (50 kt) - Triangle with side attached to staff, pointing to the correct side
-    for (let i = 0; i < flags; i++) {
-        svg += `<polygon points="0,${yPos - 5} 0,${yPos + 5} ${10 * barbSide},${yPos}" fill="black"/>`;
-        yPos -= barbSpacing + 5; // Move up the staff (toward the tip)
-    }
-
-    // Full barbs (10 kt) - Straight to the correct side (perpendicular)
-    for (let i = 0; i < fullBarbs; i++) {
-        svg += `<line x1="0" y1="${yPos}" x2="${10 * barbSide}" y2="${yPos}" stroke="black" stroke-width="1"/>`;
-        yPos -= barbSpacing;
-    }
-
-    // Half barbs (5 kt) - Straight to the correct side (perpendicular)
-    if (halfBarbs > 0) {
-        svg += `<line x1="0" y1="${yPos}" x2="${5 * barbSide}" y2="${yPos}" stroke="black" stroke-width="1"/>`;
-    }
-
-    // Circle for calm winds (< 5 kt)
-    if (speed < 5) {
-        svg += `<circle cx="0" cy="0" r="3" fill="none" stroke="black" stroke-width="1"/>`;
-    }
-
-    svg += `</g></svg>`;
-    return svg;
-}
-async function getAltitude(lat, lng) {
-    const { elevation } = await Utils.getLocationData(lat, lng);
-    console.log('Fetched elevation from Open-Meteo:', elevation);
-    return elevation !== 'N/A' ? elevation : 'N/A';
-}
-function getLastFullHourUTC() {
-    const now = new Date();
-    const utcYear = now.getUTCFullYear();
-    const utcMonth = now.getUTCMonth();
-    const utcDate = now.getUTCDate();
-    const utcHour = now.getUTCHours();
-    const lastFullHour = new Date(Date.UTC(utcYear, utcMonth, utcDate, utcHour, 0, 0));
-    console.log('Last full hour UTC:', lastFullHour.toISOString());
-    return lastFullHour; // Return Date object instead of string
-}
-async function getDisplayTime(utcTimeStr) {
-    const timeZone = document.querySelector('input[name="timeZone"]:checked')?.value || 'Z';
-    if (timeZone === 'Z' || !AppState.lastLat || !AppState.lastLng) {
-        return Utils.formatTime(utcTimeStr); // Synchronous
-    } else {
-        return await Utils.formatLocalTime(utcTimeStr, AppState.lastLat, AppState.lastLng); // Async
-    }
-}
-function configureMarker(lat, lng, altitude, openPopup = false) {
-    if (!AppState.map) {
-        console.warn('Map not initialized, cannot configure marker');
-        return null;
-    }
-    if (AppState.currentMarker) {
-        AppState.currentMarker.remove();
-    }
-    AppState.currentMarker = createCustomMarker(lat, lng).addTo(AppState.map);
-    attachMarkerDragend(AppState.currentMarker);
-    AppState.currentMarker.on('click', (e) => {
-        L.DomEvent.stopPropagation(e); // Prevent map click events from interfering
-        const popup = AppState.currentMarker.getPopup();
-        console.log('Marker click event, popup state:', { hasPopup: !!popup, isOpen: popup?.isOpen() });
-        if (popup?.isOpen()) {
-            AppState.currentMarker.closePopup();
-            console.log('Closed popup on marker click');
-        } else {
-            updateMarkerPopup(AppState.currentMarker, lat, lng, altitude, true);
-            console.log('Requested popup open on marker click');
-        }
-    });
-    updateMarkerPopup(AppState.currentMarker, lat, lng, altitude, openPopup);
-    console.log('Configured marker at:', { lat, lng, openPopup });
-    return AppState.currentMarker;
-}
 
 // == Tile caching ==
 Utils.handleMessage = displayMessage;
@@ -1151,7 +1032,7 @@ function initMap() {
     }
 
     async function fetchInitialWeather(lat, lng) {
-        const lastFullHourUTC = getLastFullHourUTC();
+        const lastFullHourUTC = Utils.getLastFullHourUTC();
         let utcIsoString;
         try {
             utcIsoString = lastFullHourUTC.toISOString();
@@ -1200,7 +1081,18 @@ function initMap() {
     }
 
     const initialAltitude = 'N/A';
-    configureMarker(defaultCenter[0], defaultCenter[1], initialAltitude, false);
+    AppState.currentMarker = Utils.configureMarker(
+        AppState.map,
+        defaultCenter[0],
+        defaultCenter[1],
+        initialAltitude,
+        false,
+        createCustomMarker,
+        attachMarkerDragend,
+        updateMarkerPopup,
+        AppState.currentMarker,
+        (marker) => { AppState.currentMarker = marker; }
+    );
     AppState.isManualPanning = false;
 
     TileCache.init().then(() => {
@@ -1247,9 +1139,20 @@ function initMap() {
                 const userCoords = [position.coords.latitude, position.coords.longitude];
                 AppState.lastLat = position.coords.latitude;
                 AppState.lastLng = position.coords.longitude;
-                AppState.lastAltitude = await getAltitude(AppState.lastLat, AppState.lastLng);
+                AppState.lastAltitude = await Utils.getAltitude(AppState.lastLat, AppState.lastLng);
 
-                configureMarker(AppState.lastLat, AppState.lastLng, AppState.lastAltitude, false);
+                AppState.currentMarker = Utils.configureMarker(
+                    AppState.map,
+                    AppState.lastLat,
+                    AppState.lastLng,
+                    AppState.lastAltitude,
+                    false,
+                    createCustomMarker,
+                    attachMarkerDragend,
+                    updateMarkerPopup,
+                    AppState.currentMarker,
+                    (marker) => { AppState.currentMarker = marker; }
+                );
                 AppState.map.setView(userCoords, defaultZoom);
 
                 if (Settings.state.userSettings.calculateJump) {
@@ -1273,8 +1176,19 @@ function initMap() {
                 Utils.handleError('Unable to retrieve your location. Using default location.');
                 AppState.lastLat = defaultCenter[0];
                 AppState.lastLng = defaultCenter[1];
-                AppState.lastAltitude = await getAltitude(AppState.lastLat, AppState.lastLng);
-                configureMarker(AppState.lastLat, AppState.lastLng, AppState.lastAltitude, false);
+                AppState.lastAltitude = await Utils.getAltitude(AppState.lastLat, AppState.lastLng);
+                AppState.currentMarker = Utils.configureMarker(
+                    AppState.map,
+                    AppState.lastLat,
+                    AppState.lastLng,
+                    AppState.lastAltitude,
+                    false,
+                    createCustomMarker,
+                    attachMarkerDragend,
+                    updateMarkerPopup,
+                    AppState.currentMarker,
+                    (marker) => { AppState.currentMarker = marker; }
+                ); 
                 AppState.map.setView(defaultCenter, defaultZoom);
                 recenterMap(true);
                 AppState.isManualPanning = false;
@@ -1301,8 +1215,19 @@ function initMap() {
         Utils.handleError('Geolocation not supported. Using default location.');
         AppState.lastLat = defaultCenter[0];
         AppState.lastLng = defaultCenter[1];
-        AppState.lastAltitude = getAltitude(AppState.lastLat, AppState.lastLng);
-        configureMarker(AppState.lastLat, AppState.lastLng, initialAltitude, false);
+        AppState.lastAltitude = Utils.getAltitude(AppState.lastLat, AppState.lastLng);
+        AppState.currentMarker = Utils.configureMarker(
+            AppState.map,
+            AppState.lastLat,
+            AppState.lastLng,
+            AppState.lastAltitude,
+            false,
+            createCustomMarker,
+            attachMarkerDragend,
+            updateMarkerPopup,
+            AppState.currentMarker,
+            (marker) => { AppState.currentMarker = marker; }
+        ); 
         AppState.map.setView(defaultCenter, defaultZoom);
         recenterMap(true);
         AppState.isManualPanning = false;
@@ -1341,7 +1266,7 @@ function initMap() {
             console.log('Using cached elevation:', { lat, lng, elevation });
         } else {
             try {
-                elevation = await getAltitude(lat, lng);
+                elevation = await Utils.getAltitude(lat, lng);
                 elevationCache.set(cacheKey, elevation);
                 console.log('Fetched elevation:', { lat, lng, elevation });
             } catch (error) {
@@ -1472,10 +1397,21 @@ function initMap() {
         const { lat, lng } = e.latlng;
         AppState.lastLat = lat;
         AppState.lastLng = lng;
-        AppState.lastAltitude = await getAltitude(lat, lng);
+        AppState.lastAltitude = await Utils.getAltitude(lat, lng);
         console.log('Map double-clicked, moving marker to:', { lat, lng });
 
-        configureMarker(AppState.lastLat, AppState.lastLng, AppState.lastAltitude, false);
+        AppState.currentMarker = Utils.configureMarker(
+            AppState.map,
+            AppState.lastLat,
+            AppState.lastLng,
+            AppState.lastAltitude,
+            false,
+            createCustomMarker,
+            attachMarkerDragend,
+            updateMarkerPopup,
+            AppState.currentMarker,
+            (marker) => { AppState.currentMarker = marker; }
+        ); 
         resetJumpRunDirection(true);
         if (Settings.state.userSettings.calculateJump) {
             console.log('Recalculating jump for marker click');
@@ -1566,8 +1502,19 @@ function initMap() {
             const { lat, lng } = latlng;
             AppState.lastLat = lat;
             AppState.lastLng = lng;
-            AppState.lastAltitude = await getAltitude(lat, lng);
-            configureMarker(AppState.lastLat, AppState.lastLng, AppState.lastAltitude, false);
+            AppState.lastAltitude = await Utils.getAltitude(lat, lng);
+            AppState.currentMarker = Utils.configureMarker(
+                AppState.map,
+                AppState.lastLat,
+                AppState.lastLng,
+                AppState.lastAltitude,
+                false,
+                createCustomMarker,
+                attachMarkerDragend,
+                updateMarkerPopup,
+                AppState.currentMarker,
+                (marker) => { AppState.currentMarker = marker; }
+            ); 
             resetJumpRunDirection(true);
             if (Settings.state.userSettings.calculateJump) {
                 calculateJump();
@@ -1744,7 +1691,7 @@ function attachMarkerDragend(marker) {
         const position = marker.getLatLng();
         AppState.lastLat = position.lat;
         AppState.lastLng = position.lng;
-        AppState.lastAltitude = await getAltitude(AppState.lastLat, AppState.lastLng);
+        AppState.lastAltitude = await Utils.getAltitude(AppState.lastLat, AppState.lastLng);
         const wasOpen = marker.getPopup()?.isOpen() || false;
         updateMarkerPopup(marker, AppState.lastLat, AppState.lastLng, AppState.lastAltitude, wasOpen);
         console.log('Marker dragged to:', { lat: AppState.lastLat, lng: AppState.lastLng });
@@ -2003,11 +1950,22 @@ function loadGpxTrack(file) {
                 const finalPoint = points[points.length - 1];
                 AppState.lastLat = finalPoint.lat;
                 AppState.lastLng = finalPoint.lng;
-                AppState.lastAltitude = await getAltitude(AppState.lastLat, AppState.lastLng); // Fetch terrain altitude for final point
+                AppState.lastAltitude = await Utils.getAltitude(AppState.lastLat, AppState.lastLng); // Fetch terrain altitude for final point
                 console.log('Moved marker to final GPX point:', { lat: AppState.lastLat, lng: AppState.lastLng, lastAltitude: AppState.lastAltitude });
 
                 // Update marker position
-                configureMarker(AppState.lastLat, AppState.lastLng, AppState.lastAltitude, false);
+                AppState.currentMarker = Utils.configureMarker(
+                    AppState.map,
+                    AppState.lastLat,
+                    AppState.lastLng,
+                    AppState.lastAltitude,
+                    false,
+                    createCustomMarker,
+                    attachMarkerDragend,
+                    updateMarkerPopup,
+                    AppState.currentMarker,
+                    (marker) => { AppState.currentMarker = marker; }
+                );
                 AppState.isManualPanning = false;
 
                 // Trigger weather fetch and jump calculations
@@ -3122,7 +3080,7 @@ async function updateWeatherDisplay(index, originalTime = null) {
     const heightUnit = getHeightUnit();
     const windSpeedUnit = getWindSpeedUnit();
     const temperatureUnit = getTemperatureUnit();
-    const time = await getDisplayTime(AppState.weatherData.time[index]);
+    const time = await Utils.getDisplayTime(AppState.weatherData.time[index]);
     const interpolatedData = interpolateWeatherData(index);
     const surfaceHeight = refLevel === 'AMSL' && AppState.lastAltitude !== 'N/A' ? Math.round(AppState.lastAltitude) : 0;
 
@@ -3186,7 +3144,7 @@ async function updateWeatherDisplay(index, originalTime = null) {
         }
 
         const speedKt = Math.round(Utils.convertWind(spd, 'kt', 'km/h') / 5) * 5;
-        const windBarbSvg = data.dir === 'N/A' || isNaN(speedKt) ? 'N/A' : generateWindBarb(data.dir, speedKt);
+        const windBarbSvg = data.dir === 'N/A' || isNaN(speedKt) ? 'N/A' : Utils.generateWindBarb(data.dir, speedKt);
 
         output += `<tr class="${windClass} ${humidityClass}">
             <td>${Math.round(displayHeight)}</td>
@@ -6184,7 +6142,7 @@ function setupSliderEvents() {
     slider.addEventListener('change', async () => {
         const sliderIndex = parseInt(slider.value) || 0;
         if (AppState.weatherData?.time?.[sliderIndex]) {
-            const displayTime = await getDisplayTime(AppState.weatherData.time[sliderIndex]);
+            const displayTime = await Utils.getDisplayTime(AppState.weatherData.time[sliderIndex]);
             const timeLabel = document.getElementById('timeLabel');
             if (timeLabel) {
                 timeLabel.textContent = `Time: ${displayTime}`;
@@ -7232,9 +7190,20 @@ function setupCoordinateEvents() {
                 const [lat, lng] = parseCoordinates();
                 AppState.lastLat = lat;
                 AppState.lastLng = lng;
-                AppState.lastAltitude = await getAltitude(lat, lng);
+                AppState.lastAltitude = await Utils.getAltitude(lat, lng);
                 console.log('Coordinate input, moving marker to:', { lat, lng });
-                configureMarker(lat, lng, AppState.lastAltitude, false);
+                AppState.currentMarker = Utils.configureMarker(
+                    AppState.map,
+                    lat,
+                    lng,
+                    AppState.lastAltitude,
+                    false,
+                    createCustomMarker,
+                    attachMarkerDragend,
+                    updateMarkerPopup,
+                    AppState.currentMarker,
+                    (marker) => { AppState.currentMarker = marker; }
+                );
                 resetJumpRunDirection(true);
                 addCoordToHistory(lat, lng);
                 if (Settings.state.userSettings.calculateJump) {
@@ -7575,7 +7544,7 @@ function setupMenuItemEvents() {
 
     // Remove any existing click handlers to prevent duplicates
     calculateJumpMenuItem.removeEventListener('click', calculateJumpMenuItem._clickHandler);
-calculateJumpMenuItem._clickHandler = (event) => {
+    calculateJumpMenuItem._clickHandler = (event) => {
         event.stopPropagation();
         event.preventDefault();
         const parentLi = calculateJumpMenuItem.closest('li');

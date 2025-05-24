@@ -1,4 +1,3 @@
-//import { displayError } from './app.js';
 
 export class Utils {
     // Format ISO time string to UTC (e.g., "2025-03-15T00:00Z" -> "2025-03-15 0000Z")
@@ -640,6 +639,129 @@ static calculateBearing(lat1, lng1, lat2, lng2) {
     bearing = (bearing + 360) % 360; // Normalize to 0-360
     return bearing;
 }
+
+static generateWindBarb(direction, speedKt) {
+    // Convert speed to knots if not already (assuming speedKt is in knots)
+    const speed = Math.round(speedKt);
+
+    // SVG dimensions
+    const width = 40;
+    const height = 40;
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const staffLength = 20;
+
+    // Determine hemisphere based on latitude (lastLat)
+    const isNorthernHemisphere = typeof AppState.lastLat === 'number' && !isNaN(AppState.lastLat) ? AppState.lastLat >= 0 : true;
+    const barbSide = isNorthernHemisphere ? -1 : 1; // -1 for left (Northern), 1 for right (Southern)
+
+    // Calculate barb components
+    let flags = Math.floor(speed / 50); // 50 kt flags
+    let remaining = speed % 50;
+    let fullBarbs = Math.floor(remaining / 10); // 10 kt full barbs
+    let halfBarbs = Math.floor((remaining % 10) / 5); // 5 kt half barbs
+
+    // Adjust for small speeds
+    if (speed < 5) {
+        fullBarbs = 0;
+        halfBarbs = 0;
+    } else if (speed < 10 && halfBarbs > 0) {
+        halfBarbs = 1; // Ensure at least one half barb for 5-9 kt
+    }
+
+    // Start SVG
+    let svg = `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`;
+
+    // Rotate based on wind direction (wind *from* direction)
+    const rotation = direction + 180; // Staff points toward wind source (tip at origin)
+    svg += `<g transform="translate(${centerX}, ${centerY}) rotate(${rotation})">`;
+
+    // Draw the staff (vertical line, base at bottom, tip at top toward the source)
+    svg += `<line x1="0" y1="${staffLength / 2}" x2="0" y2="${-staffLength / 2}" stroke="black" stroke-width="1"/>`;
+
+    // Draw barbs on the appropriate side, at the base of the staff
+    let yPos = staffLength / 2; // Start at the base (wind blowing toward this end)
+    const barbSpacing = 4;
+
+    // Flags (50 kt) - Triangle with side attached to staff, pointing to the correct side
+    for (let i = 0; i < flags; i++) {
+        svg += `<polygon points="0,${yPos - 5} 0,${yPos + 5} ${10 * barbSide},${yPos}" fill="black"/>`;
+        yPos -= barbSpacing + 5; // Move up the staff (toward the tip)
+    }
+
+    // Full barbs (10 kt) - Straight to the correct side (perpendicular)
+    for (let i = 0; i < fullBarbs; i++) {
+        svg += `<line x1="0" y1="${yPos}" x2="${10 * barbSide}" y2="${yPos}" stroke="black" stroke-width="1"/>`;
+        yPos -= barbSpacing;
+    }
+
+    // Half barbs (5 kt) - Straight to the correct side (perpendicular)
+    if (halfBarbs > 0) {
+        svg += `<line x1="0" y1="${yPos}" x2="${5 * barbSide}" y2="${yPos}" stroke="black" stroke-width="1"/>`;
+    }
+
+    // Circle for calm winds (< 5 kt)
+    if (speed < 5) {
+        svg += `<circle cx="0" cy="0" r="3" fill="none" stroke="black" stroke-width="1"/>`;
+    }
+
+    svg += `</g></svg>`;
+    return svg;
+}
+
+static async getAltitude(lat, lng) {
+    const { elevation } = await Utils.getLocationData(lat, lng);
+    console.log('Fetched elevation from Open-Meteo:', elevation);
+    return elevation !== 'N/A' ? elevation : 'N/A';
+}
+
+static getLastFullHourUTC() {
+    const now = new Date();
+    const utcYear = now.getUTCFullYear();
+    const utcMonth = now.getUTCMonth();
+    const utcDate = now.getUTCDate();
+    const utcHour = now.getUTCHours();
+    const lastFullHour = new Date(Date.UTC(utcYear, utcMonth, utcDate, utcHour, 0, 0));
+    console.log('Last full hour UTC:', lastFullHour.toISOString());
+    return lastFullHour; // Return Date object instead of string
+}
+
+static async getDisplayTime(utcTimeStr) {
+    const timeZone = document.querySelector('input[name="timeZone"]:checked')?.value || 'Z';
+    if (timeZone === 'Z' || !AppState.lastLat || !AppState.lastLng) {
+        return Utils.formatTime(utcTimeStr); // Synchronous
+    } else {
+        return await Utils.formatLocalTime(utcTimeStr, AppState.lastLat, AppState.lastLng); // Async
+    }
+}
+
+static configureMarker(map, lat, lng, altitude, openPopup = false, createCustomMarker, attachMarkerDragend, updateMarkerPopup, currentMarker, setCurrentMarker) {
+        if (!map) {
+            console.warn('Map not initialized, cannot configure marker');
+            return null;
+        }
+        if (currentMarker) {
+            currentMarker.remove();
+        }
+        const marker = createCustomMarker(lat, lng).addTo(map);
+        attachMarkerDragend(marker);
+        marker.on('click', (e) => {
+            L.DomEvent.stopPropagation(e);
+            const popup = marker.getPopup();
+            console.log('Marker click event, popup state:', { hasPopup: !!popup, isOpen: popup?.isOpen() });
+            if (popup?.isOpen()) {
+                marker.closePopup();
+                console.log('Closed popup on marker click');
+            } else {
+                updateMarkerPopup(marker, lat, lng, altitude, true);
+                console.log('Requested popup open on marker click');
+            }
+        });
+        updateMarkerPopup(marker, lat, lng, altitude, openPopup);
+        setCurrentMarker(marker); // Update the marker in the caller's state
+        console.log('Configured marker at:', { lat, lng, openPopup });
+        return marker;
+    }
 
 }
 
