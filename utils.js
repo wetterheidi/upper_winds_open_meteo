@@ -26,7 +26,7 @@ export class Utils {
         if (isNaN(numericValue)) {
             return 'N/A';
         }
-        return toUnit === 'ft' ? (value * 3.28084).toFixed(0) : value; // m to ft or unchanged if m
+        return toUnit === 'ft' ? parseFloat((value * 3.28084).toFixed(0)) : value; // m to ft or unchanged if m
     }
 
     static convertWind(value, toUnit, fromUnit = 'km/h') {
@@ -109,12 +109,15 @@ export class Utils {
     }
 
     // Gaussian-weighted interpolation between two points
-    static gaussianInterpolation(y1, y2, h1, h2, hp) {
-        let w1 = 1 / Math.abs(h1 - hp);
-        let w2 = 1 / Math.abs(h2 - hp);
-        const yp = (w1 * y1 + w2 * y2) / (w1 + w2);
-        return yp;
-    }
+static gaussianInterpolation(y1, y2, h1, h2, hp) {
+    // Handle edge cases where hp equals h1 or h2
+    if (h1 === hp) return y1;
+    if (h2 === hp) return y2;
+     let w1 = 1 / Math.abs(h1 - hp);
+     let w2 = 1 / Math.abs(h2 - hp);
+     const yp = (w1 * y1 + w2 * y2) / (w1 + w2);
+     return yp;
+ }
 
     static interpolateWindAtAltitude(z, pressureLevels, heights, uComponents, vComponents) {
         if (pressureLevels.length != heights.length || pressureLevels.length != uComponents.length || pressureLevels.length != vComponents.length) {
