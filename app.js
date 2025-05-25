@@ -439,7 +439,7 @@ function initMap() {
                     updateMarkerPopup,
                     AppState.currentMarker,
                     (marker) => { AppState.currentMarker = marker; }
-                ); 
+                );
                 AppState.map.setView(defaultCenter, defaultZoom);
                 recenterMap(true);
                 AppState.isManualPanning = false;
@@ -478,7 +478,7 @@ function initMap() {
             updateMarkerPopup,
             AppState.currentMarker,
             (marker) => { AppState.currentMarker = marker; }
-        ); 
+        );
         AppState.map.setView(defaultCenter, defaultZoom);
         recenterMap(true);
         AppState.isManualPanning = false;
@@ -662,7 +662,7 @@ function initMap() {
             updateMarkerPopup,
             AppState.currentMarker,
             (marker) => { AppState.currentMarker = marker; }
-        ); 
+        );
         resetJumpRunDirection(true);
         if (Settings.state.userSettings.calculateJump) {
             console.log('Recalculating jump for marker click');
@@ -765,7 +765,7 @@ function initMap() {
                 updateMarkerPopup,
                 AppState.currentMarker,
                 (marker) => { AppState.currentMarker = marker; }
-            ); 
+            );
             resetJumpRunDirection(true);
             if (Settings.state.userSettings.calculateJump) {
                 calculateJump();
@@ -1227,13 +1227,20 @@ function loadCsvTrack(file) {
                         }
                         let time = null;
                         try {
-                            time = luxon.DateTime.fromISO(timeStr, { zone: 'utc' });
+                            // Parse timestamp as local time
+                            time = luxon.DateTime.fromISO(timeStr, { setZone: true });
                             if (!time.isValid) {
-                                console.warn('Invalid timestamp in CSV:', { time: timeStr });
+                                console.warn('Invalid timestamp in CSV:', { time: timeStr, reason: time.invalidReason });
                                 time = null;
+                            } else {
+                                console.log('Parsed CSV timestamp as local:', { timeStr, localTime: time.toISO(), zone: time.zoneName });
+                                // Convert to UTC for consistency with GPX
+                                time = time.toUTC();
+                                console.log('Converted to UTC:', { utcTime: time.toISO() });
                             }
                         } catch (error) {
-                            console.warn('Error parsing timestamp in CSV:', { time: timeStr, error });
+                            console.warn('Error parsing timestamp in CSV:', { time: timeStr, error: error.message });
+                            time = null;
                         }
                         points.push({
                             lat: lat,
@@ -2399,7 +2406,8 @@ async function updateWeatherDisplay(index, originalTime = null) {
     const heightUnit = getHeightUnit();
     const windSpeedUnit = getWindSpeedUnit();
     const temperatureUnit = getTemperatureUnit();
-    const time = await Utils.getDisplayTime(AppState.weatherData.time[index]);
+    // Pass lat and lng to getDisplayTime
+    const time = await Utils.getDisplayTime(AppState.weatherData.time[index], AppState.lastLat, AppState.lastLng);
     const interpolatedData = interpolateWeatherData(index);
     const surfaceHeight = refLevel === 'AMSL' && AppState.lastAltitude !== 'N/A' ? Math.round(AppState.lastAltitude) : 0;
 
@@ -5529,8 +5537,8 @@ function setupSliderEvents() {
     slider.addEventListener('change', async () => {
         const sliderIndex = parseInt(slider.value) || 0;
         if (AppState.weatherData?.time?.[sliderIndex]) {
-            const displayTime = await Utils.getDisplayTime(AppState.weatherData.time[sliderIndex]);
-            const timeLabel = document.getElementById('timeLabel');
+            const displayTime = await Utils.getDisplayTime(AppState.weatherData.time[sliderIndex], AppState.lastLat, AppState.lastLng); const timeLabel = document.getElementById('timeLabel');
+            //const time = await Utils.getDisplayTime(AppState.weatherData.time[index], AppState.lastLat, AppState.lastLng);
             if (timeLabel) {
                 timeLabel.textContent = `Time: ${displayTime}`;
                 console.log('Updated time label:', displayTime);

@@ -657,12 +657,12 @@ static getLastFullHourUTC() {
     return lastFullHour; // Return Date object instead of string
 }
 
-static async getDisplayTime(utcTimeStr) {
+static async getDisplayTime(utcTimeStr, lat, lng) {
     const timeZone = document.querySelector('input[name="timeZone"]:checked')?.value || 'Z';
-    if (timeZone === 'Z' || !AppState.lastLat || !AppState.lastLng) {
+    if (timeZone === 'Z' || !lat || !lng) {
         return Utils.formatTime(utcTimeStr); // Synchronous
     } else {
-        return await Utils.formatLocalTime(utcTimeStr, AppState.lastLat, AppState.lastLng); // Async
+        return await Utils.formatLocalTime(utcTimeStr, lat, lng); // Async
     }
 }
 
