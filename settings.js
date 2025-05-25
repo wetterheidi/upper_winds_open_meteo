@@ -233,11 +233,7 @@ export const Settings = {
             onCancel();
         };
     },
-
-    isFeatureUnlocked(feature) {
-        return feature === 'landingPattern' ? isLandingPatternUnlocked : isCalculateJumpUnlocked;
-    },
-
+    
     saveUnlockedFeatures() {
         try {
             const featuresString = JSON.stringify(this.state.unlockedFeatures);

@@ -216,14 +216,14 @@
             </ul>
         </li>
         <li>
-            <span>GPX Track</span>
+            <span>Track Upload</span>
             <ul class="submenu hidden">
                 <li>
-                    <label class="radio-label">
-                        Upload GPX File:
-                        <input type="file" id="gpxFileInput" accept=".gpx" style="margin-top: 5px;">
+                    <label class="radio-label" title="GPX or FlySight-CSV">
+                        Upload File:
+                        <input type="file" id="trackFileInput" accept=".gpx,.csv" style="margin-top: 5px;">
                 <li>
-                    <button id="clearGpxTrack" style="margin-left: 10px;">Clear</button>
+                    <button id="clearTrack" style="margin-left: 10px;">Clear</button>
                 </li>
                 </label>
         </li>
@@ -482,6 +482,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-gpx/1.7.0/gpx.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/luxon/3.4.4/luxon.min.js"></script>
     <script src="https://unpkg.com/mgrs@1.0.0/dist/mgrs.js"></script>
+    <script src="https://unpkg.com/papaparse@5.5.3/papaparse.min.js"></script>
     <script type="module" src="settings.js"></script>
     <script type="module" src="utils.js"></script>
     <script type="module" src="constants.js"></script>

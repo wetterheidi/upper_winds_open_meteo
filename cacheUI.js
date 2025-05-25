@@ -31,8 +31,12 @@ function setupCacheManagement() {
 function setupCacheSettings({ map, lastLat, lastLng, baseMaps }) {
     const cacheRadiusSelect = document.getElementById('cacheRadiusSelect');
     if (cacheRadiusSelect) {
-        cacheRadiusSelect.addEventListener('change', () => {
-            Settings.state.userSettings.cacheRadiusKm = parseInt(cacheRadiusSelect.value, 10);
+cacheRadiusSelect.addEventListener('change', () => {
+    if (!Settings.state || !Settings.state.userSettings) {
+        console.error('Settings not properly initialized');
+        return;
+    }
+     Settings.state.userSettings.cacheRadiusKm = parseInt(cacheRadiusSelect.value, 10);
             Settings.save();
             console.log('Updated cacheRadiusKm:', Settings.state.userSettings.cacheRadiusKm);
         });

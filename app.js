@@ -1157,20 +1157,11 @@ function loadGpxTrack(file) {
         return;
     }
 
-    if (!file) {
-        Utils.handleError('No file selected.');
-        return;
-    }
     AppState.isLoadingGpx = true;
     const reader = new FileReader();
     reader.onload = async function (e) {
         try {
             const gpxData = e.target.result;
-            if (AppState.gpxLayer) {
-                AppState.map.removeLayer(AppState.gpxLayer);
-                AppState.gpxLayer = null;
-            }
-            AppState.gpxPoints = [];
             const parser = new DOMParser();
             const xml = parser.parseFromString(gpxData, 'text/xml');
             const trackpoints = xml.getElementsByTagName('trkpt');
@@ -1194,142 +1185,7 @@ function loadGpxTrack(file) {
             if (points.length < 2) {
                 throw new Error('GPX track has insufficient points.');
             }
-            AppState.gpxPoints = points;
-
-            // Move marker to final point and update lastAltitude
-            if (points.length > 0) {
-                const finalPoint = points[points.length - 1];
-                AppState.lastLat = finalPoint.lat;
-                AppState.lastLng = finalPoint.lng;
-                AppState.lastAltitude = await Utils.getAltitude(AppState.lastLat, AppState.lastLng); // Fetch terrain altitude for final point
-                console.log('Moved marker to final GPX point:', { lat: AppState.lastLat, lng: AppState.lastLng, lastAltitude: AppState.lastAltitude });
-
-                // Update marker position
-                AppState.currentMarker = Utils.configureMarker(
-                    AppState.map,
-                    AppState.lastLat,
-                    AppState.lastLng,
-                    AppState.lastAltitude,
-                    false,
-                    createCustomMarker,
-                    attachMarkerDragend,
-                    updateMarkerPopup,
-                    AppState.currentMarker,
-                    (marker) => { AppState.currentMarker = marker; }
-                );
-                AppState.isManualPanning = false;
-
-                // Trigger weather fetch and jump calculations
-                let timestampToUse = null;
-                if (points[0].time && points[0].time.isValid) {
-                    const initialTimestamp = points[0].time;
-                    console.log('GPX initial timestamp:', initialTimestamp.toISO());
-                    const today = luxon.DateTime.utc().startOf('day');
-                    const trackDate = initialTimestamp.startOf('day');
-                    const isToday = trackDate.hasSame(today, 'day');
-
-                    // Round to nearest hour
-                    let roundedTimestamp = initialTimestamp.startOf('hour');
-                    if (initialTimestamp.minute >= 30) {
-                        roundedTimestamp = roundedTimestamp.plus({ hours: 1 });
-                    }
-                    console.log('GPX rounded timestamp:', roundedTimestamp.toISO());
-                    timestampToUse = roundedTimestamp.toISO();
-
-                    if (!isToday) {
-                        // Set historical date for past tracks
-                        const historicalDatePicker = document.getElementById('historicalDatePicker');
-                        if (historicalDatePicker) {
-                            historicalDatePicker.value = trackDate.toFormat('yyyy-MM-dd');
-                            console.log('Set historicalDatePicker to:', historicalDatePicker.value);
-                        } else {
-                            console.warn('historicalDatePicker not found, cannot set historical date');
-                            Utils.handleError('Cannot fetch historical weather: date picker not found.');
-                        }
-                    }
-                } else {
-                    console.warn('No valid timestamp in GPX track, using current time for weather');
-                }
-
-                await fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, timestampToUse);
-                if (Settings.state.userSettings.calculateJump) {
-                    debouncedCalculateJump();
-                    calculateCutAway();
-                }
-                if (Settings.state.userSettings.showJumpRunTrack) {
-                    updateJumpRunTrack();
-                }
-                if (Settings.state.userSettings.showLandingPattern) {
-                    updateLandingPattern();
-                }
-            }
-
-            // Create GPX layer with custom pane
-            AppState.gpxLayer = L.layerGroup({ pane: 'gpxTrackPane' });
-            const groundAltitude = AppState.lastAltitude !== 'N/A' && !isNaN(AppState.lastAltitude) ? parseFloat(AppState.lastAltitude) : null;
-            const windUnit = getWindSpeedUnit();
-            const heightUnit = getHeightUnit();
-            for (let i = 0; i < points.length - 1; i++) {
-                const p1 = points[i];
-                const p2 = points[i + 1];
-                const ele1 = p1.ele;
-                const ele2 = p2.ele;
-                let color = '#808080';
-                if (groundAltitude !== null && ele1 !== null && ele2 !== null) {
-                    const agl1 = ele1 - groundAltitude;
-                    const agl2 = ele2 - groundAltitude;
-                    const avgAgl = (agl1 + agl2) / 2;
-                    color = interpolateColor(avgAgl);
-                }
-                const segment = L.polyline([[p1.lat, p1.lng], [p2.lat, p2.lng]], {
-                    color: color,
-                    weight: 4,
-                    opacity: 0.75,
-                    pane: 'gpxTrackPane'
-                }).bindTooltip('', { sticky: true });
-                segment.on('mousemove', function (e) {
-                    const latlng = e.latlng;
-                    let closestPoint = points[0];
-                    let minDist = Infinity;
-                    let closestIndex = 0;
-                    points.forEach((p, index) => {
-                        const dist = Math.sqrt(Math.pow(p.lat - latlng.lat, 2) + Math.pow(p.lng - latlng.lng, 2));
-                        if (dist < minDist) {
-                            minDist = dist;
-                            closestPoint = p;
-                            closestIndex = index;
-                        }
-                    });
-                    segment.setTooltipContent(getTooltipContent(closestPoint, closestIndex, points, groundAltitude, getWindSpeedUnit(), getHeightUnit())).openTooltip(latlng);
-                });
-                AppState.gpxLayer.addLayer(segment);
-            }
-            AppState.gpxLayer.addTo(AppState.map);
-            console.log('GPX layer added:', { gpxLayer: AppState.gpxLayer });
-
-            // Center map to track bounds
-            if (points.length > 0) {
-                const bounds = L.latLngBounds(points.map(p => [p.lat, p.lng]));
-                if (bounds.isValid()) {
-                    AppState.map.invalidateSize();
-                    AppState.map.fitBounds(bounds, { padding: [50, 50], maxZoom: maxZoom });
-                    console.log('Map fitted to GPX track bounds:', { bounds: bounds.toBBoxString() });
-                } else {
-                    console.warn('Invalid GPX track bounds:', { points });
-                    Utils.handleError('Unable to display GPX track: invalid coordinates.');
-                }
-            }
-
-            // Display track info
-            const distance = (points.reduce((dist, p, i) => {
-                if (i === 0) return 0;
-                const prev = points[i - 1];
-                return dist + AppState.map.distance([prev.lat, prev.lng], [p.lat, p.lng]);
-            }, 0) / 1000).toFixed(2);
-            const elevations = points.map(p => p.ele).filter(e => e !== null);
-            const elevationMin = elevations.length ? Math.min(...elevations).toFixed(0) : 'N/A';
-            const elevationMax = elevations.length ? Math.max(...elevations).toFixed(0) : 'N/A';
-            document.getElementById('info').innerHTML += `<br><strong>GPX Track:</strong> Distance: ${distance} km, Min Elevation: ${elevationMin} m, Max Elevation: ${elevationMax} m`;
+            await renderTrack(points, file.name);
         } catch (error) {
             console.error('Error in loadGpxTrack:', error);
             Utils.handleError('Error parsing GPX file: ' + error.message);
@@ -1342,6 +1198,218 @@ function loadGpxTrack(file) {
         AppState.isLoadingGpx = false;
     };
     reader.readAsText(file);
+}
+function loadCsvTrack(file) {
+    if (!AppState.map) {
+        console.warn('Map not initialized, cannot load CSV track');
+        Utils.handleError('Map not initialized, cannot load CSV track.');
+        return;
+    }
+
+    AppState.isLoadingGpx = true; // Reuse loading state
+    const reader = new FileReader();
+    reader.onload = async function (e) {
+        try {
+            const csvData = e.target.result;
+            const points = [];
+            Papa.parse(csvData, {
+                skipEmptyLines: true,
+                step: function (row) {
+                    const data = row.data;
+                    if (data[0] === '$GNSS') {
+                        const timeStr = data[1];
+                        const lat = parseFloat(data[2]);
+                        const lng = parseFloat(data[3]);
+                        const ele = parseFloat(data[4]); // hMSL as elevation
+                        if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180 || isNaN(ele)) {
+                            console.warn('Invalid CSV trackpoint:', { time: timeStr, lat, lng, ele });
+                            return;
+                        }
+                        let time = null;
+                        try {
+                            time = luxon.DateTime.fromISO(timeStr, { zone: 'utc' });
+                            if (!time.isValid) {
+                                console.warn('Invalid timestamp in CSV:', { time: timeStr });
+                                time = null;
+                            }
+                        } catch (error) {
+                            console.warn('Error parsing timestamp in CSV:', { time: timeStr, error });
+                        }
+                        points.push({
+                            lat: lat,
+                            lng: lng,
+                            ele: ele,
+                            time: time
+                        });
+                    }
+                },
+                error: function (error) {
+                    throw new Error('Error parsing CSV: ' + error.message);
+                }
+            });
+            if (points.length < 2) {
+                throw new Error('CSV track has insufficient points.');
+            }
+            await renderTrack(points, file.name);
+        } catch (error) {
+            console.error('Error in loadCsvTrack:', error);
+            Utils.handleError('Error parsing CSV file: ' + error.message);
+        } finally {
+            AppState.isLoadingGpx = false;
+        }
+    };
+    reader.onerror = function () {
+        Utils.handleError('Error reading CSV file.');
+        AppState.isLoadingGpx = false;
+    };
+    reader.readAsText(file);
+}
+async function renderTrack(points, fileName) {
+    try {
+        // Clear existing layer
+        if (AppState.gpxLayer) {
+            AppState.map.removeLayer(AppState.gpxLayer);
+            AppState.gpxLayer = null;
+        }
+        AppState.gpxPoints = points;
+
+        // Move marker to final point and update lastAltitude
+        if (points.length > 0) {
+            const finalPoint = points[points.length - 1];
+            AppState.lastLat = finalPoint.lat;
+            AppState.lastLng = finalPoint.lng;
+            AppState.lastAltitude = await Utils.getAltitude(AppState.lastLat, AppState.lastLng);
+            console.log('Moved marker to final track point:', { lat: AppState.lastLat, lng: AppState.lastLng, lastAltitude: AppState.lastAltitude });
+
+            // Update marker position
+            AppState.currentMarker = Utils.configureMarker(
+                AppState.map,
+                AppState.lastLat,
+                AppState.lastLng,
+                AppState.lastAltitude,
+                false,
+                createCustomMarker,
+                attachMarkerDragend,
+                updateMarkerPopup,
+                AppState.currentMarker,
+                (marker) => { AppState.currentMarker = marker; }
+            );
+            AppState.isManualPanning = false;
+
+            // Trigger weather fetch and jump calculations
+            let timestampToUse = null;
+            if (points[0].time && points[0].time.isValid) {
+                const initialTimestamp = points[0].time;
+                console.log('Track initial timestamp:', initialTimestamp.toISO());
+                const today = luxon.DateTime.utc().startOf('day');
+                const trackDate = initialTimestamp.startOf('day');
+                const isToday = trackDate.hasSame(today, 'day');
+
+                // Round to nearest hour
+                let roundedTimestamp = initialTimestamp.startOf('hour');
+                if (initialTimestamp.minute >= 30) {
+                    roundedTimestamp = roundedTimestamp.plus({ hours: 1 });
+                }
+                console.log('Track rounded timestamp:', roundedTimestamp.toISO());
+                timestampToUse = roundedTimestamp.toISO();
+
+                if (!isToday) {
+                    const historicalDatePicker = document.getElementById('historicalDatePicker');
+                    if (historicalDatePicker) {
+                        historicalDatePicker.value = trackDate.toFormat('yyyy-MM-dd');
+                        console.log('Set historicalDatePicker to:', historicalDatePicker.value);
+                    } else {
+                        console.warn('historicalDatePicker not found, cannot set historical date');
+                        Utils.handleError('Cannot fetch historical weather: date picker not found.');
+                    }
+                }
+            } else {
+                console.warn('No valid timestamp in track, using current time for weather');
+            }
+
+            await fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, timestampToUse);
+            if (Settings.state.userSettings.calculateJump) {
+                debouncedCalculateJump();
+                calculateCutAway();
+            }
+            if (Settings.state.userSettings.showJumpRunTrack) {
+                updateJumpRunTrack();
+            }
+            if (Settings.state.userSettings.showLandingPattern) {
+                updateLandingPattern();
+            }
+        }
+
+        // Create track layer with custom pane
+        AppState.gpxLayer = L.layerGroup({ pane: 'gpxTrackPane' });
+        const groundAltitude = AppState.lastAltitude !== 'N/A' && !isNaN(AppState.lastAltitude) ? parseFloat(AppState.lastAltitude) : null;
+        for (let i = 0; i < points.length - 1; i++) {
+            const p1 = points[i];
+            const p2 = points[i + 1];
+            const ele1 = p1.ele;
+            const ele2 = p2.ele;
+            let color = '#808080';
+            if (groundAltitude !== null && ele1 !== null && ele2 !== null) {
+                const agl1 = ele1 - groundAltitude;
+                const agl2 = ele2 - groundAltitude;
+                const avgAgl = (agl1 + agl2) / 2;
+                color = interpolateColor(avgAgl);
+            }
+            const segment = L.polyline([[p1.lat, p1.lng], [p2.lat, p2.lng]], {
+                color: color,
+                weight: 4,
+                opacity: 0.75,
+                pane: 'gpxTrackPane'
+            }).bindTooltip('', { sticky: true });
+            segment.on('mousemove', function (e) {
+                const latlng = e.latlng;
+                let closestPoint = points[0];
+                let minDist = Infinity;
+                let closestIndex = 0;
+                points.forEach((p, index) => {
+                    const dist = Math.sqrt(Math.pow(p.lat - latlng.lat, 2) + Math.pow(p.lng - latlng.lng, 2));
+                    if (dist < minDist) {
+                        minDist = dist;
+                        closestPoint = p;
+                        closestIndex = index;
+                    }
+                });
+                segment.setTooltipContent(getTooltipContent(closestPoint, closestIndex, points, groundAltitude, getWindSpeedUnit(), getHeightUnit())).openTooltip(latlng);
+            });
+            AppState.gpxLayer.addLayer(segment);
+        }
+        AppState.gpxLayer.addTo(AppState.map);
+        console.log('Track layer added:', { gpxLayer: AppState.gpxLayer });
+
+        // Center map to track bounds
+        if (points.length > 0) {
+            const bounds = L.latLngBounds(points.map(p => [p.lat, p.lng]));
+            if (bounds.isValid()) {
+                AppState.map.invalidateSize();
+                AppState.map.fitBounds(bounds, { padding: [50, 50], maxZoom: AppState.maxZoom });
+                console.log('Map fitted to track bounds:', { bounds: bounds.toBBoxString() });
+            } else {
+                console.warn('Invalid track bounds:', { points });
+                Utils.handleError('Unable to display track: invalid coordinates.');
+            }
+        }
+
+        // Display track info
+        const distance = (points.reduce((dist, p, i) => {
+            if (i === 0) return 0;
+            const prev = points[i - 1];
+            return dist + AppState.map.distance([prev.lat, prev.lng], [p.lat, p.lng]);
+        }, 0) / 1000).toFixed(2);
+        const elevations = points.map(p => p.ele).filter(e => e !== null);
+        const elevationMin = elevations.length ? Math.min(...elevations).toFixed(0) : 'N/A';
+        const elevationMax = elevations.length ? Math.max(...elevations).toFixed(0) : 'N/A';
+        document.getElementById('info').innerHTML += `<br><strong>Track:</strong> Distance: ${distance} km, Min Elevation: ${elevationMin} m, Max Elevation: ${elevationMax} m (Source: ${fileName})`;
+    } catch (error) {
+        console.error('Error in renderTrack:', error);
+        Utils.handleError('Error rendering track: ' + error.message);
+        AppState.gpxPoints = [];
+        AppState.gpxLayer = null;
+    }
 }
 
 // == Live Tracking Handling ==
@@ -2395,7 +2463,7 @@ async function updateWeatherDisplay(index, originalTime = null) {
         }
 
         const speedKt = Math.round(Utils.convertWind(spd, 'kt', 'km/h') / 5) * 5;
-        const windBarbSvg = data.dir === 'N/A' || isNaN(speedKt) ? 'N/A' : Utils.generateWindBarb(data.dir, speedKt);
+        const windBarbSvg = data.dir === 'N/A' || isNaN(speedKt) ? 'N/A' : generateWindBarb(data.dir, speedKt);
 
         output += `<tr class="${windClass} ${humidityClass}">
             <td>${Math.round(displayHeight)}</td>
@@ -2827,6 +2895,74 @@ function downloadTableAsAscii(format) {
     Settings.updateUnitLabels();
     Settings.updateUnitLabels();
 
+}
+function generateWindBarb(direction, speedKt) {
+    // Convert speed to knots if not already (assuming speedKt is in knots)
+    const speed = Math.round(speedKt);
+
+    // SVG dimensions
+    const width = 40;
+    const height = 40;
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const staffLength = 20;
+
+    // Determine hemisphere based on latitude (lastLat)
+    const isNorthernHemisphere = typeof AppState.lastLat === 'number' && !isNaN(AppState.lastLat) ? AppState.lastLat >= 0 : true;
+    const barbSide = isNorthernHemisphere ? -1 : 1; // -1 for left (Northern), 1 for right (Southern)
+
+    // Calculate barb components
+    let flags = Math.floor(speed / 50); // 50 kt flags
+    let remaining = speed % 50;
+    let fullBarbs = Math.floor(remaining / 10); // 10 kt full barbs
+    let halfBarbs = Math.floor((remaining % 10) / 5); // 5 kt half barbs
+
+    // Adjust for small speeds
+    if (speed < 5) {
+        fullBarbs = 0;
+        halfBarbs = 0;
+    } else if (speed < 10 && halfBarbs > 0) {
+        halfBarbs = 1; // Ensure at least one half barb for 5-9 kt
+    }
+
+    // Start SVG
+    let svg = `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`;
+
+    // Rotate based on wind direction (wind *from* direction)
+    const rotation = direction + 180; // Staff points toward wind source (tip at origin)
+    svg += `<g transform="translate(${centerX}, ${centerY}) rotate(${rotation})">`;
+
+    // Draw the staff (vertical line, base at bottom, tip at top toward the source)
+    svg += `<line x1="0" y1="${staffLength / 2}" x2="0" y2="${-staffLength / 2}" stroke="black" stroke-width="1"/>`;
+
+    // Draw barbs on the appropriate side, at the base of the staff
+    let yPos = staffLength / 2; // Start at the base (wind blowing toward this end)
+    const barbSpacing = 4;
+
+    // Flags (50 kt) - Triangle with side attached to staff, pointing to the correct side
+    for (let i = 0; i < flags; i++) {
+        svg += `<polygon points="0,${yPos - 5} 0,${yPos + 5} ${10 * barbSide},${yPos}" fill="black"/>`;
+        yPos -= barbSpacing + 5; // Move up the staff (toward the tip)
+    }
+
+    // Full barbs (10 kt) - Straight to the correct side (perpendicular)
+    for (let i = 0; i < fullBarbs; i++) {
+        svg += `<line x1="0" y1="${yPos}" x2="${10 * barbSide}" y2="${yPos}" stroke="black" stroke-width="1"/>`;
+        yPos -= barbSpacing;
+    }
+
+    // Half barbs (5 kt) - Straight to the correct side (perpendicular)
+    if (halfBarbs > 0) {
+        svg += `<line x1="0" y1="${yPos}" x2="${5 * barbSide}" y2="${yPos}" stroke="black" stroke-width="1"/>`;
+    }
+
+    // Circle for calm winds (< 5 kt)
+    if (speed < 5) {
+        svg += `<circle cx="0" cy="0" r="3" fill="none" stroke="black" stroke-width="1"/>`;
+    }
+
+    svg += `</g></svg>`;
+    return svg;
 }
 
 // == Autoupdate Functionality ==
@@ -6522,25 +6658,37 @@ function setupCheckbox(id, setting, callback) {
         console.warn(`Checkbox ${id} not found`);
     }
 }
-function setupGpxTrackEvents() {
-    console.log('Setting up GPX track events');
-    const gpxFileInput = document.getElementById('gpxFileInput');
-    if (gpxFileInput) {
-        gpxFileInput.addEventListener('change', (e) => {
+function setupTrackEvents() {
+    console.log('Setting up track events');
+    const trackFileInput = document.getElementById('trackFileInput');
+    if (trackFileInput) {
+        trackFileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
-            console.log('GPX file selected:', file?.name);
-            loadGpxTrack(file);
+            console.log('Track file selected:', file?.name);
+            if (!file) {
+                Utils.handleError('No file selected.');
+                return;
+            }
+            const extension = file.name.split('.').pop().toLowerCase();
+            if (extension === 'gpx') {
+                loadGpxTrack(file);
+            } else if (extension === 'csv') {
+                loadCsvTrack(file);
+            } else {
+                Utils.handleError('Unsupported file type. Please upload a .gpx or .csv file.');
+            }
         });
     } else {
-        console.warn('GPX file input not found:', { id: 'gpxFileInput' });
+        console.warn('Track file input not found:', { id: 'trackFileInput' });
     }
-    const clearGpxButton = document.getElementById('clearGpxTrack');
-    if (clearGpxButton) {
-        clearGpxButton.addEventListener('click', () => {
-            console.log('Clear GPX button clicked');
+
+    const clearTrackButton = document.getElementById('clearTrack');
+    if (clearTrackButton) {
+        clearTrackButton.addEventListener('click', () => {
+            console.log('Clear track button clicked');
             if (!AppState.map) {
-                console.warn('Map not initialized, cannot clear GPX track');
-                Utils.handleError('Cannot clear GPX track: map not initialized.');
+                console.warn('Map not initialized, cannot clear track');
+                Utils.handleError('Cannot clear track: map not initialized.');
                 return;
             }
             if (AppState.gpxLayer) {
@@ -6548,29 +6696,29 @@ function setupGpxTrackEvents() {
                     AppState.map.removeLayer(AppState.gpxLayer);
                     AppState.gpxLayer = null;
                     AppState.gpxPoints = [];
-                    console.log('Cleared GPX track');
+                    console.log('Cleared track');
                     const infoElement = document.getElementById('info');
                     if (infoElement) {
                         infoElement.innerHTML = 'Click on the map to fetch weather data.';
                     } else {
                         console.warn('Info element not found:', { id: 'info' });
                     }
-                    if (gpxFileInput) {
-                        gpxFileInput.value = '';
+                    if (trackFileInput) {
+                        trackFileInput.value = '';
                     } else {
-                        console.warn('GPX file input not found for clearing:', { id: 'gpxFileInput' });
+                        console.warn('Track file input not found for clearing:', { id: 'trackFileInput' });
                     }
                 } catch (error) {
-                    console.error('Error clearing GPX track:', error);
-                    Utils.handleError('Failed to clear GPX track: ' + error.message);
+                    console.error('Error clearing track:', error);
+                    Utils.handleError('Failed to clear track: ' + error.message);
                 }
             } else {
-                console.log('No GPX track to clear');
-                Utils.handleError('No GPX track to clear.');
+                console.log('No track to clear');
+                Utils.handleError('No track to clear.');
             }
         });
     } else {
-        console.warn('Clear GPX button not found:', { id: 'clearGpxTrack' });
+        console.warn('Clear track button not found:', { id: 'clearTrack' });
     }
 }
 function setupResetButton() {
@@ -7133,7 +7281,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupResetButton();
     setupResetCutAwayMarkerButton();
     setupClearHistoricalDate(); // Add this line
-    setupGpxTrackEvents(); // Add this line
+    setupTrackEvents(); // Add this line
     setupCacheManagement();
     setupCacheSettings({ map: AppState.map, lastLat: AppState.lastLat, lastLng: AppState.lastLng, baseMaps: AppState.baseMaps });
     setupAutoupdate(); // Add autoupdate setup

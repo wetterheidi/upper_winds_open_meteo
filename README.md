@@ -136,3 +136,5 @@ Leverages [OpenMeteo API](https://open-meteo.com/) for:
 
 ## Warning
 Data is sourced from OpenMeteo and may contain inaccuracies. Always verify with official meteorological sources for critical applications, especially skydiving or aviation.
+
+![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/wetterheidi/upper_winds_open_meteo?utm_source=oss&utm_medium=github&utm_campaign=wetterheidi%2Fupper_winds_open_meteo&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
