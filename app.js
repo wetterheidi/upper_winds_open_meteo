@@ -1199,6 +1199,7 @@ function loadGpxTrack(file) {
     };
     reader.readAsText(file);
 }
+//If FlySight stores Z time
 function loadCsvTrackUTC(file) {
     if (!AppState.map) {
         console.warn('Map not initialized, cannot load CSV track');
@@ -1271,6 +1272,7 @@ function loadCsvTrackUTC(file) {
     };
     reader.readAsText(file);
 }
+//If FlySight stores loc time
 function loadCsvTrack(file) {
     if (!AppState.map) {
         console.warn('Map not initialized, cannot load CSV track');
@@ -1345,7 +1347,6 @@ function loadCsvTrack(file) {
     };
     reader.readAsText(file);
 } 
-
 async function renderTrack(points, fileName) {
     try {
         // Clear existing layer
@@ -3087,7 +3088,6 @@ function setupAutoupdate() {
         startAutoupdate();
     }
 }
-
 function startAutoupdate() {
     if (AppState.autoupdateInterval) {
         console.log('Autoupdate already running, skipping start');
@@ -3121,7 +3121,6 @@ function startAutoupdate() {
 
     Utils.handleMessage('Autoupdate enabled');
 }
-
 function stopAutoupdate() {
     if (AppState.autoupdateInterval) {
         clearInterval(AppState.autoupdateInterval);
@@ -3130,7 +3129,6 @@ function stopAutoupdate() {
         Utils.handleMessage('Autoupdate disabled');
     }
 }
-
 async function updateToCurrentHour() {
     if (!AppState.lastLat || !AppState.lastLng) {
         console.warn('No location selected, cannot update weather data');
