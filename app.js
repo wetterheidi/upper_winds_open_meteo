@@ -1199,7 +1199,7 @@ function loadGpxTrack(file) {
     };
     reader.readAsText(file);
 }
-function loadCsvTrack(file) {
+function loadCsvTrackUTC(file) {
     if (!AppState.map) {
         console.warn('Map not initialized, cannot load CSV track');
         Utils.handleError('Map not initialized, cannot load CSV track.');
@@ -1271,6 +1271,81 @@ function loadCsvTrack(file) {
     };
     reader.readAsText(file);
 }
+function loadCsvTrack(file) {
+    if (!AppState.map) {
+        console.warn('Map not initialized, cannot load CSV track');
+        Utils.handleError('Map not initialized, cannot load CSV track.');
+        return;
+    }
+
+    AppState.isLoadingGpx = true; // Reuse loading state
+    const reader = new FileReader();
+    reader.onload = async function (e) {
+        try {
+            const csvData = e.target.result;
+            const points = [];
+            Papa.parse(csvData, {
+                skipEmptyLines: true,
+                step: function (row) {
+                    const data = row.data;
+                    if (data[0] === '$GNSS') {
+                        let timeStr = data[1]; // e.g., '2025-04-26T17:36:33.800Z' or '2025-04-26T17:36:33.800'
+                        const lat = parseFloat(data[2]);
+                        const lng = parseFloat(data[3]);
+                        const ele = parseFloat(data[4]); // hMSL as elevation
+                        if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180 || isNaN(ele)) {
+                            console.warn('Invalid CSV trackpoint:', { time: timeStr, lat, lng, ele });
+                            return;
+                        }
+                        let time = null;
+                        try {
+                            // Remove 'Z' or any explicit offset to treat as local time
+                            timeStr = timeStr.replace(/Z$|([+-]\d{2}:\d{2})$/, '');
+                            // Parse as local time in the user's time zone
+                            time = luxon.DateTime.fromISO(timeStr, { zone: luxon.Settings.defaultZone });
+                            if (!time.isValid) {
+                                console.warn('Invalid timestamp in CSV:', { time: timeStr, reason: time.invalidReason });
+                                time = null;
+                            } else {
+                                console.log('Parsed CSV timestamp as local:', { timeStr, localTime: time.toISO(), zone: time.zoneName });
+                                // Convert to UTC for consistency with GPX
+                                time = time.toUTC();
+                                console.log('Converted to UTC:', { utcTime: time.toISO() });
+                            }
+                        } catch (error) {
+                            console.warn('Error parsing timestamp in CSV:', { time: timeStr, error: error.message });
+                            time = null;
+                        }
+                        points.push({
+                            lat: lat,
+                            lng: lng,
+                            ele: ele,
+                            time: time
+                        });
+                    }
+                },
+                error: function (error) {
+                    throw new Error('Error parsing CSV: ' + error.message);
+                }
+            });
+            if (points.length < 2) {
+                throw new Error('CSV track has insufficient points.');
+            }
+            await renderTrack(points, file.name);
+        } catch (error) {
+            console.error('Error in loadCsvTrack:', error);
+            Utils.handleError('Error parsing CSV file: ' + error.message);
+        } finally {
+            AppState.isLoadingGpx = false;
+        }
+    };
+    reader.onerror = function () {
+        Utils.handleError('Error reading CSV file.');
+        AppState.isLoadingGpx = false;
+    };
+    reader.readAsText(file);
+} 
+
 async function renderTrack(points, fileName) {
     try {
         // Clear existing layer
