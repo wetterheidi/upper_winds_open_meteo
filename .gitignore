@@ -1,3 +1,6 @@
+# Sensitive configuration files
+config.js
+
 # Environment variables
 .env
 
