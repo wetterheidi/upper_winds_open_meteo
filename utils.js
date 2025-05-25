@@ -421,35 +421,44 @@ export class Utils {
         }
     }
 
-    static dmsToDecimal(degrees, minutes, seconds, direction) {
-        // Validate inputs
-        if (typeof degrees !== 'number' || isNaN(degrees) ||
-            typeof minutes !== 'number' || isNaN(minutes) ||
-            typeof seconds !== 'number' || isNaN(seconds) ||
-            typeof direction !== 'string' || !['N', 'S', 'E', 'W'].includes(direction.toUpperCase())) {
-            throw new Error('Invalid DMS input: degrees, minutes, seconds must be numbers, and direction must be N, S, E, or W');
+    static dmsToDecimal(deg, min, sec, dir) {
+        if (isNaN(deg) || isNaN(min) || isNaN(sec) || !dir) {
+            console.warn('Invalid DMS inputs:', { deg, min, sec, dir });
+            throw new Error('Invalid DMS values');
         }
-
-        // Calculate decimal degrees
-        let decimal = degrees + (minutes / 60) + (seconds / 3600);
-        if (direction.toUpperCase() === 'S' || direction.toUpperCase() === 'W') {
+        let decimal = deg + (min / 60) + (sec / 3600);
+        if (dir === 'S' || dir === 'W') {
             decimal = -decimal;
+        }
+        if (isNaN(decimal)) {
+            console.warn('DMS to decimal conversion failed:', { deg, min, sec, dir });
+            throw new Error('Failed to convert DMS to decimal');
         }
         return decimal;
     }
 
     static decimalToDms(decimal, isLat) {
+        if (isNaN(decimal) || decimal === null || decimal === undefined) {
+            console.warn('Invalid decimal value for DMS conversion:', decimal);
+            throw new Error('Invalid coordinate for DMS conversion');
+        }
         const absolute = Math.abs(decimal);
-        const degrees = Math.floor(absolute);
-        const minutesFloat = (absolute - degrees) * 60;
-        const minutes = Math.floor(minutesFloat);
-        const seconds = ((minutesFloat - minutes) * 60).toFixed(1);
+        const deg = Math.floor(absolute);
+        const min = Math.floor((absolute - deg) * 60);
+        const sec = ((absolute - deg) * 3600) - (min * 60);
+        const dir = isLat ? (decimal >= 0 ? 'N' : 'S') : (decimal >= 0 ? 'E' : 'W');
 
-        const direction = isLat
-            ? (decimal >= 0 ? 'N' : 'S')
-            : (decimal >= 0 ? 'E' : 'W');
+        if (isNaN(deg) || isNaN(min) || isNaN(sec)) {
+            console.warn('DMS calculation resulted in invalid values:', { deg, min, sec });
+            throw new Error('Failed to convert to DMS');
+        }
 
-        return `${degrees}° ${minutes}' ${seconds}" ${direction}`;
+        return {
+            deg,
+            min,
+            sec,
+            dir
+        };
     }
 
     static decimalToMgrs(lat, lng) {
@@ -597,76 +606,76 @@ export class Utils {
     }
 
     static calculateNewCenter(lat, lng, distance, bearing) {
-    const R = 6371000; // Earth's radius in meters
-    const lat1 = lat * Math.PI / 180; // Convert to radians
-    const lng1 = lng * Math.PI / 180;
-    const bearingRad = bearing * Math.PI / 180; // Wind FROM direction
+        const R = 6371000; // Earth's radius in meters
+        const lat1 = lat * Math.PI / 180; // Convert to radians
+        const lng1 = lng * Math.PI / 180;
+        const bearingRad = bearing * Math.PI / 180; // Wind FROM direction
 
-    const delta = distance / R; // Angular distance
+        const delta = distance / R; // Angular distance
 
-    const lat2 = Math.asin(Math.sin(lat1) * Math.cos(delta) +
-        Math.cos(lat1) * Math.sin(delta) * Math.cos(bearingRad));
-    const lng2 = lng1 + Math.atan2(Math.sin(bearingRad) * Math.sin(delta) * Math.cos(lat1),
-        Math.cos(delta) - Math.sin(lat1) * Math.sin(lat2));
+        const lat2 = Math.asin(Math.sin(lat1) * Math.cos(delta) +
+            Math.cos(lat1) * Math.sin(delta) * Math.cos(bearingRad));
+        const lng2 = lng1 + Math.atan2(Math.sin(bearingRad) * Math.sin(delta) * Math.cos(lat1),
+            Math.cos(delta) - Math.sin(lat1) * Math.sin(lat2));
 
-    // Convert back to degrees
-    const newLat = lat2 * 180 / Math.PI;
-    const newLng = lng2 * 180 / Math.PI;
+        // Convert back to degrees
+        const newLat = lat2 * 180 / Math.PI;
+        const newLng = lng2 * 180 / Math.PI;
 
-    // Normalize longitude to [-180, 180]
-    const normalizedLng = ((newLng + 540) % 360) - 180;
+        // Normalize longitude to [-180, 180]
+        const normalizedLng = ((newLng + 540) % 360) - 180;
 
-    return [newLat, normalizedLng];
-}
-
-static debounce(func, wait) {
-    let timeout;
-    return function (...args) {
-        clearTimeout(timeout);
-        timeout = setTimeout(() => func.apply(this, args), wait);
-    };
-}
-
-static calculateBearing(lat1, lng1, lat2, lng2) {
-    const toRad = deg => deg * Math.PI / 180;
-    const toDeg = rad => rad * 180 / Math.PI;
-
-    const dLon = toRad(lng2 - lng1);
-    const y = Math.sin(dLon) * Math.cos(toRad(lat2));
-    const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
-        Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLon);
-    let bearing = toDeg(Math.atan2(y, x));
-    bearing = (bearing + 360) % 360; // Normalize to 0-360
-    return bearing;
-}
-
-static async getAltitude(lat, lng) {
-    const { elevation } = await Utils.getLocationData(lat, lng);
-    console.log('Fetched elevation from Open-Meteo:', elevation);
-    return elevation !== 'N/A' ? elevation : 'N/A';
-}
-
-static getLastFullHourUTC() {
-    const now = new Date();
-    const utcYear = now.getUTCFullYear();
-    const utcMonth = now.getUTCMonth();
-    const utcDate = now.getUTCDate();
-    const utcHour = now.getUTCHours();
-    const lastFullHour = new Date(Date.UTC(utcYear, utcMonth, utcDate, utcHour, 0, 0));
-    console.log('Last full hour UTC:', lastFullHour.toISOString());
-    return lastFullHour; // Return Date object instead of string
-}
-
-static async getDisplayTime(utcTimeStr, lat, lng) {
-    const timeZone = document.querySelector('input[name="timeZone"]:checked')?.value || 'Z';
-    if (timeZone === 'Z' || !lat || !lng) {
-        return Utils.formatTime(utcTimeStr); // Synchronous
-    } else {
-        return await Utils.formatLocalTime(utcTimeStr, lat, lng); // Async
+        return [newLat, normalizedLng];
     }
-}
 
-static configureMarker(map, lat, lng, altitude, openPopup = false, createCustomMarker, attachMarkerDragend, updateMarkerPopup, currentMarker, setCurrentMarker) {
+    static debounce(func, wait) {
+        let timeout;
+        return function (...args) {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(this, args), wait);
+        };
+    }
+
+    static calculateBearing(lat1, lng1, lat2, lng2) {
+        const toRad = deg => deg * Math.PI / 180;
+        const toDeg = rad => rad * 180 / Math.PI;
+
+        const dLon = toRad(lng2 - lng1);
+        const y = Math.sin(dLon) * Math.cos(toRad(lat2));
+        const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
+            Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLon);
+        let bearing = toDeg(Math.atan2(y, x));
+        bearing = (bearing + 360) % 360; // Normalize to 0-360
+        return bearing;
+    }
+
+    static async getAltitude(lat, lng) {
+        const { elevation } = await Utils.getLocationData(lat, lng);
+        console.log('Fetched elevation from Open-Meteo:', elevation);
+        return elevation !== 'N/A' ? elevation : 'N/A';
+    }
+
+    static getLastFullHourUTC() {
+        const now = new Date();
+        const utcYear = now.getUTCFullYear();
+        const utcMonth = now.getUTCMonth();
+        const utcDate = now.getUTCDate();
+        const utcHour = now.getUTCHours();
+        const lastFullHour = new Date(Date.UTC(utcYear, utcMonth, utcDate, utcHour, 0, 0));
+        console.log('Last full hour UTC:', lastFullHour.toISOString());
+        return lastFullHour; // Return Date object instead of string
+    }
+
+    static async getDisplayTime(utcTimeStr, lat, lng) {
+        const timeZone = document.querySelector('input[name="timeZone"]:checked')?.value || 'Z';
+        if (timeZone === 'Z' || !lat || !lng) {
+            return Utils.formatTime(utcTimeStr); // Synchronous
+        } else {
+            return await Utils.formatLocalTime(utcTimeStr, lat, lng); // Async
+        }
+    }
+
+    static configureMarker(map, lat, lng, altitude, openPopup = false, createCustomMarker, attachMarkerDragend, updateMarkerPopup, currentMarker, setCurrentMarker) {
         if (!map) {
             console.warn('Map not initialized, cannot configure marker');
             return null;

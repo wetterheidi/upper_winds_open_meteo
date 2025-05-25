@@ -6,6 +6,7 @@ import { Constants, FEATURE_PASSWORD } from './constants.js';
 import { displayMessage, displayProgress, displayError, hideProgress, updateOfflineIndicator, isMobileDevice } from './ui.js';
 import { TileCache, cacheTilesForDIP, debouncedCacheVisibleTiles } from './tileCache.js';
 import { setupCacheManagement, setupCacheSettings } from './cacheUI.js';
+import * as Coordinates from './coordinates.js';
 "use strict";
 
 let userSettings;
@@ -391,6 +392,7 @@ function initMap() {
                 AppState.lastLat = position.coords.latitude;
                 AppState.lastLng = position.coords.longitude;
                 AppState.lastAltitude = await Utils.getAltitude(AppState.lastLat, AppState.lastLng);
+                Coordinates.addCoordToHistory(AppState.lastLat, AppState.lastLng);
 
                 AppState.currentMarker = Utils.configureMarker(
                     AppState.map,
@@ -650,6 +652,7 @@ function initMap() {
         AppState.lastLng = lng;
         AppState.lastAltitude = await Utils.getAltitude(lat, lng);
         console.log('Map double-clicked, moving marker to:', { lat, lng });
+        Coordinates.addCoordToHistory(lat, lng);
 
         AppState.currentMarker = Utils.configureMarker(
             AppState.map,
@@ -754,6 +757,7 @@ function initMap() {
             AppState.lastLat = lat;
             AppState.lastLng = lng;
             AppState.lastAltitude = await Utils.getAltitude(lat, lng);
+            Coordinates.addCoordToHistory(lat, lng);
             AppState.currentMarker = Utils.configureMarker(
                 AppState.map,
                 AppState.lastLat,
@@ -943,6 +947,7 @@ function attachMarkerDragend(marker) {
         AppState.lastLat = position.lat;
         AppState.lastLng = position.lng;
         AppState.lastAltitude = await Utils.getAltitude(AppState.lastLat, AppState.lastLng);
+        Coordinates.addCoordToHistory(position.lat, position.lng);
         const wasOpen = marker.getPopup()?.isOpen() || false;
         updateMarkerPopup(marker, AppState.lastLat, AppState.lastLng, AppState.lastAltitude, wasOpen);
         console.log('Marker dragged to:', { lat: AppState.lastLat, lng: AppState.lastLng });
@@ -1346,7 +1351,7 @@ function loadCsvTrack(file) {
         AppState.isLoadingGpx = false;
     };
     reader.readAsText(file);
-} 
+}
 async function renderTrack(points, fileName) {
     try {
         // Clear existing layer
@@ -5319,128 +5324,6 @@ function createArrowIcon(lat, lng, bearing, color) {
     });
 }
 
-// == Coordinates History and Favorites ==
-function initCoordStorage() {
-    if (!localStorage.getItem('coordHistory')) {
-        localStorage.setItem('coordHistory', JSON.stringify([]));
-    }
-}
-function getCoordHistory() {
-    return JSON.parse(localStorage.getItem('coordHistory')) || [];
-}
-function formatCoordLabel(lat, lng, format) {
-    if (format === 'DMS') {
-        const latDMS = Utils.decimalToDMS(lat, 'lat');
-        const lngDMS = Utils.decimalToDMS(lng, 'lng');
-        return `${latDMS.deg}°${latDMS.min}'${latDMS.sec}"${latDMS.dir} ${lngDMS.deg}°${lngDMS.min}'${lngDMS.sec}"${lngDMS.dir}`;
-    } else if (format === 'MGRS') {
-        try {
-            return mgrs.forward([lng, lat], 10);
-        } catch (e) {
-            console.warn('MGRS format failed:', e);
-            return `${lat.toFixed(2)}, ${lng.toFixed(2)}`;
-        }
-    }
-    return `${lat.toFixed(2)}, ${lng.toFixed(2)}`;
-}
-function addCoordToHistory(lat, lng) {
-    const history = getCoordHistory();
-    const format = Settings.state.userSettings.coordFormat;
-    const newEntry = {
-        lat: parseFloat(lat.toFixed(4)),
-        lng: parseFloat(lng.toFixed(4)),
-        label: formatCoordLabel(lat, lng, format),
-        isFavorite: false,
-        timestamp: Date.now()
-    };
-    const existing = history.find(
-        entry => entry.lat === newEntry.lat && entry.lng === newEntry.lng
-    );
-    if (existing) {
-        newEntry.isFavorite = existing.isFavorite;
-        newEntry.label = existing.isFavorite ? existing.label : newEntry.label;
-        history.splice(history.indexOf(existing), 1);
-    }
-    history.unshift(newEntry);
-    const favorites = history.filter(entry => entry.isFavorite);
-    const nonFavorites = history.filter(entry => !entry.isFavorite).slice(0, 5);
-    localStorage.setItem('coordHistory', JSON.stringify([...favorites, ...nonFavorites]));
-    updateCoordDropdown();
-}
-function toggleFavorite(lat, lng) {
-    console.log('Toggling favorite for:', { lat, lng });
-    const history = getCoordHistory();
-    const entry = history.find(
-        entry => entry.lat === parseFloat(lat.toFixed(4)) && entry.lng === parseFloat(lng.toFixed(4))
-    );
-    if (entry) {
-        console.log('Found entry:', entry);
-        entry.isFavorite = !entry.isFavorite;
-        if (entry.isFavorite) {
-            entry.label = prompt('Name this favorite location:', entry.label) || entry.label;
-        } else {
-            entry.label = formatCoordLabel(entry.lat, entry.lng, Settings.state.userSettings.coordFormat);
-        }
-        localStorage.setItem('coordHistory', JSON.stringify(history));
-        updateCoordDropdown();
-        console.log('Updated history:', getCoordHistory());
-    } else {
-        console.log('No matching coordinate, adding as favorite');
-        const format = Settings.state.userSettings.coordFormat;
-        const newEntry = {
-            lat: parseFloat(lat.toFixed(4)),
-            lng: parseFloat(lng.toFixed(4)),
-            label: prompt('Name this favorite location:', formatCoordLabel(lat, lng, format)) || formatCoordLabel(lat, lng, format),
-            isFavorite: true,
-            timestamp: Date.now()
-        };
-        history.unshift(newEntry);
-        localStorage.setItem('coordHistory', JSON.stringify(history));
-        updateCoordDropdown();
-    }
-}
-function updateCoordDropdown() {
-    const select = document.getElementById('coordHistory');
-    if (!select) return;
-    select.innerHTML = '<option value="">Select a location</option>';
-    const history = getCoordHistory();
-    history.sort((a, b) => {
-        if (a.isFavorite && !b.isFavorite) return -1;
-        if (!a.isFavorite && b.isFavorite) return 1;
-        return b.timestamp - a.timestamp;
-    });
-    history.forEach(entry => {
-        const option = document.createElement('option');
-        option.value = `${entry.lat},${entry.lng}`;
-        option.text = `${entry.isFavorite ? '★ ' : ''}${entry.label}`;
-        select.appendChild(option);
-    });
-}
-function populateCoordInputs(lat, lng) {
-    const format = Settings.state.userSettings.coordFormat;
-    if (format === 'Decimal') {
-        document.getElementById('latDec').value = lat;
-        document.getElementById('lngDec').value = lng;
-    } else if (format === 'DMS') {
-        const latDMS = Utils.decimalToDMS(lat, 'lat');
-        const lngDMS = Utils.decimalToDMS(lng, 'lng');
-        document.getElementById('latDeg').value = latDMS.deg;
-        document.getElementById('latMin').value = latDMS.min;
-        document.getElementById('latSec').value = latDMS.sec;
-        document.getElementById('latDir').value = latDMS.dir;
-        document.getElementById('lngDeg').value = lngDMS.deg;
-        document.getElementById('lngMin').value = lngDMS.min;
-        document.getElementById('lngSec').value = lngDMS.sec;
-        document.getElementById('lngDir').value = lngDMS.dir;
-    } else if (format === 'MGRS') {
-        try {
-            document.getElementById('mgrsCoord').value = mgrs.forward([lng, lat], 10);
-        } catch (e) {
-            console.warn('MGRS conversion failed:', e);
-        }
-    }
-}
-
 // == UI and Event Handling ==
 function initializeApp() {
     Settings.initialize();
@@ -5889,11 +5772,9 @@ function setupRadioEvents() {
         updateAllDisplays();
     });
     setupRadioGroup('coordFormat', () => {
-        updateCoordInputs(Settings.state.userSettings.coordFormat);
-        if (AppState.currentMarker && AppState.lastLat && AppState.lastLng) {
-            // Check if popup is open to preserve its state
-            const isPopupOpen = AppState.currentMarker.getPopup()?.isOpen() || false;
-            updateMarkerPopup(AppState.currentMarker, AppState.lastLat, AppState.lastLng, AppState.lastAltitude, isPopupOpen);
+        Coordinates.updateCoordInputs(Settings.state.userSettings.coordFormat, AppState.lastLat, AppState.lastLng);
+        if (AppState.lastLat && AppState.lastLng) {
+            updateMarkerPopup(AppState.currentMarker, AppState.lastLat, AppState.lastLng, AppState.lastAltitude, AppState.currentMarker.getPopup()?.isOpen() || false);
         }
     });
     setupRadioGroup('downloadFormat', () => {
@@ -6643,72 +6524,68 @@ function setupCheckboxEvents() {
     }
 }
 function setupCoordinateEvents() {
-    initCoordStorage(); // Assumes initCoordStorage exists
+    Coordinates.initCoordStorage();
+    
+    // Define the move marker logic
+    const moveMarker = async (lat, lng) => {
+        try {
+            AppState.lastLat = lat;
+            AppState.lastLng = lng;
+            AppState.lastAltitude = await Utils.getAltitude(lat, lng);
+            console.log('Moving marker to:', { lat, lng });
+            AppState.currentMarker = Utils.configureMarker(
+                AppState.map,
+                lat,
+                lng,
+                AppState.lastAltitude,
+                false,
+                createCustomMarker,
+                attachMarkerDragend,
+                updateMarkerPopup,
+                AppState.currentMarker,
+                (marker) => { AppState.currentMarker = marker; }
+            );
+            resetJumpRunDirection(true);
+            Coordinates.addCoordToHistory(lat, lng);
+            if (Settings.state.userSettings.calculateJump) {
+                console.log('Recalculating jump for coordinate input');
+                debouncedCalculateJump();
+                calculateCutAway();
+            }
+            recenterMap(true);
+            AppState.isManualPanning = false;
+            await fetchWeatherForLocation(lat, lng);
+        } catch (error) {
+            console.error('Error moving marker:', error);
+            Utils.handleError(error.message);
+        }
+    };
+
+    // Set the move marker callback for coordinates.js
+    Coordinates.setMoveMarkerCallback(moveMarker);
+
+    // Initialize coordinate inputs
     const coordInputs = document.getElementById('coordInputs');
     if (coordInputs) {
-        updateCoordInputs(Settings.state.userSettings.coordFormat);
+        Coordinates.updateCoordInputs(Settings.state.userSettings.coordFormat, AppState.lastLat, AppState.lastLng);
     } else {
         console.warn('Coordinate inputs container (#coordInputs) not found');
     }
 
+    // Attach event listener to move marker button
     const moveMarkerBtn = document.getElementById('moveMarkerBtn');
     if (moveMarkerBtn) {
         moveMarkerBtn.addEventListener('click', async () => {
+            console.log('Move marker button clicked');
             try {
-                const [lat, lng] = parseCoordinates();
-                AppState.lastLat = lat;
-                AppState.lastLng = lng;
-                AppState.lastAltitude = await Utils.getAltitude(lat, lng);
-                console.log('Coordinate input, moving marker to:', { lat, lng });
-                AppState.currentMarker = Utils.configureMarker(
-                    AppState.map,
-                    lat,
-                    lng,
-                    AppState.lastAltitude,
-                    false,
-                    createCustomMarker,
-                    attachMarkerDragend,
-                    updateMarkerPopup,
-                    AppState.currentMarker,
-                    (marker) => { AppState.currentMarker = marker; }
-                );
-                resetJumpRunDirection(true);
-                addCoordToHistory(lat, lng);
-                if (Settings.state.userSettings.calculateJump) {
-                    console.log('Recalculating jump for coordinate input');
-                    debouncedCalculateJump();
-                    calculateCutAway();
-                }
-                recenterMap(true);
-                AppState.isManualPanning = false;
-                await fetchWeatherForLocation(lat, lng);
+                const [lat, lng] = Coordinates.parseCoordinates();
+                await moveMarker(lat, lng); // Use the same logic
             } catch (error) {
+                console.error('Error moving marker:', error);
                 Utils.handleError(error.message);
             }
         });
-    }
-
-    const coordHistory = document.getElementById('coordHistory');
-    if (coordHistory) {
-        coordHistory.addEventListener('change', (e) => {
-            if (e.target.value) {
-                const [lat, lng] = e.target.value.split(',').map(parseFloat);
-                populateCoordInputs(lat, lng);
-                moveMarkerBtn.click();
-            }
-        });
-    }
-
-    const favoriteBtn = document.getElementById('favoriteBtn');
-    if (favoriteBtn) {
-        favoriteBtn.addEventListener('click', () => {
-            try {
-                const [lat, lng] = parseCoordinates();
-                toggleFavorite(lat, lng);
-            } catch (error) {
-                Utils.handleError('Please enter valid coordinates to favorite');
-            }
-        });
+        console.log('Attached event listener to moveMarkerBtn');
     }
 }
 function setupCheckbox(id, setting, callback) {
@@ -7105,102 +6982,6 @@ function clearJumpCircles() {
         additionalBlueCircles: window.additionalBlueCircles?.length || 0,
         additionalBlueLabels: window.additionalBlueLabels?.length || 0
     });
-}
-function updateCoordInputs(format) {
-    const coordInputs = document.getElementById('coordInputs');
-    if (!coordInputs) return;
-
-    coordInputs.innerHTML = '';
-    if (format === 'Decimal') {
-        coordInputs.innerHTML = `
-            <label>Latitude: <input type="number" id="latDec" step="any" placeholder="e.g., 48.0179"></label>
-            <label>Longitude: <input type="number" id="lngDec" step="any" placeholder="e.g., 11.1923"></label>
-        `;
-    } else if (format === 'DMS') {
-        coordInputs.innerHTML = `
-            <label>Lat: 
-                <input type="number" id="latDeg" min="0" max="90" placeholder="Deg">°
-                <input type="number" id="latMin" min="0" max="59" placeholder="Min">'
-                <input type="number" id="latSec" min="0" max="59.999" step="0.001" placeholder="Sec">"
-                <select id="latDir"><option value="N">N</option><option value="S">S</option></select>
-            </label>
-            <label>Lng: 
-                <input type="number" id="lngDeg" min="0" max="180" placeholder="Deg">°
-                <input type="number" id="lngMin" min="0" max="59" placeholder="Min">'
-                <input type="number" id="lngSec" min="0" max="59.999" step="0.001" placeholder="Sec">"
-                <select id="lngDir"><option value="E">E</option><option value="W">W</option></select>
-            </label>
-        `;
-    } else if (format === 'MGRS') {
-        coordInputs.innerHTML = `
-            <label>MGRS: <input type="text" id="mgrsCoord" placeholder="e.g., 32UPU12345678"></label>
-        `;
-    }
-    coordInputs.innerHTML += `
-        <label for="coordHistory">Recent/Favorites:</label>
-        <select id="coordHistory" aria-label="Select recent or favorite coordinates">
-            <option value="">Select a location</option>
-        </select>
-        <button id="favoriteBtn" style="margin-left: 10px;">Toggle Favorite</button>
-    `;
-    console.log(`Coordinate inputs updated to ${format}`);
-    updateCoordDropdown();
-}
-function parseCoordinates() {
-    let lat, lng;
-
-    if (Settings.state.userSettings.coordFormat === 'Decimal') {
-        lat = parseFloat(document.getElementById('latDec')?.value);
-        lng = parseFloat(document.getElementById('lngDec')?.value);
-        if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-            throw new Error('Invalid Decimal Degrees coordinates');
-        }
-    } else if (Settings.state.userSettings.coordFormat === 'DMS') {
-        const latDeg = parseInt(document.getElementById('latDeg')?.value) || 0;
-        const latMin = parseInt(document.getElementById('latMin')?.value) || 0;
-        const latSec = parseFloat(document.getElementById('latSec')?.value) || 0;
-        const latDir = document.getElementById('latDir')?.value;
-        const lngDeg = parseInt(document.getElementById('lngDeg')?.value) || 0;
-        const lngMin = parseInt(document.getElementById('lngMin')?.value) || 0;
-        const lngSec = parseFloat(document.getElementById('lngSec')?.value) || 0;
-        const lngDir = document.getElementById('lngDir')?.value;
-
-        lat = Utils.dmsToDecimal(latDeg, latMin, latSec, latDir);
-        lng = Utils.dmsToDecimal(lngDeg, lngMin, lngSec, lngDir);
-
-        if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-            throw new Error('Invalid DMS coordinates');
-        }
-    } else if (Settings.state.userSettings.coordFormat === 'MGRS') {
-        const mgrsInput = document.getElementById('mgrsCoord')?.value.trim();
-        if (!mgrsInput) {
-            throw new Error('MGRS coordinate cannot be empty');
-        }
-
-        console.log('Attempting to parse MGRS:', mgrsInput);
-
-        if (!/^[0-6][0-9][A-HJ-NP-Z][A-HJ-NP-Z]{2}[0-9]+$/.test(mgrsInput)) {
-            throw new Error('MGRS format invalid. Example: 32UPU12345678 (zone, band, square, easting/northing)');
-        }
-
-        try {
-            if (typeof mgrs === 'undefined') {
-                throw new Error('MGRS library not loaded. Check script inclusion.');
-            }
-
-            console.log('Calling mgrs.toPoint with:', mgrsInput);
-            [lng, lat] = mgrs.toPoint(mgrsInput);
-            console.log(`Parsed MGRS ${mgrsInput} to Lat: ${lat}, Lng: ${lng}`);
-
-            if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-                throw new Error('Parsed MGRS coordinates out of valid range');
-            }
-        } catch (e) {
-            console.error('MGRS parsing failed:', e.message, 'Input:', mgrsInput);
-            throw new Error(`Invalid MGRS format: ${e.message}`);
-        }
-    }
-    return [lat, lng];
 }
 function setupRadioGroup(name, callback) {
     const radios = document.querySelectorAll(`input[name="${name}"]`);
