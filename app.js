@@ -22,7 +22,7 @@ try {
     userSettings = { ...Settings.defaultSettings };
 }
 
-export {createCustomMarker, attachMarkerDragend, updateMarkerPopup, fetchWeatherForLocation, debouncedCalculateJump, calculateCutAway, getWindSpeedUnit, getHeightUnit, getCoordinateFormat};
+export {createCustomMarker, attachMarkerDragend, updateMarkerPopup, fetchWeatherForLocation, debouncedCalculateJump, calculateCutAway };
 export const AppState = {
     isInitialized: false,
     coordsControl: null,

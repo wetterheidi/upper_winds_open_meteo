@@ -1,4 +1,4 @@
-import { AppState, createCustomMarker, attachMarkerDragend, updateMarkerPopup, fetchWeatherForLocation, debouncedCalculateJump, calculateCutAway, getWindSpeedUnit, getHeightUnit, getCoordinateFormat } from './app.js';
+import { AppState, createCustomMarker, attachMarkerDragend, updateMarkerPopup, fetchWeatherForLocation, debouncedCalculateJump, calculateCutAway } from './app.js';
 import { Settings } from "./settings.js";
 import { Utils } from "./utils.js";
 import { interpolateColor} from "./uiHelpers.js";
@@ -11,7 +11,7 @@ export function getTooltipContent(point, index, points, groundAltitude, windUnit
         return 'Map not initialized';
     }
 
-    const coordFormat = getCoordinateFormat();
+    const coordFormat = Settings.getValue('coordFormat', 'radio', 'Decimal');
     const coords = Utils.convertCoords(point.lat, point.lng, coordFormat);
     let tooltipContent = coordFormat === 'MGRS' ? `MGRS: ${coords.lat}` : `Lat: ${coords.lat}<br>Lng: ${coords.lng}`;
     const elevation = point.ele;
@@ -350,7 +350,7 @@ export async function renderTrack(points, fileName) {
                         closestIndex = index;
                     }
                 });
-                segment.setTooltipContent(getTooltipContent(closestPoint, closestIndex, points, groundAltitude, getWindSpeedUnit(), getHeightUnit())).openTooltip(latlng);
+                segment.setTooltipContent(getTooltipContent(closestPoint, closestIndex, points, groundAltitude, Settings.getValue('windUnit', 'radio', 'kt'), Settings.getValue('heightUnit', 'radio', 'm'))).openTooltip(latlng);
             });
             AppState.gpxLayer.addLayer(segment);
         }
