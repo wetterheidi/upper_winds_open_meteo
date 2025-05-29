@@ -2035,7 +2035,7 @@ function updateJumpMasterLine() {
         return;
     }
 
-    const bearing = Utils.calculateBearing(liveLatLng.lat, liveLatLng.lng, targetLat, targetLng).toFixed(0);
+    const bearing = calculateBearing(liveLatLng.lat, liveLatLng.lng, targetLat, targetLng).toFixed(0);
     const distanceMeters = AppState.map.distance(liveLatLng, [targetLat, targetLng]);
     const heightUnit = getHeightUnit();
     const convertedDistance = Utils.convertHeight(distanceMeters, heightUnit);
