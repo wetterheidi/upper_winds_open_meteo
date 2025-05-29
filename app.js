@@ -8,6 +8,8 @@ import { TileCache, cacheTilesForDIP, debouncedCacheVisibleTiles } from './tileC
 import { setupCacheManagement, setupCacheSettings } from './cacheUI.js';
 import * as Coordinates from './coordinates.js';
 import { interpolateColor, generateWindBarb, createArrowIcon } from "./uiHelpers.js";
+import { handleHarpPlacement, createHarpMarker, clearHarpMarker } from './harpMarker.js';
+
 "use strict";
 
 let userSettings;
@@ -75,7 +77,7 @@ export const AppState = {
     autoupdateInterval: null
 };
 
-const debouncedCalculateJump = Utils.debounce(calculateJump, 300);
+export const debouncedCalculateJump = Utils.debounce(calculateJump, 300);
 const getTemperatureUnit = () => Settings.getValue('temperatureUnit', 'radio', 'C');
 const getHeightUnit = () => Settings.getValue('heightUnit', 'radio', 'm');
 const getWindSpeedUnit = () => Settings.getValue('windUnit', 'radio', 'kt');
@@ -825,29 +827,6 @@ function reinitializeCoordsControl() {
     AppState.coordsControl.addTo(AppState.map);
     console.log('After reinitialize - coordsControl:', AppState.coordsControl);
 }
-function handleHarpPlacement(e) {
-    if (!AppState.isPlacingHarp) return;
-    const { lat, lng } = e.latlng;
-    if (AppState.harpMarker) {
-        AppState.harpMarker.setLatLng([lat, lng]);
-        console.log('Updated HARP marker position:', { lat, lng });
-    } else {
-        AppState.harpMarker = createHarpMarker(lat, lng).addTo(AppState.map);
-        console.log('Placed new HARP marker:', { lat, lng });
-    }
-    Settings.state.userSettings.harpLat = lat;
-    Settings.state.userSettings.harpLng = lng;
-    Settings.save();
-    AppState.isPlacingHarp = false;
-    AppState.map.off('click', handleHarpPlacement);
-    console.log('HARP placement mode deactivated');
-    // Enable HARP radio button
-    const harpRadio = document.querySelector('input[name="jumpMasterLineTarget"][value="HARP"]');
-    if (harpRadio) {
-        harpRadio.disabled = false;
-        console.log('Enabled HARP radio button');
-    }
-}
 function createCustomMarker(lat, lng) {
     const customIcon = L.icon({
         iconUrl: 'favicon.ico',
@@ -878,69 +857,6 @@ function createCutAwayMarker(lat, lng) {
         icon: cutAwayIcon,
         draggable: true
     });
-}
-function createHarpMarker(latitude, longitude) {
-    const marker = L.marker([latitude, longitude], {
-        icon: L.divIcon({
-            className: 'harp-marker',
-            html: '<div style="background-color: green; width: 10px; height: 10px; border-radius: 50%;"></div>',
-            iconSize: [10, 10],
-            iconAnchor: [5, 5]
-        }),
-        pane: 'markerPane' // Use standard marker pane
-    });
-    console.log('Created HARP marker at:', { latitude, longitude });
-    return marker;
-}
-function clearHarpMarker() {
-    if (!AppState.map) {
-        console.warn('Map not initialized, cannot clear HARP marker');
-        Utils.handleMessage('Map not initialized, cannot clear HARP marker.');
-        return;
-    }
-
-    if (AppState.harpMarker) {
-        AppState.map.removeLayer(AppState.harpMarker);
-        AppState.harpMarker = null;
-        console.log('Removed HARP marker');
-    }
-    Settings.state.userSettings.harpLat = null;
-    Settings.state.userSettings.harpLng = null;
-    Settings.save();
-    const harpRadio = document.querySelector('input[name="jumpMasterLineTarget"][value="HARP"]');
-    if (harpRadio) {
-        harpRadio.disabled = true;
-        console.log('Disabled HARP radio button');
-    }
-    // If Jump Master Line is set to HARP, remove it or switch to DIP
-    if (Settings.state.userSettings.jumpMasterLineTarget === 'HARP' && Settings.state.userSettings.showJumpMasterLine) {
-        if (AppState.jumpMasterLine) {
-            AppState.map.removeLayer(AppState.jumpMasterLine);
-            AppState.jumpMasterLine = null;
-            console.log('Removed Jump Master Line: HARP marker cleared');
-        }
-        // Switch to DIP
-        Settings.state.userSettings.jumpMasterLineTarget = 'DIP';
-        const dipRadio = document.querySelector('input[name="jumpMasterLineTarget"][value="DIP"]');
-        if (dipRadio) {
-            dipRadio.checked = true;
-            console.log('Switched Jump Master Line to DIP');
-        }
-        Settings.save();
-        // Update line if live tracking is active
-        if (AppState.liveMarker && AppState.currentMarker && AppState.lastLat !== null && AppState.lastLng !== null) {
-            debouncedPositionUpdate({
-                coords: {
-                    latitude: AppState.lastLatitude,
-                    longitude: AppState.lastLongitude,
-                    accuracy: AppState.lastAccuracy,
-                    altitude: AppState.lastDeviceAltitude,
-                    altitudeAccuracy: AppState.lastAltitudeAccuracy
-                }
-            });
-        }
-    }
-    Utils.handleMessage('HARP marker cleared');
 }
 function attachMarkerDragend(marker) {
     marker.on('dragend', async (e) => {
@@ -1483,7 +1399,7 @@ async function renderTrack(points, fileName) {
 }
 
 // == Live Tracking Handling ==
-const debouncedPositionUpdate = Utils.debounce(async (position) => {
+export const debouncedPositionUpdate = Utils.debounce(async (position) => {
     if (!AppState.map) {
         console.warn('Map not initialized, cannot update position');
         return;
@@ -6295,120 +6211,120 @@ function setupCheckboxEvents() {
         }
     });
 
-setupCheckbox('showJumpMasterLine', 'showJumpMasterLine', (checkbox) => {
-    console.log('showJumpMasterLine checkbox changed to:', checkbox.checked);
-    // Only allow changes if trackPosition is enabled
-    if (!Settings.state.userSettings.trackPosition) {
-        checkbox.checked = false;
-        checkbox.disabled = true;
-        checkbox.style.opacity = '0.5';
-        checkbox.title = 'Enable Live Tracking to use Jump Master Line';
-        Settings.state.userSettings.showJumpMasterLine = false;
+    setupCheckbox('showJumpMasterLine', 'showJumpMasterLine', (checkbox) => {
+        console.log('showJumpMasterLine checkbox changed to:', checkbox.checked);
+        // Only allow changes if trackPosition is enabled
+        if (!Settings.state.userSettings.trackPosition) {
+            checkbox.checked = false;
+            checkbox.disabled = true;
+            checkbox.style.opacity = '0.5';
+            checkbox.title = 'Enable Live Tracking to use Jump Master Line';
+            Settings.state.userSettings.showJumpMasterLine = false;
+            Settings.save();
+            Utils.handleMessage('Enable Live Tracking to use Jump Master Line.');
+            const submenu = checkbox.closest('li')?.querySelector('ul');
+            toggleSubmenu(checkbox, submenu, false);
+            return;
+        }
+        // If targeting DIP, ensure a position is set
+        if (checkbox.checked && Settings.state.userSettings.jumpMasterLineTarget === 'DIP' &&
+            (AppState.lastLat === null || AppState.lastLng === null || !AppState.currentMarker)) {
+            checkbox.checked = false;
+            Settings.state.userSettings.showJumpMasterLine = false;
+            Settings.save();
+            Utils.handleMessage('Please select a DIP position on the map first.');
+            const submenu = checkbox.closest('li')?.querySelector('ul');
+            toggleSubmenu(checkbox, submenu, false);
+            return;
+        }
+        // If targeting HARP, ensure valid HARP coordinates exist
+        if (checkbox.checked && Settings.state.userSettings.jumpMasterLineTarget === 'HARP' &&
+            (!Settings.state.userSettings.harpLat || !Settings.state.userSettings.harpLng)) {
+            checkbox.checked = false;
+            Settings.state.userSettings.showJumpMasterLine = false;
+            Settings.save();
+            Utils.handleMessage('Please place a HARP marker first.');
+            const submenu = checkbox.closest('li')?.querySelector('ul');
+            toggleSubmenu(checkbox, submenu, false);
+            return;
+        }
+        Settings.state.userSettings.showJumpMasterLine = checkbox.checked;
         Settings.save();
-        Utils.handleMessage('Enable Live Tracking to use Jump Master Line.');
         const submenu = checkbox.closest('li')?.querySelector('ul');
-        toggleSubmenu(checkbox, submenu, false);
-        return;
-    }
-    // If targeting DIP, ensure a position is set
-    if (checkbox.checked && Settings.state.userSettings.jumpMasterLineTarget === 'DIP' && 
-        (AppState.lastLat === null || AppState.lastLng === null || !AppState.currentMarker)) {
-        checkbox.checked = false;
-        Settings.state.userSettings.showJumpMasterLine = false;
-        Settings.save();
-        Utils.handleMessage('Please select a DIP position on the map first.');
-        const submenu = checkbox.closest('li')?.querySelector('ul');
-        toggleSubmenu(checkbox, submenu, false);
-        return;
-    }
-    // If targeting HARP, ensure valid HARP coordinates exist
-    if (checkbox.checked && Settings.state.userSettings.jumpMasterLineTarget === 'HARP' && 
-        (!Settings.state.userSettings.harpLat || !Settings.state.userSettings.harpLng)) {
-        checkbox.checked = false;
-        Settings.state.userSettings.showJumpMasterLine = false;
-        Settings.save();
-        Utils.handleMessage('Please place a HARP marker first.');
-        const submenu = checkbox.closest('li')?.querySelector('ul');
-        toggleSubmenu(checkbox, submenu, false);
-        return;
-    }
-    Settings.state.userSettings.showJumpMasterLine = checkbox.checked;
-    Settings.save();
-    const submenu = checkbox.closest('li')?.querySelector('ul');
-    console.log('Submenu lookup for showJumpMasterLine:', { submenu: submenu ? 'Found' : 'Not found', submenuClasses: submenu?.classList.toString() });
-    toggleSubmenu(checkbox, submenu, checkbox.checked);
-    if (!checkbox.checked) {
-        if (AppState.jumpMasterLine) {
-            if (AppState.map && typeof AppState.map.removeLayer === 'function') {
-                AppState.map.removeLayer(AppState.jumpMasterLine);
-            } else {
-                console.warn('Map not initialized, cannot remove jumpMasterLine');
+        console.log('Submenu lookup for showJumpMasterLine:', { submenu: submenu ? 'Found' : 'Not found', submenuClasses: submenu?.classList.toString() });
+        toggleSubmenu(checkbox, submenu, checkbox.checked);
+        if (!checkbox.checked) {
+            if (AppState.jumpMasterLine) {
+                if (AppState.map && typeof AppState.map.removeLayer === 'function') {
+                    AppState.map.removeLayer(AppState.jumpMasterLine);
+                } else {
+                    console.warn('Map not initialized, cannot remove jumpMasterLine');
+                }
+                AppState.jumpMasterLine = null;
+                console.log('Removed Jump Master Line: unchecked');
             }
-            AppState.jumpMasterLine = null;
-            console.log('Removed Jump Master Line: unchecked');
-        }
-        if (AppState.livePositionControl) {
-            AppState.livePositionControl.update(
-                AppState.lastLatitude || 0,
-                AppState.lastLongitude || 0,
-                AppState.lastDeviceAltitude,
-                AppState.lastAltitudeAccuracy,
-                AppState.lastAccuracy,
-                AppState.lastSpeed,
-                AppState.lastEffectiveWindUnit,
-                AppState.lastDirection,
-                false,
-                null
-            );
-            console.log('Cleared jump master line data from livePositionControl');
-        }
-    } else {
-        // Immediately draw the Jump Master Line if conditions are met
-        if (AppState.liveMarker && AppState.livePositionControl && 
-            ((Settings.state.userSettings.jumpMasterLineTarget === 'DIP' && AppState.currentMarker && 
-              AppState.lastLat !== null && AppState.lastLng !== null) || 
-             (Settings.state.userSettings.jumpMasterLineTarget === 'HARP' && 
-              Settings.state.userSettings.harpLat && Settings.state.userSettings.harpLng))) {
-            console.log('Drawing Jump Master Line immediately for:', Settings.state.userSettings.jumpMasterLineTarget);
-            updateJumpMasterLine();
-            // Update live position control with current data
-            AppState.livePositionControl.update(
-                AppState.lastLatitude || 0,
-                AppState.lastLongitude || 0,
-                AppState.lastDeviceAltitude,
-                AppState.lastAltitudeAccuracy,
-                AppState.lastAccuracy,
-                AppState.lastSpeed,
-                AppState.lastEffectiveWindUnit,
-                AppState.lastDirection,
-                true,
-                null
-            );
-            // Trigger a position update to ensure line is drawn with latest data
-            if (AppState.lastLatitude && AppState.lastLongitude) {
-                debouncedPositionUpdate({
-                    coords: {
-                        latitude: AppState.lastLatitude,
-                        longitude: AppState.lastLongitude,
-                        accuracy: AppState.lastAccuracy || 0,
-                        altitude: AppState.lastDeviceAltitude,
-                        altitudeAccuracy: AppState.lastAltitudeAccuracy
-                    }
-                });
+            if (AppState.livePositionControl) {
+                AppState.livePositionControl.update(
+                    AppState.lastLatitude || 0,
+                    AppState.lastLongitude || 0,
+                    AppState.lastDeviceAltitude,
+                    AppState.lastAltitudeAccuracy,
+                    AppState.lastAccuracy,
+                    AppState.lastSpeed,
+                    AppState.lastEffectiveWindUnit,
+                    AppState.lastDirection,
+                    false,
+                    null
+                );
+                console.log('Cleared jump master line data from livePositionControl');
             }
         } else {
-            console.log('Cannot draw Jump Master Line immediately: missing required data', {
-                hasLiveMarker: !!AppState.liveMarker,
-                hasLivePositionControl: !!AppState.livePositionControl,
-                target: Settings.state.userSettings.jumpMasterLineTarget,
-                hasDIP: AppState.currentMarker && AppState.lastLat !== null && AppState.lastLng !== null,
-                hasHARP: Settings.state.userSettings.harpLat && Settings.state.userSettings.harpLng
-            });
+            // Immediately draw the Jump Master Line if conditions are met
+            if (AppState.liveMarker && AppState.livePositionControl &&
+                ((Settings.state.userSettings.jumpMasterLineTarget === 'DIP' && AppState.currentMarker &&
+                    AppState.lastLat !== null && AppState.lastLng !== null) ||
+                    (Settings.state.userSettings.jumpMasterLineTarget === 'HARP' &&
+                        Settings.state.userSettings.harpLat && Settings.state.userSettings.harpLng))) {
+                console.log('Drawing Jump Master Line immediately for:', Settings.state.userSettings.jumpMasterLineTarget);
+                updateJumpMasterLine();
+                // Update live position control with current data
+                AppState.livePositionControl.update(
+                    AppState.lastLatitude || 0,
+                    AppState.lastLongitude || 0,
+                    AppState.lastDeviceAltitude,
+                    AppState.lastAltitudeAccuracy,
+                    AppState.lastAccuracy,
+                    AppState.lastSpeed,
+                    AppState.lastEffectiveWindUnit,
+                    AppState.lastDirection,
+                    true,
+                    null
+                );
+                // Trigger a position update to ensure line is drawn with latest data
+                if (AppState.lastLatitude && AppState.lastLongitude) {
+                    debouncedPositionUpdate({
+                        coords: {
+                            latitude: AppState.lastLatitude,
+                            longitude: AppState.lastLongitude,
+                            accuracy: AppState.lastAccuracy || 0,
+                            altitude: AppState.lastDeviceAltitude,
+                            altitudeAccuracy: AppState.lastAltitudeAccuracy
+                        }
+                    });
+                }
+            } else {
+                console.log('Cannot draw Jump Master Line immediately: missing required data', {
+                    hasLiveMarker: !!AppState.liveMarker,
+                    hasLivePositionControl: !!AppState.livePositionControl,
+                    target: Settings.state.userSettings.jumpMasterLineTarget,
+                    hasDIP: AppState.currentMarker && AppState.lastLat !== null && AppState.lastLng !== null,
+                    hasHARP: Settings.state.userSettings.harpLat && Settings.state.userSettings.harpLng
+                });
+            }
         }
-    }
-});
+    });
 
-    const harpRadio = document.querySelector('input[name="jumpMasterLineTarget"][value="HARP"]');
+const harpRadio = document.querySelector('input[name="jumpMasterLineTarget"][value="HARP"]');
     if (harpRadio) {
         harpRadio.disabled = !Settings.state.userSettings.harpLat || !Settings.state.userSettings.harpLng;
         console.log('HARP radio button initialized, disabled:', harpRadio.disabled);
@@ -6419,14 +6335,14 @@ setupCheckbox('showJumpMasterLine', 'showJumpMasterLine', (checkbox) => {
         placeHarpButton.addEventListener('click', () => {
             AppState.isPlacingHarp = true;
             console.log('HARP placement mode activated');
-            AppState.map.on('click', handleHarpPlacement);
+            AppState.map.on('click', handleHarpPlacement); // Use imported function
             Utils.handleMessage('Click the map to place the HARP marker');
         });
     }
 
     const clearHarpButton = document.getElementById('clearHarpButton');
     if (clearHarpButton) {
-        clearHarpButton.addEventListener('click', clearHarpMarker);
+        clearHarpButton.addEventListener('click', clearHarpMarker); // Use imported function
     }
 
     const menu = document.querySelector('.hamburger-menu');
@@ -6438,7 +6354,7 @@ setupCheckbox('showJumpMasterLine', 'showJumpMasterLine', (checkbox) => {
 }
 function setupCoordinateEvents() {
     Coordinates.initCoordStorage();
-    
+
     // Define the move marker logic
     const moveMarker = async (lat, lng) => {
         try {
