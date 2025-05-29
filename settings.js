@@ -101,25 +101,15 @@ export const Settings = {
         this.state.userSettings = { ...this.defaultSettings, ...storedSettings };
         console.log('Initialized userSettings:', this.state.userSettings);
 
-        // Reset jumpMasterLineTarget to DIP unless valid HARP coordinates exist
+        // Reset HARP coordinates to null at startup
+        this.state.userSettings.harpLat = null;
+        this.state.userSettings.harpLng = null;
+        console.log('Reset HARP coordinates to null at startup');
+
+        // Reset jumpMasterLineTarget to DIP if it was HARP
         if (this.state.userSettings.jumpMasterLineTarget === 'HARP') {
-            const { harpLat, harpLng } = this.state.userSettings;
-            // Validate HARP coordinates (e.g., reasonable lat/lng ranges)
-            if (
-                harpLat === null ||
-                harpLng === null ||
-                typeof harpLat !== 'number' ||
-                typeof harpLng !== 'number' ||
-                harpLat < -90 ||
-                harpLat > 90 ||
-                harpLng < -180 ||
-                harpLng > 180
-            ) {
-                console.log('Invalid or missing HARP coordinates, resetting jumpMasterLineTarget to DIP');
-                this.state.userSettings.jumpMasterLineTarget = 'DIP';
-                this.state.userSettings.harpLat = null;
-                this.state.userSettings.harpLng = null;
-            }
+            console.log('Reset jumpMasterLineTarget to DIP due to cleared HARP coordinates');
+            this.state.userSettings.jumpMasterLineTarget = 'DIP';
         }
 
         // Update unlocked features
