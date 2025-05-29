@@ -48,6 +48,7 @@ export const AppState = {
     gpxLayer: null,
     gpxPoints: [],
     isLoadingGpx: false,
+    isTrackLoaded: false, // New flag
     liveMarker: null,
     jumpMasterLine: null,
     isPlacingHarp: false,
@@ -1258,6 +1259,7 @@ async function renderTrack(points, fileName) {
             AppState.gpxLayer = null;
         }
         AppState.gpxPoints = points;
+        AppState.isTrackLoaded = false; // Reset flag at start
 
         // Move marker to final point and update lastAltitude
         if (points.length > 0) {
@@ -1327,7 +1329,7 @@ async function renderTrack(points, fileName) {
         }
 
         // Create track layer with custom pane
-        AppState.gpxLayer = L.layerGroup({ pane: 'gpxTrackPane' });
+        AppState.gpxLayer = L.layerGroup([], { pane: 'gpxTrackPane' });
         const groundAltitude = AppState.lastAltitude !== 'N/A' && !isNaN(AppState.lastAltitude) ? parseFloat(AppState.lastAltitude) : null;
         for (let i = 0; i < points.length - 1; i++) {
             const p1 = points[i];
@@ -1365,7 +1367,8 @@ async function renderTrack(points, fileName) {
             AppState.gpxLayer.addLayer(segment);
         }
         AppState.gpxLayer.addTo(AppState.map);
-        console.log('Track layer added:', { gpxLayer: AppState.gpxLayer });
+        AppState.isTrackLoaded = true; // Set flag after successful rendering
+        console.log('Track layer added:', { gpxLayer: AppState.gpxLayer, isTrackLoaded: AppState.isTrackLoaded });
 
         // Center map to track bounds
         if (points.length > 0) {
@@ -1395,6 +1398,8 @@ async function renderTrack(points, fileName) {
         Utils.handleError('Error rendering track: ' + error.message);
         AppState.gpxPoints = [];
         AppState.gpxLayer = null;
+        AppState.isTrackLoaded = false; // Ensure flag is reset on failure
+        console.log('Track rendering failed:', { isTrackLoaded: AppState.isTrackLoaded });
     }
 }
 
@@ -3836,17 +3841,17 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
         console.log('No blue circles created, skipping label update and zoom listener');
     }
 
-    console.log('Jump circles added at zoom:', currentZoom, 'Layers on map:', {
-        blue: !!AppState.jumpCircle,
-        red: !!AppState.jumpCircleFull,
-        green: !!AppState.jumpCircleGreen,
-        darkGreen: !!AppState.jumpCircleGreenLight,
-        additionalBlue: window.additionalBlueCircles?.length || 0,
-        additionalBlueLabels: window.additionalBlueLabels?.length || 0
-    });
-
-    if (AppState.gpxLayer) {
+    // Ensure gpxLayer is valid and track is loaded before bringing to front
+    if (AppState.isTrackLoaded && AppState.gpxLayer && typeof AppState.gpxLayer.bringToFront === 'function') {
+        console.log('Bringing gpxLayer to front');
         AppState.gpxLayer.bringToFront();
+    } else {
+        console.log('gpxLayer not brought to front:', {
+            isTrackLoaded: AppState.isTrackLoaded,
+            gpxLayerExists: !!AppState.gpxLayer,
+            hasBringToFront: AppState.gpxLayer && typeof AppState.gpxLayer.bringToFront === 'function',
+            gpxLayerType: AppState.gpxLayer ? AppState.gpxLayer.constructor.name : null
+        });
     }
 
     ['showExitAreaCheckbox', 'showCanopyAreaCheckbox', 'showJumpRunTrack'].forEach(id => {
@@ -4776,74 +4781,48 @@ function calculateLandingPatternCoords(lat, lng, interpolatedData, sliderIndex) 
     return { downwindLat: downwindEnd[0], downwindLng: downwindEnd[1] };
 }
 function updateLandingPattern() {
+    console.log('updateLandingPattern called');
     if (!AppState.map) {
         console.warn('Map not initialized, cannot update landing pattern');
         return;
     }
 
-    console.log('updateLandingPattern called');
-    if (!Settings.state.userSettings.showLandingPattern || !AppState.weatherData || !AppState.lastLat || !AppState.lastLng || AppState.lastAltitude === null || AppState.lastAltitude === 'N/A') {
-        console.log('Landing pattern not updated: missing data or feature disabled');
-        // Clear existing layers
-        if (AppState.landingPatternPolygon) {
-            AppState.map.removeLayer(AppState.landingPatternPolygon);
-            AppState.landingPatternPolygon = null;
-        }
-        if (AppState.secondlandingPatternPolygon) {
-            AppState.map.removeLayer(AppState.secondlandingPatternPolygon);
-            AppState.secondlandingPatternPolygon = null;
-        }
-        if (AppState.thirdLandingPatternLine) {
-            AppState.map.removeLayer(AppState.thirdLandingPatternLine);
-            AppState.thirdLandingPatternLine = null;
-        }
-        if (AppState.finalArrow) {
-            AppState.map.removeLayer(AppState.finalArrow);
-            AppState.finalArrow = null;
-        }
-        if (AppState.baseArrow) {
-            AppState.map.removeLayer(AppState.baseArrow);
-            AppState.baseArrow = null;
-        }
-        if (AppState.downwindArrow) {
-            AppState.map.removeLayer(AppState.downwindArrow);
-            AppState.downwindArrow = null;
-        }
-        return;
-    }
-
     const currentZoom = AppState.map.getZoom();
-    const isVisible = currentZoom >= Constants.landingPatternMinZoom;
+    const isVisible = currentZoom >= Constants.landingPatternMinZoom; // e.g., 14
     console.log('Landing pattern zoom check:', { currentZoom, landingPatternMinZoom: Constants.landingPatternMinZoom, isVisible });
 
-    // Clear existing layers to prevent duplicates
-    if (AppState.landingPatternPolygon) {
-        AppState.map.removeLayer(AppState.landingPatternPolygon);
-        AppState.landingPatternPolygon = null;
-    }
-    if (AppState.secondlandingPatternPolygon) {
-        AppState.map.removeLayer(AppState.secondlandingPatternPolygon);
-        AppState.secondlandingPatternPolygon = null;
-    }
-    if (AppState.thirdLandingPatternLine) {
-        AppState.map.removeLayer(AppState.thirdLandingPatternLine);
-        AppState.thirdLandingPatternLine = null;
-    }
-    if (AppState.finalArrow) {
-        AppState.map.removeLayer(AppState.finalArrow);
-        AppState.finalArrow = null;
-    }
-    if (AppState.baseArrow) {
-        AppState.map.removeLayer(AppState.baseArrow);
-        AppState.baseArrow = null;
-    }
-    if (AppState.downwindArrow) {
-        AppState.map.removeLayer(AppState.downwindArrow);
-        AppState.downwindArrow = null;
+    // Clear existing layers
+    const removeLayer = (layer, name) => {
+        if (layer && AppState.map.hasLayer(layer)) {
+            AppState.map.removeLayer(layer);
+            console.log(`Removed ${name}`);
+        }
+    };
+    removeLayer(AppState.landingPatternPolygon, 'landing pattern polygon');
+    removeLayer(AppState.secondlandingPatternPolygon, 'second landing pattern polygon');
+    removeLayer(AppState.thirdLandingPatternLine, 'third landing pattern line');
+    removeLayer(AppState.finalArrow, 'final arrow');
+    removeLayer(AppState.baseArrow, 'base arrow');
+    removeLayer(AppState.downwindArrow, 'downwind arrow');
+    AppState.landingPatternPolygon = null;
+    AppState.secondlandingPatternPolygon = null;
+    AppState.thirdLandingPatternLine = null;
+    AppState.finalArrow = null;
+    AppState.baseArrow = null;
+    AppState.downwindArrow = null;
+
+    if (!Settings.state.userSettings.showLandingPattern) {
+        console.log('Landing pattern disabled, layers cleared');
+        return;
     }
 
     if (!isVisible) {
         console.log('Landing pattern not displayed - zoom too low:', currentZoom);
+        return;
+    }
+
+    if (!AppState.weatherData || !AppState.lastLat || !AppState.lastLng) {
+        console.warn('Cannot render landing pattern: missing weather data or coordinates');
         return;
     }
 
@@ -6125,7 +6104,34 @@ function setupCheckboxEvents() {
             checkbox.checked = false;
             const submenu = checkbox.closest('li')?.querySelector('ul');
             toggleSubmenu(checkbox, submenu, false);
-            // Clear landing pattern layers...
+            // Clear landing pattern layers
+            if (AppState.map) {
+                const layers = [
+                    AppState.landingPatternPolygon,
+                    AppState.secondlandingPatternPolygon,
+                    AppState.thirdLandingPatternLine,
+                    AppState.finalArrow,
+                    AppState.baseArrow,
+                    AppState.downwindArrow
+                ];
+                layers.forEach((layer, index) => {
+                    if (layer && AppState.map.hasLayer(layer)) {
+                        AppState.map.removeLayer(layer);
+                        console.log(`Removed landing pattern layer ${index}:`, layer);
+                    }
+                });
+                // Reset state
+                AppState.landingPatternPolygon = null;
+                AppState.secondlandingPatternPolygon = null;
+                AppState.thirdLandingPatternLine = null;
+                AppState.finalArrow = null;
+                AppState.baseArrow = null;
+                AppState.downwindArrow = null;
+                AppState.landingWindDir = null;
+                console.log('Cleared landing pattern layers and reset state');
+            } else {
+                console.warn('Map not initialized, cannot clear landing pattern layers');
+            }
         };
         if (checkbox.checked) {
             if (Settings.isFeatureUnlocked('landingPattern')) {
@@ -6324,7 +6330,7 @@ function setupCheckboxEvents() {
         }
     });
 
-const harpRadio = document.querySelector('input[name="jumpMasterLineTarget"][value="HARP"]');
+    const harpRadio = document.querySelector('input[name="jumpMasterLineTarget"][value="HARP"]');
     if (harpRadio) {
         harpRadio.disabled = !Settings.state.userSettings.harpLat || !Settings.state.userSettings.harpLng;
         console.log('HARP radio button initialized, disabled:', harpRadio.disabled);
@@ -6483,7 +6489,8 @@ function setupTrackEvents() {
                     AppState.map.removeLayer(AppState.gpxLayer);
                     AppState.gpxLayer = null;
                     AppState.gpxPoints = [];
-                    console.log('Cleared track');
+                    AppState.isTrackLoaded = false; // Reset flag
+                    console.log('Cleared track:', { isTrackLoaded: AppState.isTrackLoaded });
                     const infoElement = document.getElementById('info');
                     if (infoElement) {
                         infoElement.innerHTML = 'Click on the map to fetch weather data.';
