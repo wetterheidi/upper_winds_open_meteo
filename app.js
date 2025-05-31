@@ -77,7 +77,10 @@ export const AppState = {
     lastAltitude: null,
     currentMarker: null,
     isManualPanning: false,
-    autoupdateInterval: null
+    autoupdateInterval: null,
+    accuracyCircle: null,
+    additionalBlueCircles: [],
+    additionalBlueLabels: []
 };
 
 const debouncedCalculateJump = Utils.debounce(calculateJump, 300);
@@ -1077,9 +1080,9 @@ export const debouncedPositionUpdate = Utils.debounce(async (position) => {
         updateAccuracyCircle(latitude, longitude, accuracy);
     } else {
         console.warn('Skipping accuracy circle update: invalid accuracy', { accuracy });
-        if (window.accuracyCircle) {
-            AppState.map.removeLayer(window.accuracyCircle);
-            window.accuracyCircle = null;
+        if (AppState.accuracyCircle) {
+            AppState.map.removeLayer(AppState.accuracyCircle);
+            AppState.accuracyCircle = null;
             console.log('Removed accuracy circle');
         }
     }
@@ -1466,9 +1469,9 @@ function stopPositionTracking() {
         AppState.liveMarker = null;
         console.log('Removed liveMarker');
     }
-    if (window.accuracyCircle) {
-        AppState.map.removeLayer(window.accuracyCircle);
-        window.accuracyCircle = null;
+    if (AppState.accuracyCircle) {
+        AppState.map.removeLayer(AppState.accuracyCircle);
+        AppState.accuracyCircle = null;
         console.log('Removed accuracy circle');
     }
     if (AppState.livePositionControl) {
@@ -1487,12 +1490,12 @@ function stopPositionTracking() {
 }
 function updateAccuracyCircle(lat, lng, accuracy) {
     try {
-        if (window.accuracyCircle) {
-            AppState.map.removeLayer(window.accuracyCircle);
-            window.accuracyCircle = null;
+        if (AppState.accuracyCircle) {
+            AppState.map.removeLayer(AppState.accuracyCircle);
+            AppState.accuracyCircle = null;
             console.log('Removed previous accuracy circle');
         }
-        window.accuracyCircle = L.circle([lat, lng], {
+        AppState.accuracyCircle = L.circle([lat, lng], {
             radius: accuracy,
             color: 'blue',
             fillOpacity: 0.1,
@@ -1503,9 +1506,9 @@ function updateAccuracyCircle(lat, lng, accuracy) {
         console.log('Updated accuracy circle:', { lat, lng, radius: accuracy });
     } catch (error) {
         console.error('Error updating accuracy circle:', error);
-        if (window.accuracyCircle) {
-            AppState.map.removeLayer(window.accuracyCircle);
-            window.accuracyCircle = null;
+        if (AppState.accuracyCircle) {
+            AppState.map.removeLayer(AppState.accuracyCircle);
+            AppState.accuracyCircle = null;
         }
     }
 }
@@ -1626,33 +1629,91 @@ async function checkAvailableModels(lat, lon) {
             const response = await fetch(
                 `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m&models=${model}`
             );
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-            const data = await response.json();
-            if (data.hourly && data.hourly.temperature_2m && data.hourly.temperature_2m.length > 0) {
-                availableModels.push(model);
+
+            if (response.ok) { // Status 200-299
+                const data = await response.json();
+                if (data.hourly && data.hourly.temperature_2m && data.hourly.temperature_2m.length > 0) {
+                    availableModels.push(model);
+                } else {
+                    // Das Modell ist zwar "ok" (Status 2xx), liefert aber keine relevanten stündlichen Daten.
+                    // Dies könnte auch als "nicht verfügbar" für die Zwecke dieser App behandelt werden.
+                    // console.info(`${model} returned OK but no relevant hourly data, treating as unavailable.`);
+                }
+            } else {
+                // Behandle nicht-ok Antworten
+                if (response.status === 400) {
+                    // HTTP 400 (Bad Request) - Erwartetes Szenario, wenn das Modell für die Koordinaten nicht verfügbar ist.
+                    // Keine laute Fehlermeldung in der Konsole.
+                    // Optional: Eine Info-Meldung, falls du es dennoch sehen möchtest.
+                    // console.info(`${model} is not available for the selected coordinates (HTTP 400). This is expected.`);
+                } else {
+                    // Für andere Fehler (500, 401, 403, Netzwerkprobleme, die nicht vom catch-Block unten gefangen werden),
+                    // protokolliere sie als Warnung.
+                    const errorText = await response.text().catch(() => "Could not retrieve error text"); // Fallback, falls .text() fehlschlägt
+                    console.warn(`Problem checking model ${model}: HTTP ${response.status} - ${errorText}`);
+                }
             }
         } catch (error) {
-            console.log(`${model} not available: ${error.message}`);
+            // Dies fängt Netzwerkfehler (z.B. DNS-Fehler, Server nicht erreichbar, CORS-Probleme)
+            // oder wenn der Fetch selbst einen Fehler wirft (z.B. durch AbortSignal).
+            console.warn(`Network error or other issue checking model ${model}: ${error.message}`);
         }
     }
 
     const modelSelect = document.getElementById('modelSelect');
-    modelSelect.innerHTML = '';
-    availableModels.forEach(model => {
-        const option = document.createElement('option');
-        option.value = model;
-        option.textContent = model.replace('_', ' ').toUpperCase();
-        modelSelect.appendChild(option);
-    });
+    if (modelSelect) {
+        const currentSelectedModel = modelSelect.value; // Speichere das aktuell ausgewählte Modell
+        modelSelect.innerHTML = ''; // Alte Optionen entfernen
 
-    const modelDisplay = availableModels.length > 0
-        ? `<br><strong>Available Models:</strong><ul>${availableModels.map(m => `<li>${m.replace('_', ' ').toUpperCase()}</li>`).join('')}</ul>`
-        : '<br><strong>Available Models:</strong> None';
+        if (availableModels.length === 0) {
+            // Füge eine Standardoption hinzu, wenn keine Modelle verfügbar sind
+            const option = document.createElement('option');
+            option.value = "";
+            option.textContent = "No models available";
+            option.disabled = true;
+            modelSelect.appendChild(option);
+            modelSelect.value = ""; // Wähle die "No models available" Option aus
+        } else {
+            availableModels.forEach(model => {
+                const option = document.createElement('option');
+                option.value = model;
+                option.textContent = model.replace(/_/g, ' ').toUpperCase();
+                modelSelect.appendChild(option);
+            });
 
-    const currentContent = document.getElementById('info').innerHTML;
-    document.getElementById('info').innerHTML = currentContent + modelDisplay;
+            // Versuche, das gespeicherte oder zuvor ausgewählte Modell wiederherzustellen
+            const storedModel = Settings.state.userSettings.model;
+            if (availableModels.includes(storedModel)) {
+                modelSelect.value = storedModel;
+            } else if (availableModels.includes(currentSelectedModel)) {
+                modelSelect.value = currentSelectedModel; // Fallback auf das vorher ausgewählte, falls noch verfügbar
+            } else if (availableModels.length > 0) {
+                // Wähle das erste verfügbare Modell aus, wenn das gespeicherte/vorherige nicht verfügbar ist
+                modelSelect.value = availableModels[0];
+                Settings.state.userSettings.model = availableModels[0]; // Aktualisiere die Einstellung
+                Settings.save();
+            }
+        }
+    } else {
+        console.warn("Element with ID 'modelSelect' not found.");
+    }
+
+    const infoElement = document.getElementById('info');
+    if (infoElement) {
+        const modelDisplay = availableModels.length > 0
+            ? `<br><strong>Available Models:</strong><ul>${availableModels.map(m => `<li>${m.replace(/_/g, ' ').toUpperCase()}</li>`).join('')}</ul>`
+            : '<br><strong>Available Models:</strong> None';
+
+        // Ersetze nur den "Available Models" Teil, falls vorhanden, sonst anhängen
+        const modelDisplayRegex = /(<br><strong>Available Models:<\/strong><ul>.*?<\/ul>|<br><strong>Available Models:<\/strong> None)/s;
+        if (modelDisplayRegex.test(infoElement.innerHTML)) {
+            infoElement.innerHTML = infoElement.innerHTML.replace(modelDisplayRegex, modelDisplay);
+        } else {
+            infoElement.innerHTML += modelDisplay;
+        }
+    } else {
+        console.warn("Element with ID 'info' not found.");
+    }
 
     return availableModels;
 }
@@ -3177,8 +3238,8 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
         redCircle: !!AppState.jumpCircleFull,
         greenCircle: !!AppState.jumpCircleGreen,
         darkGreenCircle: !!AppState.jumpCircleGreenLight,
-        additionalBlueCircles: window.additionalBlueCircles?.length || 0,
-        additionalBlueLabels: window.additionalBlueLabels?.length || 0
+        additionalBlueCircles: AppState.additionalBlueCircles?.length || 0,
+        additionalBlueLabels: AppState.additionalBlueLabels?.length || 0
     });
 
     // Cleanup based on mode
@@ -3190,21 +3251,21 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
         // Only clear canopy circles
         removeLayer(AppState.jumpCircle, 'blue circle');
         removeLayer(AppState.jumpCircleFull, 'red circle');
-        if (window.additionalBlueCircles) {
-            window.additionalBlueCircles.forEach(circle => removeLayer(circle, 'additional blue circle'));
-            window.additionalBlueCircles = [];
+        if (AppState.additionalBlueCircles) {
+            AppState.additionalBlueCircles.forEach(circle => removeLayer(circle, 'additional blue circle'));
+            AppState.additionalBlueCircles = [];
         }
-        if (window.additionalBlueLabels) {
-            window.additionalBlueLabels.forEach(label => removeLayer(label, 'additional blue label'));
-            window.additionalBlueLabels = [];
+        if (AppState.additionalBlueLabels) {
+            AppState.additionalBlueLabels.forEach(label => removeLayer(label, 'additional blue label'));
+            AppState.additionalBlueLabels = [];
         }
     } else {
         // Clear all circles if neither mode is specified
         clearJumpCircles();
     }
 
-    window.additionalBlueCircles = window.additionalBlueCircles || [];
-    window.additionalBlueLabels = window.additionalBlueLabels || [];
+    AppState.additionalBlueCircles = AppState.additionalBlueCircles || [];
+    AppState.additionalBlueLabels = AppState.additionalBlueLabels || [];
 
     function calculateLabelAnchor(center, radius) {
         const centerLatLng = L.latLng(center[0], center[1]);
@@ -3312,8 +3373,8 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
         console.log('Added red circle at:', { center: newCenterRed, radius: radiusFull });
 
         if (Array.isArray(additionalBlueRadii) && Array.isArray(additionalBlueDisplacements) && Array.isArray(additionalBlueDirections) && Array.isArray(additionalBlueUpperLimits)) {
-            window.additionalBlueCircles = [];
-            window.additionalBlueLabels = [];
+            AppState.additionalBlueCircles = [];
+            AppState.additionalBlueLabels = [];
             additionalBlueRadii.forEach((addRadius, i) => {
                 if (Number.isFinite(addRadius) && addRadius > 0 &&
                     Number.isFinite(additionalBlueDisplacements[i]) && Number.isFinite(additionalBlueDirections[i]) &&
@@ -3339,8 +3400,8 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
                         zIndexOffset: 2100
                     }).addTo(AppState.map);
 
-                    window.additionalBlueCircles.push(circle);
-                    window.additionalBlueLabels.push(label);
+                    AppState.additionalBlueCircles.push(circle);
+                    AppState.additionalBlueLabels.push(label);
                     blueCircleMetadata.push({ circle, label, center: addCenter, radius: addRadius, content: blueContent });
                     console.log(`Added additional blue circle ${i}:`, { center: addCenter, radius: addRadius, content: blueContent });
 
@@ -3376,13 +3437,13 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
 
             removeLayer(AppState.jumpCircle, 'blue circle');
             removeLayer(AppState.jumpCircleFull, 'red circle');
-            if (window.additionalBlueCircles) {
-                window.additionalBlueCircles.forEach(circle => removeLayer(circle, 'additional blue circle'));
-                window.additionalBlueCircles = [];
+            if (AppState.additionalBlueCircles) {
+                AppState.additionalBlueCircles.forEach(circle => removeLayer(circle, 'additional blue circle'));
+                AppState.additionalBlueCircles = [];
             }
-            if (window.additionalBlueLabels) {
-                window.additionalBlueLabels.forEach(label => removeLayer(label, 'additional blue label'));
-                window.additionalBlueLabels = [];
+            if (AppState.additionalBlueLabels) {
+                AppState.additionalBlueLabels.forEach(label => removeLayer(label, 'additional blue label'));
+                AppState.additionalBlueLabels = [];
             }
 
             AppState.jumpCircle = L.circle(newCenterBlue, {
@@ -3408,8 +3469,8 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
             console.log('Re-added red circle at:', { center: newCenterRed, radius: canopyResult.radiusFull });
 
             if (Array.isArray(canopyResult.additionalBlueRadii)) {
-                window.additionalBlueCircles = [];
-                window.additionalBlueLabels = [];
+                AppState.additionalBlueCircles = [];
+                AppState.additionalBlueLabels = [];
                 canopyResult.additionalBlueRadii.forEach((addRadius, i) => {
                     if (Number.isFinite(addRadius) && addRadius > 0 &&
                         Number.isFinite(canopyResult.additionalBlueDisplacements[i]) &&
@@ -3436,8 +3497,8 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
                             zIndexOffset: 2100
                         }).addTo(AppState.map);
 
-                        window.additionalBlueCircles.push(circle);
-                        window.additionalBlueLabels.push(label);
+                        AppState.additionalBlueCircles.push(circle);
+                        AppState.additionalBlueLabels.push(label);
                         blueCircleMetadata.push({ circle, label, center: addCenter, radius: addRadius, content: blueContent });
                         console.log(`Re-added additional blue circle ${i}:`, { center: addCenter, radius: addRadius, content: blueContent });
 
@@ -5615,21 +5676,21 @@ function setupCheckboxEvents() {
                 }
                 AppState.jumpCircleFull = null;
             }
-            if (window.additionalBlueCircles) {
-                window.additionalBlueCircles.forEach(circle => {
+            if (AppState.additionalBlueCircles) {
+                AppState.additionalBlueCircles.forEach(circle => {
                     if (AppState.map && typeof AppState.map.removeLayer === 'function') {
                         AppState.map.removeLayer(circle);
                     }
                 });
-                window.additionalBlueCircles = [];
+                AppState.additionalBlueCircles = [];
             }
-            if (window.additionalBlueLabels) {
-                window.additionalBlueLabels.forEach(label => {
+            if (AppState.additionalBlueLabels) {
+                AppState.additionalBlueLabels.forEach(label => {
                     if (AppState.map && typeof AppState.map.removeLayer === 'function') {
                         AppState.map.removeLayer(label);
                     }
                 });
-                window.additionalBlueLabels = [];
+                AppState.additionalBlueLabels = [];
             }
             console.log('Cleared blue and red circles and labels');
         }
@@ -6414,13 +6475,13 @@ function clearJumpCircles() {
     removeLayer(AppState.jumpCircleGreen, 'green circle');
     removeLayer(AppState.jumpCircleGreenLight, 'dark green circle');
 
-    if (window.additionalBlueCircles) {
-        window.additionalBlueCircles.forEach((circle, i) => removeLayer(circle, `additional blue circle ${i}`));
-        window.additionalBlueCircles = [];
+    if (AppState.additionalBlueCircles) {
+        AppState.additionalBlueCircles.forEach((circle, i) => removeLayer(circle, `additional blue circle ${i}`));
+        AppState.additionalBlueCircles = [];
     }
-    if (window.additionalBlueLabels) {
-        window.additionalBlueLabels.forEach((label, i) => removeLayer(label, `additional blue label ${i}`));
-        window.additionalBlueLabels = [];
+    if (AppState.additionalBlueLabels) {
+        AppState.additionalBlueLabels.forEach((label, i) => removeLayer(label, `additional blue label ${i}`));
+        AppState.additionalBlueLabels = [];
     }
 
     AppState.jumpCircle = null;
@@ -6432,8 +6493,8 @@ function clearJumpCircles() {
         red: !!AppState.jumpCircleFull,
         green: !!AppState.jumpCircleGreen,
         darkGreen: !!AppState.jumpCircleGreenLight,
-        additionalBlueCircles: window.additionalBlueCircles?.length || 0,
-        additionalBlueLabels: window.additionalBlueLabels?.length || 0
+        additionalBlueCircles: AppState.additionalBlueCircles?.length || 0,
+        additionalBlueLabels: AppState.additionalBlueLabels?.length || 0
     });
 }
 function setupRadioGroup(name, callback) {
