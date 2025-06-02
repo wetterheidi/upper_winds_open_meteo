@@ -9,7 +9,7 @@ import { setupCacheManagement, setupCacheSettings } from './cacheUI.js';
 import * as Coordinates from './coordinates.js';
 import { interpolateColor, generateWindBarb, createArrowIcon } from "./uiHelpers.js";
 import { handleHarpPlacement, createHarpMarker, clearHarpMarker } from './harpMarker.js';
-import {loadGpxTrack, loadCsvTrackUTC, loadCsvTrack, renderTrack, getTooltipContent} from './trackManager.js';
+import { loadGpxTrack, loadCsvTrackUTC, loadCsvTrack, renderTrack, getTooltipContent } from './trackManager.js';
 
 "use strict";
 
@@ -22,7 +22,7 @@ try {
     userSettings = { ...Settings.defaultSettings };
 }
 
-export {createCustomMarker, attachMarkerDragend, updateMarkerPopup, fetchWeatherForLocation, debouncedCalculateJump, calculateCutAway };
+export { createCustomMarker, attachMarkerDragend, updateMarkerPopup, fetchWeatherForLocation, debouncedCalculateJump, calculateCutAway };
 export const AppState = {
     isInitialized: false,
     coordsControl: null,
@@ -113,27 +113,108 @@ L.Control.Coordinates = L.Control.extend({
         this._container.innerHTML = content;
     }
 });
-function initMap() {
-    if (AppState.map) {
-        console.warn('Map already initialized, skipping initMap');
-        return;
+
+// == Refactored initMap ==
+// an den Anfang von app.js, nach den Imports und AppState Definition
+let mapInitialized = false; // Um mehrfache Initialisierung sicher zu verhindern
+let elevationCache = new Map();
+let qfeCache = new Map();
+let lastTapTime = 0; // Für die Doppelklick-Erkennung auf Touch-Geräten
+let hasTileErrorSwitched = false;
+
+const debouncedGetElevationAndQFE = Utils.debounce(async (lat, lng, requestLatLng, callback) => {
+    const cacheKey = `${lat.toFixed(5)},${lng.toFixed(5)}`;
+    const sliderIndex = getSliderValue(); // getSliderValue muss hier zugreifbar sein
+    const weatherCacheKey = `${cacheKey}-${sliderIndex}`;
+    let elevation, qfe;
+
+    if (elevationCache.has(cacheKey)) {
+        elevation = elevationCache.get(cacheKey);
+    } else {
+        try {
+            elevation = await Utils.getAltitude(lat, lng);
+            elevationCache.set(cacheKey, elevation);
+        } catch (error) {
+            console.warn('Failed to fetch elevation:', error);
+            elevation = 'N/A';
+        }
     }
 
-    const defaultCenter = [48.0179, 11.1923];
-    const defaultZoom = 11;
+    if (qfeCache.has(weatherCacheKey)) {
+        qfe = qfeCache.get(weatherCacheKey);
+    } else {
+        if (AppState.weatherData && AppState.weatherData.surface_pressure && sliderIndex >= 0 && sliderIndex < AppState.weatherData.surface_pressure.length) {
+            const surfacePressure = AppState.weatherData.surface_pressure[sliderIndex];
+            const temperature = AppState.weatherData.temperature_2m?.[sliderIndex] || 16.1;
+            const referenceElevation = AppState.lastAltitude !== 'N/A' ? AppState.lastAltitude : 339;
+            qfe = Utils.calculateQFE(surfacePressure, elevation, referenceElevation, temperature);
+            qfeCache.set(weatherCacheKey, qfe);
+            console.log('Calculated QFE:', { lat, lng, surfacePressure, elevation, referenceElevation, temperature, qfe });
+        } else {
+            console.warn('Surface pressure not available for QFE:', {
+                hasWeatherData: !!AppState.weatherData,
+                hasSurfacePressure: !!AppState.weatherData?.surface_pressure,
+                sliderIndexValid: sliderIndex >= 0 && sliderIndex < (AppState.weatherData?.surface_pressure?.length || 0)
+            });
+            qfe = 'N/A';
+        }
+    }
+    callback({ elevation, qfe }, requestLatLng);
+}, 500);
 
+async function _fetchInitialWeather(lat, lng) {
+    const lastFullHourUTC = Utils.getLastFullHourUTC();
+    let utcIsoString;
+    try {
+        utcIsoString = lastFullHourUTC.toISOString();
+    } catch (error) {
+        console.error('Failed to get UTC time:', error);
+        const now = new Date();
+        now.setMinutes(0, 0, 0);
+        utcIsoString = now.toISOString();
+    }
+
+    let initialTime;
+    if (Settings.state.userSettings.timeZone === 'Z') {
+        initialTime = utcIsoString.replace(':00.000Z', 'Z');
+    } else {
+        try {
+            const localTimeStr = await Utils.formatLocalTime(utcIsoString, lat, lng);
+            const match = localTimeStr.match(/^(\d{4}-\d{2}-\d{2}) (\d{2})(\d{2}) GMT([+-]\d+)/);
+            if (!match) throw new Error(`Local time string format mismatch: ${localTimeStr}`);
+            const [, datePart, hour, minute, offset] = match;
+            const offsetSign = offset.startsWith('+') ? '+' : '-';
+            const offsetHours = Math.abs(parseInt(offset, 10)).toString().padStart(2, '0');
+            const formattedOffset = `${offsetSign}${offsetHours}:00`;
+            const isoFormatted = `${datePart}T${hour}:${minute}:00${formattedOffset}`;
+            const localDate = new Date(isoFormatted);
+            if (isNaN(localDate.getTime())) throw new Error(`Failed to parse localDate from ${isoFormatted}`);
+            initialTime = localDate.toISOString().replace(':00.000Z', 'Z');
+        } catch (error) {
+            console.error('Error converting to local time for initial weather:', error);
+            initialTime = utcIsoString.replace(':00.000Z', 'Z');
+        }
+    }
+    await fetchWeatherForLocation(lat, lng, initialTime, true);
+}
+
+// HILFSFUNKTIONEN FÜR initMap (innerhalb von app.js)
+
+function _initializeBasicMapInstance(defaultCenter, defaultZoom) {
     AppState.lastLat = AppState.lastLat || defaultCenter[0];
     AppState.lastLng = AppState.lastLng || defaultCenter[1];
-
     AppState.map = L.map('map', {
         center: defaultCenter,
         zoom: defaultZoom,
         zoomControl: false,
-        doubleClickZoom: false,
+        doubleClickZoom: false, // Wichtig für eigenen dblclick Handler
         maxZoom: 19,
         minZoom: navigator.onLine ? 6 : 11
     });
+    console.log('Map instance created.');
+}
 
+function _setupBaseLayersAndHandling() {
     AppState.baseMaps = {
         "OpenStreetMap": L.tileLayer.cached('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
@@ -178,112 +259,111 @@ function initMap() {
     };
 
     const openMeteoAttribution = 'Weather data by <a href="https://open-meteo.com">Open-Meteo</a>';
-    AppState.map.attributionControl.addAttribution(openMeteoAttribution);
+    if (AppState.map && AppState.map.attributionControl) {
+        AppState.map.attributionControl.addAttribution(openMeteoAttribution);
+    }
 
-    const selectedBaseMap = Settings.state.userSettings.baseMaps in AppState.baseMaps ? Settings.state.userSettings.baseMaps : "Esri Street";
-    const fallbackBaseMap = "OpenStreetMap";
-    const layer = AppState.baseMaps[selectedBaseMap];
-    let hasSwitched = false;
+    const selectedBaseMapName = Settings.state.userSettings.baseMaps in AppState.baseMaps
+        ? Settings.state.userSettings.baseMaps
+        : "Esri Street";
+    const activeLayer = AppState.baseMaps[selectedBaseMapName];
 
-    layer.on('tileerror', () => {
-        if (!navigator.onLine) {
-            if (!hasSwitched) {
-                console.warn(`${selectedBaseMap} tiles unavailable offline. Zoom restricted to levels 11–14.`);
-                Utils.handleError('Offline: Zoom restricted to levels 11–14 for cached tiles.');
-                hasSwitched = true;
+    if (activeLayer && typeof activeLayer.on === 'function') {
+        activeLayer.on('tileerror', () => {
+            if (!navigator.onLine) {
+                if (!hasTileErrorSwitched) {
+                    console.warn(`${selectedBaseMapName} tiles unavailable offline. Zoom restricted.`);
+                    Utils.handleMessage('Offline: Zoom restricted to levels 11–14 for cached tiles.');
+                    hasTileErrorSwitched = true;
+                }
+                return;
             }
-            return;
-        }
-        if (!hasSwitched && failedCount > totalTiles / 2) {
-            console.warn(`${selectedBaseMap} tiles slow or unavailable, switching to ${fallbackBaseMap}`);
-            if (AppState.map.hasLayer(layer)) {
-                AppState.map.removeLayer(layer);
-                AppState.baseMaps[fallbackBaseMap].addTo(AppState.map);
-                Settings.state.userSettings.baseMaps = fallbackBaseMap;
+            if (!hasTileErrorSwitched && AppState.map.hasLayer(activeLayer)) {
+                const fallbackBaseMapName = "OpenStreetMap";
+                console.warn(`${selectedBaseMapName} tiles unavailable, switching to ${fallbackBaseMapName}`);
+                AppState.map.removeLayer(activeLayer);
+                AppState.baseMaps[fallbackBaseMapName].addTo(AppState.map);
+                Settings.state.userSettings.baseMaps = fallbackBaseMapName;
                 Settings.save();
-                Utils.handleError(`${selectedBaseMap} tiles slow or unavailable. Switched to ${fallbackBaseMap}.`);
-                hasSwitched = true;
+                Utils.handleMessage(`${selectedBaseMapName} tiles unavailable. Switched to ${fallbackBaseMapName}.`);
+                hasTileErrorSwitched = true;
+            } else if (!hasTileErrorSwitched) {
+                console.warn(`Tile error in ${selectedBaseMapName}, attempting to continue.`);
             }
-        } else {
-            console.warn(`Tile error in ${selectedBaseMap}, attempting to continue`);
-        }
-    });
+        });
+        activeLayer.addTo(AppState.map);
+    } else {
+        console.error(`Default base map "${selectedBaseMapName}" could not be added.`);
+        AppState.baseMaps["OpenStreetMap"].addTo(AppState.map); // Sicherer Fallback
+    }
 
-    layer.addTo(AppState.map);
-    AppState.map.invalidateSize();
+    if (AppState.map) AppState.map.invalidateSize();
 
     window.addEventListener('online', () => {
-        hasSwitched = false;
-        AppState.map.options.minZoom = 6;
-        console.log('Back online, restored minZoom to 6');
-        updateOfflineIndicator();
+        hasTileErrorSwitched = false;
+        if (AppState.map) AppState.map.options.minZoom = 6;
+        updateOfflineIndicator(); // updateOfflineIndicator muss global/importiert sein
     });
-
     window.addEventListener('offline', () => {
+        if (AppState.map) AppState.map.options.minZoom = 9;
         updateOfflineIndicator();
     });
+    console.log('Base layers and online/offline handlers set up.');
+}
 
-    AppState.map.on('zoomstart', (e) => {
-        if (!navigator.onLine) {
-            const targetZoom = e.target._zoom || AppState.map.getZoom();
-            if (targetZoom < 11) {
-                e.target._zoom = 11;
-                AppState.map.setZoom(11);
-                Utils.handleError('Offline: Zoom restricted to levels 11–14 for cached tiles.');
-            } else if (targetZoom > 14) {
-                e.target._zoom = 14;
-                AppState.map.setZoom(14);
-                Utils.handleError('Offline: Zoom restricted to levels 11–14 for cached tiles.');
-            }
-        }
-    });
-
+function _addStandardMapControls() {
+    if (!AppState.map) {
+        console.error("Karte nicht initialisiert, bevor Controls hinzugefügt werden können.");
+        return;
+    }
     L.control.layers(AppState.baseMaps, null, { position: 'topright' }).addTo(AppState.map);
     AppState.map.on('baselayerchange', function (e) {
-        Settings.state.userSettings.baseMaps = e.name;
-        Settings.save();
         console.log(`Base map changed to: ${e.name}`);
-        hasSwitched = false;
-        if (AppState.lastLat && AppState.lastLng) {
+        if (Settings && Settings.state && Settings.state.userSettings) {
+            Settings.state.userSettings.baseMaps = e.name;
+            Settings.save();
+            console.log(`Saved selected base map "${e.name}" to settings.`);
+        } else {
+            console.error("Settings object not properly available to save base map choice.");
+        }
+        hasTileErrorSwitched = false;
+        if (AppState.lastLat && AppState.lastLng && typeof cacheTilesForDIP === 'function') {
             cacheTilesForDIP({ map: AppState.map, lastLat: AppState.lastLat, lastLng: AppState.lastLng, baseMaps: AppState.baseMaps });
         }
     });
-
-    AppState.map.on('moveend', () => {
-        if (AppState.lastLat && AppState.lastLng) {
-            debouncedCacheVisibleTiles({ map: AppState.map, baseMaps: AppState.baseMaps });
-        }
-    });
-
     L.control.zoom({ position: 'topright' }).addTo(AppState.map);
     L.control.polylineMeasure({
-        position: 'topright',
-        unit: 'kilometres',
-        showBearings: true,
+        position: 'topright', 
+        unit: 'kilometres', 
+        showBearings: true, 
         clearMeasurementsOnStop: false,
-        showClearControl: true,
-        showUnitControl: true,
+        showClearControl: true, 
+        showUnitControl: true, 
         tooltipTextFinish: 'Click to finish the line<br>',
-        tooltipTextDelete: 'Shift-click to delete point',
-        tooltipTextMove: 'Drag to move point<br>',
-        tooltipTextResume: 'Click to resume line<br>',
-        tooltipTextAdd: 'Click to add point<br>',
-        measureControlTitleOn: 'Start measuring distance and bearing',
+        tooltipTextDelete: 'Shift-click to delete point', tooltipTextMove: 'Drag to move point<br>',
+        tooltipTextResume: 'Click to resume line<br>', tooltipTextAdd: 'Click to add point<br>',
+        measureControlTitleOn: 'Start measuring distance and bearing', 
         measureControlTitleOff: 'Stop measuring'
     }).addTo(AppState.map);
 
-    L.control.scale({
-        position: 'bottomleft',
-        metric: true,
-        imperial: true,
-        maxWidth: 100
+    L.control.scale({ 
+        position: 'bottomleft', 
+        metric: true, 
+        imperial: false, 
+        maxWidth: 100 
     }).addTo(AppState.map);
+    console.log('Standard map controls and baselayerchange handler added.');
+}
 
+function _setupCustomPanes() {
     AppState.map.createPane('gpxTrackPane');
     AppState.map.getPane('gpxTrackPane').style.zIndex = 650;
     AppState.map.getPane('tooltipPane').style.zIndex = 700;
     AppState.map.getPane('popupPane').style.zIndex = 700;
+    console.log('Custom map panes created.');
+}
 
+function _initializeLivePositionControl() {
     AppState.livePositionControl = L.control.livePosition({ position: 'bottomright' }).addTo(AppState.map);
     if (AppState.livePositionControl._container) {
         AppState.livePositionControl._container.style.display = 'none';
@@ -291,441 +371,325 @@ function initMap() {
     } else {
         console.warn('livePositionControl._container not initialized in initMap');
     }
+}
 
-    async function fetchInitialWeather(lat, lng) {
-        const lastFullHourUTC = Utils.getLastFullHourUTC();
-        let utcIsoString;
-        try {
-            utcIsoString = lastFullHourUTC.toISOString();
-            console.log('initMap: Last full hour UTC:', utcIsoString);
-        } catch (error) {
-            console.error('Failed to get UTC time:', error);
-            const now = new Date();
-            now.setMinutes(0, 0, 0);
-            utcIsoString = now.toISOString();
-            console.log('initMap: Fallback to current time:', utcIsoString);
-        }
-
-        let initialTime;
-        if (Settings.state.userSettings.timeZone === 'Z') {
-            initialTime = utcIsoString.replace(':00.000Z', 'Z');
-        } else {
-            try {
-                const localTimeStr = await Utils.formatLocalTime(utcIsoString, lat, lng);
-                console.log('initMap: Local time string:', localTimeStr);
-                const match = localTimeStr.match(/^(\d{4}-\d{2}-\d{2}) (\d{2})(\d{2}) GMT([+-]\d+)/);
-                if (!match) {
-                    throw new Error(`Local time string format mismatch: ${localTimeStr}`);
-                }
-                const [, datePart, hour, minute, offset] = match;
-                const offsetSign = offset.startsWith('+') ? '+' : '-';
-                const offsetHours = Math.abs(parseInt(offset, 10)).toString().padStart(2, '0');
-                const formattedOffset = `${offsetSign}${offsetHours}:00`;
-                const isoFormatted = `${datePart}T${hour}:${minute}:00${formattedOffset}`;
-                console.log('initMap: ISO formatted local time:', isoFormatted);
-                const localDate = new Date(isoFormatted);
-                if (isNaN(localDate.getTime())) {
-                    throw new Error(`Failed to parse localDate from ${isoFormatted}`);
-                }
-                const localDateUtc = localDate.toISOString();
-                console.log('initMap: Local time in UTC:', localDateUtc);
-                initialTime = localDateUtc.replace(':00.000Z', 'Z');
-            } catch (error) {
-                console.error('Error converting to local time:', error);
-                initialTime = utcIsoString.replace(':00.000Z', 'Z');
-                console.log('initMap: Falling back to UTC time:', initialTime);
-            }
-        }
-
-        console.log('initMap: initialTime:', initialTime);
-        await fetchWeatherForLocation(lat, lng, initialTime, true);
-    }
-
-    const initialAltitude = 'N/A';
+function _initializeDefaultMarker(defaultCenter, initialAltitude) {
+    // Annahme: createCustomMarker, attachMarkerDragend, updateMarkerPopup sind global in app.js definiert
     AppState.currentMarker = Utils.configureMarker(
-        AppState.map,
-        defaultCenter[0],
-        defaultCenter[1],
-        initialAltitude,
-        false,
-        createCustomMarker,
-        attachMarkerDragend,
+        AppState.map, 
+        defaultCenter[0], 
+        defaultCenter[1], 
+        initialAltitude, false,
+        createCustomMarker, 
+        attachMarkerDragend, 
         updateMarkerPopup,
-        AppState.currentMarker,
+        AppState.currentMarker, 
         (marker) => { AppState.currentMarker = marker; }
     );
     AppState.isManualPanning = false;
+    console.log('Default marker initialized.');
+}
 
-    TileCache.init().then(() => {
-        TileCache.migrateTiles().then(() => {
-            TileCache.getCacheSize().then(size => {
-                if (size > 500) {
-                    TileCache.clearOldTiles(3).then(result => {
-                        Utils.handleMessage(`Cleared ${result.deletedCount} old tiles to free up space: ${result.deletedSizeMB.toFixed(2)} MB freed.`);
-                    }).catch(error => {
-                        console.error('Failed to clear old tiles during init:', error);
-                        Utils.handleError('Failed to clear old tiles during startup.');
-                    });
-                } else {
-                    TileCache.clearOldTiles().then(() => {
-                        cacheTilesForDIP({ map: AppState.map, lastLat: AppState.lastLat, lastLng: AppState.lastLng, baseMaps: AppState.baseMaps });
-                    }).catch(error => {
-                        console.error('Failed to clear old tiles:', error);
-                    });
-                }
-            }).catch(error => {
-                console.error('Failed to get cache size during init:', error);
-                TileCache.clearOldTiles().then(() => {
-                    cacheTilesForDIP({ map: AppState.map, lastLat: AppState.lastLat, lastLng: AppState.lastLng, baseMaps: AppState.baseMaps });
-                }).catch(error => {
-                    console.error('Failed to clear old tiles:', error);
-                });
-            });
-        }).catch(error => {
-            console.error('Failed to migrate tiles:', error);
-            TileCache.clearOldTiles().then(() => {
-                cacheTilesForDIP({ map: AppState.map, lastLat: AppState.lastLat, lastLng: AppState.lastLng, baseMaps: AppState.baseMaps });
-            }).catch(err => {
-                console.error('Failed to clear old tiles:', err);
-            });
-        });
-    }).catch(error => {
-        console.error('Failed to initialize tile cache:', error);
-        Utils.handleError('Tile caching unavailable.');
-    });
+async function _initializeTileCacheLogic() {
+    try {
+        await TileCache.init();
+        await TileCache.migrateTiles();
+        const size = await TileCache.getCacheSize();
+        if (size > 500) {
+            const result = await TileCache.clearOldTiles(3);
+            Utils.handleMessage(`Cleared ${result.deletedCount} old tiles: ${result.deletedSizeMB.toFixed(2)} MB freed.`);
+        } else {
+            await TileCache.clearOldTiles();
+        }
+    } catch (error) {
+        console.error('Failed to initialize or manage tile cache:', error);
+        Utils.handleError('Tile caching setup failed.');
+    }
+    console.log('Tile cache logic initialized.');
+}
 
+async function _geolocationSuccessCallback(position, defaultZoom) {
+    const userCoords = [position.coords.latitude, position.coords.longitude];
+    AppState.lastLat = position.coords.latitude;
+    AppState.lastLng = position.coords.longitude;
+    AppState.lastAltitude = await Utils.getAltitude(AppState.lastLat, AppState.lastLng);
+    Coordinates.addCoordToHistory(AppState.lastLat, AppState.lastLng);
+
+    AppState.currentMarker = Utils.configureMarker(
+        AppState.map, AppState.lastLat, AppState.lastLng, AppState.lastAltitude, false,
+        createCustomMarker, attachMarkerDragend, updateMarkerPopup,
+        AppState.currentMarker, (marker) => { AppState.currentMarker = marker; }
+    );
+    AppState.map.setView(userCoords, defaultZoom);
+
+    if (Settings.state.userSettings.calculateJump) {
+        calculateJump(); calculateCutAway();
+    }
+    recenterMap(true);
+    AppState.isManualPanning = false;
+    await _fetchInitialWeather(AppState.lastLat, AppState.lastLng);
+    if (Settings.state.userSettings.trackPosition) {
+        setCheckboxValue('trackPositionCheckbox', true); startPositionTracking();
+    }
+    cacheTilesForDIP({ map: AppState.map, lastLat: AppState.lastLat, lastLng: AppState.lastLng, baseMaps: AppState.baseMaps });
+    console.log('Geolocation success handled.');
+}
+
+async function _geolocationErrorCallback(error, defaultCenter, defaultZoom) {
+    console.warn(`Geolocation error: ${error.message}`);
+    Utils.handleMessage('Unable to retrieve your location. Using default location.');
+    AppState.lastLat = defaultCenter[0]; AppState.lastLng = defaultCenter[1];
+    AppState.lastAltitude = await Utils.getAltitude(AppState.lastLat, AppState.lastLng);
+    AppState.currentMarker = Utils.configureMarker(
+        AppState.map, AppState.lastLat, AppState.lastLng, AppState.lastAltitude, false,
+        createCustomMarker, attachMarkerDragend, updateMarkerPopup,
+        AppState.currentMarker, (marker) => { AppState.currentMarker = marker; }
+    );
+    AppState.map.setView(defaultCenter, defaultZoom);
+    recenterMap(true); AppState.isManualPanning = false;
+    await _fetchInitialWeather(AppState.lastLat, AppState.lastLng);
+    if (Settings.state.userSettings.trackPosition) {
+        Utils.handleMessage('Tracking disabled due to geolocation failure.');
+        setCheckboxValue('trackPositionCheckbox', false);
+        Settings.state.userSettings.trackPosition = false; Settings.save();
+    }
+    cacheTilesForDIP({ map: AppState.map, lastLat: AppState.lastLat, lastLng: AppState.lastLng, baseMaps: AppState.baseMaps });
+    console.log('Geolocation error handled.');
+}
+
+async function _handleGeolocation(defaultCenter, defaultZoom) {
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
-            async (position) => {
-                const userCoords = [position.coords.latitude, position.coords.longitude];
-                AppState.lastLat = position.coords.latitude;
-                AppState.lastLng = position.coords.longitude;
-                AppState.lastAltitude = await Utils.getAltitude(AppState.lastLat, AppState.lastLng);
-                Coordinates.addCoordToHistory(AppState.lastLat, AppState.lastLng);
-
-                AppState.currentMarker = Utils.configureMarker(
-                    AppState.map,
-                    AppState.lastLat,
-                    AppState.lastLng,
-                    AppState.lastAltitude,
-                    false,
-                    createCustomMarker,
-                    attachMarkerDragend,
-                    updateMarkerPopup,
-                    AppState.currentMarker,
-                    (marker) => { AppState.currentMarker = marker; }
-                );
-                AppState.map.setView(userCoords, defaultZoom);
-
-                if (Settings.state.userSettings.calculateJump) {
-                    calculateJump();
-                    calculateCutAway();
-                }
-                recenterMap(true);
-                AppState.isManualPanning = false;
-
-                await fetchInitialWeather(AppState.lastLat, AppState.lastLng);
-
-                if (Settings.state.userSettings.trackPosition) {
-                    setCheckboxValue('trackPositionCheckbox', true);
-                    startPositionTracking();
-                }
-
-                cacheTilesForDIP({ map: AppState.map, lastLat: AppState.lastLat, lastLng: AppState.lastLng, baseMaps: AppState.baseMaps });
-            },
-            async (error) => {
-                console.warn(`Geolocation error: ${error.message}`);
-                Utils.handleError('Unable to retrieve your location. Using default location.');
-                AppState.lastLat = defaultCenter[0];
-                AppState.lastLng = defaultCenter[1];
-                AppState.lastAltitude = await Utils.getAltitude(AppState.lastLat, AppState.lastLng);
-                AppState.currentMarker = Utils.configureMarker(
-                    AppState.map,
-                    AppState.lastLat,
-                    AppState.lastLng,
-                    AppState.lastAltitude,
-                    false,
-                    createCustomMarker,
-                    attachMarkerDragend,
-                    updateMarkerPopup,
-                    AppState.currentMarker,
-                    (marker) => { AppState.currentMarker = marker; }
-                );
-                AppState.map.setView(defaultCenter, defaultZoom);
-                recenterMap(true);
-                AppState.isManualPanning = false;
-
-                await fetchInitialWeather(AppState.lastLat, AppState.lastLng);
-
-                if (Settings.state.userSettings.trackPosition) {
-                    Utils.handleError('Tracking disabled due to geolocation failure.');
-                    setCheckboxValue('trackPositionCheckbox', false);
-                    Settings.state.userSettings.trackPosition = false;
-                    Settings.save();
-                }
-
-                cacheTilesForDIP({ map: AppState.map, lastLat: AppState.lastLat, lastLng: AppState.lastLng, baseMaps: AppState.baseMaps });
-            },
-            {
-                enableHighAccuracy: true,
-                timeout: 20000,
-                maximumAge: 0
-            }
+            (position) => _geolocationSuccessCallback(position, defaultZoom),
+            (geoError) => _geolocationErrorCallback(geoError, defaultCenter, defaultZoom),
+            { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
         );
     } else {
         console.warn('Geolocation not supported.');
-        Utils.handleError('Geolocation not supported. Using default location.');
-        AppState.lastLat = defaultCenter[0];
-        AppState.lastLng = defaultCenter[1];
-        AppState.lastAltitude = Utils.getAltitude(AppState.lastLat, AppState.lastLng);
-        AppState.currentMarker = Utils.configureMarker(
-            AppState.map,
-            AppState.lastLat,
-            AppState.lastLng,
-            AppState.lastAltitude,
-            false,
-            createCustomMarker,
-            attachMarkerDragend,
-            updateMarkerPopup,
-            AppState.currentMarker,
-            (marker) => { AppState.currentMarker = marker; }
-        );
-        AppState.map.setView(defaultCenter, defaultZoom);
-        recenterMap(true);
-        AppState.isManualPanning = false;
-
-        fetchInitialWeather(AppState.lastLat, AppState.lastLng);
-
-        if (Settings.state.userSettings.trackPosition) {
-            Utils.handleError('Tracking disabled: Geolocation not supported.');
-            setCheckboxValue('trackPositionCheckbox', false);
-            Settings.state.userSettings.trackPosition = false;
-            Settings.save();
-        }
-
-        cacheTilesForDIP({ map: AppState.map, lastLat: AppState.lastLat, lastLng: AppState.lastLng, baseMaps: AppState.baseMaps });
+        await _geolocationErrorCallback({ message: "Geolocation not supported by this browser." }, defaultCenter, defaultZoom);
     }
+}
 
-    updateOfflineIndicator();
-
-    AppState.coordsControl = new L.Control.Coordinates();
+function _initializeCoordsControlAndHandlers() {
+    AppState.coordsControl = new L.Control.Coordinates(); // L.Control.Coordinates muss global sein
     AppState.coordsControl.addTo(AppState.map);
-    console.log('coordsControl initialized:', AppState.coordsControl);
+    console.log('CoordsControl initialized.');
 
-    const elevationCache = new Map();
-    const qfeCache = new Map();
-
-    const debouncedGetElevationAndQFE = Utils.debounce(async (lat, lng, requestLatLng, callback) => {
-        const cacheKey = `${lat.toFixed(5)},${lng.toFixed(5)}`;
-        const sliderIndex = getSliderValue();
-        const weatherCacheKey = `${cacheKey}-${sliderIndex}`;
-
-        let elevation, qfe;
-
-        // Check elevation cache
-        if (elevationCache.has(cacheKey)) {
-            elevation = elevationCache.get(cacheKey);
-            console.log('Using cached elevation:', { lat, lng, elevation });
-        } else {
-            try {
-                elevation = await Utils.getAltitude(lat, lng);
-                elevationCache.set(cacheKey, elevation);
-                console.log('Fetched elevation:', { lat, lng, elevation });
-            } catch (error) {
-                console.warn('Failed to fetch elevation:', error);
-                elevation = 'N/A';
-            }
-        }
-
-        // Check QFE cache
-        if (qfeCache.has(weatherCacheKey)) {
-            qfe = qfeCache.get(weatherCacheKey);
-            console.log('Using cached QFE:', { lat, lng, qfe });
-        } else {
-            // Fetch weather data if not available
-            if (!AppState.weatherData || !AppState.weatherData.surface_pressure) {
-                console.log('No weather data for QFE, fetching for:', { lat, lng });
-                await fetchWeatherForLocation(lat, lng, null, false);
-            }
-
-            if (AppState.weatherData && AppState.weatherData.surface_pressure && sliderIndex >= 0 && sliderIndex < AppState.weatherData.surface_pressure.length) {
-                const surfacePressure = AppState.weatherData.surface_pressure[sliderIndex];
-                const temperature = AppState.weatherData.temperature_2m?.[sliderIndex] || 16.1; // Use DIP's temperature as default
-                const referenceElevation = AppState.lastAltitude || 339; // Use DIP's elevation as reference
-                qfe = Utils.calculateQFE(surfacePressure, elevation, referenceElevation, temperature);
-                qfeCache.set(weatherCacheKey, qfe);
-                console.log('Calculated QFE:', { lat, lng, surfacePressure, elevation, referenceElevation, temperature, qfe });
-            } else {
-                console.warn('Surface pressure not available for QFE:', {
-                    hasWeatherData: !!AppState.weatherData,
-                    hasSurfacePressure: !!AppState.weatherData?.surface_pressure,
-                    sliderIndexValid: sliderIndex >= 0 && sliderIndex < (AppState.weatherData?.surface_pressure?.length || 0)
-                });
-                qfe = 'N/A';
-            }
-        }
-
-        callback({ elevation, qfe }, requestLatLng);
-    }, 500);
-
+    // Mousemove Handler (vereinfacht, da debouncedGetElevationAndQFE jetzt globaler ist)
     AppState.map.on('mousemove', function (e) {
-        const coordFormat = getCoordinateFormat();
-        const lat = e.latlng.lat;
-        const lng = e.latlng.lng;
-        AppState.lastMouseLatLng = { lat, lng };
-
-        let coordText;
-        if (coordFormat === 'MGRS') {
-            const mgrs = Utils.decimalToMgrs(lat, lng);
-            const formattedMgrs = mgrs ? mgrs : 'N/A';
-            coordText = `MGRS: ${formattedMgrs}`;
-        } else if (coordFormat === 'DMS') {
-            const latDMS = Utils.decimalToDms(lat, true);
-            const lngDMS = Utils.decimalToDms(lng, false);
-            coordText = `Lat: ${latDMS}, Lng: ${lngDMS}`;
-        } else {
-            coordText = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
-        }
-
-        AppState.coordsControl.update(`${coordText}<br>Elevation: Fetching...<br>QFE: Fetching...`);
-
-        debouncedGetElevationAndQFE(lat, lng, { lat, lng }, ({ elevation, qfe }, requestLatLng) => {
-            if (AppState.lastMouseLatLng) {
-                const deltaLat = Math.abs(AppState.lastMouseLatLng.lat - requestLatLng.lat);
-                const deltaLng = Math.abs(AppState.lastMouseLatLng.lng - requestLatLng.lng);
-                const threshold = 0.05;
-                if (deltaLat < threshold && deltaLng < threshold) {
-                    const heightUnit = getHeightUnit();
-                    let displayElevation = elevation === 'N/A' ? 'N/A' : elevation;
-                    if (displayElevation !== 'N/A') {
-                        displayElevation = Utils.convertHeight(displayElevation, heightUnit);
-                        displayElevation = Math.round(displayElevation);
-                    }
-                    const qfeText = qfe === 'N/A' ? 'N/A' : `${qfe} hPa`;
-                    console.log('Updating elevation and QFE display:', { lat: requestLatLng.lat, lng: requestLatLng.lng, elevation, qfe, heightUnit, displayElevation });
-                    AppState.coordsControl.update(`${coordText}<br>Elevation: ${displayElevation} ${displayElevation === 'N/A' ? '' : heightUnit}<br>QFE: ${qfeText}`);
-                } else {
-                    console.log('Discarded elevation and QFE update: mouse moved too far', {
-                        requestLat: requestLatLng.lat,
-                        requestLng: requestLatLng.lng,
-                        currentLat: AppState.lastMouseLatLng.lat,
-                        currentLng: AppState.lastMouseLatLng.lng
-                    });
-                }
-            } else {
-                console.warn('No lastMouseLatLng, skipping elevation and QFE update');
-            }
-        });
-    });
-
-    AppState.map.on('movestart', (e) => {
-        if (!e.target.dragging || !e.target.dragging._marker) {
-            AppState.isManualPanning = true;
-            console.log('Manual panning detected, isManualPanning set to true');
-        }
+        _handleMapMouseMove(e); // Ausgelagert
     });
 
     AppState.map.on('mouseout', function () {
-        AppState.coordsControl.getContainer().innerHTML = 'Move mouse over map';
+        if (AppState.coordsControl && AppState.coordsControl.getContainer()) {
+            AppState.coordsControl.getContainer().innerHTML = 'Move mouse over map';
+        }
+    });
+    console.log('Mousemove and mouseout handlers set up.');
+}
+
+// Die einzelnen komplexen Event-Handler
+function _handleMapMouseMove(e) {
+    const coordFormat = getCoordinateFormat(); // getCoordinateFormat muss global definiert sein
+    const lat = e.latlng.lat;
+    const lng = e.latlng.lng;
+    AppState.lastMouseLatLng = { lat, lng };
+
+    let coordText;
+    if (coordFormat === 'MGRS') {
+        const mgrsVal = Utils.decimalToMgrs(lat, lng); // Utils.decimalToMgrs
+        coordText = `MGRS: ${mgrsVal ? mgrsVal : 'N/A'}`;
+    } else if (coordFormat === 'DMS') {
+        const latDMS = Utils.decimalToDms(lat, true); // Utils.decimalToDms
+        const lngDMS = Utils.decimalToDms(lng, false); // Utils.decimalToDms
+        coordText = `Lat: ${latDMS}, Lng: ${lngDMS}`;
+    } else {
+        coordText = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
+    }
+
+    if (AppState.coordsControl) {
+        AppState.coordsControl.update(`${coordText}<br>Elevation: Fetching...<br>QFE: Fetching...`);
+    }
+
+    debouncedGetElevationAndQFE(lat, lng, { lat, lng }, ({ elevation, qfe }, requestLatLng) => {
+        if (AppState.lastMouseLatLng && AppState.coordsControl) {
+            const deltaLat = Math.abs(AppState.lastMouseLatLng.lat - requestLatLng.lat);
+            const deltaLng = Math.abs(AppState.lastMouseLatLng.lng - requestLatLng.lng);
+            const threshold = 0.05;
+            if (deltaLat < threshold && deltaLng < threshold) {
+                const heightUnit = getHeightUnit(); // getHeightUnit muss global definiert sein
+                let displayElevation = elevation === 'N/A' ? 'N/A' : elevation;
+                if (displayElevation !== 'N/A') {
+                    displayElevation = Utils.convertHeight(displayElevation, heightUnit); // Utils.convertHeight
+                    displayElevation = Math.round(displayElevation);
+                }
+                const qfeText = qfe === 'N/A' ? 'N/A' : `${qfe} hPa`;
+                AppState.coordsControl.update(`${coordText}<br>Elevation: ${displayElevation} ${displayElevation === 'N/A' ? '' : heightUnit}<br>QFE: ${qfeText}`);
+            }
+        }
+    });
+}
+
+async function _handleMapDblClick(e) {
+    console.log('--- _handleMapDblClick START ---', e.latlng);
+    const { lat, lng } = e.latlng;
+    AppState.lastLat = lat;
+    AppState.lastLng = lng;
+    AppState.lastAltitude = await Utils.getAltitude(lat, lng);
+    Coordinates.addCoordToHistory(lat, lng);
+
+    // Wichtig: createCustomMarker, attachMarkerDragend, updateMarkerPopup müssen im globalen Scope von app.js definiert sein.
+    AppState.currentMarker = Utils.configureMarker(
+        AppState.map, AppState.lastLat, AppState.lastLng, AppState.lastAltitude, false,
+        createCustomMarker, attachMarkerDragend, updateMarkerPopup, AppState.currentMarker,
+        (newMarker) => {
+            AppState.currentMarker = newMarker;
+            console.log('_handleMapDblClick: setCurrentMarker callback. New AppState.currentMarker ID:', newMarker ? newMarker._leaflet_id : 'none');
+        }
+    );
+
+    resetJumpRunDirection(true); // resetJumpRunDirection muss global definiert sein
+    if (Settings.state.userSettings.calculateJump) {
+        calculateJump(); // calculateJump muss global definiert sein
+        calculateCutAway(); // calculateCutAway muss global definiert sein
+    }
+    recenterMap(true); // recenterMap muss global definiert sein
+    AppState.isManualPanning = false;
+
+    const slider = document.getElementById('timeSlider');
+    const currentIndex = parseInt(slider.value) || 0;
+    const currentTime = AppState.weatherData?.time?.[currentIndex] || null;
+
+    await fetchWeatherForLocation(lat, lng, currentTime); // fetchWeatherForLocation muss global definiert sein
+
+    if (Settings.state.userSettings.showJumpRunTrack) updateJumpRunTrack(); // updateJumpRunTrack muss global definiert sein
+    cacheTilesForDIP({ map: AppState.map, lastLat: AppState.lastLat, lastLng: AppState.lastLng, baseMaps: AppState.baseMaps }); // cacheTilesForDIP muss global definiert sein
+    if (Settings.state.userSettings.showJumpMasterLine && Settings.state.userSettings.trackPosition) updateJumpMasterLine(); // updateJumpMasterLine muss global definiert sein
+    console.log('--- _handleMapDblClick END ---');
+}
+
+function _setupCoreMapEventHandlers() {
+    if (!AppState.map) return;
+
+    AppState.coordsControl = new L.Control.Coordinates();
+    AppState.coordsControl.addTo(AppState.map);
+    console.log('CoordsControl initialized.');
+
+    AppState.map.on('mousemove', _handleMapMouseMove);
+    AppState.map.on('dblclick', _handleMapDblClick); // HIER WIRD DER DOPPELKLICK-HANDLER REGISTRIERT
+
+    AppState.map.on('mouseout', function () {
+        if (AppState.coordsControl && AppState.coordsControl.getContainer()) {
+            AppState.coordsControl.getContainer().innerHTML = 'Move mouse over map';
+        }
     });
 
-    AppState.map.on('contextmenu', (e) => {
-        if (!Settings.state.userSettings.showCutAwayFinder || !Settings.state.userSettings.calculateJump) {
-            console.log('Cut-away marker placement ignored: showCutAwayFinder or calculateJump not enabled');
-            return;
+    AppState.map.on('zoomstart', (e) => { // Zoom-Beschränkung im Offline-Modus
+        if (!navigator.onLine) {
+            const targetZoom = e.target._zoom || AppState.map.getZoom();
+            if (targetZoom < 11) {
+                e.target._zoom = 11; AppState.map.setZoom(11);
+                Utils.handleMessage('Offline: Zoom restricted to levels 11–14 for cached tiles.');
+            } else if (targetZoom > 14) {
+                e.target._zoom = 14; AppState.map.setZoom(14);
+                Utils.handleMessage('Offline: Zoom restricted to levels 11–14 for cached tiles.');
+            }
         }
-        const { lat, lng } = e.latlng;
-        console.log('Right-click: Placing/moving cut-away marker at:', { lat, lng });
+    });
 
+    AppState.map.on('zoomend', () => { // Logik bei Zoom-Ende
+        const currentZoom = AppState.map.getZoom();
+        if (Settings.state.userSettings.calculateJump && AppState.weatherData && AppState.lastLat && AppState.lastLng) calculateJump();
+        if (Settings.state.userSettings.showJumpRunTrack) updateJumpRunTrack();
+        if (Settings.state.userSettings.showLandingPattern) updateLandingPattern();
+        if (AppState.currentMarker && AppState.lastLat && AppState.lastLng) {
+            AppState.currentMarker.setLatLng([AppState.lastLat, AppState.lastLng]);
+            updateMarkerPopup(AppState.currentMarker, AppState.lastLat, AppState.lastLng, AppState.lastAltitude, AppState.currentMarker.getPopup()?.isOpen() || false);
+        }
+        // Anker-Marker-Größe anpassen
+        if (AppState.jumpRunTrackLayer && Settings.state.userSettings.showJumpRunTrack) {
+            const anchorMarker = AppState.jumpRunTrackLayer.getLayers().find(layer => layer.options.icon?.options.className === 'jrt-anchor-marker');
+            if (anchorMarker) {
+                const baseSize = currentZoom <= 11 ? 10 : currentZoom <= 12 ? 12 : currentZoom <= 13 ? 14 : 16;
+                anchorMarker.setIcon(L.divIcon({
+                    className: 'jrt-anchor-marker',
+                    html: `<div style="background-color: orange; width: ${baseSize}px; height: ${baseSize}px; border-radius: 50%; border: 2px solid white; opacity: 0.8;"></div>`,
+                    iconSize: [baseSize, baseSize], iconAnchor: [baseSize / 2, baseSize / 2], tooltipAnchor: [0, -(baseSize / 2 + 5)]
+                }));
+            }
+        }
+    });
+
+    AppState.map.on('movestart', (e) => { // Manuelles Panning erkennen
+        if (!e.target.dragging || !e.target.dragging._marker) {
+            AppState.isManualPanning = true;
+        }
+    });
+
+    AppState.map.on('contextmenu', (e) => { // Rechtsklick für Cut-Away-Marker
+        if (!Settings.state.userSettings.showCutAwayFinder || !Settings.state.userSettings.calculateJump) return;
+        const { lat, lng } = e.latlng;
         if (AppState.cutAwayMarker) {
             AppState.cutAwayMarker.setLatLng([lat, lng]);
         } else {
             AppState.cutAwayMarker = createCutAwayMarker(lat, lng).addTo(AppState.map);
             attachCutAwayMarkerDragend(AppState.cutAwayMarker);
         }
-
-        AppState.cutAwayLat = lat;
-        AppState.cutAwayLng = lng;
-
+        AppState.cutAwayLat = lat; AppState.cutAwayLng = lng;
         updateCutAwayMarkerPopup(AppState.cutAwayMarker, lat, lng);
-
-        if (AppState.weatherData && Settings.state.userSettings.calculateJump) {
-            console.log('Recalculating cut-away for marker placement');
-            calculateCutAway();
-        }
+        if (AppState.weatherData && Settings.state.userSettings.calculateJump) calculateCutAway();
     });
 
-    AppState.map.on('dblclick', async (e) => {
-        const { lat, lng } = e.latlng;
-        AppState.lastLat = lat;
-        AppState.lastLng = lng;
-        AppState.lastAltitude = await Utils.getAltitude(lat, lng);
-        console.log('Map double-clicked, moving marker to:', { lat, lng });
-        Coordinates.addCoordToHistory(lat, lng);
+    // Touchstart für Doppel-Tipp
+    const mapContainer = AppState.map.getContainer();
+    mapContainer.addEventListener('touchstart', async (e) => { // _handleMapTouchStart Logik hier (oder als separate Funktion)
+        if (e.touches.length !== 1 || e.target.closest('.leaflet-marker-icon')) return;
+        const currentTime = new Date().getTime();
+        const timeSinceLastTap = currentTime - lastTapTime;
+        const tapThreshold = 300;
+        if (timeSinceLastTap < tapThreshold && timeSinceLastTap > 0) {
+            e.preventDefault();
+            const rect = mapContainer.getBoundingClientRect();
+            const touchX = e.touches[0].clientX - rect.left;
+            const touchY = e.touches[0].clientY - rect.top;
+            const latlng = AppState.map.containerPointToLatLng([touchX, touchY]);
 
-        AppState.currentMarker = Utils.configureMarker(
-            AppState.map,
-            AppState.lastLat,
-            AppState.lastLng,
-            AppState.lastAltitude,
-            false,
-            createCustomMarker,
-            attachMarkerDragend,
-            updateMarkerPopup,
-            AppState.currentMarker,
-            (marker) => { AppState.currentMarker = marker; }
-        );
-        resetJumpRunDirection(true);
-        if (Settings.state.userSettings.calculateJump) {
-            console.log('Recalculating jump for marker click');
-            calculateJump();
-            calculateCutAway();
+            // Logik von _handleMapDblClick hier duplizieren oder _handleMapDblClick aufrufen
+            // Für Konsistenz und weniger Redundanz, _handleMapDblClick aufrufen:
+            await _handleMapDblClick({ latlng: latlng }); // Übergebe ein Objekt, das e.latlng simuliert
         }
-        recenterMap(true);
-        AppState.isManualPanning = false;
+        lastTapTime = currentTime;
+    }, { passive: false });
 
-        const slider = document.getElementById('timeSlider');
-        const currentIndex = parseInt(slider.value) || 0;
-        const currentTime = AppState.weatherData?.time?.[currentIndex] || null;
+    console.log('Core map event handlers (mousemove, dblclick, zoom, contextmenu, touchstart) set up.');
+}
 
-        await fetchWeatherForLocation(lat, lng, currentTime);
-
-        if (Settings.state.userSettings.showJumpRunTrack) {
-            console.log('Updating JRT after weather fetch for double-click');
-            updateJumpRunTrack();
-        }
-        cacheTilesForDIP({ map: AppState.map, lastLat: AppState.lastLat, lastLng: AppState.lastLng, baseMaps: AppState.baseMaps });
-
-        if (Settings.state.userSettings.showJumpMasterLine && Settings.state.userSettings.trackPosition) {
-            console.log('Updating Jump Master Line for double-click');
-            updateJumpMasterLine();
+function _handleMapZoomEvents() {
+    AppState.map.on('zoomstart', (e) => {
+        if (!navigator.onLine) {
+            const targetZoom = e.target._zoom || AppState.map.getZoom();
+            if (targetZoom < 11) {
+                e.target._zoom = 11; // Internen Zoomwert direkt setzen
+                AppState.map.setZoom(11);
+                Utils.handleMessage('Offline: Zoom restricted to levels 11–14 for cached tiles.');
+            } else if (targetZoom > 14) {
+                e.target._zoom = 14; // Internen Zoomwert direkt setzen
+                AppState.map.setZoom(14);
+                Utils.handleMessage('Offline: Zoom restricted to levels 11–14 for cached tiles.');
+            }
         }
     });
-
-    AppState.map.on('zoomend', () => {
+    AppState.map.on('zoomend', (e) => { // 'e' wird hier nicht direkt verwendet, aber es ist gut, es zu haben
         const currentZoom = AppState.map.getZoom();
-        console.log('Zoom level changed to:', currentZoom);
-
-        if (Settings.state.userSettings.calculateJump && AppState.weatherData && AppState.lastLat && AppState.lastLng) {
-            console.log('Recalculating jump for zoom:', currentZoom);
-            calculateJump();
-        }
-
-        if (Settings.state.userSettings.showJumpRunTrack) {
-            console.log('Updating jump run track for zoom:', currentZoom);
-            updateJumpRunTrack();
-        }
-
-        if (Settings.state.userSettings.showLandingPattern) {
-            console.log('Updating landing pattern for zoom:', currentZoom);
-            updateLandingPattern();
-        }
+        if (Settings.state.userSettings.calculateJump && AppState.weatherData && AppState.lastLat && AppState.lastLng) calculateJump();
+        if (Settings.state.userSettings.showJumpRunTrack) updateJumpRunTrack();
+        if (Settings.state.userSettings.showLandingPattern) updateLandingPattern();
 
         if (AppState.currentMarker && AppState.lastLat && AppState.lastLng) {
             AppState.currentMarker.setLatLng([AppState.lastLat, AppState.lastLng]);
             updateMarkerPopup(AppState.currentMarker, AppState.lastLat, AppState.lastLng, AppState.lastAltitude, AppState.currentMarker.getPopup()?.isOpen() || false);
         }
-
+        // Logik zur Anpassung der Anker-Marker-Größe
         if (AppState.jumpRunTrackLayer && Settings.state.userSettings.showJumpRunTrack) {
             const anchorMarker = AppState.jumpRunTrackLayer.getLayers().find(layer => layer.options.icon?.options.className === 'jrt-anchor-marker');
             if (anchorMarker) {
@@ -738,86 +702,129 @@ function initMap() {
                     tooltipAnchor: [0, -(baseSize / 2 + 5)]
                 });
                 anchorMarker.setIcon(newIcon);
-                console.log('Updated anchor marker size for zoom:', { zoom: currentZoom, size: baseSize });
             }
         }
     });
-
-    let lastTapTime = 0;
-    const tapThreshold = 300;
-    const mapContainer = AppState.map.getContainer();
-
-    mapContainer.addEventListener('touchstart', async (e) => {
-        console.log('Map touchstart event, target:', e.target, 'touches:', e.touches.length);
-        if (e.touches.length !== 1 || e.target.closest('.leaflet-marker-icon')) {
-            console.log('Ignoring map touchstart: multiple touches or marker target');
-            return;
-        }
-
-        const currentTime = new Date().getTime();
-        const timeSinceLastTap = currentTime - lastTapTime;
-        if (timeSinceLastTap < tapThreshold && timeSinceLastTap > 0) {
-            e.preventDefault();
-            const rect = mapContainer.getBoundingClientRect();
-            const touchX = e.touches[0].clientX - rect.left;
-            const touchY = e.touches[0].clientY - rect.top;
-            const latlng = AppState.map.containerPointToLatLng([touchX, touchY]);
-            const { lat, lng } = latlng;
-            AppState.lastLat = lat;
-            AppState.lastLng = lng;
-            AppState.lastAltitude = await Utils.getAltitude(lat, lng);
-            Coordinates.addCoordToHistory(lat, lng);
-            AppState.currentMarker = Utils.configureMarker(
-                AppState.map,
-                AppState.lastLat,
-                AppState.lastLng,
-                AppState.lastAltitude,
-                false,
-                createCustomMarker,
-                attachMarkerDragend,
-                updateMarkerPopup,
-                AppState.currentMarker,
-                (marker) => { AppState.currentMarker = marker; }
-            );
-            resetJumpRunDirection(true);
-            if (Settings.state.userSettings.calculateJump) {
-                calculateJump();
-                calculateCutAway();
-            }
-            recenterMap(true);
-            AppState.isManualPanning = false;
-
-            const slider = document.getElementById('timeSlider');
-            const currentIndex = parseInt(slider.value) || 0;
-            const currentTime = AppState.weatherData?.time?.[currentIndex] || null;
-            await fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, currentTime);
-            cacheTilesForDIP({ map: AppState.map, lastLat: AppState.lastLat, lastLng: AppState.lastLng, baseMaps: AppState.baseMaps });
-            if (Settings.state.userSettings.showJumpMasterLine && Settings.state.userSettings.trackPosition) {
-                console.log('Updating Jump Master Line for double-tap');
-                updateJumpMasterLine();
-            }
-        }
-        lastTapTime = currentTime;
-    }, { passive: false });
-
-    AppState.map.on('click', (e) => {
-        console.log('Map click event, target:', e.originalEvent.target);
-    });
-
-    AppState.map.on('mousedown', (e) => {
-        console.log('Map mousedown event, target:', e.originalEvent.target);
-    });
-
-    const hamburgerBtn = document.getElementById('hamburgerBtn');
-    const menu = document.getElementById('menu');
-    if (hamburgerBtn && menu) {
-        hamburgerBtn.addEventListener('click', () => {
-            console.log('Hamburger menu clicked, menu visibility toggled');
-        });
-    }
-
-    //initializeApp();
 }
+
+async function _handleMapTouchStart(e) { // lastTapTime ist jetzt global
+    const mapContainer = AppState.map.getContainer();
+    if (e.touches.length !== 1 || e.target.closest('.leaflet-marker-icon')) return;
+
+    const currentTime = new Date().getTime();
+    const timeSinceLastTap = currentTime - lastTapTime;
+    const tapThreshold = 300; // tapThreshold könnte auch eine Konstante sein
+
+    if (timeSinceLastTap < tapThreshold && timeSinceLastTap > 0) {
+        e.preventDefault();
+        const rect = mapContainer.getBoundingClientRect();
+        const touchX = e.touches[0].clientX - rect.left;
+        const touchY = e.touches[0].clientY - rect.top;
+        const latlng = AppState.map.containerPointToLatLng([touchX, touchY]);
+
+        // Im Wesentlichen die gleiche Logik wie bei _handleMapDblClick
+        AppState.lastLat = latlng.lat;
+        AppState.lastLng = latlng.lng;
+        AppState.lastAltitude = await Utils.getAltitude(latlng.lat, latlng.lng);
+        Coordinates.addCoordToHistory(latlng.lat, latlng.lng);
+
+        AppState.currentMarker = Utils.configureMarker(
+            AppState.map, AppState.lastLat, AppState.lastLng, AppState.lastAltitude, false,
+            createCustomMarker, attachMarkerDragend, updateMarkerPopup, AppState.currentMarker,
+            (marker) => { AppState.currentMarker = marker; }
+        );
+        resetJumpRunDirection(true);
+        if (Settings.state.userSettings.calculateJump) {
+            calculateJump();
+            calculateCutAway();
+        }
+        recenterMap(true);
+        AppState.isManualPanning = false;
+
+        const slider = document.getElementById('timeSlider');
+        const currentIndexVal = parseInt(slider.value) || 0; // Geändert zu currentIndexVal
+        const currentTimestamp = AppState.weatherData?.time?.[currentIndexVal] || null; // Geändert zu currentTimestamp
+        await fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, currentTimestamp); // Geändert zu currentTimestamp
+        cacheTilesForDIP({ map: AppState.map, lastLat: AppState.lastLat, lastLng: AppState.lastLng, baseMaps: AppState.baseMaps });
+        if (Settings.state.userSettings.showJumpMasterLine && Settings.state.userSettings.trackPosition) updateJumpMasterLine();
+    }
+    lastTapTime = currentTime;
+}
+
+function _setupRemainingMapHandlers() {
+    AppState.map.on('movestart', (e) => {
+        if (!e.target.dragging || !e.target.dragging._marker) {
+            AppState.isManualPanning = true;
+        }
+    });
+
+    AppState.map.on('contextmenu', (e) => { // Umbenannt zu _handleMapContextMenu für Konsistenz
+        if (!Settings.state.userSettings.showCutAwayFinder || !Settings.state.userSettings.calculateJump) return;
+        const { lat, lng } = e.latlng;
+        if (AppState.cutAwayMarker) {
+            AppState.cutAwayMarker.setLatLng([lat, lng]);
+        } else {
+            AppState.cutAwayMarker = createCutAwayMarker(lat, lng).addTo(AppState.map);
+            attachCutAwayMarkerDragend(AppState.cutAwayMarker);
+        }
+        AppState.cutAwayLat = lat;
+        AppState.cutAwayLng = lng;
+        updateCutAwayMarkerPopup(AppState.cutAwayMarker, lat, lng);
+        if (AppState.weatherData && Settings.state.userSettings.calculateJump) calculateCutAway();
+    });
+
+    // Touchstart (Doppel-Tipp)
+    const mapContainer = AppState.map.getContainer();
+    mapContainer.addEventListener('touchstart', _handleMapTouchStart, { passive: false });
+
+
+    // Einfache Click/Mousedown-Handler (können hier bleiben oder auch ausgelagert werden, falls sie wachsen)
+    AppState.map.on('click', (e) => { /* console.log('Map click event, target:', e.originalEvent.target); */ });
+    AppState.map.on('mousedown', (e) => { /* console.log('Map mousedown event, target:', e.originalEvent.target); */ });
+    console.log('Remaining map interaction handlers set up.');
+}
+
+function initMap() {
+    if (mapInitialized || AppState.map) {
+        console.warn('Map already initialized or init in progress.');
+        return;
+    }
+    mapInitialized = true;
+    console.log('initMap started...');
+
+    const defaultCenter = [48.0179, 11.1923];
+    const defaultZoom = 11;
+    const initialAltitude = 'N/A';
+
+    _initializeBasicMapInstance(defaultCenter, defaultZoom);
+    _setupBaseLayersAndHandling();      // Definiert AppState.baseMaps, fügt erste Ebene hinzu
+    _addStandardMapControls();          // Fügt L.control.layers und andere Controls hinzu, registriert 'baselayerchange'
+    _setupCustomPanes();
+    _initializeLivePositionControl();
+    _initializeDefaultMarker(defaultCenter, initialAltitude); // Setzt AppState.currentMarker
+
+    // Kern-Event-Handler (inkl. dblclick) registrieren, nachdem die Karte und Controls da sind
+    _setupCoreMapEventHandlers();
+
+    // Kachel-Caching und Geolocation parallel
+    Promise.all([
+        _initializeTileCacheLogic(),
+        _handleGeolocation(defaultCenter, defaultZoom)
+    ]).then(() => {
+        if (AppState.lastLat && AppState.lastLng) {
+            // cacheTilesForDIP wird bereits in den Geolocation-Callbacks aufgerufen
+            // console.log('Ensuring tiles are cached for initial DIP after geolocation/fallback.');
+            // cacheTilesForDIP({ map: AppState.map, lastLat: AppState.lastLat, lastLng: AppState.lastLng, baseMaps: AppState.baseMaps });
+        }
+        console.log('Initial tile caching and geolocation promise resolved.');
+    }).catch(error => {
+        console.error("Error during parallel initialization of cache/geolocation:", error);
+    });
+
+    updateOfflineIndicator();
+    console.log('initMap finished.');
+}
+
 function reinitializeCoordsControl() {
     if (!AppState.map) {
         console.warn('Map not initialized, cannot reinitialize coords control');
