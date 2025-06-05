@@ -6085,7 +6085,7 @@ function setupTrackEvents() {
             if (extension === 'gpx') {
                 loadGpxTrack(file);
             } else if (extension === 'csv') {
-                loadCsvTrack(file);
+                loadCsvTrackUTC(file);
             } else {
                 Utils.handleError('Unsupported file type. Please upload a .gpx or .csv file.');
             }
