@@ -48,7 +48,9 @@ export const Settings = {
         harpLng: null,
         cacheRadiusKm: 10,
         cacheZoomLevels: [11, 12, 13, 14],
-        autoupdate: false
+        autoupdate: false,
+        selectedEnsembleModels: [], // Standardmäßig keine Ensemble-Modelle ausgewählt
+        currentEnsembleScenario: 'all_models', // Standard-Szenario
     },
 
     // State
@@ -112,6 +114,10 @@ export const Settings = {
             this.state.userSettings.jumpMasterLineTarget = 'DIP';
         }
 
+        // Reset ensemble models
+        this.state.userSettings.selectedEnsembleModels = [...this.defaultSettings.selectedEnsembleModels]; // Setzt auf leeres Array (gemäß defaultSettings)
+        this.state.userSettings.currentEnsembleScenario = this.defaultSettings.currentEnsembleScenario; // z.B. 'all_models'
+
         // Update unlocked features
         this.state.unlockedFeatures = {
             landingPattern: storedUnlockedFeatures.landingPattern || false,
@@ -126,7 +132,7 @@ export const Settings = {
         }
 
         // Save updated settings to persist the reset
-        this.save();
+        //this.save();
     },
 
     /**
@@ -223,7 +229,7 @@ export const Settings = {
             onCancel();
         };
     },
-    
+
     saveUnlockedFeatures() {
         try {
             const featuresString = JSON.stringify(this.state.unlockedFeatures);

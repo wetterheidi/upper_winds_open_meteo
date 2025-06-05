@@ -1,3 +1,4 @@
+import { displayError } from './ui.js';
 
 export class Utils {
     // Format ISO time string to UTC (e.g., "2025-03-15T00:00Z" -> "2025-03-15 0000Z")
@@ -419,7 +420,8 @@ static gaussianInterpolation(y1, y2, h1, h2, hp) {
         if (typeof displayError === 'function') {
             displayError(message);
         } else {
-            console.warn('displayError not available, logging to console');
+            // Dieser Fall sollte nun seltener eintreten
+            console.warn('Utils.js: displayError function is not available, logging to console only.');
             console.error('Error message:', message);
         }
     }

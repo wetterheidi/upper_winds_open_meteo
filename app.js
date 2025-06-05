@@ -80,7 +80,12 @@ export const AppState = {
     autoupdateInterval: null,
     accuracyCircle: null,
     additionalBlueCircles: [],
-    additionalBlueLabels: []
+    additionalBlueLabels: [],
+    ensembleModelsData: null, // Objekt zur Speicherung der Wetterdaten für jedes ausgewählte Ensemble-Modell, z.B. { icon_global: weatherDataICON, gfs_global: weatherDataGFS }
+    selectedEnsembleModels: [], // Array der Namen der ausgewählten Ensemble-Modelle
+    currentEnsembleScenario: 'all_models', // Aktuell ausgewähltes Szenario
+    ensembleLayerGroup: null, // Eigene LayerGroup für Ensemble-Visualisierungen
+    ensembleScenarioCircles: {}, // Speichert die Leaflet-Layer für die Szenario-Kreise, z.B. { min_wind: circleLayer, mean_wind: circleLayer }
 };
 
 const debouncedCalculateJump = Utils.debounce(calculateJump, 300);
@@ -116,10 +121,10 @@ L.Control.Coordinates = L.Control.extend({
 
 // == Refactored initMap ==
 // an den Anfang von app.js, nach den Imports und AppState Definition
-let mapInitialized = false; 
+let mapInitialized = false;
 let elevationCache = new Map();
 let qfeCache = new Map();
-let lastTapTime = 0; 
+let lastTapTime = 0;
 let hasTileErrorSwitched = false;
 
 const debouncedGetElevationAndQFE = Utils.debounce(async (lat, lng, requestLatLng, callback) => {
@@ -331,24 +336,24 @@ function _addStandardMapControls() {
     });
     L.control.zoom({ position: 'topright' }).addTo(AppState.map);
     L.control.polylineMeasure({
-        position: 'topright', 
-        unit: 'kilometres', 
-        showBearings: true, 
+        position: 'topright',
+        unit: 'kilometres',
+        showBearings: true,
         clearMeasurementsOnStop: false,
-        showClearControl: true, 
-        showUnitControl: true, 
+        showClearControl: true,
+        showUnitControl: true,
         tooltipTextFinish: 'Click to finish the line<br>',
         tooltipTextDelete: 'Shift-click to delete point', tooltipTextMove: 'Drag to move point<br>',
         tooltipTextResume: 'Click to resume line<br>', tooltipTextAdd: 'Click to add point<br>',
-        measureControlTitleOn: 'Start measuring distance and bearing', 
+        measureControlTitleOn: 'Start measuring distance and bearing',
         measureControlTitleOff: 'Stop measuring'
     }).addTo(AppState.map);
 
-    L.control.scale({ 
-        position: 'bottomleft', 
-        metric: true, 
-        imperial: false, 
-        maxWidth: 100 
+    L.control.scale({
+        position: 'bottomleft',
+        metric: true,
+        imperial: false,
+        maxWidth: 100
     }).addTo(AppState.map);
     console.log('Standard map controls and baselayerchange handler added.');
 }
@@ -371,14 +376,14 @@ function _initializeLivePositionControl() {
 function _initializeDefaultMarker(defaultCenter, initialAltitude) {
     // Annahme: createCustomMarker, attachMarkerDragend, updateMarkerPopup sind global in app.js definiert
     AppState.currentMarker = Utils.configureMarker(
-        AppState.map, 
-        defaultCenter[0], 
-        defaultCenter[1], 
+        AppState.map,
+        defaultCenter[0],
+        defaultCenter[1],
         initialAltitude, false,
-        createCustomMarker, 
-        attachMarkerDragend, 
+        createCustomMarker,
+        attachMarkerDragend,
         updateMarkerPopup,
-        AppState.currentMarker, 
+        AppState.currentMarker,
         (marker) => { AppState.currentMarker = marker; }
     );
     AppState.isManualPanning = false;
@@ -409,28 +414,28 @@ async function _geolocationSuccessCallback(position, defaultZoom) {
     Coordinates.addCoordToHistory(AppState.lastLat, AppState.lastLng);
 
     AppState.currentMarker = Utils.configureMarker(
-        AppState.map, 
-        AppState.lastLat, 
-        AppState.lastLng, 
-        AppState.lastAltitude, 
+        AppState.map,
+        AppState.lastLat,
+        AppState.lastLng,
+        AppState.lastAltitude,
         false,
-        createCustomMarker, 
-        attachMarkerDragend, 
+        createCustomMarker,
+        attachMarkerDragend,
         updateMarkerPopup,
-        AppState.currentMarker, 
+        AppState.currentMarker,
         (marker) => { AppState.currentMarker = marker; }
     );
     AppState.map.setView(userCoords, defaultZoom);
 
     if (Settings.state.userSettings.calculateJump) {
-        calculateJump(); 
+        calculateJump();
         calculateCutAway();
     }
     recenterMap(true);
     AppState.isManualPanning = false;
     await _fetchInitialWeather(AppState.lastLat, AppState.lastLng);
     if (Settings.state.userSettings.trackPosition) {
-        setCheckboxValue('trackPositionCheckbox', true); 
+        setCheckboxValue('trackPositionCheckbox', true);
         startPositionTracking();
     }
     cacheTilesForDIP({ map: AppState.map, lastLat: AppState.lastLat, lastLng: AppState.lastLng, baseMaps: AppState.baseMaps });
@@ -442,25 +447,25 @@ async function _geolocationErrorCallback(error, defaultCenter, defaultZoom) {
     AppState.lastLat = defaultCenter[0]; AppState.lastLng = defaultCenter[1];
     AppState.lastAltitude = await Utils.getAltitude(AppState.lastLat, AppState.lastLng);
     AppState.currentMarker = Utils.configureMarker(
-        AppState.map, 
-        AppState.lastLat, 
-        AppState.lastLng, 
-        AppState.lastAltitude, 
+        AppState.map,
+        AppState.lastLat,
+        AppState.lastLng,
+        AppState.lastAltitude,
         false,
-        createCustomMarker, 
-        attachMarkerDragend, 
+        createCustomMarker,
+        attachMarkerDragend,
         updateMarkerPopup,
-        AppState.currentMarker, 
+        AppState.currentMarker,
         (marker) => { AppState.currentMarker = marker; }
     );
     AppState.map.setView(defaultCenter, defaultZoom);
-    recenterMap(true); 
+    recenterMap(true);
     AppState.isManualPanning = false;
     await _fetchInitialWeather(AppState.lastLat, AppState.lastLng);
     if (Settings.state.userSettings.trackPosition) {
         Utils.handleMessage('Tracking disabled due to geolocation failure.');
         setCheckboxValue('trackPositionCheckbox', false);
-        Settings.state.userSettings.trackPosition = false; 
+        Settings.state.userSettings.trackPosition = false;
         Settings.save();
     }
     cacheTilesForDIP({ map: AppState.map, lastLat: AppState.lastLat, lastLng: AppState.lastLng, baseMaps: AppState.baseMaps });
@@ -471,9 +476,11 @@ async function _handleGeolocation(defaultCenter, defaultZoom) {
         navigator.geolocation.getCurrentPosition(
             (position) => _geolocationSuccessCallback(position, defaultZoom),
             (geoError) => _geolocationErrorCallback(geoError, defaultCenter, defaultZoom),
-            { enableHighAccuracy: true, 
-                timeout: 20000, 
-                maximumAge: 0 }
+            {
+                enableHighAccuracy: true,
+                timeout: 20000,
+                maximumAge: 0
+            }
         );
     } else {
         console.warn('Geolocation not supported.');
@@ -481,7 +488,7 @@ async function _handleGeolocation(defaultCenter, defaultZoom) {
     }
 }
 function _initializeCoordsControlAndHandlers() {
-    AppState.coordsControl = new L.Control.Coordinates(); 
+    AppState.coordsControl = new L.Control.Coordinates();
     AppState.coordsControl.addTo(AppState.map);
     console.log('CoordsControl initialized.');
 
@@ -554,11 +561,11 @@ async function _handleMapDblClick(e) {
         AppState.lastLng,
         AppState.lastAltitude,
         false, // openPopup
-        createCustomMarker,     
-        attachMarkerDragend,    
-        updateMarkerPopup,      
-        AppState.currentMarker, 
-        (newMarker) => {       
+        createCustomMarker,
+        attachMarkerDragend,
+        updateMarkerPopup,
+        AppState.currentMarker,
+        (newMarker) => {
             AppState.currentMarker = newMarker;
             console.log('_handleMapDblClick: setCurrentMarker callback. New AppState.currentMarker ID:', newMarker ? newMarker._leaflet_id : 'none');
         }
@@ -579,7 +586,7 @@ async function _handleMapDblClick(e) {
     await fetchWeatherForLocation(lat, lng, currentTime);
 
     if (Settings.state.userSettings.showJumpRunTrack) updateJumpRunTrack();
-    if (AppState.map && AppState.lastLat && AppState.lastLng && AppState.baseMaps) { 
+    if (AppState.map && AppState.lastLat && AppState.lastLng && AppState.baseMaps) {
         cacheTilesForDIP({ map: AppState.map, lastLat: AppState.lastLat, lastLng: AppState.lastLng, baseMaps: AppState.baseMaps });
     }
     if (Settings.state.userSettings.showJumpMasterLine && Settings.state.userSettings.trackPosition) updateJumpMasterLine();
@@ -590,7 +597,7 @@ function _setupCoreMapEventHandlers() {
         console.error("Karte nicht initialisiert in _setupCoreMapEventHandlers");
         return;
     }
-    if (!AppState.coordsControl) { 
+    if (!AppState.coordsControl) {
         AppState.coordsControl = new L.Control.Coordinates();
         AppState.coordsControl.addTo(AppState.map);
         console.log('CoordsControl initialized in _setupCoreMapEventHandlers.');
@@ -610,11 +617,11 @@ function _setupCoreMapEventHandlers() {
         if (!navigator.onLine) {
             const targetZoom = e.target._zoom || AppState.map.getZoom();
             if (targetZoom < 11) {
-                e.target._zoom = 11; 
+                e.target._zoom = 11;
                 AppState.map.setZoom(11);
                 Utils.handleMessage('Offline: Zoom restricted to levels 11–14 for cached tiles.');
             } else if (targetZoom > 14) {
-                e.target._zoom = 14; 
+                e.target._zoom = 14;
                 AppState.map.setZoom(14);
                 Utils.handleMessage('Offline: Zoom restricted to levels 11–14 for cached tiles.');
             }
@@ -650,8 +657,8 @@ function _setupCoreMapEventHandlers() {
     AppState.map.on('movestart', (e) => {
         // Prüft, ob die Bewegung durch Ziehen der Karte ausgelöst wurde und nicht durch Ziehen eines Markers
         if (e.target === AppState.map && (!e.originalEvent || e.originalEvent.target === AppState.map.getContainer())) {
-             AppState.isManualPanning = true;
-             console.log('Manual map panning detected.');
+            AppState.isManualPanning = true;
+            console.log('Manual map panning detected.');
         }
     });
 
@@ -1552,37 +1559,175 @@ export async function checkAvailableModels(lat, lon) {
         'icon_seamless', 'icon_global', 'icon_eu', 'icon_d2', 'ecmwf_ifs025', 'ecmwf_aifs025_single', 'gfs_seamless', 'gfs_global', 'gfs_hrrr', 'arome_france', 'gem_hrdps_continental', 'gem_regional'
     ];
     let availableModels = [];
+
     for (const model of modelList) {
         const apiUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m&models=${model}`;
-        console.log(`[checkAvailableModels] Checking model: ${model} with URL: ${apiUrl}`);
+        // console.log(`[checkAvailableModels] Checking model: ${model} with URL: ${apiUrl}`); // Kann für detailliertes Debugging aktiviert bleiben
         try {
             const response = await fetch(apiUrl);
-            console.log(`[checkAvailableModels] Response status for ${model}: ${response.status}`);
+            // console.log(`[checkAvailableModels] Response status for ${model}: ${response.status}`);
 
             if (response.ok) { // Status 200-299
                 const data = await response.json();
-                console.log(`[checkAvailableModels] Data for ${model}:`, data);
+                // console.log(`[checkAvailableModels] Data for ${model}:`, data); // Kann für detailliertes Debugging aktiviert bleiben
+
                 if (data.hourly && data.hourly.temperature_2m && data.hourly.temperature_2m.length > 0) {
-                    availableModels.push(model);
-                    console.log(`[checkAvailableModels] Model ${model} ADDED to availableModels. Current list:`, availableModels);
+                    // *** VERBESSERTE PRÜFUNG: Sicherstellen, dass das Array nicht nur aus null-Werten besteht ***
+                    const hasActualNumericData = data.hourly.temperature_2m.some(temp => temp !== null && !isNaN(parseFloat(temp)));
+                    
+                    if (hasActualNumericData) {
+                        availableModels.push(model);
+                        // console.log(`[checkAvailableModels] Model ${model} ADDED to availableModels. Current list:`, availableModels);
+                    } else {
+                        console.log(`[checkAvailableModels] Model ${model} (HTTP 200 OK) returned an array for temperature_2m, but it contained no valid numeric data (e.g., all nulls or non-numeric). Considered unavailable. Data sample:`, data.hourly.temperature_2m.slice(0,5));
+                    }
                 } else {
-                    console.log(`[checkAvailableModels] Model ${model} OK, but no valid hourly data. Hourly data:`, data.hourly);
+                    // Model gab HTTP 200 OK, aber die Struktur data.hourly.temperature_2m war nicht wie erwartet (fehlt, leer, etc.)
+                    // Oder hourly_units.temperature_2m war "undefined", was ein starker Indikator ist.
+                    if (data.hourly_units && data.hourly_units.temperature_2m === "undefined") {
+                         console.log(`[checkAvailableModels] Model ${model} (HTTP 200 OK) has temperature_2m unit "undefined". Considered unavailable.`);
+                    } else {
+                         console.log(`[checkAvailableModels] Model ${model} (HTTP 200 OK) but no valid hourly data structure. Hourly data:`, data.hourly);
+                    }
                 }
             } else if (response.status === 400) {
-                // Erwarteter Fehler, Modell nicht verfügbar für Koordinaten - keine laute Konsolenausgabe
+                // Erwarteter Fehler, Modell nicht verfügbar für Koordinaten
                 console.info(`[checkAvailableModels] Model ${model} not available (HTTP 400 - Bad Request). This is expected for some models/locations.`);
             } else {
                 // Andere HTTP-Fehler
-                const errorText = await response.text().catch(() => "Could not retrieve error text from response.");
+                const errorText = await response.text().catch(() => `Could not retrieve error text from response for model ${model}.`);
                 console.warn(`[checkAvailableModels] Problem checking model ${model}: HTTP ${response.status} - ${errorText}`);
             }
         } catch (error) {
-            // Netzwerkfehler oder andere Fehler beim Fetch selbst
-            /* istanbul ignore next */
+            /* istanbul ignore next */ // Diese Zeile ist spezifisch für Test-Coverage-Tools wie Istanbul/NYC.js
             console.warn(`[checkAvailableModels] Network error or other issue checking model ${model}: ${error.message}`);
         }
     }
-    console.log('[checkAvailableModels] Finished. Final available models:', availableModels);
+
+    // ---- UI Aktualisierung für Haupt-Modellauswahl (modelSelect) ----
+    const modelSelect = document.getElementById('modelSelect');
+    if (modelSelect) {
+        const currentSelectedModelInDropdown = modelSelect.value;
+        modelSelect.innerHTML = ''; // Alte Optionen entfernen
+
+        if (availableModels.length === 0) {
+            const option = document.createElement('option');
+            option.value = "";
+            option.textContent = "No models available";
+            option.disabled = true;
+            modelSelect.appendChild(option);
+            modelSelect.value = "";
+        } else {
+            availableModels.forEach(model => {
+                const option = document.createElement('option');
+                option.value = model;
+                option.textContent = model.replace(/_/g, ' ').toUpperCase();
+                modelSelect.appendChild(option);
+            });
+
+            const storedPrimaryModel = Settings.state.userSettings.model;
+            if (availableModels.includes(storedPrimaryModel)) {
+                modelSelect.value = storedPrimaryModel;
+            } else if (availableModels.includes(currentSelectedModelInDropdown)) {
+                modelSelect.value = currentSelectedModelInDropdown;
+            } else if (availableModels.length > 0) {
+                modelSelect.value = availableModels[0];
+                // Wichtig: Wenn das primär ausgewählte Modell geändert werden muss,
+                // sollte Settings.state.userSettings.model auch aktualisiert werden.
+                if (Settings.state.userSettings.model !== modelSelect.value) {
+                    console.log(`[checkAvailableModels] Primary model '${Settings.state.userSettings.model}' no longer available or invalid. Switched to '${modelSelect.value}'.`);
+                    Settings.state.userSettings.model = modelSelect.value;
+                    Settings.save(); // Speichere die Änderung des primären Modells
+                    // Ein change Event manuell auslösen, damit fetchWeather für das neue primäre Modell geladen wird
+                    // Dies ist wichtig, wenn das vorherige primäre Modell nicht mehr verfügbar ist.
+                    modelSelect.dispatchEvent(new Event('change'));
+                }
+            }
+        }
+    } else {
+        console.warn("[checkAvailableModels] Element with ID 'modelSelect' not found.");
+    }
+
+
+    // ---- UI Aktualisierung für Ensemble-Modellauswahl (ensembleModelsSubmenu) ----
+    const ensembleModelsSubmenu = document.getElementById('ensembleModelsSubmenu');
+    if (ensembleModelsSubmenu) {
+        ensembleModelsSubmenu.innerHTML = ''; // Alte Checkboxen entfernen
+
+        if (availableModels.length === 0) {
+            const li = document.createElement('li');
+            li.textContent = "No models available";
+            ensembleModelsSubmenu.appendChild(li);
+        } else {
+            availableModels.forEach(model => {
+                const li = document.createElement('li');
+                const label = document.createElement('label');
+                label.className = 'radio-label';
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.name = 'ensembleModel';
+                checkbox.value = model;
+                checkbox.checked = Settings.state.userSettings.selectedEnsembleModels.includes(model);
+
+                checkbox.addEventListener('change', () => {
+                    const currentSelected = Settings.state.userSettings.selectedEnsembleModels || [];
+                    if (checkbox.checked) {
+                        if (!currentSelected.includes(model)) {
+                            Settings.state.userSettings.selectedEnsembleModels.push(model);
+                        }
+                    } else {
+                        Settings.state.userSettings.selectedEnsembleModels = currentSelected.filter(m => m !== model);
+                    }
+                    Settings.save();
+                    console.log('[checkAvailableModels] Ensemble selection changed by user. New selection:', Settings.state.userSettings.selectedEnsembleModels);
+                    fetchEnsembleWeatherData();
+                });
+
+                label.appendChild(checkbox);
+                label.appendChild(document.createTextNode(` ${model.replace(/_/g, ' ').toUpperCase()}`));
+                li.appendChild(label);
+                ensembleModelsSubmenu.appendChild(li);
+            });
+        }
+    } else {
+        console.warn("[checkAvailableModels] Element with ID 'ensembleModelsSubmenu' not found.");
+    }
+
+    // ---- Bereinigung der in Settings gespeicherten Ensemble-Auswahl ----
+    let currentSelectedEnsembleModels = Settings.state.userSettings.selectedEnsembleModels || [];
+    const originalSelectedCount = currentSelectedEnsembleModels.length;
+
+    const updatedSelectedEnsembleModels = currentSelectedEnsembleModels.filter(model => availableModels.includes(model));
+
+    if (updatedSelectedEnsembleModels.length !== originalSelectedCount) {
+        console.log('[checkAvailableModels] Some previously selected ensemble models are no longer available. Updating selection.');
+        Settings.state.userSettings.selectedEnsembleModels = updatedSelectedEnsembleModels;
+        Settings.save();
+        console.log('[checkAvailableModels] Updated selectedEnsembleModels in Settings:', updatedSelectedEnsembleModels);
+
+        // UI der Checkboxen erneut explizit synchronisieren (obwohl sie oben neu gezeichnet wurden, ist dies eine doppelte Sicherheit)
+        const ensembleCheckboxes = document.querySelectorAll('#ensembleModelsSubmenu input[name="ensembleModel"]');
+        ensembleCheckboxes.forEach(cb => {
+            cb.checked = updatedSelectedEnsembleModels.includes(cb.value);
+        });
+
+        if (updatedSelectedEnsembleModels.length > 0) {
+            fetchEnsembleWeatherData(); 
+        } else {
+            AppState.ensembleModelsData = null;
+            clearEnsembleVisualizations();
+            console.log("[checkAvailableModels] No ensemble models left selected or available after cleanup.");
+        }
+    } else {
+        // Auswahl hat sich nicht geändert, aber Position könnte sich geändert haben.
+        // Wenn Modelle ausgewählt sind, deren Daten für die neue Position laden.
+        if (Settings.state.userSettings.selectedEnsembleModels && Settings.state.userSettings.selectedEnsembleModels.length > 0) {
+             console.log("[checkAvailableModels] Selected ensemble models are still available at the new location. Ensuring data is fetched for the new location.");
+             fetchEnsembleWeatherData();
+        }
+    }
+    
+    console.log('[checkAvailableModels] Finished. Final effective available models:', availableModels);
     return availableModels;
 }
 async function fetchWeatherForLocation(lat, lng, currentTime = null, isInitialLoad = false) {
@@ -1647,7 +1792,24 @@ export async function fetchWeather(lat, lon, currentTime = null, isInitialLoad =
     try {
         const modelSelect = document.getElementById('modelSelect');
         const selectedModelValue = modelSelect ? modelSelect.value : Settings.defaultSettings.model;
-        
+
+        const modelMap = {
+            'icon_seamless': 'dwd_icon',
+            'icon_global': 'dwd_icon',
+            'icon_eu': 'dwd_icon_eu',
+            'icon_d2': 'dwd_icon_d2',
+            'ecmwf_ifs025': 'ecmwf_ifs025',
+            'ecmwf_aifs025_single': 'ecmwf_aifs025_single', // Korrigiert von ecmwf_aifs025
+            'gfs_seamless': 'ncep_gfs013',
+            'gfs_global': 'ncep_gfs025',
+            'gfs_hrrr': 'ncep_hrrr_conus',
+            'arome_france': 'meteofrance_arome_france0025',
+            'gem_hrdps_continental': 'cmc_gem_hrdps',
+            'gem_regional': 'cmc_gem_rdps'
+        };
+
+        const modelApiIdentifierForMeta = modelMap[selectedModelKey] || selectedModelKey;
+
         if (!selectedModelValue) { // Zusätzliche Prüfung, falls modelSelect leer war
             console.warn("[fetchWeather] No model selected in dropdown. Aborting fetchWeather.");
             Utils.handleError("No weather model selected to fetch data.");
@@ -1659,7 +1821,7 @@ export async function fetchWeather(lat, lon, currentTime = null, isInitialLoad =
 
         let isHistorical = false;
         let startDateStr, endDateStr;
-        let targetDateForAPI = null; 
+        let targetDateForAPI = null;
         const today = luxon.DateTime.utc().startOf('day');
 
         if (currentTime) {
@@ -1672,11 +1834,11 @@ export async function fetchWeather(lat, lon, currentTime = null, isInitialLoad =
                     const isoString = `${dateStr}T${hourStr}:${minuteStr}:00${formattedOffset}`;
                     parsedCurrentTime = luxon.DateTime.fromISO(isoString, { zone: 'utc' });
                 }
-            } else { 
-                 parsedCurrentTime = luxon.DateTime.fromISO(currentTime, { zone: 'utc' });
+            } else {
+                parsedCurrentTime = luxon.DateTime.fromISO(currentTime, { zone: 'utc' });
             }
             if (parsedCurrentTime && parsedCurrentTime.isValid) {
-                targetDateForAPI = parsedCurrentTime.startOf('day'); 
+                targetDateForAPI = parsedCurrentTime.startOf('day');
                 if (targetDateForAPI < today) isHistorical = true;
             }
         }
@@ -1688,21 +1850,21 @@ export async function fetchWeather(lat, lon, currentTime = null, isInitialLoad =
                 isHistorical = true; targetDateForAPI = selectedPickerDate;
             }
         }
-        
+
         let baseUrl = 'https://api.open-meteo.com/v1/forecast';
         const modelIdentifierForMeta = selectedModelValue.replace(/_seamless|_global|_eu|_d2/, '').split('_')[0];
 
         if (isHistorical && targetDateForAPI) {
             baseUrl = 'https://historical-forecast-api.open-meteo.com/v1/forecast';
             startDateStr = targetDateForAPI.toFormat('yyyy-MM-dd');
-            endDateStr = startDateStr; 
+            endDateStr = startDateStr;
             console.log(`[fetchWeather] Historical fetch for date: ${startDateStr}`);
         } else {
             // Nur Meta für Forecast-Modelle abrufen, da historische API keine "run time" hat
             let runDate;
             try {
                 const metaResponse = await fetch(`https://api.open-meteo.com/data/${modelIdentifierForMeta}/static/meta.json`);
-                 if (!metaResponse.ok) {
+                if (!metaResponse.ok) {
                     console.warn(`[fetchWeather] Meta fetch failed for ${modelIdentifierForMeta}: ${metaResponse.status}. Using current time for forecast window.`);
                     runDate = new Date(); // Fallback auf aktuelle Zeit
                 } else {
@@ -1713,8 +1875,8 @@ export async function fetchWeather(lat, lon, currentTime = null, isInitialLoad =
                 console.warn(`[fetchWeather] Meta fetch error for ${modelIdentifierForMeta}: ${metaError.message}. Using current time for forecast window.`);
                 runDate = new Date(); // Fallback
             }
-            
-            let forecastStart = luxon.DateTime.fromJSDate(runDate).setZone('utc').plus({hours: 6});
+
+            let forecastStart = luxon.DateTime.fromJSDate(runDate).setZone('utc').plus({ hours: 6 });
             if (forecastStart > luxon.DateTime.utc()) forecastStart = luxon.DateTime.utc();
             startDateStr = forecastStart.toFormat('yyyy-MM-dd');
             const forecastDays = selectedModelValue.includes('_d2') ? 2 : (selectedModelValue.includes('hrrr') ? 1 : 7); // HRRR oft nur 1-2 Tage
@@ -1724,7 +1886,7 @@ export async function fetchWeather(lat, lon, currentTime = null, isInitialLoad =
 
         const hourlyParams = "surface_pressure,temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,temperature_1000hPa,relative_humidity_1000hPa,wind_speed_1000hPa,wind_direction_1000hPa,geopotential_height_1000hPa,temperature_950hPa,relative_humidity_950hPa,wind_speed_950hPa,wind_direction_950hPa,geopotential_height_950hPa,temperature_925hPa,relative_humidity_925hPa,wind_speed_925hPa,wind_direction_925hPa,geopotential_height_925hPa,temperature_900hPa,relative_humidity_900hPa,wind_speed_900hPa,wind_direction_900hPa,geopotential_height_900hPa,temperature_850hPa,relative_humidity_850hPa,wind_speed_850hPa,wind_direction_850hPa,geopotential_height_850hPa,temperature_800hPa,relative_humidity_800hPa,wind_speed_800hPa,wind_direction_800hPa,geopotential_height_800hPa,temperature_700hPa,relative_humidity_700hPa,wind_speed_700hPa,wind_direction_700hPa,geopotential_height_700hPa,temperature_600hPa,relative_humidity_600hPa,wind_speed_600hPa,wind_direction_600hPa,geopotential_height_600hPa,temperature_500hPa,relative_humidity_500hPa,wind_speed_500hPa,wind_direction_500hPa,geopotential_height_500hPa,temperature_400hPa,relative_humidity_400hPa,wind_speed_400hPa,wind_direction_400hPa,geopotential_height_400hPa,temperature_300hPa,relative_humidity_300hPa,wind_speed_300hPa,wind_direction_300hPa,geopotential_height_300hPa,temperature_250hPa,relative_humidity_250hPa,wind_speed_250hPa,wind_direction_250hPa,geopotential_height_250hPa,temperature_200hPa,relative_humidity_200hPa,wind_speed_200hPa,wind_direction_200hPa,geopotential_height_200hPa";
         const url = `${baseUrl}?latitude=${lat}&longitude=${lon}&hourly=${hourlyParams}&models=${selectedModelValue}&start_date=${startDateStr}&end_date=${endDateStr}`;
-        
+
         console.log('[fetchWeather] Fetching weather from:', url);
         const response = await fetch(url);
         if (!response.ok) {
@@ -1733,14 +1895,14 @@ export async function fetchWeather(lat, lon, currentTime = null, isInitialLoad =
         }
         const data = await response.json();
         if (!data.hourly || !data.hourly.time || data.hourly.time.length === 0) { // Zusätzliche Prüfung auf leeres Zeit-Array
-             console.warn("[fetchWeather] No hourly data or time array returned from API for model:", selectedModelValue, "Data:", data);
-             throw new Error('No hourly data returned from API for model: ' + selectedModelValue);
+            console.warn("[fetchWeather] No hourly data or time array returned from API for model:", selectedModelValue, "Data:", data);
+            throw new Error('No hourly data returned from API for model: ' + selectedModelValue);
         }
-        
+
         console.log(`[fetchWeather] Successfully fetched data for model ${selectedModelValue}. Number of time entries: ${data.hourly.time.length}`);
 
         const lastValidIndex = data.hourly.time.length - 1;
-        AppState.weatherData = {}; 
+        AppState.weatherData = {};
         for (const key in data.hourly) {
             if (Object.hasOwnProperty.call(data.hourly, key)) {
                 AppState.weatherData[key] = data.hourly[key].slice(0, lastValidIndex + 1);
@@ -1750,19 +1912,19 @@ export async function fetchWeather(lat, lon, currentTime = null, isInitialLoad =
         const slider = document.getElementById('timeSlider');
         slider.min = 0; slider.max = AppState.weatherData.time.length - 1;
         slider.disabled = AppState.weatherData.time.length <= 1;
-        if (slider.disabled) { 
-            slider.style.opacity = '0.5'; slider.style.cursor = 'not-allowed'; 
+        if (slider.disabled) {
+            slider.style.opacity = '0.5'; slider.style.cursor = 'not-allowed';
             const infoEl = document.getElementById('info');
             if (infoEl) infoEl.innerHTML += '<br><strong>Note:</strong> Only one forecast time available.';
         } else {
-             slider.style.opacity = '1'; slider.style.cursor = 'pointer';
+            slider.style.opacity = '1'; slider.style.cursor = 'pointer';
         }
 
 
         let initialIndex = 0;
         if (currentTime && AppState.weatherData.time.length > 0) {
             let targetLuxonDate = null;
-             if (typeof currentTime === 'string' && currentTime.includes('GMT')) {
+            if (typeof currentTime === 'string' && currentTime.includes('GMT')) {
                 const match = currentTime.match(/^(\d{4}-\d{2}-\d{2})\s(\d{2})(\d{2})\sGMT([+-]\d{1,2})$/);
                 if (match) {
                     const [, dateStr, hourStr, minuteStr, offset] = match;
@@ -1770,7 +1932,7 @@ export async function fetchWeather(lat, lon, currentTime = null, isInitialLoad =
                     const isoString = `${dateStr}T${hourStr}:${minuteStr}:00${formattedOffset}`;
                     targetLuxonDate = luxon.DateTime.fromISO(isoString, { zone: 'utc' });
                 }
-             } else { targetLuxonDate = luxon.DateTime.fromISO(currentTime, {zone: 'utc'}); }
+            } else { targetLuxonDate = luxon.DateTime.fromISO(currentTime, { zone: 'utc' }); }
 
             if (targetLuxonDate && targetLuxonDate.isValid) {
                 const targetTimestamp = targetLuxonDate.toMillis();
@@ -1783,14 +1945,14 @@ export async function fetchWeather(lat, lon, currentTime = null, isInitialLoad =
             }
         } else if (isHistorical && targetDateForAPI && AppState.weatherData.time.length > 0) {
             let minDiff = Infinity;
-             AppState.weatherData.time.forEach((time, idx) => {
-                const timeLuxon = luxon.DateTime.fromISO(time, {zone: 'utc'});
+            AppState.weatherData.time.forEach((time, idx) => {
+                const timeLuxon = luxon.DateTime.fromISO(time, { zone: 'utc' });
                 if (timeLuxon.hasSame(targetDateForAPI, 'day')) {
-                    const diffToNoon = Math.abs(timeLuxon.hour - 12); 
+                    const diffToNoon = Math.abs(timeLuxon.hour - 12);
                     if (diffToNoon < minDiff) { minDiff = diffToNoon; initialIndex = idx; }
                 }
             });
-             if (minDiff === Infinity && AppState.weatherData.time.length > 0) initialIndex = 0;
+            if (minDiff === Infinity && AppState.weatherData.time.length > 0) initialIndex = 0;
         } else if (AppState.weatherData.time.length > 0) {
             const now = luxon.DateTime.utc(); let minDiff = Infinity;
             AppState.weatherData.time.forEach((time, idx) => {
@@ -1805,10 +1967,10 @@ export async function fetchWeather(lat, lon, currentTime = null, isInitialLoad =
         // Model Run Time nur für Forecast aktualisieren
         if (!isHistorical) {
             // Die `runDate` für Meta wurde schon oben geholt. Wir verwenden sie hier.
-             const metaResponse = await fetch(`https://api.open-meteo.com/data/${modelIdentifierForMeta}/static/meta.json`);
-             if (metaResponse.ok) {
+            const metaResponse = await fetch(`https://api.open-meteo.com/data/${modelIdentifierForMeta}/static/meta.json`);
+            if (metaResponse.ok) {
                 const metaData = await metaResponse.json();
-                 if (metaData && metaData.last_run_initialisation_time) {
+                if (metaData && metaData.last_run_initialisation_time) {
                     const runDateFromMeta = new Date(metaData.last_run_initialisation_time * 1000);
                     const year = runDateFromMeta.getUTCFullYear();
                     const month = String(runDateFromMeta.getUTCMonth() + 1).padStart(2, '0');
@@ -1817,7 +1979,7 @@ export async function fetchWeather(lat, lon, currentTime = null, isInitialLoad =
                     const minute = String(runDateFromMeta.getUTCMinutes()).padStart(2, '0');
                     AppState.lastModelRun = `${year}-${month}-${day} ${hour}${minute}Z`;
                 } else { AppState.lastModelRun = "N/A"; }
-             } else { AppState.lastModelRun = "N/A (Meta fetch failed)"; }
+            } else { AppState.lastModelRun = "N/A (Meta fetch failed)"; }
         } else { AppState.lastModelRun = "N/A (Historical Data)"; }
         console.log("[fetchWeather] lastModelRun set to:", AppState.lastModelRun);
 
@@ -1825,13 +1987,462 @@ export async function fetchWeather(lat, lon, currentTime = null, isInitialLoad =
         console.error("[fetchWeather] Error:", error);
         Utils.handleError(`Failed to fetch weather: ${error.message}`);
         AppState.weatherData = null; AppState.lastModelRun = null;
-        const infoElement = document.getElementById('info'); if(infoElement) infoElement.innerHTML = 'Failed to load weather data.';
-        const slider = document.getElementById('timeSlider'); if(slider) { slider.disabled = true; slider.value = 0; slider.max = 0;}
-        const selectedTimeElement = document.getElementById('selectedTime'); if(selectedTimeElement) selectedTimeElement.innerHTML = 'Selected Time: N/A';
+        const infoElement = document.getElementById('info'); if (infoElement) infoElement.innerHTML = 'Failed to load weather data.';
+        const slider = document.getElementById('timeSlider'); if (slider) { slider.disabled = true; slider.value = 0; slider.max = 0; }
+        const selectedTimeElement = document.getElementById('selectedTime'); if (selectedTimeElement) selectedTimeElement.innerHTML = 'Selected Time: N/A';
     } finally {
         if (loadingElement) loadingElement.style.display = 'none';
     }
 }
+
+async function fetchEnsembleWeatherData() {
+    if (!AppState.lastLat || !AppState.lastLng) {
+        Utils.handleMessage("Please select a location first.");
+        return;
+    }
+    if (!Settings.state.userSettings.selectedEnsembleModels || Settings.state.userSettings.selectedEnsembleModels.length === 0) {
+        AppState.ensembleModelsData = null;
+        clearEnsembleVisualizations();
+        console.log("No ensemble models selected. Cleared ensemble data and visualizations.");
+        return;
+    }
+
+    const lat = AppState.lastLat;
+    const lon = AppState.lastLng;
+    const modelsToFetch = Settings.state.userSettings.selectedEnsembleModels;
+
+    console.log(`Fetching ensemble weather data for models: ${modelsToFetch.join(', ')} at ${lat}, ${lon}`);
+    const loadingElement = document.getElementById('loading');
+    if (loadingElement) loadingElement.style.display = 'block';
+
+
+    const modelString = modelsToFetch.join(',');
+
+    // Basisvariablen, die wir von der API erwarten (ohne Modell-Suffix)
+    const baseVariablesList = [
+        "surface_pressure", "temperature_2m", "relative_humidity_2m", "wind_speed_10m", "wind_direction_10m",
+        "geopotential_height_1000hPa", "temperature_1000hPa", "relative_humidity_1000hPa", "wind_speed_1000hPa", "wind_direction_1000hPa",
+        "geopotential_height_950hPa", "temperature_950hPa", "relative_humidity_950hPa", "wind_speed_950hPa", "wind_direction_950hPa",
+        "geopotential_height_925hPa", "temperature_925hPa", "relative_humidity_925hPa", "wind_speed_925hPa", "wind_direction_925hPa",
+        "geopotential_height_900hPa", "temperature_900hPa", "relative_humidity_900hPa", "wind_speed_900hPa", "wind_direction_900hPa",
+        "geopotential_height_850hPa", "temperature_850hPa", "relative_humidity_850hPa", "wind_speed_850hPa", "wind_direction_850hPa",
+        "geopotential_height_800hPa", "temperature_800hPa", "relative_humidity_800hPa", "wind_speed_800hPa", "wind_direction_800hPa",
+        "geopotential_height_700hPa", "temperature_700hPa", "relative_humidity_700hPa", "wind_speed_700hPa", "wind_direction_700hPa",
+        "geopotential_height_600hPa", "temperature_600hPa", "relative_humidity_600hPa", "wind_speed_600hPa", "wind_direction_600hPa",
+        "geopotential_height_500hPa", "temperature_500hPa", "relative_humidity_500hPa", "wind_speed_500hPa", "wind_direction_500hPa",
+        "geopotential_height_400hPa", "temperature_400hPa", "relative_humidity_400hPa", "wind_speed_400hPa", "wind_direction_400hPa",
+        "geopotential_height_300hPa", "temperature_300hPa", "relative_humidity_300hPa", "wind_speed_300hPa", "wind_direction_300hPa",
+        "geopotential_height_250hPa", "temperature_250hPa", "relative_humidity_250hPa", "wind_speed_250hPa", "wind_direction_250hPa",
+        "geopotential_height_200hPa", "temperature_200hPa", "relative_humidity_200hPa", "wind_speed_200hPa", "wind_direction_200hPa"
+    ];
+    const hourlyVariablesString = baseVariablesList.join(',');
+
+    const historicalDatePicker = document.getElementById('historicalDatePicker');
+    const selectedDateValue = historicalDatePicker ? historicalDatePicker.value : null;
+    const selectedDate = selectedDateValue ? luxon.DateTime.fromISO(selectedDateValue, { zone: 'utc' }) : null;
+    const today = luxon.DateTime.utc().startOf('day');
+    const isHistorical = selectedDate && selectedDate < today;
+
+    let startDateStr, endDateStr;
+    let baseUrl = 'https://api.open-meteo.com/v1/forecast';
+
+    if (isHistorical) {
+        baseUrl = 'https://historical-forecast-api.open-meteo.com/v1/forecast';
+        startDateStr = selectedDate.toFormat('yyyy-MM-dd');
+        endDateStr = startDateStr;
+    } else {
+        const now = luxon.DateTime.utc();
+        startDateStr = now.toFormat('yyyy-MM-dd');
+        endDateStr = now.plus({ days: 7 }).toFormat('yyyy-MM-dd'); // Standard-Vorhersagezeitraum
+    }
+
+    const url = `${baseUrl}?latitude=${lat}&longitude=${lon}&hourly=${hourlyVariablesString}&models=${modelString}&start_date=${startDateStr}&end_date=${endDateStr}`;
+    console.log("Constructed ensemble URL:", url);
+
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`API request failed: ${response.status} - ${errorText}`);
+        }
+        const apiResponseData = await response.json(); // Nennen wir es apiResponseData, um Verwechslung zu vermeiden
+        console.log("Raw data from OpenMeteo for ensemble request:", JSON.stringify(apiResponseData, null, 2));
+        console.log("Models requested:", modelsToFetch);
+
+        AppState.ensembleModelsData = {}; // Wichtig: Hier initialisieren
+
+        if (apiResponseData.error && apiResponseData.reason) {
+            throw new Error(`API Error: ${apiResponseData.reason}`);
+        }
+
+        if (!apiResponseData.hourly) {
+            let errorMsg = 'Unexpected data format: "hourly" field missing in API response.';
+            if (apiResponseData && typeof apiResponseData.latitude !== 'undefined') {
+                 errorMsg = "Received metadata but no 'hourly' data for any requested ensemble model.";
+            }
+            console.error(errorMsg, apiResponseData);
+            throw new Error(errorMsg);
+        }
+
+        // Die 'time'-Achse ist für alle Modelle gleich und nicht suffigiert
+        const sharedTimeArray = apiResponseData.hourly.time;
+        if (!sharedTimeArray) {
+            throw new Error("Shared 'time' array missing in hourly data.");
+        }
+
+        modelsToFetch.forEach(modelName => {
+            const modelSpecificHourlyData = { time: [...sharedTimeArray] }; // Kopiere das Zeitarray
+            let foundDataForThisModel = false;
+
+            // Iteriere durch die Basisvariablen und suche die suffigierten Pendants
+            baseVariablesList.forEach(baseVar => {
+                const suffixedVarKey = `${baseVar}_${modelName}`; // z.B. temperature_2m_icon_global
+                
+                if (apiResponseData.hourly[suffixedVarKey]) {
+                    modelSpecificHourlyData[baseVar] = apiResponseData.hourly[suffixedVarKey];
+                    foundDataForThisModel = true;
+                } else if (modelsToFetch.length === 1 && apiResponseData.hourly[baseVar]) {
+                    // Fallback für Einzelmodellanfragen, wo Suffixe fehlen könnten
+                    modelSpecificHourlyData[baseVar] = apiResponseData.hourly[baseVar];
+                    foundDataForThisModel = true;
+                } else {
+                    modelSpecificHourlyData[baseVar] = null; // Oder new Array(sharedTimeArray.length).fill(null);
+                }
+            });
+
+            if (foundDataForThisModel) {
+                AppState.ensembleModelsData[modelName] = modelSpecificHourlyData;
+                console.log(`Successfully processed and stored data for model: ${modelName}`);
+            } else {
+                console.warn(`No data found for model ${modelName} with suffixed keys in the 'hourly' object. Available keys for this model might be missing or the model is unavailable for this specific request. Hourly keys in response:`, Object.keys(apiResponseData.hourly));
+                 // Utils.handleMessage(`Warning: No data retrieved for model ${modelName}.`); // Optional: Nutzer informieren
+            }
+        });
+
+
+        if (Object.keys(AppState.ensembleModelsData).length === 0 && modelsToFetch.length > 0) {
+            const msg = "Could not retrieve and process data for any of the selected ensemble models. They might be unavailable or the API response structure was not as expected for these models.";
+            console.warn(msg, "Original API response:", apiResponseData);
+            Utils.handleMessage(msg);
+        } else {
+            console.log("Ensemble weather data processed and stored in AppState.ensembleModelsData:", AppState.ensembleModelsData);
+        }
+
+        processAndVisualizeEnsemble();
+
+    } catch (error) {
+        console.error('Error in fetchEnsembleWeatherData:', error);
+        Utils.handleError(`Failed to fetch ensemble weather data: ${error.message}`);
+        AppState.ensembleModelsData = null;
+        clearEnsembleVisualizations();
+    } finally {
+        if (loadingElement) {
+            loadingElement.style.display = 'none';
+        }
+    }
+}
+
+// Hilfsfunktion zum Leeren der Ensemble-Visualisierungen
+function clearEnsembleVisualizations() {
+    if (AppState.ensembleLayerGroup) {
+        AppState.ensembleLayerGroup.clearLayers();
+    } else {
+        // Sicherstellen, dass die LayerGroup existiert und zur Karte hinzugefügt wurde
+        if (AppState.map) {
+            AppState.ensembleLayerGroup = L.layerGroup().addTo(AppState.map);
+        } else {
+            console.warn("Karte nicht initialisiert, ensembleLayerGroup kann nicht erstellt werden.");
+            return;
+        }
+    }
+    AppState.ensembleScenarioCircles = {}; // Zurücksetzen der gespeicherten Kreise
+    console.log("Ensemble visualizations cleared.");
+}
+
+function processAndVisualizeEnsemble() {
+    clearEnsembleVisualizations();
+
+    if (!AppState.ensembleModelsData || Object.keys(AppState.ensembleModelsData).length === 0) {
+        console.log("No ensemble data to process.");
+        if (Settings.state.userSettings.selectedEnsembleModels.length > 0 && Settings.state.userSettings.currentEnsembleScenario !== 'all_models') {
+            Utils.handleMessage("Data for selected ensemble models not yet available. Fetching...");
+            fetchEnsembleWeatherData(); // Versuch, Daten erneut zu laden
+        }
+        return;
+    }
+
+    const scenario = Settings.state.userSettings.currentEnsembleScenario;
+    const sliderIndex = getSliderValue();
+
+    console.log(`Processing ensemble scenario: ${scenario} for slider index: ${sliderIndex}`);
+
+    if (scenario === 'all_models') {
+        for (const modelName in AppState.ensembleModelsData) {
+            if (Object.hasOwnProperty.call(AppState.ensembleModelsData, modelName)) {
+                const modelHourlyData = AppState.ensembleModelsData[modelName];
+                // Erstelle eine temporäre weatherData-Struktur für diese spezifische Modellanfrage
+                const tempWeatherData = { hourly: modelHourlyData };
+                const canopyResult = calculateCanopyCirclesForEnsemble(modelName, tempWeatherData);
+                if (canopyResult) {
+                    const color = getDistinctColorForModel(modelName);
+                    drawEnsembleCircle(canopyResult, color, modelName);
+                }
+            }
+        }
+    } else { // Min, Mean, Max scenarios
+        const scenarioProfile = calculateEnsembleScenarioProfile(scenario, sliderIndex);
+        if (scenarioProfile) {
+            const canopyResult = calculateCanopyCirclesForEnsemble(scenario, scenarioProfile);
+            if (canopyResult) {
+                const color = getDistinctColorForScenario(scenario);
+                drawEnsembleCircle(canopyResult, color, scenario.replace('_', ' '));
+            }
+        } else {
+            console.warn(`Could not calculate profile for scenario: ${scenario}`);
+            Utils.handleMessage(`Could not generate '${scenario.replace('_', ' ')}' profile. Not enough data?`);
+        }
+    }
+}
+
+// Hilfsfunktion für unterscheidbare Farben (Beispiel)
+function getDistinctColorForModel(modelName) {
+    let hash = 0;
+    for (let i = 0; i < modelName.length; i++) {
+        hash = modelName.charCodeAt(i) + ((hash << 5) - hash);
+        hash = hash & hash; // Convert to 32bit integer
+    }
+    const hue = hash % 360;
+    return `hsl(${hue}, 70%, 60%)`; // HSL für bessere Farbverteilung
+}
+
+function getDistinctColorForScenario(scenario) {
+    if (scenario === 'min_wind') return 'rgba(0, 0, 255, 0.7)';    // Blau
+    if (scenario === 'mean_wind') return 'rgba(0, 255, 0, 0.7)';   // Grün
+    if (scenario === 'max_wind') return 'rgba(255, 0, 0, 0.7)';    // Rot
+    return 'rgba(128, 128, 128, 0.7)'; // Grau für Fallback
+}
+
+// Neue Funktion zum Zeichnen eines einzelnen Ensemble-Kreises
+function drawEnsembleCircle(canopyResult, color, label) {
+    if (!AppState.map || !canopyResult || !AppState.ensembleLayerGroup) return;
+
+    // canopyResult sollte { centerLat, centerLng, radius, displacement, direction, profileIdentifier } enthalten
+    const newCenter = Utils.calculateNewCenter(canopyResult.centerLat, canopyResult.centerLng, canopyResult.displacement, canopyResult.direction);
+
+    const circle = L.circle(newCenter, {
+        radius: canopyResult.radius,
+        color: color,
+        fillColor: color,
+        fillOpacity: 0.15, // Etwas sichtbarer als 0.1
+        weight: 2,       // Etwas dicker
+        dashArray: '5, 10' // Strichelung: 5px Strich, 10px Lücke
+    }).addTo(AppState.ensembleLayerGroup);
+
+    const tooltipText = `${label}: ${Math.round(canopyResult.radius)}m drift @ ${Math.round(canopyResult.direction)}°`;
+    circle.bindTooltip(tooltipText, { permanent: false, direction: 'top', className: 'ensemble-tooltip' }); // Eigene Klasse für Styling
+    AppState.ensembleScenarioCircles[label] = circle; // Speichern unter dem Label (Szenario oder Modellname)
+    console.log(`Drew ensemble circle for ${label} at [${newCenter.join(', ')}], radius ${canopyResult.radius}`);
+}
+
+function calculateEnsembleScenarioProfile(scenarioType /* sliderIndex hier nicht mehr als direkter Parameter nötig, wird in der Schleife verwendet */) {
+    if (!AppState.ensembleModelsData || Object.keys(AppState.ensembleModelsData).length === 0) {
+        console.warn("No ensemble data available for profile calculation.");
+        return null;
+    }
+
+    const numModels = Object.keys(AppState.ensembleModelsData).length;
+    if (numModels === 0) return null;
+
+    console.log(`Calculating full time-series ensemble profile for: ${scenarioType}`);
+
+    const scenarioHourlyData = {}; // Das wird das neue 'hourly'-Objekt für das Szenario
+
+    // Annahme: Alle Modelle haben die gleiche Zeitachsenstruktur. Nehmen Sie sie vom ersten Modell.
+    const firstModelName = Object.keys(AppState.ensembleModelsData)[0];
+    const timeArrayFromFirstModel = AppState.ensembleModelsData[firstModelName]?.time; // ?. für Sicherheit
+
+    if (!timeArrayFromFirstModel || timeArrayFromFirstModel.length === 0) {
+        console.error("Time data missing or empty in the first ensemble model for profile calculation.");
+        return null;
+    }
+    scenarioHourlyData.time = [...timeArrayFromFirstModel]; // Kopiere das vollständige Zeitarray
+
+    const numTimeSteps = scenarioHourlyData.time.length;
+
+    // Basisvariablen (ohne Modell-Suffix), die aggregiert werden sollen
+    const baseVariablesToProcess = [
+        "surface_pressure", "temperature_2m", "relative_humidity_2m",
+        "geopotential_height_1000hPa", "temperature_1000hPa", "relative_humidity_1000hPa",
+        "geopotential_height_950hPa", "temperature_950hPa", "relative_humidity_950hPa",
+        "geopotential_height_925hPa", "temperature_925hPa", "relative_humidity_925hPa",
+        "geopotential_height_900hPa", "temperature_900hPa", "relative_humidity_900hPa",
+        "geopotential_height_850hPa", "temperature_850hPa", "relative_humidity_850hPa",
+        "geopotential_height_800hPa", "temperature_800hPa", "relative_humidity_800hPa",
+        "geopotential_height_700hPa", "temperature_700hPa", "relative_humidity_700hPa",
+        "geopotential_height_600hPa", "temperature_600hPa", "relative_humidity_600hPa",
+        "geopotential_height_500hPa", "temperature_500hPa", "relative_humidity_500hPa",
+        "geopotential_height_400hPa", "temperature_400hPa", "relative_humidity_400hPa",
+        "geopotential_height_300hPa", "temperature_300hPa", "relative_humidity_300hPa",
+        "geopotential_height_250hPa", "temperature_250hPa", "relative_humidity_250hPa",
+        "geopotential_height_200hPa", "temperature_200hPa", "relative_humidity_200hPa"
+    ];
+
+    // Windvariablen-Paare (Basisnamen)
+    const windVariablePairs = [
+        ["wind_speed_10m", "wind_direction_10m"]
+    ];
+    const pressureLevels = [1000, 950, 925, 900, 850, 800, 700, 600, 500, 400, 300, 250, 200];
+    pressureLevels.forEach(p => {
+        windVariablePairs.push([`wind_speed_${p}hPa`, `wind_direction_${p}hPa`]);
+    });
+
+    // Initialisiere die Arrays in scenarioHourlyData mit der korrekten Länge
+    baseVariablesToProcess.forEach(varName => {
+        scenarioHourlyData[varName] = new Array(numTimeSteps).fill(null);
+    });
+    windVariablePairs.forEach(pair => {
+        scenarioHourlyData[pair[0]] = new Array(numTimeSteps).fill(null); // für Geschwindigkeit
+        scenarioHourlyData[pair[1]] = new Array(numTimeSteps).fill(null); // für Richtung
+    });
+
+    // Iteriere durch jeden Zeitschritt der gesamten Vorhersageperiode
+    for (let t = 0; t < numTimeSteps; t++) {
+        // Verarbeite nicht-Wind Variablen
+        baseVariablesToProcess.forEach(varName => {
+            const valuesAtTimeStep = [];
+            for (const modelName in AppState.ensembleModelsData) {
+                // Stelle sicher, dass das Modell auch Daten für diese Variable hat
+                const modelHourly = AppState.ensembleModelsData[modelName];
+                if (modelHourly && modelHourly[varName]) {
+                    const val = modelHourly[varName][t]; // Zugriff auf den t-ten Wert
+                    if (val !== null && val !== undefined && !isNaN(val)) {
+                        valuesAtTimeStep.push(val);
+                    }
+                }
+            }
+            if (valuesAtTimeStep.length > 0) {
+                if (scenarioType === 'min_wind') scenarioHourlyData[varName][t] = Math.min(...valuesAtTimeStep);
+                else if (scenarioType === 'max_wind') scenarioHourlyData[varName][t] = Math.max(...valuesAtTimeStep);
+                else scenarioHourlyData[varName][t] = valuesAtTimeStep.reduce((a, b) => a + b, 0) / valuesAtTimeStep.length; // Mean
+            }
+            // Wenn keine Werte vorhanden sind, bleibt der Wert null (durch Initialisierung oben)
+        });
+
+        // Verarbeite Windvariablen
+        windVariablePairs.forEach(pair => {
+            const speedVarName = pair[0];
+            const dirVarName = pair[1];
+            let u_components_t = [];
+            let v_components_t = [];
+            let speeds_t = [];
+            let dirs_t = [];
+
+            for (const modelName in AppState.ensembleModelsData) {
+                const modelHourly = AppState.ensembleModelsData[modelName];
+                if (modelHourly && modelHourly[speedVarName] && modelHourly[dirVarName]) {
+                    const speed = modelHourly[speedVarName][t];
+                    const dir = modelHourly[dirVarName][t];
+                    if (speed !== null && speed !== undefined && !isNaN(speed) &&
+                        dir !== null && dir !== undefined && !isNaN(dir)) {
+                        speeds_t.push(speed);
+                        dirs_t.push(dir);
+                        u_components_t.push(-speed * Math.sin(dir * Math.PI / 180));
+                        v_components_t.push(-speed * Math.cos(dir * Math.PI / 180));
+                    }
+                }
+            }
+
+            if (speeds_t.length > 0) {
+                if (scenarioType === 'min_wind') {
+                    const minSpeed = Math.min(...speeds_t);
+                    const minIndex = speeds_t.indexOf(minSpeed);
+                    scenarioHourlyData[speedVarName][t] = minSpeed;
+                    scenarioHourlyData[dirVarName][t] = dirs_t[minIndex];
+                } else if (scenarioType === 'max_wind') {
+                    const maxSpeed = Math.max(...speeds_t);
+                    const maxIndex = speeds_t.indexOf(maxSpeed);
+                    scenarioHourlyData[speedVarName][t] = maxSpeed;
+                    scenarioHourlyData[dirVarName][t] = dirs_t[maxIndex];
+                } else { // mean_wind
+                    const mean_u = u_components_t.reduce((a, b) => a + b, 0) / u_components_t.length;
+                    const mean_v = v_components_t.reduce((a, b) => a + b, 0) / v_components_t.length;
+                    scenarioHourlyData[speedVarName][t] = Utils.windSpeed(mean_u, mean_v);
+                    scenarioHourlyData[dirVarName][t] = Utils.windDirection(mean_u, mean_v);
+                }
+            }
+             // Wenn keine Werte vorhanden sind, bleiben die Werte null
+        });
+    }
+    // console.log(`Vollständiges Zeitreihenprofil für ${scenarioType}:`, scenarioHourlyData);
+    return { hourly: scenarioHourlyData }; // Struktur wie eine einzelne API-Modellantwort
+}
+
+/**
+ * Berechnet die Canopy-Kreise für ein gegebenes Ensemble-Profil oder ein einzelnes Modell aus dem Ensemble.
+ * @param {string} profileIdentifier - Name des Modells oder Szenarios (z.B. "icon_global", "min_wind").
+ * @param {object} [specificProfileData=null] - Optionale, spezifische Wetterdaten für das Profil.
+ * Wenn null, wird versucht, die Daten aus AppState.ensembleModelsData[profileIdentifier] zu verwenden.
+ * @returns {object|null} Das Ergebnis von calculateCanopyCircles oder null bei Fehler.
+ */
+function calculateCanopyCirclesForEnsemble(profileIdentifier, specificProfileData = null) {
+    console.log(`Calculating canopy circles for ensemble profile/model: ${profileIdentifier}`);
+
+    // Bestimme die zu verwendenden Wetterdaten
+    let weatherDataForProfile;
+    if (specificProfileData) {
+        weatherDataForProfile = specificProfileData; // Direkte Übergabe für Min/Mean/Max Profile
+    } else if (AppState.ensembleModelsData && AppState.ensembleModelsData[profileIdentifier]) {
+        // Für 'all_models'-Szenario, hole Daten des spezifischen Modells
+        weatherDataForProfile = { hourly: AppState.ensembleModelsData[profileIdentifier] };
+    } else {
+        console.warn(`Keine Daten für Profil/Modell ${profileIdentifier} in calculateCanopyCirclesForEnsemble gefunden.`);
+        return null;
+    }
+
+    if (!weatherDataForProfile.hourly || !AppState.lastLat || !AppState.lastLng) {
+        console.warn(`Unvollständige Daten für calculateCanopyCirclesForEnsemble: ${profileIdentifier}`);
+        return null;
+    }
+
+       const originalGlobalWeatherData = AppState.weatherData;
+    const originalShowCanopyArea = Settings.state.userSettings.showCanopyArea;
+    const originalCalculateJump = Settings.state.userSettings.calculateJump;
+
+    AppState.weatherData = weatherDataForProfile.hourly;
+    // Für Ensemble-Visualisierung temporär die Bedingungen erfüllen,
+    // oder calculateCanopyCircles so anpassen, dass es diese optional ignoriert.
+    Settings.state.userSettings.showCanopyArea = true; // Temporär setzen
+    Settings.state.userSettings.calculateJump = true;  // Temporär setzen
+    
+    let result = null;
+    try {
+        result = calculateCanopyCircles();
+    } catch (error) {
+        console.error(`Fehler in calculateCanopyCircles für Profil ${profileIdentifier}:`, error);
+        result = null;
+    } finally {
+        AppState.weatherData = originalGlobalWeatherData;
+        Settings.state.userSettings.showCanopyArea = originalShowCanopyArea; // Zurücksetzen
+        Settings.state.userSettings.calculateJump = originalCalculateJump;  // Zurücksetzen
+        // Settings.save(); // Nicht hier speichern, da es temporäre Änderungen sind
+    }
+
+    if (result) {
+        // Die Visualisierungsfunktion erwartet eine vereinfachte Struktur.
+        // Wir verwenden hier die Daten des "roten Kreises" (volle Distanz).
+        return {
+            centerLat: result.redLat,
+            centerLng: result.redLng,
+            radius: result.radiusFull,
+            displacement: result.displacementFull,
+            direction: result.directionFull,
+            profileIdentifier: profileIdentifier // Behalte die ID für Tooltips etc.
+        };
+    }
+    console.warn(`calculateCanopyCircles lieferte null für Profil ${profileIdentifier}`);
+    return null;
+}
+
 export async function updateWeatherDisplay(index, originalTime = null) {
     console.log(`updateWeatherDisplay called with index: ${index}, Time: ${AppState.weatherData.time[index]}`);
     if (!AppState.weatherData || !AppState.weatherData.time || index < 0 || index >= AppState.weatherData.time.length) {
@@ -4725,27 +5336,64 @@ function setupSliderEvents() {
                 console.log('Updating jump run track for slider index:', sliderIndex);
                 updateJumpRunTrack();
             }
-            recenterMap();
+            //recenterMap();
             updateLivePositionControl();
         } else {
-            console.warn('Cannot update displays: missing data', {
-                weatherData: !!AppState.weatherData,
-                lastLat: AppState.lastLat,
-                lastLng: AppState.lastLng
-            });
+            // Aktualisiere zumindest die Zeitanzeige, auch wenn keine vollständigen Wetterdaten für das Hauptmodell da sind
+            let timeToDisplay = 'N/A';
+            if (AppState.weatherData?.time?.[sliderIndex]) {
+                timeToDisplay = await Utils.getDisplayTime(AppState.weatherData.time[sliderIndex], AppState.lastLat, AppState.lastLng);
+            } else if (AppState.ensembleModelsData && Object.keys(AppState.ensembleModelsData).length > 0) {
+                const firstEnsembleModelName = Object.keys(AppState.ensembleModelsData)[0];
+                const ensembleTimeArray = AppState.ensembleModelsData[firstEnsembleModelName]?.time;
+                if (ensembleTimeArray?.[sliderIndex]) {
+                    timeToDisplay = await Utils.getDisplayTime(ensembleTimeArray[sliderIndex], AppState.lastLat, AppState.lastLng);
+                }
+            }
+            const selectedTimeElement = document.getElementById('selectedTime');
+            if (selectedTimeElement) {
+                 selectedTimeElement.innerHTML = `Selected Time: ${timeToDisplay}`;
+            }
+        }
+
+        // 2. Ensemble-Visualisierungen aktualisieren
+        if (Settings.state.userSettings.selectedEnsembleModels && Settings.state.userSettings.selectedEnsembleModels.length > 0) {
+            console.log("Time slider change triggering ensemble update for index:", sliderIndex);
+            if (AppState.ensembleModelsData && Object.keys(AppState.ensembleModelsData).length > 0) {
+                processAndVisualizeEnsemble(); // Diese Funktion verwendet intern den aktuellen sliderIndex via getSliderValue()
+            } else {
+                console.warn("Ensemble update skipped: AppState.ensembleModelsData is not populated yet.");
+                // Optional: Daten erneut abrufen, falls sie fehlen sollten
+                // await fetchEnsembleWeatherData();
+                // processAndVisualizeEnsemble();
+            }
         }
     });
 
+   // Das 'change'-Event (feuert nach dem Loslassen des Sliders) kann für finale Textupdates bleiben,
+    // oder wenn die 'input'-Performance bei sehr vielen Datenpunkten ein Problem wäre.
+    // Für die Textanzeige der Zeit ist 'input' aber auch responsiv genug.
     slider.addEventListener('change', async () => {
         const sliderIndex = parseInt(slider.value) || 0;
+        let timeToDisplay = 'N/A';
+
+        // Konsistente Logik zur Zeitanzeige, wie im 'input'-Handler
         if (AppState.weatherData?.time?.[sliderIndex]) {
-            const displayTime = await Utils.getDisplayTime(AppState.weatherData.time[sliderIndex], AppState.lastLat, AppState.lastLng); const timeLabel = document.getElementById('timeLabel');
-            //const time = await Utils.getDisplayTime(AppState.weatherData.time[index], AppState.lastLat, AppState.lastLng);
-            if (timeLabel) {
-                timeLabel.textContent = `Time: ${displayTime}`;
-                console.log('Updated time label:', displayTime);
+            timeToDisplay = await Utils.getDisplayTime(AppState.weatherData.time[sliderIndex], AppState.lastLat, AppState.lastLng);
+        } else if (AppState.ensembleModelsData && Object.keys(AppState.ensembleModelsData).length > 0) {
+            const firstEnsembleModelName = Object.keys(AppState.ensembleModelsData)[0];
+            const ensembleTimeArray = AppState.ensembleModelsData[firstEnsembleModelName]?.time;
+            if (ensembleTimeArray?.[sliderIndex]) {
+                timeToDisplay = await Utils.getDisplayTime(ensembleTimeArray[sliderIndex], AppState.lastLat, AppState.lastLng);
             }
         }
+        const selectedTimeElement = document.getElementById('selectedTime');
+        if (selectedTimeElement) {
+             selectedTimeElement.innerHTML = `Selected Time: ${timeToDisplay}`;
+             console.log('Time slider change event, updated selectedTime label to:', timeToDisplay);
+        }
+        // Die Haupt-Aktualisierungslogik ist bereits im 'input'-Event.
+        // Zusätzliche Aktionen nach dem Loslassen könnten hier platziert werden.
     });
 }
 function setupModelSelectEvents() {
@@ -5106,6 +5754,57 @@ function setupRadioEvents() {
                 });
             }
         });
+    }
+
+    //Ensemble stuff
+    const scenarioRadios = document.querySelectorAll('input[name="ensembleScenario"]');
+    scenarioRadios.forEach(radio => {
+        radio.addEventListener('change', () => {
+            if (radio.checked) {
+                Settings.state.userSettings.currentEnsembleScenario = radio.value;
+                AppState.currentEnsembleScenario = radio.value; // Auch AppState aktualisieren
+                Settings.save();
+                console.log('Ensemble scenario changed to:', radio.value);
+
+                // Daten abrufen (falls noch nicht geschehen) und dann visualisieren
+                if (Settings.state.userSettings.selectedEnsembleModels.length > 0) {
+                    // Prüfen, ob Daten für die ausgewählten Modelle bereits geladen sind
+                    const modelsLoaded = Settings.state.userSettings.selectedEnsembleModels.every(
+                        m => AppState.ensembleModelsData && AppState.ensembleModelsData[m]
+                    );
+
+                    if (!modelsLoaded && radio.value !== 'all_models') { // Min/Mean/Max benötigen alle Modelldaten
+                        fetchEnsembleWeatherData(); // processAndVisualizeEnsemble wird am Ende von fetchEnsembleWeatherData aufgerufen
+                    } else if (!modelsLoaded && radio.value === 'all_models' && AppState.ensembleModelsData && Object.keys(AppState.ensembleModelsData).length > 0) {
+                        // 'all_models' kann auch mit unvollständigen Daten etwas anzeigen
+                        processAndVisualizeEnsemble();
+                    } else if (modelsLoaded) {
+                        processAndVisualizeEnsemble();
+                    } else { // Keine Modelle ausgewählt oder Daten fehlen komplett
+                        Utils.handleMessage("Please select models and ensure data is fetched.");
+                        clearEnsembleVisualizations();
+                    }
+                } else if (radio.value !== 'all_models') {
+                    Utils.handleMessage("Please select models from the 'Ensemble > Models' menu first.");
+                    clearEnsembleVisualizations();
+                } else { // 'all_models' aber keine Modelle selektiert
+                    clearEnsembleVisualizations();
+                }
+            }
+        });
+    });
+
+    // Initialisierung des ausgewählten Szenarios beim Laden der Seite
+    const initialScenario = Settings.state.userSettings.currentEnsembleScenario || 'all_models';
+    const currentScenarioRadio = document.querySelector(`input[name="ensembleScenario"][value="${initialScenario}"]`);
+    if (currentScenarioRadio) {
+        currentScenarioRadio.checked = true;
+        AppState.currentEnsembleScenario = initialScenario; // AppState synchron halten
+    }
+
+    // Sicherstellen, dass die ensembleLayerGroup initialisiert ist, wenn die Karte bereit ist
+    if (AppState.map && !AppState.ensembleLayerGroup) {
+        AppState.ensembleLayerGroup = L.layerGroup().addTo(AppState.map);
     }
 }
 function setupInputEvents() {
@@ -5926,7 +6625,7 @@ function setupTrackEvents() {
             const file = e.target.files[0];
             console.log('[app.js] Track file selected:', file?.name);
             if (!file) { /* istanbul ignore next */ Utils.handleError('No file selected.'); return; }
-            
+
             const extension = file.name.split('.').pop().toLowerCase();
             let trackMetaData = null;
 
@@ -5964,14 +6663,14 @@ function setupTrackEvents() {
                     const currentInfoHTML = infoEl.innerHTML;
                     const modelInfoMatch = currentInfoHTML.match(modelDisplayRegex);
                     const baseInfo = modelInfoMatch ? modelInfoMatch[0] : ''; // Behalte Modellinfos
-                    
+
                     // Entferne alte Track-Infos, falls vorhanden (heuristisch)
                     const oldTrackInfoRegex = /<br><strong>Track:<\/strong>.*?\(Source:.*?\)/s;
                     let newInfoHTML = currentInfoHTML.replace(modelDisplayRegex, '').replace(oldTrackInfoRegex, '').trim();
                     if (newInfoHTML === 'Click on the map to fetch weather data.' || newInfoHTML === 'No weather data.' || newInfoHTML === 'No models available at this location.' || newInfoHTML === 'Failed to load weather data.' || newInfoHTML === 'No weather model selected.') {
                         newInfoHTML = ''; // Leere Standardnachrichten, um Platz für Trackinfo zu machen
                     }
-                    
+
                     infoEl.innerHTML = (newInfoHTML ? newInfoHTML + "<br>" : "") + trackMetaData.summaryForInfoElement + baseInfo;
                 }
             } else if (trackMetaData && !trackMetaData.success) {
@@ -5994,7 +6693,7 @@ function setupTrackEvents() {
                     if (AppState.map.hasLayer(AppState.gpxLayer)) AppState.map.removeLayer(AppState.gpxLayer);
                     AppState.gpxLayer = null; AppState.gpxPoints = []; AppState.isTrackLoaded = false;
                     console.log('[app.js] Cleared track from map and AppState');
-                    
+
                     const infoElement = document.getElementById('info');
                     if (infoElement) {
                         const modelDisplayRegex = /(<br><strong>Available Models:<\/strong><ul>.*?<\/ul>|<br><strong>Available Models:<\/strong> None)/s;
