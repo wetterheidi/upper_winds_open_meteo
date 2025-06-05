@@ -1,4 +1,5 @@
-import { AppState, createCustomMarker, attachMarkerDragend, updateMarkerPopup, fetchWeatherForLocation, debouncedCalculateJump, calculateCutAway } from './app.js';
+import { AppState, createCustomMarker, attachMarkerDragend, updateMarkerPopup, fetchWeatherForLocation, debouncedCalculateJump, calculateCutAway, updateJumpRunTrack,
+    updateLandingPattern } from './app.js';
 import { Settings } from "./settings.js";
 import { Utils } from "./utils.js";
 import { interpolateColor} from "./uiHelpers.js";

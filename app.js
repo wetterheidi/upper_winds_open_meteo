@@ -213,7 +213,6 @@ function _initializeBasicMapInstance(defaultCenter, defaultZoom) {
     });
     console.log('Map instance created.');
 }
-
 function _setupBaseLayersAndHandling() {
     AppState.baseMaps = {
         "OpenStreetMap": L.tileLayer.cached('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -310,7 +309,6 @@ function _setupBaseLayersAndHandling() {
     });
     console.log('Base layers and online/offline handlers set up.');
 }
-
 function _addStandardMapControls() {
     if (!AppState.map) {
         console.error("Karte nicht initialisiert, bevor Controls hinzugefügt werden können.");
@@ -354,7 +352,6 @@ function _addStandardMapControls() {
     }).addTo(AppState.map);
     console.log('Standard map controls and baselayerchange handler added.');
 }
-
 function _setupCustomPanes() {
     AppState.map.createPane('gpxTrackPane');
     AppState.map.getPane('gpxTrackPane').style.zIndex = 650;
@@ -362,7 +359,6 @@ function _setupCustomPanes() {
     AppState.map.getPane('popupPane').style.zIndex = 700;
     console.log('Custom map panes created.');
 }
-
 function _initializeLivePositionControl() {
     AppState.livePositionControl = L.control.livePosition({ position: 'bottomright' }).addTo(AppState.map);
     if (AppState.livePositionControl._container) {
@@ -372,7 +368,6 @@ function _initializeLivePositionControl() {
         console.warn('livePositionControl._container not initialized in initMap');
     }
 }
-
 function _initializeDefaultMarker(defaultCenter, initialAltitude) {
     // Annahme: createCustomMarker, attachMarkerDragend, updateMarkerPopup sind global in app.js definiert
     AppState.currentMarker = Utils.configureMarker(
@@ -389,7 +384,6 @@ function _initializeDefaultMarker(defaultCenter, initialAltitude) {
     AppState.isManualPanning = false;
     console.log('Default marker initialized.');
 }
-
 async function _initializeTileCacheLogic() {
     try {
         await TileCache.init();
@@ -407,7 +401,6 @@ async function _initializeTileCacheLogic() {
     }
     console.log('Tile cache logic initialized.');
 }
-
 async function _geolocationSuccessCallback(position, defaultZoom) {
     const userCoords = [position.coords.latitude, position.coords.longitude];
     AppState.lastLat = position.coords.latitude;
@@ -443,7 +436,6 @@ async function _geolocationSuccessCallback(position, defaultZoom) {
     cacheTilesForDIP({ map: AppState.map, lastLat: AppState.lastLat, lastLng: AppState.lastLng, baseMaps: AppState.baseMaps });
     console.log('Geolocation success handled.');
 }
-
 async function _geolocationErrorCallback(error, defaultCenter, defaultZoom) {
     console.warn(`Geolocation error: ${error.message}`);
     Utils.handleMessage('Unable to retrieve your location. Using default location.');
@@ -474,7 +466,6 @@ async function _geolocationErrorCallback(error, defaultCenter, defaultZoom) {
     cacheTilesForDIP({ map: AppState.map, lastLat: AppState.lastLat, lastLng: AppState.lastLng, baseMaps: AppState.baseMaps });
     console.log('Geolocation error handled.');
 }
-
 async function _handleGeolocation(defaultCenter, defaultZoom) {
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
@@ -489,7 +480,6 @@ async function _handleGeolocation(defaultCenter, defaultZoom) {
         await _geolocationErrorCallback({ message: "Geolocation not supported by this browser." }, defaultCenter, defaultZoom);
     }
 }
-
 function _initializeCoordsControlAndHandlers() {
     AppState.coordsControl = new L.Control.Coordinates(); 
     AppState.coordsControl.addTo(AppState.map);
@@ -549,7 +539,6 @@ function _handleMapMouseMove(e) {
         }
     });
 }
-
 async function _handleMapDblClick(e) {
     console.log('--- _handleMapDblClick START ---', e.latlng);
     const { lat, lng } = e.latlng;
@@ -596,7 +585,6 @@ async function _handleMapDblClick(e) {
     if (Settings.state.userSettings.showJumpMasterLine && Settings.state.userSettings.trackPosition) updateJumpMasterLine();
     console.log('--- _handleMapDblClick END ---');
 }
-
 function _setupCoreMapEventHandlers() {
     if (!AppState.map) {
         console.error("Karte nicht initialisiert in _setupCoreMapEventHandlers");
@@ -716,7 +704,6 @@ function _setupCoreMapEventHandlers() {
 
     console.log('All core map event handlers have been set up.');
 }
-
 function initMap() {
     if (mapInitialized || AppState.map) {
         console.warn('Map already initialized or init in progress.');
@@ -1559,7 +1546,7 @@ function updateJumpMasterLine() {
 
 
 // == Weather Data Handling ==
-async function checkAvailableModels(lat, lon) {
+export async function checkAvailableModels(lat, lon) {
     const modelList = [
         'icon_seamless', 'icon_global', 'icon_eu', 'icon_d2', 'ecmwf_ifs025', 'ecmwf_aifs025_single', 'gfs_seamless', 'gfs_global', 'gfs_hrrr', 'arome_france', 'gem_hrdps_continental', 'gem_regional'
     ];
@@ -1695,7 +1682,7 @@ async function fetchWeatherForLocation(lat, lng, currentTime = null, isInitialLo
         restoreUIInteractivity();
     }
 }
-async function fetchWeather(lat, lon, currentTime = null, isInitialLoad = false) {
+export async function fetchWeather(lat, lon, currentTime = null, isInitialLoad = false) {
     try {
         document.getElementById('loading').style.display = 'block';
         const modelSelect = document.getElementById('modelSelect');
@@ -1984,7 +1971,7 @@ async function fetchWeather(lat, lon, currentTime = null, isInitialLoad = false)
         Utils.handleError(`Failed to fetch weather data: ${error.message}`);
     }
 }
-async function updateWeatherDisplay(index, originalTime = null) {
+export async function updateWeatherDisplay(index, originalTime = null) {
     console.log(`updateWeatherDisplay called with index: ${index}, Time: ${AppState.weatherData.time[index]}`);
     if (!AppState.weatherData || !AppState.weatherData.time || index < 0 || index >= AppState.weatherData.time.length) {
         console.error('No weather data available or index out of bounds:', index);
@@ -2089,7 +2076,7 @@ async function updateWeatherDisplay(index, originalTime = null) {
     document.getElementById('selectedTime').innerHTML = `Selected Time: ${time}`;
     updateLandingPattern();
 }
-function calculateMeanWind() {
+export function calculateMeanWind() {
     console.log('Calculating mean wind with model:', document.getElementById('modelSelect').value, 'weatherData:', AppState.weatherData);
     const index = document.getElementById('timeSlider').value || 0;
     const interpolatedData = interpolateWeatherData(index);
@@ -2149,7 +2136,7 @@ function calculateMeanWind() {
     document.getElementById('meanWindResult').innerHTML = result;
     console.log('Calculated Mean Wind:', result, 'u:', meanWind[2], 'v:', meanWind[3]);
 }
-function interpolateWeatherData(sliderIndex) {
+export function interpolateWeatherData(sliderIndex) {
     if (!AppState.weatherData || !AppState.weatherData.time || sliderIndex >= AppState.weatherData.time.length) {
         console.warn('No weather data available for interpolation');
         return [];
@@ -2300,7 +2287,7 @@ function interpolateWeatherData(sliderIndex) {
     console.log('Interpolated data length:', interpolatedData.length, 'Max height:', interpolatedData[interpolatedData.length - 1].displayHeight);
     return interpolatedData;
 }
-function downloadTableAsAscii(format) {
+export function downloadTableAsAscii(format) {
     if (!AppState.weatherData || !AppState.weatherData.time) {
         Utils.handleError('No weather data available to download.');
         return;
@@ -2509,7 +2496,7 @@ function downloadTableAsAscii(format) {
 }
 
 // == Autoupdate Functionality ==
-function setupAutoupdate() {
+export function setupAutoupdate() {
     const autoupdateCheckbox = document.getElementById('autoupdateCheckbox');
     if (!autoupdateCheckbox) {
         console.warn('Autoupdate checkbox not found');
@@ -2547,7 +2534,7 @@ function setupAutoupdate() {
         startAutoupdate();
     }
 }
-function startAutoupdate() {
+export function startAutoupdate() {
     if (AppState.autoupdateInterval) {
         console.log('Autoupdate already running, skipping start');
         return;
@@ -2580,7 +2567,7 @@ function startAutoupdate() {
 
     Utils.handleMessage('Autoupdate enabled');
 }
-function stopAutoupdate() {
+export function stopAutoupdate() {
     if (AppState.autoupdateInterval) {
         clearInterval(AppState.autoupdateInterval);
         AppState.autoupdateInterval = null;
@@ -2588,7 +2575,7 @@ function stopAutoupdate() {
         Utils.handleMessage('Autoupdate disabled');
     }
 }
-async function updateToCurrentHour() {
+export async function updateToCurrentHour() {
     if (!AppState.lastLat || !AppState.lastLng) {
         console.warn('No location selected, cannot update weather data');
         Utils.handleError('Please select a location to enable autoupdate.');
@@ -2643,7 +2630,7 @@ async function updateToCurrentHour() {
 }
 
 // == Jump and Free Fall Calculations ==
-function getSeparationFromTAS(ias) {
+export function getSeparationFromTAS(ias) {
     // Convert exitAltitude from meters to feet (1m = 3.28084ft)
     const exitAltitudeFt = Settings.state.userSettings.exitAltitude * 3.28084;
 
@@ -2667,7 +2654,7 @@ function getSeparationFromTAS(ias) {
     console.log(`Calculated TAS: ${tas}kt, Closest speed: ${closestSpeed}kt, Separation: ${separation}s`);
     return separation;
 }
-function calculateFreeFall(weatherData, exitAltitude, openingAltitude, sliderIndex, startLat, startLng, elevation) {
+export function calculateFreeFall(weatherData, exitAltitude, openingAltitude, sliderIndex, startLat, startLng, elevation) {
     console.log('Starting calculateFreeFall...', { exitAltitude, openingAltitude, sliderIndex });
 
     if (!AppState.weatherData || !AppState.weatherData.time || !AppState.weatherData.surface_pressure) {
@@ -2818,7 +2805,7 @@ function calculateFreeFall(weatherData, exitAltitude, openingAltitude, sliderInd
     console.log(`Free fall considerations output: Throw and drift: ${Math.round(directionDeg)}° ${Math.round(distance)} m ${Math.round(final.time)} s ${hStart} m ${hStop} m`);
     return result;
 }
-function visualizeFreeFallPath(path) {
+export function visualizeFreeFallPath(path) {
     if (!AppState.map || !Settings.state.userSettings.calculateJump) return;
 
     const latLngs = path.map(point => point.latLng);
@@ -2833,7 +2820,7 @@ function visualizeFreeFallPath(path) {
 }
 
 // Isolated calculation functions
-function calculateExitCircle() {
+export function calculateExitCircle() {
     if (!Settings.state.userSettings.showExitArea || !Settings.state.userSettings.calculateJump || !AppState.weatherData || !AppState.lastLat || !AppState.lastLng) {
         console.log('Skipping calculateExitCircle: conditions not met');
         return null;
@@ -2932,7 +2919,7 @@ function calculateExitCircle() {
         freeFallTime: freeFallResult.time
     };
 }
-function calculateCanopyCircles() {
+export function calculateCanopyCircles() {
     if (!Settings.state.userSettings.showCanopyArea || !Settings.state.userSettings.calculateJump || !AppState.weatherData || !AppState.lastLat || !AppState.lastLng) {
         console.log('Skipping calculateCanopyCircles: conditions not met');
         return null;
@@ -3073,7 +3060,7 @@ function calculateCanopyCircles() {
         freeFallTime: freeFallResult.time
     };
 }
-function calculateJumpRunTrack() {
+export function calculateJumpRunTrack() {
     if (!Settings.state.userSettings.showJumpRunTrack || !Settings.state.userSettings.calculateJump || !AppState.weatherData || !AppState.lastLat || !AppState.lastLng) {
         console.log('Skipping calculateJumpRunTrack: conditions not met');
         return null;
@@ -3083,7 +3070,7 @@ function calculateJumpRunTrack() {
     const trackData = jumpRunTrack();
     return trackData;
 }
-function calculateJump() {
+export function calculateJump() {
     console.log('Starting calculateJump...', {
         showExitArea: Settings.state.userSettings.showExitArea,
         showCanopyArea: Settings.state.userSettings.showCanopyArea,
@@ -3146,7 +3133,7 @@ function calculateJump() {
     console.log('calculateJump completed', result);
     return result;
 }
-function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, additionalBlueRadii = [], additionalBlueDisplacements = [], additionalBlueDirections = [], additionalBlueUpperLimits = [], displacement = 0, displacementFull = 0, direction = 0, directionFull = 0, freeFallDirection = 0, freeFallDistance = 0, freeFallTime = 0, showExitAreaOnly = false, showCanopyAreaOnly = false) {
+export function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, additionalBlueRadii = [], additionalBlueDisplacements = [], additionalBlueDirections = [], additionalBlueUpperLimits = [], displacement = 0, displacementFull = 0, direction = 0, directionFull = 0, freeFallDirection = 0, freeFallDistance = 0, freeFallTime = 0, showExitAreaOnly = false, showCanopyAreaOnly = false) {
     console.log('updateJumpCircle called with:', {
         blueLat, blueLng, redLat, redLng, radius, radiusFull,
         additionalBlueRadii, additionalBlueDisplacements, additionalBlueDirections, additionalBlueUpperLimits,
@@ -3488,7 +3475,7 @@ function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, 
     console.log('updateJumpCircle completed');
     return true;
 }
-function clearIsolineMarkers() {
+export function clearIsolineMarkers() {
     console.log('clearIsolineMarkers called');
     if (!AppState.map) {
         console.warn('Map not available in clearIsolineMarkers');
@@ -3545,7 +3532,7 @@ function clearIsolineMarkers() {
         });
     }
 }
-function resetJumpRunDirection(triggerUpdate = true) {
+export function resetJumpRunDirection(triggerUpdate = true) {
     AppState.customJumpRunDirection = null;
     const directionInput = document.getElementById('jumpRunTrackDirection');
     if (directionInput) {
@@ -3558,7 +3545,7 @@ function resetJumpRunDirection(triggerUpdate = true) {
         updateJumpRunTrack();
     }
 }
-function jumpRunTrack() {
+export function jumpRunTrack() {
     console.log('Starting jumpRunTrack...', {
         weatherData: !!AppState.weatherData,
         lastLat: AppState.lastLat,
@@ -3791,7 +3778,7 @@ function jumpRunTrack() {
         approachTime: approachTime
     };
 }
-function updateJumpRunTrack() {
+export function updateJumpRunTrack() {
     if (!AppState.map) {
         console.warn('Map not initialized, cannot update jump run track');
         return;
@@ -4314,7 +4301,7 @@ function calculateCutAway() {
 }
 
 // == Landing Pattern Calculations ==
-function calculateLandingPatternCoords(lat, lng, interpolatedData, sliderIndex) {
+export function calculateLandingPatternCoords(lat, lng, interpolatedData, sliderIndex) {
     const CANOPY_SPEED_KT = parseInt(document.getElementById('canopySpeed').value) || 20;
     const DESCENT_RATE_MPS = parseFloat(document.getElementById('descentRate').value) || 3.5;
     const LEG_HEIGHT_FINAL = parseInt(document.getElementById('legHeightFinal').value) || 100;
@@ -4399,7 +4386,7 @@ function calculateLandingPatternCoords(lat, lng, interpolatedData, sliderIndex) 
 
     return { downwindLat: downwindEnd[0], downwindLng: downwindEnd[1] };
 }
-function updateLandingPattern() {
+export function updateLandingPattern() {
     console.log('updateLandingPattern called');
     if (!AppState.map) {
         console.warn('Map not initialized, cannot update landing pattern');
