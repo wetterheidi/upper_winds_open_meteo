@@ -1574,20 +1574,20 @@ export async function checkAvailableModels(lat, lon) {
                 if (data.hourly && data.hourly.temperature_2m && data.hourly.temperature_2m.length > 0) {
                     // *** VERBESSERTE PRÜFUNG: Sicherstellen, dass das Array nicht nur aus null-Werten besteht ***
                     const hasActualNumericData = data.hourly.temperature_2m.some(temp => temp !== null && !isNaN(parseFloat(temp)));
-                    
+
                     if (hasActualNumericData) {
                         availableModels.push(model);
                         // console.log(`[checkAvailableModels] Model ${model} ADDED to availableModels. Current list:`, availableModels);
                     } else {
-                        console.log(`[checkAvailableModels] Model ${model} (HTTP 200 OK) returned an array for temperature_2m, but it contained no valid numeric data (e.g., all nulls or non-numeric). Considered unavailable. Data sample:`, data.hourly.temperature_2m.slice(0,5));
+                        console.log(`[checkAvailableModels] Model ${model} (HTTP 200 OK) returned an array for temperature_2m, but it contained no valid numeric data (e.g., all nulls or non-numeric). Considered unavailable. Data sample:`, data.hourly.temperature_2m.slice(0, 5));
                     }
                 } else {
                     // Model gab HTTP 200 OK, aber die Struktur data.hourly.temperature_2m war nicht wie erwartet (fehlt, leer, etc.)
                     // Oder hourly_units.temperature_2m war "undefined", was ein starker Indikator ist.
                     if (data.hourly_units && data.hourly_units.temperature_2m === "undefined") {
-                         console.log(`[checkAvailableModels] Model ${model} (HTTP 200 OK) has temperature_2m unit "undefined". Considered unavailable.`);
+                        console.log(`[checkAvailableModels] Model ${model} (HTTP 200 OK) has temperature_2m unit "undefined". Considered unavailable.`);
                     } else {
-                         console.log(`[checkAvailableModels] Model ${model} (HTTP 200 OK) but no valid hourly data structure. Hourly data:`, data.hourly);
+                        console.log(`[checkAvailableModels] Model ${model} (HTTP 200 OK) but no valid hourly data structure. Hourly data:`, data.hourly);
                     }
                 }
             } else if (response.status === 400) {
@@ -1712,7 +1712,7 @@ export async function checkAvailableModels(lat, lon) {
         });
 
         if (updatedSelectedEnsembleModels.length > 0) {
-            fetchEnsembleWeatherData(); 
+            fetchEnsembleWeatherData();
         } else {
             AppState.ensembleModelsData = null;
             clearEnsembleVisualizations();
@@ -1722,11 +1722,11 @@ export async function checkAvailableModels(lat, lon) {
         // Auswahl hat sich nicht geändert, aber Position könnte sich geändert haben.
         // Wenn Modelle ausgewählt sind, deren Daten für die neue Position laden.
         if (Settings.state.userSettings.selectedEnsembleModels && Settings.state.userSettings.selectedEnsembleModels.length > 0) {
-             console.log("[checkAvailableModels] Selected ensemble models are still available at the new location. Ensuring data is fetched for the new location.");
-             fetchEnsembleWeatherData();
+            console.log("[checkAvailableModels] Selected ensemble models are still available at the new location. Ensuring data is fetched for the new location.");
+            fetchEnsembleWeatherData();
         }
     }
-    
+
     console.log('[checkAvailableModels] Finished. Final effective available models:', availableModels);
     return availableModels;
 }
@@ -1787,19 +1787,28 @@ async function fetchWeatherForLocation(lat, lng, currentTime = null, isInitialLo
 export async function fetchWeather(lat, lon, currentTime = null, isInitialLoad = false) {
     const loadingElement = document.getElementById('loading');
     if (loadingElement) loadingElement.style.display = 'block';
-    console.log(`[fetchWeather] Called for lat: ${lat}, lon: ${lon}, currentTime: ${currentTime}`);
+    console.log(`[fetchWeather] Called for lat: ${lat}, lon: ${lon}, currentTime: ${currentTime}, isInitialLoad: ${isInitialLoad}`);
 
     try {
         const modelSelect = document.getElementById('modelSelect');
+        // Verwende den Wert aus dem Dropdown oder einen Default, falls das Dropdown noch nicht initialisiert ist.
         const selectedModelValue = modelSelect ? modelSelect.value : Settings.defaultSettings.model;
 
+        if (!selectedModelValue) {
+            console.warn("[fetchWeather] No model selected in dropdown or default settings. Aborting fetchWeather.");
+            Utils.handleError("No weather model selected to fetch data.");
+            if (loadingElement) loadingElement.style.display = 'none';
+            return;
+        }
+
+        // Die korrekte modelMap zur Umwandlung der Dropdown-Werte in API-spezifische Identifier für Meta-Daten
         const modelMap = {
             'icon_seamless': 'dwd_icon',
             'icon_global': 'dwd_icon',
             'icon_eu': 'dwd_icon_eu',
             'icon_d2': 'dwd_icon_d2',
             'ecmwf_ifs025': 'ecmwf_ifs025',
-            'ecmwf_aifs025_single': 'ecmwf_aifs025_single', // Korrigiert von ecmwf_aifs025
+            'ecmwf_aifs025_single': 'ecmwf_aifs025_single',
             'gfs_seamless': 'ncep_gfs013',
             'gfs_global': 'ncep_gfs025',
             'gfs_hrrr': 'ncep_hrrr_conus',
@@ -1808,83 +1817,106 @@ export async function fetchWeather(lat, lon, currentTime = null, isInitialLoad =
             'gem_regional': 'cmc_gem_rdps'
         };
 
-        const modelApiIdentifierForMeta = modelMap[selectedModelKey] || selectedModelKey;
+        // Korrekter Identifier für den Meta-Daten-Abruf
+        const modelApiIdentifierForMeta = modelMap[selectedModelValue] || selectedModelValue;
+        // Für den Haupt-Forecast-API-Call wird `selectedModelValue` direkt verwendet,
+        // da der `models`-Parameter der Forecast-API die allgemeinen Namen (z.B. "icon_global") erwartet.
 
-        if (!selectedModelValue) { // Zusätzliche Prüfung, falls modelSelect leer war
-            console.warn("[fetchWeather] No model selected in dropdown. Aborting fetchWeather.");
-            Utils.handleError("No weather model selected to fetch data.");
-            if (loadingElement) loadingElement.style.display = 'none';
-            return;
-        }
-        console.log(`[fetchWeather] Using model: ${selectedModelValue}`);
-
+        console.log(`[fetchWeather] Using model (for forecast API): '${selectedModelValue}', Meta API identifier: '${modelApiIdentifierForMeta}'`);
 
         let isHistorical = false;
         let startDateStr, endDateStr;
         let targetDateForAPI = null;
         const today = luxon.DateTime.utc().startOf('day');
 
+        // Logik zur Bestimmung, ob historische Daten oder Forecast benötigt werden
+        // und Setzen von targetDateForAPI
         if (currentTime) {
             let parsedCurrentTime = null;
             if (typeof currentTime === 'string' && currentTime.includes('GMT')) {
                 const match = currentTime.match(/^(\d{4}-\d{2}-\d{2})\s(\d{2})(\d{2})\sGMT([+-]\d{1,2})$/);
                 if (match) {
-                    const [, dateStr, hourStr, minuteStr, offset] = match;
+                    const [, dateStrParse, hourStr, minuteStr, offset] = match;
                     const formattedOffset = `${offset.startsWith('+') ? '+' : '-'}${Math.abs(parseInt(offset, 10)).toString().padStart(2, '0')}:00`;
-                    const isoString = `${dateStr}T${hourStr}:${minuteStr}:00${formattedOffset}`;
+                    const isoString = `${dateStrParse}T${hourStr}:${minuteStr}:00${formattedOffset}`;
                     parsedCurrentTime = luxon.DateTime.fromISO(isoString, { zone: 'utc' });
                 }
             } else {
                 parsedCurrentTime = luxon.DateTime.fromISO(currentTime, { zone: 'utc' });
             }
             if (parsedCurrentTime && parsedCurrentTime.isValid) {
-                targetDateForAPI = parsedCurrentTime.startOf('day');
+                targetDateForAPI = parsedCurrentTime.startOf('day'); // Nur das Datum für den API Call
                 if (targetDateForAPI < today) isHistorical = true;
             }
         }
 
-        if (!isHistorical) {
+        if (!isHistorical) { // Nur prüfen, wenn nicht schon durch currentTime als historisch markiert
             const historicalDatePicker = document.getElementById('historicalDatePicker');
             const selectedPickerDate = historicalDatePicker?.value ? luxon.DateTime.fromISO(historicalDatePicker.value, { zone: 'utc' }).startOf('day') : null;
             if (selectedPickerDate && selectedPickerDate < today) {
-                isHistorical = true; targetDateForAPI = selectedPickerDate;
+                isHistorical = true;
+                targetDateForAPI = selectedPickerDate;
             }
         }
+        // Ende der Datumslogik
 
         let baseUrl = 'https://api.open-meteo.com/v1/forecast';
-        const modelIdentifierForMeta = selectedModelValue.replace(/_seamless|_global|_eu|_d2/, '').split('_')[0];
+        let runDateForForecastWindowCalculation; // Für die Berechnung des Vorhersagefensters
 
         if (isHistorical && targetDateForAPI) {
             baseUrl = 'https://historical-forecast-api.open-meteo.com/v1/forecast';
             startDateStr = targetDateForAPI.toFormat('yyyy-MM-dd');
-            endDateStr = startDateStr;
+            endDateStr = startDateStr; // Historische Daten sind tagesgenau
             console.log(`[fetchWeather] Historical fetch for date: ${startDateStr}`);
+            AppState.lastModelRun = "N/A (Historical Data)"; // Setze für historische Daten
         } else {
-            // Nur Meta für Forecast-Modelle abrufen, da historische API keine "run time" hat
-            let runDate;
+            // Nur für Forecast-Modelle die Meta-Daten (Modelllaufzeit) abrufen
             try {
-                const metaResponse = await fetch(`https://api.open-meteo.com/data/${modelIdentifierForMeta}/static/meta.json`);
+                const metaUrl = `https://api.open-meteo.com/data/${modelApiIdentifierForMeta}/static/meta.json`;
+                console.log(`[fetchWeather] Attempting meta fetch with URL: ${metaUrl}`);
+                const metaResponse = await fetch(metaUrl);
                 if (!metaResponse.ok) {
-                    console.warn(`[fetchWeather] Meta fetch failed for ${modelIdentifierForMeta}: ${metaResponse.status}. Using current time for forecast window.`);
-                    runDate = new Date(); // Fallback auf aktuelle Zeit
+                    console.warn(`[fetchWeather] Meta fetch failed for '${modelApiIdentifierForMeta}': ${metaResponse.status} (${metaResponse.statusText}). Using current time as fallback for forecast window.`);
+                    runDateForForecastWindowCalculation = new Date(); // Fallback
+                    AppState.lastModelRun = `N/A (Meta ${metaResponse.status})`;
                 } else {
                     const metaData = await metaResponse.json();
-                    runDate = new Date(metaData.last_run_initialisation_time * 1000);
+                    if (metaData && typeof metaData.last_run_initialisation_time === 'number') {
+                        runDateForForecastWindowCalculation = new Date(metaData.last_run_initialisation_time * 1000);
+                        const year = runDateForForecastWindowCalculation.getUTCFullYear();
+                        const month = String(runDateForForecastWindowCalculation.getUTCMonth() + 1).padStart(2, '0');
+                        const day = String(runDateForForecastWindowCalculation.getUTCDate()).padStart(2, '0');
+                        const hour = String(runDateForForecastWindowCalculation.getUTCHours()).padStart(2, '0');
+                        const minute = String(runDateForForecastWindowCalculation.getUTCMinutes()).padStart(2, '0');
+                        AppState.lastModelRun = `${year}-${month}-${day} ${hour}${minute}Z`;
+                        console.log('[fetchWeather] Meta success. Last model run:', AppState.lastModelRun);
+                    } else {
+                        console.warn(`[fetchWeather] Meta data for '${modelApiIdentifierForMeta}' valid (HTTP 200) but 'last_run_initialisation_time' missing or invalid. Using current time. MetaData:`, metaData);
+                        runDateForForecastWindowCalculation = new Date();
+                        AppState.lastModelRun = 'N/A (Invalid meta structure)';
+                    }
                 }
             } catch (metaError) {
-                console.warn(`[fetchWeather] Meta fetch error for ${modelIdentifierForMeta}: ${metaError.message}. Using current time for forecast window.`);
-                runDate = new Date(); // Fallback
+                console.warn(`[fetchWeather] Meta fetch exception for '${modelApiIdentifierForMeta}': ${metaError.message}. Using current time for forecast window.`);
+                runDateForForecastWindowCalculation = new Date(); // Fallback
+                AppState.lastModelRun = 'N/A (Meta exception)';
             }
 
-            let forecastStart = luxon.DateTime.fromJSDate(runDate).setZone('utc').plus({ hours: 6 });
-            if (forecastStart > luxon.DateTime.utc()) forecastStart = luxon.DateTime.utc();
+            // Berechnung des Vorhersagefensters basierend auf runDateForForecastWindowCalculation
+            let forecastStart = luxon.DateTime.fromJSDate(runDateForForecastWindowCalculation).setZone('utc').plus({ hours: 6 });
+            const nowUtc = luxon.DateTime.utc();
+            if (forecastStart > nowUtc) forecastStart = nowUtc; // Nicht in der Zukunft starten
             startDateStr = forecastStart.toFormat('yyyy-MM-dd');
-            const forecastDays = selectedModelValue.includes('_d2') ? 2 : (selectedModelValue.includes('hrrr') ? 1 : 7); // HRRR oft nur 1-2 Tage
+
+            // Bestimme Anzahl der Vorhersagetage basierend auf dem Modell
+            const forecastDays = selectedModelValue.includes('_d2') ? 2 : (selectedModelValue.includes('hrrr') ? 1 : 7);
             endDateStr = forecastStart.plus({ days: forecastDays }).toFormat('yyyy-MM-dd');
-            console.log(`[fetchWeather] Forecast fetch from ${startDateStr} to ${endDateStr}`);
+            console.log(`[fetchWeather] Forecast fetch from ${startDateStr} to ${endDateStr} (based on runDate: ${runDateForForecastWindowCalculation.toISOString()})`);
         }
 
         const hourlyParams = "surface_pressure,temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,temperature_1000hPa,relative_humidity_1000hPa,wind_speed_1000hPa,wind_direction_1000hPa,geopotential_height_1000hPa,temperature_950hPa,relative_humidity_950hPa,wind_speed_950hPa,wind_direction_950hPa,geopotential_height_950hPa,temperature_925hPa,relative_humidity_925hPa,wind_speed_925hPa,wind_direction_925hPa,geopotential_height_925hPa,temperature_900hPa,relative_humidity_900hPa,wind_speed_900hPa,wind_direction_900hPa,geopotential_height_900hPa,temperature_850hPa,relative_humidity_850hPa,wind_speed_850hPa,wind_direction_850hPa,geopotential_height_850hPa,temperature_800hPa,relative_humidity_800hPa,wind_speed_800hPa,wind_direction_800hPa,geopotential_height_800hPa,temperature_700hPa,relative_humidity_700hPa,wind_speed_700hPa,wind_direction_700hPa,geopotential_height_700hPa,temperature_600hPa,relative_humidity_600hPa,wind_speed_600hPa,wind_direction_600hPa,geopotential_height_600hPa,temperature_500hPa,relative_humidity_500hPa,wind_speed_500hPa,wind_direction_500hPa,geopotential_height_500hPa,temperature_400hPa,relative_humidity_400hPa,wind_speed_400hPa,wind_direction_400hPa,geopotential_height_400hPa,temperature_300hPa,relative_humidity_300hPa,wind_speed_300hPa,wind_direction_300hPa,geopotential_height_300hPa,temperature_250hPa,relative_humidity_250hPa,wind_speed_250hPa,wind_direction_250hPa,geopotential_height_250hPa,temperature_200hPa,relative_humidity_200hPa,wind_speed_200hPa,wind_direction_200hPa,geopotential_height_200hPa";
+
+        // Für den &models= Parameter in der Haupt-API-Anfrage wird selectedModelValue direkt verwendet.
         const url = `${baseUrl}?latitude=${lat}&longitude=${lon}&hourly=${hourlyParams}&models=${selectedModelValue}&start_date=${startDateStr}&end_date=${endDateStr}`;
 
         console.log('[fetchWeather] Fetching weather from:', url);
@@ -1894,102 +1926,122 @@ export async function fetchWeather(lat, lon, currentTime = null, isInitialLoad =
             throw new Error(`HTTP error! Status: ${response.status} - ${errorText}`);
         }
         const data = await response.json();
-        if (!data.hourly || !data.hourly.time || data.hourly.time.length === 0) { // Zusätzliche Prüfung auf leeres Zeit-Array
+        if (!data.hourly || !data.hourly.time || data.hourly.time.length === 0) {
             console.warn("[fetchWeather] No hourly data or time array returned from API for model:", selectedModelValue, "Data:", data);
             throw new Error('No hourly data returned from API for model: ' + selectedModelValue);
         }
 
         console.log(`[fetchWeather] Successfully fetched data for model ${selectedModelValue}. Number of time entries: ${data.hourly.time.length}`);
 
+        // Daten in AppState.weatherData speichern
         const lastValidIndex = data.hourly.time.length - 1;
-        AppState.weatherData = {};
+        AppState.weatherData = {}; // AppState.weatherData zurücksetzen
         for (const key in data.hourly) {
             if (Object.hasOwnProperty.call(data.hourly, key)) {
+                // Sicherstellen, dass die Arrays nicht länger als die 'time'-Achse sind
                 AppState.weatherData[key] = data.hourly[key].slice(0, lastValidIndex + 1);
             }
         }
 
+        // Slider aktualisieren
         const slider = document.getElementById('timeSlider');
-        slider.min = 0; slider.max = AppState.weatherData.time.length - 1;
-        slider.disabled = AppState.weatherData.time.length <= 1;
-        if (slider.disabled) {
-            slider.style.opacity = '0.5'; slider.style.cursor = 'not-allowed';
-            const infoEl = document.getElementById('info');
-            if (infoEl) infoEl.innerHTML += '<br><strong>Note:</strong> Only one forecast time available.';
-        } else {
-            slider.style.opacity = '1'; slider.style.cursor = 'pointer';
+        if (slider) { // Prüfen, ob Slider existiert
+            slider.min = 0;
+            slider.max = AppState.weatherData.time.length > 0 ? AppState.weatherData.time.length - 1 : 0;
+            slider.disabled = AppState.weatherData.time.length <= 1;
+
+            if (slider.disabled) {
+                slider.style.opacity = '0.5';
+                slider.style.cursor = 'not-allowed';
+                const infoEl = document.getElementById('info');
+                if (infoEl && !infoEl.innerHTML.includes('Only one forecast time available.')) { // Verhindere Duplikate
+                    infoEl.innerHTML += '<br><strong>Note:</strong> Only one forecast time available.';
+                }
+            } else {
+                slider.style.opacity = '1';
+                slider.style.cursor = 'pointer';
+            }
         }
 
-
+        // initialIndex bestimmen und Slider & Anzeige aktualisieren
         let initialIndex = 0;
-        if (currentTime && AppState.weatherData.time.length > 0) {
-            let targetLuxonDate = null;
-            if (typeof currentTime === 'string' && currentTime.includes('GMT')) {
-                const match = currentTime.match(/^(\d{4}-\d{2}-\d{2})\s(\d{2})(\d{2})\sGMT([+-]\d{1,2})$/);
-                if (match) {
-                    const [, dateStr, hourStr, minuteStr, offset] = match;
-                    const formattedOffset = `${offset.startsWith('+') ? '+' : '-'}${Math.abs(parseInt(offset, 10)).toString().padStart(2, '0')}:00`;
-                    const isoString = `${dateStr}T${hourStr}:${minuteStr}:00${formattedOffset}`;
-                    targetLuxonDate = luxon.DateTime.fromISO(isoString, { zone: 'utc' });
+        if (AppState.weatherData.time && AppState.weatherData.time.length > 0) { // Nur wenn Zeitdaten vorhanden sind
+            if (currentTime) { // Wenn eine bestimmte Zeit angefordert wurde
+                let targetLuxonDate = null;
+                if (typeof currentTime === 'string' && currentTime.includes('GMT')) {
+                    const match = currentTime.match(/^(\d{4}-\d{2}-\d{2})\s(\d{2})(\d{2})\sGMT([+-]\d{1,2})$/);
+                    if (match) {
+                        const [, dateStrParse, hourStr, minuteStr, offset] = match;
+                        const formattedOffset = `${offset.startsWith('+') ? '+' : '-'}${Math.abs(parseInt(offset, 10)).toString().padStart(2, '0')}:00`;
+                        const isoString = `${dateStrParse}T${hourStr}:${minuteStr}:00${formattedOffset}`;
+                        targetLuxonDate = luxon.DateTime.fromISO(isoString, { zone: 'utc' });
+                    }
+                } else {
+                    targetLuxonDate = luxon.DateTime.fromISO(currentTime, { zone: 'utc' });
                 }
-            } else { targetLuxonDate = luxon.DateTime.fromISO(currentTime, { zone: 'utc' }); }
 
-            if (targetLuxonDate && targetLuxonDate.isValid) {
-                const targetTimestamp = targetLuxonDate.toMillis();
+                if (targetLuxonDate && targetLuxonDate.isValid) {
+                    const targetTimestamp = targetLuxonDate.toMillis();
+                    let minDiff = Infinity;
+                    AppState.weatherData.time.forEach((time, idx) => {
+                        const timeTimestamp = luxon.DateTime.fromISO(time, { zone: 'utc' }).toMillis();
+                        const diff = Math.abs(timeTimestamp - targetTimestamp);
+                        if (diff < minDiff) {
+                            minDiff = diff;
+                            initialIndex = idx;
+                        }
+                    });
+                }
+            } else if (isHistorical && targetDateForAPI) { // Für historische Daten, versuche Mittag zu finden
+                let minDiff = Infinity;
+                let foundDay = false;
+                AppState.weatherData.time.forEach((time, idx) => {
+                    const timeLuxon = luxon.DateTime.fromISO(time, { zone: 'utc' });
+                    if (timeLuxon.hasSame(targetDateForAPI, 'day')) {
+                        foundDay = true;
+                        const diffToNoon = Math.abs(timeLuxon.hour - 12);
+                        if (diffToNoon < minDiff) {
+                            minDiff = diffToNoon;
+                            initialIndex = idx;
+                        }
+                    }
+                });
+                if (!foundDay) initialIndex = 0; // Fallback, falls kein passender Tag in den Daten ist
+            } else { // Für Forecast, finde die Zeit, die "jetzt" am nächsten ist
+                const now = luxon.DateTime.utc();
                 let minDiff = Infinity;
                 AppState.weatherData.time.forEach((time, idx) => {
                     const timeTimestamp = luxon.DateTime.fromISO(time, { zone: 'utc' }).toMillis();
-                    const diff = Math.abs(timeTimestamp - targetTimestamp);
-                    if (diff < minDiff) { minDiff = diff; initialIndex = idx; }
+                    const diff = Math.abs(timeTimestamp - now.toMillis());
+                    if (diff < minDiff) {
+                        minDiff = diff;
+                        initialIndex = idx;
+                    }
                 });
             }
-        } else if (isHistorical && targetDateForAPI && AppState.weatherData.time.length > 0) {
-            let minDiff = Infinity;
-            AppState.weatherData.time.forEach((time, idx) => {
-                const timeLuxon = luxon.DateTime.fromISO(time, { zone: 'utc' });
-                if (timeLuxon.hasSame(targetDateForAPI, 'day')) {
-                    const diffToNoon = Math.abs(timeLuxon.hour - 12);
-                    if (diffToNoon < minDiff) { minDiff = diffToNoon; initialIndex = idx; }
-                }
-            });
-            if (minDiff === Infinity && AppState.weatherData.time.length > 0) initialIndex = 0;
-        } else if (AppState.weatherData.time.length > 0) {
-            const now = luxon.DateTime.utc(); let minDiff = Infinity;
-            AppState.weatherData.time.forEach((time, idx) => {
-                const timeTimestamp = luxon.DateTime.fromISO(time, { zone: 'utc' }).toMillis();
-                const diff = Math.abs(timeTimestamp - now.toMillis());
-                if (diff < minDiff) { minDiff = diff; initialIndex = idx; }
-            });
         }
-        slider.value = initialIndex;
-        await updateWeatherDisplay(initialIndex);
+        if (slider) slider.value = initialIndex; // Slider-Wert setzen
+        await updateWeatherDisplay(initialIndex); // Anzeige mit dem ermittelten Index aktualisieren
 
-        // Model Run Time nur für Forecast aktualisieren
-        if (!isHistorical) {
-            // Die `runDate` für Meta wurde schon oben geholt. Wir verwenden sie hier.
-            const metaResponse = await fetch(`https://api.open-meteo.com/data/${modelIdentifierForMeta}/static/meta.json`);
-            if (metaResponse.ok) {
-                const metaData = await metaResponse.json();
-                if (metaData && metaData.last_run_initialisation_time) {
-                    const runDateFromMeta = new Date(metaData.last_run_initialisation_time * 1000);
-                    const year = runDateFromMeta.getUTCFullYear();
-                    const month = String(runDateFromMeta.getUTCMonth() + 1).padStart(2, '0');
-                    const day = String(runDateFromMeta.getUTCDate()).padStart(2, '0');
-                    const hour = String(runDateFromMeta.getUTCHours()).padStart(2, '0');
-                    const minute = String(runDateFromMeta.getUTCMinutes()).padStart(2, '0');
-                    AppState.lastModelRun = `${year}-${month}-${day} ${hour}${minute}Z`;
-                } else { AppState.lastModelRun = "N/A"; }
-            } else { AppState.lastModelRun = "N/A (Meta fetch failed)"; }
-        } else { AppState.lastModelRun = "N/A (Historical Data)"; }
-        console.log("[fetchWeather] lastModelRun set to:", AppState.lastModelRun);
+        // AppState.lastModelRun wurde bereits im Meta-Daten-Block oder für historische Daten gesetzt.
+        console.log("[fetchWeather] final lastModelRun to be used by UI:", AppState.lastModelRun);
 
-    } catch (error) /* istanbul ignore next */ {
-        console.error("[fetchWeather] Error:", error);
+
+    } catch (error) {
+        console.error("[fetchWeather] Main fetch/processing Error:", error);
         Utils.handleError(`Failed to fetch weather: ${error.message}`);
-        AppState.weatherData = null; AppState.lastModelRun = null;
-        const infoElement = document.getElementById('info'); if (infoElement) infoElement.innerHTML = 'Failed to load weather data.';
-        const slider = document.getElementById('timeSlider'); if (slider) { slider.disabled = true; slider.value = 0; slider.max = 0; }
-        const selectedTimeElement = document.getElementById('selectedTime'); if (selectedTimeElement) selectedTimeElement.innerHTML = 'Selected Time: N/A';
+        AppState.weatherData = null;
+        AppState.lastModelRun = null; // Zurücksetzen
+        const infoElement = document.getElementById('info');
+        if (infoElement) infoElement.innerHTML = 'Failed to load weather data.';
+        const slider = document.getElementById('timeSlider');
+        if (slider) {
+            slider.disabled = true;
+            slider.value = 0;
+            slider.max = 0;
+        }
+        const selectedTimeElement = document.getElementById('selectedTime');
+        if (selectedTimeElement) selectedTimeElement.innerHTML = 'Selected Time: N/A';
     } finally {
         if (loadingElement) loadingElement.style.display = 'none';
     }
@@ -2078,7 +2130,7 @@ async function fetchEnsembleWeatherData() {
         if (!apiResponseData.hourly) {
             let errorMsg = 'Unexpected data format: "hourly" field missing in API response.';
             if (apiResponseData && typeof apiResponseData.latitude !== 'undefined') {
-                 errorMsg = "Received metadata but no 'hourly' data for any requested ensemble model.";
+                errorMsg = "Received metadata but no 'hourly' data for any requested ensemble model.";
             }
             console.error(errorMsg, apiResponseData);
             throw new Error(errorMsg);
@@ -2097,7 +2149,7 @@ async function fetchEnsembleWeatherData() {
             // Iteriere durch die Basisvariablen und suche die suffigierten Pendants
             baseVariablesList.forEach(baseVar => {
                 const suffixedVarKey = `${baseVar}_${modelName}`; // z.B. temperature_2m_icon_global
-                
+
                 if (apiResponseData.hourly[suffixedVarKey]) {
                     modelSpecificHourlyData[baseVar] = apiResponseData.hourly[suffixedVarKey];
                     foundDataForThisModel = true;
@@ -2115,7 +2167,7 @@ async function fetchEnsembleWeatherData() {
                 console.log(`Successfully processed and stored data for model: ${modelName}`);
             } else {
                 console.warn(`No data found for model ${modelName} with suffixed keys in the 'hourly' object. Available keys for this model might be missing or the model is unavailable for this specific request. Hourly keys in response:`, Object.keys(apiResponseData.hourly));
-                 // Utils.handleMessage(`Warning: No data retrieved for model ${modelName}.`); // Optional: Nutzer informieren
+                // Utils.handleMessage(`Warning: No data retrieved for model ${modelName}.`); // Optional: Nutzer informieren
             }
         });
 
@@ -2238,10 +2290,36 @@ function drawEnsembleCircle(canopyResult, color, label) {
         dashArray: '5, 10' // Strichelung: 5px Strich, 10px Lücke
     }).addTo(AppState.ensembleLayerGroup);
 
-    const tooltipText = `${label}: ${Math.round(canopyResult.radius)}m drift @ ${Math.round(canopyResult.direction)}°`;
-    circle.bindTooltip(tooltipText, { permanent: false, direction: 'top', className: 'ensemble-tooltip' }); // Eigene Klasse für Styling
-    AppState.ensembleScenarioCircles[label] = circle; // Speichern unter dem Label (Szenario oder Modellname)
-    console.log(`Drew ensemble circle for ${label} at [${newCenter.join(', ')}], radius ${canopyResult.radius}`);
+    const userWindUnit = Settings.getValue('windUnit', 'radio', 'kt'); // Hole die aktuelle Einheit aus den Settings
+    // Die Geschwindigkeit von calculateMeanWind ist in m/s. Konvertiere sie in die Benutzereinheit.
+    const meanWindSpeedConverted = Utils.convertWind(canopyResult.meanWindSpeedMps, userWindUnit, 'm/s');
+    const formattedMeanWindSpeed = userWindUnit === 'bft' ?
+        Math.round(meanWindSpeedConverted) :
+        meanWindSpeedConverted.toFixed(1);
+
+    // Bestimme die Höhen für die Tooltip-Anzeige
+    // openingAltitude und elevation (AppState.lastAltitude) sind in Metern.
+    const openingAltitudeAGL = parseInt(document.getElementById('openingAltitude')?.value) || Settings.state.userSettings.openingAltitude || 1200;
+    // Der Mittelwind wurde von der Oberfläche (elevation) bis zur Schirmöffnung (elevation + openingAltitude - 200) berechnet
+    const lowerLimitDisplay = 0; // AGL
+    const upperLimitDisplay = openingAltitudeAGL - 200; // AGL, bis zur effektiven Schirmöffnungshöhe
+
+    const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
+    const lowerLimitFormatted = Math.round(Utils.convertHeight(lowerLimitDisplay, heightUnit)); // Konvertiere 0m AGL
+    const upperLimitFormatted = Math.round(Utils.convertHeight(upperLimitDisplay, heightUnit)); // Konvertiere Öffnungshöhe AGL
+
+    const tooltipText = `<strong>${label}</strong><br>` +
+        `Mean Wind ${lowerLimitFormatted}-${upperLimitFormatted} ${heightUnit} AGL:<br>` +
+        `${Utils.roundToTens(canopyResult.meanWindDir)}° ${formattedMeanWindSpeed} ${userWindUnit}`;
+
+    circle.bindTooltip(tooltipText, {
+        permanent: false,
+        direction: 'top',
+        className: 'ensemble-tooltip', // Beibehaltung der CSS-Klasse
+        opacity: 0.9 // Standard-Tooltip-Deckkraft
+    });
+
+    AppState.ensembleScenarioCircles[label] = circle; console.log(`Drew ensemble circle for ${label} at [${newCenter.join(', ')}], radius ${canopyResult.radius}`);
 }
 
 function calculateEnsembleScenarioProfile(scenarioType /* sliderIndex hier nicht mehr als direkter Parameter nötig, wird in der Schleife verwendet */) {
@@ -2370,7 +2448,7 @@ function calculateEnsembleScenarioProfile(scenarioType /* sliderIndex hier nicht
                     scenarioHourlyData[dirVarName][t] = Utils.windDirection(mean_u, mean_v);
                 }
             }
-             // Wenn keine Werte vorhanden sind, bleiben die Werte null
+            // Wenn keine Werte vorhanden sind, bleiben die Werte null
         });
     }
     // console.log(`Vollständiges Zeitreihenprofil für ${scenarioType}:`, scenarioHourlyData);
@@ -2404,7 +2482,7 @@ function calculateCanopyCirclesForEnsemble(profileIdentifier, specificProfileDat
         return null;
     }
 
-       const originalGlobalWeatherData = AppState.weatherData;
+    const originalGlobalWeatherData = AppState.weatherData;
     const originalShowCanopyArea = Settings.state.userSettings.showCanopyArea;
     const originalCalculateJump = Settings.state.userSettings.calculateJump;
 
@@ -2413,7 +2491,7 @@ function calculateCanopyCirclesForEnsemble(profileIdentifier, specificProfileDat
     // oder calculateCanopyCircles so anpassen, dass es diese optional ignoriert.
     Settings.state.userSettings.showCanopyArea = true; // Temporär setzen
     Settings.state.userSettings.calculateJump = true;  // Temporär setzen
-    
+
     let result = null;
     try {
         result = calculateCanopyCircles();
@@ -2436,6 +2514,8 @@ function calculateCanopyCirclesForEnsemble(profileIdentifier, specificProfileDat
             radius: result.radiusFull,
             displacement: result.displacementFull,
             direction: result.directionFull,
+            meanWindDir: result.meanWindForFullCanopyDir, // Die tatsächliche Mittelwindrichtung
+            meanWindSpeedMps: result.meanWindForFullCanopySpeedMps, // Die Mittelwindgeschwindigkeit in m/s
             profileIdentifier: profileIdentifier // Behalte die ID für Tooltips etc.
         };
     }
@@ -3527,6 +3607,8 @@ export function calculateCanopyCircles() {
         displacementFull: centerDisplacementFull,
         direction: meanWindDirection,
         directionFull: meanWindDirectionFull,
+        meanWindForFullCanopyDir: meanWindDirectionFull,
+        meanWindForFullCanopySpeedMps: meanWindSpeedMpsFull, // In m/s, wie von calculateMeanWind geliefert
         freeFallDirection: freeFallResult.directionDeg,
         freeFallDistance: freeFallResult.distance,
         freeFallTime: freeFallResult.time
@@ -5352,7 +5434,7 @@ function setupSliderEvents() {
             }
             const selectedTimeElement = document.getElementById('selectedTime');
             if (selectedTimeElement) {
-                 selectedTimeElement.innerHTML = `Selected Time: ${timeToDisplay}`;
+                selectedTimeElement.innerHTML = `Selected Time: ${timeToDisplay}`;
             }
         }
 
@@ -5370,7 +5452,7 @@ function setupSliderEvents() {
         }
     });
 
-   // Das 'change'-Event (feuert nach dem Loslassen des Sliders) kann für finale Textupdates bleiben,
+    // Das 'change'-Event (feuert nach dem Loslassen des Sliders) kann für finale Textupdates bleiben,
     // oder wenn die 'input'-Performance bei sehr vielen Datenpunkten ein Problem wäre.
     // Für die Textanzeige der Zeit ist 'input' aber auch responsiv genug.
     slider.addEventListener('change', async () => {
@@ -5389,8 +5471,8 @@ function setupSliderEvents() {
         }
         const selectedTimeElement = document.getElementById('selectedTime');
         if (selectedTimeElement) {
-             selectedTimeElement.innerHTML = `Selected Time: ${timeToDisplay}`;
-             console.log('Time slider change event, updated selectedTime label to:', timeToDisplay);
+            selectedTimeElement.innerHTML = `Selected Time: ${timeToDisplay}`;
+            console.log('Time slider change event, updated selectedTime label to:', timeToDisplay);
         }
         // Die Haupt-Aktualisierungslogik ist bereits im 'input'-Event.
         // Zusätzliche Aktionen nach dem Loslassen könnten hier platziert werden.
@@ -6936,38 +7018,78 @@ function setupMenuItemEvents() {
         const parentLi = calculateJumpMenuItem.closest('li');
         const submenu = parentLi?.querySelector('ul');
         const enableFeature = () => {
-            Settings.state.userSettings.calculateJump = true;
-            Settings.save();
+            // Diese Funktion wird aufgerufen, wenn das Submenü geöffnet wird
+            // oder die Funktion nach Passworteingabe aktiviert wird.
+            // Hier sollte Settings.state.userSettings.calculateJump ggf. auf true gesetzt werden,
+            // falls es vorher explizit deaktiviert wurde.
+            if (!Settings.state.userSettings.calculateJump && Settings.isFeatureUnlocked('calculateJump')) {
+                Settings.state.userSettings.calculateJump = true;
+                Settings.save();
+            }
             toggleSubmenu(calculateJumpMenuItem, submenu, true);
+            // calculateJump() nur aufrufen, wenn auch wirklich Daten/Marker da sind und die relevanten Unter-Checkboxen aktiv sind.
+            // Die Unter-Checkboxen (showExitArea, showCanopyArea) steuern dann die eigentliche Visualisierung.
+            // Ein direkter Aufruf von calculateJump() hier ist vielleicht nicht nötig, da die Checkbox-Handler das tun.
+            // Stattdessen die bestehenden Visualisierungen basierend auf den Checkbox-Status neu rendern:
             if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
-                debouncedCalculateJump();
-                calculateCutAway();
+                if (Settings.state.userSettings.showExitArea || Settings.state.userSettings.showCanopyArea) {
+                    calculateJump(); // Dies berücksichtigt die Checkboxen
+                }
+                if (Settings.state.userSettings.showCutAwayFinder) {
+                    calculateCutAway();
+                }
+                if (Settings.state.userSettings.showJumpRunTrack) {
+                    updateJumpRunTrack();
+                }
             }
             calculateJumpMenuItem.style.opacity = '1';
             calculateJumpMenuItem.title = '';
         };
-        const disableFeature = () => {
-            Settings.state.userSettings.calculateJump = false;
-            Settings.save();
-            toggleSubmenu(calculateJumpMenuItem, submenu, false);
-            clearJumpCircles();
-            calculateJumpMenuItem.style.opacity = Settings.isFeatureUnlocked('calculateJump') ? '1' : '0.5';
-            calculateJumpMenuItem.title = Settings.isFeatureUnlocked('calculateJump') ? '' : 'Feature locked. Click to enter password.';
-        };
-        if (!Settings.isFeatureUnlocked('calculateJump')) {
-            Settings.showPasswordModal('calculateJump', enableFeature, () => {
-                if (submenu) toggleSubmenu(calculateJumpMenuItem, submenu, false);
-            });
-        } else {
-            if (submenu) {
-                const isSubmenuHidden = submenu.classList.contains('hidden');
-                if (isSubmenuHidden) enableFeature();
-                else disableFeature();
+
+        const disableFeatureOrToggleSubmenu = (isClosingMenu) => {
+            // Diese Funktion wird aufgerufen, wenn das Submenü geschlossen wird.
+            // Wir wollen NICHT Settings.state.userSettings.calculateJump auf false setzen,
+            // und auch NICHT clearJumpCircles() aufrufen, nur weil das Menü zugeklappt wird.
+            toggleSubmenu(calculateJumpMenuItem, submenu, !isClosingMenu); // !isClosingMenu, da es das Submenü schließt
+
+            // Die Kreise etc. bleiben basierend auf ihren Checkboxen sichtbar.
+            // Nichts weiter zu tun hier, außer das Menü zu schließen.
+            // Die Opacity/Title Logik für den "Calculate Jump" Menüpunkt sollte nur die Passwort-Sperre reflektieren.
+            if (!(Settings.isFeatureUnlocked('calculateJump') && Settings.state.isCalculateJumpUnlocked)) {
+                calculateJumpMenuItem.style.opacity = '0.5';
+                calculateJumpMenuItem.title = 'Feature locked. Click to enter password.';
+            } else {
+                calculateJumpMenuItem.style.opacity = '1';
+                calculateJumpMenuItem.title = '';
             }
-        }
-    };
-    calculateJumpMenuItem.addEventListener('click', calculateJumpMenuItem._clickHandler, { capture: true });
-    console.log('Attached click handler to Calculate Jump menu item with capture phase');
+        };
+
+        calculateJumpMenuItem._clickHandler = (event) => {
+            event.stopPropagation();
+            event.preventDefault();
+            // const parentLi = calculateJumpMenuItem.closest('li'); // Ist schon oben
+            // const submenu = parentLi?.querySelector('ul'); // Ist schon oben
+
+            if (!Settings.isFeatureUnlocked('calculateJump')) {
+                Settings.showPasswordModal('calculateJump', enableFeature, () => {
+                    if (submenu) toggleSubmenu(calculateJumpMenuItem, submenu, false); // Schließe Submenü bei Abbruch
+                });
+            } else {
+                // Wenn die Funktion freigeschaltet ist, toggelt der Klick nur das Submenü
+                // und ruft die entsprechende Funktion zum Öffnen oder Schließen auf.
+                if (submenu) {
+                    const isSubmenuHidden = submenu.classList.contains('hidden');
+                    if (isSubmenuHidden) { // Wird geöffnet
+                        enableFeature(); // Stellt sicher, dass calculateJump = true ist, falls es mal deaktiviert war
+                    } else { // Wird geschlossen
+                        disableFeatureOrToggleSubmenu(true); // true bedeutet, wir schließen das Menü
+                    }
+                }
+            }
+        };
+
+        calculateJumpMenuItem.addEventListener('click', calculateJumpMenuItem._clickHandler, { capture: true }); console.log('Attached click handler to Calculate Jump menu item with capture phase');
+    }
 }
 function clearJumpCircles() {
     if (!AppState.map) {
