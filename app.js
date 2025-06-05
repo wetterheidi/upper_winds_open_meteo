@@ -9,7 +9,7 @@ import { setupCacheManagement, setupCacheSettings } from './cacheUI.js';
 import * as Coordinates from './coordinates.js';
 import { interpolateColor, generateWindBarb, createArrowIcon } from "./uiHelpers.js";
 import { handleHarpPlacement, createHarpMarker, clearHarpMarker } from './harpMarker.js';
-import { loadGpxTrack, loadCsvTrackUTC, loadCsvTrack } from './trackManager.js';
+import { loadGpxTrack, loadCsvTrackUTC } from './trackManager.js';
 
 "use strict";
 
@@ -5919,68 +5919,95 @@ function setupCheckbox(id, setting, callback) {
     }
 }
 function setupTrackEvents() {
-    console.log('Setting up track events');
+    console.log('[app.js] Setting up track events');
     const trackFileInput = document.getElementById('trackFileInput');
     if (trackFileInput) {
-        trackFileInput.addEventListener('change', (e) => {
+        trackFileInput.addEventListener('change', async (e) => {
             const file = e.target.files[0];
-            console.log('Track file selected:', file?.name);
-            if (!file) {
-                Utils.handleError('No file selected.');
-                return;
-            }
+            console.log('[app.js] Track file selected:', file?.name);
+            if (!file) { /* istanbul ignore next */ Utils.handleError('No file selected.'); return; }
+            
             const extension = file.name.split('.').pop().toLowerCase();
+            let trackMetaData = null;
+
             if (extension === 'gpx') {
-                loadGpxTrack(file);
+                trackMetaData = await loadGpxTrack(file);
             } else if (extension === 'csv') {
-                loadCsvTrackUTC(file);
+                trackMetaData = await loadCsvTrackUTC(file); // Oder loadCsvTrack, je nach Bedarf
             } else {
                 Utils.handleError('Unsupported file type. Please upload a .gpx or .csv file.');
+                return;
+            }
+
+            if (trackMetaData && trackMetaData.success) {
+                console.log('[app.js] Track processed successfully by trackManager. MetaData:', trackMetaData);
+                if (trackMetaData.historicalDateString) {
+                    const historicalDatePicker = document.getElementById('historicalDatePicker');
+                    if (historicalDatePicker) {
+                        historicalDatePicker.value = trackMetaData.historicalDateString;
+                        console.log('[app.js] Set historicalDatePicker to:', historicalDatePicker.value);
+                        // Ggf. Autoupdate deaktivieren, wenn ein historisches Datum gesetzt wird
+                        if (Settings.state.userSettings.autoupdate) {
+                            stopAutoupdate();
+                            const autoupdateCheckbox = document.getElementById('autoupdateCheckbox');
+                            if (autoupdateCheckbox) autoupdateCheckbox.checked = false;
+                            Settings.state.userSettings.autoupdate = false;
+                            Settings.save();
+                            Utils.handleMessage('Autoupdate disabled due to historical track upload.');
+                        }
+                    }
+                }
+                const infoEl = document.getElementById('info');
+                if (infoEl && trackMetaData.summaryForInfoElement) {
+                    // Logik zum intelligenten Aktualisieren des Info-Bereichs
+                    const modelDisplayRegex = /(<br><strong>Available Models:<\/strong><ul>.*?<\/ul>|<br><strong>Available Models:<\/strong> None)/s;
+                    const currentInfoHTML = infoEl.innerHTML;
+                    const modelInfoMatch = currentInfoHTML.match(modelDisplayRegex);
+                    const baseInfo = modelInfoMatch ? modelInfoMatch[0] : ''; // Behalte Modellinfos
+                    
+                    // Entferne alte Track-Infos, falls vorhanden (heuristisch)
+                    const oldTrackInfoRegex = /<br><strong>Track:<\/strong>.*?\(Source:.*?\)/s;
+                    let newInfoHTML = currentInfoHTML.replace(modelDisplayRegex, '').replace(oldTrackInfoRegex, '').trim();
+                    if (newInfoHTML === 'Click on the map to fetch weather data.' || newInfoHTML === 'No weather data.' || newInfoHTML === 'No models available at this location.' || newInfoHTML === 'Failed to load weather data.' || newInfoHTML === 'No weather model selected.') {
+                        newInfoHTML = ''; // Leere Standardnachrichten, um Platz für Trackinfo zu machen
+                    }
+                    
+                    infoEl.innerHTML = (newInfoHTML ? newInfoHTML + "<br>" : "") + trackMetaData.summaryForInfoElement + baseInfo;
+                }
+            } else if (trackMetaData && !trackMetaData.success) {
+                /* istanbul ignore next */
+                console.warn('[app.js] Track processing in trackManager reported an error:', trackMetaData.error);
+            } else {
+                /* istanbul ignore next */
+                console.warn('[app.js] Track processing did not return valid metadata or failed silently in trackManager.');
             }
         });
-    } else {
-        console.warn('Track file input not found:', { id: 'trackFileInput' });
-    }
+    } else { /* istanbul ignore next */ console.warn('Track file input (#trackFileInput) not found.'); }
 
     const clearTrackButton = document.getElementById('clearTrack');
     if (clearTrackButton) {
         clearTrackButton.addEventListener('click', () => {
-            console.log('Clear track button clicked');
-            if (!AppState.map) {
-                console.warn('Map not initialized, cannot clear track');
-                Utils.handleError('Cannot clear track: map not initialized.');
-                return;
-            }
+            console.log('[app.js] Clear track button clicked');
+            if (!AppState.map) { /* istanbul ignore next */ Utils.handleError('Cannot clear track: map not initialized.'); return; }
             if (AppState.gpxLayer) {
                 try {
-                    AppState.map.removeLayer(AppState.gpxLayer);
-                    AppState.gpxLayer = null;
-                    AppState.gpxPoints = [];
-                    AppState.isTrackLoaded = false; // Reset flag
-                    console.log('Cleared track:', { isTrackLoaded: AppState.isTrackLoaded });
+                    if (AppState.map.hasLayer(AppState.gpxLayer)) AppState.map.removeLayer(AppState.gpxLayer);
+                    AppState.gpxLayer = null; AppState.gpxPoints = []; AppState.isTrackLoaded = false;
+                    console.log('[app.js] Cleared track from map and AppState');
+                    
                     const infoElement = document.getElementById('info');
                     if (infoElement) {
-                        infoElement.innerHTML = 'Click on the map to fetch weather data.';
-                    } else {
-                        console.warn('Info element not found:', { id: 'info' });
+                        const modelDisplayRegex = /(<br><strong>Available Models:<\/strong><ul>.*?<\/ul>|<br><strong>Available Models:<\/strong> None)/s;
+                        const currentInfoHTML = infoElement.innerHTML;
+                        const modelInfoMatch = currentInfoHTML.match(modelDisplayRegex);
+                        const baseMessage = 'Click on the map to fetch weather data.';
+                        infoElement.innerHTML = baseMessage + (modelInfoMatch ? modelInfoMatch[0] : '');
                     }
-                    if (trackFileInput) {
-                        trackFileInput.value = '';
-                    } else {
-                        console.warn('Track file input not found for clearing:', { id: 'trackFileInput' });
-                    }
-                } catch (error) {
-                    console.error('Error clearing track:', error);
-                    Utils.handleError('Failed to clear track: ' + error.message);
-                }
-            } else {
-                console.log('No track to clear');
-                Utils.handleError('No track to clear.');
-            }
+                    if (trackFileInput) trackFileInput.value = ''; // Eingabefeld zurücksetzen
+                } catch (error) { /* istanbul ignore next */ Utils.handleError('Failed to clear track: ' + error.message); }
+            } else { Utils.handleMessage('No track to clear.'); }
         });
-    } else {
-        console.warn('Clear track button not found:', { id: 'clearTrack' });
-    }
+    } else { /* istanbul ignore next */ console.warn('Clear track button (#clearTrack) not found.'); }
 }
 function setupResetButton() {
     const bottomContainer = document.getElementById('bottom-container');
