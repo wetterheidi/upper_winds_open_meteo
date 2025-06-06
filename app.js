@@ -86,6 +86,7 @@ export const AppState = {
     currentEnsembleScenario: 'all_models', // Aktuell ausgewähltes Szenario
     ensembleLayerGroup: null, // Eigene LayerGroup für Ensemble-Visualisierungen
     ensembleScenarioCircles: {}, // Speichert die Leaflet-Layer für die Szenario-Kreise, z.B. { min_wind: circleLayer, mean_wind: circleLayer }
+    heatmapLayer: null, // Für die Referenz auf den Heatmap-Layer
 };
 
 const debouncedCalculateJump = Utils.debounce(calculateJump, 300);
@@ -2198,16 +2199,16 @@ async function fetchEnsembleWeatherData() {
 function clearEnsembleVisualizations() {
     if (AppState.ensembleLayerGroup) {
         AppState.ensembleLayerGroup.clearLayers();
-    } else {
-        // Sicherstellen, dass die LayerGroup existiert und zur Karte hinzugefügt wurde
-        if (AppState.map) {
-            AppState.ensembleLayerGroup = L.layerGroup().addTo(AppState.map);
-        } else {
-            console.warn("Karte nicht initialisiert, ensembleLayerGroup kann nicht erstellt werden.");
-            return;
-        }
+    } else if (AppState.map) {
+        AppState.ensembleLayerGroup = L.layerGroup().addTo(AppState.map);
     }
-    AppState.ensembleScenarioCircles = {}; // Zurücksetzen der gespeicherten Kreise
+
+    // Explizit den alten Heatmap-Layer entfernen, falls er existiert
+    if (AppState.heatmapLayer && AppState.map.hasLayer(AppState.heatmapLayer)) {
+        AppState.map.removeLayer(AppState.heatmapLayer);
+    }
+    AppState.heatmapLayer = null;
+    AppState.ensembleScenarioCircles = {};
     console.log("Ensemble visualizations cleared.");
 }
 
@@ -2228,7 +2229,9 @@ function processAndVisualizeEnsemble() {
 
     console.log(`Processing ensemble scenario: ${scenario} for slider index: ${sliderIndex}`);
 
-    if (scenario === 'all_models') {
+    if (scenario === 'heatmap') {
+        generateAndDisplayHeatmap(); // Neue Funktion aufrufen
+    } else if (scenario === 'all_models') {
         for (const modelName in AppState.ensembleModelsData) {
             if (Object.hasOwnProperty.call(AppState.ensembleModelsData, modelName)) {
                 const modelHourlyData = AppState.ensembleModelsData[modelName];
@@ -2521,6 +2524,124 @@ function calculateCanopyCirclesForEnsemble(profileIdentifier, specificProfileDat
     }
     console.warn(`calculateCanopyCircles lieferte null für Profil ${profileIdentifier}`);
     return null;
+}
+
+function generateAndDisplayHeatmap() {
+
+    // 1. Clear previous visualizations
+    clearEnsembleVisualizations();
+    if (AppState.heatmapLayer) {
+        AppState.map.removeLayer(AppState.heatmapLayer);
+        AppState.heatmapLayer = null;
+    }
+
+    // 2. Check if there is data
+    if (!AppState.ensembleModelsData || Object.keys(AppState.ensembleModelsData).length < 2) {
+        Utils.handleMessage("Please select at least two ensemble models to generate a heatmap.");
+        return;
+    }
+
+    // 3. Calculate all individual model circles
+    const modelCircles = [];
+    for (const modelName in AppState.ensembleModelsData) {
+        if (Object.hasOwnProperty.call(AppState.ensembleModelsData, modelName)) {
+            const modelHourlyData = AppState.ensembleModelsData[modelName];
+            const canopyResult = calculateCanopyCirclesForEnsemble(modelName, { hourly: modelHourlyData });
+
+            if (canopyResult) {
+                const center = Utils.calculateNewCenter(canopyResult.centerLat, canopyResult.centerLng, canopyResult.displacement, canopyResult.direction);
+                modelCircles.push({
+                    centerLat: center[0],
+                    centerLng: center[1],
+                    radius: canopyResult.radius
+                });
+            }
+        }
+    }
+
+    if (modelCircles.length === 0) {
+        console.warn("Could not calculate any circles for the heatmap.");
+        return;
+    }
+    console.log(`[Heatmap] Calculated ${modelCircles.length} model circles.`);
+
+    // 4. Bounding-Box und Raster-Berechnung (bleibt gleich)
+    let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
+    const metersPerDegree = 111320;
+    modelCircles.forEach(circle => {
+        const latRadius = circle.radius / metersPerDegree;
+        const lngRadius = circle.radius / (metersPerDegree * Math.cos(circle.centerLat * Math.PI / 180));
+        minLat = Math.min(minLat, circle.centerLat - latRadius);
+        maxLat = Math.max(maxLat, circle.centerLat + latRadius);
+        minLng = Math.min(minLng, circle.centerLng - lngRadius);
+        maxLng = Math.max(maxLng, circle.centerLng + lngRadius);
+    });
+
+    const gridResolution = 40;
+    const latStep = gridResolution / metersPerDegree;
+    const heatmapPoints = [];
+
+    console.log("[Heatmap] Starting grid calculation...");
+    for (let lat = minLat; lat <= maxLat; lat += latStep) {
+        const lngStep = gridResolution / (metersPerDegree * Math.cos(lat * Math.PI / 180));
+        for (let lng = minLng; lng <= maxLng; lng += lngStep) {
+            let overlapCount = 0;
+            const gridCellLatLng = L.latLng(lat, lng);
+            modelCircles.forEach(circle => {
+                const circleCenterLatLng = L.latLng(circle.centerLat, circle.centerLng);
+                const distance = AppState.map.distance(gridCellLatLng, circleCenterLatLng);
+                if (distance <= circle.radius) {
+                    overlapCount++;
+                }
+            });
+            if (overlapCount > 0) {
+                heatmapPoints.push([lat, lng, overlapCount]);
+            }
+        }
+    }
+    console.log(`[Heatmap] Finished grid calculation. Generated ${heatmapPoints.length} heatmap points.`);
+
+    // 5. Heatmap-Layer erstellen und anzeigen
+    if (heatmapPoints.length > 0) {
+        const maxOverlap = modelCircles.length;
+
+        // *** ANGEPASSTER FARBVERLAUF FÜR SCHARFE ÜBERGÄNGE ***
+        const gradient = {};
+        if (maxOverlap === 1) {
+            gradient[1.0] = 'lime'; // Wenn nur ein Modell da ist, ist es grün
+        } else {
+            // Definiert scharfe Übergänge an den ganzzahligen Schritten
+            // z.B. bei 3 Modellen: 1/3=rot, 2/3=gelb, 3/3=grün
+            for (let i = 1; i <= maxOverlap; i++) {
+                const ratio = i / maxOverlap;
+                if (i === 1) {
+                    gradient[ratio] = 'red';
+                } else if (i < maxOverlap) {
+                    gradient[ratio] = 'yellow';
+                } else { // i === maxOverlap
+                    gradient[ratio] = 'lime';
+                }
+            }
+            // Um die Übergänge noch schärfer zu machen, könnten wir die Stopps verdoppeln,
+            // aber diese einfache Zuordnung sollte schon ein viel klareres Bild ergeben.
+        }
+
+        console.log("[Heatmap] Using gradient:", gradient);
+
+        if (AppState.heatmapLayer) {
+            AppState.map.removeLayer(AppState.heatmapLayer);
+        }
+
+        AppState.heatmapLayer = L.heatLayer(heatmapPoints, {
+            radius: 20, // Ein etwas kleinerer Radius kann helfen, die Zonen klarer zu trennen
+            blur: 10,   // Ein etwas kleinerer Blur ebenfalls
+            max: maxOverlap,
+            minOpacity: 0.01, // Macht die Heatmap etwas weniger durchsichtig
+            gradient: gradient // Der neu berechnete, "schärfere" Farbverlauf
+        }).addTo(AppState.map);
+    } else {
+        Utils.handleMessage("No overlapping landing areas found for the selected models.");
+    }
 }
 
 export async function updateWeatherDisplay(index, originalTime = null) {
