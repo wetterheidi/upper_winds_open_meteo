@@ -5948,6 +5948,7 @@ function setupRadioEvents() {
         });
     }
 
+    
     //Ensemble stuff
     const scenarioRadios = document.querySelectorAll('input[name="ensembleScenario"]');
     scenarioRadios.forEach(radio => {
