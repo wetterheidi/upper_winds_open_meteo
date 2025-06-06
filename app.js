@@ -90,7 +90,8 @@ export const AppState = {
     ensembleScenarioCircles: {}, // Speichert die Leaflet-Layer für die Szenario-Kreise, z.B. { min_wind: circleLayer, mean_wind: circleLayer }
     heatmapLayer: null, // Für die Referenz auf den Heatmap-Layer
 };
-
+const HEATMAP_BASE_RADIUS = 20;
+const HEATMAP_REFERENCE_ZOOM = 13;
 const debouncedCalculateJump = Utils.debounce(calculateJump, 300);
 export const getTemperatureUnit = () => Settings.getValue('temperatureUnit', 'radio', 'C');
 export const getHeightUnit = () => Settings.getValue('heightUnit', 'radio', 'm');
@@ -653,6 +654,16 @@ function _setupCoreMapEventHandlers() {
                     tooltipAnchor: [0, -(baseSize / 2 + 5)]
                 }));
             }
+        }
+
+        // Update heatmap radius on zoomend to adjust dynamically
+        if (AppState.heatmapLayer) {
+            const newRadius = calculateDynamicRadius(HEATMAP_BASE_RADIUS, HEATMAP_REFERENCE_ZOOM);
+            AppState.heatmapLayer.setOptions({ radius: newRadius });
+            console.log('Heatmap radius updated on zoom:', {
+                currentZoom: AppState.map.getZoom(),
+                newRadius
+            });
         }
     });
 
@@ -2219,7 +2230,7 @@ export function interpolateWeatherData(sliderIndex) {
         console.warn('No weather data available for interpolation');
         return [];
     }
- 
+
     const baseHeight = Math.round(AppState.lastAltitude);
     const interpStep = parseInt(getInterpolationStep()) || 100;
     const heightUnit = getHeightUnit();
@@ -3041,6 +3052,23 @@ function calculateCanopyCirclesForEnsemble(profileIdentifier, specificProfileDat
     console.warn(`calculateCanopyCircles lieferte null für Profil ${profileIdentifier}`);
     return null;
 }
+export function calculateDynamicRadius(baseRadius = 20, referenceZoom = 13) {
+    const currentZoom = AppState.map.getZoom();
+    // Scale radius inversely with zoom level relative to referenceZoom
+    // At zoom 13, radius = baseRadius; below 13, radius increases; above 13, radius decreases
+    // Der ursprüngliche, aggressive Skalierungsfaktor
+    const aggressiveScaleFactor = Math.pow(2, currentZoom - referenceZoom);
+    
+    // NEU: Wir dämpfen den Faktor mit der Quadratwurzel
+    const scaleFactor = Math.sqrt(aggressiveScaleFactor);
+    const dynamicRadius = baseRadius * scaleFactor;
+    // Clamp radius to reasonable bounds to avoid extreme values
+    const minRadius = 5;  // Minimum radius to avoid disappearing at high zooms
+    const maxRadius = 50; // Maximum radius to avoid excessive spread at low zooms
+    const adjustedRadius = Math.max(minRadius, Math.min(maxRadius, dynamicRadius));
+    console.log('[calculateDynamicRadius] Calculated dynamic radius:', { currentZoom, baseRadius, scaleFactor, dynamicRadius, adjustedRadius });
+    return adjustedRadius;
+}
 function generateAndDisplayHeatmap() {
 
     // 1. Clear previous visualizations
@@ -3116,29 +3144,24 @@ function generateAndDisplayHeatmap() {
     }
     console.log(`[Heatmap] Finished grid calculation. Generated ${heatmapPoints.length} heatmap points.`);
 
-    // 5. Heatmap-Layer erstellen und anzeigen
+// 5. Heatmap-Layer erstellen und anzeigen
     if (heatmapPoints.length > 0) {
         const maxOverlap = modelCircles.length;
-
-        // *** ANGEPASSTER FARBVERLAUF FÜR SCHARFE ÜBERGÄNGE ***
-        const gradient = {};
+        const gradient = { /* ... Gradienten-Logik bleibt gleich ... */ };
+        
         if (maxOverlap === 1) {
-            gradient[1.0] = 'lime'; // Wenn nur ein Modell da ist, ist es grün
+            gradient[1.0] = 'lime'; 
         } else {
-            // Definiert scharfe Übergänge an den ganzzahligen Schritten
-            // z.B. bei 3 Modellen: 1/3=rot, 2/3=gelb, 3/3=grün
             for (let i = 1; i <= maxOverlap; i++) {
                 const ratio = i / maxOverlap;
                 if (i === 1) {
                     gradient[ratio] = 'red';
                 } else if (i < maxOverlap) {
                     gradient[ratio] = 'yellow';
-                } else { // i === maxOverlap
+                } else { 
                     gradient[ratio] = 'lime';
                 }
             }
-            // Um die Übergänge noch schärfer zu machen, könnten wir die Stopps verdoppeln,
-            // aber diese einfache Zuordnung sollte schon ein viel klareres Bild ergeben.
         }
 
         console.log("[Heatmap] Using gradient:", gradient);
@@ -3147,12 +3170,14 @@ function generateAndDisplayHeatmap() {
             AppState.map.removeLayer(AppState.heatmapLayer);
         }
 
+        const dynamicRadius = calculateDynamicRadius(HEATMAP_BASE_RADIUS, HEATMAP_REFERENCE_ZOOM);
+
         AppState.heatmapLayer = L.heatLayer(heatmapPoints, {
-            radius: 20, // Ein etwas kleinerer Radius kann helfen, die Zonen klarer zu trennen
-            blur: 10,   // Ein etwas kleinerer Blur ebenfalls
+            radius: dynamicRadius,
+            blur: 10,
             max: maxOverlap,
-            minOpacity: 0.01, // Macht die Heatmap etwas weniger durchsichtig
-            gradient: gradient // Der neu berechnete, "schärfere" Farbverlauf
+            minOpacity: 0.01,
+            gradient: gradient
         }).addTo(AppState.map);
     } else {
         Utils.handleMessage("No overlapping landing areas found for the selected models.");
