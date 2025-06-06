@@ -2047,603 +2047,6 @@ export async function fetchWeather(lat, lon, currentTime = null, isInitialLoad =
         if (loadingElement) loadingElement.style.display = 'none';
     }
 }
-
-async function fetchEnsembleWeatherData() {
-    if (!AppState.lastLat || !AppState.lastLng) {
-        Utils.handleMessage("Please select a location first.");
-        return;
-    }
-    if (!Settings.state.userSettings.selectedEnsembleModels || Settings.state.userSettings.selectedEnsembleModels.length === 0) {
-        AppState.ensembleModelsData = null;
-        clearEnsembleVisualizations();
-        console.log("No ensemble models selected. Cleared ensemble data and visualizations.");
-        return;
-    }
-
-    const lat = AppState.lastLat;
-    const lon = AppState.lastLng;
-    const modelsToFetch = Settings.state.userSettings.selectedEnsembleModels;
-
-    console.log(`Fetching ensemble weather data for models: ${modelsToFetch.join(', ')} at ${lat}, ${lon}`);
-    const loadingElement = document.getElementById('loading');
-    if (loadingElement) loadingElement.style.display = 'block';
-
-
-    const modelString = modelsToFetch.join(',');
-
-    // Basisvariablen, die wir von der API erwarten (ohne Modell-Suffix)
-    const baseVariablesList = [
-        "surface_pressure", "temperature_2m", "relative_humidity_2m", "wind_speed_10m", "wind_direction_10m",
-        "geopotential_height_1000hPa", "temperature_1000hPa", "relative_humidity_1000hPa", "wind_speed_1000hPa", "wind_direction_1000hPa",
-        "geopotential_height_950hPa", "temperature_950hPa", "relative_humidity_950hPa", "wind_speed_950hPa", "wind_direction_950hPa",
-        "geopotential_height_925hPa", "temperature_925hPa", "relative_humidity_925hPa", "wind_speed_925hPa", "wind_direction_925hPa",
-        "geopotential_height_900hPa", "temperature_900hPa", "relative_humidity_900hPa", "wind_speed_900hPa", "wind_direction_900hPa",
-        "geopotential_height_850hPa", "temperature_850hPa", "relative_humidity_850hPa", "wind_speed_850hPa", "wind_direction_850hPa",
-        "geopotential_height_800hPa", "temperature_800hPa", "relative_humidity_800hPa", "wind_speed_800hPa", "wind_direction_800hPa",
-        "geopotential_height_700hPa", "temperature_700hPa", "relative_humidity_700hPa", "wind_speed_700hPa", "wind_direction_700hPa",
-        "geopotential_height_600hPa", "temperature_600hPa", "relative_humidity_600hPa", "wind_speed_600hPa", "wind_direction_600hPa",
-        "geopotential_height_500hPa", "temperature_500hPa", "relative_humidity_500hPa", "wind_speed_500hPa", "wind_direction_500hPa",
-        "geopotential_height_400hPa", "temperature_400hPa", "relative_humidity_400hPa", "wind_speed_400hPa", "wind_direction_400hPa",
-        "geopotential_height_300hPa", "temperature_300hPa", "relative_humidity_300hPa", "wind_speed_300hPa", "wind_direction_300hPa",
-        "geopotential_height_250hPa", "temperature_250hPa", "relative_humidity_250hPa", "wind_speed_250hPa", "wind_direction_250hPa",
-        "geopotential_height_200hPa", "temperature_200hPa", "relative_humidity_200hPa", "wind_speed_200hPa", "wind_direction_200hPa"
-    ];
-    const hourlyVariablesString = baseVariablesList.join(',');
-
-    const historicalDatePicker = document.getElementById('historicalDatePicker');
-    const selectedDateValue = historicalDatePicker ? historicalDatePicker.value : null;
-    const selectedDate = selectedDateValue ? luxon.DateTime.fromISO(selectedDateValue, { zone: 'utc' }) : null;
-    const today = luxon.DateTime.utc().startOf('day');
-    const isHistorical = selectedDate && selectedDate < today;
-
-    let startDateStr, endDateStr;
-    let baseUrl = 'https://api.open-meteo.com/v1/forecast';
-
-    if (isHistorical) {
-        baseUrl = 'https://historical-forecast-api.open-meteo.com/v1/forecast';
-        startDateStr = selectedDate.toFormat('yyyy-MM-dd');
-        endDateStr = startDateStr;
-    } else {
-        const now = luxon.DateTime.utc();
-        startDateStr = now.toFormat('yyyy-MM-dd');
-        endDateStr = now.plus({ days: 7 }).toFormat('yyyy-MM-dd'); // Standard-Vorhersagezeitraum
-    }
-
-    const url = `${baseUrl}?latitude=${lat}&longitude=${lon}&hourly=${hourlyVariablesString}&models=${modelString}&start_date=${startDateStr}&end_date=${endDateStr}`;
-    console.log("Constructed ensemble URL:", url);
-
-    try {
-        const response = await fetch(url);
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`API request failed: ${response.status} - ${errorText}`);
-        }
-        const apiResponseData = await response.json(); // Nennen wir es apiResponseData, um Verwechslung zu vermeiden
-        console.log("Raw data from OpenMeteo for ensemble request:", JSON.stringify(apiResponseData, null, 2));
-        console.log("Models requested:", modelsToFetch);
-
-        AppState.ensembleModelsData = {}; // Wichtig: Hier initialisieren
-
-        if (apiResponseData.error && apiResponseData.reason) {
-            throw new Error(`API Error: ${apiResponseData.reason}`);
-        }
-
-        if (!apiResponseData.hourly) {
-            let errorMsg = 'Unexpected data format: "hourly" field missing in API response.';
-            if (apiResponseData && typeof apiResponseData.latitude !== 'undefined') {
-                errorMsg = "Received metadata but no 'hourly' data for any requested ensemble model.";
-            }
-            console.error(errorMsg, apiResponseData);
-            throw new Error(errorMsg);
-        }
-
-        // Die 'time'-Achse ist für alle Modelle gleich und nicht suffigiert
-        const sharedTimeArray = apiResponseData.hourly.time;
-        if (!sharedTimeArray) {
-            throw new Error("Shared 'time' array missing in hourly data.");
-        }
-
-        modelsToFetch.forEach(modelName => {
-            const modelSpecificHourlyData = { time: [...sharedTimeArray] }; // Kopiere das Zeitarray
-            let foundDataForThisModel = false;
-
-            // Iteriere durch die Basisvariablen und suche die suffigierten Pendants
-            baseVariablesList.forEach(baseVar => {
-                const suffixedVarKey = `${baseVar}_${modelName}`; // z.B. temperature_2m_icon_global
-
-                if (apiResponseData.hourly[suffixedVarKey]) {
-                    modelSpecificHourlyData[baseVar] = apiResponseData.hourly[suffixedVarKey];
-                    foundDataForThisModel = true;
-                } else if (modelsToFetch.length === 1 && apiResponseData.hourly[baseVar]) {
-                    // Fallback für Einzelmodellanfragen, wo Suffixe fehlen könnten
-                    modelSpecificHourlyData[baseVar] = apiResponseData.hourly[baseVar];
-                    foundDataForThisModel = true;
-                } else {
-                    modelSpecificHourlyData[baseVar] = null; // Oder new Array(sharedTimeArray.length).fill(null);
-                }
-            });
-
-            if (foundDataForThisModel) {
-                AppState.ensembleModelsData[modelName] = modelSpecificHourlyData;
-                console.log(`Successfully processed and stored data for model: ${modelName}`);
-            } else {
-                console.warn(`No data found for model ${modelName} with suffixed keys in the 'hourly' object. Available keys for this model might be missing or the model is unavailable for this specific request. Hourly keys in response:`, Object.keys(apiResponseData.hourly));
-                // Utils.handleMessage(`Warning: No data retrieved for model ${modelName}.`); // Optional: Nutzer informieren
-            }
-        });
-
-
-        if (Object.keys(AppState.ensembleModelsData).length === 0 && modelsToFetch.length > 0) {
-            const msg = "Could not retrieve and process data for any of the selected ensemble models. They might be unavailable or the API response structure was not as expected for these models.";
-            console.warn(msg, "Original API response:", apiResponseData);
-            Utils.handleMessage(msg);
-        } else {
-            console.log("Ensemble weather data processed and stored in AppState.ensembleModelsData:", AppState.ensembleModelsData);
-        }
-
-        processAndVisualizeEnsemble();
-
-    } catch (error) {
-        console.error('Error in fetchEnsembleWeatherData:', error);
-        Utils.handleError(`Failed to fetch ensemble weather data: ${error.message}`);
-        AppState.ensembleModelsData = null;
-        clearEnsembleVisualizations();
-    } finally {
-        if (loadingElement) {
-            loadingElement.style.display = 'none';
-        }
-    }
-}
-
-// Hilfsfunktion zum Leeren der Ensemble-Visualisierungen
-function clearEnsembleVisualizations() {
-    if (AppState.ensembleLayerGroup) {
-        AppState.ensembleLayerGroup.clearLayers();
-    } else if (AppState.map) {
-        AppState.ensembleLayerGroup = L.layerGroup().addTo(AppState.map);
-    }
-
-    // Explizit den alten Heatmap-Layer entfernen, falls er existiert
-    if (AppState.heatmapLayer && AppState.map.hasLayer(AppState.heatmapLayer)) {
-        AppState.map.removeLayer(AppState.heatmapLayer);
-    }
-    AppState.heatmapLayer = null;
-    AppState.ensembleScenarioCircles = {};
-    console.log("Ensemble visualizations cleared.");
-}
-
-function processAndVisualizeEnsemble() {
-    clearEnsembleVisualizations();
-
-    if (!AppState.ensembleModelsData || Object.keys(AppState.ensembleModelsData).length === 0) {
-        console.log("No ensemble data to process.");
-        if (Settings.state.userSettings.selectedEnsembleModels.length > 0 && Settings.state.userSettings.currentEnsembleScenario !== 'all_models') {
-            Utils.handleMessage("Data for selected ensemble models not yet available. Fetching...");
-            fetchEnsembleWeatherData(); // Versuch, Daten erneut zu laden
-        }
-        return;
-    }
-
-    const scenario = Settings.state.userSettings.currentEnsembleScenario;
-    const sliderIndex = getSliderValue();
-
-    console.log(`Processing ensemble scenario: ${scenario} for slider index: ${sliderIndex}`);
-
-    if (scenario === 'heatmap') {
-        generateAndDisplayHeatmap(); // Neue Funktion aufrufen
-    } else if (scenario === 'all_models') {
-        for (const modelName in AppState.ensembleModelsData) {
-            if (Object.hasOwnProperty.call(AppState.ensembleModelsData, modelName)) {
-                const modelHourlyData = AppState.ensembleModelsData[modelName];
-                // Erstelle eine temporäre weatherData-Struktur für diese spezifische Modellanfrage
-                const tempWeatherData = { hourly: modelHourlyData };
-                const canopyResult = calculateCanopyCirclesForEnsemble(modelName, tempWeatherData);
-                if (canopyResult) {
-                    const color = getDistinctColorForModel(modelName);
-                    drawEnsembleCircle(canopyResult, color, modelName);
-                }
-            }
-        }
-    } else { // Min, Mean, Max scenarios
-        const scenarioProfile = calculateEnsembleScenarioProfile(scenario, sliderIndex);
-        if (scenarioProfile) {
-            const canopyResult = calculateCanopyCirclesForEnsemble(scenario, scenarioProfile);
-            if (canopyResult) {
-                const color = getDistinctColorForScenario(scenario);
-                drawEnsembleCircle(canopyResult, color, scenario.replace('_', ' '));
-            }
-        } else {
-            console.warn(`Could not calculate profile for scenario: ${scenario}`);
-            Utils.handleMessage(`Could not generate '${scenario.replace('_', ' ')}' profile. Not enough data?`);
-        }
-    }
-}
-
-// Hilfsfunktion für unterscheidbare Farben (Beispiel)
-function getDistinctColorForModel(modelName) {
-    let hash = 0;
-    for (let i = 0; i < modelName.length; i++) {
-        hash = modelName.charCodeAt(i) + ((hash << 5) - hash);
-        hash = hash & hash; // Convert to 32bit integer
-    }
-    const hue = hash % 360;
-    return `hsl(${hue}, 70%, 60%)`; // HSL für bessere Farbverteilung
-}
-
-function getDistinctColorForScenario(scenario) {
-    if (scenario === 'min_wind') return 'rgba(0, 0, 255, 0.7)';    // Blau
-    if (scenario === 'mean_wind') return 'rgba(0, 255, 0, 0.7)';   // Grün
-    if (scenario === 'max_wind') return 'rgba(255, 0, 0, 0.7)';    // Rot
-    return 'rgba(128, 128, 128, 0.7)'; // Grau für Fallback
-}
-
-// Neue Funktion zum Zeichnen eines einzelnen Ensemble-Kreises
-function drawEnsembleCircle(canopyResult, color, label) {
-    if (!AppState.map || !canopyResult || !AppState.ensembleLayerGroup) return;
-
-    // canopyResult sollte { centerLat, centerLng, radius, displacement, direction, profileIdentifier } enthalten
-    const newCenter = Utils.calculateNewCenter(canopyResult.centerLat, canopyResult.centerLng, canopyResult.displacement, canopyResult.direction);
-
-    const circle = L.circle(newCenter, {
-        radius: canopyResult.radius,
-        color: color,
-        fillColor: color,
-        fillOpacity: 0.15, // Etwas sichtbarer als 0.1
-        weight: 2,       // Etwas dicker
-        dashArray: '5, 10' // Strichelung: 5px Strich, 10px Lücke
-    }).addTo(AppState.ensembleLayerGroup);
-
-    const userWindUnit = Settings.getValue('windUnit', 'radio', 'kt'); // Hole die aktuelle Einheit aus den Settings
-    // Die Geschwindigkeit von calculateMeanWind ist in m/s. Konvertiere sie in die Benutzereinheit.
-    const meanWindSpeedConverted = Utils.convertWind(canopyResult.meanWindSpeedMps, userWindUnit, 'm/s');
-    const formattedMeanWindSpeed = userWindUnit === 'bft' ?
-        Math.round(meanWindSpeedConverted) :
-        meanWindSpeedConverted.toFixed(1);
-
-    // Bestimme die Höhen für die Tooltip-Anzeige
-    // openingAltitude und elevation (AppState.lastAltitude) sind in Metern.
-    const openingAltitudeAGL = parseInt(document.getElementById('openingAltitude')?.value) || Settings.state.userSettings.openingAltitude || 1200;
-    // Der Mittelwind wurde von der Oberfläche (elevation) bis zur Schirmöffnung (elevation + openingAltitude - 200) berechnet
-    const lowerLimitDisplay = 0; // AGL
-    const upperLimitDisplay = openingAltitudeAGL - 200; // AGL, bis zur effektiven Schirmöffnungshöhe
-
-    const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
-    const lowerLimitFormatted = Math.round(Utils.convertHeight(lowerLimitDisplay, heightUnit)); // Konvertiere 0m AGL
-    const upperLimitFormatted = Math.round(Utils.convertHeight(upperLimitDisplay, heightUnit)); // Konvertiere Öffnungshöhe AGL
-
-    const tooltipText = `<strong>${label}</strong><br>` +
-        `Mean Wind ${lowerLimitFormatted}-${upperLimitFormatted} ${heightUnit} AGL:<br>` +
-        `${Utils.roundToTens(canopyResult.meanWindDir)}° ${formattedMeanWindSpeed} ${userWindUnit}`;
-
-    circle.bindTooltip(tooltipText, {
-        permanent: false,
-        direction: 'top',
-        className: 'ensemble-tooltip', // Beibehaltung der CSS-Klasse
-        opacity: 0.9 // Standard-Tooltip-Deckkraft
-    });
-
-    AppState.ensembleScenarioCircles[label] = circle; console.log(`Drew ensemble circle for ${label} at [${newCenter.join(', ')}], radius ${canopyResult.radius}`);
-}
-
-function calculateEnsembleScenarioProfile(scenarioType /* sliderIndex hier nicht mehr als direkter Parameter nötig, wird in der Schleife verwendet */) {
-    if (!AppState.ensembleModelsData || Object.keys(AppState.ensembleModelsData).length === 0) {
-        console.warn("No ensemble data available for profile calculation.");
-        return null;
-    }
-
-    const numModels = Object.keys(AppState.ensembleModelsData).length;
-    if (numModels === 0) return null;
-
-    console.log(`Calculating full time-series ensemble profile for: ${scenarioType}`);
-
-    const scenarioHourlyData = {}; // Das wird das neue 'hourly'-Objekt für das Szenario
-
-    // Annahme: Alle Modelle haben die gleiche Zeitachsenstruktur. Nehmen Sie sie vom ersten Modell.
-    const firstModelName = Object.keys(AppState.ensembleModelsData)[0];
-    const timeArrayFromFirstModel = AppState.ensembleModelsData[firstModelName]?.time; // ?. für Sicherheit
-
-    if (!timeArrayFromFirstModel || timeArrayFromFirstModel.length === 0) {
-        console.error("Time data missing or empty in the first ensemble model for profile calculation.");
-        return null;
-    }
-    scenarioHourlyData.time = [...timeArrayFromFirstModel]; // Kopiere das vollständige Zeitarray
-
-    const numTimeSteps = scenarioHourlyData.time.length;
-
-    // Basisvariablen (ohne Modell-Suffix), die aggregiert werden sollen
-    const baseVariablesToProcess = [
-        "surface_pressure", "temperature_2m", "relative_humidity_2m",
-        "geopotential_height_1000hPa", "temperature_1000hPa", "relative_humidity_1000hPa",
-        "geopotential_height_950hPa", "temperature_950hPa", "relative_humidity_950hPa",
-        "geopotential_height_925hPa", "temperature_925hPa", "relative_humidity_925hPa",
-        "geopotential_height_900hPa", "temperature_900hPa", "relative_humidity_900hPa",
-        "geopotential_height_850hPa", "temperature_850hPa", "relative_humidity_850hPa",
-        "geopotential_height_800hPa", "temperature_800hPa", "relative_humidity_800hPa",
-        "geopotential_height_700hPa", "temperature_700hPa", "relative_humidity_700hPa",
-        "geopotential_height_600hPa", "temperature_600hPa", "relative_humidity_600hPa",
-        "geopotential_height_500hPa", "temperature_500hPa", "relative_humidity_500hPa",
-        "geopotential_height_400hPa", "temperature_400hPa", "relative_humidity_400hPa",
-        "geopotential_height_300hPa", "temperature_300hPa", "relative_humidity_300hPa",
-        "geopotential_height_250hPa", "temperature_250hPa", "relative_humidity_250hPa",
-        "geopotential_height_200hPa", "temperature_200hPa", "relative_humidity_200hPa"
-    ];
-
-    // Windvariablen-Paare (Basisnamen)
-    const windVariablePairs = [
-        ["wind_speed_10m", "wind_direction_10m"]
-    ];
-    const pressureLevels = [1000, 950, 925, 900, 850, 800, 700, 600, 500, 400, 300, 250, 200];
-    pressureLevels.forEach(p => {
-        windVariablePairs.push([`wind_speed_${p}hPa`, `wind_direction_${p}hPa`]);
-    });
-
-    // Initialisiere die Arrays in scenarioHourlyData mit der korrekten Länge
-    baseVariablesToProcess.forEach(varName => {
-        scenarioHourlyData[varName] = new Array(numTimeSteps).fill(null);
-    });
-    windVariablePairs.forEach(pair => {
-        scenarioHourlyData[pair[0]] = new Array(numTimeSteps).fill(null); // für Geschwindigkeit
-        scenarioHourlyData[pair[1]] = new Array(numTimeSteps).fill(null); // für Richtung
-    });
-
-    // Iteriere durch jeden Zeitschritt der gesamten Vorhersageperiode
-    for (let t = 0; t < numTimeSteps; t++) {
-        // Verarbeite nicht-Wind Variablen
-        baseVariablesToProcess.forEach(varName => {
-            const valuesAtTimeStep = [];
-            for (const modelName in AppState.ensembleModelsData) {
-                // Stelle sicher, dass das Modell auch Daten für diese Variable hat
-                const modelHourly = AppState.ensembleModelsData[modelName];
-                if (modelHourly && modelHourly[varName]) {
-                    const val = modelHourly[varName][t]; // Zugriff auf den t-ten Wert
-                    if (val !== null && val !== undefined && !isNaN(val)) {
-                        valuesAtTimeStep.push(val);
-                    }
-                }
-            }
-            if (valuesAtTimeStep.length > 0) {
-                if (scenarioType === 'min_wind') scenarioHourlyData[varName][t] = Math.min(...valuesAtTimeStep);
-                else if (scenarioType === 'max_wind') scenarioHourlyData[varName][t] = Math.max(...valuesAtTimeStep);
-                else scenarioHourlyData[varName][t] = valuesAtTimeStep.reduce((a, b) => a + b, 0) / valuesAtTimeStep.length; // Mean
-            }
-            // Wenn keine Werte vorhanden sind, bleibt der Wert null (durch Initialisierung oben)
-        });
-
-        // Verarbeite Windvariablen
-        windVariablePairs.forEach(pair => {
-            const speedVarName = pair[0];
-            const dirVarName = pair[1];
-            let u_components_t = [];
-            let v_components_t = [];
-            let speeds_t = [];
-            let dirs_t = [];
-
-            for (const modelName in AppState.ensembleModelsData) {
-                const modelHourly = AppState.ensembleModelsData[modelName];
-                if (modelHourly && modelHourly[speedVarName] && modelHourly[dirVarName]) {
-                    const speed = modelHourly[speedVarName][t];
-                    const dir = modelHourly[dirVarName][t];
-                    if (speed !== null && speed !== undefined && !isNaN(speed) &&
-                        dir !== null && dir !== undefined && !isNaN(dir)) {
-                        speeds_t.push(speed);
-                        dirs_t.push(dir);
-                        u_components_t.push(-speed * Math.sin(dir * Math.PI / 180));
-                        v_components_t.push(-speed * Math.cos(dir * Math.PI / 180));
-                    }
-                }
-            }
-
-            if (speeds_t.length > 0) {
-                if (scenarioType === 'min_wind') {
-                    const minSpeed = Math.min(...speeds_t);
-                    const minIndex = speeds_t.indexOf(minSpeed);
-                    scenarioHourlyData[speedVarName][t] = minSpeed;
-                    scenarioHourlyData[dirVarName][t] = dirs_t[minIndex];
-                } else if (scenarioType === 'max_wind') {
-                    const maxSpeed = Math.max(...speeds_t);
-                    const maxIndex = speeds_t.indexOf(maxSpeed);
-                    scenarioHourlyData[speedVarName][t] = maxSpeed;
-                    scenarioHourlyData[dirVarName][t] = dirs_t[maxIndex];
-                } else { // mean_wind
-                    const mean_u = u_components_t.reduce((a, b) => a + b, 0) / u_components_t.length;
-                    const mean_v = v_components_t.reduce((a, b) => a + b, 0) / v_components_t.length;
-                    scenarioHourlyData[speedVarName][t] = Utils.windSpeed(mean_u, mean_v);
-                    scenarioHourlyData[dirVarName][t] = Utils.windDirection(mean_u, mean_v);
-                }
-            }
-            // Wenn keine Werte vorhanden sind, bleiben die Werte null
-        });
-    }
-    // console.log(`Vollständiges Zeitreihenprofil für ${scenarioType}:`, scenarioHourlyData);
-    return { hourly: scenarioHourlyData }; // Struktur wie eine einzelne API-Modellantwort
-}
-
-/**
- * Berechnet die Canopy-Kreise für ein gegebenes Ensemble-Profil oder ein einzelnes Modell aus dem Ensemble.
- * @param {string} profileIdentifier - Name des Modells oder Szenarios (z.B. "icon_global", "min_wind").
- * @param {object} [specificProfileData=null] - Optionale, spezifische Wetterdaten für das Profil.
- * Wenn null, wird versucht, die Daten aus AppState.ensembleModelsData[profileIdentifier] zu verwenden.
- * @returns {object|null} Das Ergebnis von calculateCanopyCircles oder null bei Fehler.
- */
-function calculateCanopyCirclesForEnsemble(profileIdentifier, specificProfileData = null) {
-    console.log(`Calculating canopy circles for ensemble profile/model: ${profileIdentifier}`);
-
-    // Bestimme die zu verwendenden Wetterdaten
-    let weatherDataForProfile;
-    if (specificProfileData) {
-        weatherDataForProfile = specificProfileData; // Direkte Übergabe für Min/Mean/Max Profile
-    } else if (AppState.ensembleModelsData && AppState.ensembleModelsData[profileIdentifier]) {
-        // Für 'all_models'-Szenario, hole Daten des spezifischen Modells
-        weatherDataForProfile = { hourly: AppState.ensembleModelsData[profileIdentifier] };
-    } else {
-        console.warn(`Keine Daten für Profil/Modell ${profileIdentifier} in calculateCanopyCirclesForEnsemble gefunden.`);
-        return null;
-    }
-
-    if (!weatherDataForProfile.hourly || !AppState.lastLat || !AppState.lastLng) {
-        console.warn(`Unvollständige Daten für calculateCanopyCirclesForEnsemble: ${profileIdentifier}`);
-        return null;
-    }
-
-    const originalGlobalWeatherData = AppState.weatherData;
-    const originalShowCanopyArea = Settings.state.userSettings.showCanopyArea;
-    const originalCalculateJump = Settings.state.userSettings.calculateJump;
-
-    AppState.weatherData = weatherDataForProfile.hourly;
-    // Für Ensemble-Visualisierung temporär die Bedingungen erfüllen,
-    // oder calculateCanopyCircles so anpassen, dass es diese optional ignoriert.
-    Settings.state.userSettings.showCanopyArea = true; // Temporär setzen
-    Settings.state.userSettings.calculateJump = true;  // Temporär setzen
-
-    let result = null;
-    try {
-        result = calculateCanopyCircles();
-    } catch (error) {
-        console.error(`Fehler in calculateCanopyCircles für Profil ${profileIdentifier}:`, error);
-        result = null;
-    } finally {
-        AppState.weatherData = originalGlobalWeatherData;
-        Settings.state.userSettings.showCanopyArea = originalShowCanopyArea; // Zurücksetzen
-        Settings.state.userSettings.calculateJump = originalCalculateJump;  // Zurücksetzen
-        // Settings.save(); // Nicht hier speichern, da es temporäre Änderungen sind
-    }
-
-    if (result) {
-        // Die Visualisierungsfunktion erwartet eine vereinfachte Struktur.
-        // Wir verwenden hier die Daten des "roten Kreises" (volle Distanz).
-        return {
-            centerLat: result.redLat,
-            centerLng: result.redLng,
-            radius: result.radiusFull,
-            displacement: result.displacementFull,
-            direction: result.directionFull,
-            meanWindDir: result.meanWindForFullCanopyDir, // Die tatsächliche Mittelwindrichtung
-            meanWindSpeedMps: result.meanWindForFullCanopySpeedMps, // Die Mittelwindgeschwindigkeit in m/s
-            profileIdentifier: profileIdentifier // Behalte die ID für Tooltips etc.
-        };
-    }
-    console.warn(`calculateCanopyCircles lieferte null für Profil ${profileIdentifier}`);
-    return null;
-}
-
-function generateAndDisplayHeatmap() {
-
-    // 1. Clear previous visualizations
-    clearEnsembleVisualizations();
-    if (AppState.heatmapLayer) {
-        AppState.map.removeLayer(AppState.heatmapLayer);
-        AppState.heatmapLayer = null;
-    }
-
-    // 2. Check if there is data
-    if (!AppState.ensembleModelsData || Object.keys(AppState.ensembleModelsData).length < 2) {
-        Utils.handleMessage("Please select at least two ensemble models to generate a heatmap.");
-        return;
-    }
-
-    // 3. Calculate all individual model circles
-    const modelCircles = [];
-    for (const modelName in AppState.ensembleModelsData) {
-        if (Object.hasOwnProperty.call(AppState.ensembleModelsData, modelName)) {
-            const modelHourlyData = AppState.ensembleModelsData[modelName];
-            const canopyResult = calculateCanopyCirclesForEnsemble(modelName, { hourly: modelHourlyData });
-
-            if (canopyResult) {
-                const center = Utils.calculateNewCenter(canopyResult.centerLat, canopyResult.centerLng, canopyResult.displacement, canopyResult.direction);
-                modelCircles.push({
-                    centerLat: center[0],
-                    centerLng: center[1],
-                    radius: canopyResult.radius
-                });
-            }
-        }
-    }
-
-    if (modelCircles.length === 0) {
-        console.warn("Could not calculate any circles for the heatmap.");
-        return;
-    }
-    console.log(`[Heatmap] Calculated ${modelCircles.length} model circles.`);
-
-    // 4. Bounding-Box und Raster-Berechnung (bleibt gleich)
-    let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
-    const metersPerDegree = 111320;
-    modelCircles.forEach(circle => {
-        const latRadius = circle.radius / metersPerDegree;
-        const lngRadius = circle.radius / (metersPerDegree * Math.cos(circle.centerLat * Math.PI / 180));
-        minLat = Math.min(minLat, circle.centerLat - latRadius);
-        maxLat = Math.max(maxLat, circle.centerLat + latRadius);
-        minLng = Math.min(minLng, circle.centerLng - lngRadius);
-        maxLng = Math.max(maxLng, circle.centerLng + lngRadius);
-    });
-
-    const gridResolution = 40;
-    const latStep = gridResolution / metersPerDegree;
-    const heatmapPoints = [];
-
-    console.log("[Heatmap] Starting grid calculation...");
-    for (let lat = minLat; lat <= maxLat; lat += latStep) {
-        const lngStep = gridResolution / (metersPerDegree * Math.cos(lat * Math.PI / 180));
-        for (let lng = minLng; lng <= maxLng; lng += lngStep) {
-            let overlapCount = 0;
-            const gridCellLatLng = L.latLng(lat, lng);
-            modelCircles.forEach(circle => {
-                const circleCenterLatLng = L.latLng(circle.centerLat, circle.centerLng);
-                const distance = AppState.map.distance(gridCellLatLng, circleCenterLatLng);
-                if (distance <= circle.radius) {
-                    overlapCount++;
-                }
-            });
-            if (overlapCount > 0) {
-                heatmapPoints.push([lat, lng, overlapCount]);
-            }
-        }
-    }
-    console.log(`[Heatmap] Finished grid calculation. Generated ${heatmapPoints.length} heatmap points.`);
-
-    // 5. Heatmap-Layer erstellen und anzeigen
-    if (heatmapPoints.length > 0) {
-        const maxOverlap = modelCircles.length;
-
-        // *** ANGEPASSTER FARBVERLAUF FÜR SCHARFE ÜBERGÄNGE ***
-        const gradient = {};
-        if (maxOverlap === 1) {
-            gradient[1.0] = 'lime'; // Wenn nur ein Modell da ist, ist es grün
-        } else {
-            // Definiert scharfe Übergänge an den ganzzahligen Schritten
-            // z.B. bei 3 Modellen: 1/3=rot, 2/3=gelb, 3/3=grün
-            for (let i = 1; i <= maxOverlap; i++) {
-                const ratio = i / maxOverlap;
-                if (i === 1) {
-                    gradient[ratio] = 'red';
-                } else if (i < maxOverlap) {
-                    gradient[ratio] = 'yellow';
-                } else { // i === maxOverlap
-                    gradient[ratio] = 'lime';
-                }
-            }
-            // Um die Übergänge noch schärfer zu machen, könnten wir die Stopps verdoppeln,
-            // aber diese einfache Zuordnung sollte schon ein viel klareres Bild ergeben.
-        }
-
-        console.log("[Heatmap] Using gradient:", gradient);
-
-        if (AppState.heatmapLayer) {
-            AppState.map.removeLayer(AppState.heatmapLayer);
-        }
-
-        AppState.heatmapLayer = L.heatLayer(heatmapPoints, {
-            radius: 20, // Ein etwas kleinerer Radius kann helfen, die Zonen klarer zu trennen
-            blur: 10,   // Ein etwas kleinerer Blur ebenfalls
-            max: maxOverlap,
-            minOpacity: 0.01, // Macht die Heatmap etwas weniger durchsichtig
-            gradient: gradient // Der neu berechnete, "schärfere" Farbverlauf
-        }).addTo(AppState.map);
-    } else {
-        Utils.handleMessage("No overlapping landing areas found for the selected models.");
-    }
-}
-
 export async function updateWeatherDisplay(index, originalTime = null) {
     console.log(`updateWeatherDisplay called with index: ${index}, Time: ${AppState.weatherData.time[index]}`);
     if (!AppState.weatherData || !AppState.weatherData.time || index < 0 || index >= AppState.weatherData.time.length) {
@@ -3166,6 +2569,592 @@ export function downloadTableAsAscii(format) {
     Settings.updateUnitLabels();
     Settings.updateUnitLabels();
 
+}
+
+// == Ensemble Data Handling ==
+async function fetchEnsembleWeatherData() {
+    if (!AppState.lastLat || !AppState.lastLng) {
+        Utils.handleMessage("Please select a location first.");
+        return;
+    }
+    if (!Settings.state.userSettings.selectedEnsembleModels || Settings.state.userSettings.selectedEnsembleModels.length === 0) {
+        AppState.ensembleModelsData = null;
+        clearEnsembleVisualizations();
+        console.log("No ensemble models selected. Cleared ensemble data and visualizations.");
+        return;
+    }
+
+    const lat = AppState.lastLat;
+    const lon = AppState.lastLng;
+    const modelsToFetch = Settings.state.userSettings.selectedEnsembleModels;
+
+    console.log(`Fetching ensemble weather data for models: ${modelsToFetch.join(', ')} at ${lat}, ${lon}`);
+    const loadingElement = document.getElementById('loading');
+    if (loadingElement) loadingElement.style.display = 'block';
+
+
+    const modelString = modelsToFetch.join(',');
+
+    // Basisvariablen, die wir von der API erwarten (ohne Modell-Suffix)
+    const baseVariablesList = [
+        "surface_pressure", "temperature_2m", "relative_humidity_2m", "wind_speed_10m", "wind_direction_10m",
+        "geopotential_height_1000hPa", "temperature_1000hPa", "relative_humidity_1000hPa", "wind_speed_1000hPa", "wind_direction_1000hPa",
+        "geopotential_height_950hPa", "temperature_950hPa", "relative_humidity_950hPa", "wind_speed_950hPa", "wind_direction_950hPa",
+        "geopotential_height_925hPa", "temperature_925hPa", "relative_humidity_925hPa", "wind_speed_925hPa", "wind_direction_925hPa",
+        "geopotential_height_900hPa", "temperature_900hPa", "relative_humidity_900hPa", "wind_speed_900hPa", "wind_direction_900hPa",
+        "geopotential_height_850hPa", "temperature_850hPa", "relative_humidity_850hPa", "wind_speed_850hPa", "wind_direction_850hPa",
+        "geopotential_height_800hPa", "temperature_800hPa", "relative_humidity_800hPa", "wind_speed_800hPa", "wind_direction_800hPa",
+        "geopotential_height_700hPa", "temperature_700hPa", "relative_humidity_700hPa", "wind_speed_700hPa", "wind_direction_700hPa",
+        "geopotential_height_600hPa", "temperature_600hPa", "relative_humidity_600hPa", "wind_speed_600hPa", "wind_direction_600hPa",
+        "geopotential_height_500hPa", "temperature_500hPa", "relative_humidity_500hPa", "wind_speed_500hPa", "wind_direction_500hPa",
+        "geopotential_height_400hPa", "temperature_400hPa", "relative_humidity_400hPa", "wind_speed_400hPa", "wind_direction_400hPa",
+        "geopotential_height_300hPa", "temperature_300hPa", "relative_humidity_300hPa", "wind_speed_300hPa", "wind_direction_300hPa",
+        "geopotential_height_250hPa", "temperature_250hPa", "relative_humidity_250hPa", "wind_speed_250hPa", "wind_direction_250hPa",
+        "geopotential_height_200hPa", "temperature_200hPa", "relative_humidity_200hPa", "wind_speed_200hPa", "wind_direction_200hPa"
+    ];
+    const hourlyVariablesString = baseVariablesList.join(',');
+
+    const historicalDatePicker = document.getElementById('historicalDatePicker');
+    const selectedDateValue = historicalDatePicker ? historicalDatePicker.value : null;
+    const selectedDate = selectedDateValue ? luxon.DateTime.fromISO(selectedDateValue, { zone: 'utc' }) : null;
+    const today = luxon.DateTime.utc().startOf('day');
+    const isHistorical = selectedDate && selectedDate < today;
+
+    let startDateStr, endDateStr;
+    let baseUrl = 'https://api.open-meteo.com/v1/forecast';
+
+    if (isHistorical) {
+        baseUrl = 'https://historical-forecast-api.open-meteo.com/v1/forecast';
+        startDateStr = selectedDate.toFormat('yyyy-MM-dd');
+        endDateStr = startDateStr;
+    } else {
+        const now = luxon.DateTime.utc();
+        startDateStr = now.toFormat('yyyy-MM-dd');
+        endDateStr = now.plus({ days: 7 }).toFormat('yyyy-MM-dd'); // Standard-Vorhersagezeitraum
+    }
+
+    const url = `${baseUrl}?latitude=${lat}&longitude=${lon}&hourly=${hourlyVariablesString}&models=${modelString}&start_date=${startDateStr}&end_date=${endDateStr}`;
+    console.log("Constructed ensemble URL:", url);
+
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`API request failed: ${response.status} - ${errorText}`);
+        }
+        const apiResponseData = await response.json(); // Nennen wir es apiResponseData, um Verwechslung zu vermeiden
+        console.log("Raw data from OpenMeteo for ensemble request:", JSON.stringify(apiResponseData, null, 2));
+        console.log("Models requested:", modelsToFetch);
+
+        AppState.ensembleModelsData = {}; // Wichtig: Hier initialisieren
+
+        if (apiResponseData.error && apiResponseData.reason) {
+            throw new Error(`API Error: ${apiResponseData.reason}`);
+        }
+
+        if (!apiResponseData.hourly) {
+            let errorMsg = 'Unexpected data format: "hourly" field missing in API response.';
+            if (apiResponseData && typeof apiResponseData.latitude !== 'undefined') {
+                errorMsg = "Received metadata but no 'hourly' data for any requested ensemble model.";
+            }
+            console.error(errorMsg, apiResponseData);
+            throw new Error(errorMsg);
+        }
+
+        // Die 'time'-Achse ist für alle Modelle gleich und nicht suffigiert
+        const sharedTimeArray = apiResponseData.hourly.time;
+        if (!sharedTimeArray) {
+            throw new Error("Shared 'time' array missing in hourly data.");
+        }
+
+        modelsToFetch.forEach(modelName => {
+            const modelSpecificHourlyData = { time: [...sharedTimeArray] }; // Kopiere das Zeitarray
+            let foundDataForThisModel = false;
+
+            // Iteriere durch die Basisvariablen und suche die suffigierten Pendants
+            baseVariablesList.forEach(baseVar => {
+                const suffixedVarKey = `${baseVar}_${modelName}`; // z.B. temperature_2m_icon_global
+
+                if (apiResponseData.hourly[suffixedVarKey]) {
+                    modelSpecificHourlyData[baseVar] = apiResponseData.hourly[suffixedVarKey];
+                    foundDataForThisModel = true;
+                } else if (modelsToFetch.length === 1 && apiResponseData.hourly[baseVar]) {
+                    // Fallback für Einzelmodellanfragen, wo Suffixe fehlen könnten
+                    modelSpecificHourlyData[baseVar] = apiResponseData.hourly[baseVar];
+                    foundDataForThisModel = true;
+                } else {
+                    modelSpecificHourlyData[baseVar] = null; // Oder new Array(sharedTimeArray.length).fill(null);
+                }
+            });
+
+            if (foundDataForThisModel) {
+                AppState.ensembleModelsData[modelName] = modelSpecificHourlyData;
+                console.log(`Successfully processed and stored data for model: ${modelName}`);
+            } else {
+                console.warn(`No data found for model ${modelName} with suffixed keys in the 'hourly' object. Available keys for this model might be missing or the model is unavailable for this specific request. Hourly keys in response:`, Object.keys(apiResponseData.hourly));
+                // Utils.handleMessage(`Warning: No data retrieved for model ${modelName}.`); // Optional: Nutzer informieren
+            }
+        });
+
+
+        if (Object.keys(AppState.ensembleModelsData).length === 0 && modelsToFetch.length > 0) {
+            const msg = "Could not retrieve and process data for any of the selected ensemble models. They might be unavailable or the API response structure was not as expected for these models.";
+            console.warn(msg, "Original API response:", apiResponseData);
+            Utils.handleMessage(msg);
+        } else {
+            console.log("Ensemble weather data processed and stored in AppState.ensembleModelsData:", AppState.ensembleModelsData);
+        }
+
+        processAndVisualizeEnsemble();
+
+    } catch (error) {
+        console.error('Error in fetchEnsembleWeatherData:', error);
+        Utils.handleError(`Failed to fetch ensemble weather data: ${error.message}`);
+        AppState.ensembleModelsData = null;
+        clearEnsembleVisualizations();
+    } finally {
+        if (loadingElement) {
+            loadingElement.style.display = 'none';
+        }
+    }
+}
+function clearEnsembleVisualizations() {
+    if (AppState.ensembleLayerGroup) {
+        AppState.ensembleLayerGroup.clearLayers();
+    } else if (AppState.map) {
+        AppState.ensembleLayerGroup = L.layerGroup().addTo(AppState.map);
+    }
+
+    // Explizit den alten Heatmap-Layer entfernen, falls er existiert
+    if (AppState.heatmapLayer && AppState.map.hasLayer(AppState.heatmapLayer)) {
+        AppState.map.removeLayer(AppState.heatmapLayer);
+    }
+    AppState.heatmapLayer = null;
+    AppState.ensembleScenarioCircles = {};
+    console.log("Ensemble visualizations cleared.");
+}
+function processAndVisualizeEnsemble() {
+    clearEnsembleVisualizations();
+
+    if (!AppState.ensembleModelsData || Object.keys(AppState.ensembleModelsData).length === 0) {
+        console.log("No ensemble data to process.");
+        if (Settings.state.userSettings.selectedEnsembleModels.length > 0 && Settings.state.userSettings.currentEnsembleScenario !== 'all_models') {
+            Utils.handleMessage("Data for selected ensemble models not yet available. Fetching...");
+            fetchEnsembleWeatherData(); // Versuch, Daten erneut zu laden
+        }
+        return;
+    }
+
+    const scenario = Settings.state.userSettings.currentEnsembleScenario;
+    const sliderIndex = getSliderValue();
+
+    console.log(`Processing ensemble scenario: ${scenario} for slider index: ${sliderIndex}`);
+
+    if (scenario === 'heatmap') {
+        generateAndDisplayHeatmap(); // Neue Funktion aufrufen
+    } else if (scenario === 'all_models') {
+        for (const modelName in AppState.ensembleModelsData) {
+            if (Object.hasOwnProperty.call(AppState.ensembleModelsData, modelName)) {
+                const modelHourlyData = AppState.ensembleModelsData[modelName];
+                // Erstelle eine temporäre weatherData-Struktur für diese spezifische Modellanfrage
+                const tempWeatherData = { hourly: modelHourlyData };
+                const canopyResult = calculateCanopyCirclesForEnsemble(modelName, tempWeatherData);
+                if (canopyResult) {
+                    const color = getDistinctColorForModel(modelName);
+                    drawEnsembleCircle(canopyResult, color, modelName);
+                }
+            }
+        }
+    } else { // Min, Mean, Max scenarios
+        const scenarioProfile = calculateEnsembleScenarioProfile(scenario, sliderIndex);
+        if (scenarioProfile) {
+            const canopyResult = calculateCanopyCirclesForEnsemble(scenario, scenarioProfile);
+            if (canopyResult) {
+                const color = getDistinctColorForScenario(scenario);
+                drawEnsembleCircle(canopyResult, color, scenario.replace('_', ' '));
+            }
+        } else {
+            console.warn(`Could not calculate profile for scenario: ${scenario}`);
+            Utils.handleMessage(`Could not generate '${scenario.replace('_', ' ')}' profile. Not enough data?`);
+        }
+    }
+}
+function getDistinctColorForModel(modelName) {
+    let hash = 0;
+    for (let i = 0; i < modelName.length; i++) {
+        hash = modelName.charCodeAt(i) + ((hash << 5) - hash);
+        hash = hash & hash; // Convert to 32bit integer
+    }
+    const hue = hash % 360;
+    return `hsl(${hue}, 70%, 60%)`; // HSL für bessere Farbverteilung
+}
+function getDistinctColorForScenario(scenario) {
+    if (scenario === 'min_wind') return 'rgba(0, 0, 255, 0.7)';    // Blau
+    if (scenario === 'mean_wind') return 'rgba(0, 255, 0, 0.7)';   // Grün
+    if (scenario === 'max_wind') return 'rgba(255, 0, 0, 0.7)';    // Rot
+    return 'rgba(128, 128, 128, 0.7)'; // Grau für Fallback
+}
+function drawEnsembleCircle(canopyResult, color, label) {
+    if (!AppState.map || !canopyResult || !AppState.ensembleLayerGroup) return;
+
+    // canopyResult sollte { centerLat, centerLng, radius, displacement, direction, profileIdentifier } enthalten
+    const newCenter = Utils.calculateNewCenter(canopyResult.centerLat, canopyResult.centerLng, canopyResult.displacement, canopyResult.direction);
+
+    const circle = L.circle(newCenter, {
+        radius: canopyResult.radius,
+        color: color,
+        fillColor: color,
+        fillOpacity: 0.15, // Etwas sichtbarer als 0.1
+        weight: 2,       // Etwas dicker
+        dashArray: '5, 10' // Strichelung: 5px Strich, 10px Lücke
+    }).addTo(AppState.ensembleLayerGroup);
+
+    const userWindUnit = Settings.getValue('windUnit', 'radio', 'kt'); // Hole die aktuelle Einheit aus den Settings
+    // Die Geschwindigkeit von calculateMeanWind ist in m/s. Konvertiere sie in die Benutzereinheit.
+    const meanWindSpeedConverted = Utils.convertWind(canopyResult.meanWindSpeedMps, userWindUnit, 'm/s');
+    const formattedMeanWindSpeed = userWindUnit === 'bft' ?
+        Math.round(meanWindSpeedConverted) :
+        meanWindSpeedConverted.toFixed(1);
+
+    // Bestimme die Höhen für die Tooltip-Anzeige
+    // openingAltitude und elevation (AppState.lastAltitude) sind in Metern.
+    const openingAltitudeAGL = parseInt(document.getElementById('openingAltitude')?.value) || Settings.state.userSettings.openingAltitude || 1200;
+    // Der Mittelwind wurde von der Oberfläche (elevation) bis zur Schirmöffnung (elevation + openingAltitude - 200) berechnet
+    const lowerLimitDisplay = 0; // AGL
+    const upperLimitDisplay = openingAltitudeAGL - 200; // AGL, bis zur effektiven Schirmöffnungshöhe
+
+    const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
+    const lowerLimitFormatted = Math.round(Utils.convertHeight(lowerLimitDisplay, heightUnit)); // Konvertiere 0m AGL
+    const upperLimitFormatted = Math.round(Utils.convertHeight(upperLimitDisplay, heightUnit)); // Konvertiere Öffnungshöhe AGL
+
+    const tooltipText = `<strong>${label}</strong><br>` +
+        `Mean Wind ${lowerLimitFormatted}-${upperLimitFormatted} ${heightUnit} AGL:<br>` +
+        `${Utils.roundToTens(canopyResult.meanWindDir)}° ${formattedMeanWindSpeed} ${userWindUnit}`;
+
+    circle.bindTooltip(tooltipText, {
+        permanent: false,
+        direction: 'top',
+        className: 'ensemble-tooltip', // Beibehaltung der CSS-Klasse
+        opacity: 0.9 // Standard-Tooltip-Deckkraft
+    });
+
+    AppState.ensembleScenarioCircles[label] = circle; console.log(`Drew ensemble circle for ${label} at [${newCenter.join(', ')}], radius ${canopyResult.radius}`);
+}
+function calculateEnsembleScenarioProfile(scenarioType /* sliderIndex hier nicht mehr als direkter Parameter nötig, wird in der Schleife verwendet */) {
+    if (!AppState.ensembleModelsData || Object.keys(AppState.ensembleModelsData).length === 0) {
+        console.warn("No ensemble data available for profile calculation.");
+        return null;
+    }
+
+    const numModels = Object.keys(AppState.ensembleModelsData).length;
+    if (numModels === 0) return null;
+
+    console.log(`Calculating full time-series ensemble profile for: ${scenarioType}`);
+
+    const scenarioHourlyData = {}; // Das wird das neue 'hourly'-Objekt für das Szenario
+
+    // Annahme: Alle Modelle haben die gleiche Zeitachsenstruktur. Nehmen Sie sie vom ersten Modell.
+    const firstModelName = Object.keys(AppState.ensembleModelsData)[0];
+    const timeArrayFromFirstModel = AppState.ensembleModelsData[firstModelName]?.time; // ?. für Sicherheit
+
+    if (!timeArrayFromFirstModel || timeArrayFromFirstModel.length === 0) {
+        console.error("Time data missing or empty in the first ensemble model for profile calculation.");
+        return null;
+    }
+    scenarioHourlyData.time = [...timeArrayFromFirstModel]; // Kopiere das vollständige Zeitarray
+
+    const numTimeSteps = scenarioHourlyData.time.length;
+
+    // Basisvariablen (ohne Modell-Suffix), die aggregiert werden sollen
+    const baseVariablesToProcess = [
+        "surface_pressure", "temperature_2m", "relative_humidity_2m",
+        "geopotential_height_1000hPa", "temperature_1000hPa", "relative_humidity_1000hPa",
+        "geopotential_height_950hPa", "temperature_950hPa", "relative_humidity_950hPa",
+        "geopotential_height_925hPa", "temperature_925hPa", "relative_humidity_925hPa",
+        "geopotential_height_900hPa", "temperature_900hPa", "relative_humidity_900hPa",
+        "geopotential_height_850hPa", "temperature_850hPa", "relative_humidity_850hPa",
+        "geopotential_height_800hPa", "temperature_800hPa", "relative_humidity_800hPa",
+        "geopotential_height_700hPa", "temperature_700hPa", "relative_humidity_700hPa",
+        "geopotential_height_600hPa", "temperature_600hPa", "relative_humidity_600hPa",
+        "geopotential_height_500hPa", "temperature_500hPa", "relative_humidity_500hPa",
+        "geopotential_height_400hPa", "temperature_400hPa", "relative_humidity_400hPa",
+        "geopotential_height_300hPa", "temperature_300hPa", "relative_humidity_300hPa",
+        "geopotential_height_250hPa", "temperature_250hPa", "relative_humidity_250hPa",
+        "geopotential_height_200hPa", "temperature_200hPa", "relative_humidity_200hPa"
+    ];
+
+    // Windvariablen-Paare (Basisnamen)
+    const windVariablePairs = [
+        ["wind_speed_10m", "wind_direction_10m"]
+    ];
+    const pressureLevels = [1000, 950, 925, 900, 850, 800, 700, 600, 500, 400, 300, 250, 200];
+    pressureLevels.forEach(p => {
+        windVariablePairs.push([`wind_speed_${p}hPa`, `wind_direction_${p}hPa`]);
+    });
+
+    // Initialisiere die Arrays in scenarioHourlyData mit der korrekten Länge
+    baseVariablesToProcess.forEach(varName => {
+        scenarioHourlyData[varName] = new Array(numTimeSteps).fill(null);
+    });
+    windVariablePairs.forEach(pair => {
+        scenarioHourlyData[pair[0]] = new Array(numTimeSteps).fill(null); // für Geschwindigkeit
+        scenarioHourlyData[pair[1]] = new Array(numTimeSteps).fill(null); // für Richtung
+    });
+
+    // Iteriere durch jeden Zeitschritt der gesamten Vorhersageperiode
+    for (let t = 0; t < numTimeSteps; t++) {
+        // Verarbeite nicht-Wind Variablen
+        baseVariablesToProcess.forEach(varName => {
+            const valuesAtTimeStep = [];
+            for (const modelName in AppState.ensembleModelsData) {
+                // Stelle sicher, dass das Modell auch Daten für diese Variable hat
+                const modelHourly = AppState.ensembleModelsData[modelName];
+                if (modelHourly && modelHourly[varName]) {
+                    const val = modelHourly[varName][t]; // Zugriff auf den t-ten Wert
+                    if (val !== null && val !== undefined && !isNaN(val)) {
+                        valuesAtTimeStep.push(val);
+                    }
+                }
+            }
+            if (valuesAtTimeStep.length > 0) {
+                if (scenarioType === 'min_wind') scenarioHourlyData[varName][t] = Math.min(...valuesAtTimeStep);
+                else if (scenarioType === 'max_wind') scenarioHourlyData[varName][t] = Math.max(...valuesAtTimeStep);
+                else scenarioHourlyData[varName][t] = valuesAtTimeStep.reduce((a, b) => a + b, 0) / valuesAtTimeStep.length; // Mean
+            }
+            // Wenn keine Werte vorhanden sind, bleibt der Wert null (durch Initialisierung oben)
+        });
+
+        // Verarbeite Windvariablen
+        windVariablePairs.forEach(pair => {
+            const speedVarName = pair[0];
+            const dirVarName = pair[1];
+            let u_components_t = [];
+            let v_components_t = [];
+            let speeds_t = [];
+            let dirs_t = [];
+
+            for (const modelName in AppState.ensembleModelsData) {
+                const modelHourly = AppState.ensembleModelsData[modelName];
+                if (modelHourly && modelHourly[speedVarName] && modelHourly[dirVarName]) {
+                    const speed = modelHourly[speedVarName][t];
+                    const dir = modelHourly[dirVarName][t];
+                    if (speed !== null && speed !== undefined && !isNaN(speed) &&
+                        dir !== null && dir !== undefined && !isNaN(dir)) {
+                        speeds_t.push(speed);
+                        dirs_t.push(dir);
+                        u_components_t.push(-speed * Math.sin(dir * Math.PI / 180));
+                        v_components_t.push(-speed * Math.cos(dir * Math.PI / 180));
+                    }
+                }
+            }
+
+            if (speeds_t.length > 0) {
+                if (scenarioType === 'min_wind') {
+                    const minSpeed = Math.min(...speeds_t);
+                    const minIndex = speeds_t.indexOf(minSpeed);
+                    scenarioHourlyData[speedVarName][t] = minSpeed;
+                    scenarioHourlyData[dirVarName][t] = dirs_t[minIndex];
+                } else if (scenarioType === 'max_wind') {
+                    const maxSpeed = Math.max(...speeds_t);
+                    const maxIndex = speeds_t.indexOf(maxSpeed);
+                    scenarioHourlyData[speedVarName][t] = maxSpeed;
+                    scenarioHourlyData[dirVarName][t] = dirs_t[maxIndex];
+                } else { // mean_wind
+                    const mean_u = u_components_t.reduce((a, b) => a + b, 0) / u_components_t.length;
+                    const mean_v = v_components_t.reduce((a, b) => a + b, 0) / v_components_t.length;
+                    scenarioHourlyData[speedVarName][t] = Utils.windSpeed(mean_u, mean_v);
+                    scenarioHourlyData[dirVarName][t] = Utils.windDirection(mean_u, mean_v);
+                }
+            }
+            // Wenn keine Werte vorhanden sind, bleiben die Werte null
+        });
+    }
+    // console.log(`Vollständiges Zeitreihenprofil für ${scenarioType}:`, scenarioHourlyData);
+    return { hourly: scenarioHourlyData }; // Struktur wie eine einzelne API-Modellantwort
+}
+/**
+ * Berechnet die Canopy-Kreise für ein gegebenes Ensemble-Profil oder ein einzelnes Modell aus dem Ensemble.
+ * @param {string} profileIdentifier - Name des Modells oder Szenarios (z.B. "icon_global", "min_wind").
+ * @param {object} [specificProfileData=null] - Optionale, spezifische Wetterdaten für das Profil.
+ * Wenn null, wird versucht, die Daten aus AppState.ensembleModelsData[profileIdentifier] zu verwenden.
+ * @returns {object|null} Das Ergebnis von calculateCanopyCircles oder null bei Fehler.
+ */
+function calculateCanopyCirclesForEnsemble(profileIdentifier, specificProfileData = null) {
+    console.log(`Calculating canopy circles for ensemble profile/model: ${profileIdentifier}`);
+
+    // Bestimme die zu verwendenden Wetterdaten
+    let weatherDataForProfile;
+    if (specificProfileData) {
+        weatherDataForProfile = specificProfileData; // Direkte Übergabe für Min/Mean/Max Profile
+    } else if (AppState.ensembleModelsData && AppState.ensembleModelsData[profileIdentifier]) {
+        // Für 'all_models'-Szenario, hole Daten des spezifischen Modells
+        weatherDataForProfile = { hourly: AppState.ensembleModelsData[profileIdentifier] };
+    } else {
+        console.warn(`Keine Daten für Profil/Modell ${profileIdentifier} in calculateCanopyCirclesForEnsemble gefunden.`);
+        return null;
+    }
+
+    if (!weatherDataForProfile.hourly || !AppState.lastLat || !AppState.lastLng) {
+        console.warn(`Unvollständige Daten für calculateCanopyCirclesForEnsemble: ${profileIdentifier}`);
+        return null;
+    }
+
+    const originalGlobalWeatherData = AppState.weatherData;
+    const originalShowCanopyArea = Settings.state.userSettings.showCanopyArea;
+    const originalCalculateJump = Settings.state.userSettings.calculateJump;
+
+    AppState.weatherData = weatherDataForProfile.hourly;
+    // Für Ensemble-Visualisierung temporär die Bedingungen erfüllen,
+    // oder calculateCanopyCircles so anpassen, dass es diese optional ignoriert.
+    Settings.state.userSettings.showCanopyArea = true; // Temporär setzen
+    Settings.state.userSettings.calculateJump = true;  // Temporär setzen
+
+    let result = null;
+    try {
+        result = calculateCanopyCircles();
+    } catch (error) {
+        console.error(`Fehler in calculateCanopyCircles für Profil ${profileIdentifier}:`, error);
+        result = null;
+    } finally {
+        AppState.weatherData = originalGlobalWeatherData;
+        Settings.state.userSettings.showCanopyArea = originalShowCanopyArea; // Zurücksetzen
+        Settings.state.userSettings.calculateJump = originalCalculateJump;  // Zurücksetzen
+        // Settings.save(); // Nicht hier speichern, da es temporäre Änderungen sind
+    }
+
+    if (result) {
+        // Die Visualisierungsfunktion erwartet eine vereinfachte Struktur.
+        // Wir verwenden hier die Daten des "roten Kreises" (volle Distanz).
+        return {
+            centerLat: result.redLat,
+            centerLng: result.redLng,
+            radius: result.radiusFull,
+            displacement: result.displacementFull,
+            direction: result.directionFull,
+            meanWindDir: result.meanWindForFullCanopyDir, // Die tatsächliche Mittelwindrichtung
+            meanWindSpeedMps: result.meanWindForFullCanopySpeedMps, // Die Mittelwindgeschwindigkeit in m/s
+            profileIdentifier: profileIdentifier // Behalte die ID für Tooltips etc.
+        };
+    }
+    console.warn(`calculateCanopyCircles lieferte null für Profil ${profileIdentifier}`);
+    return null;
+}
+function generateAndDisplayHeatmap() {
+
+    // 1. Clear previous visualizations
+    clearEnsembleVisualizations();
+    if (AppState.heatmapLayer) {
+        AppState.map.removeLayer(AppState.heatmapLayer);
+        AppState.heatmapLayer = null;
+    }
+
+    // 2. Check if there is data
+    if (!AppState.ensembleModelsData || Object.keys(AppState.ensembleModelsData).length < 2) {
+        Utils.handleMessage("Please select at least two ensemble models to generate a heatmap.");
+        return;
+    }
+
+    // 3. Calculate all individual model circles
+    const modelCircles = [];
+    for (const modelName in AppState.ensembleModelsData) {
+        if (Object.hasOwnProperty.call(AppState.ensembleModelsData, modelName)) {
+            const modelHourlyData = AppState.ensembleModelsData[modelName];
+            const canopyResult = calculateCanopyCirclesForEnsemble(modelName, { hourly: modelHourlyData });
+
+            if (canopyResult) {
+                const center = Utils.calculateNewCenter(canopyResult.centerLat, canopyResult.centerLng, canopyResult.displacement, canopyResult.direction);
+                modelCircles.push({
+                    centerLat: center[0],
+                    centerLng: center[1],
+                    radius: canopyResult.radius
+                });
+            }
+        }
+    }
+
+    if (modelCircles.length === 0) {
+        console.warn("Could not calculate any circles for the heatmap.");
+        return;
+    }
+    console.log(`[Heatmap] Calculated ${modelCircles.length} model circles.`);
+
+    // 4. Bounding-Box und Raster-Berechnung (bleibt gleich)
+    let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
+    const metersPerDegree = 111320;
+    modelCircles.forEach(circle => {
+        const latRadius = circle.radius / metersPerDegree;
+        const lngRadius = circle.radius / (metersPerDegree * Math.cos(circle.centerLat * Math.PI / 180));
+        minLat = Math.min(minLat, circle.centerLat - latRadius);
+        maxLat = Math.max(maxLat, circle.centerLat + latRadius);
+        minLng = Math.min(minLng, circle.centerLng - lngRadius);
+        maxLng = Math.max(maxLng, circle.centerLng + lngRadius);
+    });
+
+    const gridResolution = 40;
+    const latStep = gridResolution / metersPerDegree;
+    const heatmapPoints = [];
+
+    console.log("[Heatmap] Starting grid calculation...");
+    for (let lat = minLat; lat <= maxLat; lat += latStep) {
+        const lngStep = gridResolution / (metersPerDegree * Math.cos(lat * Math.PI / 180));
+        for (let lng = minLng; lng <= maxLng; lng += lngStep) {
+            let overlapCount = 0;
+            const gridCellLatLng = L.latLng(lat, lng);
+            modelCircles.forEach(circle => {
+                const circleCenterLatLng = L.latLng(circle.centerLat, circle.centerLng);
+                const distance = AppState.map.distance(gridCellLatLng, circleCenterLatLng);
+                if (distance <= circle.radius) {
+                    overlapCount++;
+                }
+            });
+            if (overlapCount > 0) {
+                heatmapPoints.push([lat, lng, overlapCount]);
+            }
+        }
+    }
+    console.log(`[Heatmap] Finished grid calculation. Generated ${heatmapPoints.length} heatmap points.`);
+
+    // 5. Heatmap-Layer erstellen und anzeigen
+    if (heatmapPoints.length > 0) {
+        const maxOverlap = modelCircles.length;
+
+        // *** ANGEPASSTER FARBVERLAUF FÜR SCHARFE ÜBERGÄNGE ***
+        const gradient = {};
+        if (maxOverlap === 1) {
+            gradient[1.0] = 'lime'; // Wenn nur ein Modell da ist, ist es grün
+        } else {
+            // Definiert scharfe Übergänge an den ganzzahligen Schritten
+            // z.B. bei 3 Modellen: 1/3=rot, 2/3=gelb, 3/3=grün
+            for (let i = 1; i <= maxOverlap; i++) {
+                const ratio = i / maxOverlap;
+                if (i === 1) {
+                    gradient[ratio] = 'red';
+                } else if (i < maxOverlap) {
+                    gradient[ratio] = 'yellow';
+                } else { // i === maxOverlap
+                    gradient[ratio] = 'lime';
+                }
+            }
+            // Um die Übergänge noch schärfer zu machen, könnten wir die Stopps verdoppeln,
+            // aber diese einfache Zuordnung sollte schon ein viel klareres Bild ergeben.
+        }
+
+        console.log("[Heatmap] Using gradient:", gradient);
+
+        if (AppState.heatmapLayer) {
+            AppState.map.removeLayer(AppState.heatmapLayer);
+        }
+
+        AppState.heatmapLayer = L.heatLayer(heatmapPoints, {
+            radius: 20, // Ein etwas kleinerer Radius kann helfen, die Zonen klarer zu trennen
+            blur: 10,   // Ein etwas kleinerer Blur ebenfalls
+            max: maxOverlap,
+            minOpacity: 0.01, // Macht die Heatmap etwas weniger durchsichtig
+            gradient: gradient // Der neu berechnete, "schärfere" Farbverlauf
+        }).addTo(AppState.map);
+    } else {
+        Utils.handleMessage("No overlapping landing areas found for the selected models.");
+    }
 }
 
 // == Autoupdate Functionality ==
