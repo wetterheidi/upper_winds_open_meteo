@@ -3054,13 +3054,13 @@ function calculateCanopyCirclesForEnsemble(profileIdentifier, specificProfileDat
 }
 export function calculateDynamicRadius(baseRadius = 20, referenceZoom = 13) {
     const currentZoom = AppState.map.getZoom();
-    // Scale radius inversely with zoom level relative to referenceZoom
-    // At zoom 13, radius = baseRadius; below 13, radius increases; above 13, radius decreases
-    // Der ursprüngliche, aggressive Skalierungsfaktor
-    const aggressiveScaleFactor = Math.pow(2, currentZoom - referenceZoom);
+    // NEU: Anstatt der festen "2" verwenden wir eine anpassbare Basis.
+    // Ein Wert um 1.6 ist oft ein guter Kompromiss.
+    // - Näher an 1: Sanftere Skalierung
+    // - Näher an 2: Aggressivere Skalierung
+    const scalingBase = 1.42; 
     
-    // NEU: Wir dämpfen den Faktor mit der Quadratwurzel
-    const scaleFactor = Math.sqrt(aggressiveScaleFactor);
+    const scaleFactor = Math.pow(scalingBase, currentZoom - referenceZoom);
     const dynamicRadius = baseRadius * scaleFactor;
     // Clamp radius to reasonable bounds to avoid extreme values
     const minRadius = 5;  // Minimum radius to avoid disappearing at high zooms
