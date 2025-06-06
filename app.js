@@ -2217,7 +2217,7 @@ export function interpolateWeatherData(sliderIndex) {
         console.warn('No weather data available for interpolation');
         return [];
     }
-
+ 
     const baseHeight = Math.round(AppState.lastAltitude);
     const interpStep = parseInt(getInterpolationStep()) || 100;
     const heightUnit = getHeightUnit();
