@@ -5,13 +5,13 @@ import {
     updateMarkerPopup,
     fetchWeatherForLocation,
     debouncedCalculateJump,
-    calculateCutAway,
     updateJumpRunTrack,
     updateLandingPattern,
     getCoordinateFormat,
     getWindSpeedUnit,
     getHeightUnit
 } from './app.js';
+import { calculateCutAway } from "./jumpPlanner.js";
 import { Settings } from "./settings.js";
 import { Utils } from "./utils.js";
 import { interpolateColor } from "./uiHelpers.js";
