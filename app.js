@@ -3494,6 +3494,12 @@ export function calculateJump() {
         updateMarkerPopup(AppState.currentMarker, AppState.lastLat, AppState.lastLng, AppState.lastAltitude, AppState.currentMarker.getPopup()?.isOpen() || false);
     }
 
+    // NEU: Ensemble-Visualisierung nach der Hauptberechnung aktualisieren
+    if (Settings.state.userSettings.selectedEnsembleModels && Settings.state.userSettings.selectedEnsembleModels.length > 0) {
+        console.log("calculateJump triggering ensemble update.");
+        processAndVisualizeEnsemble();
+    }
+
     console.log('calculateJump completed', result);
     return result;
 }
@@ -6540,7 +6546,7 @@ async function updateAllDisplays() {
             recenterMap();
         }
         updateLivePositionControl();
-        // Update Jump Master Line distance unit if active
+        
         if (AppState.jumpMasterLine && AppState.liveMarker && AppState.currentMarker && AppState.lastLat !== null && AppState.lastLng !== null) {
             if (!AppState.map) {
                 console.warn('Map not initialized, cannot update Jump Master Line popup');
@@ -6556,6 +6562,13 @@ async function updateAllDisplays() {
             AppState.jumpMasterLine.setPopupContent(`<b>Jump Master Line</b><br>Bearing: ${bearing}°<br>Distance: ${roundedDistance} ${heightUnit}`);
             console.log('Updated Jump Master Line popup for heightUnit:', { bearing, distance: roundedDistance, unit: heightUnit });
         }
+        
+        // NEU: Ensemble-Visualisierung aktualisieren, wenn sich Anzeige-Parameter ändern
+        if (Settings.state.userSettings.selectedEnsembleModels && Settings.state.userSettings.selectedEnsembleModels.length > 0) {
+            console.log("updateAllDisplays triggering ensemble update.");
+            processAndVisualizeEnsemble();
+        }
+
     } catch (error) {
         console.error('Error in updateAllDisplays:', error);
     }
