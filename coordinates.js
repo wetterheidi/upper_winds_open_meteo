@@ -156,7 +156,7 @@ function parseQueryAsCoordinates(query) {
  * Rendert die Ergebnisliste, die Favoriten, Verlauf und Suchergebnisse enthält.
  * @param {Array} searchResults - Ein Array mit Suchergebnissen von der API.
  */
-function renderResultsList(searchResults = []) {
+function renderResultsList(searchResults = []) { 
     const resultsList = document.getElementById('locationResults');
     if (!resultsList) return;
 
@@ -231,7 +231,7 @@ function renderResultsList(searchResults = []) {
     if (searchResults.length > 0) {
         const heading = document.createElement('li');
         heading.className = 'results-heading';
-        heading.textContent = 'Suchergebnisse';
+        heading.textContent = 'Results';
         heading.style.fontWeight = 'bold';
         heading.style.background = '#f0f0f0';
         resultsList.appendChild(heading);
