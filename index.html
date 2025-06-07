@@ -204,14 +204,16 @@
             </li>
         </ul>
         </li>
-        <li>
-            <span>Coordinate Input</span>
-            <ul class="submenu hidden">
+         <li>
+            <span>Search Location</span>
+            <ul class="submenu" id="locationSearchSubmenu">
                 <li>
-                    <div id="coordInputs"></div>
-                </li>
-                <li>
-                    <button id="moveMarkerBtn">Move Marker</button>
+                    <div class="search-container">
+                        <input type="text" id="locationSearchInput" placeholder="Look up location or city...">
+                        <button id="saveCurrentLocationBtn" title="Save As Favorite">★+</button>
+                    </div>
+                    <ul id="locationResults" class="location-results-list">
+                        </ul>
                 </li>
             </ul>
         </li>

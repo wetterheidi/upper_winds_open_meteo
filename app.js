@@ -6,7 +6,7 @@ import { Constants, FEATURE_PASSWORD } from './constants.js';
 import { displayMessage, displayProgress, displayError, hideProgress, updateOfflineIndicator, isMobileDevice } from './ui.js';
 import { TileCache, cacheTilesForDIP, debouncedCacheVisibleTiles } from './tileCache.js';
 import { setupCacheManagement, setupCacheSettings } from './cacheUI.js';
-import * as Coordinates from './coordinates.js';
+import { initializeLocationSearch, setMoveMarkerCallback, setCurrentMarkerPositionCallback, addCoordToHistory } from './coordinates.js';
 import { interpolateColor, generateWindBarb, createArrowIcon } from "./uiHelpers.js";
 import { handleHarpPlacement, createHarpMarker, clearHarpMarker } from './harpMarker.js';
 import { loadGpxTrack, loadCsvTrackUTC } from './trackManager.js';
@@ -557,7 +557,7 @@ async function _handleMapDblClick(e) {
     AppState.lastLng = lng;
     AppState.lastAltitude = await Utils.getAltitude(lat, lng);
     console.log('Map double-clicked, moving marker to:', { lat, lng });
-    Coordinates.addCoordToHistory(lat, lng);
+    addCoordToHistory(lat, lng, `Marker-Position: ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
 
     AppState.currentMarker = Utils.configureMarker(
         AppState.map,
@@ -819,7 +819,7 @@ function attachMarkerDragend(marker) {
         AppState.lastLat = position.lat;
         AppState.lastLng = position.lng;
         AppState.lastAltitude = await Utils.getAltitude(AppState.lastLat, AppState.lastLng);
-        Coordinates.addCoordToHistory(position.lat, position.lng);
+        addCoordToHistory(position.lat, position.lng, `Marker-Position: ${position.lat.toFixed(4)}, ${position.lng.toFixed(4)}`);
         const wasOpen = marker.getPopup()?.isOpen() || false;
         updateMarkerPopup(marker, AppState.lastLat, AppState.lastLng, AppState.lastAltitude, wasOpen);
         console.log('Marker dragged to:', { lat: AppState.lastLat, lng: AppState.lastLng });
@@ -2807,7 +2807,7 @@ function getDistinctColorForScenario(scenario) {
     return 'rgba(128, 128, 128, 0.7)'; // Grau für Fallback
 }
 function drawEnsembleCircle(exitResult, color, label) {
-   if (!AppState.map || !exitResult || !AppState.ensembleLayerGroup) return;
+    if (!AppState.map || !exitResult || !AppState.ensembleLayerGroup) return;
 
     const center = [exitResult.centerLat, exitResult.centerLng];
 
@@ -2821,12 +2821,12 @@ function drawEnsembleCircle(exitResult, color, label) {
     }).addTo(AppState.ensembleLayerGroup);
 
     const userWindUnit = Settings.getValue('windUnit', 'radio', 'kt');
-    
+
     // Prüfen, ob meanWindSpeedMps eine gültige Zahl ist
     let formattedMeanWindSpeed = 'N/A';
     if (exitResult.meanWindSpeedMps !== 'N/A' && Number.isFinite(exitResult.meanWindSpeedMps)) {
         const meanWindSpeedConverted = Utils.convertWind(exitResult.meanWindSpeedMps, userWindUnit, 'm/s');
-        
+
         // Zusätzliche Prüfung, da convertWind 'N/A' zurückgeben kann
         if (meanWindSpeedConverted !== 'N/A' && Number.isFinite(meanWindSpeedConverted)) {
             formattedMeanWindSpeed = userWindUnit === 'bft' ?
@@ -2843,8 +2843,8 @@ function drawEnsembleCircle(exitResult, color, label) {
     const lowerLimitFormatted = Math.round(Utils.convertHeight(lowerLimitDisplay, heightUnit));
     const upperLimitFormatted = Math.round(Utils.convertHeight(upperLimitDisplay, heightUnit));
 
-    const meanWindDirFormatted = (exitResult.meanWindDir !== 'N/A' && Number.isFinite(exitResult.meanWindDir)) 
-        ? Utils.roundToTens(exitResult.meanWindDir) 
+    const meanWindDirFormatted = (exitResult.meanWindDir !== 'N/A' && Number.isFinite(exitResult.meanWindDir))
+        ? Utils.roundToTens(exitResult.meanWindDir)
         : 'N/A';
 
     const tooltipText = `<strong>${label}</strong><br>` +
@@ -2858,7 +2858,7 @@ function drawEnsembleCircle(exitResult, color, label) {
         opacity: 0.9
     });
 
-    AppState.ensembleScenarioCircles[label] = circle; 
+    AppState.ensembleScenarioCircles[label] = circle;
     console.log(`Drew ensemble circle for ${label} at [${center.join(', ')}], radius ${exitResult.radius}`);
 }
 function calculateEnsembleScenarioProfile(scenarioType /* sliderIndex hier nicht mehr als direkter Parameter nötig, wird in der Schleife verwendet */) {
@@ -3114,7 +3114,7 @@ function calculateExitCircleForEnsemble(profileIdentifier, specificProfileData =
 
             const upperLimit = elevation + openingAltitudeAGL - 200;
             const lowerLimit = elevation + legHeightDownwind;
-            
+
             const meanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, lowerLimit, upperLimit);
             if (meanWind && Number.isFinite(meanWind[0]) && Number.isFinite(meanWind[1])) {
                 meanWindResult = {
@@ -3156,8 +3156,8 @@ export function calculateDynamicRadius(baseRadius = 20, referenceZoom = 13) {
     // Ein Wert um 1.6 ist oft ein guter Kompromiss.
     // - Näher an 1: Sanftere Skalierung
     // - Näher an 2: Aggressivere Skalierung
-    const scalingBase = 1.42; 
-    
+    const scalingBase = 1.42;
+
     const scaleFactor = Math.pow(scalingBase, currentZoom - referenceZoom);
     const dynamicRadius = baseRadius * scaleFactor;
     // Clamp radius to reasonable bounds to avoid extreme values
@@ -3247,9 +3247,9 @@ function generateAndDisplayHeatmap() {
     if (heatmapPoints.length > 0) {
         const maxOverlap = modelCircles.length;
         const gradient = {};
-        
+
         if (maxOverlap === 1) {
-            gradient[1.0] = 'lime'; 
+            gradient[1.0] = 'lime';
         } else {
             for (let i = 1; i <= maxOverlap; i++) {
                 const ratio = i / maxOverlap;
@@ -3257,7 +3257,7 @@ function generateAndDisplayHeatmap() {
                     gradient[ratio] = 'red';
                 } else if (i < maxOverlap) {
                     gradient[ratio] = 'yellow';
-                } else { 
+                } else {
                     gradient[ratio] = 'lime';
                 }
             }
@@ -5899,71 +5899,6 @@ function setupCheckboxEvents() {
         });
     }
 }
-function setupCoordinateEvents() {
-    Coordinates.initCoordStorage();
-
-    // Define the move marker logic
-    const moveMarker = async (lat, lng) => {
-        try {
-            AppState.lastLat = lat;
-            AppState.lastLng = lng;
-            AppState.lastAltitude = await Utils.getAltitude(lat, lng);
-            console.log('Moving marker to:', { lat, lng });
-            AppState.currentMarker = Utils.configureMarker(
-                AppState.map,
-                lat,
-                lng,
-                AppState.lastAltitude,
-                false,
-                createCustomMarker,
-                attachMarkerDragend,
-                updateMarkerPopup,
-                AppState.currentMarker,
-                (marker) => { AppState.currentMarker = marker; }
-            );
-            resetJumpRunDirection(true);
-            Coordinates.addCoordToHistory(lat, lng);
-            if (Settings.state.userSettings.calculateJump) {
-                console.log('Recalculating jump for coordinate input');
-                debouncedCalculateJump();
-                JumpPlanner.calculateCutAway();
-            }
-            recenterMap(true);
-            AppState.isManualPanning = false;
-            await fetchWeatherForLocation(lat, lng);
-        } catch (error) {
-            console.error('Error moving marker:', error);
-            Utils.handleError(error.message);
-        }
-    };
-
-    // Set the move marker callback for coordinates.js
-    Coordinates.setMoveMarkerCallback(moveMarker);
-
-    // Initialize coordinate inputs
-    const coordInputs = document.getElementById('coordInputs');
-    if (coordInputs) {
-        Coordinates.updateCoordInputs(Settings.state.userSettings.coordFormat, AppState.lastLat, AppState.lastLng);
-    } else {
-        console.warn('Coordinate inputs container (#coordInputs) not found');
-    }
-
-    // Attach event listener to move marker button
-    const moveMarkerBtn = document.getElementById('moveMarkerBtn');
-    if (moveMarkerBtn) {
-        moveMarkerBtn.addEventListener('click', async () => {
-            console.log('Move marker button clicked');
-            try {
-                const [lat, lng] = Coordinates.parseCoordinates();
-                await moveMarker(lat, lng); // Use the same logic
-            } catch (error) {
-                console.error('Error moving marker:', error);
-                Utils.handleError(error.message);
-            }
-        });
-        console.log('Attached event listener to moveMarkerBtn');
-    }
-}
 function setupCheckbox(id, setting, callback) {
     console.log(`setupCheckbox called for id: ${id}`);
     const checkbox = document.getElementById(id);
@@ -6546,7 +6481,7 @@ async function updateAllDisplays() {
             recenterMap();
         }
         updateLivePositionControl();
-        
+
         if (AppState.jumpMasterLine && AppState.liveMarker && AppState.currentMarker && AppState.lastLat !== null && AppState.lastLng !== null) {
             if (!AppState.map) {
                 console.warn('Map not initialized, cannot update Jump Master Line popup');
@@ -6562,7 +6497,7 @@ async function updateAllDisplays() {
             AppState.jumpMasterLine.setPopupContent(`<b>Jump Master Line</b><br>Bearing: ${bearing}°<br>Distance: ${roundedDistance} ${heightUnit}`);
             console.log('Updated Jump Master Line popup for heightUnit:', { bearing, distance: roundedDistance, unit: heightUnit });
         }
-        
+
         // NEU: Ensemble-Visualisierung aktualisieren, wenn sich Anzeige-Parameter ändern
         if (Settings.state.userSettings.selectedEnsembleModels && Settings.state.userSettings.selectedEnsembleModels.length > 0) {
             console.log("updateAllDisplays triggering ensemble update.");
@@ -6590,7 +6525,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setupRadioEvents();
     setupInputEvents();
     setupCheckboxEvents();
-    setupCoordinateEvents();
     setupResetButton();
     setupResetCutAwayMarkerButton();
     setupClearHistoricalDate(); // Add this line
@@ -6598,4 +6532,31 @@ document.addEventListener('DOMContentLoaded', () => {
     setupCacheManagement();
     setupCacheSettings({ map: AppState.map, lastLat: AppState.lastLat, lastLng: AppState.lastLng, baseMaps: AppState.baseMaps });
     setupAutoupdate(); // Add autoupdate setup
+    // Setzt das neue Orts-Management-System auf
+    initializeLocationSearch();
+    // Übergibt die notwendigen Kontrollfunktionen an das Koordinaten-Modul
+    setMoveMarkerCallback((lat, lng) => {
+        // Diese Logik bewegt den Marker und holt neue Wetterdaten
+        // Sie ist wahrscheinlich Teil Ihrer "moveMarker" oder "dragend" Logik
+        AppState.lastLat = lat;
+        AppState.lastLng = lng;
+        Utils.getAltitude(lat, lng).then(altitude => {
+            AppState.lastAltitude = altitude;
+            AppState.currentMarker = Utils.configureMarker(
+                AppState.map, lat, lng, altitude, false,
+                createCustomMarker, attachMarkerDragend, updateMarkerPopup, AppState.currentMarker,
+                (marker) => { AppState.currentMarker = marker; }
+            );
+            recenterMap(true);
+            fetchWeatherForLocation(lat, lng);
+        });
+    });
+    setCurrentMarkerPositionCallback(() => {
+        // Gibt die aktuelle Position des Markers zurück
+        if (AppState.currentMarker) {
+            const pos = AppState.currentMarker.getLatLng();
+            return { lat: pos.lat, lng: pos.lng };
+        }
+        return null;
+    });
 });

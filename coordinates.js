@@ -1,404 +1,436 @@
+// coordinates.js - Neu gestaltet für eine intuitive Orts-Suche
+
 "use strict";
 
 import { Settings } from './settings.js';
 import { Utils } from './utils.js';
 
-// External dependencies (must be set by app.js)
+// Callbacks, die von app.js gesetzt werden, um mit der Karte zu interagieren
 let moveMarkerCallback = null;
+let getCurrentMarkerPositionCallback = null;
 
-function setMoveMarkerCallback(callback) {
-    moveMarkerCallback = callback;
+/**
+ * Initialisiert das gesamte Location-Search-Modul.
+ * Diese Funktion wird von app.js aufgerufen.
+ */
+function initializeLocationSearch() {
+    // Referenzen zu den neuen UI-Elementen
+    const searchInput = document.getElementById('locationSearchInput');
+    const resultsList = document.getElementById('locationResults');
+    const saveFavoriteBtn = document.getElementById('saveCurrentLocationBtn');
+
+    if (!searchInput || !resultsList || !saveFavoriteBtn) {
+        console.error('Einige Elemente der Ortssuche wurden nicht im DOM gefunden.');
+        return;
+    }
+
+    // Debounced-Version der Suchfunktion, um die API-Anfragen zu begrenzen
+    const debouncedSearch = Utils.debounce(performSearch, 300);
+
+    // Event Listener für das Suchfeld
+    searchInput.addEventListener('input', () => {
+        debouncedSearch(searchInput.value);
+    });
+
+    // Zeigt die Liste an, wenn der Benutzer in das Feld klickt
+    searchInput.addEventListener('focus', () => {
+        renderResultsList(); // Zeigt Favoriten/Verlauf sofort an
+        resultsList.style.display = 'block';
+    });
+
+    // Verbirgt die Liste, wenn der Benutzer aus dem Feld klickt (mit einer kleinen Verzögerung)
+    searchInput.addEventListener('blur', () => {
+        setTimeout(() => {
+            resultsList.style.display = 'none';
+        }, 200); // Verzögerung, damit Klicks auf Listeneinträge noch registriert werden
+    });
+
+    // Event Listener für den "Favorit speichern"-Button
+    saveFavoriteBtn.addEventListener('click', () => {
+        if (getCurrentMarkerPositionCallback) {
+            const pos = getCurrentMarkerPositionCallback();
+            if (pos && pos.lat && pos.lng) {
+                const name = prompt("Please enter a name for this favorit:");
+                if (name) {
+                    addOrUpdateFavorite(pos.lat, pos.lng, name);
+                }
+            } else {
+                Utils.handleError("No valid marker position.");
+            }
+        }
+    });
+
+    // Initial das UI rendern
+    renderResultsList();
 }
 
-// Initialize coordinate storage in localStorage
-function initCoordStorage() {
-    if (!localStorage.getItem('coordHistory')) {
-        localStorage.setItem('coordHistory', JSON.stringify([]));
-        console.log('Initialized coordHistory in localStorage');
+/**
+ * Führt die Suche aus, basierend auf der Benutzereingabe.
+ * Unterscheidet zwischen Koordinaten und Suchbegriffen.
+ * @param {string} query - Die Eingabe des Benutzers.
+ */
+async function performSearch(query) {
+    if (!query.trim()) {
+        renderResultsList(); // Zeigt nur Favoriten/Verlauf bei leerer Eingabe
+        return;
+    }
+
+    let searchResults = [];
+    const parsedCoords = parseQueryAsCoordinates(query);
+
+    if (parsedCoords) {
+        // Wenn die Eingabe als Koordinate erkannt wurde
+        searchResults.push({
+            display_name: `Koordinate: ${parsedCoords.lat.toFixed(5)}, ${parsedCoords.lng.toFixed(5)}`,
+            lat: parsedCoords.lat,
+            lon: parsedCoords.lng, // <<< KORREKTUR HIER: Stellt sicher, dass 'lon' den Wert von 'lng' erhält
+            type: 'coordinate'
+        });
+        renderResultsList(searchResults);
+    } else {
+        // Wenn es keine Koordinate ist, Nominatim API für die Ortssuche verwenden
+        try {
+            const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&addressdetails=1`;
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: { 'User-Agent': 'Skydiving-Weather-App/1.0 (anonymous)' }
+            });
+            if (!response.ok) throw new Error(`Nominatim API Fehler: ${response.statusText}`);
+            const data = await response.json();
+            searchResults = data;
+            renderResultsList(searchResults);
+        } catch (error) {
+            console.error('Fehler bei der Geocoding-Suche:', error);
+            Utils.handleError("Could not find location.");
+            renderResultsList([]);
+        }
     }
 }
 
-// Retrieve coordinate history from localStorage
+/**
+ * Versucht, eine Benutzereingabe als Koordinate zu parsen.
+ * Erkennt Dezimalgrade und MGRS (mit oder ohne Leerzeichen).
+ * @param {string} query - Die Eingabe des Benutzers.
+ * @returns {object|null} Ein Objekt mit {lat, lng} oder null.
+ */
+function parseQueryAsCoordinates(query) {
+    const trimmedQuery = query.trim();
+
+    // 1. Versuch: Dezimalgrade (z.B. "48.123, -11.456" oder "48.123 -11.456")
+    const cleanedForDecimal = trimmedQuery.replace(',', ' ');
+    const decMatch = cleanedForDecimal.match(/^(-?\d{1,3}(\.\d+)?)\s+(-?\d{1,3}(\.\d+)?)$/);
+    if (decMatch) {
+        const lat = parseFloat(decMatch[1]);
+        const lng = parseFloat(decMatch[3]);
+        if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+            console.log("Eingabe als Dezimalgrad erkannt.");
+            return { lat, lng };
+        }
+    }
+
+    // 2. Versuch: MGRS (z.B. "32U PU 12345 67890" oder "32UPU1234567890")
+    const cleanedForMgrs = trimmedQuery.replace(/\s/g, '').toUpperCase();
+    // Ein robusterer Regex für MGRS: Zone, Band, Square, und eine gerade Anzahl von Ziffern.
+    const mgrsRegex = /^[0-9]{1,2}[C-HJ-NP-X][A-HJ-NP-Z]{2}(\d{2}|\d{4}|\d{6}|\d{8}|\d{10})$/;
+
+    if (typeof mgrs !== 'undefined' && mgrsRegex.test(cleanedForMgrs)) {
+        try {
+            const [lng, lat] = mgrs.toPoint(cleanedForMgrs);
+            if (!isNaN(lat) && !isNaN(lng)) {
+                console.log("Eingabe als MGRS erkannt.");
+                return { lat, lng };
+            }
+        } catch (e) {
+            // Fängt Fehler von der mgrs.toPoint-Bibliothek ab, falls das Format doch ungültig ist.
+            console.warn("MGRS-Parsing fehlgeschlagen, obwohl Regex passte:", e.message);
+            return null;
+        }
+    }
+
+    // Wenn keine Koordinate erkannt wurde
+    return null;
+}
+
+
+/**
+ * Rendert die Ergebnisliste, die Favoriten, Verlauf und Suchergebnisse enthält.
+ * @param {Array} searchResults - Ein Array mit Suchergebnissen von der API.
+ */
+function renderResultsList(searchResults = []) {
+    const resultsList = document.getElementById('locationResults');
+    if (!resultsList) return;
+
+    resultsList.innerHTML = '';
+    const history = getCoordHistory();
+    const favorites = history.filter(item => item.isFavorite);
+    const nonFavorites = history.filter(item => !item.isFavorite);
+
+// Funktion zum Erstellen eines Listeneintrags (JETZT MIT LÖSCHFUNKTION)
+    const createListItem = (item) => {
+        const li = document.createElement('li');
+        
+        // KORREKTUR: Sicherstellen, dass lat und lon/lng korrekt gelesen werden
+        const lat = parseFloat(item.lat);
+        const lon = parseFloat(item.lon || item.lng); // Akzeptiert 'lon' ODER 'lng'
+        
+        if (isNaN(lat) || isNaN(lon)) return null; // Ungültigen Eintrag überspringen
+
+        li.dataset.lat = lat;
+        li.dataset.lon = lon;
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'location-name';
+        nameSpan.textContent = item.display_name || item.label;
+        li.appendChild(nameSpan);
+
+        nameSpan.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            if (moveMarkerCallback) {
+                moveMarkerCallback(lat, lon);
+                addCoordToHistory(lat, lon, item.display_name || item.label, item.isFavorite || false);
+                resultsList.style.display = 'none';
+            }
+        });
+
+        // Container für die Buttons (Favorit & Löschen)
+        const buttonsContainer = document.createElement('div');
+        buttonsContainer.className = 'location-item-buttons';
+        
+        // Favoriten-Stern
+        const favToggle = document.createElement('button');
+        favToggle.className = 'favorite-toggle';
+        favToggle.innerHTML = item.isFavorite ? '★' : '☆';
+        if(item.isFavorite) favToggle.classList.add('is-favorite');
+        favToggle.title = "Als Favorit markieren/entfernen";
+        buttonsContainer.appendChild(favToggle);
+
+        favToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleFavorite(lat, lon, item.display_name || item.label);
+        });
+
+        // NEU: Löschen-Button hinzufügen
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'delete-location-btn';
+        deleteBtn.innerHTML = '×'; // Ein einfaches 'x' als Symbol
+        deleteBtn.title = "Diesen Eintrag löschen";
+        buttonsContainer.appendChild(deleteBtn);
+
+        deleteBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (confirm(`Möchten Sie "${item.display_name || item.label}" wirklich löschen?`)) {
+                removeLocationFromHistory(lat, lon);
+            }
+        });
+
+        li.appendChild(buttonsContainer);
+        return li;
+    };
+
+    // Rendere Suchergebnisse
+    if (searchResults.length > 0) {
+        const heading = document.createElement('li');
+        heading.className = 'results-heading';
+        heading.textContent = 'Suchergebnisse';
+        heading.style.fontWeight = 'bold';
+        heading.style.background = '#f0f0f0';
+        resultsList.appendChild(heading);
+        searchResults.forEach(result => {
+            // Prüfen, ob dieser Ort bereits ein Favorit ist
+            const fav = favorites.find(f => Math.abs(f.lat - result.lat) < 0.001 && Math.abs(f.lng - result.lon) < 0.001);
+            result.isFavorite = !!fav;
+            if (fav) result.display_name = fav.label; // Wenn Favorit, benutze den gespeicherten Namen
+
+            resultsList.appendChild(createListItem(result));
+        });
+    }
+
+    // Rendere Favoriten
+    if (favorites.length > 0) {
+        const heading = document.createElement('li');
+        heading.className = 'results-heading';
+        heading.textContent = 'Favorites';
+        heading.style.fontWeight = 'bold';
+        heading.style.background = '#f0f0f0';
+        resultsList.appendChild(heading);
+        favorites.forEach(fav => resultsList.appendChild(createListItem(fav)));
+    }
+
+    // Rendere Verlauf
+    if (nonFavorites.length > 0) {
+        const heading = document.createElement('li');
+        heading.className = 'results-heading';
+        heading.textContent = 'Previous Locations';
+        heading.style.fontWeight = 'bold';
+        heading.style.background = '#f0f0f0';
+        resultsList.appendChild(heading);
+        nonFavorites.forEach(item => resultsList.appendChild(createListItem(item)));
+    }
+}
+
+
+// --- Funktionen zur Verwaltung von localStorage ---
+
 function getCoordHistory() {
     try {
         return JSON.parse(localStorage.getItem('coordHistory')) || [];
-    } catch (error) {
-        console.error('Failed to parse coordHistory:', error);
-        Utils.handleError('Failed to load coordinate history.');
+    } catch (e) {
         return [];
     }
 }
 
-// Format a coordinate pair for display in the dropdown
-function formatCoordLabel(lat, lng, format) {
-    if (isNaN(lat) || isNaN(lng)) {
-        console.warn('Invalid coordinates for formatting:', { lat, lng });
-        return 'Invalid coordinates';
+function saveCoordHistory(history) {
+    try {
+        localStorage.setItem('coordHistory', JSON.stringify(history));
+    } catch (e) {
+        console.error("Error saving history:", e);
     }
-    if (format === 'DMS') {
-        try {
-            const latDMS = Utils.decimalToDms(lat, true);
-            const lngDMS = Utils.decimalToDms(lng, false);
-            return `${latDMS.deg}°${latDMS.min}'${latDMS.sec.toFixed(3)}"${latDMS.dir} ${lngDMS.deg}°${lngDMS.min}'${lngDMS.sec.toFixed(3)}"${lngDMS.dir}`;
-        } catch (e) {
-            console.warn('DMS formatting failed:', e);
-            Utils.handleError('Failed to format DMS coordinates.');
-            return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-        }
-    } else if (format === 'MGRS') {
-        try {
-            const mgrsCoord = mgrs.forward([lng, lat], 10);
-            console.log('Formatted MGRS:', { lat, lng, mgrsCoord });
-            return mgrsCoord;
-        } catch (e) {
-            console.warn('MGRS format failed:', e);
-            Utils.handleError('Failed to format MGRS coordinates.');
-            return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-        }
-    }
-    return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
 }
 
-// Add a coordinate pair to history, maintaining a limit
-function addCoordToHistory(lat, lng) {
-    if (isNaN(lat) || isNaN(lng)) {
-        console.warn('Cannot add invalid coordinates to history:', { lat, lng });
-        Utils.handleError('Invalid coordinates cannot be added to history.');
-        return;
-    }
-    const history = getCoordHistory();
-    const format = Settings.state.userSettings.coordFormat || 'Decimal';
+function addCoordToHistory(lat, lng, label, isFavorite = false) {
+    if (isNaN(lat) || isNaN(lng)) return;
+
+    let history = getCoordHistory();
     const newLat = parseFloat(lat.toFixed(5));
     const newLng = parseFloat(lng.toFixed(5));
-    const newEntry = {
+
+    // Entferne alte Einträge für dieselbe Koordinate
+    history = history.filter(entry => Math.abs(entry.lat - newLat) > 0.0001 || Math.abs(entry.lng - newLng) > 0.0001);
+
+    // Füge neuen Eintrag am Anfang hinzu
+    history.unshift({
         lat: newLat,
         lng: newLng,
-        label: formatCoordLabel(newLat, newLng, format),
-        isFavorite: false,
+        label: label,
+        isFavorite: isFavorite,
         timestamp: Date.now()
-    };
-    const existing = history.find(
-        entry => Math.abs(entry.lat - newLat) < 0.0001 && Math.abs(entry.lng - newLng) < 0.0001
-    );
-    if (existing) {
-        newEntry.isFavorite = existing.isFavorite;
-        newEntry.label = existing.isFavorite ? existing.label : newEntry.label;
-        history.splice(history.indexOf(existing), 1);
-        console.log('Removed duplicate entry from history:', { lat: newLat, lng: newLng });
-    }
-    history.unshift(newEntry);
-    const favorites = history.filter(entry => entry.isFavorite);
-    const nonFavorites = history.filter(entry => !entry.isFavorite).slice(0, 5);
-    try {
-        localStorage.setItem('coordHistory', JSON.stringify([...favorites, ...nonFavorites]));
-        console.log('Added to coordHistory:', { lat: newLat, lng: newLng, format });
-        updateCoordDropdown();
-    } catch (error) {
-        console.error('Failed to save coordHistory:', error);
-        Utils.handleError('Failed to save coordinate history.');
-    }
+    });
+
+    // Begrenze die Anzahl der Nicht-Favoriten
+    const favorites = history.filter(e => e.isFavorite);
+    const nonFavorites = history.filter(e => !e.isFavorite).slice(0, 5); // Behalte 5 letzte Orte
+
+    saveCoordHistory([...favorites, ...nonFavorites]);
+    renderResultsList();
 }
 
-// Toggle favorite status for a coordinate pair
-function toggleFavorite(lat, lng) {
-    console.log('Attempting to toggle favorite for:', { lat, lng });
-    if (isNaN(lat) || isNaN(lng)) {
-        console.warn('Cannot toggle favorite for invalid coordinates:', { lat, lng });
-        Utils.handleError('Invalid coordinates cannot be favorited.');
-        return;
-    }
-    const history = getCoordHistory();
+function addOrUpdateFavorite(lat, lng, name) {
+    if (isNaN(lat) || isNaN(lng)) return;
+
+    let history = getCoordHistory();
     const newLat = parseFloat(lat.toFixed(5));
     const newLng = parseFloat(lng.toFixed(5));
-    const entry = history.find(
-        entry => Math.abs(entry.lat - newLat) < 0.0001 && Math.abs(entry.lng - newLng) < 0.0001
-    );
-    const format = Settings.state.userSettings.coordFormat || 'Decimal';
-    if (entry) {
-        console.log('Found entry in history:', entry);
-        entry.isFavorite = !entry.isFavorite;
-        if (entry.isFavorite) {
-            entry.label = prompt('Name this favorite location:', entry.label) || entry.label;
-            Utils.handleMessage(`Marked as favorite: ${entry.label}`);
-        } else {
-            entry.label = formatCoordLabel(entry.lat, entry.lng, format);
-            Utils.handleMessage('Removed from favorites.');
-        }
-        try {
-            localStorage.setItem('coordHistory', JSON.stringify(history));
-            updateCoordDropdown();
-            console.log('Updated history:', getCoordHistory());
-        } catch (error) {
-            console.error('Failed to save coordHistory:', error);
-            Utils.handleError('Failed to save favorite status.');
-        }
+
+    // Prüfen, ob der Ort bereits existiert
+    const existingEntry = history.find(entry => Math.abs(entry.lat - newLat) < 0.0001 && Math.abs(entry.lng - newLng) < 0.0001);
+
+    if (existingEntry) {
+        existingEntry.isFavorite = true;
+        existingEntry.label = name;
     } else {
-        console.log('No matching coordinate, adding as favorite');
-        const newEntry = {
+        history.unshift({
             lat: newLat,
             lng: newLng,
-            label: prompt('Name this favorite location:', formatCoordLabel(newLat, newLng, format)) || formatCoordLabel(newLat, newLng, format),
+            label: name,
             isFavorite: true,
             timestamp: Date.now()
-        };
-        history.unshift(newEntry);
-        try {
-            localStorage.setItem('coordHistory', JSON.stringify(history));
-            Utils.handleMessage(`Added favorite: ${newEntry.label}`);
-            updateCoordDropdown();
-        } catch (error) {
-            console.error('Failed to save coordHistory:', error);
-            Utils.handleError('Failed to add favorite.');
-        }
-    }
-}
-
-// Update the coordinate history dropdown
-function updateCoordDropdown() {
-    const select = document.getElementById('coordHistory');
-    if (!select) {
-        console.warn('Coordinate history dropdown not found');
-        return;
-    }
-    select.innerHTML = '<option value="">Select a location</option>';
-    const history = getCoordHistory();
-    history.sort((a, b) => {
-        if (a.isFavorite && !b.isFavorite) return -1;
-        if (!a.isFavorite && b.isFavorite) return 1;
-        return b.timestamp - a.timestamp;
-    });
-    history.forEach(entry => {
-        const option = document.createElement('option');
-        option.value = `${entry.lat},${entry.lng}`;
-        option.text = `${entry.isFavorite ? '★ ' : ''}${entry.label}`;
-        select.appendChild(option);
-    });
-    console.log('Updated coordHistory dropdown:', { entries: history.length });
-}
-
-// Populate coordinate input fields based on format
-function populateCoordInputs(lat, lng) {
-    if (isNaN(lat) || isNaN(lng)) {
-        console.warn('Cannot populate inputs with invalid coordinates:', { lat, lng });
-        Utils.handleError('Invalid coordinates for input fields.');
-        return;
-    }
-    const format = Settings.state.userSettings.coordFormat || 'Decimal';
-    console.log('Populating coordinate inputs:', { lat, lng, format });
-    if (format === 'Decimal') {
-        setInputValue('latDec', lat.toFixed(5));
-        setInputValue('lngDec', lng.toFixed(5));
-    } else if (format === 'DMS') {
-        try {
-            const latDMS = Utils.decimalToDms(lat, true);
-            const lngDMS = Utils.decimalToDms(lng, false);
-            setInputValue('latDeg', latDMS.deg);
-            setInputValue('latMin', latDMS.min);
-            setInputValue('latSec', latDMS.sec.toFixed(3));
-            setInputValue('latDir', latDMS.dir);
-            setInputValue('lngDeg', lngDMS.deg);
-            setInputValue('lngMin', lngDMS.min);
-            setInputValue('lngSec', lngDMS.sec.toFixed(3));
-            setInputValue('lngDir', lngDMS.dir);
-        } catch (e) {
-            console.warn('Failed to populate DMS inputs:', e);
-            Utils.handleError('Failed to populate DMS coordinates.');
-        }
-    } else if (format === 'MGRS') {
-        try {
-            setInputValue('mgrsCoord', mgrs.forward([lng, lat], 10));
-        } catch (e) {
-            console.warn('MGRS conversion failed:', e);
-            Utils.handleError('Failed to populate MGRS coordinates.');
-        }
-    }
-}
-
-// Parse coordinates from input fields
-function parseCoordinates() {
-    let lat, lng;
-
-    const format = Settings.state.userSettings.coordFormat || 'Decimal';
-    console.log('Parsing coordinates for format:', format);
-    if (format === 'Decimal') {
-        lat = parseFloat(document.getElementById('latDec')?.value);
-        lng = parseFloat(document.getElementById('lngDec')?.value);
-        if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-            console.warn('Invalid Decimal coordinates:', { lat, lng });
-            throw new Error('Invalid Decimal Degrees coordinates');
-        }
-    } else if (format === 'DMS') {
-        const latDeg = parseInt(document.getElementById('latDeg')?.value) || 0;
-        const latMin = parseInt(document.getElementById('latMin')?.value) || 0;
-        const latSec = parseFloat(document.getElementById('latSec')?.value) || 0;
-        const latDir = document.getElementById('latDir')?.value || 'N';
-        const lngDeg = parseInt(document.getElementById('lngDeg')?.value) || 0;
-        const lngMin = parseInt(document.getElementById('lngMin')?.value) || 0;
-        const lngSec = parseFloat(document.getElementById('lngSec')?.value) || 0;
-        const lngDir = document.getElementById('lngDir')?.value || 'E';
-
-        if (isNaN(latDeg) || isNaN(latMin) || isNaN(latSec) || isNaN(lngDeg) || isNaN(lngMin) || isNaN(lngSec)) {
-            console.warn('Invalid DMS inputs:', { latDeg, latMin, latSec, lngDeg, lngMin, lngSec });
-            throw new Error('Invalid DMS coordinates: all fields must be numeric');
-        }
-        if (latDeg < 0 || latDeg > 90 || latMin < 0 || latMin >= 60 || latSec < 0 || latSec >= 60 ||
-            lngDeg < 0 || lngDeg > 180 || lngMin < 0 || lngMin >= 60 || lngSec < 0 || lngSec >= 60) {
-            console.warn('DMS values out of range:', { latDeg, latMin, latSec, lngDeg, lngMin, lngSec });
-            throw new Error('Invalid DMS coordinates: values out of range');
-        }
-
-        lat = Utils.dmsToDecimal(latDeg, latMin, latSec, latDir);
-        lng = Utils.dmsToDecimal(lngDeg, lngMin, lngSec, lngDir);
-
-        if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-            console.warn('Invalid DMS conversion:', { lat, lng });
-            throw new Error('Invalid DMS coordinates');
-        }
-    } else if (format === 'MGRS') {
-        const mgrsInput = document.getElementById('mgrsCoord')?.value.trim();
-        if (!mgrsInput) {
-            console.warn('Empty MGRS input');
-            throw new Error('MGRS coordinate cannot be empty');
-        }
-
-        console.log('Attempting to parse MGRS:', mgrsInput);
-
-        if (!/^[0-6][0-9][A-HJ-NP-Z][A-HJ-NP-Z]{2}[0-9]+$/.test(mgrsInput)) {
-            console.warn('Invalid MGRS format:', mgrsInput);
-            throw new Error('MGRS format invalid. Example: 32UPU12345678 (zone, band, square, easting/northing)');
-        }
-
-        try {
-            if (typeof mgrs === 'undefined') {
-                console.warn('MGRS library not loaded');
-                throw new Error('MGRS library not loaded. Check script inclusion.');
-            }
-
-            console.log('Calling mgrs.toPoint with:', mgrsInput);
-            [lng, lat] = mgrs.toPoint(mgrsInput);
-            console.log(`Parsed MGRS ${mgrsInput} to Lat: ${lat}, Lng: ${lng}`);
-
-            if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-                console.warn('Invalid MGRS coordinates:', { lat, lng });
-                throw new Error('Parsed MGRS coordinates out of valid range');
-            }
-        } catch (e) {
-            console.error('MGRS parsing failed:', e.message, 'Input:', mgrsInput);
-            throw new Error(`Invalid MGRS format: ${e.message}`);
-        }
-    }
-    console.log('Parsed coordinates:', { lat, lng, format });
-    return [lat, lng];
-}
-
-// Update coordinate input fields based on format
-function updateCoordInputs(format, currentLat = null, currentLng = null) {
-    const coordInputs = document.getElementById('coordInputs');
-    if (!coordInputs) {
-        console.warn('Coordinate inputs container (#coordInputs) not found');
-        return;
-    }
-
-    coordInputs.innerHTML = '';
-    if (format === 'Decimal') {
-        coordInputs.innerHTML = `
-            <label>Latitude: <input type="number" id="latDec" step="any" placeholder="e.g., 48.0179"></label>
-            <label>Longitude: <input type="number" id="lngDec" step="any" placeholder="e.g., 11.1923"></label>
-        `;
-    } else if (format === 'DMS') {
-        coordInputs.innerHTML = `
-            <label>Lat: 
-                <input type="number" id="latDeg" min="0" max="90" placeholder="Deg">°
-                <input type="number" id="latMin" min="0" max="59" placeholder="Min">'
-                <input type="number" id="latSec" min="0" max="59.999" step="0.001" placeholder="Sec">"
-                <select id="latDir"><option value="N">N</option><option value="S">S</option></select>
-            </label>
-            <label>Lng: 
-                <input type="number" id="lngDeg" min="0" max="180" placeholder="Deg">°
-                <input type="number" id="lngMin" min="0" max="59" placeholder="Min">'
-                <input type="number" id="lngSec" min="0" max="59.999" step="0.001" placeholder="Sec">"
-                <select id="lngDir"><option value="E">E</option><option value="W">W</option></select>
-            </label>
-        `;
-    } else if (format === 'MGRS') {
-        coordInputs.innerHTML = `
-            <label>MGRS: <input type="text" id="mgrsCoord" placeholder="e.g., 32UPU12345678"></label>
-        `;
-    }
-    coordInputs.innerHTML += `
-        <label for="coordHistory">Recent/Favorites:</label>
-        <select id="coordHistory" aria-label="Select recent or favorite coordinates">
-            <option value="">Select a location</option>
-        </select>
-        <button id="favoriteBtn" style="margin-left: 10px;">Toggle Favorite</button>
-    `;
-    console.log(`Coordinate inputs updated to ${format}`);
-    updateCoordDropdown();
-
-    // Populate inputs with current coordinates if provided
-    if (currentLat !== null && currentLng !== null && !isNaN(currentLat) && !isNaN(currentLng)) {
-        populateCoordInputs(currentLat, currentLng);
-    }
-
-    // Attach event listener to favorite button
-    const favoriteBtn = document.getElementById('favoriteBtn');
-    if (favoriteBtn) {
-        favoriteBtn.addEventListener('click', () => {
-            console.log('Favorite button clicked');
-            try {
-                const [lat, lng] = parseCoordinates();
-                toggleFavorite(lat, lng);
-            } catch (error) {
-                console.error('Error toggling favorite:', error);
-                Utils.handleError(error.message);
-            }
         });
-        console.log('Attached event listener to favoriteBtn');
     }
 
-    // Attach event listener to coordHistory dropdown
-    const coordHistory = document.getElementById('coordHistory');
-    if (coordHistory) {
-        coordHistory.addEventListener('change', (e) => {
-            if (e.target.value) {
-                const [lat, lng] = e.target.value.split(',').map(parseFloat);
-                console.log('Selected history coordinate:', { lat, lng });
-                if (isNaN(lat) || isNaN(lng)) {
-                    console.warn('Invalid coordinates selected from history:', { lat, lng });
-                    Utils.handleError('Invalid coordinates selected.');
-                    return;
-                }
-                populateCoordInputs(lat, lng);
-                if (moveMarkerCallback) {
-                    moveMarkerCallback(lat, lng);
-                } else {
-                    console.warn('moveMarkerCallback not set');
-                    Utils.handleError('Marker movement not configured.');
-                }
-            }
-        });
-        console.log('Attached event listener to coordHistory');
-    }
+    saveCoordHistory(history);
+    Utils.handleMessage(`"${name}" als Favorit gespeichert.`);
+    renderResultsList();
 }
 
-// Helper function to set input values safely
-function setInputValue(id, value) {
-    const element = document.getElementById(id);
-    if (element) {
-        element.value = value;
+/**
+ * Schaltet den Favoriten-Status eines Ortes um (ohne ihn zu löschen).
+ * @param {number} lat - Die Latitude des Ortes.
+ * @param {number} lng - Die Longitude des Ortes.
+ * @param {string} label - Das aktuelle Label des Ortes.
+ */
+function toggleFavorite(lat, lng, label) {
+    if (isNaN(lat) || isNaN(lng)) return;
+    
+    let history = getCoordHistory();
+    const entry = history.find(e => {
+        const entryLat = parseFloat(e.lat);
+        const entryLng = parseFloat(e.lon || e.lng);
+        return Math.abs(entryLat - lat) < 0.0001 && Math.abs(entryLng - lng) < 0.0001;
+    });
+
+    if (entry) {
+        // Schalte den Favoriten-Status einfach um.
+        entry.isFavorite = !entry.isFavorite;
+
+        if (entry.isFavorite) {
+            // Wenn es zum Favorit wird, nach einem Namen fragen (optional)
+            const name = prompt("Please enter a name for this favorite:", entry.label || label);
+            if (name) {
+                entry.label = name;
+                Utils.handleMessage(`"${name}" als Favorit gespeichert.`);
+            } else {
+                // Wenn der Benutzer abbricht, den Vorgang rückgängig machen.
+                entry.isFavorite = false;
+                return; // Beende die Funktion hier
+            }
+        } else {
+            Utils.handleMessage(`"${entry.label}" ist kein Favorit mehr.`);
+        }
     } else {
-        console.warn(`Input element ${id} not found`);
+        // Sollte nicht vorkommen, da der Button nur bei existierenden Einträgen angezeigt wird.
+        // Sicherheitshalber: Neuen Favoriten hinzufügen.
+        addOrUpdateFavorite(lat, lng, label);
     }
+
+    saveCoordHistory(history);
+    renderResultsList(); // Liste neu zeichnen, um den geänderten Stern anzuzeigen
 }
+
+/**
+ * Entfernt einen Ort vollständig aus dem Verlauf und den Favoriten.
+ * @param {number} lat - Die Latitude des zu löschenden Ortes.
+ * @param {number} lng - Die Longitude des zu löschenden Ortes.
+ */
+function removeLocationFromHistory(lat, lng) {
+    if (isNaN(lat) || isNaN(lng)) return;
+
+    let history = getCoordHistory();
+    
+    // Filtere den Eintrag heraus, der gelöscht werden soll
+    const updatedHistory = history.filter(entry => {
+        const entryLat = parseFloat(entry.lat);
+        const entryLng = parseFloat(entry.lng || entry.lon);
+        return Math.abs(entryLat - lat) > 0.0001 || Math.abs(entryLng - lng) > 0.0001;
+    });
+
+    saveCoordHistory(updatedHistory);
+    Utils.handleMessage("Location deleted.");
+    renderResultsList(); // Rendere die Liste neu, um die Änderung anzuzeigen
+}
+
+
+// --- Exportiere die notwendigen Funktionen ---
 
 export {
-    initCoordStorage,
-    getCoordHistory,
-    formatCoordLabel,
-    addCoordToHistory,
-    toggleFavorite,
-    updateCoordInputs,
-    populateCoordInputs,
-    parseCoordinates,
-    setMoveMarkerCallback
+    initializeLocationSearch,
+    setMoveMarkerCallback,
+    setCurrentMarkerPositionCallback,
+    addCoordToHistory
 };
+
+
+/**
+ * Setzt die Callback-Funktion, um den Marker auf der Karte zu bewegen.
+ * @param {function} callback - Die Funktion aus app.js, die (lat, lng) entgegennimmt.
+ */
+function setMoveMarkerCallback(callback) {
+    moveMarkerCallback = callback;
+}
+
+/**
+ * Setzt die Callback-Funktion, um die aktuelle Position des Markers abzufragen.
+ * @param {function} callback - Die Funktion aus app.js, die {lat, lng} zurückgibt.
+ */
+function setCurrentMarkerPositionCallback(callback) {
+    getCurrentMarkerPositionCallback = callback;
+}

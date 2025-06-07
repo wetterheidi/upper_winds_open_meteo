@@ -1130,6 +1130,125 @@ input[type="checkbox"][style*="opacity: 1"] {
     white-space: nowrap;
 }
 
+/* Stile für das neue Orts-Management-Panel */
+#locationSearchSubmenu {
+    padding: 5px; /* Etwas weniger Innenabstand für ein kompakteres Design */
+}
+
+.search-container {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-bottom: 5px;
+}
+
+#locationSearchInput {
+    flex-grow: 1; /* Das Eingabefeld nimmt den meisten Platz ein */
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+#saveCurrentLocationBtn {
+    background-color: #4da8da;
+    color: white;
+    border: none;
+    border-radius: 3px; /* Rund */
+    width: 30px;
+    height: 30px;
+    font-size: 16px;
+    cursor: pointer;
+    flex-shrink: 0; /* Verhindert, dass der Button schrumpft */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#saveCurrentLocationBtn:hover {
+    background-color: #0056b3;
+}
+
+.location-results-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    max-height: 250px; /* Begrenzt die Höhe der Liste */
+    overflow-y: auto; /* Fügt einen Scrollbalken hinzu, wenn nötig */
+    border-top: 1px solid #eee;
+}
+
+.location-results-list li {
+    padding: 8px 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    border-bottom: 1px solid #eee;
+}
+
+.location-results-list li:hover {
+    background-color: #f0f8ff;
+}
+
+.location-results-list .location-name {
+    flex-grow: 1;
+}
+
+.location-results-list .favorite-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 18px;
+    padding: 0 5px;
+    color: #ccc;
+}
+
+.location-results-list .favorite-toggle.is-favorite {
+    color: #f3d131; /* Gold für Favoriten */
+}
+
+.location-results-list .location-info {
+    font-size: 11px;
+    color: #888;
+    display: block;
+}
+
+.location-item-buttons {
+    display: flex;
+    align-items: center;
+    gap: 5px; /* Abstand zwischen den Buttons */
+}
+
+.delete-location-btn {
+    background: none;
+    border: 1px solid #999;
+    color: #888;
+    border-radius: 50%;
+    /* Feste, gleiche Breite und Höhe erzwingen */
+    width: 24px !important;
+    height: 24px !important;
+    min-width: 24px !important;
+    min-height: 24px !important;
+    padding: 0;
+    cursor: pointer;
+    font-size: 20px; /* Leicht vergrößert für bessere Sichtbarkeit */
+    font-weight: bold;
+    
+    /* Perfekte Zentrierung des '×' */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    box-sizing: border-box !important; /* Verhindert, dass Padding/Border die Größe beeinflusst */
+}
+
+.delete-location-btn:hover {
+    background-color: #fee; /* Etwas dezenter als das vorherige Rot */
+    color: #d63031;
+    border-color: #d63031;
+}
+
 @keyframes spin {
     0% {
         transform: rotate(0deg);
