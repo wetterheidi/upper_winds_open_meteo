@@ -1,12 +1,9 @@
 import { AppState } from './state.js';
 import {
-    createCustomMarker,
-    attachMarkerDragend,
-    updateMarkerPopup,
     fetchWeatherForLocation,
     debouncedCalculateJump,
-    updateJumpRunTrack,
-    updateLandingPattern,
+    updateJumpRunTrackDisplay,
+    updateLandingPatternDisplay,
     getCoordinateFormat,
     getWindSpeedUnit,
     getHeightUnit
@@ -15,6 +12,7 @@ import { calculateCutAway } from "./jumpPlanner.js";
 import { Settings } from "./settings.js";
 import { Utils } from "./utils.js";
 import { interpolateColor } from "./uiHelpers.js";
+import { attachMarkerDragend, createCustomMarker, updateMarkerPopup } from './mapManager.js';
 "use strict";
 
 
@@ -223,8 +221,8 @@ async function renderTrack(points, fileName) {
                 debouncedCalculateJump();
                 calculateCutAway();
             }
-            if (Settings.state.userSettings.showJumpRunTrack) updateJumpRunTrack();
-            if (Settings.state.userSettings.showLandingPattern) updateLandingPattern();
+            if (Settings.state.userSettings.showJumpRunTrack) updateJumpRunTrackDisplay();
+            if (Settings.state.userSettings.showLandingPattern) updateLandingPatternDisplay();
         }
 
         AppState.gpxLayer = L.layerGroup([], { pane: 'gpxTrackPane' });

@@ -9,10 +9,11 @@ import { TileCache, cacheTilesForDIP, debouncedCacheVisibleTiles } from './tileC
 import { setupCacheManagement, setupCacheSettings } from './cacheUI.js';
 import * as Coordinates from './coordinates.js';
 import { initializeLocationSearch } from './coordinates.js'; // <-- HIER ERGÄNZEN
-import { interpolateColor, generateWindBarb, createArrowIcon } from "./uiHelpers.js";
+import { interpolateColor, generateWindBarb } from "./uiHelpers.js";
 import { handleHarpPlacement, createHarpMarker, clearHarpMarker } from './harpMarker.js';
 import { loadGpxTrack, loadCsvTrackUTC } from './trackManager.js';
 import * as JumpPlanner from './jumpPlanner.js';
+import * as mapManager from './mapManager.js';
 
 
 "use strict";
@@ -26,7 +27,7 @@ try {
     userSettings = { ...Settings.defaultSettings };
 }
 
-export { createCustomMarker, attachMarkerDragend, updateMarkerPopup, fetchWeatherForLocation, debouncedCalculateJump };
+export { fetchWeatherForLocation, debouncedCalculateJump };
 
 const HEATMAP_BASE_RADIUS = 20;
 const HEATMAP_REFERENCE_ZOOM = 13;
@@ -63,11 +64,9 @@ L.Control.Coordinates = L.Control.extend({
 
 // == Refactored initMap ==
 // an den Anfang von app.js, nach den Imports und AppState Definition
-let mapInitialized = false;
 let elevationCache = new Map();
 let qfeCache = new Map();
 let lastTapTime = 0;
-let hasTileErrorSwitched = false;
 
 const debouncedGetElevationAndQFE = Utils.debounce(async (lat, lng, requestLatLng, callback) => {
     const cacheKey = `${lat.toFixed(5)},${lng.toFixed(5)}`;
@@ -145,567 +144,6 @@ async function _fetchInitialWeather(lat, lng) {
     await fetchWeatherForLocation(lat, lng, initialTime, true);
 }
 
-// HILFSFUNKTIONEN FÜR initMap (innerhalb von app.js)
-
-function _initializeBasicMapInstance(defaultCenter, defaultZoom) {
-    AppState.lastLat = AppState.lastLat || defaultCenter[0];
-    AppState.lastLng = AppState.lastLng || defaultCenter[1];
-    AppState.map = L.map('map', {
-        center: defaultCenter,
-        zoom: defaultZoom,
-        zoomControl: false,
-        doubleClickZoom: false, // Wichtig für eigenen dblclick Handler
-        maxZoom: 19,
-        minZoom: navigator.onLine ? 6 : 11
-    });
-    console.log('Map instance created.');
-}
-function _setupBaseLayersAndHandling() {
-    AppState.baseMaps = {
-        "OpenStreetMap": L.tileLayer.cached('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-            subdomains: ['a', 'b', 'c']
-        }),
-        "OpenTopoMap": L.tileLayer.cached('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-            maxZoom: 17,
-            attribution: '© <a href="https://www.openstreetmap.org/copyright">OSM</a>, <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)',
-            subdomains: ['a', 'b', 'c']
-        }),
-        "Esri Satellite": L.tileLayer.cached('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-            maxZoom: 19,
-            attribution: '© Esri, USDA, USGS'
-        }),
-        "Esri Street": L.tileLayer.cached('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
-            maxZoom: 19,
-            attribution: '© Esri, USGS'
-        }),
-        "Esri Topo": L.tileLayer.cached('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
-            maxZoom: 19,
-            attribution: '© Esri, USGS'
-        }),
-        "Esri Satellite + OSM": L.layerGroup([
-            L.tileLayer.cached('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                maxZoom: 19,
-                attribution: '© Esri, USDA, USGS',
-                zIndex: 1
-            }),
-            L.tileLayer.cached('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 19,
-                attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-                opacity: 0.5,
-                zIndex: 2,
-                updateWhenIdle: true,
-                keepBuffer: 2,
-                subdomains: ['a', 'b', 'c']
-            })
-        ], {
-            attribution: '© Esri, USDA, USGS | © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        })
-    };
-
-    const openMeteoAttribution = 'Weather data by <a href="https://open-meteo.com">Open-Meteo</a>';
-    if (AppState.map && AppState.map.attributionControl) {
-        AppState.map.attributionControl.addAttribution(openMeteoAttribution);
-    }
-
-    const selectedBaseMapName = Settings.state.userSettings.baseMaps in AppState.baseMaps
-        ? Settings.state.userSettings.baseMaps
-        : "Esri Street";
-    const activeLayer = AppState.baseMaps[selectedBaseMapName];
-
-    if (activeLayer && typeof activeLayer.on === 'function') {
-        activeLayer.on('tileerror', () => {
-            if (!navigator.onLine) {
-                if (!hasTileErrorSwitched) {
-                    console.warn(`${selectedBaseMapName} tiles unavailable offline. Zoom restricted.`);
-                    Utils.handleMessage('Offline: Zoom restricted to levels 11–14 for cached tiles.');
-                    hasTileErrorSwitched = true;
-                }
-                return;
-            }
-            if (!hasTileErrorSwitched && AppState.map.hasLayer(activeLayer)) {
-                const fallbackBaseMapName = "OpenStreetMap";
-                console.warn(`${selectedBaseMapName} tiles unavailable, switching to ${fallbackBaseMapName}`);
-                AppState.map.removeLayer(activeLayer);
-                AppState.baseMaps[fallbackBaseMapName].addTo(AppState.map);
-                Settings.state.userSettings.baseMaps = fallbackBaseMapName;
-                Settings.save();
-                Utils.handleMessage(`${selectedBaseMapName} tiles unavailable. Switched to ${fallbackBaseMapName}.`);
-                hasTileErrorSwitched = true;
-            } else if (!hasTileErrorSwitched) {
-                console.warn(`Tile error in ${selectedBaseMapName}, attempting to continue.`);
-            }
-        });
-        activeLayer.addTo(AppState.map);
-    } else {
-        console.error(`Default base map "${selectedBaseMapName}" could not be added.`);
-        AppState.baseMaps["OpenStreetMap"].addTo(AppState.map); // Sicherer Fallback
-    }
-
-    if (AppState.map) AppState.map.invalidateSize();
-
-    window.addEventListener('online', () => {
-        hasTileErrorSwitched = false;
-        if (AppState.map) AppState.map.options.minZoom = 6;
-        updateOfflineIndicator(); // updateOfflineIndicator muss global/importiert sein
-    });
-    window.addEventListener('offline', () => {
-        if (AppState.map) AppState.map.options.minZoom = 9;
-        updateOfflineIndicator();
-    });
-    console.log('Base layers and online/offline handlers set up.');
-}
-function _addStandardMapControls() {
-    if (!AppState.map) {
-        console.error("Karte nicht initialisiert, bevor Controls hinzugefügt werden können.");
-        return;
-    }
-    L.control.layers(AppState.baseMaps, null, { position: 'topright' }).addTo(AppState.map);
-    AppState.map.on('baselayerchange', function (e) {
-        console.log(`Base map changed to: ${e.name}`);
-        if (Settings && Settings.state && Settings.state.userSettings) {
-            Settings.state.userSettings.baseMaps = e.name;
-            Settings.save();
-            console.log(`Saved selected base map "${e.name}" to settings.`);
-        } else {
-            console.error("Settings object not properly available to save base map choice.");
-        }
-        hasTileErrorSwitched = false;
-        if (AppState.lastLat && AppState.lastLng && typeof cacheTilesForDIP === 'function') {
-            cacheTilesForDIP({ map: AppState.map, lastLat: AppState.lastLat, lastLng: AppState.lastLng, baseMaps: AppState.baseMaps });
-        }
-    });
-    L.control.zoom({ position: 'topright' }).addTo(AppState.map);
-    L.control.polylineMeasure({
-        position: 'topright',
-        unit: 'kilometres',
-        showBearings: true,
-        clearMeasurementsOnStop: false,
-        showClearControl: true,
-        showUnitControl: true,
-        tooltipTextFinish: 'Click to finish the line<br>',
-        tooltipTextDelete: 'Shift-click to delete point', tooltipTextMove: 'Drag to move point<br>',
-        tooltipTextResume: 'Click to resume line<br>', tooltipTextAdd: 'Click to add point<br>',
-        measureControlTitleOn: 'Start measuring distance and bearing',
-        measureControlTitleOff: 'Stop measuring'
-    }).addTo(AppState.map);
-
-    L.control.scale({
-        position: 'bottomleft',
-        metric: true,
-        imperial: false,
-        maxWidth: 100
-    }).addTo(AppState.map);
-    console.log('Standard map controls and baselayerchange handler added.');
-}
-function _setupCustomPanes() {
-    AppState.map.createPane('gpxTrackPane');
-    AppState.map.getPane('gpxTrackPane').style.zIndex = 650;
-    AppState.map.getPane('tooltipPane').style.zIndex = 700;
-    AppState.map.getPane('popupPane').style.zIndex = 700;
-    console.log('Custom map panes created.');
-}
-function _initializeLivePositionControl() {
-    AppState.livePositionControl = L.control.livePosition({ position: 'bottomright' }).addTo(AppState.map);
-    if (AppState.livePositionControl._container) {
-        AppState.livePositionControl._container.style.display = 'none';
-        console.log('Initialized livePositionControl and hid by default');
-    } else {
-        console.warn('livePositionControl._container not initialized in initMap');
-    }
-}
-function _initializeDefaultMarker(defaultCenter, initialAltitude) {
-    // Annahme: createCustomMarker, attachMarkerDragend, updateMarkerPopup sind global in app.js definiert
-    AppState.currentMarker = Utils.configureMarker(
-        AppState.map,
-        defaultCenter[0],
-        defaultCenter[1],
-        initialAltitude, false,
-        createCustomMarker,
-        attachMarkerDragend,
-        updateMarkerPopup,
-        AppState.currentMarker,
-        (marker) => { AppState.currentMarker = marker; }
-    );
-    AppState.isManualPanning = false;
-    console.log('Default marker initialized.');
-}
-async function _initializeTileCacheLogic() {
-    try {
-        await TileCache.init();
-        await TileCache.migrateTiles();
-        const size = await TileCache.getCacheSize();
-        if (size > 500) {
-            const result = await TileCache.clearOldTiles(3);
-            Utils.handleMessage(`Cleared ${result.deletedCount} old tiles: ${result.deletedSizeMB.toFixed(2)} MB freed.`);
-        } else {
-            await TileCache.clearOldTiles();
-        }
-    } catch (error) {
-        console.error('Failed to initialize or manage tile cache:', error);
-        Utils.handleError('Tile caching setup failed.');
-    }
-    console.log('Tile cache logic initialized.');
-}
-async function _geolocationSuccessCallback(position, defaultZoom) {
-    const userCoords = [position.coords.latitude, position.coords.longitude];
-    AppState.lastLat = position.coords.latitude;
-    AppState.lastLng = position.coords.longitude;
-    AppState.lastAltitude = await Utils.getAltitude(AppState.lastLat, AppState.lastLng);
-    Coordinates.addCoordToHistory(AppState.lastLat, AppState.lastLng);
-    Coordinates.updateCurrentMarkerPosition(AppState.lastLat, AppState.lastLng);
-
-    AppState.currentMarker = Utils.configureMarker(
-        AppState.map,
-        AppState.lastLat,
-        AppState.lastLng,
-        AppState.lastAltitude,
-        false,
-        createCustomMarker,
-        attachMarkerDragend,
-        updateMarkerPopup,
-        AppState.currentMarker,
-        (marker) => { AppState.currentMarker = marker; }
-    );
-    AppState.map.setView(userCoords, defaultZoom);
-
-    if (Settings.state.userSettings.calculateJump) {
-        calculateJump();
-        JumpPlanner.calculateCutAway();
-    }
-    recenterMap(true);
-    AppState.isManualPanning = false;
-    await _fetchInitialWeather(AppState.lastLat, AppState.lastLng);
-    if (Settings.state.userSettings.trackPosition) {
-        setCheckboxValue('trackPositionCheckbox', true);
-        startPositionTracking();
-    }
-    cacheTilesForDIP({ map: AppState.map, lastLat: AppState.lastLat, lastLng: AppState.lastLng, baseMaps: AppState.baseMaps });
-    console.log('Geolocation success handled.');
-}
-async function _geolocationErrorCallback(error, defaultCenter, defaultZoom) {
-    console.warn(`Geolocation error: ${error.message}`);
-    Utils.handleMessage('Unable to retrieve your location. Using default location.');
-    AppState.lastLat = defaultCenter[0]; AppState.lastLng = defaultCenter[1];
-    AppState.lastAltitude = await Utils.getAltitude(AppState.lastLat, AppState.lastLng);
-    AppState.currentMarker = Utils.configureMarker(
-        AppState.map,
-        AppState.lastLat,
-        AppState.lastLng,
-        AppState.lastAltitude,
-        false,
-        createCustomMarker,
-        attachMarkerDragend,
-        updateMarkerPopup,
-        AppState.currentMarker,
-        (marker) => { AppState.currentMarker = marker; }
-    );
-    AppState.map.setView(defaultCenter, defaultZoom);
-    recenterMap(true);
-    AppState.isManualPanning = false;
-    await _fetchInitialWeather(AppState.lastLat, AppState.lastLng);
-    if (Settings.state.userSettings.trackPosition) {
-        Utils.handleMessage('Tracking disabled due to geolocation failure.');
-        setCheckboxValue('trackPositionCheckbox', false);
-        Settings.state.userSettings.trackPosition = false;
-        Settings.save();
-    }
-    cacheTilesForDIP({ map: AppState.map, lastLat: AppState.lastLat, lastLng: AppState.lastLng, baseMaps: AppState.baseMaps });
-    console.log('Geolocation error handled.');
-}
-async function _handleGeolocation(defaultCenter, defaultZoom) {
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-            (position) => _geolocationSuccessCallback(position, defaultZoom),
-            (geoError) => _geolocationErrorCallback(geoError, defaultCenter, defaultZoom),
-            {
-                enableHighAccuracy: true,
-                timeout: 20000,
-                maximumAge: 0
-            }
-        );
-    } else {
-        console.warn('Geolocation not supported.');
-        await _geolocationErrorCallback({ message: "Geolocation not supported by this browser." }, defaultCenter, defaultZoom);
-    }
-}
-function _initializeCoordsControlAndHandlers() {
-    AppState.coordsControl = new L.Control.Coordinates();
-    AppState.coordsControl.addTo(AppState.map);
-    console.log('CoordsControl initialized.');
-
-    // Mousemove Handler (vereinfacht, da debouncedGetElevationAndQFE jetzt globaler ist)
-    AppState.map.on('mousemove', function (e) {
-        _handleMapMouseMove(e); // Ausgelagert
-    });
-
-    AppState.map.on('mouseout', function () {
-        if (AppState.coordsControl && AppState.coordsControl.getContainer()) {
-            AppState.coordsControl.getContainer().innerHTML = 'Move mouse over map';
-        }
-    });
-    console.log('Mousemove and mouseout handlers set up.');
-}
-
-// Die einzelnen komplexen Event-Handler
-function _handleMapMouseMove(e) {
-    const coordFormat = getCoordinateFormat(); // getCoordinateFormat muss global definiert sein
-    const lat = e.latlng.lat;
-    const lng = e.latlng.lng;
-    AppState.lastMouseLatLng = { lat, lng };
-
-    let coordText;
-    if (coordFormat === 'MGRS') {
-        const mgrsVal = Utils.decimalToMgrs(lat, lng); // Utils.decimalToMgrs
-        coordText = `MGRS: ${mgrsVal ? mgrsVal : 'N/A'}`;
-    } else if (coordFormat === 'DMS') {
-        const latDMS = Utils.decimalToDms(lat, true); // Utils.decimalToDms
-        const lngDMS = Utils.decimalToDms(lng, false); // Utils.decimalToDms
-        coordText = `Lat: ${latDMS}, Lng: ${lngDMS}`;
-    } else {
-        coordText = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
-    }
-
-    if (AppState.coordsControl) {
-        AppState.coordsControl.update(`${coordText}<br>Elevation: Fetching...<br>QFE: Fetching...`);
-    }
-
-    debouncedGetElevationAndQFE(lat, lng, { lat, lng }, ({ elevation, qfe }, requestLatLng) => {
-        if (AppState.lastMouseLatLng && AppState.coordsControl) {
-            const deltaLat = Math.abs(AppState.lastMouseLatLng.lat - requestLatLng.lat);
-            const deltaLng = Math.abs(AppState.lastMouseLatLng.lng - requestLatLng.lng);
-            const threshold = 0.05;
-            if (deltaLat < threshold && deltaLng < threshold) {
-                const heightUnit = getHeightUnit(); // getHeightUnit muss global definiert sein
-                let displayElevation = elevation === 'N/A' ? 'N/A' : elevation;
-                if (displayElevation !== 'N/A') {
-                    displayElevation = Utils.convertHeight(displayElevation, heightUnit); // Utils.convertHeight
-                    displayElevation = Math.round(displayElevation);
-                }
-                const qfeText = qfe === 'N/A' ? 'N/A' : `${qfe} hPa`;
-                AppState.coordsControl.update(`${coordText}<br>Elevation: ${displayElevation} ${displayElevation === 'N/A' ? '' : heightUnit}<br>QFE: ${qfeText}`);
-            }
-        }
-    });
-}
-async function _handleMapDblClick(e) {
-    console.log('--- _handleMapDblClick START ---', e.latlng);
-    const { lat, lng } = e.latlng;
-    AppState.lastLat = lat;
-    AppState.lastLng = lng;
-    AppState.lastAltitude = await Utils.getAltitude(lat, lng);
-    console.log('Map double-clicked, moving marker to:', { lat, lng });
-    addCoordToHistory(lat, lng, `Marker-Position: ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
-    Coordinates.updateCurrentMarkerPosition(lat, lng);
-
-    AppState.currentMarker = Utils.configureMarker(
-        AppState.map,
-        AppState.lastLat,
-        AppState.lastLng,
-        AppState.lastAltitude,
-        false, // openPopup
-        createCustomMarker,
-        attachMarkerDragend,
-        updateMarkerPopup,
-        AppState.currentMarker,
-        (newMarker) => {
-            AppState.currentMarker = newMarker;
-            console.log('_handleMapDblClick: setCurrentMarker callback. New AppState.currentMarker ID:', newMarker ? newMarker._leaflet_id : 'none');
-        }
-    );
-
-    resetJumpRunDirection(true);
-    if (Settings.state.userSettings.calculateJump) {
-        calculateJump();
-        JumpPlanner.calculateCutAway();
-    }
-    recenterMap(true);
-    AppState.isManualPanning = false;
-
-    const slider = document.getElementById('timeSlider');
-    const currentIndex = parseInt(slider.value) || 0;
-    const currentTime = AppState.weatherData?.time?.[currentIndex] || null;
-
-    await fetchWeatherForLocation(lat, lng, currentTime);
-
-    if (Settings.state.userSettings.showJumpRunTrack) updateJumpRunTrack();
-    if (AppState.map && AppState.lastLat && AppState.lastLng && AppState.baseMaps) {
-        cacheTilesForDIP({ map: AppState.map, lastLat: AppState.lastLat, lastLng: AppState.lastLng, baseMaps: AppState.baseMaps });
-    }
-    if (Settings.state.userSettings.showJumpMasterLine && Settings.state.userSettings.trackPosition) updateJumpMasterLine();
-    console.log('--- _handleMapDblClick END ---');
-}
-function _setupCoreMapEventHandlers() {
-    if (!AppState.map) {
-        console.error("Karte nicht initialisiert in _setupCoreMapEventHandlers");
-        return;
-    }
-    if (!AppState.coordsControl) {
-        AppState.coordsControl = new L.Control.Coordinates();
-        AppState.coordsControl.addTo(AppState.map);
-        console.log('CoordsControl initialized in _setupCoreMapEventHandlers.');
-    }
-
-    AppState.map.on('mousemove', _handleMapMouseMove);
-    AppState.map.on('mouseout', function () {
-        if (AppState.coordsControl && AppState.coordsControl.getContainer()) {
-            AppState.coordsControl.getContainer().innerHTML = 'Move mouse over map';
-        }
-    });
-
-    AppState.map.on('dblclick', _handleMapDblClick);
-
-    // Zoom Events
-    AppState.map.on('zoomstart', (e) => {
-        if (!navigator.onLine) {
-            const targetZoom = e.target._zoom || AppState.map.getZoom();
-            if (targetZoom < 11) {
-                e.target._zoom = 11;
-                AppState.map.setZoom(11);
-                Utils.handleMessage('Offline: Zoom restricted to levels 11–14 for cached tiles.');
-            } else if (targetZoom > 14) {
-                e.target._zoom = 14;
-                AppState.map.setZoom(14);
-                Utils.handleMessage('Offline: Zoom restricted to levels 11–14 for cached tiles.');
-            }
-        }
-    });
-    AppState.map.on('zoomend', () => {
-        const currentZoom = AppState.map.getZoom();
-        if (Settings.state.userSettings.calculateJump && AppState.weatherData && AppState.lastLat && AppState.lastLng) calculateJump();
-        if (Settings.state.userSettings.showJumpRunTrack) updateJumpRunTrack();
-        if (Settings.state.userSettings.showLandingPattern) updateLandingPattern();
-
-        if (AppState.currentMarker && AppState.lastLat && AppState.lastLng) {
-            AppState.currentMarker.setLatLng([AppState.lastLat, AppState.lastLng]);
-            updateMarkerPopup(AppState.currentMarker, AppState.lastLat, AppState.lastLng, AppState.lastAltitude, AppState.currentMarker.getPopup()?.isOpen() || false);
-        }
-        // Anker-Marker-Größe anpassen
-        if (AppState.jumpRunTrackLayer && Settings.state.userSettings.showJumpRunTrack) {
-            const anchorMarker = AppState.jumpRunTrackLayer.getLayers().find(layer => layer.options.icon?.options.className === 'jrt-anchor-marker');
-            if (anchorMarker) {
-                const baseSize = currentZoom <= 11 ? 10 : currentZoom <= 12 ? 12 : currentZoom <= 13 ? 14 : 16;
-                anchorMarker.setIcon(L.divIcon({
-                    className: 'jrt-anchor-marker',
-                    html: `<div style="background-color: orange; width: ${baseSize}px; height: ${baseSize}px; border-radius: 50%; border: 2px solid white; opacity: 0.8;"></div>`,
-                    iconSize: [baseSize, baseSize],
-                    iconAnchor: [baseSize / 2, baseSize / 2],
-                    tooltipAnchor: [0, -(baseSize / 2 + 5)]
-                }));
-            }
-        }
-
-        // Update heatmap radius on zoomend to adjust dynamically
-        if (AppState.heatmapLayer) {
-            const newRadius = calculateDynamicRadius(HEATMAP_BASE_RADIUS, HEATMAP_REFERENCE_ZOOM);
-            AppState.heatmapLayer.setOptions({ radius: newRadius });
-            console.log('Heatmap radius updated on zoom:', {
-                currentZoom: AppState.map.getZoom(),
-                newRadius
-            });
-        }
-    });
-
-    // Movestart (für manuelles Panning)
-    AppState.map.on('movestart', (e) => {
-        // Prüft, ob die Bewegung durch Ziehen der Karte ausgelöst wurde und nicht durch Ziehen eines Markers
-        if (e.target === AppState.map && (!e.originalEvent || e.originalEvent.target === AppState.map.getContainer())) {
-            AppState.isManualPanning = true;
-            console.log('Manual map panning detected.');
-        }
-    });
-
-
-    // Contextmenu (Rechtsklick für Cut-Away-Marker)
-    AppState.map.on('contextmenu', (e) => {
-        if (!Settings.state.userSettings.showCutAwayFinder || !Settings.state.userSettings.calculateJump) return;
-        const { lat, lng } = e.latlng;
-        if (AppState.cutAwayMarker) {
-            AppState.cutAwayMarker.setLatLng([lat, lng]);
-        } else {
-            // createCutAwayMarker und attachCutAwayMarkerDragend müssen global/importiert sein
-            AppState.cutAwayMarker = createCutAwayMarker(lat, lng).addTo(AppState.map);
-            attachCutAwayMarkerDragend(AppState.cutAwayMarker);
-        }
-        AppState.cutAwayLat = lat;
-        AppState.cutAwayLng = lng;
-        updateCutAwayMarkerPopup(AppState.cutAwayMarker, lat, lng); // updateCutAwayMarkerPopup muss global/importiert sein
-        if (AppState.weatherData && Settings.state.userSettings.calculateJump) JumpPlanner.calculateCutAway();
-    });
-
-    // Touchstart (Doppel-Tipp) auf dem Kartencontainer
-    const mapContainer = AppState.map.getContainer();
-    mapContainer.addEventListener('touchstart', async (e) => {
-        if (e.touches.length !== 1 || e.target.closest('.leaflet-marker-icon')) return; // Ignoriere Multi-Touch oder Klick auf Marker
-        const currentTime = new Date().getTime();
-        const timeSinceLastTap = currentTime - lastTapTime; // lastTapTime ist eine module-level Variable
-        const tapThreshold = 300; // ms
-        if (timeSinceLastTap < tapThreshold && timeSinceLastTap > 0) {
-            e.preventDefault(); // Verhindere Standard-Touch-Aktionen wie Zoom
-            const rect = mapContainer.getBoundingClientRect();
-            const touchX = e.touches[0].clientX - rect.left;
-            const touchY = e.touches[0].clientY - rect.top;
-            const latlng = AppState.map.containerPointToLatLng([touchX, touchY]);
-
-            await _handleMapDblClick({ latlng: latlng, containerPoint: L.point(touchX, touchY), layerPoint: AppState.map.latLngToLayerPoint(latlng) });
-        }
-        lastTapTime = currentTime; // Aktualisiere die Zeit des letzten Taps
-    }, { passive: false }); // passive: false ist wichtig, um preventDefault zu erlauben
-
-    // Optionale, einfache Click/Mousedown-Handler (falls benötigt)
-    AppState.map.on('click', (e) => {
-        // console.log('Map click event, target:', e.originalEvent.target);
-        // Z.B. um Popups zu schließen oder andere UI-Interaktionen zu steuern.
-        // Achte darauf, dass dies nicht mit dem Doppelklick/Doppel-Tipp kollidiert.
-    });
-    AppState.map.on('mousedown', (e) => {
-        // console.log('Map mousedown event, target:', e.originalEvent.target);
-    });
-
-    console.log('All core map event handlers have been set up.');
-}
-function initMap() {
-    if (mapInitialized || AppState.map) {
-        console.warn('Map already initialized or init in progress.');
-        return;
-    }
-    mapInitialized = true;
-    console.log('initMap started...');
-
-    const defaultCenter = [48.0179, 11.1923];
-    const defaultZoom = 11;
-    const initialAltitude = 'N/A';
-
-    _initializeBasicMapInstance(defaultCenter, defaultZoom);
-    _setupBaseLayersAndHandling();      // Definiert AppState.baseMaps, fügt erste Ebene hinzu
-    _addStandardMapControls();          // Fügt L.control.layers und andere Controls hinzu, registriert 'baselayerchange'
-    _setupCustomPanes();
-    _initializeLivePositionControl();
-    _initializeDefaultMarker(defaultCenter, initialAltitude); // Setzt AppState.currentMarker
-
-    // Kern-Event-Handler (inkl. dblclick) registrieren, nachdem die Karte und Controls da sind
-    _setupCoreMapEventHandlers();
-
-    // Kachel-Caching und Geolocation parallel
-    Promise.all([
-        _initializeTileCacheLogic(),
-        _handleGeolocation(defaultCenter, defaultZoom)
-    ]).then(() => {
-        if (AppState.lastLat && AppState.lastLng) {
-            // cacheTilesForDIP wird bereits in den Geolocation-Callbacks aufgerufen
-            // console.log('Ensuring tiles are cached for initial DIP after geolocation/fallback.');
-            // cacheTilesForDIP({ map: AppState.map, lastLat: AppState.lastLat, lastLng: AppState.lastLng, baseMaps: AppState.baseMaps });
-        }
-        console.log('Initial tile caching and geolocation promise resolved.');
-    }).catch(error => {
-        console.error("Error during parallel initialization of cache/geolocation:", error);
-    });
-
-    updateOfflineIndicator();
-    console.log('initMap finished.');
-}
-
 // == Marker and popup functions ==
 function reinitializeCoordsControl() {
     if (!AppState.map) {
@@ -721,21 +159,6 @@ function reinitializeCoordsControl() {
     AppState.coordsControl = new L.Control.Coordinates();
     AppState.coordsControl.addTo(AppState.map);
     console.log('After reinitialize - coordsControl:', AppState.coordsControl);
-}
-function createCustomMarker(lat, lng) {
-    const customIcon = L.icon({
-        iconUrl: 'favicon.ico',
-        iconSize: [32, 32],
-        iconAnchor: [16, 32],
-        popupAnchor: [0, -32],
-        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-        shadowSize: [41, 41],
-        shadowAnchor: [13, 32]
-    });
-    return L.marker([lat, lng], {
-        icon: customIcon,
-        draggable: true
-    });
 }
 function createCutAwayMarker(lat, lng) {
     const cutAwayIcon = L.icon({
@@ -753,51 +176,6 @@ function createCutAwayMarker(lat, lng) {
         draggable: true
     });
 }
-function attachMarkerDragend(marker) {
-    marker.on('dragend', async (e) => {
-        const position = marker.getLatLng();
-        AppState.lastLat = position.lat;
-        AppState.lastLng = position.lng;
-        AppState.lastAltitude = await Utils.getAltitude(AppState.lastLat, AppState.lastLng);
-        addCoordToHistory(position.lat, position.lng, `Marker-Position: ${position.lat.toFixed(4)}, ${position.lng.toFixed(4)}`);
-        Coordinates.updateCurrentMarkerPosition(position.lat, position.lng);
-        const wasOpen = marker.getPopup()?.isOpen() || false;
-        updateMarkerPopup(marker, AppState.lastLat, AppState.lastLng, AppState.lastAltitude, wasOpen);
-        console.log('Marker dragged to:', { lat: AppState.lastLat, lng: AppState.lastLng });
-        resetJumpRunDirection(true);
-        if (Settings.state.userSettings.calculateJump) {
-            console.log('Recalculating jump for marker drag');
-            debouncedCalculateJump(); // Use debounced version
-            JumpPlanner.calculateCutAway();
-        }
-        recenterMap(true); // Force recenter after fallback
-        AppState.isManualPanning = false; // Reset after marker placement
-        const slider = document.getElementById('timeSlider');
-        const currentIndex = parseInt(slider.value) || 0;
-        const currentTime = AppState.weatherData?.time?.[currentIndex] || null;
-        document.getElementById('info').innerHTML = `Fetching weather and models...`;
-        const availableModels = await checkAvailableModels(AppState.lastLat, AppState.lastLng);
-        if (availableModels.length > 0) {
-            await fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, currentTime);
-            Settings.updateModelRunInfo();
-            if (AppState.lastAltitude !== 'N/A') calculateMeanWind();
-            updateLandingPattern();
-            if (Settings.state.userSettings.showJumpRunTrack) {
-                console.log('Updating JRT after weather fetch for marker drag');
-                updateJumpRunTrack();
-            }
-            slider.value = currentIndex;
-            cacheTilesForDIP({ map: AppState.map, lastLat: AppState.lastLat, lastLng: AppState.lastLng, baseMaps: AppState.baseMaps });
-            // Update Jump Master Line if active
-            if (Settings.state.userSettings.showJumpMasterLine && Settings.state.userSettings.trackPosition) {
-                console.log('Updating Jump Master Line for marker dragend');
-                updateJumpMasterLine();
-            }
-        } else {
-            document.getElementById('info').innerHTML = `No models available.`;
-        }
-    });
-}
 function attachCutAwayMarkerDragend(marker) {
     marker.on('dragend', (e) => {
         const position = marker.getLatLng();
@@ -811,67 +189,6 @@ function attachCutAwayMarkerDragend(marker) {
             JumpPlanner.calculateCutAway();
         }
     });
-}
-async function updateMarkerPopup(marker, lat, lng, altitude, open = false) {
-    console.log('Updating marker popup:', { lat, lng, altitude, format: getCoordinateFormat(), open });
-    const coordFormat = getCoordinateFormat();
-    const coords = Utils.convertCoords(lat, lng, coordFormat);
-    const sliderIndex = getSliderValue();
-
-    if (!AppState.weatherData && lat && lng) {
-        console.log('No weather data available, fetching for:', { lat, lng });
-        await fetchWeatherForLocation(lat, lng, null, false);
-    }
-
-    console.log('Weather data status:', {
-        weatherDataExists: !!AppState.weatherData,
-        surfacePressureExists: !!AppState.weatherData?.surface_pressure,
-        sliderIndex,
-        surfacePressureLength: AppState.weatherData?.surface_pressure?.length,
-        samplePressure: AppState.weatherData?.surface_pressure?.[sliderIndex]
-    });
-
-    let popupContent;
-    if (coordFormat === 'MGRS') {
-        popupContent = `MGRS: ${coords.lat}<br>Alt: ${altitude} m`;
-    } else {
-        popupContent = `Lat: ${coords.lat}<br>Lng: ${coords.lng}<br>Alt: ${altitude} m`;
-    }
-
-    if (AppState.weatherData && AppState.weatherData.surface_pressure && sliderIndex >= 0 && sliderIndex < AppState.weatherData.surface_pressure.length) {
-        const surfacePressure = AppState.weatherData.surface_pressure[sliderIndex];
-        popupContent += ` QFE: ${surfacePressure.toFixed(0)} hPa`;
-    } else {
-        popupContent += ` QFE: N/A`;
-        console.warn('Surface pressure not available:', {
-            hasWeatherData: !!AppState.weatherData,
-            hasSurfacePressure: !!AppState.weatherData?.surface_pressure,
-            sliderIndexValid: sliderIndex >= 0 && sliderIndex < (AppState.weatherData?.surface_pressure?.length || 0)
-        });
-    }
-
-    // Unbind and bind new popup content
-    marker.unbindPopup();
-    marker.bindPopup(popupContent);
-    console.log('Popup rebound with content:', popupContent);
-
-    // If the popup is open, update its content immediately
-    const popup = marker.getPopup();
-    const isOpen = popup?.isOpen();
-    if (isOpen) {
-        popup.setContent(popupContent);
-        popup.update(); // Ensure the popup layout is refreshed
-        console.log('Updated open popup content:', popupContent);
-    } else if (open) {
-        console.log('Attempting to open popup');
-        marker.openPopup();
-        const isNowOpen = marker.getPopup()?.isOpen();
-        console.log('Popup open status after openPopup():', isNowOpen);
-        if (!isNowOpen) {
-            console.warn('Popup failed to open, retrying');
-            marker.openPopup();
-        }
-    }
 }
 function updateCutAwayMarkerPopup(marker, lat, lng, open = false) {
     const coordFormat = getCoordinateFormat();
@@ -891,26 +208,51 @@ function updateCutAwayMarkerPopup(marker, lat, lng, open = false) {
         marker.openPopup();
     }
 }
-function recenterMap(force = false) {
-    if (AppState.isLoadingGpx) {
-        console.log('Skipping recenterMap during GPX loading');
+async function refreshMarkerPopup() {
+    // 1. Sicherheitscheck: Gibt es überhaupt einen Marker zum Aktualisieren?
+    if (!AppState.currentMarker || AppState.lastLat === null) {
         return;
     }
-    if (AppState.isManualPanning && !force) {
-        console.log('Skipping recenterMap due to manual panning');
-        return;
-    }
-    if (AppState.map && AppState.currentMarker) {
-        AppState.map.invalidateSize();
-        AppState.map.panTo(AppState.currentMarker.getLatLng());
-        console.log('Map recentered on marker at:', AppState.currentMarker.getLatLng());
+
+    // 2. Hier findet die gesamte Logik und Datensammlung statt!
+    //    Wir greifen auf den globalen AppState zu, um die nötigen Infos zu holen.
+    const lat = AppState.lastLat;
+    const lng = AppState.lastLng;
+    const altitude = AppState.lastAltitude;
+    const coordFormat = getCoordinateFormat(); // Diese Funktion lebt in app.js
+    const sliderIndex = getSliderValue();      // Diese auch
+
+    const coords = Utils.convertCoords(lat, lng, coordFormat);
+
+    // 3. Den Inhalt des Popups zusammenbauen.
+    let popupContent;
+    if (coordFormat === 'MGRS') {
+        popupContent = `MGRS: ${coords.lat}<br>Alt: ${altitude} m`;
     } else {
-        console.warn('Cannot recenter map: map or marker not defined');
+        popupContent = `Lat: ${coords.lat}<br>Lng: ${coords.lng}<br>Alt: ${altitude} m`;
     }
+
+    // Fügen Sie die QFE-Logik hinzu.
+    if (AppState.weatherData && AppState.weatherData.surface_pressure) {
+        const surfacePressure = AppState.weatherData.surface_pressure[sliderIndex];
+        if (surfacePressure) {
+            popupContent += ` QFE: ${surfacePressure.toFixed(0)} hPa`;
+        } else {
+            popupContent += ` QFE: N/A`;
+        }
+    } else {
+        popupContent += ` QFE: N/A`;
+    }
+
+    // 4. Den "Maler" mit der fertigen "Bauanleitung" beauftragen.
+    //    Wir übergeben den Marker, den wir aktualisieren wollen, und den fertigen Text.
+    refreshMarkerPopup(AppState.currentMarker, popupContent);
 }
-function initializeMap() {
-    console.log('Initializing map...');
-    initMap();
+function setupCoordinateEvents() {
+    // Nur noch dieser Aufruf bleibt übrig.
+    Coordinates.initializeLocationSearch();
+
+    console.log("Coordinate events setup complete.");
 }
 
 // == Live Tracking Handling ==
@@ -1725,7 +1067,7 @@ async function fetchWeatherForLocation(lat, lng, currentTime = null, isInitialLo
                 calculateMeanWind();
                 if (Settings.state.userSettings.calculateJump) { debouncedCalculateJump(); JumpPlanner.calculateCutAway(); }
             }
-            if (Settings.state.userSettings.showLandingPattern) updateLandingPattern();
+            if (Settings.state.userSettings.showLandingPattern) updateLandingPatternDisplay();
         } else {
             if (infoElement) infoElement.innerHTML = `No models available.`;
             Settings.updateModelRunInfo(null, lat, lng);
@@ -2104,7 +1446,7 @@ export async function updateWeatherDisplay(index, originalTime = null) {
     output += `</table>`;
     document.getElementById('info').innerHTML = output;
     document.getElementById('selectedTime').innerHTML = `Selected Time: ${time}`;
-    updateLandingPattern();
+    updateLandingPatternDisplay();
 }
 export function calculateMeanWind() {
     console.log('Calculating mean wind with model:', document.getElementById('modelSelect').value, 'weatherData:', AppState.weatherData);
@@ -3348,7 +2690,7 @@ export async function updateToCurrentHour() {
             debouncedCalculateJump();
             JumpPlanner.calculateCutAway();
             if (Settings.state.userSettings.showJumpRunTrack) {
-                updateJumpRunTrack();
+                updateJumpRunTrackDisplay();
             }
         }
         console.log('Updated all displays for current hour');
@@ -3375,416 +2717,75 @@ export function visualizeFreeFallPath(path) {
 
 // Isolated calculation functions
 
-export function calculateJump() {
-    console.log('Starting calculateJump...', {
-        showExitArea: Settings.state.userSettings.showExitArea,
-        showCanopyArea: Settings.state.userSettings.showCanopyArea,
-        showJumpRunTrack: Settings.state.userSettings.showJumpRunTrack
-    });
+function calculateJump() {
+    console.log('App: Starte Sprungberechnung und erstelle Bauanleitung...');
 
     if (!AppState.weatherData || !AppState.lastLat || !AppState.lastLng) {
-        console.warn('Missing required data for calculateJump');
-        clearJumpCircles();
-        return null;
+        mapManager.drawJumpVisualization(null); // Befehl an den Maler: "Alles wegmachen"
+        return;
     }
 
-    clearJumpCircles();
+    // Dies ist die "Bauanleitung" für den Maler
+    const visualizationData = {
+        exitCircles: [],
+        canopyCircles: [],
+        canopyLabels: []
+    };
 
-    let result = {};
+    // -- BAUANLEITUNG FÜR EXIT AREA FÜLLEN --
     if (Settings.state.userSettings.showExitArea) {
         const exitResult = JumpPlanner.calculateExitCircle();
         if (exitResult) {
-            updateJumpCircle(
-                exitResult.darkGreenLat, exitResult.darkGreenLng,
-                exitResult.greenLat, exitResult.greenLng,
-                exitResult.darkGreenRadius, exitResult.greenRadius,
-                [], [], [], [],
-                0, 0, 0, 0,
-                exitResult.freeFallDirection, exitResult.freeFallDistance, exitResult.freeFallTime,
-                true, false
-            );
-            result = { ...result, ...exitResult, exitCircle: true };
+            // Füge die fertigen Zeichen-Instruktionen zur Bauanleitung hinzu
+            visualizationData.exitCircles.push({
+                center: [exitResult.greenLat, exitResult.greenLng],
+                radius: exitResult.greenRadius,
+                color: 'green'
+            });
+            visualizationData.exitCircles.push({
+                center: [exitResult.darkGreenLat, exitResult.darkGreenLng],
+                radius: exitResult.darkGreenRadius,
+                color: 'darkgreen'
+            });
         }
     }
+
+    // -- BAUANLEITUNG FÜR CANOPY AREA FÜLLEN --
     if (Settings.state.userSettings.showCanopyArea) {
         const canopyResult = JumpPlanner.calculateCanopyCircles();
         if (canopyResult) {
-            updateJumpCircle(
-                canopyResult.blueLat, canopyResult.blueLng,
-                canopyResult.redLat, canopyResult.redLng,
-                canopyResult.radius, canopyResult.radiusFull,
-                canopyResult.additionalBlueRadii, canopyResult.additionalBlueDisplacements,
-                canopyResult.additionalBlueDirections, canopyResult.additionalBlueUpperLimits,
-                canopyResult.displacement, canopyResult.displacementFull,
-                canopyResult.direction, canopyResult.directionFull,
-                canopyResult.freeFallDirection, canopyResult.freeFallDistance, canopyResult.freeFallTime,
-                false, true
-            );
-            result = { ...result, ...canopyResult, canopyCircles: true };
-        }
-    }
-    if (Settings.state.userSettings.showJumpRunTrack) {
-        const trackResult = calculateJumpRunTrack();
-        if (trackResult) {
-            result = { ...result, track: true };
-        }
-    }
+            // HIER findet die Berechnung statt!
+            const redCenter = Utils.calculateNewCenter(canopyResult.redLat, canopyResult.redLng, canopyResult.displacementFull, canopyResult.directionFull);
 
-    if (AppState.currentMarker && AppState.lastLat && AppState.lastLng) {
-        AppState.currentMarker.setLatLng([AppState.lastLat, AppState.lastLng]);
-        updateMarkerPopup(AppState.currentMarker, AppState.lastLat, AppState.lastLng, AppState.lastAltitude, AppState.currentMarker.getPopup()?.isOpen() || false);
-    }
-
-    // NEU: Ensemble-Visualisierung nach der Hauptberechnung aktualisieren
-    if (Settings.state.userSettings.selectedEnsembleModels && Settings.state.userSettings.selectedEnsembleModels.length > 0) {
-        console.log("calculateJump triggering ensemble update.");
-        processAndVisualizeEnsemble();
-    }
-
-    console.log('calculateJump completed', result);
-    return result;
-}
-export function updateJumpCircle(blueLat, blueLng, redLat, redLng, radius, radiusFull, additionalBlueRadii = [], additionalBlueDisplacements = [], additionalBlueDirections = [], additionalBlueUpperLimits = [], displacement = 0, displacementFull = 0, direction = 0, directionFull = 0, freeFallDirection = 0, freeFallDistance = 0, freeFallTime = 0, showExitAreaOnly = false, showCanopyAreaOnly = false) {
-    console.log('updateJumpCircle called with:', {
-        blueLat, blueLng, redLat, redLng, radius, radiusFull,
-        additionalBlueRadii, additionalBlueDisplacements, additionalBlueDirections, additionalBlueUpperLimits,
-        displacement, displacementFull, direction, directionFull, freeFallDirection, freeFallDistance, freeFallTime,
-        showExitArea: Settings.state.userSettings.showExitArea,
-        showCanopyArea: Settings.state.userSettings.showCanopyArea,
-        showExitAreaOnly, showCanopyAreaOnly
-    });
-
-    if (!AppState.map) {
-        console.warn('Map not available to update jump circles');
-        return false;
-    }
-
-    const currentZoom = AppState.map.getZoom();
-    const isVisible = currentZoom >= Constants.minZoom && currentZoom <= Constants.maxZoom;
-    console.log('Zoom check:', { currentZoom, minZoom: Constants.minZoom, maxZoom: Constants.maxZoom, isVisible });
-
-    const blueCircleMetadata = [];
-
-    const removeLayer = (layer, name) => {
-        if (layer && typeof layer === 'object' && '_leaflet_id' in layer && AppState.map.hasLayer(layer)) {
-            console.log(`Removing existing ${name}`);
-            AppState.map.removeLayer(layer);
-        }
-    };
-
-    console.log('Before cleanup:', {
-        blueCircle: !!AppState.jumpCircle,
-        redCircle: !!AppState.jumpCircleFull,
-        greenCircle: !!AppState.jumpCircleGreen,
-        darkGreenCircle: !!AppState.jumpCircleGreenLight,
-        additionalBlueCircles: AppState.additionalBlueCircles?.length || 0,
-        additionalBlueLabels: AppState.additionalBlueLabels?.length || 0
-    });
-
-    // Cleanup based on mode
-    if (showExitAreaOnly) {
-        // Only clear exit circles
-        removeLayer(AppState.jumpCircleGreen, 'green circle');
-        removeLayer(AppState.jumpCircleGreenLight, 'dark green circle');
-    } else if (showCanopyAreaOnly) {
-        // Only clear canopy circles
-        removeLayer(AppState.jumpCircle, 'blue circle');
-        removeLayer(AppState.jumpCircleFull, 'red circle');
-        if (AppState.additionalBlueCircles) {
-            AppState.additionalBlueCircles.forEach(circle => removeLayer(circle, 'additional blue circle'));
-            AppState.additionalBlueCircles = [];
-        }
-        if (AppState.additionalBlueLabels) {
-            AppState.additionalBlueLabels.forEach(label => removeLayer(label, 'additional blue label'));
-            AppState.additionalBlueLabels = [];
-        }
-    } else {
-        // Clear all circles if neither mode is specified
-        clearJumpCircles();
-    }
-
-    AppState.additionalBlueCircles = AppState.additionalBlueCircles || [];
-    AppState.additionalBlueLabels = AppState.additionalBlueLabels || [];
-
-    function calculateLabelAnchor(center, radius) {
-        const centerLatLng = L.latLng(center[0], center[1]);
-        const earthRadius = 6378137;
-        const deltaLat = (radius / earthRadius) * (180 / Math.PI);
-        const topEdgeLatLng = L.latLng(center[0] + deltaLat, center[1]);
-        const centerPoint = AppState.map.latLngToLayerPoint(centerLatLng);
-        const topEdgePoint = AppState.map.latLngToLayerPoint(topEdgeLatLng);
-        const offsetY = centerPoint.y - topEdgePoint.y + 10;
-        console.log('calculateLabelAnchor:', { center, radius, anchor: [25, offsetY] });
-        return [25, offsetY];
-    }
-
-    function updateBlueCircleLabels() {
-        if (!blueCircleMetadata.length) {
-            console.log('No blue circle metadata to update labels');
-            return;
-        }
-        const zoom = AppState.map.getZoom();
-        blueCircleMetadata.forEach(({ circle, label, center, radius, content }) => {
-            label.setIcon(L.divIcon({
-                className: `isoline-label isoline-label-${zoom <= 11 ? 'small' : 'large'}`,
-                html: `<span style="font-size: ${zoom <= 11 ? '8px' : '10px'}">${content}</span>`,
-                iconSize: zoom <= 11 ? [50, 12] : [60, 14],
-                iconAnchor: calculateLabelAnchor(center, radius)
-            }));
-        });
-        console.log('Updated isoline labels for zoom:', zoom);
-    }
-
-    try {
-        AppState.map.off('zoomend', updateBlueCircleLabels);
-    } catch (e) {
-        console.warn('Failed to remove zoomend listener:', e.message);
-    }
-
-    if (!isVisible || (!Settings.state.userSettings.showExitArea && !Settings.state.userSettings.showCanopyArea)) {
-        console.log('No circles to render:', { isVisible, showExitArea: Settings.state.userSettings.showExitArea, showCanopyArea: Settings.state.userSettings.showCanopyArea });
-        return false;
-    }
-
-    // Render exit circles
-    if (showExitAreaOnly && Settings.state.userSettings.showExitArea && Number.isFinite(blueLat) && Number.isFinite(blueLng) && Number.isFinite(radius) && Number.isFinite(radiusFull)) {
-        AppState.jumpCircleGreen = L.circle([redLat, redLng], {
-            radius: radiusFull,
-            color: 'green',
-            fillColor: 'green',
-            fillOpacity: 0.2,
-            weight: 2
-        }).addTo(AppState.map);
-        AppState.jumpCircleGreenLight = L.circle([blueLat, blueLng], {
-            radius: radius,
-            color: 'darkgreen',
-            fillColor: 'darkgreen',
-            fillOpacity: 0.2,
-            weight: 2
-        }).addTo(AppState.map);
-        if (AppState.jumpCircleGreen.setZIndex) AppState.jumpCircleGreen.setZIndex(600);
-        if (AppState.jumpCircleGreenLight.setZIndex) AppState.jumpCircleGreenLight.setZIndex(600);
-        console.log('Added green and dark green circles:', {
-            greenCenter: [redLat, redLng],
-            greenRadius: radiusFull,
-            darkGreenCenter: [blueLat, blueLng],
-            darkGreenRadius: radius
-        });
-
-        const tooltipContent = `
-            Exit areas calculated with:<br>
-            Throw/Drift: ${Number.isFinite(freeFallDirection) ? Math.round(freeFallDirection) : 'N/A'}° ${Number.isFinite(freeFallDistance) ? Math.round(freeFallDistance) : 'N/A'} m<br>
-            Free Fall Time: ${freeFallTime != null && !isNaN(freeFallTime) ? Math.round(freeFallTime) : 'N/A'} sec
-        `;
-        AppState.jumpCircleGreenLight.bindTooltip(tooltipContent, {
-            direction: 'top',
-            offset: [0, 0],
-            className: 'wind-tooltip'
-        });
-        console.log('Tooltip bound to dark green circle:', { tooltipContent });
-    }
-
-    // Render canopy circles
-    if (showCanopyAreaOnly && Settings.state.userSettings.showCanopyArea && Number.isFinite(blueLat) && Number.isFinite(blueLng) && Number.isFinite(redLat) && Number.isFinite(redLng) && Number.isFinite(radius) && Number.isFinite(radiusFull)) {
-        const newCenterBlue = Utils.calculateNewCenter(blueLat, blueLng, displacement, direction);
-        const newCenterRed = Utils.calculateNewCenter(redLat, redLng, displacementFull, directionFull);
-
-        AppState.jumpCircle = L.circle(newCenterBlue, {
-            radius: radius,
-            color: 'blue',
-            fillColor: 'blue',
-            fillOpacity: 0,
-            weight: 2,
-            opacity: 0.1
-        }).addTo(AppState.map);
-        if (AppState.jumpCircle.setZIndex) AppState.jumpCircle.setZIndex(1000);
-        console.log('Added main blue circle at:', { center: newCenterBlue, radius });
-
-        AppState.jumpCircleFull = L.circle(newCenterRed, {
-            radius: radiusFull,
-            color: 'red',
-            fillColor: 'red',
-            fillOpacity: 0,
-            weight: 2,
-            opacity: 0.8
-        }).addTo(AppState.map);
-        if (AppState.jumpCircleFull.setZIndex) AppState.jumpCircleFull.setZIndex(400);
-        console.log('Added red circle at:', { center: newCenterRed, radius: radiusFull });
-
-        if (Array.isArray(additionalBlueRadii) && Array.isArray(additionalBlueDisplacements) && Array.isArray(additionalBlueDirections) && Array.isArray(additionalBlueUpperLimits)) {
-            AppState.additionalBlueCircles = [];
-            AppState.additionalBlueLabels = [];
-            additionalBlueRadii.forEach((addRadius, i) => {
-                if (Number.isFinite(addRadius) && addRadius > 0 &&
-                    Number.isFinite(additionalBlueDisplacements[i]) && Number.isFinite(additionalBlueDirections[i]) &&
-                    Number.isFinite(additionalBlueUpperLimits[i])) {
-                    const addCenter = Utils.calculateNewCenter(blueLat, blueLng, additionalBlueDisplacements[i], additionalBlueDirections[i]);
-                    const blueContent = `${Math.round(additionalBlueUpperLimits[i])}m`;
-                    const circle = L.circle(addCenter, {
-                        radius: addRadius,
-                        color: 'blue',
-                        fillColor: 'blue',
-                        fillOpacity: 0.1,
-                        weight: 1
-                    }).addTo(AppState.map);
-                    if (circle.setZIndex) circle.setZIndex(1000);
-
-                    const label = L.marker(addCenter, {
-                        icon: L.divIcon({
-                            className: `isoline-label isoline-label-${currentZoom <= 11 ? 'small' : 'large'}`,
-                            html: `<span style="font-size: ${currentZoom <= 11 ? '8px' : '10px'}">${blueContent}</span>`,
-                            iconSize: currentZoom <= 11 ? [50, 12] : [60, 14],
-                            iconAnchor: calculateLabelAnchor(addCenter, addRadius)
-                        }),
-                        zIndexOffset: 2100
-                    }).addTo(AppState.map);
-
-                    AppState.additionalBlueCircles.push(circle);
-                    AppState.additionalBlueLabels.push(label);
-                    blueCircleMetadata.push({ circle, label, center: addCenter, radius: addRadius, content: blueContent });
-                    console.log(`Added additional blue circle ${i}:`, { center: addCenter, radius: addRadius, content: blueContent });
-
-                    if (currentZoom <= 11 && i % 2 === 1) {
-                        label.remove();
-                        console.log(`Hid label for blue circle ${i} at zoom:`, currentZoom);
-                    }
-                } else {
-                    console.warn(`Invalid data for blue circle ${i}:`, {
-                        addRadius,
-                        displacement: additionalBlueDisplacements[i],
-                        direction: additionalBlueDirections[i],
-                        upperLimit: additionalBlueUpperLimits[i]
-                    });
-                }
-            });
-        } else {
-            console.warn('Invalid or empty arrays for additional blue circles:', {
-                additionalBlueRadii,
-                additionalBlueDisplacements,
-                additionalBlueDirections,
-                additionalBlueUpperLimits
-            });
-        }
-    }
-
-    // Re-render canopy circles if active and not in showExitAreaOnly mode
-    if (!showExitAreaOnly && Settings.state.userSettings.showCanopyArea && !showCanopyAreaOnly) {
-        const canopyResult = JumpPlanner.calculateCanopyCircles();
-        if (canopyResult) {
-            const newCenterBlue = Utils.calculateNewCenter(canopyResult.blueLat, canopyResult.blueLng, canopyResult.displacement, canopyResult.direction);
-            const newCenterRed = Utils.calculateNewCenter(canopyResult.redLat, canopyResult.redLng, canopyResult.displacementFull, canopyResult.directionFull);
-
-            removeLayer(AppState.jumpCircle, 'blue circle');
-            removeLayer(AppState.jumpCircleFull, 'red circle');
-            if (AppState.additionalBlueCircles) {
-                AppState.additionalBlueCircles.forEach(circle => removeLayer(circle, 'additional blue circle'));
-                AppState.additionalBlueCircles = [];
-            }
-            if (AppState.additionalBlueLabels) {
-                AppState.additionalBlueLabels.forEach(label => removeLayer(label, 'additional blue label'));
-                AppState.additionalBlueLabels = [];
-            }
-
-            AppState.jumpCircle = L.circle(newCenterBlue, {
-                radius: canopyResult.radius,
-                color: 'blue',
-                fillColor: 'blue',
-                fillOpacity: 0,
-                weight: 2,
-                opacity: 0.1
-            }).addTo(AppState.map);
-            if (AppState.jumpCircle.setZIndex) AppState.jumpCircle.setZIndex(1000);
-            console.log('Re-added main blue circle at:', { center: newCenterBlue, radius: canopyResult.radius });
-
-            AppState.jumpCircleFull = L.circle(newCenterRed, {
+            // Füge die fertige Instruktion für den roten Kreis hinzu
+            visualizationData.canopyCircles.push({
+                center: redCenter,
                 radius: canopyResult.radiusFull,
                 color: 'red',
-                fillColor: 'red',
-                fillOpacity: 0,
                 weight: 2,
                 opacity: 0.8
-            }).addTo(AppState.map);
-            if (AppState.jumpCircleFull.setZIndex) AppState.jumpCircleFull.setZIndex(400);
-            console.log('Re-added red circle at:', { center: newCenterRed, radius: canopyResult.radiusFull });
+            });
 
-            if (Array.isArray(canopyResult.additionalBlueRadii)) {
-                AppState.additionalBlueCircles = [];
-                AppState.additionalBlueLabels = [];
-                canopyResult.additionalBlueRadii.forEach((addRadius, i) => {
-                    if (Number.isFinite(addRadius) && addRadius > 0 &&
-                        Number.isFinite(canopyResult.additionalBlueDisplacements[i]) &&
-                        Number.isFinite(canopyResult.additionalBlueDirections[i]) &&
-                        Number.isFinite(canopyResult.additionalBlueUpperLimits[i])) {
-                        const addCenter = Utils.calculateNewCenter(canopyResult.blueLat, canopyResult.blueLng, canopyResult.additionalBlueDisplacements[i], canopyResult.additionalBlueDirections[i]);
-                        const blueContent = `${Math.round(canopyResult.additionalBlueUpperLimits[i])}m`;
-                        const circle = L.circle(addCenter, {
-                            radius: addRadius,
-                            color: 'blue',
-                            fillColor: 'blue',
-                            fillOpacity: 0.1,
-                            weight: 1
-                        }).addTo(AppState.map);
-                        if (circle.setZIndex) circle.setZIndex(1000);
-
-                        const label = L.marker(addCenter, {
-                            icon: L.divIcon({
-                                className: `isoline-label isoline-label-${currentZoom <= 11 ? 'small' : 'large'}`,
-                                html: `<span style="font-size: ${currentZoom <= 11 ? '8px' : '10px'}">${blueContent}</span>`,
-                                iconSize: currentZoom <= 11 ? [50, 12] : [60, 14],
-                                iconAnchor: calculateLabelAnchor(addCenter, addRadius)
-                            }),
-                            zIndexOffset: 2100
-                        }).addTo(AppState.map);
-
-                        AppState.additionalBlueCircles.push(circle);
-                        AppState.additionalBlueLabels.push(label);
-                        blueCircleMetadata.push({ circle, label, center: addCenter, radius: addRadius, content: blueContent });
-                        console.log(`Re-added additional blue circle ${i}:`, { center: addCenter, radius: addRadius, content: blueContent });
-
-                        if (currentZoom <= 11 && i % 2 === 1) {
-                            label.remove();
-                            console.log(`Hid label for blue circle ${i} at zoom:`, currentZoom);
-                        }
-                    }
+            // Erstelle die Instruktionen für die blauen Kreise
+            canopyResult.additionalBlueRadii.forEach((radius, i) => {
+                const center = Utils.calculateNewCenter(canopyResult.blueLat, canopyResult.blueLng, canopyResult.additionalBlueDisplacements[i], canopyResult.additionalBlueDirections[i]);
+                visualizationData.canopyCircles.push({
+                    center: center,
+                    radius: radius,
+                    color: 'blue',
+                    weight: 1,
+                    opacity: 0.1
                 });
-            }
-        }
-    }
-
-    if (blueCircleMetadata.length) {
-        updateBlueCircleLabels();
-        AppState.map.on('zoomend', updateBlueCircleLabels);
-    } else {
-        console.log('No blue circles created, skipping label update and zoom listener');
-    }
-
-    // Ensure gpxLayer is valid and track is loaded before bringing to front
-    if (AppState.isTrackLoaded && AppState.gpxLayer && typeof AppState.gpxLayer.bringToFront === 'function') {
-        console.log('Bringing gpxLayer to front');
-        AppState.gpxLayer.bringToFront();
-    } else {
-        console.log('gpxLayer not brought to front:', {
-            isTrackLoaded: AppState.isTrackLoaded,
-            gpxLayerExists: !!AppState.gpxLayer,
-            hasBringToFront: AppState.gpxLayer && typeof AppState.gpxLayer.bringToFront === 'function',
-            gpxLayerType: AppState.gpxLayer ? AppState.gpxLayer.constructor.name : null
-        });
-    }
-
-    ['showExitAreaCheckbox', 'showCanopyAreaCheckbox', 'showJumpRunTrack'].forEach(id => {
-        const checkbox = document.getElementById(id);
-        if (checkbox) {
-            console.log(`Checkbox ${id} DOM state after update:`, {
-                disabled: checkbox.disabled,
-                pointerEvents: getComputedStyle(checkbox).pointerEvents,
-                zIndex: getComputedStyle(checkbox).zIndex,
-                parentClasses: checkbox.parentElement.className
+                visualizationData.canopyLabels.push({
+                    center: center,
+                    text: `${Math.round(canopyResult.additionalBlueUpperLimits[i])}m`
+                });
             });
         }
-    });
+    }
 
-    console.log('updateJumpCircle completed');
-    return true;
+    // Übergebe die fertige Bauanleitung an den Maler
+    mapManager.drawJumpVisualization(visualizationData);
 }
 export function clearIsolineMarkers() {
     console.log('clearIsolineMarkers called');
@@ -3853,7 +2854,7 @@ export function resetJumpRunDirection(triggerUpdate = true) {
     console.log('Reset JRT direction to calculated');
     if (triggerUpdate && Settings.state.userSettings.showJumpRunTrack && AppState.weatherData && AppState.lastLat && AppState.lastLng) {
         console.log('Triggering JRT update after reset');
-        updateJumpRunTrack();
+        updateJumpRunTrackDisplay();
     }
 }
 export function calculateJumpRunTrack() {
@@ -3862,364 +2863,29 @@ export function calculateJumpRunTrack() {
         return null;
     }
     console.log('Calculating jump run track...');
-    updateJumpRunTrack();
+    updateJumpRunTrackDisplay();
     const trackData = JumpPlanner.jumpRunTrack();
     return trackData;
 }
-export function updateJumpRunTrack() {
-    if (!AppState.map) {
-        console.warn('Map not initialized, cannot update jump run track');
-        return;
-    }
 
-    console.log('updateJumpRunTrack called', {
-        showJumpRunTrack: Settings.state.userSettings.showJumpRunTrack,
-        weatherData: !!AppState.weatherData,
-        lastLat: AppState.lastLat,
-        lastLng: AppState.lastLng,
-        customJumpRunDirection: AppState.customJumpRunDirection,
-        currentZoom: AppState.map.getZoom(),
-        jumpRunTrackOffset: Settings.state.userSettings.jumpRunTrackOffset,
-        jumpRunTrackForwardOffset: Settings.state.userSettings.jumpRunTrackForwardOffset
-    });
+// Dies ist die neue Funktion, die die ganze "Denkarbeit" leistet.
+export function updateLandingPatternDisplay() {
 
-    const currentZoom = AppState.map.getZoom();
-    const isZoomInRange = currentZoom >= Constants.minZoom && currentZoom <= Constants.maxZoom;
-
-    // Remove existing jump run track layer
-    if (AppState.jumpRunTrackLayer) {
-        try {
-            AppState.map.removeLayer(AppState.jumpRunTrackLayer);
-            console.log('Removed existing JRT layer group');
-        } catch (error) {
-            console.warn('Error removing JRT layer group:', error);
-        }
-        AppState.jumpRunTrackLayer = null;
-    }
-
-    if (!Settings.state.userSettings.showJumpRunTrack || !AppState.weatherData || !AppState.lastLat || !AppState.lastLng || !isZoomInRange) {
-        console.log('Jump run track not drawn', {
-            showJumpRunTrack: Settings.state.userSettings.showJumpRunTrack,
-            weatherData: !!AppState.weatherData,
-            lastLat: AppState.lastLat,
-            lastLng: AppState.lastLng,
-            isZoomInRange
-        });
-        const directionInput = document.getElementById('jumpRunTrackDirection');
-        if (directionInput) {
-            setInputValueSilently('jumpRunTrackDirection', '');
-        }
-        return;
-    }
-
-    const trackData = JumpPlanner.jumpRunTrack();
-    if (!trackData || !trackData.latlngs || !Array.isArray(trackData.latlngs) || trackData.latlngs.length < 2) {
-        console.error('Invalid trackData from jumpRunTrack:', trackData);
-        return;
-    }
-
-    let { latlngs, direction, trackLength, approachLatLngs, approachLength, approachTime } = trackData;
-
-    const isValidLatLngs = latlngs.every(ll => Array.isArray(ll) && ll.length === 2 && !isNaN(ll[0]) && !isNaN(ll[1]));
-    if (!isValidLatLngs) {
-        console.error('Invalid latlngs format in trackData:', latlngs);
-        return;
-    }
-
-    console.log('Updating jump run track with:', {
-        latlngs,
-        direction,
-        trackLength,
-        lateralOffset: Settings.state.userSettings.jumpRunTrackOffset,
-        forwardOffset: Settings.state.userSettings.jumpRunTrackForwardOffset
-    });
-    if (approachLatLngs) {
-        console.log('Updating approach path with:', { approachLatLngs, approachLength });
-    }
-
-    // Create a LayerGroup to hold all components
-    AppState.jumpRunTrackLayer = L.layerGroup().addTo(AppState.map);
-
-    // Create polyline for the jump run track (interactive for tooltips)
-    const trackPolyline = L.polyline(latlngs, {
-        color: 'orange',
-        weight: 4,
-        opacity: 0.9,
-        interactive: true
-    }).addTo(AppState.jumpRunTrackLayer);
-
-    trackPolyline.bindTooltip(`Jump Run: ${Math.round(direction)}°, ${Math.round(trackLength)} m`, {
-        permanent: false,
-        direction: 'top',
-        offset: [0, -10]
-    });
-
-    // Prevent drag events on the polyline
-    trackPolyline.on('mousedown touchstart', (e) => {
-        L.DomEvent.stopPropagation(e);
-    });
-
-    // Create polyline for the approach path (interactive for tooltips)
-    let approachPolyline = null;
-    if (approachLatLngs && Array.isArray(approachLatLngs) && approachLatLngs.length === 2) {
-        const isValidApproachLatLngs = approachLatLngs.every(ll => Array.isArray(ll) && ll.length === 2 && !isNaN(ll[0]) && !isNaN(ll[1]));
-        if (isValidApproachLatLngs) {
-            approachPolyline = L.polyline(approachLatLngs, {
-                color: 'orange',
-                weight: 3,
-                opacity: 0.9,
-                dashArray: '10, 10',
-                interactive: true
-            }).addTo(AppState.jumpRunTrackLayer);
-
-            approachPolyline.bindTooltip(`Approach: ${Math.round(direction)}°, ${Math.round(approachLength)} m, ${Math.round(approachTime / 60)} min`, {
-                permanent: false,
-                direction: 'top',
-                offset: [0, -10]
-            });
-
-            // Prevent drag events on the approach polyline
-            approachPolyline.on('mousedown touchstart', (e) => {
-                L.DomEvent.stopPropagation(e);
-            });
-        } else {
-            console.warn('Invalid approachLatLngs format:', approachLatLngs);
-        }
-    } else {
-        console.warn('approachLatLngs is null or invalid:', approachLatLngs);
-    }
-
-    // Add airplane marker at the front end (now draggable)
-    const frontEnd = latlngs[1];
-    const airplaneIcon = L.icon({
-        iconUrl: 'airplane_orange.png',
-        iconSize: [32, 32],
-        iconAnchor: [16, 16],
-        popupAnchor: [0, -16],
-        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-        shadowSize: [41, 41],
-        shadowAnchor: [13, 32]
-    });
-
-    const airplaneMarker = L.marker(frontEnd, {
-        icon: airplaneIcon,
-        rotationAngle: direction,
-        rotationOrigin: 'center center',
-        draggable: true, // Make the airplane marker draggable
-        zIndexOffset: 2000 // Ensure it's above other layers
-    }).addTo(AppState.jumpRunTrackLayer);
-
-    // Add tooltip to indicate draggability
-    airplaneMarker.bindTooltip('Drag to move Jump Run Track', {
-        permanent: false,
-        direction: 'top',
-        offset: [0, -20]
-    });
-
-    // Store original positions for drag calculations
-    let originalTrackLatLngs = latlngs.map(ll => [...ll]);
-    let originalApproachLatLngs = approachLatLngs ? approachLatLngs.map(ll => [...ll]) : null;
-    let originalAirplaneLatLng = [...frontEnd];
-    let originalCenterLat = AppState.lastLat;
-    let originalCenterLng = AppState.lastLng;
-    if (Settings.state.userSettings.jumpRunTrackForwardOffset !== 0) {
-        const forwardDistance = Math.abs(Settings.state.userSettings.jumpRunTrackForwardOffset);
-        const forwardBearing = Settings.state.userSettings.jumpRunTrackForwardOffset >= 0 ? direction : (direction + 180) % 360;
-        [originalCenterLat, originalCenterLng] = Utils.calculateNewCenter(AppState.lastLat, AppState.lastLng, forwardDistance, forwardBearing);
-    }
-    if (Settings.state.userSettings.jumpRunTrackOffset !== 0) {
-        const lateralDistance = Math.abs(Settings.state.userSettings.jumpRunTrackOffset);
-        const lateralBearing = Settings.state.userSettings.jumpRunTrackOffset >= 0
-            ? (direction + 90) % 360
-            : (direction - 90 + 360) % 360;
-        [originalCenterLat, originalCenterLng] = Utils.calculateNewCenter(originalCenterLat, originalCenterLng, lateralDistance, lateralBearing);
-    }
-
-    // Update direction input
-    const directionInput = document.getElementById('jumpRunTrackDirection');
-    if (directionInput) {
-        setInputValueSilently('jumpRunTrackDirection', Math.round(direction));
-    }
-
-    // Dragging handlers for the airplane marker
-    airplaneMarker.on('mousedown', (e) => {
-        console.log('Airplane marker mousedown:', e);
-        if (AppState.map) {
-            AppState.map.dragging.disable();
-        }
-        L.DomEvent.stopPropagation(e);
-    });
-
-    airplaneMarker.on('dragstart', () => {
-        console.log('Airplane marker dragstart');
-        if (AppState.map) {
-            AppState.map.dragging.disable();
-        }
-    });
-
-    airplaneMarker.on('drag', () => {
-        console.log('Airplane marker drag');
-        const newLatLng = airplaneMarker.getLatLng();
-        // Calculate delta from the original center (lastLat, lastLng) to new center
-        const originalCenter = L.latLng(originalCenterLat, originalCenterLng);
-        const newCenter = L.latLng(originalTrackLatLngs[1][0], originalTrackLatLngs[1][1]); // Front end of JRT
-        const deltaLat = newLatLng.lat - newCenter.lat;
-        const deltaLng = newLatLng.lng - newCenter.lng;
-
-        // Update track polyline
-        const newTrackLatLngs = originalTrackLatLngs.map(ll => [ll[0] + deltaLat, ll[1] + deltaLng]);
-        trackPolyline.setLatLngs(newTrackLatLngs);
-        originalTrackLatLngs = newTrackLatLngs;
-
-        // Update approach polyline if it exists
-        if (approachPolyline && originalApproachLatLngs) {
-            const newApproachLatLngs = originalApproachLatLngs.map(ll => [ll[0] + deltaLat, ll[1] + deltaLng]);
-            approachPolyline.setLatLngs(newApproachLatLngs);
-            originalApproachLatLngs = newApproachLatLngs;
-        }
-
-        // Update airplane marker position (already handled by Leaflet)
-        originalAirplaneLatLng = [newLatLng.lat, newLatLng.lng];
-        originalCenterLat += deltaLat;
-        originalCenterLng += deltaLng;
-    });
-
-    airplaneMarker.on('dragend', () => {
-        console.log('Airplane marker dragend');
-        if (AppState.map) {
-            AppState.map.dragging.enable();
-        }
-
-        const newLatLng = airplaneMarker.getLatLng();
-
-        // Calculate displacement from original center (lastLat, lastLng)
-        const originalCenter = L.latLng(AppState.lastLat, AppState.lastLng);
-        const newCenter = L.latLng(newLatLng.lat - (originalAirplaneLatLng[0] - originalCenterLat), newLatLng.lng - (originalAirplaneLatLng[1] - originalCenterLng));
-        if (!AppState.map) {
-            console.warn('Map not initialized, cannot calculate distance for dragend');
-            return;
-        }
-        const distance = AppState.map.distance(originalCenter, newCenter);
-        const bearing = Utils.calculateBearing(originalCenter.lat, originalCenter.lng, newCenter.lat, newCenter.lng);
-
-        // Calculate lateral and forward components
-        const trackDirectionRad = direction * Math.PI / 180;
-        const bearingRad = bearing * Math.PI / 180;
-
-        let angle = Math.abs(((bearing - direction + 540) % 360) - 180);
-        if (angle > 90) {
-            angle = 180 - angle;
-        }
-        const angleRad = angle * Math.PI / 180;
-
-        const forwardDistance = distance * Math.cos(angleRad);
-        const lateralDistance = distance * Math.sin(angleRad);
-
-        let forwardOffsetSign = 1;
-        const forwardAngle = Math.abs(((bearing - direction + 540) % 360) - 180);
-        const backwardAngle = Math.abs(((bearing - (direction + 180) % 360 + 540) % 360) - 180);
-        if (backwardAngle < forwardAngle) {
-            forwardOffsetSign = -1;
-        }
-
-        let lateralOffsetSign = 1;
-        const rightAngle = Math.abs(((bearing - (direction + 90) % 360 + 540) % 360) - 180);
-        const leftAngle = Math.abs(((bearing - (direction - 90 + 360) % 360 + 540) % 360) - 180);
-        if (leftAngle < rightAngle) {
-            lateralOffsetSign = -1;
-        }
-
-        const newForwardOffset = Math.round((forwardDistance * forwardOffsetSign) / 100) * 100;
-        const newLateralOffset = Math.round((lateralDistance * lateralOffsetSign) / 100) * 100;
-
-        const clampedForwardOffset = Math.max(-50000, Math.min(50000, newForwardOffset));
-        const clampedLateralOffset = Math.max(-50000, Math.min(50000, newLateralOffset));
-
-        Settings.state.userSettings.jumpRunTrackOffset = clampedLateralOffset;
-        Settings.state.userSettings.jumpRunTrackForwardOffset = clampedForwardOffset;
-        Settings.save();
-        console.log('JRT dragged, new offsets:', {
-            lateralOffset: Settings.state.userSettings.jumpRunTrackOffset,
-            forwardOffset: Settings.state.userSettings.jumpRunTrackForwardOffset,
-            distance,
-            bearing,
-            forwardDistance,
-            lateralDistance,
-            angle
-        });
-
-        const lateralOffsetInput = document.getElementById('jumpRunTrackOffset');
-        if (lateralOffsetInput) {
-            lateralOffsetInput.value = Settings.state.userSettings.jumpRunTrackOffset;
-        }
-        const forwardOffsetInput = document.getElementById('jumpRunTrackForwardOffset');
-        if (forwardOffsetInput) {
-            forwardOffsetInput.value = Settings.state.userSettings.jumpRunTrackForwardOffset;
-        }
-    });
-
-    airplaneMarker.on('touchstart', (e) => {
-        console.log('Airplane marker touchstart:', e);
-        if (AppState.map) {
-            AppState.map.dragging.disable();
-        }
-        L.DomEvent.stopPropagation(e);
-    });
-
-    airplaneMarker.on('click', (e) => {
-        console.log('Airplane marker click:', e);
-        L.DomEvent.stopPropagation(e);
-    });
-}
-
-// == Landing Pattern Calculations ==
-export function updateLandingPattern() {
-    console.log('updateLandingPattern called');
-    if (!AppState.map) {
-        console.warn('Map not initialized, cannot update landing pattern');
+    // --- TEIL A: DATEN SAMMELN UND PRÜFEN (1:1 aus Ihrer alten Funktion) ---
+    if (!Settings.state.userSettings.showLandingPattern || !AppState.weatherData || !AppState.lastLat) {
+        mapManager.drawLandingPattern(null); // Sagt dem Kellner: "Tisch abräumen"
         return;
     }
 
     const currentZoom = AppState.map.getZoom();
-    const isVisible = currentZoom >= Constants.landingPatternMinZoom; // e.g., 14
-    console.log('Landing pattern zoom check:', { currentZoom, landingPatternMinZoom: Constants.landingPatternMinZoom, isVisible });
-
-    // Clear existing layers
-    const removeLayer = (layer, name) => {
-        if (layer && AppState.map.hasLayer(layer)) {
-            AppState.map.removeLayer(layer);
-            console.log(`Removed ${name}`);
-        }
-    };
-    removeLayer(AppState.landingPatternPolygon, 'landing pattern polygon');
-    removeLayer(AppState.secondlandingPatternPolygon, 'second landing pattern polygon');
-    removeLayer(AppState.thirdLandingPatternLine, 'third landing pattern line');
-    removeLayer(AppState.finalArrow, 'final arrow');
-    removeLayer(AppState.baseArrow, 'base arrow');
-    removeLayer(AppState.downwindArrow, 'downwind arrow');
-    AppState.landingPatternPolygon = null;
-    AppState.secondlandingPatternPolygon = null;
-    AppState.thirdLandingPatternLine = null;
-    AppState.finalArrow = null;
-    AppState.baseArrow = null;
-    AppState.downwindArrow = null;
-
-    if (!Settings.state.userSettings.showLandingPattern) {
-        console.log('Landing pattern disabled, layers cleared');
-        return;
-    }
-
-    if (!isVisible) {
+    if (currentZoom < Constants.landingPatternMinZoom) {
         console.log('Landing pattern not displayed - zoom too low:', currentZoom);
-        return;
+        // Sende den Befehl "Alles wegmachen" an den Maler und beende die Funktion.
+        mapManager.drawLandingPattern(null); 
+        return; 
     }
-
-    if (!AppState.weatherData || !AppState.lastLat || !AppState.lastLng) {
-        console.warn('Cannot render landing pattern: missing weather data or coordinates');
-        return;
-    }
-
-    const showLandingPattern = document.getElementById('showLandingPattern').checked;
+    
+    //... (alle Zeilen von "const sliderIndex = ..." bis "if (!interpolatedData ...)") ...
     const sliderIndex = parseInt(document.getElementById('timeSlider').value) || 0;
     const landingDirection = document.querySelector('input[name="landingDirection"]:checked')?.value || 'LL';
     const customLandingDirectionLLInput = document.getElementById('customLandingDirectionLL');
@@ -4231,42 +2897,27 @@ export function updateLandingPattern() {
     const DESCENT_RATE_MPS = parseFloat(document.getElementById('descentRate').value) || 3.5;
     const LEG_HEIGHT_FINAL = parseInt(document.getElementById('legHeightFinal').value) || 100;
     const LEG_HEIGHT_BASE = parseInt(document.getElementById('legHeightBase').value) || 200;
+
     const LEG_HEIGHT_DOWNWIND = parseInt(document.getElementById('legHeightDownwind').value) || 300;
-
-    // Remove existing layers
-    [AppState.landingPatternPolygon, AppState.secondlandingPatternPolygon, AppState.thirdLandingPatternLine, AppState.finalArrow, AppState.baseArrow, AppState.downwindArrow].forEach(layer => {
-        if (layer) {
-            layer.remove();
-            layer = null;
-        }
-    });
-
-    if (!showLandingPattern || !AppState.weatherData || !AppState.weatherData.time || !AppState.currentMarker || sliderIndex >= AppState.weatherData.time.length) {
-        console.log('Landing pattern not updated: missing data or not enabled');
-        return;
-    }
-
     const markerLatLng = AppState.currentMarker.getLatLng();
     const lat = markerLatLng.lat;
     const lng = markerLatLng.lng;
     const baseHeight = Math.round(AppState.lastAltitude);
-
     const interpolatedData = interpolateWeatherData(sliderIndex);
-    if (!interpolatedData || interpolatedData.length === 0) {
-        console.warn('No interpolated data available for landing pattern calculation');
-        return;
-    }
+    if (!interpolatedData || interpolatedData.length === 0) return;
 
-    // Convert wind speeds from km/h (Open-Meteo) to kt explicitly
+
+    // *** HIER IST DIE KORREKTUR: FÜGEN SIE DIESEN BLOCK EIN ***
+    // Holt die aktuellen Einstellungen aus dem HTML-Dokument.
+   
+
     const heights = interpolatedData.map(d => d.height);
     const dirs = interpolatedData.map(d => Number.isFinite(d.dir) ? parseFloat(d.dir) : 0);
-    const spdsKt = interpolatedData.map(d => Utils.convertWind(parseFloat(d.spd) || 0, 'kt', 'km/h')); // km/h to kt
-
-    // Calculate U and V components in kt
+    const spdsKt = interpolatedData.map(d => Utils.convertWind(parseFloat(d.spd) || 0, 'kt', 'km/h'));
     const uComponents = spdsKt.map((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
     const vComponents = spdsKt.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
 
-    // Determine effective landing direction based on selected pattern and input
+        // Determine effective landing direction based on selected pattern and input
     let effectiveLandingWindDir;
     if (landingDirection === 'LL' && Number.isFinite(customLandingDirLL) && customLandingDirLL >= 0 && customLandingDirLL <= 359) {
         effectiveLandingWindDir = customLandingDirLL;
@@ -4302,7 +2953,9 @@ export function updateLandingPattern() {
         return [startLat + deltaLat, startLng + deltaLng];
     };
 
-    // Final Leg (0-100m AGL)
+    // --- TEIL B: ALLE BERECHNUNGEN (1:1 aus Ihrer alten Funktion) ---
+    // Der gesamte Block, der die Punkte, Winde und Farben berechnet.
+
     const finalLimits = [baseHeight, baseHeight + LEG_HEIGHT_FINAL];
     console.log('Final limits:', finalLimits);
     const finalMeanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, ...finalLimits);
@@ -4335,27 +2988,10 @@ export function updateLandingPattern() {
     const finalLength = finalGroundSpeedKt * 1.852 / 3.6 * finalTime;
     const finalBearing = (effectiveLandingWindDir + 180) % 360;
     const finalEnd = calculateLegEndpoint(lat, lng, finalBearing, finalGroundSpeedKt, finalTime);
-
-    AppState.landingPatternPolygon = L.polyline([[lat, lng], finalEnd], {
-        color: 'red',
-        weight: 3,
-        opacity: 0.8,
-        dashArray: '5, 10'
-    }).addTo(AppState.map);
-
     // Add a fat blue arrow in the middle of the final leg pointing to landing direction
     const finalMidLat = (lat + finalEnd[0]) / 2;
     const finalMidLng = (lng + finalEnd[1]) / 2;
     const finalArrowBearing = (finalWindDir - 90 + 180) % 360; // Points in direction of the mean wind at final
-
-    AppState.finalArrow = L.marker([finalMidLat, finalMidLng], {
-        icon: createArrowIcon(finalMidLat, finalMidLng, finalArrowBearing, finalArrowColor)
-    }).addTo(AppState.map);
-    AppState.finalArrow.bindTooltip(`${Math.round(finalWindDir)}° ${formatWindSpeed(finalWindSpeedKt)}${getWindSpeedUnit()}`, {
-        offset: [10, 0], // Slight offset to avoid overlap
-        direction: 'right',
-        className: 'wind-tooltip'
-    });
 
     // Base Leg (100-200m AGL)
     const baseLimits = [baseHeight + LEG_HEIGHT_FINAL, baseHeight + LEG_HEIGHT_BASE];
@@ -4405,26 +3041,10 @@ export function updateLandingPattern() {
 
     const baseEnd = calculateLegEndpoint(finalEnd[0], finalEnd[1], baseBearing, baseGroundSpeedKt, baseTime);
 
-    AppState.secondlandingPatternPolygon = L.polyline([finalEnd, baseEnd], {
-        color: 'red',
-        weight: 3,
-        opacity: 0.8,
-        dashArray: '5, 10'
-    }).addTo(AppState.map);
-
     // Add a fat blue arrow in the middle of the base leg pointing to landing direction
     const baseMidLat = (finalEnd[0] + baseEnd[0]) / 2;
     const baseMidLng = (finalEnd[1] + baseEnd[1]) / 2;
     const baseArrowBearing = (baseWindDir - 90 + 180) % 360; // Points in direction of the mean wind at base
-
-    AppState.baseArrow = L.marker([baseMidLat, baseMidLng], {
-        icon: createArrowIcon(baseMidLat, baseMidLng, baseArrowBearing, baseArrowColor)
-    }).addTo(AppState.map);
-    AppState.baseArrow.bindTooltip(`${Math.round(baseWindDir)}° ${formatWindSpeed(baseWindSpeedKt)}${getWindSpeedUnit()}`, {
-        offset: [10, 0],
-        direction: 'right',
-        className: 'wind-tooltip'
-    });
 
     // Downwind Leg (200-300m AGL)
     const downwindLimits = [baseHeight + LEG_HEIGHT_BASE, baseHeight + LEG_HEIGHT_DOWNWIND];
@@ -4458,27 +3078,15 @@ export function updateLandingPattern() {
     const downwindLength = downwindGroundSpeedKt * 1.852 / 3.6 * downwindTime;
     const downwindEnd = calculateLegEndpoint(baseEnd[0], baseEnd[1], downwindCourse, downwindGroundSpeedKt, downwindTime);
 
-    AppState.thirdLandingPatternLine = L.polyline([baseEnd, downwindEnd], {
-        color: 'red',
-        weight: 3,
-        opacity: 0.8,
-        dashArray: '5, 10'
-    }).addTo(AppState.map);
-
-    // Add a fat blue arrow in знак middle of the downwind leg pointing to landing direction
+    // Berechnet die exakten Mittelpunkte für die Platzierung der Windpfeile.
+    const finalMidPoint = [(lat + finalEnd[0]) / 2, (lng + finalEnd[1]) / 2];
+    const baseMidPoint = [(finalEnd[0] + baseEnd[0]) / 2, (finalEnd[1] + baseEnd[1]) / 2];
+    const downwindMidPoint = [(baseEnd[0] + downwindEnd[0]) / 2, (baseEnd[1] + downwindEnd[1]) / 2];
+ 
+    // Add a fat blue arrow in the middle of the downwind leg pointing to landing direction
     const downwindMidLat = (baseEnd[0] + downwindEnd[0]) / 2;
     const downwindMidLng = (baseEnd[1] + downwindEnd[1]) / 2;
     const downwindArrowBearing = (downwindWindDir - 90 + 180) % 360; // Points in direction of the mean wind at downwind
-
-    // Create a custom arrow icon using Leaflet’s DivIcon
-    AppState.downwindArrow = L.marker([downwindMidLat, downwindMidLng], {
-        icon: createArrowIcon(downwindMidLat, downwindMidLng, downwindArrowBearing, downwindArrowColor)
-    }).addTo(AppState.map);
-    AppState.downwindArrow.bindTooltip(`${Math.round(downwindWindDir)}° ${formatWindSpeed(downwindWindSpeedKt)}${getWindSpeedUnit()}`, {
-        offset: [10, 0],
-        direction: 'right',
-        className: 'wind-tooltip'
-    });
 
     console.log(`Landing Pattern Updated:
         Final Leg: Wind: ${finalWindDir.toFixed(1)}° @ ${finalWindSpeedKt.toFixed(1)}kt, Course: ${finalCourse.toFixed(1)}°, WCA: ${finalWca.toFixed(1)}°, GS: ${finalGroundSpeedKt.toFixed(1)}kt, HW: ${finalHeadwind.toFixed(1)}kt, Length: ${finalLength.toFixed(1)}m
@@ -4493,7 +3101,90 @@ export function updateLandingPattern() {
     console.log('Coordinates base end: ', baseEnd[0], baseEnd[1], 'Leg Height:', baseHeight + LEG_HEIGHT_BASE);
     console.log('Coordinates downwind end: ', downwindEnd[0], downwindEnd[1], 'Leg Height:', baseHeight + LEG_HEIGHT_DOWNWIND);
 
-    //map.fitBounds([[lat, lng], finalEnd, baseEnd, downwindEnd], { padding: [50, 50] });
+    // --- TEIL C: DIE "BAUANLEITUNG" FÜR DEN KELLNER ERSTELLEN ---
+    // Hier fassen wir alle Ergebnisse sauber zusammen.
+    const patternData = {
+        legs: [
+            { path: [[lat, lng], finalEnd], options: { color: 'red', weight: 3, opacity: 0.8, dashArray: '5, 10' } },
+            { path: [finalEnd, baseEnd], options: { color: 'red', weight: 3, opacity: 0.8, dashArray: '5, 10' } },
+            { path: [baseEnd, downwindEnd], options: { color: 'red', weight: 3, opacity: 0.8, dashArray: '5, 10' } }
+        ],
+        arrows: [
+            {
+                position: finalMidPoint,
+                bearing: (finalWindDir - 90 + 180) % 360,
+                color: finalArrowColor,
+                tooltipText: `${Math.round(finalWindDir)}° ${formatWindSpeed(finalWindSpeedKt)}${getWindSpeedUnit()}` // Ihr alter Tooltip-Text
+            },
+            {
+                position: baseMidPoint,
+                bearing: (baseMeanWind[0] - 90 + 180) % 360,
+                color: baseArrowColor,
+                tooltipText: `${Math.round(baseWindDir)}° ${formatWindSpeed(baseWindSpeedKt)}${getWindSpeedUnit()}`
+            },
+            {
+                position: downwindMidPoint,
+                bearing: (downwindMeanWind[0] - 90 + 180) % 360,
+                color: downwindArrowColor,
+                tooltipText: `${Math.round(downwindWindDir)}° ${formatWindSpeed(downwindWindSpeedKt)}${getWindSpeedUnit()}`
+            }
+        ]
+    };
+
+    // --- TEIL D: DEN KELLNER MIT DER FERTIGEN BESTELLUNG LOSSCHICKEN ---
+    mapManager.drawLandingPattern(patternData);
+}
+export function updateJumpRunTrackDisplay() {
+
+    // --- TEIL A: DATEN SAMMELN UND PRÜFEN (1:1 aus Ihrer alten Funktion) ---
+    const currentZoom = AppState.map.getZoom();
+    const isZoomInRange = currentZoom >= Constants.minZoom && currentZoom <= Constants.maxZoom;
+
+    if (!Settings.state.userSettings.showJumpRunTrack || !AppState.weatherData || !AppState.lastLat || !isZoomInRange) {
+        mapManager.drawJumpRunTrack(null); // Sagt dem Maler: "Mach den Tisch leer"
+        return;
+    }
+
+    // --- TEIL B: DATEN VOM PLANER HOLEN (1:1 aus Ihrer alten Funktion) ---
+    const trackResult = JumpPlanner.jumpRunTrack();
+    if (!trackResult) {
+        mapManager.drawJumpRunTrack(null);
+        return;
+    }
+
+    // --- TEIL C: DIE "BAUANLEITUNG" FÜR DEN MALER ERSTELLEN ---
+    // Hier fassen wir alle Ergebnisse in einem sauberen Objekt zusammen.
+
+    const trackData = {
+        // Anleitung für die Hauptlinie
+        path: {
+            latlngs: trackResult.latlngs,
+            options: { color: 'orange', weight: 4, opacity: 0.9, interactive: true },
+            tooltipText: `Jump Run: ${Math.round(trackResult.direction)}°, ${Math.round(trackResult.trackLength)} m`
+        },
+        // Anleitung für das Flugzeug
+        airplane: {
+            position: trackResult.latlngs[1], // Vordere Position
+            bearing: trackResult.direction
+        },
+        // Anleitung für die Anfluglinie (nur wenn vorhanden)
+        approachPath: null
+    };
+
+    if (trackResult.approachLatLngs) {
+        trackData.approachPath = {
+            latlngs: trackResult.approachLatLngs,
+            options: { color: 'orange', weight: 3, opacity: 0.9, dashArray: '10, 10', interactive: true },
+            tooltipText: `Approach: ${Math.round(trackResult.direction)}°, ${Math.round(trackResult.approachLength)} m, ${Math.round(trackResult.approachTime / 60)} min`
+        };
+    }
+
+    // --- TEIL D: DEN MALER MIT DER FERTIGEN ANLEITUNG BEAUFTRAGEN ---
+    mapManager.drawJumpRunTrack(trackData);
+
+    // Die komplexe Drag-Logik, die in der alten Funktion war, ist hier bewusst
+    // weggelassen, um den Schritt einfach zu halten. Sie kann später als
+    // nächstes Feature wieder hinzugefügt werden, sobald diese Struktur steht.
 }
 
 // == UI and Event Handling ==
@@ -4622,6 +3313,72 @@ function restoreUIInteractivity() {
 
     console.log('UI interactivity check completed');
 }
+function setupMapEventListeners() {
+    console.log("App: Richte Event-Listener für Karten-Events ein.");
+
+    document.addEventListener('map:location_selected', async (event) => {
+        const { lat, lng, source } = event.detail;
+        console.log(`App: Event 'map:location_selected' von '${source}' empfangen.`);
+
+        // --- HIER IST JETZT DIE GESAMTE ANWENDUNGSLOGIK ---
+
+        // 1. Marker-Position im AppState und UI aktualisieren
+        AppState.lastLat = lat;
+        AppState.lastLng = lng;
+        AppState.lastAltitude = await Utils.getAltitude(lat, lng);
+
+        // Informiere das Coordinates-Modul über die neue Position
+        Coordinates.updateCurrentMarkerPosition(lat, lng);
+        Coordinates.addCoordToHistory(lat, lng);
+
+        // Bewege den Marker (falls die Aktion nicht schon vom Marker selbst kam)
+        if (source !== 'marker_drag') {
+            // Annahme: Sie haben eine moveMarker-Funktion im mapManager
+            // Dies ist ein Befehl von app.js an mapManager.js
+            mapManager.moveMarker(lat, lng);
+        }
+
+        // 2. Kernlogik ausführen
+        resetJumpRunDirection(true); // resetJumpRunDirection muss in app.js sein
+        await fetchWeatherForLocation(lat, lng); // fetchWeather... muss in app.js sein
+
+        if (Settings.state.userSettings.calculateJump) {
+            calculateJump(); // calculateJump muss in app.js sein
+            JumpPlanner.calculateCutAway();
+        }
+
+        mapManager.recenterMap(true); // recenterMap ist jetzt im mapManager
+        AppState.isManualPanning = false;
+
+        // 3. UI-Updates anstoßen, die von den neuen Daten abhängen
+        updateJumpRunTrackDisplay(); // update... Funktionen sind jetzt im mapManager
+        updateLandingPatternDisplay();
+    });
+
+    document.addEventListener('map:mousemove', (event) => {
+        // 1. Hole die rohen Koordinaten aus dem Event
+        const { lat, lng } = event.detail;
+
+        // 2. Hier passiert die Logik! app.js kennt getCoordinateFormat.
+        const coordFormat = getCoordinateFormat();
+        let coordText;
+
+        if (coordFormat === 'MGRS') {
+            const mgrsVal = Utils.decimalToMgrs(lat, lng);
+            coordText = `MGRS: ${mgrsVal || 'N/A'}`;
+        } else if (coordFormat === 'DMS') {
+            const latDMS = Utils.decimalToDms(lat, true);
+            const lngDMS = Utils.decimalToDms(lng, false);
+            coordText = `Lat: ${latDMS.deg}°... Lng: ${lngDMS.deg}°...`; // (gekürzt)
+        } else {
+            coordText = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
+        }
+
+        // 3. Gib den Befehl zum Aktualisieren der Anzeige.
+        //    Dafür brauchen wir eine neue, kleine Helferfunktion im mapManager.
+        mapManager.updateCoordsDisplay(coordText);
+    });
+}
 function setupSliderEvents() {
     const slider = document.getElementById('timeSlider');
     if (!slider) {
@@ -4639,19 +3396,18 @@ function setupSliderEvents() {
             if (AppState.lastAltitude !== 'N/A') calculateMeanWind();
             if (Settings.state.userSettings.showLandingPattern) {
                 console.log('Updating landing pattern for slider index:', sliderIndex);
-                updateLandingPattern();
+                updateLandingPatternDisplay();
             }
             if (Settings.state.userSettings.calculateJump) {
                 console.log('Recalculating jump for slider index:', sliderIndex);
-                clearJumpCircles();
                 calculateJump();
                 JumpPlanner.calculateCutAway();
             }
             if (Settings.state.userSettings.showJumpRunTrack) {
                 console.log('Updating jump run track for slider index:', sliderIndex);
-                updateJumpRunTrack();
+                updateJumpRunTrackDisplay();
             }
-            //recenterMap();
+            //mapManager.recenterMap();
             updateLivePositionControl();
         } else {
             // Aktualisiere zumindest die Zeitanzeige, auch wenn keine vollständigen Wetterdaten für das Hauptmodell da sind
@@ -4783,12 +3539,12 @@ function setupModelSelectEvents() {
             }
             if (Settings.state.userSettings.showJumpRunTrack) {
                 console.log('Updating JRT for model change');
-                updateJumpRunTrack();
+                updateJumpRunTrackDisplay();
             }
             if (AppState.currentMarker) {
                 console.log('Updating marker popup for model change');
                 const wasOpen = AppState.currentMarker.getPopup()?.isOpen() || false;
-                await updateMarkerPopup(AppState.currentMarker, AppState.lastLat, AppState.lastLng, AppState.lastAltitude, wasOpen);
+                await refreshMarkerPopup(AppState.currentMarker, AppState.lastLat, AppState.lastLng, AppState.lastAltitude, wasOpen);
             }
             if (AppState.cutAwayMarker && AppState.cutAwayLat && AppState.cutAwayLng) {
                 console.log('Updating cut-away marker popup for model change');
@@ -4983,7 +3739,7 @@ function setupRadioEvents() {
     setupRadioGroup('coordFormat', () => {
         Coordinates.updateCoordInputs(Settings.state.userSettings.coordFormat, AppState.lastLat, AppState.lastLng);
         if (AppState.lastLat && AppState.lastLng) {
-            updateMarkerPopup(AppState.currentMarker, AppState.lastLat, AppState.lastLng, AppState.lastAltitude, AppState.currentMarker.getPopup()?.isOpen() || false);
+            refreshMarkerPopup(AppState.currentMarker, AppState.lastLat, AppState.lastLng, AppState.lastAltitude, AppState.currentMarker.getPopup()?.isOpen() || false);
         }
     });
     setupRadioGroup('downloadFormat', () => {
@@ -5187,8 +3943,8 @@ function setupInputEvents() {
             Settings.save();
             if (Settings.state.userSettings.landingDirection === 'LL' && AppState.weatherData && AppState.lastLat && AppState.lastLng) {
                 console.log('Updating landing pattern for LL:', customDir);
-                updateLandingPattern();
-                recenterMap();
+                updateLandingPatternDisplay();
+                mapManager.recenterMap();
             }
         } else {
             Utils.handleError('Landing direction must be between 0 and 359°.');
@@ -5203,8 +3959,8 @@ function setupInputEvents() {
             Settings.save();
             if (Settings.state.userSettings.landingDirection === 'RR' && AppState.weatherData && AppState.lastLat && AppState.lastLng) {
                 console.log('Updating landing pattern for RR:', customDir);
-                updateLandingPattern();
-                recenterMap();
+                updateLandingPatternDisplay();
+                mapManager.recenterMap();
             }
         } else {
             Utils.handleError('Landing direction must be between 0 and 359°.');
@@ -5229,7 +3985,7 @@ function setupInputEvents() {
             if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
                 if (Settings.state.userSettings.showJumpRunTrack) {
                     console.log('Updating JRT for custom direction input');
-                    updateJumpRunTrack();
+                    updateJumpRunTrackDisplay();
                 }
                 if (Settings.state.userSettings.calculateJump) {
                     console.log('Recalculating jump for custom JRT direction');
@@ -5254,7 +4010,7 @@ function setupInputEvents() {
             if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
                 if (Settings.state.userSettings.showJumpRunTrack) {
                     console.log('Updating JRT for invalid direction input');
-                    updateJumpRunTrack();
+                    updateJumpRunTrackDisplay();
                 }
                 if (Settings.state.userSettings.calculateJump) {
                     console.log('Recalculating jump for reset JRT direction');
@@ -5272,7 +4028,7 @@ function setupInputEvents() {
             Settings.save();
             if (Settings.state.userSettings.calculateJump && Settings.state.userSettings.showJumpRunTrack && AppState.weatherData && AppState.lastLat && AppState.lastLng) {
                 console.log('Updating JRT for offset change');
-                updateJumpRunTrack();
+                updateJumpRunTrackDisplay();
             }
         } else {
             Utils.handleError('Offset must be between -50000 and 50000 in steps of 100.');
@@ -5284,7 +4040,7 @@ function setupInputEvents() {
             Settings.save();
             if (Settings.state.userSettings.calculateJump && Settings.state.userSettings.showJumpRunTrack) {
                 console.log('Resetting JRT for invalid offset');
-                updateJumpRunTrack();
+                updateJumpRunTrackDisplay();
             }
         }
     });
@@ -5296,7 +4052,7 @@ function setupInputEvents() {
             Settings.save();
             if (Settings.state.userSettings.calculateJump && Settings.state.userSettings.showJumpRunTrack && AppState.weatherData && AppState.lastLat && AppState.lastLng) {
                 console.log('Updating JRT for forward offset change');
-                updateJumpRunTrack();
+                updateJumpRunTrackDisplay();
             }
         } else {
             Utils.handleError('Forward offset must be between -50000 and 50000 in steps of 100.');
@@ -5308,7 +4064,7 @@ function setupInputEvents() {
             Settings.save();
             if (Settings.state.userSettings.calculateJump && Settings.state.userSettings.showJumpRunTrack) {
                 console.log('Resetting JRT for invalid forward offset');
-                updateJumpRunTrack();
+                updateJumpRunTrackDisplay();
             }
         }
     });
@@ -5417,7 +4173,7 @@ function setupCheckboxEvents() {
         if (checkbox.checked && AppState.weatherData && AppState.lastLat && AppState.lastLng) {
             updateWeatherDisplay(getSliderValue());
         }
-        recenterMap();
+        mapManager.recenterMap();
     });
 
     setupCheckbox('showExitAreaCheckbox', 'showExitArea', (checkbox) => {
@@ -5427,20 +4183,8 @@ function setupCheckboxEvents() {
         console.log('Show Exit Area set to:', Settings.state.userSettings.showExitArea);
         if (checkbox.checked && AppState.weatherData && AppState.lastLat && AppState.lastLng && Settings.state.isCalculateJumpUnlocked && Settings.state.userSettings.calculateJump) {
             const exitResult = JumpPlanner.calculateExitCircle();
-            if (exitResult) {
-                updateJumpCircle(
-                    exitResult.darkGreenLat, exitResult.darkGreenLng,
-                    exitResult.greenLat, exitResult.greenLng,
-                    exitResult.darkGreenRadius, exitResult.greenRadius,
-                    [], [], [], [],
-                    0, 0, 0, 0,
-                    exitResult.freeFallDirection, exitResult.freeFallDistance, exitResult.freeFallTime,
-                    true, false
-                );
-            }
             JumpPlanner.calculateCutAway();
         } else {
-            clearJumpCircles();
             if (Settings.state.isCalculateJumpUnlocked && Settings.state.userSettings.calculateJump) calculateJump();
             console.log('Cleared exit circles and re-rendered active circles');
         }
@@ -5453,19 +4197,6 @@ function setupCheckboxEvents() {
         console.log('Show Canopy Area set to:', Settings.state.userSettings.showCanopyArea);
         if (checkbox.checked && AppState.weatherData && AppState.lastLat && AppState.lastLng && Settings.state.isCalculateJumpUnlocked && Settings.state.userSettings.calculateJump) {
             const canopyResult = JumpPlanner.calculateCanopyCircles();
-            if (canopyResult) {
-                updateJumpCircle(
-                    canopyResult.blueLat, canopyResult.blueLng,
-                    canopyResult.redLat, canopyResult.redLng,
-                    canopyResult.radius, canopyResult.radiusFull,
-                    canopyResult.additionalBlueRadii, canopyResult.additionalBlueDisplacements,
-                    canopyResult.additionalBlueDirections, canopyResult.additionalBlueUpperLimits,
-                    canopyResult.displacement, canopyResult.displacementFull,
-                    canopyResult.direction, canopyResult.directionFull,
-                    canopyResult.freeFallDirection, canopyResult.freeFallDistance, canopyResult.freeFallTime,
-                    false, true
-                );
-            }
             JumpPlanner.calculateCutAway();
         } else {
             if (AppState.jumpCircle) {
@@ -5576,8 +4307,8 @@ function setupCheckboxEvents() {
             const submenu = checkbox.closest('li')?.querySelector('ul');
             toggleSubmenu(checkbox, submenu, true);
             if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
-                updateLandingPattern();
-                recenterMap();
+                updateLandingPatternDisplay();
+                mapManager.recenterMap();
             }
         };
         const disableFeature = () => {
@@ -6208,7 +4939,7 @@ function setupMenuItemEvents() {
                     JumpPlanner.calculateCutAway();
                 }
                 if (Settings.state.userSettings.showJumpRunTrack) {
-                    updateJumpRunTrack();
+                    updateJumpRunTrackDisplay();
                 }
             }
             calculateJumpMenuItem.style.opacity = '1';
@@ -6216,9 +4947,6 @@ function setupMenuItemEvents() {
         };
 
         const disableFeatureOrToggleSubmenu = (isClosingMenu) => {
-            // Diese Funktion wird aufgerufen, wenn das Submenü geschlossen wird.
-            // Wir wollen NICHT Settings.state.userSettings.calculateJump auf false setzen,
-            // und auch NICHT clearJumpCircles() aufrufen, nur weil das Menü zugeklappt wird.
             toggleSubmenu(calculateJumpMenuItem, submenu, !isClosingMenu); // !isClosingMenu, da es das Submenü schließt
 
             // Die Kreise etc. bleiben basierend auf ihren Checkboxen sichtbar.
@@ -6259,49 +4987,6 @@ function setupMenuItemEvents() {
 
         calculateJumpMenuItem.addEventListener('click', calculateJumpMenuItem._clickHandler, { capture: true }); console.log('Attached click handler to Calculate Jump menu item with capture phase');
     }
-}
-function clearJumpCircles() {
-    if (!AppState.map) {
-        console.warn('Map not initialized, cannot clear jump circles');
-        return;
-    }
-
-    console.log('Clearing all jump circles');
-    const removeLayer = (layer, name) => {
-        if (layer && typeof layer === 'object' && '_leaflet_id' in layer && AppState.map.hasLayer(layer)) {
-            console.log(`Removing ${name}`);
-            AppState.map.removeLayer(layer);
-        } else if (layer) {
-            console.warn(`Layer ${name} not removed: not on map or invalid`, { layer });
-        }
-    };
-
-    removeLayer(AppState.jumpCircle, 'blue circle');
-    removeLayer(AppState.jumpCircleFull, 'red circle');
-    removeLayer(AppState.jumpCircleGreen, 'green circle');
-    removeLayer(AppState.jumpCircleGreenLight, 'dark green circle');
-
-    if (AppState.additionalBlueCircles) {
-        AppState.additionalBlueCircles.forEach((circle, i) => removeLayer(circle, `additional blue circle ${i}`));
-        AppState.additionalBlueCircles = [];
-    }
-    if (AppState.additionalBlueLabels) {
-        AppState.additionalBlueLabels.forEach((label, i) => removeLayer(label, `additional blue label ${i}`));
-        AppState.additionalBlueLabels = [];
-    }
-
-    AppState.jumpCircle = null;
-    AppState.jumpCircleFull = null;
-    AppState.jumpCircleGreen = null;
-    AppState.jumpCircleGreenLight = null;
-    console.log('All jump circles cleared', {
-        blue: !!AppState.jumpCircle,
-        red: !!AppState.jumpCircleFull,
-        green: !!AppState.jumpCircleGreen,
-        darkGreen: !!AppState.jumpCircleGreenLight,
-        additionalBlueCircles: AppState.additionalBlueCircles?.length || 0,
-        additionalBlueLabels: AppState.additionalBlueLabels?.length || 0
-    });
 }
 function setupRadioGroup(name, callback) {
     const radios = document.querySelectorAll(`input[name="${name}"]`);
@@ -6413,13 +5098,13 @@ async function updateAllDisplays() {
         if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
             await updateWeatherDisplay(sliderIndex);
             if (AppState.lastAltitude !== 'N/A') calculateMeanWind();
-            if (Settings.state.userSettings.showLandingPattern) updateLandingPattern();
+            if (Settings.state.userSettings.showLandingPattern) updateLandingPatternDisplay();
             if (Settings.state.userSettings.calculateJump) {
                 debouncedCalculateJump();
                 JumpPlanner.calculateCutAway();
-                if (Settings.state.userSettings.showJumpRunTrack) updateJumpRunTrack();
+                if (Settings.state.userSettings.showJumpRunTrack) updateJumpRunTrackDisplay();
             }
-            recenterMap();
+            mapManager.recenterMap();
         }
         updateLivePositionControl();
 
@@ -6451,74 +5136,74 @@ async function updateAllDisplays() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Initialize settings and UI
-    initializeApp();
+    // 1. Grundlegende Settings initialisieren, die keine Karte brauchen.
     Settings.initialize();
+    initializeApp();
     initializeUIElements();
-    initializeMap();
 
-    // Setup event listeners
-    setupMenuItemEvents();
-    setupSliderEvents();
-    setupModelSelectEvents();
-    setupDownloadEvents();
-    setupMenuEvents();
-    setupRadioEvents();
-    setupInputEvents();
-    setupCheckboxEvents();
-    setupResetButton();
-    setupResetCutAwayMarkerButton();
-    setupClearHistoricalDate(); // Add this line
-    setupTrackEvents(); // Add this line
-    setupCacheManagement();
-    setupCacheSettings({ map: AppState.map, lastLat: AppState.lastLat, lastLng: AppState.lastLng, baseMaps: AppState.baseMaps });
-    setupAutoupdate(); // Add autoupdate setup
-    initializeLocationSearch();
+    // 2. Rufe initializeMap auf und WARTE auf das Ergebnis (die fertige Karte).
+    //    Die `await`-Anweisung pausiert den Code hier, bis die Karte bereit ist.
+    const mapInstance = mapManager.initializeMap();
+
+    // 3. Erst wenn die Karte garantiert existiert, die abhängigen Funktionen aufrufen.
+    if (mapInstance) {
+        console.log("App: Karte ist bereit, richte abhängige Events ein.");
+        setupMapEventListeners(); // Ihr neuer Listener für Karten-Events
+        setupMenuEvents();
+        setupSliderEvents();
+        setupCheckboxEvents();
+        setupCoordinateEvents();
+        setupDownloadEvents();
+        setupResetButton();
+        setupResetCutAwayMarkerButton();
+        setupClearHistoricalDate();
+        setupTrackEvents();
+        setupCacheManagement();
+        setupCacheSettings({ map: AppState.map, lastLat: AppState.lastLat, lastLng: AppState.lastLng, baseMaps: AppState.baseMaps });
+        setupAutoupdate();
+    } else {
+        console.error("App: Karteninitialisierung ist fehlgeschlagen. UI-Events werden nicht eingerichtet.");
+        Utils.handleError("Map could not be loaded. Please refresh the page.");
+    }
 
     document.addEventListener('location:selected', async (event) => {
-        // Die übergebenen Daten (lat, lng) aus dem 'detail'-Objekt des Events auslesen
-        const { lat, lng } = event.detail;
-
-        console.log(`Event 'location:selected' empfangen. Verschiebe Marker zu:`, { lat, lng });
-
-        // --- HIER KOMMT IHRE BISHERIGE 'moveMarker'-LOGIK HIN ---
+        const { lat, lng, source } = event.detail;
+        console.log(`App: Event 'map:location_selected' empfangen. Quelle: ${source}, Koordinaten:`, { lat, lng });
         try {
-            AppState.lastLat = lat;
-            AppState.lastLng = lng;
-            AppState.lastAltitude = await Utils.getAltitude(lat, lng);
-
-            AppState.currentMarker = Utils.configureMarker(
-                AppState.map,
-                lat,
-                lng,
-                AppState.lastAltitude,
-                false,
-                createCustomMarker,
-                attachMarkerDragend,
-                updateMarkerPopup,
-                AppState.currentMarker,
-                (marker) => { AppState.currentMarker = marker; }
-            );
+            console.log('App: Rufe createOrUpdateMarker auf...');
+            await mapManager.createOrUpdateMarker(lat, lng);
+            console.log('App: createOrUpdateMarker abgeschlossen.');
             Coordinates.updateCurrentMarkerPosition(lat, lng);
-
-            resetJumpRunDirection(true);
-            // addCoordToHistory wird bereits in coordinates.js aufgerufen
-
-            if (Settings.state.userSettings.calculateJump) {
-                console.log('Recalculating jump for coordinate input');
-                debouncedCalculateJump();
-                JumpPlanner.calculateCutAway();
+            if (event.detail.source !== 'marker_drag') {
+                Coordinates.addCoordToHistory(lat, lng);
             }
-
-            recenterMap(true);
-            AppState.isManualPanning = false;
-
+            resetJumpRunDirection(true);
             await fetchWeatherForLocation(lat, lng);
-
+            if (Settings.state.userSettings.calculateJump) {
+                calculateJump();
+            }
+            mapManager.recenterMap(true);
+            AppState.isManualPanning = false;
         } catch (error) {
-            console.error('Fehler beim Verarbeiten von "location:selected":', error);
+            console.error('Fehler beim Verarbeiten von "map:location_selected":', error);
             Utils.handleError(error.message);
         }
-        // --- ENDE DER 'moveMarker'-LOGIK ---
+    });
+
+    // --- FÜGEN SIE DIESEN NEUEN LISTENER HINZU ---
+    document.addEventListener('map:zoomend', (event) => {
+        console.log("App: Event 'map:zoomend' empfangen.");
+
+        // Hier ist jetzt das neue Zuhause für die Anwendungslogik!
+        if (Settings.state.userSettings.calculateJump && AppState.weatherData && AppState.lastLat) {
+            calculateJump();
+        }
+        if (Settings.state.userSettings.showJumpRunTrack) {
+            updateJumpRunTrackDisplay();
+        }
+        if (Settings.state.userSettings.showLandingPattern) {
+            updateLandingPatternDisplay();
+        }
+
     });
 });

@@ -110,15 +110,15 @@ export class Utils {
     }
 
     // Gaussian-weighted interpolation between two points
-static gaussianInterpolation(y1, y2, h1, h2, hp) {
-    // Handle edge cases where hp equals h1 or h2
-    if (h1 === hp) return y1;
-    if (h2 === hp) return y2;
-     let w1 = 1 / Math.abs(h1 - hp);
-     let w2 = 1 / Math.abs(h2 - hp);
-     const yp = (w1 * y1 + w2 * y2) / (w1 + w2);
-     return yp;
- }
+    static gaussianInterpolation(y1, y2, h1, h2, hp) {
+        // Handle edge cases where hp equals h1 or h2
+        if (h1 === hp) return y1;
+        if (h2 === hp) return y2;
+        let w1 = 1 / Math.abs(h1 - hp);
+        let w2 = 1 / Math.abs(h2 - hp);
+        const yp = (w1 * y1 + w2 * y2) / (w1 + w2);
+        return yp;
+    }
 
     static interpolateWindAtAltitude(z, pressureLevels, heights, uComponents, vComponents) {
         if (pressureLevels.length != heights.length || pressureLevels.length != uComponents.length || pressureLevels.length != vComponents.length) {
@@ -680,7 +680,7 @@ static gaussianInterpolation(y1, y2, h1, h2, hp) {
         }
     }
 
-    static configureMarker(map, lat, lng, altitude, openPopup = false, createCustomMarker, attachMarkerDragend, updateMarkerPopup, currentMarker, setCurrentMarker) {
+    /*static configureMarker(map, lat, lng, altitude, openPopup = false, createCustomMarker, attachMarkerDragend, updateMarkerPopup, currentMarker, setCurrentMarker) {
         if (!map) {
             console.warn('Map not initialized, cannot configure marker');
             return null;
@@ -706,7 +706,7 @@ static gaussianInterpolation(y1, y2, h1, h2, hp) {
         setCurrentMarker(marker); // Update the marker in the caller's state
         console.log('Configured marker at:', { lat, lng, openPopup });
         return marker;
-    }
+    }*/
 
 }
 

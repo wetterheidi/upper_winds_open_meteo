@@ -94,40 +94,7 @@ function generateWindBarb(direction, speedKt, latitude = null) {
     return svg;
 }
 
-// Creates an arrow icon for landing pattern
-function createArrowIcon(lat, lng, bearing, color) {
-    // Normalize bearing to 0-360
-    const normalizedBearing = (bearing + 360) % 360;
-
-    // Use the original SVG shape
-    const arrowSvg = `
-        <svg width="40" height="20" viewBox="0 0 40 20" xmlns="http://www.w3.org/2000/svg">
-            <line x1="0" y1="10" x2="30" y2="10" stroke="${color}" stroke-width="4" />
-            <polygon points="30,5 40,10 30,15" fill="${color}" />
-        </svg>
-    `;
-
-    // Wrap SVG in a div with CSS rotation
-    return L.divIcon({
-        html: `
-            <div style="
-                transform: rotate(${normalizedBearing}deg);
-                transform-origin: center center;
-                width: 40px;
-                height: 20px;
-            ">
-                ${arrowSvg}
-            </div>
-        `,
-        className: 'wind-arrow-icon', // Avoid Leaflet default styles
-        iconSize: [40, 20], // Match SVG dimensions
-        iconAnchor: [20, 10], // Center of the icon (half of width and height)
-        popupAnchor: [0, -10] // Adjust if popups are needed
-    });
-}
-
 export {
     interpolateColor,
     generateWindBarb,
-    createArrowIcon
 };
