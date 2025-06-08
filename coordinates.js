@@ -5,9 +5,9 @@
 import { Settings } from './settings.js';
 import { Utils } from './utils.js';
 
-// Callbacks, die von app.js gesetzt werden, um mit der Karte zu interagieren
-let moveMarkerCallback = null;
-let getCurrentMarkerPositionCallback = null;
+
+let currentMarkerPosition = { lat: null, lng: null }; // Interne Variable
+
 
 /**
  * Initialisiert das gesamte Location-Search-Modul.
@@ -47,16 +47,14 @@ function initializeLocationSearch() {
 
     // Event Listener für den "Favorit speichern"-Button
     saveFavoriteBtn.addEventListener('click', () => {
-        if (getCurrentMarkerPositionCallback) {
-            const pos = getCurrentMarkerPositionCallback();
-            if (pos && pos.lat && pos.lng) {
-                const name = prompt("Please enter a name for this favorit:");
-                if (name) {
-                    addOrUpdateFavorite(pos.lat, pos.lng, name);
-                }
-            } else {
-                Utils.handleError("No valid marker position.");
+        // Greift auf die interne Variable zu, nicht auf einen Callback
+        if (currentMarkerPosition && currentMarkerPosition.lat !== null && currentMarkerPosition.lng !== null) {
+            const name = prompt("Please enter a name for this favorit:");
+            if (name) {
+                addOrUpdateFavorite(currentMarkerPosition.lat, currentMarkerPosition.lng, name);
             }
+        } else {
+            Utils.handleError("No valid marker position available to save.");
         }
     });
 
@@ -156,7 +154,7 @@ function parseQueryAsCoordinates(query) {
  * Rendert die Ergebnisliste, die Favoriten, Verlauf und Suchergebnisse enthält.
  * @param {Array} searchResults - Ein Array mit Suchergebnissen von der API.
  */
-function renderResultsList(searchResults = []) { 
+function renderResultsList(searchResults = []) {
     const resultsList = document.getElementById('locationResults');
     if (!resultsList) return;
 
@@ -165,14 +163,14 @@ function renderResultsList(searchResults = []) {
     const favorites = history.filter(item => item.isFavorite);
     const nonFavorites = history.filter(item => !item.isFavorite);
 
-// Funktion zum Erstellen eines Listeneintrags (JETZT MIT LÖSCHFUNKTION)
+    // Funktion zum Erstellen eines Listeneintrags (JETZT MIT LÖSCHFUNKTION)
     const createListItem = (item) => {
         const li = document.createElement('li');
-        
+
         // KORREKTUR: Sicherstellen, dass lat und lon/lng korrekt gelesen werden
         const lat = parseFloat(item.lat);
         const lon = parseFloat(item.lon || item.lng); // Akzeptiert 'lon' ODER 'lng'
-        
+
         if (isNaN(lat) || isNaN(lon)) return null; // Ungültigen Eintrag überspringen
 
         li.dataset.lat = lat;
@@ -184,23 +182,38 @@ function renderResultsList(searchResults = []) {
         li.appendChild(nameSpan);
 
         nameSpan.addEventListener('mousedown', (e) => {
-            e.preventDefault();
-            if (moveMarkerCallback) {
-                moveMarkerCallback(lat, lon);
-                addCoordToHistory(lat, lon, item.display_name || item.label, item.isFavorite || false);
-                resultsList.style.display = 'none';
-            }
+
+            // 1. Erstelle ein neues, benutzerdefiniertes Event.
+            //    Der Name 'location:selected' ist frei wählbar, sollte aber aussagekräftig sein.
+            //    Im 'detail'-Objekt übergeben wir die Daten (lat, lon).
+            const selectEvent = new CustomEvent('location:selected', {
+                detail: {
+                    lat: lat,
+                    lng: lon // lng statt lon verwenden, um konsistent zu sein
+                },
+                bubbles: true, // Erlaubt dem Event, im DOM "aufzusteigen"
+                cancelable: true
+            });
+
+            // 2. Sende das Event vom Element aus, das angeklickt wurde.
+            //    document.dispatchEvent(selectEvent) würde auch funktionieren.
+            li.dispatchEvent(selectEvent);
+
+            // Die restliche Logik kann hier bleiben oder auch in app.js verschoben werden.
+            // Für eine saubere Trennung ist es besser, sie ebenfalls zu verschieben.
+            addCoordToHistory(lat, lon, item.display_name || item.label, item.isFavorite || false);
+            resultsList.style.display = 'none';
         });
 
         // Container für die Buttons (Favorit & Löschen)
         const buttonsContainer = document.createElement('div');
         buttonsContainer.className = 'location-item-buttons';
-        
+
         // Favoriten-Stern
         const favToggle = document.createElement('button');
         favToggle.className = 'favorite-toggle';
         favToggle.innerHTML = item.isFavorite ? '★' : '☆';
-        if(item.isFavorite) favToggle.classList.add('is-favorite');
+        if (item.isFavorite) favToggle.classList.add('is-favorite');
         favToggle.title = "Als Favorit markieren/entfernen";
         buttonsContainer.appendChild(favToggle);
 
@@ -350,7 +363,7 @@ function addOrUpdateFavorite(lat, lng, name) {
  */
 function toggleFavorite(lat, lng, label) {
     if (isNaN(lat) || isNaN(lng)) return;
-    
+
     let history = getCoordHistory();
     const entry = history.find(e => {
         const entryLat = parseFloat(e.lat);
@@ -395,7 +408,7 @@ function removeLocationFromHistory(lat, lng) {
     if (isNaN(lat) || isNaN(lng)) return;
 
     let history = getCoordHistory();
-    
+
     // Filtere den Eintrag heraus, der gelöscht werden soll
     const updatedHistory = history.filter(entry => {
         const entryLat = parseFloat(entry.lat);
@@ -408,29 +421,13 @@ function removeLocationFromHistory(lat, lng) {
     renderResultsList(); // Rendere die Liste neu, um die Änderung anzuzeigen
 }
 
+// Neue exportierte Funktion
+export function updateCurrentMarkerPosition(lat, lng) {
+    currentMarkerPosition = { lat, lng };
+}
 
 // --- Exportiere die notwendigen Funktionen ---
-
 export {
     initializeLocationSearch,
-    setMoveMarkerCallback,
-    setCurrentMarkerPositionCallback,
     addCoordToHistory
 };
-
-
-/**
- * Setzt die Callback-Funktion, um den Marker auf der Karte zu bewegen.
- * @param {function} callback - Die Funktion aus app.js, die (lat, lng) entgegennimmt.
- */
-function setMoveMarkerCallback(callback) {
-    moveMarkerCallback = callback;
-}
-
-/**
- * Setzt die Callback-Funktion, um die aktuelle Position des Markers abzufragen.
- * @param {function} callback - Die Funktion aus app.js, die {lat, lng} zurückgibt.
- */
-function setCurrentMarkerPositionCallback(callback) {
-    getCurrentMarkerPositionCallback = callback;
-}

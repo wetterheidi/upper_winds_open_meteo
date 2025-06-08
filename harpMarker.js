@@ -1,4 +1,4 @@
-import { AppState } from './app.js';
+import { AppState } from './state.js';
 import { Settings } from './settings.js';
 import { Utils } from './utils.js';
 

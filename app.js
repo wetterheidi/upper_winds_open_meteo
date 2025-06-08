@@ -1,12 +1,14 @@
 // == Project: Skydiving Weather and Jump Planner ==
 // == Constants and Global Variables ==
+import { AppState } from './state.js';
 import { Utils } from './utils.js';
 import { Settings } from './settings.js';
 import { Constants, FEATURE_PASSWORD } from './constants.js';
 import { displayMessage, displayProgress, displayError, hideProgress, updateOfflineIndicator, isMobileDevice } from './ui.js';
 import { TileCache, cacheTilesForDIP, debouncedCacheVisibleTiles } from './tileCache.js';
 import { setupCacheManagement, setupCacheSettings } from './cacheUI.js';
-import { initializeLocationSearch, setMoveMarkerCallback, setCurrentMarkerPositionCallback, addCoordToHistory } from './coordinates.js';
+import * as Coordinates from './coordinates.js';
+import { initializeLocationSearch } from './coordinates.js'; // <-- HIER ERGÄNZEN
 import { interpolateColor, generateWindBarb, createArrowIcon } from "./uiHelpers.js";
 import { handleHarpPlacement, createHarpMarker, clearHarpMarker } from './harpMarker.js';
 import { loadGpxTrack, loadCsvTrackUTC } from './trackManager.js';
@@ -25,71 +27,7 @@ try {
 }
 
 export { createCustomMarker, attachMarkerDragend, updateMarkerPopup, fetchWeatherForLocation, debouncedCalculateJump };
-export const AppState = {
-    isInitialized: false,
-    coordsControl: null,
-    lastMouseLatLng: null,
-    landingPatternPolygon: null,
-    secondlandingPatternPolygon: null,
-    thirdLandingPatternLine: null,
-    finalArrow: null,
-    baseArrow: null,
-    downwindArrow: null,
-    landingWindDir: null,
-    cutAwayMarker: null,
-    cutAwayLat: null,
-    cutAwayLng: null,
-    cutAwayCircle: null,
-    jumpRunTrackLayer: null,
-    customJumpRunDirection: null,
-    isJumperSeparationManual: false,
-    jumpCircle: null,
-    jumpCircleFull: null,
-    jumpCircleGreen: null,
-    jumpCircleGreenLight: null,
-    weatherData: null,
-    lastModelRun: null,
-    gpxLayer: null,
-    gpxPoints: [],
-    isLoadingGpx: false,
-    isTrackLoaded: false, // New flag
-    liveMarker: null,
-    jumpMasterLine: null,
-    isPlacingHarp: false,
-    harpMarker: null,
-    watchId: null,
-    prevLat: null,
-    prevLng: null,
-    prevTime: null,
-    livePositionControl: null,
-    lastLatitude: null,
-    lastLongitude: null,
-    lastDeviceAltitude: null,
-    lastAltitudeAccuracy: null,
-    lastAccuracy: null,
-    lastSpeed: 'N/A',
-    lastEffectiveWindUnit: 'kt',
-    lastDirection: 'N/A',
-    lastTerrainAltitude: 'N/A',
-    lastSmoothedSpeedMs: 0,
-    map: null,
-    baseMaps: {},
-    lastLat: null,
-    lastLng: null,
-    lastAltitude: null,
-    currentMarker: null,
-    isManualPanning: false,
-    autoupdateInterval: null,
-    accuracyCircle: null,
-    additionalBlueCircles: [],
-    additionalBlueLabels: [],
-    ensembleModelsData: null, // Objekt zur Speicherung der Wetterdaten für jedes ausgewählte Ensemble-Modell, z.B. { icon_global: weatherDataICON, gfs_global: weatherDataGFS }
-    selectedEnsembleModels: [], // Array der Namen der ausgewählten Ensemble-Modelle
-    currentEnsembleScenario: 'all_models', // Aktuell ausgewähltes Szenario
-    ensembleLayerGroup: null, // Eigene LayerGroup für Ensemble-Visualisierungen
-    ensembleScenarioCircles: {}, // Speichert die Leaflet-Layer für die Szenario-Kreise, z.B. { min_wind: circleLayer, mean_wind: circleLayer }
-    heatmapLayer: null, // Für die Referenz auf den Heatmap-Layer
-};
+
 const HEATMAP_BASE_RADIUS = 20;
 const HEATMAP_REFERENCE_ZOOM = 13;
 const debouncedCalculateJump = Utils.debounce(calculateJump, 300);
@@ -416,6 +354,7 @@ async function _geolocationSuccessCallback(position, defaultZoom) {
     AppState.lastLng = position.coords.longitude;
     AppState.lastAltitude = await Utils.getAltitude(AppState.lastLat, AppState.lastLng);
     Coordinates.addCoordToHistory(AppState.lastLat, AppState.lastLng);
+    Coordinates.updateCurrentMarkerPosition(AppState.lastLat, AppState.lastLng);
 
     AppState.currentMarker = Utils.configureMarker(
         AppState.map,
@@ -558,6 +497,7 @@ async function _handleMapDblClick(e) {
     AppState.lastAltitude = await Utils.getAltitude(lat, lng);
     console.log('Map double-clicked, moving marker to:', { lat, lng });
     addCoordToHistory(lat, lng, `Marker-Position: ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+    Coordinates.updateCurrentMarkerPosition(lat, lng);
 
     AppState.currentMarker = Utils.configureMarker(
         AppState.map,
@@ -820,6 +760,7 @@ function attachMarkerDragend(marker) {
         AppState.lastLng = position.lng;
         AppState.lastAltitude = await Utils.getAltitude(AppState.lastLat, AppState.lastLng);
         addCoordToHistory(position.lat, position.lng, `Marker-Position: ${position.lat.toFixed(4)}, ${position.lng.toFixed(4)}`);
+        Coordinates.updateCurrentMarkerPosition(position.lat, position.lng);
         const wasOpen = marker.getPopup()?.isOpen() || false;
         updateMarkerPopup(marker, AppState.lastLat, AppState.lastLng, AppState.lastAltitude, wasOpen);
         console.log('Marker dragged to:', { lat: AppState.lastLat, lng: AppState.lastLng });
@@ -6532,31 +6473,52 @@ document.addEventListener('DOMContentLoaded', () => {
     setupCacheManagement();
     setupCacheSettings({ map: AppState.map, lastLat: AppState.lastLat, lastLng: AppState.lastLng, baseMaps: AppState.baseMaps });
     setupAutoupdate(); // Add autoupdate setup
-    // Setzt das neue Orts-Management-System auf
     initializeLocationSearch();
-    // Übergibt die notwendigen Kontrollfunktionen an das Koordinaten-Modul
-    setMoveMarkerCallback((lat, lng) => {
-        // Diese Logik bewegt den Marker und holt neue Wetterdaten
-        // Sie ist wahrscheinlich Teil Ihrer "moveMarker" oder "dragend" Logik
-        AppState.lastLat = lat;
-        AppState.lastLng = lng;
-        Utils.getAltitude(lat, lng).then(altitude => {
-            AppState.lastAltitude = altitude;
+
+    document.addEventListener('location:selected', async (event) => {
+        // Die übergebenen Daten (lat, lng) aus dem 'detail'-Objekt des Events auslesen
+        const { lat, lng } = event.detail;
+
+        console.log(`Event 'location:selected' empfangen. Verschiebe Marker zu:`, { lat, lng });
+
+        // --- HIER KOMMT IHRE BISHERIGE 'moveMarker'-LOGIK HIN ---
+        try {
+            AppState.lastLat = lat;
+            AppState.lastLng = lng;
+            AppState.lastAltitude = await Utils.getAltitude(lat, lng);
+
             AppState.currentMarker = Utils.configureMarker(
-                AppState.map, lat, lng, altitude, false,
-                createCustomMarker, attachMarkerDragend, updateMarkerPopup, AppState.currentMarker,
+                AppState.map,
+                lat,
+                lng,
+                AppState.lastAltitude,
+                false,
+                createCustomMarker,
+                attachMarkerDragend,
+                updateMarkerPopup,
+                AppState.currentMarker,
                 (marker) => { AppState.currentMarker = marker; }
             );
+            Coordinates.updateCurrentMarkerPosition(lat, lng);
+
+            resetJumpRunDirection(true);
+            // addCoordToHistory wird bereits in coordinates.js aufgerufen
+
+            if (Settings.state.userSettings.calculateJump) {
+                console.log('Recalculating jump for coordinate input');
+                debouncedCalculateJump();
+                JumpPlanner.calculateCutAway();
+            }
+
             recenterMap(true);
-            fetchWeatherForLocation(lat, lng);
-        });
-    });
-    setCurrentMarkerPositionCallback(() => {
-        // Gibt die aktuelle Position des Markers zurück
-        if (AppState.currentMarker) {
-            const pos = AppState.currentMarker.getLatLng();
-            return { lat: pos.lat, lng: pos.lng };
+            AppState.isManualPanning = false;
+
+            await fetchWeatherForLocation(lat, lng);
+
+        } catch (error) {
+            console.error('Fehler beim Verarbeiten von "location:selected":', error);
+            Utils.handleError(error.message);
         }
-        return null;
+        // --- ENDE DER 'moveMarker'-LOGIK ---
     });
 });

@@ -1,5 +1,5 @@
+import { AppState } from './state.js';
 import {
-    AppState,
     createCustomMarker,
     attachMarkerDragend,
     updateMarkerPopup,

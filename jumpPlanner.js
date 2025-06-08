@@ -1,6 +1,6 @@
 // jumpPlanner.js
-
-import { AppState, getWindSpeedUnit, getHeightUnit, interpolateWeatherData } from './app.js'; // Temporär, bis AppState ausgelagert ist
+import { AppState } from './state.js';
+import { getWindSpeedUnit, getHeightUnit, interpolateWeatherData } from './app.js'; // Temporär, bis AppState ausgelagert ist
 import { Settings } from './settings.js';
 import { Utils } from './utils.js';
 import { Constants } from './constants.js';
