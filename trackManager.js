@@ -12,7 +12,7 @@ import { calculateCutAway } from "./jumpPlanner.js";
 import { Settings } from "./settings.js";
 import { Utils } from "./utils.js";
 import { interpolateColor } from "./uiHelpers.js";
-import { attachMarkerDragend, createCustomMarker, updateMarkerPopup } from './mapManager.js';
+import { attachMarkerDragend, createCustomMarker, updatePopupContent } from './mapManager.js';
 "use strict";
 
 

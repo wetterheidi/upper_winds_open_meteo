@@ -205,42 +205,35 @@ function updateCutAwayMarkerPopup(marker, lat, lng, open = false) {
     if (coordFormat === 'MGRS') {
         popupContent += `MGRS: ${coords.lat}`;
     } else {
-        popupContent += `Lat: ${coords.lat}<br>Lng: ${coords.lng}`;
+        popupContent += `Lat: ${lat.toFixed(5)}<br>Lng: ${lng.toFixed(5)}`;
     }
-    if (!marker.getPopup()) {
-        marker.bindPopup(popupContent);
-    } else {
-        marker.setPopupContent(popupContent);
-    }
-    if (open) {
-        marker.openPopup();
-    }
+    mapManager.updatePopupContent(marker, popupContent, open);
 }
 async function refreshMarkerPopup() {
-    // 1. Sicherheitscheck: Gibt es überhaupt einen Marker zum Aktualisieren?
     if (!AppState.currentMarker || AppState.lastLat === null) {
         return;
     }
 
-    // 2. Hier findet die gesamte Logik und Datensammlung statt!
-    //    Wir greifen auf den globalen AppState zu, um die nötigen Infos zu holen.
     const lat = AppState.lastLat;
     const lng = AppState.lastLng;
     const altitude = AppState.lastAltitude;
-    const coordFormat = getCoordinateFormat(); // Diese Funktion lebt in app.js
-    const sliderIndex = getSliderValue();      // Diese auch
+    const coordFormat = getCoordinateFormat();
+    const sliderIndex = getSliderValue();
 
     const coords = Utils.convertCoords(lat, lng, coordFormat);
 
-    // 3. Den Inhalt des Popups zusammenbauen.
     let popupContent;
     if (coordFormat === 'MGRS') {
         popupContent = `MGRS: ${coords.lat}<br>Alt: ${altitude} m`;
     } else {
-        popupContent = `Lat: ${coords.lat}<br>Lng: ${coords.lng}<br>Alt: ${altitude} m`;
+        const formatDMS = (dms) => `<span class="math-inline">\{dms\.deg\}°</span>{dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
+        if (coordFormat === 'DMS') {
+            popupContent = `Lat: ${formatDMS(Utils.decimalToDms(lat, true))}<br>Lng: ${formatDMS(Utils.decimalToDms(lng, false))}<br>Alt: ${altitude} m`;
+        } else {
+            popupContent = `Lat: ${lat.toFixed(5)}<br>Lng: ${lng.toFixed(5)}<br>Alt: ${altitude} m`;
+        }
     }
 
-    // Fügen Sie die QFE-Logik hinzu.
     if (AppState.weatherData && AppState.weatherData.surface_pressure) {
         const surfacePressure = AppState.weatherData.surface_pressure[sliderIndex];
         if (surfacePressure) {
@@ -252,9 +245,7 @@ async function refreshMarkerPopup() {
         popupContent += ` QFE: N/A`;
     }
 
-    // 4. Den "Maler" mit der fertigen "Bauanleitung" beauftragen.
-    //    Wir übergeben den Marker, den wir aktualisieren wollen, und den fertigen Text.
-    refreshMarkerPopup(AppState.currentMarker, popupContent);
+    mapManager.updatePopupContent(AppState.currentMarker, popupContent);
 }
 function setupCoordinateEvents() {
     // Nur noch dieser Aufruf bleibt übrig.
@@ -1070,6 +1061,7 @@ async function fetchWeatherForLocation(lat, lng, currentTime = null, isInitialLo
         if (availableModels.length > 0) {
             AppState.lastLat = lat; AppState.lastLng = lng;
             await fetchWeather(lat, lng, currentTime, isInitialLoad); // currentTime wird weitergegeben
+            await refreshMarkerPopup();
             Settings.updateModelRunInfo(AppState.lastModelRun, AppState.lastLat, AppState.lastLng);
             if (AppState.lastAltitude !== 'N/A') {
                 calculateMeanWind();
@@ -3148,31 +3140,25 @@ export function updateJumpRunTrackDisplay() {
         console.warn('Map not initialized, cannot update jump run track display');
         return;
     }
-    if (
-        !Settings.state.userSettings.showJumpRunTrack ||
-        !AppState.weatherData ||
-        !AppState.lastLat ||
-        !AppState.lastLng ||
-        !Settings.state.isCalculateJumpUnlocked ||
-        !Settings.state.userSettings.calculateJump
-    ) {
-        console.log('Removing jump run track due to unmet conditions');
-        if (AppState.jumpRunTrackLayer) {
-            if (AppState.jumpRunTrackLayer.airplaneMarker) {
-                AppState.map.removeLayer(AppState.jumpRunTrackLayer.airplaneMarker);
-                AppState.jumpRunTrackLayer.airplaneMarker = null;
-            }
-            if (AppState.jumpRunTrackLayer.approachLayer) {
-                AppState.map.removeLayer(AppState.jumpRunTrackLayer.approachLayer);
-                AppState.jumpRunTrackLayer.approachLayer = null;
-            }
-            AppState.map.removeLayer(AppState.jumpRunTrackLayer);
-            AppState.jumpRunTrackLayer = null;
-            console.log('Removed JRT polyline');
-        }
-        AppState.lastTrackData = null;
-        return;
+
+    // Prüfe alle Bedingungen, ob der Track angezeigt werden soll.
+    const shouldShow =
+        Settings.state.userSettings.showJumpRunTrack &&
+        AppState.weatherData &&
+        AppState.lastLat &&
+        AppState.lastLng &&
+        Settings.state.isCalculateJumpUnlocked &&
+        Settings.state.userSettings.calculateJump;
+
+    // Wenn die Bedingungen NICHT erfüllt sind, lösche den Track.
+    if (!shouldShow) {
+        console.log('Conditions not met to show JRT, clearing display.');
+        mapManager.drawJumpRunTrack(null); // Sagt dem mapManager, alles zu löschen.
+        AppState.lastTrackData = null; // Setzt die gespeicherten Track-Daten zurück.
+        return; // Beendet die Funktion hier.
     }
+
+    // Wenn die Bedingungen erfüllt sind, zeichne den Track.
     const trackData = JumpPlanner.jumpRunTrack();
     if (trackData && trackData.latlngs?.length === 2 && trackData.latlngs.every(ll => Number.isFinite(ll[0]) && Number.isFinite(ll[1]))) {
         console.log('Drawing jump run track with data:', trackData);
@@ -3189,21 +3175,16 @@ export function updateJumpRunTrackDisplay() {
                 tooltipText: `Approach Path: ${trackData.direction}°, Length: ${trackData.approachLength} m`,
                 originalLatLngs: AppState.lastTrackData?.approachLatLngs?.length === 2 ? AppState.lastTrackData.approachLatLngs : trackData.approachLatLngs
             } : null,
-            
-            trackLength: trackData.trackLength,
-
+            trackLength: trackData.trackLength, // Wichtig für Drag-and-Drop
             airplane: {
                 position: L.latLng(trackData.latlngs[1][0], trackData.latlngs[1][1]),
                 bearing: trackData.direction,
                 originalPosition: AppState.lastTrackData?.latlngs?.[1] && Number.isFinite(AppState.lastTrackData.latlngs[1][0]) ?
                     L.latLng(AppState.lastTrackData.latlngs[1][0], AppState.lastTrackData.latlngs[1][1]) :
                     L.latLng(trackData.latlngs[1][0], trackData.latlngs[1][1]),
-                originalLatLngs: AppState.lastTrackData?.latlngs?.length === 2 ? AppState.lastTrackData.latlngs : trackData.latlngs,
-                approachLatLngs: AppState.lastTrackData?.approachLatLngs?.length === 2 ? AppState.lastTrackData.approachLatLngs : trackData.approachLatLngs
             }
         };
         mapManager.drawJumpRunTrack(drawData);
-        // Speichere die neuen Track-Daten
         AppState.lastTrackData = {
             latlngs: trackData.latlngs,
             approachLatLngs: trackData.approachLatLngs,
@@ -3214,6 +3195,7 @@ export function updateJumpRunTrackDisplay() {
         console.log('Updated AppState.lastTrackData:', AppState.lastTrackData);
     } else {
         console.warn('No valid track data to display:', trackData);
+        mapManager.drawJumpRunTrack(null); // Sicherheitshalber auch hier löschen
         AppState.lastTrackData = null;
     }
 }
@@ -3387,27 +3369,49 @@ function setupMapEventListeners() {
     });
 
     document.addEventListener('map:mousemove', (event) => {
-        // 1. Hole die rohen Koordinaten aus dem Event
         const { lat, lng } = event.detail;
+        AppState.lastMouseLatLng = { lat, lng }; // Position für den Callback speichern
 
-        // 2. Hier passiert die Logik! app.js kennt getCoordinateFormat.
         const coordFormat = getCoordinateFormat();
         let coordText;
 
+        // Koordinaten-Text korrekt formatieren
         if (coordFormat === 'MGRS') {
             const mgrsVal = Utils.decimalToMgrs(lat, lng);
             coordText = `MGRS: ${mgrsVal || 'N/A'}`;
         } else if (coordFormat === 'DMS') {
-            const latDMS = Utils.decimalToDms(lat, true);
-            const lngDMS = Utils.decimalToDms(lng, false);
-            coordText = `Lat: ${latDMS.deg}°... Lng: ${lngDMS.deg}°...`; // (gekürzt)
+            const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
+            coordText = `Lat: ${formatDMS(Utils.decimalToDms(lat, true))}, Lng: ${formatDMS(Utils.decimalToDms(lng, false))}`;
         } else {
             coordText = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
         }
 
-        // 3. Gib den Befehl zum Aktualisieren der Anzeige.
-        //    Dafür brauchen wir eine neue, kleine Helferfunktion im mapManager.
-        mapManager.updateCoordsDisplay(coordText);
+        // Sofortiges Update mit "Fetching..."
+        if (AppState.coordsControl) {
+            AppState.coordsControl.update(`${coordText}<br>Elevation: Fetching...<br>QFE: Fetching...`);
+        }
+
+        // Debounced-Funktion aufrufen, um API-Anfragen zu begrenzen
+        debouncedGetElevationAndQFE(lat, lng, { lat, lng }, ({ elevation, qfe }, requestLatLng) => {
+            // Callback wird ausgeführt, wenn die Daten da sind
+            if (AppState.lastMouseLatLng && AppState.coordsControl) {
+                // Nur aktualisieren, wenn die Maus noch in der Nähe ist
+                const deltaLat = Math.abs(AppState.lastMouseLatLng.lat - requestLatLng.lat);
+                const deltaLng = Math.abs(AppState.lastMouseLatLng.lng - requestLatLng.lng);
+                const threshold = 0.05;
+
+                if (deltaLat < threshold && deltaLng < threshold) {
+                    const heightUnit = getHeightUnit();
+                    let displayElevation = elevation === 'N/A' ? 'N/A' : elevation;
+                    if (displayElevation !== 'N/A') {
+                        displayElevation = Utils.convertHeight(displayElevation, heightUnit);
+                        displayElevation = Math.round(displayElevation);
+                    }
+                    const qfeText = qfe === 'N/A' ? 'N/A' : `${qfe} hPa`;
+                    AppState.coordsControl.update(`${coordText}<br>Elevation: ${displayElevation} ${displayElevation === 'N/A' ? '' : heightUnit}<br>QFE: ${qfeText}`);
+                }
+            }
+        });
     });
 }
 function setupSliderEvents() {
@@ -3424,6 +3428,7 @@ function setupSliderEvents() {
 
         if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
             await updateWeatherDisplay(sliderIndex);
+            await refreshMarkerPopup(); 
             if (AppState.lastAltitude !== 'N/A') calculateMeanWind();
             if (Settings.state.userSettings.showLandingPattern) {
                 console.log('Updating landing pattern for slider index:', sliderIndex);

@@ -738,22 +738,24 @@ export async function createOrUpdateMarker(lat, lng) {
     }
     const altitude = await Utils.getAltitude(lat, lng);
     if (AppState.currentMarker) {
-        console.log("MapManager: Marker existiert, bewege ihn jetzt mit setLatLng. Aktuelle Position:", AppState.currentMarker.getLatLng());
+        console.log("MapManager: Marker existiert, bewege ihn jetzt mit setLatLng.");
         AppState.currentMarker.setLatLng([lat, lng]);
-        console.log("MapManager: Marker neu positioniert zu:", AppState.currentMarker.getLatLng());
     } else {
         console.log("MapManager: Kein Marker vorhanden, erstelle einen neuen.");
         const newMarker = createCustomMarker(lat, lng);
         attachMarkerDragend(newMarker);
         AppState.currentMarker = newMarker;
         AppState.currentMarker.addTo(AppState.map);
-        console.log("MapManager: Neuer Marker erstellt und hinzugefügt bei:", AppState.currentMarker.getLatLng());
     }
-    updateMarkerPopup(AppState.currentMarker, lat, lng, altitude);
+    
+    // HIER IST DIE ÄNDERUNG:
+    const popupContent = `Lat: ${lat.toFixed(5)}<br>Lng: ${lng.toFixed(5)}<br>Alt: ${altitude} m`;
+    updatePopupContent(AppState.currentMarker, popupContent); // Ruft die neue Funktion auf
+
     AppState.lastLat = lat;
     AppState.lastLng = lng;
     AppState.lastAltitude = altitude;
-    AppState.map.invalidateSize(); // Neu rendern, um sicherzustellen, dass der Marker sichtbar ist
+    AppState.map.invalidateSize();
 }
 
 // Private Helferfunktion: Erstellt nur den Marker.
@@ -781,13 +783,10 @@ export function attachMarkerDragend(marker) {
 }
 
 // Private Helferfunktion: Aktualisiert das Popup.
-// Sie baut den Text selbst zusammen, da sie eine rein visuelle Aufgabe hat.
-export function updateMarkerPopup(marker, lat, lng, altitude) {
+export function updatePopupContent(marker, content, open = false) {
     if (!marker) return;
-    const popupContent = `Lat: ${lat.toFixed(5)}<br>Lng: ${lng.toFixed(5)}<br>Alt: ${altitude} m`;
-    
-    const wasOpen = marker.getPopup()?.isOpen();
-    marker.unbindPopup().bindPopup(popupContent);
+    const wasOpen = marker.getPopup()?.isOpen() || open;
+    marker.unbindPopup().bindPopup(content);
     if (wasOpen) {
         marker.openPopup();
     }
