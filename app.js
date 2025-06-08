@@ -3189,6 +3189,9 @@ export function updateJumpRunTrackDisplay() {
                 tooltipText: `Approach Path: ${trackData.direction}°, Length: ${trackData.approachLength} m`,
                 originalLatLngs: AppState.lastTrackData?.approachLatLngs?.length === 2 ? AppState.lastTrackData.approachLatLngs : trackData.approachLatLngs
             } : null,
+            
+            trackLength: trackData.trackLength,
+
             airplane: {
                 position: L.latLng(trackData.latlngs[1][0], trackData.latlngs[1][1]),
                 bearing: trackData.direction,
@@ -5286,66 +5289,49 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // NEU: track:dragend-Listener hier platzieren
     document.addEventListener('track:dragend', (event) => {
-        console.log("App: Event 'track:dragend' empfangen. Berechne und speichere neue Offsets.");
+        console.log("App: Event 'track:dragend' empfangen. Neuberechnung der Offsets relativ zum DIP.");
 
         const { newPosition, originalTrackData } = event.detail;
 
-        // Validierung der Eingangsdaten
-        if (!newPosition || !Number.isFinite(newPosition.lat) || !Number.isFinite(newPosition.lng)) {
-            console.warn('Invalid newPosition:', newPosition);
-            return;
-        }
-        if (!originalTrackData?.path?.latlngs?.[0] || !originalTrackData?.path?.latlngs?.[1]) {
-            console.warn('Invalid originalTrackData:', originalTrackData);
-            return;
-        }
-
-        // Berechne den ursprünglichen Endpunkt des Tracks (Flugzeugposition)
-        const originalEnd = L.latLng(originalTrackData.path.latlngs[1][0], originalTrackData.path.latlngs[1][1]);
+        // 1. Hole den DIP (Bezugspunkt) und die Track-Daten
+        const dipPosition = L.latLng(AppState.lastLat, AppState.lastLng);
+        const trackLength = originalTrackData.trackLength;
         const trackDirection = originalTrackData.airplane.bearing;
-        const trackRad = trackDirection * Math.PI / 180; // Track-Richtung in Radiant
 
-        // Berechne die Verschiebung relativ zum ursprünglichen Endpunkt
-        const deltaLat = newPosition.lat - originalEnd.lat;
-        const deltaLng = newPosition.lng - originalEnd.lng;
-
-        // Konvertiere die Verschiebung in Meter
-        const metersPerDegreeLat = 111000; // 111 km pro Grad
-        const metersPerDegreeLng = 111000 * Math.cos(originalEnd.lat * Math.PI / 180);
-        const deltaX = deltaLng * metersPerDegreeLng; // X-Richtung (entlang Längengrade, Ost-West)
-        const deltaY = deltaLat * metersPerDegreeLat; // Y-Richtung (entlang Breitengrade, Nord-Süd)
-
-        // Projiziere die Verschiebung auf die Track-Richtung (forward) und senkrecht dazu (lateral)
-        // Forward: entlang der Track-Richtung (trackRad)
-        // Lateral: senkrecht zur Track-Richtung (trackRad + 90°)
-        const forwardOffset = Math.round(
-            deltaX * Math.cos(trackRad) + deltaY * Math.sin(trackRad)
+        // 2. Die neue Position ist das vordere Ende des Tracks. Berechne daraus den neuen Mittelpunkt des Tracks.
+        const newEndPoint = newPosition;
+        const [newCenterLat, newCenterLng] = Utils.calculateNewCenter(
+            newEndPoint.lat,
+            newEndPoint.lng,
+            trackLength / 2, // Distanz
+            (trackDirection + 180) % 360 // Peilung (rückwärts entlang des Tracks)
         );
-        const lateralOffset = Math.round(
-            deltaX * Math.sin(trackRad) - deltaY * Math.cos(trackRad)
-        );
+        const newCenterPoint = L.latLng(newCenterLat, newCenterLng);
 
-        // Speichere die neuen Offsets
+        // 3. Berechne den totalen Verschiebungs-Vektor vom DIP zum neuen Mittelpunkt.
+        const totalDistance = AppState.map.distance(dipPosition, newCenterPoint);
+        const bearingFromDipToCenter = Utils.calculateBearing(dipPosition.lat, dipPosition.lng, newCenterPoint.lat, newCenterPoint.lng);
+
+        // 4. Berechne die Winkeldifferenz zwischen dem Verschiebungs-Vektor und der Track-Richtung.
+        let angleDifference = bearingFromDipToCenter - trackDirection;
+        // Normalisiere den Winkel auf einen Wert zwischen -180 und 180
+        angleDifference = (angleDifference + 180) % 360 - 180;
+
+        // 5. Zerlege die Gesamtverschiebung in Vorwärts- und Quer-Komponenten.
+        const angleRad = angleDifference * (Math.PI / 180);
+        const forwardOffset = Math.round(totalDistance * Math.cos(angleRad));
+        const lateralOffset = Math.round(totalDistance * Math.sin(angleRad));
+
+        // 6. Aktualisiere die Settings und die UI-Eingabefelder.
         Settings.state.userSettings.jumpRunTrackOffset = lateralOffset;
         Settings.state.userSettings.jumpRunTrackForwardOffset = forwardOffset;
         Settings.save();
 
-        // Aktualisiere die Eingabefelder
-        const lateralOffsetInput = document.getElementById('jumpRunTrackOffset');
-        if (lateralOffsetInput) {
-            lateralOffsetInput.value = lateralOffset;
-            console.log('Updated jumpRunTrackOffset input to:', lateralOffset);
-        }
-        const forwardOffsetInput = document.getElementById('jumpRunTrackForwardOffset');
-        if (forwardOffsetInput) {
-            forwardOffsetInput.value = forwardOffset;
-            console.log('Updated jumpRunTrackForwardOffset input to:', forwardOffset);
-        }
+        setInputValueSilently('jumpRunTrackOffset', lateralOffset);
+        setInputValueSilently('jumpRunTrackForwardOffset', forwardOffset);
 
-        // Aktualisiere den Track
-        setTimeout(() => {
-            updateJumpRunTrackDisplay();
-        }, 0);
+        // 7. Zeichne den Track neu, um die Änderungen zu übernehmen.
+        updateJumpRunTrackDisplay();
     });
 
     document.addEventListener('location:selected', async (event) => {
