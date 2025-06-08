@@ -27,39 +27,35 @@ function initializeLocationSearch() {
     // Debounced-Version der Suchfunktion, um die API-Anfragen zu begrenzen
     const debouncedSearch = Utils.debounce(performSearch, 300);
 
-    // Event Listener für das Suchfeld
-    searchInput.addEventListener('input', () => {
-        debouncedSearch(searchInput.value);
-    });
+    // Event Listener für das Suchfeld (reagiert jetzt auf Klick)
+    searchInput.addEventListener('click', (e) => {
+        e.stopPropagation(); // Verhindert, dass der Klick sich auf andere Elemente auswirkt
 
-    // Zeigt die Liste an, wenn der Benutzer in das Feld klickt
-    searchInput.addEventListener('focus', () => {
-        renderResultsList(); // Zeigt Favoriten/Verlauf sofort an
-        resultsList.style.display = 'block';
-    });
+        // Prüft, ob die Liste bereits sichtbar ist, um sie ggf. zu schließen
+        const isVisible = resultsList.style.display === 'block';
 
-    // Verbirgt die Liste, wenn der Benutzer aus dem Feld klickt (mit einer kleinen Verzögerung)
-    searchInput.addEventListener('blur', () => {
-        setTimeout(() => {
+        if (isVisible) {
             resultsList.style.display = 'none';
-        }, 200); // Verzögerung, damit Klicks auf Listeneinträge noch registriert werden
-    });
-
-    // Event Listener für den "Favorit speichern"-Button
-    saveFavoriteBtn.addEventListener('click', () => {
-        // Greift auf die interne Variable zu, nicht auf einen Callback
-        if (currentMarkerPosition && currentMarkerPosition.lat !== null && currentMarkerPosition.lng !== null) {
-            const name = prompt("Please enter a name for this favorit:");
-            if (name) {
-                addOrUpdateFavorite(currentMarkerPosition.lat, currentMarkerPosition.lng, name);
-            }
         } else {
-            Utils.handleError("No valid marker position available to save.");
+            renderResultsList(); // Liste mit Favoriten/Verlauf füllen
+            resultsList.style.display = 'block';
         }
     });
 
-    // Initial das UI rendern
-    renderResultsList();
+    // Der 'blur'-Listener sorgt weiterhin dafür, dass die Liste ausgeblendet wird,
+    // wenn der Nutzer irgendwo anders hinklickt.
+    searchInput.addEventListener('blur', () => {
+        setTimeout(() => {
+            resultsList.style.display = 'none';
+        }, 200);
+    });
+
+    // Ein globaler Klick-Listener, der das Menü schließt, wenn man daneben klickt.
+    document.addEventListener('click', (e) => {
+        if (!searchInput.contains(e.target) && !resultsList.contains(e.target)) {
+            resultsList.style.display = 'none';
+        }
+    });
 }
 
 /**
