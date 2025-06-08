@@ -22,9 +22,17 @@ let userSettings;
 try {
     const storedSettings = localStorage.getItem('upperWindsSettings');
     userSettings = storedSettings ? JSON.parse(storedSettings) : { ...Settings.defaultSettings };
+    // Stelle sicher, dass bestimmte Einstellungen zurückgesetzt werden
+    userSettings.customJumpRunDirection = null;
+    userSettings.jumpRunTrackOffset = 0;
+    userSettings.jumpRunTrackForwardOffset = 0;
+    // Speichere die aktualisierten Settings, um localStorage zu überschreiben
+    localStorage.setItem('upperWindsSettings', JSON.stringify(userSettings));
+    console.log('Settings initialized and saved with reset offsets:', userSettings);
 } catch (error) {
     console.error('Failed to parse upperWindsSettings from localStorage:', error);
-    userSettings = { ...Settings.defaultSettings };
+    userSettings = { ...Settings.defaultSettings, customJumpRunDirection: null, jumpRunTrackOffset: 0, jumpRunTrackForwardOffset: 0 };
+    localStorage.setItem('upperWindsSettings', JSON.stringify(userSettings));
 }
 
 export { fetchWeatherForLocation, debouncedCalculateJump };
@@ -2881,10 +2889,10 @@ export function updateLandingPatternDisplay() {
     if (currentZoom < Constants.landingPatternMinZoom) {
         console.log('Landing pattern not displayed - zoom too low:', currentZoom);
         // Sende den Befehl "Alles wegmachen" an den Maler und beende die Funktion.
-        mapManager.drawLandingPattern(null); 
-        return; 
+        mapManager.drawLandingPattern(null);
+        return;
     }
-    
+
     //... (alle Zeilen von "const sliderIndex = ..." bis "if (!interpolatedData ...)") ...
     const sliderIndex = parseInt(document.getElementById('timeSlider').value) || 0;
     const landingDirection = document.querySelector('input[name="landingDirection"]:checked')?.value || 'LL';
@@ -2909,7 +2917,7 @@ export function updateLandingPatternDisplay() {
 
     // *** HIER IST DIE KORREKTUR: FÜGEN SIE DIESEN BLOCK EIN ***
     // Holt die aktuellen Einstellungen aus dem HTML-Dokument.
-   
+
 
     const heights = interpolatedData.map(d => d.height);
     const dirs = interpolatedData.map(d => Number.isFinite(d.dir) ? parseFloat(d.dir) : 0);
@@ -2917,7 +2925,7 @@ export function updateLandingPatternDisplay() {
     const uComponents = spdsKt.map((spd, i) => -spd * Math.sin(dirs[i] * Math.PI / 180));
     const vComponents = spdsKt.map((spd, i) => -spd * Math.cos(dirs[i] * Math.PI / 180));
 
-        // Determine effective landing direction based on selected pattern and input
+    // Determine effective landing direction based on selected pattern and input
     let effectiveLandingWindDir;
     if (landingDirection === 'LL' && Number.isFinite(customLandingDirLL) && customLandingDirLL >= 0 && customLandingDirLL <= 359) {
         effectiveLandingWindDir = customLandingDirLL;
@@ -3082,7 +3090,7 @@ export function updateLandingPatternDisplay() {
     const finalMidPoint = [(lat + finalEnd[0]) / 2, (lng + finalEnd[1]) / 2];
     const baseMidPoint = [(finalEnd[0] + baseEnd[0]) / 2, (finalEnd[1] + baseEnd[1]) / 2];
     const downwindMidPoint = [(baseEnd[0] + downwindEnd[0]) / 2, (baseEnd[1] + downwindEnd[1]) / 2];
- 
+
     // Add a fat blue arrow in the middle of the downwind leg pointing to landing direction
     const downwindMidLat = (baseEnd[0] + downwindEnd[0]) / 2;
     const downwindMidLng = (baseEnd[1] + downwindEnd[1]) / 2;
@@ -3135,56 +3143,76 @@ export function updateLandingPatternDisplay() {
     mapManager.drawLandingPattern(patternData);
 }
 export function updateJumpRunTrackDisplay() {
-
-    // --- TEIL A: DATEN SAMMELN UND PRÜFEN (1:1 aus Ihrer alten Funktion) ---
-    const currentZoom = AppState.map.getZoom();
-    const isZoomInRange = currentZoom >= Constants.minZoom && currentZoom <= Constants.maxZoom;
-
-    if (!Settings.state.userSettings.showJumpRunTrack || !AppState.weatherData || !AppState.lastLat || !isZoomInRange) {
-        mapManager.drawJumpRunTrack(null); // Sagt dem Maler: "Mach den Tisch leer"
+    console.log('updateJumpRunTrackDisplay called');
+    if (!AppState.map) {
+        console.warn('Map not initialized, cannot update jump run track display');
         return;
     }
-
-    // --- TEIL B: DATEN VOM PLANER HOLEN (1:1 aus Ihrer alten Funktion) ---
-    const trackResult = JumpPlanner.jumpRunTrack();
-    if (!trackResult) {
-        mapManager.drawJumpRunTrack(null);
+    if (
+        !Settings.state.userSettings.showJumpRunTrack ||
+        !AppState.weatherData ||
+        !AppState.lastLat ||
+        !AppState.lastLng ||
+        !Settings.state.isCalculateJumpUnlocked ||
+        !Settings.state.userSettings.calculateJump
+    ) {
+        console.log('Removing jump run track due to unmet conditions');
+        if (AppState.jumpRunTrackLayer) {
+            if (AppState.jumpRunTrackLayer.airplaneMarker) {
+                AppState.map.removeLayer(AppState.jumpRunTrackLayer.airplaneMarker);
+                AppState.jumpRunTrackLayer.airplaneMarker = null;
+            }
+            if (AppState.jumpRunTrackLayer.approachLayer) {
+                AppState.map.removeLayer(AppState.jumpRunTrackLayer.approachLayer);
+                AppState.jumpRunTrackLayer.approachLayer = null;
+            }
+            AppState.map.removeLayer(AppState.jumpRunTrackLayer);
+            AppState.jumpRunTrackLayer = null;
+            console.log('Removed JRT polyline');
+        }
+        AppState.lastTrackData = null;
         return;
     }
-
-    // --- TEIL C: DIE "BAUANLEITUNG" FÜR DEN MALER ERSTELLEN ---
-    // Hier fassen wir alle Ergebnisse in einem sauberen Objekt zusammen.
-
-    const trackData = {
-        // Anleitung für die Hauptlinie
-        path: {
-            latlngs: trackResult.latlngs,
-            options: { color: 'orange', weight: 4, opacity: 0.9, interactive: true },
-            tooltipText: `Jump Run: ${Math.round(trackResult.direction)}°, ${Math.round(trackResult.trackLength)} m`
-        },
-        // Anleitung für das Flugzeug
-        airplane: {
-            position: trackResult.latlngs[1], // Vordere Position
-            bearing: trackResult.direction
-        },
-        // Anleitung für die Anfluglinie (nur wenn vorhanden)
-        approachPath: null
-    };
-
-    if (trackResult.approachLatLngs) {
-        trackData.approachPath = {
-            latlngs: trackResult.approachLatLngs,
-            options: { color: 'orange', weight: 3, opacity: 0.9, dashArray: '10, 10', interactive: true },
-            tooltipText: `Approach: ${Math.round(trackResult.direction)}°, ${Math.round(trackResult.approachLength)} m, ${Math.round(trackResult.approachTime / 60)} min`
+    const trackData = JumpPlanner.jumpRunTrack();
+    if (trackData && trackData.latlngs?.length === 2 && trackData.latlngs.every(ll => Number.isFinite(ll[0]) && Number.isFinite(ll[1]))) {
+        console.log('Drawing jump run track with data:', trackData);
+        const drawData = {
+            path: {
+                latlngs: trackData.latlngs,
+                options: { color: 'orange', weight: 5, opacity: 0.8 },
+                tooltipText: `Jump Run Track: ${trackData.direction}°, Length: ${trackData.trackLength} m`,
+                originalLatLngs: AppState.lastTrackData?.latlngs?.length === 2 ? AppState.lastTrackData.latlngs : trackData.latlngs
+            },
+            approachPath: trackData.approachLatLngs?.length === 2 && trackData.approachLatLngs.every(ll => Number.isFinite(ll[0]) && Number.isFinite(ll[1])) ? {
+                latlngs: trackData.approachLatLngs,
+                options: { color: 'orange', weight: 3, opacity: 0.6, dashArray: '5, 10' },
+                tooltipText: `Approach Path: ${trackData.direction}°, Length: ${trackData.approachLength} m`,
+                originalLatLngs: AppState.lastTrackData?.approachLatLngs?.length === 2 ? AppState.lastTrackData.approachLatLngs : trackData.approachLatLngs
+            } : null,
+            airplane: {
+                position: L.latLng(trackData.latlngs[1][0], trackData.latlngs[1][1]),
+                bearing: trackData.direction,
+                originalPosition: AppState.lastTrackData?.latlngs?.[1] && Number.isFinite(AppState.lastTrackData.latlngs[1][0]) ?
+                    L.latLng(AppState.lastTrackData.latlngs[1][0], AppState.lastTrackData.latlngs[1][1]) :
+                    L.latLng(trackData.latlngs[1][0], trackData.latlngs[1][1]),
+                originalLatLngs: AppState.lastTrackData?.latlngs?.length === 2 ? AppState.lastTrackData.latlngs : trackData.latlngs,
+                approachLatLngs: AppState.lastTrackData?.approachLatLngs?.length === 2 ? AppState.lastTrackData.approachLatLngs : trackData.approachLatLngs
+            }
         };
+        mapManager.drawJumpRunTrack(drawData);
+        // Speichere die neuen Track-Daten
+        AppState.lastTrackData = {
+            latlngs: trackData.latlngs,
+            approachLatLngs: trackData.approachLatLngs,
+            direction: trackData.direction,
+            trackLength: trackData.trackLength,
+            approachLength: trackData.approachLength
+        };
+        console.log('Updated AppState.lastTrackData:', AppState.lastTrackData);
+    } else {
+        console.warn('No valid track data to display:', trackData);
+        AppState.lastTrackData = null;
     }
-
-    // --- TEIL D: DEN MALER MIT DER FERTIGEN ANLEITUNG BEAUFTRAGEN ---
-    mapManager.drawJumpRunTrack(trackData);
-
-    // Die komplexe Drag-Logik, die in der alten Funktion war, ist hier bewusst
-    // weggelassen, um den Schritt einfach zu halten. Sie kann später als
-    // nächstes Feature wieder hinzugefügt werden, sobald diese Struktur steht.
 }
 
 // == UI and Event Handling ==
@@ -4005,7 +4033,22 @@ function setupInputEvents() {
             AppState.customJumpRunDirection = null;
             const directionInput = document.getElementById('jumpRunTrackDirection');
             if (directionInput) {
-                setInputValueSilently('jumpRunTrackDirection', '');
+                directionInput.addEventListener('change', () => {
+                    const value = parseFloat(directionInput.value);
+
+                    // Prüfen, ob eine gültige Zahl eingegeben wurde
+                    if (Number.isFinite(value) && value >= 0 && value <= 359) {
+                        Settings.state.userSettings.customJumpRunDirection = value;
+                        console.log(`Setting 'customJumpRunDirection' on change to:`, value);
+                    } else {
+                        // Wenn die Eingabe ungültig ist, zurück zum berechneten Wert
+                        Settings.state.userSettings.customJumpRunDirection = null;
+                        directionInput.value = ''; // Feld leeren
+                        console.log('Invalid direction, resetting to calculated.');
+                    }
+                    Settings.save();
+                    updateJumpRunTrackDisplay();
+                });
             }
             if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
                 if (Settings.state.userSettings.showJumpRunTrack) {
@@ -4819,6 +4862,80 @@ function setupClearHistoricalDate() {
         });
     }
 }
+function setupJumpRunTrackEvents() {
+    console.log("App: Richte Event-Listener für Track-Einstellungen ein.");
+
+    const setupInput = (inputId, settingName) => {
+        const element = document.getElementById(inputId);
+        if (element) {
+            // Setze den Initialwert basierend auf Settings
+            element.value = Settings.state.userSettings[settingName] || 0;
+            console.log(`Set ${inputId} to initial value:`, element.value);
+            element.addEventListener('input', () => {
+                const value = parseFloat(element.value);
+                if (isNaN(value)) return;
+                Settings.state.userSettings[settingName] = value;
+                Settings.save();
+                updateJumpRunTrackDisplay();
+            });
+        }
+    };
+
+    setupInput('numberOfJumpers', 'numberOfJumpers');
+    setupInput('jumperSeparation', 'jumperSeparation');
+    setupInput('jumpRunTrackOffset', 'jumpRunTrackOffset');
+    setupInput('jumpRunTrackForwardOffset', 'jumpRunTrackForwardOffset');
+
+    const directionInput = document.getElementById('jumpRunTrackDirection');
+    if (directionInput) {
+        directionInput.value = Settings.state.userSettings.customJumpRunDirection || '';
+        directionInput.addEventListener('change', () => {
+            const value = parseFloat(directionInput.value);
+            if (Number.isFinite(value) && value >= 0 && value <= 359) {
+                Settings.state.userSettings.customJumpRunDirection = value;
+                console.log(`Setting 'customJumpRunDirection' on change to:`, value);
+            } else {
+                Settings.state.userSettings.customJumpRunDirection = null;
+                directionInput.value = '';
+                console.log('Invalid direction, resetting to calculated.');
+            }
+            Settings.save();
+            updateJumpRunTrackDisplay();
+        });
+    }
+
+    const showTrackCheckbox = document.getElementById('showJumpRunTrack');
+    if (showTrackCheckbox) {
+        showTrackCheckbox.addEventListener('change', (e) => {
+            Settings.state.userSettings.showJumpRunTrack = e.target.checked;
+            Settings.save();
+            updateJumpRunTrackDisplay();
+        });
+    }
+}
+function setupAndHandleInput(inputId, settingName, isNumeric = true) {
+    const inputElement = document.getElementById(inputId);
+    if (inputElement) {
+        inputElement.addEventListener('input', () => {
+            // 1. Lese den Wert aus dem Feld.
+            let value = inputElement.value;
+            // 2. Wandle ihn bei Bedarf in eine Zahl um.
+            if (isNumeric) {
+                value = parseFloat(value);
+                if (isNaN(value)) return; // Bei ungültiger Eingabe abbrechen
+            }
+
+            // 3. HIER IST DER ENTSCHEIDENDE SCHRITT: Speichere den neuen Wert im Settings-Objekt.
+            Settings.state.userSettings[settingName] = value;
+            Settings.save();
+
+            console.log(`Setting '${settingName}' aktualisiert auf:`, value);
+
+            // 4. Erst DANACH die Anzeige neu zeichnen lassen.
+            updateJumpRunTrackDisplay();
+        });
+    }
+}
 
 // Setup values
 function getSliderValue() {
@@ -5161,10 +5278,75 @@ document.addEventListener('DOMContentLoaded', () => {
         setupCacheManagement();
         setupCacheSettings({ map: AppState.map, lastLat: AppState.lastLat, lastLng: AppState.lastLng, baseMaps: AppState.baseMaps });
         setupAutoupdate();
+        setupJumpRunTrackEvents();
     } else {
         console.error("App: Karteninitialisierung ist fehlgeschlagen. UI-Events werden nicht eingerichtet.");
         Utils.handleError("Map could not be loaded. Please refresh the page.");
     }
+
+    // NEU: track:dragend-Listener hier platzieren
+    document.addEventListener('track:dragend', (event) => {
+        console.log("App: Event 'track:dragend' empfangen. Berechne und speichere neue Offsets.");
+
+        const { newPosition, originalTrackData } = event.detail;
+
+        // Validierung der Eingangsdaten
+        if (!newPosition || !Number.isFinite(newPosition.lat) || !Number.isFinite(newPosition.lng)) {
+            console.warn('Invalid newPosition:', newPosition);
+            return;
+        }
+        if (!originalTrackData?.path?.latlngs?.[0] || !originalTrackData?.path?.latlngs?.[1]) {
+            console.warn('Invalid originalTrackData:', originalTrackData);
+            return;
+        }
+
+        // Berechne den ursprünglichen Endpunkt des Tracks (Flugzeugposition)
+        const originalEnd = L.latLng(originalTrackData.path.latlngs[1][0], originalTrackData.path.latlngs[1][1]);
+        const trackDirection = originalTrackData.airplane.bearing;
+        const trackRad = trackDirection * Math.PI / 180; // Track-Richtung in Radiant
+
+        // Berechne die Verschiebung relativ zum ursprünglichen Endpunkt
+        const deltaLat = newPosition.lat - originalEnd.lat;
+        const deltaLng = newPosition.lng - originalEnd.lng;
+
+        // Konvertiere die Verschiebung in Meter
+        const metersPerDegreeLat = 111000; // 111 km pro Grad
+        const metersPerDegreeLng = 111000 * Math.cos(originalEnd.lat * Math.PI / 180);
+        const deltaX = deltaLng * metersPerDegreeLng; // X-Richtung (entlang Längengrade, Ost-West)
+        const deltaY = deltaLat * metersPerDegreeLat; // Y-Richtung (entlang Breitengrade, Nord-Süd)
+
+        // Projiziere die Verschiebung auf die Track-Richtung (forward) und senkrecht dazu (lateral)
+        // Forward: entlang der Track-Richtung (trackRad)
+        // Lateral: senkrecht zur Track-Richtung (trackRad + 90°)
+        const forwardOffset = Math.round(
+            deltaX * Math.cos(trackRad) + deltaY * Math.sin(trackRad)
+        );
+        const lateralOffset = Math.round(
+            deltaX * Math.sin(trackRad) - deltaY * Math.cos(trackRad)
+        );
+
+        // Speichere die neuen Offsets
+        Settings.state.userSettings.jumpRunTrackOffset = lateralOffset;
+        Settings.state.userSettings.jumpRunTrackForwardOffset = forwardOffset;
+        Settings.save();
+
+        // Aktualisiere die Eingabefelder
+        const lateralOffsetInput = document.getElementById('jumpRunTrackOffset');
+        if (lateralOffsetInput) {
+            lateralOffsetInput.value = lateralOffset;
+            console.log('Updated jumpRunTrackOffset input to:', lateralOffset);
+        }
+        const forwardOffsetInput = document.getElementById('jumpRunTrackForwardOffset');
+        if (forwardOffsetInput) {
+            forwardOffsetInput.value = forwardOffset;
+            console.log('Updated jumpRunTrackForwardOffset input to:', forwardOffset);
+        }
+
+        // Aktualisiere den Track
+        setTimeout(() => {
+            updateJumpRunTrackDisplay();
+        }, 0);
+    });
 
     document.addEventListener('location:selected', async (event) => {
         const { lat, lng, source } = event.detail;
@@ -5182,6 +5364,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (Settings.state.userSettings.calculateJump) {
                 calculateJump();
             }
+            // NEU: Zeichne JRT, wenn showJumpRunTrack aktiviert ist
+            if (Settings.state.userSettings.showJumpRunTrack && Settings.state.isCalculateJumpUnlocked && Settings.state.userSettings.calculateJump) {
+                console.log('App: showJumpRunTrack ist aktiviert, rufe updateJumpRunTrackDisplay auf');
+                updateJumpRunTrackDisplay();
+            }
             mapManager.recenterMap(true);
             AppState.isManualPanning = false;
         } catch (error) {
@@ -5189,6 +5376,7 @@ document.addEventListener('DOMContentLoaded', () => {
             Utils.handleError(error.message);
         }
     });
+
 
     // --- FÜGEN SIE DIESEN NEUEN LISTENER HINZU ---
     document.addEventListener('map:zoomend', (event) => {

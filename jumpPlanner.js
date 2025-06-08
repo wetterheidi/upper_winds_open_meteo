@@ -644,21 +644,14 @@ export function calculateCanopyCircles() {
 }
 
 export function jumpRunTrack() {
-    console.log('Starting jumpRunTrack...', {
-        weatherData: !!AppState.weatherData,
-        lastLat: AppState.lastLat,
-        lastLng: AppState.lastLng,
-        lastAltitude: AppState.lastAltitude,
-        customJumpRunDirection: AppState.customJumpRunDirection,
-        jumpRunTrackOffset: Settings.state.userSettings.jumpRunTrackOffset,
-        jumpRunTrackForwardOffset: Settings.state.userSettings.jumpRunTrackForwardOffset
-    });
+    console.log('Starting jumpRunTrack... Settings value for custom direction is:', Settings.state.userSettings.customJumpRunDirection);
+
     const exitAltitude = parseInt(document.getElementById('exitAltitude')?.value) || Settings.state.userSettings.exitAltitude || 3000;
     const openingAltitude = parseInt(document.getElementById('openingAltitude')?.value) || Settings.state.userSettings.openingAltitude || 1000;
-    const customDirection = parseInt(document.getElementById('jumpRunTrackDirection')?.value, 10);
     const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
-    const lateralOffset = parseInt(document.getElementById('jumpRunTrackOffset')?.value) || Settings.state.userSettings.jumpRunTrackOffset || 0;
-    const forwardOffset = parseInt(document.getElementById('jumpRunTrackForwardOffset')?.value) || Settings.state.userSettings.jumpRunTrackForwardOffset || 0;
+    // NEU: Priorisiere Settings.state.userSettings für Offsets
+    const lateralOffset = Number.isFinite(Settings.state.userSettings.jumpRunTrackOffset) ? Settings.state.userSettings.jumpRunTrackOffset : parseInt(document.getElementById('jumpRunTrackOffset')?.value) || 0;
+    const forwardOffset = Number.isFinite(Settings.state.userSettings.jumpRunTrackForwardOffset) ? Settings.state.userSettings.jumpRunTrackForwardOffset : parseInt(document.getElementById('jumpRunTrackForwardOffset')?.value) || 0;
 
     if (!AppState.weatherData || !AppState.lastLat || !AppState.lastLng || AppState.lastAltitude === null || AppState.lastAltitude === 'N/A') {
         console.warn('Cannot calculate jump run track: missing data', {
@@ -702,17 +695,21 @@ export function jumpRunTrack() {
         return null;
     }
 
-    let jumpRunTrackDirection;
-    if (AppState.customJumpRunDirection !== null && !isNaN(AppState.customJumpRunDirection) && AppState.customJumpRunDirection >= 0 && AppState.customJumpRunDirection <= 359) {
-        jumpRunTrackDirection = AppState.customJumpRunDirection;
-        console.log(`Using custom jump run direction: ${jumpRunTrackDirection}°`);
+    // 1. Berechne IMMER zuerst den Standardwert (die berechnete Richtung).
+    let jumpRunTrackDirection = Math.round(meanWind[0]); // Dies ist unser "Default".
+    console.log(`Calculated default direction is: ${jumpRunTrackDirection}°`);
+
+    // 2. Hole den Wert des Benutzers aus den Settings.
+    const customDirectionRaw = Settings.state.userSettings.customJumpRunDirection;
+    const customDirection = parseFloat(customDirectionRaw); // Explizites Parsing
+
+    // 3. PRÜFE, ob der Benutzerwert gültig ist.
+    if (Number.isFinite(customDirection) && customDirection >= 0 && customDirection <= 359) {
+        // 4. Wenn ja, ÜBERSCHREIBE den Standardwert.
+        jumpRunTrackDirection = customDirection;
+        console.log(`Using custom direction from settings: ${jumpRunTrackDirection}°`);
     } else {
-        jumpRunTrackDirection = Math.round(meanWindDirection);
-        AppState.customJumpRunDirection = null;
-        console.log(`Using calculated jump run direction: ${jumpRunTrackDirection}°`, {
-            meanWindDirection: meanWindDirection.toFixed(1),
-            inputValue: document.getElementById('jumpRunTrackDirection')?.value
-        });
+        console.log(`No valid custom direction found (raw: ${customDirectionRaw}), using calculated default.`);
     }
 
     // Calculate ground speed at exit altitude
@@ -793,8 +790,15 @@ export function jumpRunTrack() {
     // Update input field only if calculated or explicitly set
     const directionInput = document.getElementById('jumpRunTrackDirection');
     if (directionInput) {
-        directionInput.value = jumpRunTrackDirection;
-        console.log('Updated jumpRunTrackDirection input to:', jumpRunTrackDirection);
+        const customDirectionRaw = Settings.state.userSettings.customJumpRunDirection;
+        const customDirection = parseFloat(customDirectionRaw);
+        if (Number.isFinite(customDirection) && customDirection >= 0 && customDirection <= 359) {
+            directionInput.value = customDirection;
+            console.log('Updated jumpRunTrackDirection input to custom value:', customDirection);
+        } else {
+            directionInput.value = ''; // Leeres Feld, da berechnete Richtung verwendet wird
+            console.log('Cleared jumpRunTrackDirection input, using calculated direction:', jumpRunTrackDirection);
+        }
     }
 
     const halfLength = trackLength / 2;

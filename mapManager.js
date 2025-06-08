@@ -632,31 +632,97 @@ function clearJumpRunTrack() {
         jumpRunTrackLayerGroup.clearLayers();
     }
 }
+
 export function drawJumpRunTrack(trackData) {
-    // 1. Immer zuerst aufräumen
     clearJumpRunTrack();
 
-    // 2. Wenn es keine Anleitung gibt, sind wir fertig.
     if (!trackData || !jumpRunTrackLayerGroup) {
+        console.warn('No valid trackData or jumpRunTrackLayerGroup');
         return;
     }
 
-    // 3. Zeichne die Track-Linie
-    L.polyline(trackData.path, trackData.options)
-        .bindTooltip(`Jump Run: ${trackData.tooltipText}`)
+    // Validierung der Eingangsdaten
+    if (!trackData.path?.latlngs?.length || !trackData.airplane?.position) {
+        console.warn('Invalid trackData structure:', trackData);
+        return;
+    }
+
+    const trackPolyline = L.polyline(trackData.path.latlngs, trackData.path.options)
+        .bindTooltip(trackData.path.tooltipText)
         .addTo(jumpRunTrackLayerGroup);
 
-    // 4. Zeichne das Flugzeug-Icon
+    let approachPolyline = null;
+    if (trackData.approachPath?.latlngs) {
+        approachPolyline = L.polyline(trackData.approachPath.latlngs, trackData.approachPath.options)
+            .bindTooltip(trackData.approachPath.tooltipText)
+            .addTo(jumpRunTrackLayerGroup);
+    }
+
     const airplaneIcon = L.icon({
         iconUrl: 'airplane_orange.png',
-        iconSize: [32, 32], // etc.
+        iconSize: [32, 32], iconAnchor: [16, 16],
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+        shadowSize: [41, 41], shadowAnchor: [13, 32]
     });
 
-    L.marker(trackData.airplane.position, {
+    const airplaneMarker = L.marker(trackData.airplane.position, {
         icon: airplaneIcon,
         rotationAngle: trackData.airplane.bearing,
-        // ... etc.
-    }).addTo(jumpRunTrackLayerGroup);
+        rotationOrigin: 'center center',
+        draggable: true,
+        zIndexOffset: 2000
+    })
+    .bindTooltip('Drag to move Jump Run Track')
+    .addTo(jumpRunTrackLayerGroup);
+
+    airplaneMarker.on('mousedown', () => AppState.map.dragging.disable());
+    airplaneMarker.on('mouseup', () => AppState.map.dragging.enable());
+
+    airplaneMarker.on('drag', (e) => {
+        const newPos = e.target.getLatLng();
+        // Validierung von originalPosition
+        const originalPos = trackData.airplane.originalPosition;
+        if (!originalPos || !Number.isFinite(originalPos.lat) || !Number.isFinite(originalPos.lng)) {
+            console.warn('Invalid originalPosition:', originalPos);
+            return;
+        }
+
+        const deltaLat = newPos.lat - originalPos.lat;
+        const deltaLng = newPos.lng - originalPos.lng;
+
+        // Validierung von delta-Werten
+        if (!Number.isFinite(deltaLat) || !Number.isFinite(deltaLng)) {
+            console.warn('Invalid delta values:', { deltaLat, deltaLng });
+            return;
+        }
+
+        const newTrackLatLngs = trackData.path.originalLatLngs.map(ll => [
+            Number.isFinite(ll[0]) ? ll[0] + deltaLat : ll[0],
+            Number.isFinite(ll[1]) ? ll[1] + deltaLng : ll[1]
+        ]);
+        trackPolyline.setLatLngs(newTrackLatLngs);
+
+        if (approachPolyline && trackData.approachPath?.originalLatLngs) {
+            const newApproachLatLngs = trackData.approachPath.originalLatLngs.map(ll => [
+                Number.isFinite(ll[0]) ? ll[0] + deltaLat : ll[0],
+                Number.isFinite(ll[1]) ? ll[1] + deltaLng : ll[1]
+            ]);
+            approachPolyline.setLatLngs(newApproachLatLngs);
+        }
+    });
+
+    airplaneMarker.on('dragend', (e) => {
+        const newPos = e.target.getLatLng();
+        if (!Number.isFinite(newPos.lat) || !Number.isFinite(newPos.lng)) {
+            console.warn('Invalid new position in dragend:', newPos);
+            return;
+        }
+        const dragEndEvent = new CustomEvent('track:dragend', {
+            detail: { newPosition: newPos, originalTrackData: trackData },
+            bubbles: true
+        });
+        AppState.map.getContainer().dispatchEvent(dragEndEvent);
+    });
 }
 
 // Weitere exportierte Funktionen zum Steuern der Karte von außen

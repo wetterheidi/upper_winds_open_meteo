@@ -7,7 +7,6 @@ export const AppState = {
     cutAwayLat: null,
     cutAwayLng: null,
     cutAwayCircle: null,
-    customJumpRunDirection: null,
     isJumperSeparationManual: false,
     weatherData: null,
     lastModelRun: null,

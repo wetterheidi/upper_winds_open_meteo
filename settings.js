@@ -140,13 +140,14 @@ export const Settings = {
      * Includes validation to ensure data is serializable.
      */
     save() {
+        const settingsToSave = { ...this.state.userSettings };
+        // Entferne customJumpRunDirection, um es nicht zu persistieren
+        delete settingsToSave.customJumpRunDirection;
         try {
-            // Validate serializability
-            const settingsString = JSON.stringify(this.state.userSettings);
-            localStorage.setItem('upperWindsSettings', settingsString);
-            console.log('Settings saved to localStorage:', JSON.parse(settingsString));
+            localStorage.setItem('upperWindsSettings', JSON.stringify(settingsToSave));
+            console.log('Settings saved to localStorage:', settingsToSave);
         } catch (error) {
-            this.handleError(error, 'Failed to save settings to localStorage.');
+            console.error('Failed to save settings to localStorage:', error);
         }
     },
 
