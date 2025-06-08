@@ -7,12 +7,15 @@ import { Utils } from './utils.js';
 import { TileCache } from './tileCache.js';
 import { updateOfflineIndicator } from './ui.js';
 import * as Coordinates from './coordinates.js';
+import { getCoordinateFormat } from './app.js';
+
 
 let jumpVisualizationLayerGroup = null; // Unsere "Kiste" für alle Sprung-Visualisierungen
 let landingPatternLayerGroup = null;
 let jumpRunTrackLayerGroup = null; // Die neue "Kiste" für den Track
 let mapInitialized = false;
 let hasTileErrorSwitched = false;
+let labelZoomListener = null;
 
 
 // --- Hier werden wir alle kartenbezogenen Funktionen aus app.js einfügen ---
@@ -296,13 +299,13 @@ async function _geolocationSuccessCallback(position, defaultZoom) {
 async function _geolocationErrorCallback(error, defaultCenter, defaultZoom) {
     console.warn(`Geolocation error: ${error.message}`);
     Utils.handleMessage('Unable to retrieve your location. Using default location.');
-    
+
     await createOrUpdateMarker(defaultCenter[0], defaultCenter[1]);
 
     AppState.map.setView(defaultCenter, defaultZoom);
     recenterMap(true);
     AppState.isManualPanning = false;
-    
+
     // Anwendungslogik sollte hier nicht sein, diese wird über Events in app.js gehandhabt
 }
 
@@ -396,17 +399,17 @@ function _setupCoreMapEventHandlers() {
     });
     AppState.map.on('zoomend', () => {
         const currentZoom = AppState.map.getZoom();
-        
-    // HIER IST DIE ÄNDERUNG:
-    // Der Manager ruft KEINE Anwendungslogik mehr auf.
-    // Stattdessen sendet er ein Event und meldet, dass der Zoom sich geändert hat.
-    const zoomEvent = new CustomEvent('map:zoomend', {
-        detail: { zoom: currentZoom },
-        bubbles: true,
-        cancelable: true
-    });
-    AppState.map.getContainer().dispatchEvent(zoomEvent);
-    
+
+        // HIER IST DIE ÄNDERUNG:
+        // Der Manager ruft KEINE Anwendungslogik mehr auf.
+        // Stattdessen sendet er ein Event und meldet, dass der Zoom sich geändert hat.
+        const zoomEvent = new CustomEvent('map:zoomend', {
+            detail: { zoom: currentZoom },
+            bubbles: true,
+            cancelable: true
+        });
+        AppState.map.getContainer().dispatchEvent(zoomEvent);
+
         // Anker-Marker-Größe anpassen
         if (AppState.jumpRunTrackLayer && Settings.state.userSettings.showJumpRunTrack) {
             const anchorMarker = AppState.jumpRunTrackLayer.getLayers().find(layer => layer.options.icon?.options.className === 'jrt-anchor-marker');
@@ -446,18 +449,29 @@ function _setupCoreMapEventHandlers() {
     // Contextmenu (Rechtsklick für Cut-Away-Marker)
     AppState.map.on('contextmenu', (e) => {
         if (!Settings.state.userSettings.showCutAwayFinder || !Settings.state.userSettings.calculateJump) return;
+
         const { lat, lng } = e.latlng;
+
+        // Marker erstellen oder bewegen
         if (AppState.cutAwayMarker) {
             AppState.cutAwayMarker.setLatLng([lat, lng]);
         } else {
-            // createCutAwayMarker und attachCutAwayMarkerDragend müssen global/importiert sein
             AppState.cutAwayMarker = createCutAwayMarker(lat, lng).addTo(AppState.map);
             attachCutAwayMarkerDragend(AppState.cutAwayMarker);
         }
+
+        // Position im AppState speichern
         AppState.cutAwayLat = lat;
         AppState.cutAwayLng = lng;
-        updateCutAwayMarkerPopup(AppState.cutAwayMarker, lat, lng); // updateCutAwayMarkerPopup muss global/importiert sein
-        if (AppState.weatherData && Settings.state.userSettings.calculateJump) JumpPlanner.calculateCutAway();
+
+        // Popup aktualisieren und Neuberechnung anstoßen
+        updateCutAwayMarkerPopup(AppState.cutAwayMarker, lat, lng);
+
+        // Sende ein Event an app.js, damit die Neuberechnung ausgelöst wird.
+        const cutawayEvent = new CustomEvent('cutaway:marker_placed', {
+            bubbles: true
+        });
+        AppState.map.getContainer().dispatchEvent(cutawayEvent);
     });
 
     // Touchstart (Doppel-Tipp) auf dem Kartencontainer
@@ -500,10 +514,10 @@ function _handleMapDblClick(e) {
     // 1. Erstelle das Event, genau wie beim Dragging.
     //    Wir geben ihm eine Quelle mit, damit app.js weiß, woher es kam.
     const mapSelectEvent = new CustomEvent('location:selected', {
-        detail: { 
-            lat: lat, 
+        detail: {
+            lat: lat,
             lng: lng,
-            source: 'dblclick' 
+            source: 'dblclick'
         },
         bubbles: true,
         cancelable: true
@@ -511,59 +525,104 @@ function _handleMapDblClick(e) {
 
     // 2. Sende das Event.
     AppState.map.getContainer().dispatchEvent(mapSelectEvent);
-    
+
     // 3. Alle direkten Aufrufe von calculateJump() etc. sind hier GELÖSCHT!
 }
 
-//Sprungelemente löschen und zeichnen
 export function drawJumpVisualization(jumpData) {
-    // 1. Zuerst immer alles sauber machen.
-    clearJumpCircles();
+    // 1. Immer alles sauber machen.
+    clearJumpVisualization(); // Umbenannt von clearJumpCircles für Klarheit
 
-    // 2. Sicherheitscheck: Wenn keine Bauanleitung da ist, höre auf.
+    // Entferne den alten Zoom-Listener, bevor neue Labels gezeichnet werden.
+    if (labelZoomListener && AppState.map) {
+        AppState.map.off('zoomend', labelZoomListener);
+        labelZoomListener = null;
+    }
+
     if (!jumpData || !jumpVisualizationLayerGroup) {
         return;
     }
 
-    // 3. Zeichne, was in der Bauanleitung steht.
+    const labelsToUpdate = []; // Sammelt alle Labels für den Zoom-Listener
 
-    // Gibt es Daten für die Exit-Area? Dann male sie.
+    // Zeichne Exit-Kreise
     if (jumpData.exitCircles) {
-        jumpData.exitCircles.forEach(circle => {
-            L.circle(circle.center, {
-                radius: circle.radius,
-                color: circle.color,
-                fillColor: circle.color,
-                fillOpacity: 0.2,
-                weight: 2
-            }).addTo(jumpVisualizationLayerGroup); // Füge es zur "Kiste" hinzu
+        jumpData.exitCircles.forEach(circleInfo => {
+            L.circle(circleInfo.center, {
+                radius: circleInfo.radius,
+                color: circleInfo.color,
+                fillColor: circleInfo.fillColor,
+                fillOpacity: circleInfo.fillOpacity,
+                weight: circleInfo.weight || 2
+            }).addTo(jumpVisualizationLayerGroup);
         });
     }
 
-    // Gibt es Daten für die Canopy-Area? Dann male sie.
+    // Zeichne Canopy-Kreise
     if (jumpData.canopyCircles) {
-        jumpData.canopyCircles.forEach(circle => {
-            L.circle(circle.center, {
-                radius: circle.radius,
-                color: circle.color,
-                weight: circle.weight,
-                opacity: circle.opacity,
-                fillOpacity: 0
-            }).addTo(jumpVisualizationLayerGroup); // Füge es zur "Kiste" hinzu
+        jumpData.canopyCircles.forEach(circleInfo => {
+            L.circle(circleInfo.center, circleInfo).addTo(jumpVisualizationLayerGroup);
         });
     }
 
-    // Gibt es Daten für die Labels? Dann male sie.
+    // Helferfunktion zum Positionieren der Labels (aus deinem alten Code übernommen)
+    function calculateLabelAnchor(center, radius) {
+        const centerLatLng = L.latLng(center[0], center[1]);
+        const earthRadius = 6378137;
+        const deltaLat = (radius / earthRadius) * (180 / Math.PI);
+        const topEdgeLatLng = L.latLng(center[0] + deltaLat, center[1]);
+        const centerPoint = AppState.map.latLngToLayerPoint(centerLatLng);
+        const topEdgePoint = AppState.map.latLngToLayerPoint(topEdgeLatLng);
+        const offsetY = centerPoint.y - topEdgePoint.y + 10;
+        return [25, offsetY];
+    }
+
+    // Zeichne Canopy-Labels mit dynamischem Styling
     if (jumpData.canopyLabels) {
+        const currentZoom = AppState.map.getZoom();
+
         jumpData.canopyLabels.forEach(labelInfo => {
-            L.marker(labelInfo.center, {
+            const isSmall = currentZoom <= 11;
+            const labelMarker = L.marker(labelInfo.center, {
                 icon: L.divIcon({
-                    className: 'isoline-label',
-                    html: `<span>${labelInfo.text}</span>`,
-                    // ... weitere Styling-Optionen ...
-                })
-            }).addTo(jumpVisualizationLayerGroup); // Füge es zur "Kiste" hinzu
+                    className: `isoline-label ${isSmall ? 'isoline-label-small' : 'isoline-label-large'}`,
+                    html: `<span style="font-size: ${isSmall ? '8px' : '10px'}">${labelInfo.text}</span>`,
+                    iconSize: isSmall ? [50, 12] : [60, 14],
+                    iconAnchor: calculateLabelAnchor(labelInfo.center, labelInfo.radius)
+                }),
+                zIndexOffset: 2100 // Stellt sicher, dass Labels oben liegen
+            }).addTo(jumpVisualizationLayerGroup);
+
+            // Speichere die notwendigen Infos für das spätere Update
+            labelsToUpdate.push({
+                marker: labelMarker,
+                center: labelInfo.center,
+                radius: labelInfo.radius,
+                text: labelInfo.text
+            });
         });
+    }
+
+    // Erstelle einen neuen Zoom-Listener, der alle gerade erstellten Labels kennt.
+    if (labelsToUpdate.length > 0) {
+        labelZoomListener = function () {
+            const currentZoom = AppState.map.getZoom();
+            const isSmall = currentZoom <= 11;
+            labelsToUpdate.forEach(item => {
+                item.marker.setIcon(L.divIcon({
+                    className: `isoline-label ${isSmall ? 'isoline-label-small' : 'isoline-label-large'}`,
+                    html: `<span style="font-size: ${isSmall ? '8px' : '10px'}">${item.text}</span>`,
+                    iconSize: isSmall ? [50, 12] : [60, 14],
+                    iconAnchor: calculateLabelAnchor(item.center, item.radius)
+                }));
+            });
+        };
+        AppState.map.on('zoomend', labelZoomListener);
+    }
+}
+function clearJumpVisualization() {
+    if (jumpVisualizationLayerGroup) {
+        jumpVisualizationLayerGroup.clearLayers();
     }
 }
 function clearJumpCircles() {
@@ -632,6 +691,89 @@ function clearJumpRunTrack() {
         jumpRunTrackLayerGroup.clearLayers();
     }
 }
+export function createCutAwayMarker(lat, lng) {
+    const cutAwayIcon = L.icon({
+        iconUrl: 'schere_purple.png', // Du benötigst dieses Bild im Projektverzeichnis
+        iconSize: [25, 25],
+        iconAnchor: [12, 12],
+        popupAnchor: [0, -12],
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+        shadowSize: [41, 41],
+        shadowAnchor: [13, 41]
+    });
+    return L.marker([lat, lng], {
+        icon: cutAwayIcon,
+        draggable: true
+    });
+}
+export function attachCutAwayMarkerDragend(marker) {
+    marker.on('dragend', (e) => {
+        const position = marker.getLatLng();
+        AppState.cutAwayLat = position.lat;
+        AppState.cutAwayLng = position.lng;
+        console.log('Cut-away marker dragged to:', { lat: AppState.cutAwayLat, lng: AppState.cutAwayLng });
+        
+        // Popup aktualisieren und Neuberechnung anstoßen
+        updateCutAwayMarkerPopup(marker, AppState.cutAwayLat, AppState.cutAwayLng);
+        const cutawayEvent = new CustomEvent('cutaway:marker_placed', { bubbles: true });
+        AppState.map.getContainer().dispatchEvent(cutawayEvent);
+    });
+}
+export function updateCutAwayMarkerPopup(marker, lat, lng, open = false) {
+    const coordFormat = getCoordinateFormat(); // Holt das aktuelle Koordinatenformat
+    const coords = Utils.convertCoords(lat, lng, coordFormat);
+    let popupContent = `<b>Cut-Away Start</b><br>`;
+    
+    if (coordFormat === 'MGRS') {
+        popupContent += `MGRS: ${coords.lat}`;
+    } else {
+        // Nutzt die korrekte Formatierung auch hier
+        const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
+        if (coordFormat === 'DMS') {
+             popupContent += `Lat: ${formatDMS(Utils.decimalToDms(lat, true))}<br>Lng: ${formatDMS(Utils.decimalToDms(lng, false))}`;
+        } else {
+             popupContent += `Lat: ${lat.toFixed(5)}<br>Lng: ${lng.toFixed(5)}`;
+        }
+    }
+
+    // Ruft die zentrale Funktion zum Aktualisieren von Popups auf
+    updatePopupContent(marker, popupContent, open);
+}
+// 1. Eine Funktion, die den Marker und den Kreis zeichnet.
+export function drawCutAwayVisualization(data) {
+    // Zuerst immer den alten Kreis löschen.
+    if (AppState.cutAwayCircle) {
+        AppState.map.removeLayer(AppState.cutAwayCircle);
+        AppState.cutAwayCircle = null;
+    }
+
+    // Wenn keine neuen Daten da sind, sind wir fertig.
+    if (!data) return;
+
+    // Zeichne den neuen Kreis mit den übergebenen Daten.
+    AppState.cutAwayCircle = L.circle(data.center, {
+        radius: data.radius,
+        color: 'purple',
+        fillColor: 'purple',
+        fillOpacity: 0.2,
+        weight: 2
+    }).addTo(AppState.map);
+
+    AppState.cutAwayCircle.bindTooltip(data.tooltipContent, {
+        permanent: false,
+        direction: 'center',
+        className: 'cutaway-tooltip'
+    });
+}
+// 2. Eine Funktion, die den Marker (die Schere) löscht.
+export function clearCutAwayMarker() {
+    if (AppState.cutAwayMarker) {
+        AppState.map.removeLayer(AppState.cutAwayMarker);
+        AppState.cutAwayMarker = null;
+    }
+    // Lösche auch den Kreis, wenn der Marker entfernt wird.
+    drawCutAwayVisualization(null);
+}
 
 export function drawJumpRunTrack(trackData) {
     clearJumpRunTrack();
@@ -672,8 +814,8 @@ export function drawJumpRunTrack(trackData) {
         draggable: true,
         zIndexOffset: 2000
     })
-    .bindTooltip('Drag to move Jump Run Track')
-    .addTo(jumpRunTrackLayerGroup);
+        .bindTooltip('Drag to move Jump Run Track')
+        .addTo(jumpRunTrackLayerGroup);
 
     airplaneMarker.on('mousedown', () => AppState.map.dragging.disable());
     airplaneMarker.on('mouseup', () => AppState.map.dragging.enable());
@@ -747,7 +889,7 @@ export async function createOrUpdateMarker(lat, lng) {
         AppState.currentMarker = newMarker;
         AppState.currentMarker.addTo(AppState.map);
     }
-    
+
     // HIER IST DIE ÄNDERUNG:
     const popupContent = `Lat: ${lat.toFixed(5)}<br>Lng: ${lng.toFixed(5)}<br>Alt: ${altitude} m`;
     updatePopupContent(AppState.currentMarker, popupContent); // Ruft die neue Funktion auf

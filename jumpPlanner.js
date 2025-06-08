@@ -376,9 +376,9 @@ export function calculateCutAway() {
     // Vertical speed calculations
     const cutAwayAltitude = Settings.state.userSettings.cutAwayAltitude; // meters
     const surfaceAltitude = AppState.lastAltitude; // meters
-    const verticalSpeedMax = Math.sqrt((2 * 9.81 * 5) / (1.2 * 13 * 2.6)).toFixed(1); // m/s, Fully Open
-    const verticalSpeedMean = Math.sqrt((2 * 9.81 * 5) / (1.2 * 2 * 1.5)).toFixed(1); // m/s, Partially Collapsed
-    const verticalSpeedMin = Math.sqrt((2 * 9.81 * 5) / (1.2 * 0.1 * 1)).toFixed(1); // m/s, Fully Collapsed
+    const verticalSpeedMax = Math.sqrt((2 * 9.81 * 5) / (1.2 * 13 * 2.6)); // m/s, Fully Open
+    const verticalSpeedMean = Math.sqrt((2 * 9.81 * 5) / (1.2 * 2 * 1.5)); // m/s, Partially Collapsed
+    const verticalSpeedMin = Math.sqrt((2 * 9.81 * 5) / (1.2 * 0.1 * 1)); // m/s, Fully Collapsed
     const radius = 150; // meters
 
     // Log vertical speeds
@@ -431,72 +431,57 @@ export function calculateCutAway() {
         }
     });
 
-    // Remove existing cut-away circle if present
-    if (AppState.cutAwayCircle) {
-        AppState.map.removeLayer(AppState.cutAwayCircle);
-        AppState.cutAwayCircle = null;
-        console.log('Cleared existing cut-away circle');
-    }
+ // Deklariere die Variablen außerhalb des switch-Blocks.
+    let center, tooltipContent;
 
-    // Add circle for the selected cut-away state if showCutAwayFinder is enabled
+    // Nur wenn der Finder aktiv ist, die Berechnungen für das Return-Objekt durchführen.
     if (Settings.state.userSettings.showCutAwayFinder && Settings.state.userSettings.calculateJump) {
-        let center, descentTime, displacementDistance, stateLabel, verticalSpeedSelected;
+        let descentTime, displacementDistance, stateLabel, verticalSpeedSelected;
+
         switch (Settings.state.userSettings.cutAwayState) {
             case 'Partially':
                 center = [newLatMean, newLngMean];
                 descentTime = descentTimeMean;
                 displacementDistance = displacementDistanceMean;
-                verticalSpeedSelected = verticalSpeedMean;
+                verticalSpeedSelected = verticalSpeedMean.toFixed(1);
                 stateLabel = 'Partially Collapsed';
                 break;
             case 'Collapsed':
                 center = [newLatMin, newLngMin];
                 descentTime = descentTimeMin;
                 displacementDistance = displacementDistanceMin;
-                verticalSpeedSelected = verticalSpeedMin;
+                verticalSpeedSelected = verticalSpeedMin.toFixed(1);
                 stateLabel = 'Fully Collapsed';
                 break;
             case 'Open':
                 center = [newLatMax, newLngMax];
                 descentTime = descentTimeMax;
                 displacementDistance = displacementDistanceMax;
-                verticalSpeedSelected = verticalSpeedMax;
+                verticalSpeedSelected = verticalSpeedMax.toFixed(1);
                 stateLabel = 'Fully Open';
                 break;
             default:
                 console.warn('Unknown cutAwayState:', Settings.state.userSettings.cutAwayState);
-                return;
+                return null; // Beende die Funktion, wenn der Status ungültig ist.
         }
 
-        // Create tooltip content
-        const tooltipContent = `
+        tooltipContent = `
             <b>Cut-Away (${stateLabel})</b><br>
             Cut-Away Altitude: ${cutAwayAltitude} m<br>
             Displacement: ${meanWindDirection.toFixed(0)}°, ${displacementDistance.toFixed(0)} m<br>
             Descent Time/Speed: ${descentTime.toFixed(0)} s at ${verticalSpeedSelected} m/s<br>
         `;
 
-        // Add circle to map
-        AppState.cutAwayCircle = L.circle(center, {
+        // Gib das fertige Objekt zurück.
+        return {
+            center: center,
             radius: radius,
-            color: 'purple',
-            fillColor: 'purple',
-            fillOpacity: 0.2,
-            weight: 2
-        }).addTo(AppState.map);
-
-        // Bind tooltip
-        AppState.cutAwayCircle.bindTooltip(tooltipContent, {
-            permanent: false,
-            direction: 'center',
-            className: 'cutaway-tooltip'
-        });
-        console.log('Added cut-away circle:', { center, radius, stateLabel });
+            tooltipContent: tooltipContent
+        };
     }
-    console.log('calculateCutAway completed', {
-        cutAwayMarkerExists: !!AppState.cutAwayMarker,
-        cutAwayCircleExists: !!AppState.cutAwayCircle
-    });
+
+    // Wenn der Finder nicht aktiv ist, gib null zurück.
+    return null;
 }
 
 export function calculateCanopyCircles() {

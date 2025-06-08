@@ -168,47 +168,6 @@ function reinitializeCoordsControl() {
     AppState.coordsControl.addTo(AppState.map);
     console.log('After reinitialize - coordsControl:', AppState.coordsControl);
 }
-function createCutAwayMarker(lat, lng) {
-    const cutAwayIcon = L.icon({
-        iconUrl: 'schere_purple.png', // Use a different icon if available
-        iconSize: [25, 25],
-        iconAnchor: [16, 32],
-        popupAnchor: [0, -32],
-        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-        shadowSize: [41, 41],
-        shadowAnchor: [13, 32],
-        className: 'cutaway-marker' // For CSS styling (e.g., different color)
-    });
-    return L.marker([lat, lng], {
-        icon: cutAwayIcon,
-        draggable: true
-    });
-}
-function attachCutAwayMarkerDragend(marker) {
-    marker.on('dragend', (e) => {
-        const position = marker.getLatLng();
-        AppState.cutAwayLat = position.lat;
-        AppState.cutAwayLng = position.lng;
-        console.log('Cut-away marker dragged to:', { lat: AppState.cutAwayLat, lng: AppState.cutAwayLng });
-        updateCutAwayMarkerPopup(marker, AppState.cutAwayLat, AppState.cutAwayLng);
-        if (Settings.state.userSettings.showCutAwayFinder && Settings.state.userSettings.calculateJump && AppState.weatherData) {
-            console.log('Recalculating cut-away for marker drag');
-            debouncedCalculateJump(); // Use debounced version
-            JumpPlanner.calculateCutAway();
-        }
-    });
-}
-function updateCutAwayMarkerPopup(marker, lat, lng, open = false) {
-    const coordFormat = getCoordinateFormat();
-    const coords = Utils.convertCoords(lat, lng, coordFormat);
-    let popupContent = `<b>Cut-Away Start</b><br>`;
-    if (coordFormat === 'MGRS') {
-        popupContent += `MGRS: ${coords.lat}`;
-    } else {
-        popupContent += `Lat: ${lat.toFixed(5)}<br>Lng: ${lng.toFixed(5)}`;
-    }
-    mapManager.updatePopupContent(marker, popupContent, open);
-}
 async function refreshMarkerPopup() {
     if (!AppState.currentMarker || AppState.lastLat === null) {
         return;
@@ -2714,59 +2673,57 @@ export function visualizeFreeFallPath(path) {
 
     freeFallPolyline.bindPopup(`Free Fall Path<br>Duration: ${path[path.length - 1].time.toFixed(1)}s<br>Distance: ${Math.sqrt(path[path.length - 1].latLng[0] ** 2 + path[path.length - 1].latLng[1] ** 2).toFixed(1)}m`);
 }
-
-// Isolated calculation functions
-
 function calculateJump() {
     console.log('App: Starte Sprungberechnung und erstelle Bauanleitung...');
 
     if (!AppState.weatherData || !AppState.lastLat || !AppState.lastLng) {
-        mapManager.drawJumpVisualization(null); // Befehl an den Maler: "Alles wegmachen"
+        mapManager.drawJumpVisualization(null);
         return;
     }
 
-    // Dies ist die "Bauanleitung" für den Maler
     const visualizationData = {
         exitCircles: [],
         canopyCircles: [],
         canopyLabels: []
     };
 
-    // -- BAUANLEITUNG FÜR EXIT AREA FÜLLEN --
+    // --- EXIT AREA ---
     if (Settings.state.userSettings.showExitArea) {
         const exitResult = JumpPlanner.calculateExitCircle();
         if (exitResult) {
-            // Füge die fertigen Zeichen-Instruktionen zur Bauanleitung hinzu
             visualizationData.exitCircles.push({
                 center: [exitResult.greenLat, exitResult.greenLng],
                 radius: exitResult.greenRadius,
-                color: 'green'
+                color: 'green',
+                fillColor: 'green',
+                fillOpacity: 0.2,
+                weight: 2
             });
             visualizationData.exitCircles.push({
                 center: [exitResult.darkGreenLat, exitResult.darkGreenLng],
                 radius: exitResult.darkGreenRadius,
-                color: 'darkgreen'
+                color: 'darkgreen',
+                fillColor: 'darkgreen',
+                fillOpacity: 0.2,
+                weight: 2
             });
         }
     }
 
-    // -- BAUANLEITUNG FÜR CANOPY AREA FÜLLEN --
+    // --- CANOPY AREA ---
     if (Settings.state.userSettings.showCanopyArea) {
         const canopyResult = JumpPlanner.calculateCanopyCircles();
         if (canopyResult) {
-            // HIER findet die Berechnung statt!
             const redCenter = Utils.calculateNewCenter(canopyResult.redLat, canopyResult.redLng, canopyResult.displacementFull, canopyResult.directionFull);
-
-            // Füge die fertige Instruktion für den roten Kreis hinzu
             visualizationData.canopyCircles.push({
                 center: redCenter,
                 radius: canopyResult.radiusFull,
                 color: 'red',
                 weight: 2,
-                opacity: 0.8
+                opacity: 0.8,
+                fillOpacity: 0
             });
 
-            // Erstelle die Instruktionen für die blauen Kreise
             canopyResult.additionalBlueRadii.forEach((radius, i) => {
                 const center = Utils.calculateNewCenter(canopyResult.blueLat, canopyResult.blueLng, canopyResult.additionalBlueDisplacements[i], canopyResult.additionalBlueDirections[i]);
                 visualizationData.canopyCircles.push({
@@ -2774,18 +2731,36 @@ function calculateJump() {
                     radius: radius,
                     color: 'blue',
                     weight: 1,
-                    opacity: 0.1
+                    fillColor: 'blue',
+                    fillOpacity: 0.1,
+                    opacity: 1 // Rand ist voll sichtbar
                 });
                 visualizationData.canopyLabels.push({
                     center: center,
+                    radius: radius,
                     text: `${Math.round(canopyResult.additionalBlueUpperLimits[i])}m`
                 });
             });
         }
     }
 
-    // Übergebe die fertige Bauanleitung an den Maler
     mapManager.drawJumpVisualization(visualizationData);
+
+    // --- NEUER, SEPARATER BLOCK FÜR DEN CUT-AWAY-FINDER ---
+    let cutawayDrawData = null; // Standardmäßig nichts zeichnen
+    if (Settings.state.userSettings.showCutAwayFinder && AppState.cutAwayLat !== null) {
+        const result = JumpPlanner.calculateCutAway();
+        if (result) {
+            // Erstelle die "Bauanleitung" für den Cut-Away-Kreis.
+            cutawayDrawData = {
+                center: result.center,
+                radius: result.radius,
+                tooltipContent: result.tooltipContent
+            };
+        }
+    }
+    // Übergib die fertige Bauanleitung an den Zeichner (auch wenn sie 'null' ist, um alte Kreise zu löschen).
+    mapManager.drawCutAwayVisualization(cutawayDrawData);
 }
 export function clearIsolineMarkers() {
     console.log('clearIsolineMarkers called');
@@ -3428,7 +3403,7 @@ function setupSliderEvents() {
 
         if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
             await updateWeatherDisplay(sliderIndex);
-            await refreshMarkerPopup(); 
+            await refreshMarkerPopup();
             if (AppState.lastAltitude !== 'N/A') calculateMeanWind();
             if (Settings.state.userSettings.showLandingPattern) {
                 console.log('Updating landing pattern for slider index:', sliderIndex);
@@ -3805,16 +3780,6 @@ function setupRadioEvents() {
         updateUIState(); // Ensure UI reflects disabled state
         updateAllDisplays();
     });
-    setupRadioGroup('cutAwayState', () => {
-        Settings.state.userSettings.cutAwayState = Settings.getValue('cutAwayState', 'radio', 'Partially');
-        Settings.save();
-        console.log('cutAwayState changed:', Settings.state.userSettings.cutAwayState);
-        if (Settings.state.userSettings.showCutAwayFinder && Settings.state.userSettings.calculateJump && AppState.weatherData && AppState.lastLat && AppState.lastLng) {
-            console.log('Recalculating cut-away for state change');
-            debouncedCalculateJump(); // Use debounced version
-            JumpPlanner.calculateCutAway();
-        }
-    });
     setupRadioGroup('jumpMasterLineTarget', () => {
         Settings.state.userSettings.jumpMasterLineTarget = Settings.getValue('jumpMasterLineTarget', 'radio', 'DIP');
         Settings.save();
@@ -4185,10 +4150,11 @@ function setupInputEvents() {
         if (!isNaN(value) && value >= 400 && value <= 15000) {
             Settings.state.userSettings.cutAwayAltitude = value;
             Settings.save();
-            if (Settings.state.userSettings.showCutAwayFinder && Settings.state.userSettings.calculateJump && AppState.weatherData && cutAwayLat !== null && AppState.cutAwayLng !== null) {
+
+            // Rufe immer die zentrale Funktion zur Neuberechnung auf.
+            if (Settings.state.userSettings.showCutAwayFinder && AppState.weatherData && AppState.lastLat && AppState.lastLng) {
                 console.log('Recalculating jump for cut-away altitude change');
-                debouncedCalculateJump(); // Use debounced version
-                JumpPlanner.calculateCutAway();
+                calculateJump();
             }
         } else {
             Utils.handleError('Cut away altitude must be between 400 and 15000 meters.');
@@ -4230,55 +4196,22 @@ function setupCheckboxEvents() {
     setupCheckbox('showExitAreaCheckbox', 'showExitArea', (checkbox) => {
         Settings.state.userSettings.showExitArea = checkbox.checked;
         Settings.save();
-        checkbox.checked = Settings.state.userSettings.showExitArea;
         console.log('Show Exit Area set to:', Settings.state.userSettings.showExitArea);
-        if (checkbox.checked && AppState.weatherData && AppState.lastLat && AppState.lastLng && Settings.state.isCalculateJumpUnlocked && Settings.state.userSettings.calculateJump) {
-            const exitResult = JumpPlanner.calculateExitCircle();
-            JumpPlanner.calculateCutAway();
-        } else {
-            if (Settings.state.isCalculateJumpUnlocked && Settings.state.userSettings.calculateJump) calculateJump();
-            console.log('Cleared exit circles and re-rendered active circles');
+
+        // Rufe immer calculateJump auf. Die Funktion entscheidet, was zu tun ist.
+        if (AppState.weatherData && AppState.lastLat && AppState.lastLng && Settings.state.userSettings.calculateJump) {
+            calculateJump();
         }
     });
 
     setupCheckbox('showCanopyAreaCheckbox', 'showCanopyArea', (checkbox) => {
         Settings.state.userSettings.showCanopyArea = checkbox.checked;
         Settings.save();
-        checkbox.checked = Settings.state.userSettings.showCanopyArea;
         console.log('Show Canopy Area set to:', Settings.state.userSettings.showCanopyArea);
-        if (checkbox.checked && AppState.weatherData && AppState.lastLat && AppState.lastLng && Settings.state.isCalculateJumpUnlocked && Settings.state.userSettings.calculateJump) {
-            const canopyResult = JumpPlanner.calculateCanopyCircles();
-            JumpPlanner.calculateCutAway();
-        } else {
-            if (AppState.jumpCircle) {
-                if (AppState.map && typeof AppState.map.removeLayer === 'function') {
-                    AppState.map.removeLayer(AppState.jumpCircle);
-                }
-                AppState.jumpCircle = null;
-            }
-            if (AppState.jumpCircleFull) {
-                if (AppState.map && typeof AppState.map.removeLayer === 'function') {
-                    AppState.map.removeLayer(AppState.jumpCircleFull);
-                }
-                AppState.jumpCircleFull = null;
-            }
-            if (AppState.additionalBlueCircles) {
-                AppState.additionalBlueCircles.forEach(circle => {
-                    if (AppState.map && typeof AppState.map.removeLayer === 'function') {
-                        AppState.map.removeLayer(circle);
-                    }
-                });
-                AppState.additionalBlueCircles = [];
-            }
-            if (AppState.additionalBlueLabels) {
-                AppState.additionalBlueLabels.forEach(label => {
-                    if (AppState.map && typeof AppState.map.removeLayer === 'function') {
-                        AppState.map.removeLayer(label);
-                    }
-                });
-                AppState.additionalBlueLabels = [];
-            }
-            console.log('Cleared blue and red circles and labels');
+
+        // Rufe immer calculateJump auf. Die Funktion entscheidet, was zu tun ist.
+        if (AppState.weatherData && AppState.lastLat && AppState.lastLng && Settings.state.userSettings.calculateJump) {
+            calculateJump();
         }
     });
 
@@ -4315,38 +4248,31 @@ function setupCheckboxEvents() {
     });
 
     setupCheckbox('showCutAwayFinder', 'showCutAwayFinder', (checkbox) => {
-        console.log('showCutAwayFinder checkbox changed to:', checkbox.checked);
         Settings.state.userSettings.showCutAwayFinder = checkbox.checked;
         Settings.save();
-        // Find the submenu within the same <li> as the checkbox
-        const submenu = checkbox.closest('li')?.querySelector('ul');
-        console.log('Submenu lookup for showCutAwayFinder:', { submenu: submenu ? 'Found' : 'Not found', submenuClasses: submenu?.classList.toString() });
-        toggleSubmenu(checkbox, submenu, checkbox.checked);
-        if (checkbox.checked && AppState.weatherData && AppState.cutAwayLat !== null && AppState.cutAwayLng !== null && Settings.state.isCalculateJumpUnlocked && Settings.state.userSettings.calculateJump) {
-            console.log('Show Cut Away Finder enabled, running calculateCutAway');
-            JumpPlanner.calculateCutAway();
+        console.log('Show Cut Away Finder set to:', checkbox.checked);
+
+        // Finde das zugehörige Untermenü
+        const submenu = checkbox.closest('li')?.querySelector('ul.submenu');
+
+        if (checkbox.checked) {
+            // *** HIER DIE KORREKTUR: ÖFFNE DAS SUBMENÜ ***
+            if (submenu) {
+                submenu.classList.remove('hidden');
+            }
         } else {
-            if (AppState.cutAwayCircle) {
-                if (AppState.map && typeof AppState.map.removeLayer === 'function') {
-                    AppState.map.removeLayer(AppState.cutAwayCircle);
-                } else {
-                    console.warn('Map not initialized, cannot remove cutAwayCircle');
-                }
-                AppState.cutAwayCircle = null;
-                console.log('Cleared cut-away circle');
+            // Wenn die Checkbox deaktiviert wird, räume alles auf.
+            if (submenu) {
+                submenu.classList.add('hidden');
             }
-            if (AppState.cutAwayMarker) {
-                if (AppState.map && typeof AppState.map.removeLayer === 'function') {
-                    AppState.map.removeLayer(AppState.cutAwayMarker);
-                } else {
-                    console.warn('Map not initialized, cannot remove cutAwayMarker');
-                }
-                AppState.cutAwayMarker = null;
-                console.log('Cleared cut-away marker');
-            }
+            mapManager.clearCutAwayMarker();
             AppState.cutAwayLat = null;
             AppState.cutAwayLng = null;
-            console.log('Cleared cutAwayLat and cutAwayLng');
+        }
+
+        // Rufe immer calculateJump auf. Die Funktion entscheidet, was zu tun ist.
+        if (AppState.weatherData && AppState.lastLat && AppState.lastLng && Settings.state.userSettings.calculateJump) {
+            calculateJump();
         }
     });
 
@@ -4944,6 +4870,35 @@ function setupAndHandleInput(inputId, settingName, isNumeric = true) {
         });
     }
 }
+function setupCutawayRadioButtons() {
+    const cutAwayRadios = document.querySelectorAll('input[name="cutAwayState"]');
+    if (cutAwayRadios.length === 0) return;
+
+    // Set the initial state from saved settings
+    const currentSetting = Settings.state.userSettings.cutAwayState || 'Partially';
+    const activeRadio = document.querySelector(`input[name="cutAwayState"][value="${currentSetting}"]`);
+    if (activeRadio) {
+        activeRadio.checked = true;
+    }
+
+    // Add event listeners
+    cutAwayRadios.forEach(radio => {
+        radio.addEventListener('change', () => {
+            if (radio.checked) {
+                console.log(`Cut Away State changed to: ${radio.value}`);
+
+                // 1. Save the new setting
+                Settings.state.userSettings.cutAwayState = radio.value;
+                Settings.save();
+
+                // 2. Trigger the recalculation and redraw
+                if (AppState.weatherData && AppState.lastLat && AppState.lastLng && Settings.state.userSettings.calculateJump) {
+                    calculateJump();
+                }
+            }
+        });
+    });
+}
 
 // Setup values
 function getSliderValue() {
@@ -5278,6 +5233,8 @@ document.addEventListener('DOMContentLoaded', () => {
         setupSliderEvents();
         setupCheckboxEvents();
         setupCoordinateEvents();
+        setupRadioEvents();
+        setupCutawayRadioButtons();
         setupDownloadEvents();
         setupResetButton();
         setupResetCutAwayMarkerButton();
@@ -5292,6 +5249,12 @@ document.addEventListener('DOMContentLoaded', () => {
         Utils.handleError("Map could not be loaded. Please refresh the page.");
     }
 
+    document.addEventListener('cutaway:marker_placed', () => {
+        console.log("App: Event 'cutaway:marker_placed' empfangen. Neuberechnung wird ausgelöst.");
+        if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
+            calculateJump();
+        }
+    });
     // NEU: track:dragend-Listener hier platzieren
     document.addEventListener('track:dragend', (event) => {
         console.log("App: Event 'track:dragend' empfangen. Neuberechnung der Offsets relativ zum DIP.");
