@@ -185,7 +185,7 @@ async function refreshMarkerPopup() {
     if (coordFormat === 'MGRS') {
         popupContent = `MGRS: ${coords.lat}<br>Alt: ${altitude} m`;
     } else {
-        const formatDMS = (dms) => `<span class="math-inline">\{dms\.deg\}°</span>{dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
+        const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
         if (coordFormat === 'DMS') {
             popupContent = `Lat: ${formatDMS(Utils.decimalToDms(lat, true))}<br>Lng: ${formatDMS(Utils.decimalToDms(lng, false))}<br>Alt: ${altitude} m`;
         } else {
@@ -2674,6 +2674,12 @@ export function visualizeFreeFallPath(path) {
     freeFallPolyline.bindPopup(`Free Fall Path<br>Duration: ${path[path.length - 1].time.toFixed(1)}s<br>Distance: ${Math.sqrt(path[path.length - 1].latLng[0] ** 2 + path[path.length - 1].latLng[1] ** 2).toFixed(1)}m`);
 }
 function calculateJump() {
+    if (!Settings.state.isCalculateJumpUnlocked || !Settings.state.userSettings.calculateJump) {
+        mapManager.drawJumpVisualization(null); // Alte Visualisierungen löschen
+        mapManager.drawCutAwayVisualization(null);
+        return;
+    }
+
     console.log('App: Starte Sprungberechnung und erstelle Bauanleitung...');
 
     if (!AppState.weatherData || !AppState.lastLat || !AppState.lastLng) {
@@ -2847,8 +2853,13 @@ export function calculateJumpRunTrack() {
 export function updateLandingPatternDisplay() {
 
     // --- TEIL A: DATEN SAMMELN UND PRÜFEN (1:1 aus Ihrer alten Funktion) ---
-    if (!Settings.state.userSettings.showLandingPattern || !AppState.weatherData || !AppState.lastLat) {
-        mapManager.drawLandingPattern(null); // Sagt dem Kellner: "Tisch abräumen"
+    if (!Settings.state.isLandingPatternUnlocked || !Settings.state.userSettings.showLandingPattern) {
+        mapManager.drawLandingPattern(null); // Alte Visualisierungen löschen
+        return;
+    }
+
+    if (!AppState.weatherData || !AppState.lastLat) {
+        mapManager.drawLandingPattern(null);
         return;
     }
 
@@ -3583,71 +3594,41 @@ function setupMenuEvents() {
         console.warn('Map not initialized, skipping setupMenuEvents');
         return;
     }
+    console.log("setupMenuEvents wird aufgerufen für allgemeine Menü-Logik.");
 
     const hamburgerBtn = document.getElementById('hamburgerBtn');
     const menu = document.getElementById('menu');
-    if (hamburgerBtn && menu) {
-        menu.classList.add('hidden');
-        console.log('Menu initialized as hidden on load');
 
+    if (hamburgerBtn && menu) {
+        // Hamburger-Button öffnet/schließt das gesamte Menü
         hamburgerBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            e.preventDefault();
             menu.classList.toggle('hidden');
-            const isHidden = menu.classList.contains('hidden');
-            if (isHidden) {
-                AppState.map.dragging.enable();
-                AppState.map.touchZoom.enable();
-                AppState.map.doubleClickZoom.enable();
-                AppState.map.scrollWheelZoom.enable();
-                AppState.map.boxZoom.enable();
-                AppState.map.keyboard.enable();
-                // Ensure map is interactive
-                document.querySelector('.leaflet-container').style.pointerEvents = 'auto';
-                reinitializeCoordsControl();
-                console.log('Map interactions restored and coordsControl reinitialized');
+        });
+
+        // Klick außerhalb des Menüs schließt es
+        document.addEventListener('click', (e) => {
+            if (!menu.contains(e.target) && !hamburgerBtn.contains(e.target)) {
+                menu.classList.add('hidden');
             }
         });
 
-        const menuItems = menu.querySelectorAll('li span');
-        menuItems.forEach(item => {
-            item.addEventListener('click', (e) => {
-                const submenu = item.nextElementSibling;
-                if (submenu && submenu.classList.contains('submenu')) {
-                    const isSubmenuHidden = submenu.classList.contains('hidden');
-                    const parentUl = item.closest('ul');
-                    parentUl.querySelectorAll('.submenu').forEach(otherSubmenu => {
-                        if (otherSubmenu !== submenu) {
-                            otherSubmenu.classList.add('hidden');
-                        }
-                    });
-                    submenu.classList.toggle('hidden', !isSubmenuHidden);
-                    console.log('Submenu toggled:', isSubmenuHidden ? 'shown' : 'hidden');
+        // Klicks auf die allgemeinen Menüpunkte (Labels/Spans) toggeln ihre Untermenüs
+        const menuToggles = menu.querySelectorAll('li > span:not(.menu-label), li > label');
+        menuToggles.forEach(toggle => {
+            // Ignoriere den speziellen "Calculate Jump"-Menüpunkt hier
+            if (toggle.textContent.trim().includes('Calculate Jump')) {
+                return;
+            }
+
+            toggle.addEventListener('click', (event) => {
+                const submenu = toggle.parentElement.querySelector('ul.submenu');
+                if (submenu) {
+                    event.stopPropagation(); // Verhindert, dass der Klick das Hauptmenü schließt
+                    submenu.classList.toggle('hidden');
                 }
-                e.stopPropagation();
             });
         });
-
-        menu.addEventListener('click', (e) => {
-            e.stopPropagation();
-        });
-
-        document.addEventListener('click', (e) => {
-            if (!menu.contains(e.target) && !hamburgerBtn.contains(e.target) && !menu.classList.contains('hidden')) {
-                menu.classList.add('hidden');
-                AppState.map.dragging.enable();
-                AppState.map.touchZoom.enable();
-                AppState.map.doubleClickZoom.enable();
-                AppState.map.scrollWheelZoom.enable();
-                AppState.map.boxZoom.enable();
-                AppState.map.keyboard.enable();
-                document.querySelector('.leaflet-container').style.pointerEvents = 'auto';
-                reinitializeCoordsControl();
-                console.log('Menu closed, map interactions restored, coordsControl reinitialized');
-            }
-        });
-    } else {
-        console.warn('Hamburger button or menu not found');
     }
 }
 function setupRadioEvents() {
@@ -3748,9 +3729,12 @@ function setupRadioEvents() {
         updateAllDisplays();
     });
     setupRadioGroup('coordFormat', () => {
-        Coordinates.updateCoordInputs(Settings.state.userSettings.coordFormat, AppState.lastLat, AppState.lastLng);
+        // Die fehlerhafte Zeile wurde entfernt.
+        // Die Funktion `updateCoordInputs` existiert im `Coordinates`-Modul nicht mehr.
+
+        // Korrekter Aufruf, um das Marker-Popup zu aktualisieren.
         if (AppState.lastLat && AppState.lastLng) {
-            refreshMarkerPopup(AppState.currentMarker, AppState.lastLat, AppState.lastLng, AppState.lastAltitude, AppState.currentMarker.getPopup()?.isOpen() || false);
+            refreshMarkerPopup();
         }
     });
     setupRadioGroup('downloadFormat', () => {
@@ -4583,7 +4567,10 @@ function setupTrackEvents() {
         trackFileInput.addEventListener('change', async (e) => {
             const file = e.target.files[0];
             console.log('[app.js] Track file selected:', file?.name);
-            if (!file) { /* istanbul ignore next */ Utils.handleError('No file selected.'); return; }
+            if (!file) {
+                Utils.handleError('No file selected.');
+                return;
+            }
 
             const extension = file.name.split('.').pop().toLowerCase();
             let trackMetaData = null;
@@ -4591,56 +4578,61 @@ function setupTrackEvents() {
             if (extension === 'gpx') {
                 trackMetaData = await loadGpxTrack(file);
             } else if (extension === 'csv') {
-                trackMetaData = await loadCsvTrackUTC(file); // Oder loadCsvTrack, je nach Bedarf
+                trackMetaData = await loadCsvTrackUTC(file);
             } else {
                 Utils.handleError('Unsupported file type. Please upload a .gpx or .csv file.');
                 return;
             }
 
-            if (trackMetaData && trackMetaData.success) {
-                console.log('[app.js] Track processed successfully by trackManager. MetaData:', trackMetaData);
+            // --- HIER IST DIE KORREKTUR ---
+            if (trackMetaData && trackMetaData.success && trackMetaData.finalPointData) {
+                console.log('[app.js] Track processed. Updating marker and fetching weather for new location.');
+
+                const { lat, lng } = trackMetaData.finalPointData;
+
+                // 1. Marker auf die letzte Track-Position setzen
+                await mapManager.createOrUpdateMarker(lat, lng);
+
+                // 2. Wetterdaten für die neue Position abrufen (damit die Zeitslider-Logik konsistent bleibt)
+                // Wir übergeben die Zeit vom letzten Modelllauf, um den Kontext beizubehalten.
+                const currentTime = AppState.weatherData?.time?.[getSliderValue()] || null;
+                await fetchWeatherForLocation(lat, lng, currentTime);
+
+                // 3. Alle relevanten Anzeigen und Berechnungen aktualisieren
+                if (Settings.state.isCalculateJumpUnlocked && Settings.state.userSettings.calculateJump) {
+                    calculateJump();
+                }
+                if (Settings.state.isLandingPatternUnlocked && Settings.state.userSettings.showLandingPattern) {
+                    updateLandingPatternDisplay();
+                }
+
+                // 4. UI mit Track-Informationen aktualisieren
+                const infoEl = document.getElementById('info');
+                if (infoEl && trackMetaData.summaryForInfoElement) {
+                    const modelDisplayRegex = /(<br><strong>Available Models:<\/strong><ul>.*?<\/ul>|<br><strong>Available Models:<\/strong> None)/s;
+                    const currentInfoHTML = infoEl.innerHTML;
+                    const modelInfoMatch = currentInfoHTML.match(modelDisplayRegex);
+                    const baseInfo = modelInfoMatch ? modelInfoMatch[0] : '';
+                    const oldTrackInfoRegex = /<br><strong>Track:<\/strong>.*?\(Source:.*?\)/s;
+                    let newInfoHTML = currentInfoHTML.replace(modelDisplayRegex, '').replace(oldTrackInfoRegex, '').trim();
+                    if (newInfoHTML.startsWith('Click on the map')) newInfoHTML = '';
+
+                    infoEl.innerHTML = (newInfoHTML ? newInfoHTML + "<br>" : "") + trackMetaData.summaryForInfoElement + baseInfo;
+                }
+                // Historisches Datum setzen, falls vorhanden
                 if (trackMetaData.historicalDateString) {
                     const historicalDatePicker = document.getElementById('historicalDatePicker');
                     if (historicalDatePicker) {
                         historicalDatePicker.value = trackMetaData.historicalDateString;
-                        console.log('[app.js] Set historicalDatePicker to:', historicalDatePicker.value);
-                        // Ggf. Autoupdate deaktivieren, wenn ein historisches Datum gesetzt wird
-                        if (Settings.state.userSettings.autoupdate) {
-                            stopAutoupdate();
-                            const autoupdateCheckbox = document.getElementById('autoupdateCheckbox');
-                            if (autoupdateCheckbox) autoupdateCheckbox.checked = false;
-                            Settings.state.userSettings.autoupdate = false;
-                            Settings.save();
-                            Utils.handleMessage('Autoupdate disabled due to historical track upload.');
-                        }
                     }
-                }
-                const infoEl = document.getElementById('info');
-                if (infoEl && trackMetaData.summaryForInfoElement) {
-                    // Logik zum intelligenten Aktualisieren des Info-Bereichs
-                    const modelDisplayRegex = /(<br><strong>Available Models:<\/strong><ul>.*?<\/ul>|<br><strong>Available Models:<\/strong> None)/s;
-                    const currentInfoHTML = infoEl.innerHTML;
-                    const modelInfoMatch = currentInfoHTML.match(modelDisplayRegex);
-                    const baseInfo = modelInfoMatch ? modelInfoMatch[0] : ''; // Behalte Modellinfos
-
-                    // Entferne alte Track-Infos, falls vorhanden (heuristisch)
-                    const oldTrackInfoRegex = /<br><strong>Track:<\/strong>.*?\(Source:.*?\)/s;
-                    let newInfoHTML = currentInfoHTML.replace(modelDisplayRegex, '').replace(oldTrackInfoRegex, '').trim();
-                    if (newInfoHTML === 'Click on the map to fetch weather data.' || newInfoHTML === 'No weather data.' || newInfoHTML === 'No models available at this location.' || newInfoHTML === 'Failed to load weather data.' || newInfoHTML === 'No weather model selected.') {
-                        newInfoHTML = ''; // Leere Standardnachrichten, um Platz für Trackinfo zu machen
-                    }
-
-                    infoEl.innerHTML = (newInfoHTML ? newInfoHTML + "<br>" : "") + trackMetaData.summaryForInfoElement + baseInfo;
                 }
             } else if (trackMetaData && !trackMetaData.success) {
-                /* istanbul ignore next */
-                console.warn('[app.js] Track processing in trackManager reported an error:', trackMetaData.error);
+                console.warn('[app.js] Track processing reported an error:', trackMetaData.error);
             } else {
-                /* istanbul ignore next */
-                console.warn('[app.js] Track processing did not return valid metadata or failed silently in trackManager.');
+                console.warn('[app.js] Track processing did not return valid metadata.');
             }
         });
-    } else { /* istanbul ignore next */ console.warn('Track file input (#trackFileInput) not found.'); }
+    }
 
     const clearTrackButton = document.getElementById('clearTrack');
     if (clearTrackButton) {
@@ -4968,105 +4960,48 @@ function toggleSubmenu(element, submenu, isVisible) {
     }
 }
 function setupMenuItemEvents() {
+    console.log("setupMenuItemEvents wird aufgerufen für 'Calculate Jump'.");
     const calculateJumpMenuItem = Array.from(document.querySelectorAll('.menu-label'))
         .find(item => item.textContent.trim() === 'Calculate Jump');
 
     if (!calculateJumpMenuItem) {
         console.error('Calculate Jump menu item not found');
-        const menuItems = document.querySelectorAll('.hamburger-menu .menu-label');
-        console.log('Available menu labels:', Array.from(menuItems).map(item => item.textContent.trim()));
         return;
     }
 
-    calculateJumpMenuItem.setAttribute('data-label', 'calculateJump');
-    console.log('Found Calculate Jump menu item:', calculateJumpMenuItem);
+    const submenu = calculateJumpMenuItem.closest('li').querySelector('ul.submenu');
 
-    // Initialize visual state based on lock status
-    if (!(Settings.isFeatureUnlocked('calculateJump') && Settings.state.isCalculateJumpUnlocked)) {
-        calculateJumpMenuItem.style.opacity = '0.5';
-        calculateJumpMenuItem.title = 'Feature locked. Click to enter password.';
-    } else {
-        calculateJumpMenuItem.style.opacity = '1';
-        calculateJumpMenuItem.title = '';
-    }
-
-    // Remove any existing click handlers to prevent duplicates
-    calculateJumpMenuItem.removeEventListener('click', calculateJumpMenuItem._clickHandler);
-    calculateJumpMenuItem._clickHandler = (event) => {
-        event.stopPropagation();
-        event.preventDefault();
-        const parentLi = calculateJumpMenuItem.closest('li');
-        const submenu = parentLi?.querySelector('ul');
-        const enableFeature = () => {
-            // Diese Funktion wird aufgerufen, wenn das Submenü geöffnet wird
-            // oder die Funktion nach Passworteingabe aktiviert wird.
-            // Hier sollte Settings.state.userSettings.calculateJump ggf. auf true gesetzt werden,
-            // falls es vorher explizit deaktiviert wurde.
-            if (!Settings.state.userSettings.calculateJump && Settings.isFeatureUnlocked('calculateJump')) {
-                Settings.state.userSettings.calculateJump = true;
-                Settings.save();
-            }
-            toggleSubmenu(calculateJumpMenuItem, submenu, true);
-            // calculateJump() nur aufrufen, wenn auch wirklich Daten/Marker da sind und die relevanten Unter-Checkboxen aktiv sind.
-            // Die Unter-Checkboxen (showExitArea, showCanopyArea) steuern dann die eigentliche Visualisierung.
-            // Ein direkter Aufruf von calculateJump() hier ist vielleicht nicht nötig, da die Checkbox-Handler das tun.
-            // Stattdessen die bestehenden Visualisierungen basierend auf den Checkbox-Status neu rendern:
-            if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
-                if (Settings.state.userSettings.showExitArea || Settings.state.userSettings.showCanopyArea) {
-                    calculateJump(); // Dies berücksichtigt die Checkboxen
-                }
-                if (Settings.state.userSettings.showCutAwayFinder) {
-                    JumpPlanner.calculateCutAway();
-                }
-                if (Settings.state.userSettings.showJumpRunTrack) {
-                    updateJumpRunTrackDisplay();
-                }
-            }
+    const setVisualLockState = () => {
+        if (Settings.isFeatureUnlocked('calculateJump')) {
             calculateJumpMenuItem.style.opacity = '1';
-            calculateJumpMenuItem.title = '';
-        };
+            calculateJumpMenuItem.title = 'Click to open/close jump calculation settings';
+        } else {
+            calculateJumpMenuItem.style.opacity = '0.5';
+            calculateJumpMenuItem.title = 'Feature locked. Click to enter password.';
+            if (submenu) submenu.classList.add('hidden');
+        }
+    };
 
-        const disableFeatureOrToggleSubmenu = (isClosingMenu) => {
-            toggleSubmenu(calculateJumpMenuItem, submenu, !isClosingMenu); // !isClosingMenu, da es das Submenü schließt
+    setVisualLockState(); // Setzt den initialen Zustand
 
-            // Die Kreise etc. bleiben basierend auf ihren Checkboxen sichtbar.
-            // Nichts weiter zu tun hier, außer das Menü zu schließen.
-            // Die Opacity/Title Logik für den "Calculate Jump" Menüpunkt sollte nur die Passwort-Sperre reflektieren.
-            if (!(Settings.isFeatureUnlocked('calculateJump') && Settings.state.isCalculateJumpUnlocked)) {
-                calculateJumpMenuItem.style.opacity = '0.5';
-                calculateJumpMenuItem.title = 'Feature locked. Click to enter password.';
-            } else {
-                calculateJumpMenuItem.style.opacity = '1';
-                calculateJumpMenuItem.title = '';
-            }
-        };
+    calculateJumpMenuItem.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
 
-        calculateJumpMenuItem._clickHandler = (event) => {
-            event.stopPropagation();
-            event.preventDefault();
-            // const parentLi = calculateJumpMenuItem.closest('li'); // Ist schon oben
-            // const submenu = parentLi?.querySelector('ul'); // Ist schon oben
-
-            if (!Settings.isFeatureUnlocked('calculateJump')) {
-                Settings.showPasswordModal('calculateJump', enableFeature, () => {
-                    if (submenu) toggleSubmenu(calculateJumpMenuItem, submenu, false); // Schließe Submenü bei Abbruch
-                });
-            } else {
-                // Wenn die Funktion freigeschaltet ist, toggelt der Klick nur das Submenü
-                // und ruft die entsprechende Funktion zum Öffnen oder Schließen auf.
-                if (submenu) {
-                    const isSubmenuHidden = submenu.classList.contains('hidden');
-                    if (isSubmenuHidden) { // Wird geöffnet
-                        enableFeature(); // Stellt sicher, dass calculateJump = true ist, falls es mal deaktiviert war
-                    } else { // Wird geschlossen
-                        disableFeatureOrToggleSubmenu(true); // true bedeutet, wir schließen das Menü
-                    }
+        if (Settings.isFeatureUnlocked('calculateJump')) {
+            if (submenu) submenu.classList.toggle('hidden');
+        } else {
+            Settings.showPasswordModal('calculateJump',
+                () => { // onSuccess
+                    setVisualLockState();
+                    if (submenu) submenu.classList.remove('hidden');
+                },
+                () => { // onCancel
+                    setVisualLockState();
                 }
-            }
-        };
-
-        calculateJumpMenuItem.addEventListener('click', calculateJumpMenuItem._clickHandler, { capture: true }); console.log('Attached click handler to Calculate Jump menu item with capture phase');
-    }
+            );
+        }
+    });
 }
 function setupRadioGroup(name, callback) {
     const radios = document.querySelectorAll(`input[name="${name}"]`);
@@ -5228,12 +5163,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // 3. Erst wenn die Karte garantiert existiert, die abhängigen Funktionen aufrufen.
     if (mapInstance) {
         console.log("App: Karte ist bereit, richte abhängige Events ein.");
-        setupMapEventListeners(); // Ihr neuer Listener für Karten-Events
-        setupMenuEvents();
+        setupMapEventListeners();
+        setupMenuEvents(); // Für das allgemeine Menü-Toggling
+        setupMenuItemEvents(); // <<-- HIER IST DER ENTSCHEIDENDE, KORREKTE AUFRUF
         setupSliderEvents();
         setupCheckboxEvents();
         setupCoordinateEvents();
         setupRadioEvents();
+        setupInputEvents();
         setupCutawayRadioButtons();
         setupDownloadEvents();
         setupResetButton();
@@ -5244,6 +5181,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setupCacheSettings({ map: AppState.map, lastLat: AppState.lastLat, lastLng: AppState.lastLng, baseMaps: AppState.baseMaps });
         setupAutoupdate();
         setupJumpRunTrackEvents();
+        initializeLocationSearch();
     } else {
         console.error("App: Karteninitialisierung ist fehlgeschlagen. UI-Events werden nicht eingerichtet.");
         Utils.handleError("Map could not be loaded. Please refresh the page.");
@@ -5305,34 +5243,46 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('location:selected', async (event) => {
         const { lat, lng, source } = event.detail;
         console.log(`App: Event 'map:location_selected' empfangen. Quelle: ${source}, Koordinaten:`, { lat, lng });
+
         try {
-            console.log('App: Rufe createOrUpdateMarker auf...');
-            await mapManager.createOrUpdateMarker(lat, lng);
-            console.log('App: createOrUpdateMarker abgeschlossen.');
-            Coordinates.updateCurrentMarkerPosition(lat, lng);
-            if (event.detail.source !== 'marker_drag') {
-                Coordinates.addCoordToHistory(lat, lng);
+            // KORREKTUR 1: Zeit nur erhalten, wenn bereits Wetterdaten vorhanden sind.
+            // Das stellt sicher, dass der initiale Ladevorgang nicht gestört wird.
+            const sliderIndex = getSliderValue();
+            let currentTimeToPreserve = null;
+            if (AppState.weatherData && AppState.weatherData.time?.length > sliderIndex) {
+                currentTimeToPreserve = AppState.weatherData.time[sliderIndex];
+                console.log(`Bestehende Zeit wird für den neuen Ort beibehalten: ${currentTimeToPreserve}`);
             }
+
+            // Marker und UI-Elemente aktualisieren
+            await mapManager.createOrUpdateMarker(lat, lng);
+            Coordinates.updateCurrentMarkerPosition(lat, lng);
+            if (source !== 'marker_drag') {
+                Coordinates.addCoordToHistory(lat, lng, `Location at ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+            }
+
+            // Wetterdaten abrufen (übergibt die erhaltene Zeit, wenn vorhanden)
             resetJumpRunDirection(true);
-            await fetchWeatherForLocation(lat, lng);
-            if (Settings.state.userSettings.calculateJump) {
+            await fetchWeatherForLocation(lat, lng, currentTimeToPreserve);
+
+            // KORREKTUR 2: Funktionsaufrufe an Passwort-Freischaltung koppeln.
+            // Die Berechnungen werden nur ausgeführt, wenn das Feature freigeschaltet UND in den Einstellungen aktiv ist.
+            if (Settings.state.isCalculateJumpUnlocked && Settings.state.userSettings.calculateJump) {
                 calculateJump();
             }
-            // NEU: Zeichne JRT, wenn showJumpRunTrack aktiviert ist
-            if (Settings.state.userSettings.showJumpRunTrack && Settings.state.isCalculateJumpUnlocked && Settings.state.userSettings.calculateJump) {
-                console.log('App: showJumpRunTrack ist aktiviert, rufe updateJumpRunTrackDisplay auf');
-                updateJumpRunTrackDisplay();
+            if (Settings.state.isLandingPatternUnlocked && Settings.state.userSettings.showLandingPattern) {
+                updateLandingPatternDisplay();
             }
+
             mapManager.recenterMap(true);
             AppState.isManualPanning = false;
+
         } catch (error) {
-            console.error('Fehler beim Verarbeiten von "map:location_selected":', error);
+            console.error('Fehler beim Verarbeiten von "location:selected":', error);
             Utils.handleError(error.message);
         }
     });
 
-
-    // --- FÜGEN SIE DIESEN NEUEN LISTENER HINZU ---
     document.addEventListener('map:zoomend', (event) => {
         console.log("App: Event 'map:zoomend' empfangen.");
 
