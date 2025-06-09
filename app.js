@@ -2695,6 +2695,7 @@ function calculateJump() {
     if (Settings.state.userSettings.showExitArea) {
         const exitResult = JumpPlanner.calculateExitCircle();
         if (exitResult) {
+            // Der hellgrüne Kreis (gesamter möglicher Bereich)
             visualizationData.exitCircles.push({
                 center: [exitResult.greenLat, exitResult.greenLng],
                 radius: exitResult.greenRadius,
@@ -2703,13 +2704,23 @@ function calculateJump() {
                 fillOpacity: 0.2,
                 weight: 2
             });
+
+            // Erstellen des Tooltip-Inhalts
+            const tooltipContent = `
+                Exit areas calculated with:<br>
+                Throw/Drift: ${Number.isFinite(exitResult.freeFallDirection) ? Math.round(exitResult.freeFallDirection) : 'N/A'}° ${Number.isFinite(exitResult.freeFallDistance) ? Math.round(exitResult.freeFallDistance) : 'N/A'} m<br>
+                Free Fall Time: ${exitResult.freeFallTime != null && !isNaN(exitResult.freeFallTime) ? Math.round(exitResult.freeFallTime) : 'N/A'} sec
+            `;
+
+            // Der dunkelgrüne Kreis (Bereich bis zum Downwind) bekommt den Tooltip
             visualizationData.exitCircles.push({
                 center: [exitResult.darkGreenLat, exitResult.darkGreenLng],
                 radius: exitResult.darkGreenRadius,
                 color: 'darkgreen',
                 fillColor: 'darkgreen',
                 fillOpacity: 0.2,
-                weight: 2
+                weight: 2,
+                tooltip: tooltipContent // Hier wird der Tooltip hinzugefügt
             });
         }
     }
@@ -3539,43 +3550,22 @@ function setupModelSelectEvents() {
     // Handle changes
     modelSelect.addEventListener('change', async () => {
         console.log('Model select changed to:', modelSelect.value);
+
+        // Speichere die neue Modellauswahl direkt in den Einstellungen
+        Settings.state.userSettings.model = modelSelect.value;
+        Settings.save();
+
         if (AppState.lastLat && AppState.lastLng) {
+            // Behalte die aktuell ausgewählte Zeit bei
             const currentIndex = getSliderValue();
             const currentTime = AppState.weatherData?.time?.[currentIndex] || null;
-            document.getElementById('info').innerHTML = `Fetching weather with ${modelSelect.value}...`;
-            resetJumpRunDirection(false);
-            await fetchWeather(AppState.lastLat, AppState.lastLng, currentTime);
-            Settings.updateModelRunInfo(AppState.lastModelRun, AppState.lastLat, AppState.lastLng);
-            await updateWeatherDisplay(currentIndex);
-            Settings.updateUnitLabels();
 
-            if (AppState.lastAltitude !== 'N/A') {
-                calculateMeanWind();
-                if (Settings.state.userSettings.calculateJump) {
-                    console.log('Recalculating jump for model change');
-                    debouncedCalculateJump(); // Use debounced version
-                    JumpPlanner.calculateCutAway();
-                }
-            }
-            if (Settings.state.userSettings.showJumpRunTrack) {
-                console.log('Updating JRT for model change');
-                updateJumpRunTrackDisplay();
-            }
-            if (AppState.currentMarker) {
-                console.log('Updating marker popup for model change');
-                const wasOpen = AppState.currentMarker.getPopup()?.isOpen() || false;
-                await refreshMarkerPopup(AppState.currentMarker, AppState.lastLat, AppState.lastLng, AppState.lastAltitude, wasOpen);
-            }
-            if (AppState.cutAwayMarker && AppState.cutAwayLat && AppState.cutAwayLng) {
-                console.log('Updating cut-away marker popup for model change');
-                const wasOpen = AppState.cutAwayMarker.getPopup()?.isOpen() || false;
-                updateCutAwayMarkerPopup(AppState.cutAwayMarker, AppState.cutAwayLat, AppState.cutAwayLng, wasOpen);
-            }
+            // Rufe die zentrale Funktion auf, die den gesamten Prozess steuert
+            await fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, currentTime);
+
         } else {
             Utils.handleError('Please select a position on the map first.');
         }
-        Settings.state.userSettings.model = modelSelect.value;
-        Settings.save();
     });
 }
 function setupDownloadEvents() {
@@ -3608,7 +3598,7 @@ function setupMenuEvents() {
     menu.addEventListener('click', (event) => {
         // Wir interessieren uns nur für das Element, das direkt geklickt wurde.
         const target = event.target;
-        
+
         // Prüfe, ob das geklickte Element (oder sein direktes Elternelement)
         // eine Menü-Überschrift ist. Das schließt tiefere Elemente wie Buttons aus.
         const isToggleLabel = target.matches('li > span') || target.matches('li > label');
@@ -5159,6 +5149,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setupMapEventListeners();
         setupMenuEvents(); // Für das allgemeine Menü-Toggling
         setupMenuItemEvents();
+        setupModelSelectEvents();
         setupSliderEvents();
         setupCheckboxEvents();
         setupCoordinateEvents(); // HIER wird initializeLocationSearch aufgerufen

@@ -548,13 +548,22 @@ export function drawJumpVisualization(jumpData) {
     // Zeichne Exit-Kreise
     if (jumpData.exitCircles) {
         jumpData.exitCircles.forEach(circleInfo => {
-            L.circle(circleInfo.center, {
+            const circleLayer = L.circle(circleInfo.center, {
                 radius: circleInfo.radius,
                 color: circleInfo.color,
                 fillColor: circleInfo.fillColor,
                 fillOpacity: circleInfo.fillOpacity,
                 weight: circleInfo.weight || 2
             }).addTo(jumpVisualizationLayerGroup);
+
+            // NEU: Wenn eine Tooltip-Information vorhanden ist, binde sie.
+            if (circleInfo.tooltip) {
+                circleLayer.bindTooltip(circleInfo.tooltip, {
+                    direction: 'top',
+                    offset: [0, 0],
+                    className: 'wind-tooltip'
+                });
+            }
         });
     }
 
