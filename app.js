@@ -1022,9 +1022,9 @@ async function fetchWeatherForLocation(lat, lng, currentTime = null, isInitialLo
             Settings.updateModelRunInfo(AppState.lastModelRun, AppState.lastLat, AppState.lastLng);
             if (AppState.lastAltitude !== 'N/A') {
                 calculateMeanWind();
-                if (Settings.state.userSettings.calculateJump) { 
-                    debouncedCalculateJump(); 
-                    JumpPlanner.calculateCutAway(); 
+                if (Settings.state.userSettings.calculateJump) {
+                    debouncedCalculateJump();
+                    JumpPlanner.calculateCutAway();
                 }
             }
             if (Settings.state.userSettings.showLandingPattern) updateLandingPatternDisplay();
@@ -2704,7 +2704,7 @@ function calculateJump() {
     // --- EXIT AREA ---
     if (Settings.state.userSettings.showExitArea) {
         const exitResult = JumpPlanner.calculateExitCircle(interpolatedData); // Korrekt
-         if (exitResult) {
+        if (exitResult) {
             // Der hellgrüne Kreis (gesamter möglicher Bereich)
             visualizationData.exitCircles.push({
                 center: [exitResult.greenLat, exitResult.greenLng],
@@ -2772,7 +2772,7 @@ function calculateJump() {
     mapManager.drawJumpVisualization(visualizationData);
 
     // --- CUT-AWAY-FINDER ---
-    let cutawayDrawData = null; 
+    let cutawayDrawData = null;
     if (Settings.state.userSettings.showCutAwayFinder && AppState.cutAwayLat !== null) {
         const result = JumpPlanner.calculateCutAway(interpolatedData); // Daten übergeben
         if (result) {
@@ -4560,73 +4560,39 @@ function setupCheckbox(id, setting, callback) {
 function setupTrackEvents() {
     console.log('[app.js] Setting up track events');
     const trackFileInput = document.getElementById('trackFileInput');
+    const loadingElement = document.getElementById('loading'); // Deklarieren wir die Variable hier einmal zentral.
+
     if (trackFileInput) {
         trackFileInput.addEventListener('change', async (e) => {
             const file = e.target.files[0];
-            console.log('[app.js] Track file selected:', file?.name);
+            
+            // 1. Spinner hier anzeigen, wenn eine Datei ausgewählt wird.
+            if (loadingElement) {
+                loadingElement.style.display = 'block';
+            }
+
             if (!file) {
                 Utils.handleError('No file selected.');
+                if (loadingElement) loadingElement.style.display = 'none'; // Bei Fehler sofort ausblenden
                 return;
             }
 
             const extension = file.name.split('.').pop().toLowerCase();
             let trackMetaData = null;
 
-            if (extension === 'gpx') {
-                trackMetaData = await loadGpxTrack(file);
-            } else if (extension === 'csv') {
-                trackMetaData = await loadCsvTrackUTC(file);
-            } else {
-                Utils.handleError('Unsupported file type. Please upload a .gpx or .csv file.');
-                return;
-            }
-
-            // --- HIER IST DIE KORREKTUR ---
-            if (trackMetaData && trackMetaData.success && trackMetaData.finalPointData) {
-                console.log('[app.js] Track processed. Updating marker and fetching weather for new location.');
-
-                const { lat, lng } = trackMetaData.finalPointData;
-
-                // 1. Marker auf die letzte Track-Position setzen
-                await mapManager.createOrUpdateMarker(lat, lng);
-
-                // 2. Wetterdaten für die neue Position abrufen (damit die Zeitslider-Logik konsistent bleibt)
-                // Wir übergeben die Zeit vom letzten Modelllauf, um den Kontext beizubehalten.
-                const currentTime = AppState.weatherData?.time?.[getSliderValue()] || null;
-                await fetchWeatherForLocation(lat, lng, currentTime);
-
-                // 3. Alle relevanten Anzeigen und Berechnungen aktualisieren
-                if (Settings.state.isCalculateJumpUnlocked && Settings.state.userSettings.calculateJump) {
-                    calculateJump();
+            try {
+                if (extension === 'gpx') {
+                    trackMetaData = await loadGpxTrack(file);
+                } else if (extension === 'csv') {
+                    trackMetaData = await loadCsvTrackUTC(file);
+                } else {
+                    Utils.handleError('Unsupported file type. Please upload a .gpx or .csv file.');
+                    if (loadingElement) loadingElement.style.display = 'none'; // Bei Fehler sofort ausblenden
                 }
-                if (Settings.state.isLandingPatternUnlocked && Settings.state.userSettings.showLandingPattern) {
-                    updateLandingPatternDisplay();
-                }
-
-                // 4. UI mit Track-Informationen aktualisieren
-                const infoEl = document.getElementById('info');
-                if (infoEl && trackMetaData.summaryForInfoElement) {
-                    const modelDisplayRegex = /(<br><strong>Available Models:<\/strong><ul>.*?<\/ul>|<br><strong>Available Models:<\/strong> None)/s;
-                    const currentInfoHTML = infoEl.innerHTML;
-                    const modelInfoMatch = currentInfoHTML.match(modelDisplayRegex);
-                    const baseInfo = modelInfoMatch ? modelInfoMatch[0] : '';
-                    const oldTrackInfoRegex = /<br><strong>Track:<\/strong>.*?\(Source:.*?\)/s;
-                    let newInfoHTML = currentInfoHTML.replace(modelDisplayRegex, '').replace(oldTrackInfoRegex, '').trim();
-                    if (newInfoHTML.startsWith('Click on the map')) newInfoHTML = '';
-
-                    infoEl.innerHTML = (newInfoHTML ? newInfoHTML + "<br>" : "") + trackMetaData.summaryForInfoElement + baseInfo;
-                }
-                // Historisches Datum setzen, falls vorhanden
-                if (trackMetaData.historicalDateString) {
-                    const historicalDatePicker = document.getElementById('historicalDatePicker');
-                    if (historicalDatePicker) {
-                        historicalDatePicker.value = trackMetaData.historicalDateString;
-                    }
-                }
-            } else if (trackMetaData && !trackMetaData.success) {
-                console.warn('[app.js] Track processing reported an error:', trackMetaData.error);
-            } else {
-                console.warn('[app.js] Track processing did not return valid metadata.');
+            } catch (error) {
+                console.error('Error during track file processing:', error);
+                Utils.handleError('Failed to process track file.');
+                if (loadingElement) loadingElement.style.display = 'none'; // Bei Fehler sofort ausblenden
             }
         });
     }
@@ -4634,27 +4600,64 @@ function setupTrackEvents() {
     const clearTrackButton = document.getElementById('clearTrack');
     if (clearTrackButton) {
         clearTrackButton.addEventListener('click', () => {
-            console.log('[app.js] Clear track button clicked');
-            if (!AppState.map) { /* istanbul ignore next */ Utils.handleError('Cannot clear track: map not initialized.'); return; }
+            if (!AppState.map) { Utils.handleError('Cannot clear track: map not initialized.'); return; }
             if (AppState.gpxLayer) {
                 try {
                     if (AppState.map.hasLayer(AppState.gpxLayer)) AppState.map.removeLayer(AppState.gpxLayer);
                     AppState.gpxLayer = null; AppState.gpxPoints = []; AppState.isTrackLoaded = false;
-                    console.log('[app.js] Cleared track from map and AppState');
-
                     const infoElement = document.getElementById('info');
                     if (infoElement) {
                         const modelDisplayRegex = /(<br><strong>Available Models:<\/strong><ul>.*?<\/ul>|<br><strong>Available Models:<\/strong> None)/s;
                         const currentInfoHTML = infoElement.innerHTML;
                         const modelInfoMatch = currentInfoHTML.match(modelDisplayRegex);
-                        const baseMessage = 'Click on the map to fetch weather data.';
-                        infoElement.innerHTML = baseMessage + (modelInfoMatch ? modelInfoMatch[0] : '');
+                        infoElement.innerHTML = 'Click on the map to fetch weather data.' + (modelInfoMatch ? modelInfoMatch[0] : '');
                     }
-                    if (trackFileInput) trackFileInput.value = ''; // Eingabefeld zurücksetzen
-                } catch (error) { /* istanbul ignore next */ Utils.handleError('Failed to clear track: ' + error.message); }
+                    if (trackFileInput) trackFileInput.value = '';
+                } catch (error) { Utils.handleError('Failed to clear track: ' + error.message); }
             } else { Utils.handleMessage('No track to clear.'); }
         });
-    } else { /* istanbul ignore next */ console.warn('Clear track button (#clearTrack) not found.'); }
+    }
+    
+    // Listener für das "track:loaded"-Event
+    if (AppState.map) {
+        AppState.map.getContainer().addEventListener('track:loaded', async (event) => {
+            // Die Variable `loadingElement` ist hier jetzt dank der Deklaration oben verfügbar.
+            try {
+                const { lat, lng, timestamp, historicalDate, summary } = event.detail;
+                console.log('Event "track:loaded" empfangen, starte Aktionen.');
+                
+                await mapManager.createOrUpdateMarker(lat, lng);
+                
+                // 2. WICHTIG: Wir WARTEN hier, bis der langsame Wetterabruf komplett fertig ist.
+                await fetchWeatherForLocation(lat, lng, timestamp);
+
+                // Erst danach die restlichen UI-Updates durchführen
+                if (Settings.state.isCalculateJumpUnlocked && Settings.state.userSettings.calculateJump) calculateJump();
+                if (Settings.state.isLandingPatternUnlocked && Settings.state.userSettings.showLandingPattern) updateLandingPatternDisplay();
+                
+                const infoEl = document.getElementById('info');
+                if (infoEl && summary) {
+                    const modelDisplayRegex = /(<br><strong>Available Models:<\/strong><ul>.*?<\/ul>|<br><strong>Available Models:<\/strong> None)/s;
+                    const modelInfoMatch = infoEl.innerHTML.match(modelDisplayRegex);
+                    infoEl.innerHTML = summary + (modelInfoMatch ? modelInfoMatch[0] : '');
+                }
+                
+                if (historicalDate) {
+                    const historicalDatePicker = document.getElementById('historicalDatePicker');
+                    if (historicalDatePicker) historicalDatePicker.value = historicalDate;
+                }
+
+            } catch (error) {
+                console.error('Fehler bei der Verarbeitung von track:loaded:', error);
+                Utils.handleError('Konnte Track-Daten nicht vollständig verarbeiten.');
+            } finally {
+                // 3. Der Spinner wird jetzt zuverlässig GANZ AM ENDE ausgeblendet.
+                if (loadingElement) {
+                    loadingElement.style.display = 'none';
+                }
+            }
+        });
+    }
 }
 function setupResetButton() {
     const bottomContainer = document.getElementById('bottom-container');

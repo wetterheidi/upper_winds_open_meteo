@@ -1,13 +1,4 @@
 import { AppState } from './state.js';
-import {
-    fetchWeatherForLocation,
-    debouncedCalculateJump,
-    updateJumpRunTrackDisplay,
-    updateLandingPatternDisplay,
-    getCoordinateFormat,
-    getWindSpeedUnit,
-    getHeightUnit
-} from './app.js';
 import { calculateCutAway } from "./jumpPlanner.js";
 import { Settings } from "./settings.js";
 import { Utils } from "./utils.js";
@@ -16,19 +7,22 @@ import { attachMarkerDragend, createCustomMarker, updatePopupContent } from './m
 "use strict";
 
 
-function getTooltipContent(point, index, points, groundAltitude, windUnit, heightUnit) {
+function getTooltipContent(point, index, points, groundAltitude) { // Entferne windUnit und heightUnit aus den Parametern
     if (!AppState.map) {
         console.warn('Map not initialized for getTooltipContent');
         return 'Map not initialized';
     }
 
-    const currentCoordFormat = getCoordinateFormat();
+    const currentCoordFormat = Settings.getValue('coordFormat', 'radio', 'Decimal'); // Direkter Zugriff
+    const windUnit = Settings.getValue('windUnit', 'radio', 'kt'); // Direkter Zugriff
+    const heightUnit = Settings.getValue('heightUnit', 'radio', 'm'); // Direkter Zugriff
+
     const coords = Utils.convertCoords(point.lat, point.lng, currentCoordFormat);
     let tooltipContent = currentCoordFormat === 'MGRS' ? `MGRS: ${coords.lat}` : `Lat: ${coords.lat}<br>Lng: ${coords.lng}`;
-    
+
     const elevation = point.ele;
     let aglHeight = (elevation !== null && groundAltitude !== null) ? (elevation - groundAltitude) : null;
-    
+
     if (aglHeight !== null) {
         const effectiveHeightUnit = heightUnit || (Settings.state.userSettings.heightUnit || 'm');
         aglHeight = Utils.convertHeight(aglHeight, effectiveHeightUnit);
@@ -60,7 +54,7 @@ export async function loadGpxTrack(file) {
     if (!AppState.map) { /* istanbul ignore next */ Utils.handleError('Map not initialized.'); return null; }
     AppState.isLoadingGpx = true;
     const reader = new FileReader();
-    
+
     return new Promise((resolve, reject) => {
         reader.onload = async function (e) {
             try {
@@ -78,33 +72,33 @@ export async function loadGpxTrack(file) {
                     points.push({ lat, lng, ele: ele ? parseFloat(ele) : null, time: time ? luxon.DateTime.fromISO(time, { zone: 'utc' }) : null });
                 }
                 if (points.length < 2) throw new Error('GPX track has insufficient points.');
-                
+
                 const trackMetaData = await renderTrack(points, file.name);
                 resolve(trackMetaData); // Gibt Metadaten zurück
-            } catch (error) { 
-                /* istanbul ignore next */ 
-                console.error('[trackManager] Error in loadGpxTrack:', error); 
-                /* istanbul ignore next */ 
-                Utils.handleError('Error parsing GPX file: ' + error.message); 
-                /* istanbul ignore next */ 
+            } catch (error) {
+                /* istanbul ignore next */
+                console.error('[trackManager] Error in loadGpxTrack:', error);
+                /* istanbul ignore next */
+                Utils.handleError('Error parsing GPX file: ' + error.message);
+                /* istanbul ignore next */
                 resolve(null); // Gibt null bei Fehler zurück
             }
             finally { AppState.isLoadingGpx = false; }
         };
-        reader.onerror = () => { 
-            /* istanbul ignore next */ 
-            Utils.handleError('Error reading GPX file.'); 
-            /* istanbul ignore next */ 
-            AppState.isLoadingGpx = false; 
-            /* istanbul ignore next */ 
+        reader.onerror = () => {
+            /* istanbul ignore next */
+            Utils.handleError('Error reading GPX file.');
+            /* istanbul ignore next */
+            AppState.isLoadingGpx = false;
+            /* istanbul ignore next */
             reject(new Error('Error reading GPX file.')); // Promise ablehnen
         };
         reader.readAsText(file);
     });
 }
 //If FlySight stores Z time
-export async function loadCsvTrackUTC(file) { 
-    if (!AppState.map) { /* istanbul ignore next */ Utils.handleError('Map not initialized.'); return null;}
+export async function loadCsvTrackUTC(file) {
+    if (!AppState.map) { /* istanbul ignore next */ Utils.handleError('Map not initialized.'); return null; }
     AppState.isLoadingGpx = true;
     const reader = new FileReader();
 
@@ -118,8 +112,8 @@ export async function loadCsvTrackUTC(file) {
                     step: function (row) {
                         const data = row.data;
                         // Beispielhafte Annahme für CSV-Struktur: $GNSS,Zeit,Lat,Lng,Höhe
-                        if (data[0] && data[0].toUpperCase() === '$GNSS' && data.length >= 5) { 
-                            let timeStr = data[1]; 
+                        if (data[0] && data[0].toUpperCase() === '$GNSS' && data.length >= 5) {
+                            let timeStr = data[1];
                             const lat = parseFloat(data[2]);
                             const lng = parseFloat(data[3]);
                             const ele = parseFloat(data[4]);
@@ -128,34 +122,34 @@ export async function loadCsvTrackUTC(file) {
                             try {
                                 // Standard-Zeitparsing (ggf. anpassen, falls UTC/Lokal unterschiedlich behandelt werden muss)
                                 time = luxon.DateTime.fromISO(timeStr, { setZone: true }).toUTC();
-                                if(!time.isValid) time = null;
+                                if (!time.isValid) time = null;
                             } catch (parseError) { /* istanbul ignore next */ time = null; }
                             points.push({ lat, lng, ele, time });
                         }
                     },
-                    complete: async function() {
+                    complete: async function () {
                         if (points.length < 2) throw new Error('CSV track has insufficient points.');
                         const trackMetaData = await renderTrack(points, file.name);
                         resolve(trackMetaData); // Gibt Metadaten zurück
                     },
-                    error: function(error) { /* istanbul ignore next */ throw new Error('Error parsing CSV: ' + error.message); }
+                    error: function (error) { /* istanbul ignore next */ throw new Error('Error parsing CSV: ' + error.message); }
                 });
-            } catch (error) { 
-                /* istanbul ignore next */ 
-                console.error('[trackManager] Error in loadCsvTrackUTC:', error); 
-                /* istanbul ignore next */ 
-                Utils.handleError('Error parsing CSV file: ' + error.message); 
-                /* istanbul ignore next */ 
+            } catch (error) {
+                /* istanbul ignore next */
+                console.error('[trackManager] Error in loadCsvTrackUTC:', error);
+                /* istanbul ignore next */
+                Utils.handleError('Error parsing CSV file: ' + error.message);
+                /* istanbul ignore next */
                 resolve(null); // Gibt null bei Fehler zurück
             }
             finally { AppState.isLoadingGpx = false; }
         };
-        reader.onerror = () => { 
-            /* istanbul ignore next */ 
-            Utils.handleError('Error reading CSV file.'); 
-            /* istanbul ignore next */ 
-            AppState.isLoadingGpx = false; 
-            /* istanbul ignore next */ 
+        reader.onerror = () => {
+            /* istanbul ignore next */
+            Utils.handleError('Error reading CSV file.');
+            /* istanbul ignore next */
+            AppState.isLoadingGpx = false;
+            /* istanbul ignore next */
             reject(new Error('Error reading CSV file.')); // Promise ablehnen
         };
         reader.readAsText(file);
@@ -193,15 +187,6 @@ async function renderTrack(points, fileName) {
             AppState.lastAltitude = await Utils.getAltitude(AppState.lastLat, AppState.lastLng);
             trackMetaData.finalPointData = { lat: AppState.lastLat, lng: AppState.lastLng, altitude: AppState.lastAltitude };
 
-            if (typeof Utils.configureMarker === 'function') {
-                AppState.currentMarker = Utils.configureMarker(
-                    AppState.map, AppState.lastLat, AppState.lastLng, AppState.lastAltitude, false,
-                    createCustomMarker, attachMarkerDragend, updateMarkerPopup, AppState.currentMarker,
-                    (marker) => { AppState.currentMarker = marker; }
-                );
-            }
-            AppState.isManualPanning = false;
-
             if (points[0].time && points[0].time.isValid) {
                 const initialTimestamp = points[0].time;
                 const today = luxon.DateTime.utc().startOf('day');
@@ -216,13 +201,30 @@ async function renderTrack(points, fileName) {
                 trackMetaData.timestampToUseForWeather = roundedTimestamp.toISO();
             }
 
-            await fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, trackMetaData.timestampToUseForWeather);
-            if (Settings.state.userSettings.calculateJump) {
-                debouncedCalculateJump();
-                calculateCutAway();
-            }
-            if (Settings.state.userSettings.showJumpRunTrack) updateJumpRunTrackDisplay();
-            if (Settings.state.userSettings.showLandingPattern) updateLandingPatternDisplay();
+            // KORREKTUR: Berechnungen VOR die Verwendung verschieben
+            const distance = (points.reduce((dist, p, i) => {
+                if (i === 0 || !AppState.map) return 0; const prev = points[i - 1];
+                return dist + AppState.map.distance([prev.lat, prev.lng], [p.lat, p.lng]);
+            }, 0) / 1000).toFixed(2);
+            const elevations = points.map(p => p.ele).filter(e => e !== null);
+            const elevationMin = elevations.length ? Math.min(...elevations).toFixed(0) : 'N/A';
+            const elevationMax = elevations.length ? Math.max(...elevations).toFixed(0) : 'N/A';
+
+            // Event erstellen, NACHDEM alle Werte berechnet wurden
+            const trackLoadedEvent = new CustomEvent('track:loaded', {
+                detail: {
+                    lat: AppState.lastLat,
+                    lng: AppState.lastLng,
+                    altitude: AppState.lastAltitude,
+                    timestamp: trackMetaData.timestampToUseForWeather,
+                    historicalDate: trackMetaData.historicalDateString,
+                    summary: `<br><strong>Track:</strong> Distance: ${distance} km, Min Elevation: ${elevationMin} m, Max Elevation: ${elevationMax} m (Source: ${fileName})`
+                },
+                bubbles: true,
+                cancelable: true
+            });
+            
+            AppState.map.getContainer().dispatchEvent(trackLoadedEvent);
         }
 
         AppState.gpxLayer = L.layerGroup([], { pane: 'gpxTrackPane' });
@@ -248,7 +250,7 @@ async function renderTrack(points, fileName) {
                     const dist = Math.sqrt(Math.pow(p.lat - latlng.lat, 2) + Math.pow(p.lng - latlng.lng, 2));
                     if (dist < minDist) { minDist = dist; closestPoint = p; closestIndex = index; }
                 });
-                segment.setTooltipContent(getTooltipContent(closestPoint, closestIndex, points, groundAltitude, getWindSpeedUnit(), getHeightUnit())).openTooltip(latlng);
+                segment.setTooltipContent(getTooltipContent(closestPoint, closestIndex, points, groundAltitude)).openTooltip(latlng);
             });
             AppState.gpxLayer.addLayer(segment);
         }
@@ -260,25 +262,13 @@ async function renderTrack(points, fileName) {
             if (bounds.isValid()) AppState.map.fitBounds(bounds, { padding: [50, 50], maxZoom: AppState.map.getMaxZoom() || 18 });
             else Utils.handleError('Unable to display track: invalid coordinates.');
         }
-
-        const distance = (points.reduce((dist, p, i) => {
-            if (i === 0 || !AppState.map) return 0; const prev = points[i - 1];
-            return dist + AppState.map.distance([prev.lat, prev.lng], [p.lat, p.lng]);
-        }, 0) / 1000).toFixed(2);
-        const elevations = points.map(p => p.ele).filter(e => e !== null);
-        const elevationMin = elevations.length ? Math.min(...elevations).toFixed(0) : 'N/A';
-        const elevationMax = elevations.length ? Math.max(...elevations).toFixed(0) : 'N/A';
         
-        trackMetaData.summaryForInfoElement = `<br><strong>Track:</strong> Distance: ${distance} km, Min Elevation: ${elevationMin} m, Max Elevation: ${elevationMax} m (Source: ${fileName})`;
         trackMetaData.success = true;
-        
-        console.log('[trackManager] renderTrack finished successfully. MetaData:', trackMetaData);
+        console.log('[trackManager] renderTrack finished successfully.');
         return trackMetaData;
 
     } catch (error) {
-        /* istanbul ignore next */
         console.error('[trackManager] Error in renderTrack:', error);
-        /* istanbul ignore next */
         Utils.handleError('Error rendering track: ' + error.message);
         AppState.gpxPoints = [];
         if (AppState.gpxLayer && AppState.map && AppState.map.hasLayer(AppState.gpxLayer)) {
@@ -286,6 +276,6 @@ async function renderTrack(points, fileName) {
         }
         AppState.gpxLayer = null;
         AppState.isTrackLoaded = false;
-        return { success: false, error: error.message }; // Gibt ein Fehlerobjekt zurück
+        return { success: false, error: error.message };
     }
 }
