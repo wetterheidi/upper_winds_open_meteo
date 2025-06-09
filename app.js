@@ -207,9 +207,7 @@ async function refreshMarkerPopup() {
     mapManager.updatePopupContent(AppState.currentMarker, popupContent);
 }
 function setupCoordinateEvents() {
-    // Nur noch dieser Aufruf bleibt übrig.
     Coordinates.initializeLocationSearch();
-
     console.log("Coordinate events setup complete.");
 }
 
@@ -3590,46 +3588,42 @@ function setupDownloadEvents() {
     }
 }
 function setupMenuEvents() {
-    if (!AppState.map) {
-        console.warn('Map not initialized, skipping setupMenuEvents');
-        return;
-    }
     console.log("setupMenuEvents wird aufgerufen für allgemeine Menü-Logik.");
-
     const hamburgerBtn = document.getElementById('hamburgerBtn');
     const menu = document.getElementById('menu');
+    if (!hamburgerBtn || !menu) return;
 
-    if (hamburgerBtn && menu) {
-        // Hamburger-Button öffnet/schließt das gesamte Menü
-        hamburgerBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            menu.classList.toggle('hidden');
-        });
+    // Hamburger-Button und Klick-außerhalb-Logik
+    hamburgerBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        menu.classList.toggle('hidden');
+    });
+    document.addEventListener('click', (e) => {
+        if (!menu.contains(e.target) && !hamburgerBtn.contains(e.target)) {
+            menu.classList.add('hidden');
+        }
+    });
 
-        // Klick außerhalb des Menüs schließt es
-        document.addEventListener('click', (e) => {
-            if (!menu.contains(e.target) && !hamburgerBtn.contains(e.target)) {
-                menu.classList.add('hidden');
+    // --- KORRIGIERTE LOGIK ZUM ÖFFNEN DER UNTERMENÜS ---
+    menu.addEventListener('click', (event) => {
+        // Wir interessieren uns nur für das Element, das direkt geklickt wurde.
+        const target = event.target;
+        
+        // Prüfe, ob das geklickte Element (oder sein direktes Elternelement)
+        // eine Menü-Überschrift ist. Das schließt tiefere Elemente wie Buttons aus.
+        const isToggleLabel = target.matches('li > span') || target.matches('li > label');
+
+        if (isToggleLabel) {
+            // Verhindere, dass der Klick sich weiter ausbreitet
+            event.preventDefault();
+            event.stopPropagation();
+
+            const submenu = target.closest('li').querySelector('ul.submenu');
+            if (submenu) {
+                submenu.classList.toggle('hidden');
             }
-        });
-
-        // Klicks auf die allgemeinen Menüpunkte (Labels/Spans) toggeln ihre Untermenüs
-        const menuToggles = menu.querySelectorAll('li > span:not(.menu-label), li > label');
-        menuToggles.forEach(toggle => {
-            // Ignoriere den speziellen "Calculate Jump"-Menüpunkt hier
-            if (toggle.textContent.trim().includes('Calculate Jump')) {
-                return;
-            }
-
-            toggle.addEventListener('click', (event) => {
-                const submenu = toggle.parentElement.querySelector('ul.submenu');
-                if (submenu) {
-                    event.stopPropagation(); // Verhindert, dass der Klick das Hauptmenü schließt
-                    submenu.classList.toggle('hidden');
-                }
-            });
-        });
-    }
+        }
+    });
 }
 function setupRadioEvents() {
     setupRadioGroup('refLevel', () => {
@@ -5157,7 +5151,6 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeUIElements();
 
     // 2. Rufe initializeMap auf und WARTE auf das Ergebnis (die fertige Karte).
-    //    Die `await`-Anweisung pausiert den Code hier, bis die Karte bereit ist.
     const mapInstance = mapManager.initializeMap();
 
     // 3. Erst wenn die Karte garantiert existiert, die abhängigen Funktionen aufrufen.
@@ -5165,10 +5158,10 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log("App: Karte ist bereit, richte abhängige Events ein.");
         setupMapEventListeners();
         setupMenuEvents(); // Für das allgemeine Menü-Toggling
-        setupMenuItemEvents(); // <<-- HIER IST DER ENTSCHEIDENDE, KORREKTE AUFRUF
+        setupMenuItemEvents();
         setupSliderEvents();
         setupCheckboxEvents();
-        setupCoordinateEvents();
+        setupCoordinateEvents(); // HIER wird initializeLocationSearch aufgerufen
         setupRadioEvents();
         setupInputEvents();
         setupCutawayRadioButtons();
@@ -5181,7 +5174,8 @@ document.addEventListener('DOMContentLoaded', () => {
         setupCacheSettings({ map: AppState.map, lastLat: AppState.lastLat, lastLng: AppState.lastLng, baseMaps: AppState.baseMaps });
         setupAutoupdate();
         setupJumpRunTrackEvents();
-        initializeLocationSearch();
+        // Entfernen Sie diesen direkten Aufruf:
+        // initializeLocationSearch(); // <-- DIESER AUFRUF WIRD ENTFERNT
     } else {
         console.error("App: Karteninitialisierung ist fehlgeschlagen. UI-Events werden nicht eingerichtet.");
         Utils.handleError("Map could not be loaded. Please refresh the page.");
