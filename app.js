@@ -2673,17 +2673,20 @@ export function visualizeFreeFallPath(path) {
 }
 function calculateJump() {
     if (!Settings.state.isCalculateJumpUnlocked || !Settings.state.userSettings.calculateJump) {
-        mapManager.drawJumpVisualization(null); // Alte Visualisierungen löschen
+        mapManager.drawJumpVisualization(null);
         mapManager.drawCutAwayVisualization(null);
         return;
     }
-
-    console.log('App: Starte Sprungberechnung und erstelle Bauanleitung...');
 
     if (!AppState.weatherData || !AppState.lastLat || !AppState.lastLng) {
         mapManager.drawJumpVisualization(null);
         return;
     }
+
+    // Daten einmal zentral vorbereiten
+    const sliderIndex = getSliderValue();
+    const interpolatedData = interpolateWeatherData(sliderIndex);
+
 
     const visualizationData = {
         exitCircles: [],
@@ -2693,8 +2696,8 @@ function calculateJump() {
 
     // --- EXIT AREA ---
     if (Settings.state.userSettings.showExitArea) {
-        const exitResult = JumpPlanner.calculateExitCircle();
-        if (exitResult) {
+        const exitResult = JumpPlanner.calculateExitCircle(interpolatedData); // Korrekt
+         if (exitResult) {
             // Der hellgrüne Kreis (gesamter möglicher Bereich)
             visualizationData.exitCircles.push({
                 center: [exitResult.greenLat, exitResult.greenLng],
@@ -2727,7 +2730,7 @@ function calculateJump() {
 
     // --- CANOPY AREA ---
     if (Settings.state.userSettings.showCanopyArea) {
-        const canopyResult = JumpPlanner.calculateCanopyCircles();
+        const canopyResult = JumpPlanner.calculateCanopyCircles(interpolatedData); // Korrekt
         if (canopyResult) {
             const redCenter = Utils.calculateNewCenter(canopyResult.redLat, canopyResult.redLng, canopyResult.displacementFull, canopyResult.directionFull);
             visualizationData.canopyCircles.push({
@@ -2761,10 +2764,10 @@ function calculateJump() {
 
     mapManager.drawJumpVisualization(visualizationData);
 
-    // --- NEUER, SEPARATER BLOCK FÜR DEN CUT-AWAY-FINDER ---
-    let cutawayDrawData = null; // Standardmäßig nichts zeichnen
+    // --- CUT-AWAY-FINDER ---
+    let cutawayDrawData = null; 
     if (Settings.state.userSettings.showCutAwayFinder && AppState.cutAwayLat !== null) {
-        const result = JumpPlanner.calculateCutAway();
+        const result = JumpPlanner.calculateCutAway(interpolatedData); // Daten übergeben
         if (result) {
             // Erstelle die "Bauanleitung" für den Cut-Away-Kreis.
             cutawayDrawData = {
@@ -3154,7 +3157,10 @@ export function updateJumpRunTrackDisplay() {
     }
 
     // Wenn die Bedingungen erfüllt sind, zeichne den Track.
-    const trackData = JumpPlanner.jumpRunTrack();
+    // Neuer Code:
+    const sliderIndex = getSliderValue();
+    const interpolatedData = interpolateWeatherData(sliderIndex);
+    const trackData = JumpPlanner.jumpRunTrack(interpolatedData);
     if (trackData && trackData.latlngs?.length === 2 && trackData.latlngs.every(ll => Number.isFinite(ll[0]) && Number.isFinite(ll[1]))) {
         console.log('Drawing jump run track with data:', trackData);
         const drawData = {
