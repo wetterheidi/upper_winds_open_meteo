@@ -7,8 +7,6 @@ import { Utils } from './utils.js';
 import { TileCache } from './tileCache.js';
 import { updateOfflineIndicator } from './ui.js';
 import * as Coordinates from './coordinates.js';
-import { getCoordinateFormat } from './app.js';
-
 
 let jumpVisualizationLayerGroup = null; // Unsere "Kiste" für alle Sprung-Visualisierungen
 let landingPatternLayerGroup = null;
@@ -729,7 +727,7 @@ export function attachCutAwayMarkerDragend(marker) {
     });
 }
 export function updateCutAwayMarkerPopup(marker, lat, lng, open = false) {
-    const coordFormat = getCoordinateFormat(); // Holt das aktuelle Koordinatenformat
+    const coordFormat = Settings.getValue('coordFormat', 'radio', 'Decimal');
     const coords = Utils.convertCoords(lat, lng, coordFormat);
     let popupContent = `<b>Cut-Away Start</b><br>`;
     
