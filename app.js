@@ -1022,9 +1022,16 @@ async function fetchWeatherForLocation(lat, lng, currentTime = null, isInitialLo
             Settings.updateModelRunInfo(AppState.lastModelRun, AppState.lastLat, AppState.lastLng);
             if (AppState.lastAltitude !== 'N/A') {
                 calculateMeanWind();
-                if (Settings.state.userSettings.calculateJump) { debouncedCalculateJump(); JumpPlanner.calculateCutAway(); }
+                if (Settings.state.userSettings.calculateJump) { 
+                    debouncedCalculateJump(); 
+                    JumpPlanner.calculateCutAway(); 
+                }
             }
             if (Settings.state.userSettings.showLandingPattern) updateLandingPatternDisplay();
+
+            if (Settings.state.userSettings.showJumpRunTrack) {
+                updateJumpRunTrackDisplay();
+            }
         } else {
             if (infoElement) infoElement.innerHTML = `No models available.`;
             Settings.updateModelRunInfo(null, lat, lng);
@@ -3950,11 +3957,11 @@ function setupInputEvents() {
             jumpRunTrackOffset: Settings.state.userSettings.jumpRunTrackOffset
         });
         if (!isNaN(customDir) && customDir >= 0 && customDir <= 359) {
-            if (Settings.state.userSettings.jumpRunTrackOffset !== 0) {
+            /*if (Settings.state.userSettings.jumpRunTrackOffset !== 0) {
                 console.log('Error: Attempted to rotate jump run track with non-zero offset');
                 displayError('jump run track rotation only works at the original position. Reset offset to 0 or rotate before moving.');
                 return;
-            }
+            }*/
             AppState.customJumpRunDirection = customDir;
             console.log('Set custom direction from input:', customDir);
             if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
