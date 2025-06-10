@@ -47,7 +47,6 @@ Utils.handleMessage = displayMessage;
 let isCachingCancelled = false;
 
 // == Map Initialization and Interaction ==
-// Define custom Coordinates control globally
 L.Control.Coordinates = L.Control.extend({
     options: { position: 'bottomleft' },
     onAdd: function (map) {
@@ -64,13 +63,9 @@ L.Control.Coordinates = L.Control.extend({
         this._container.innerHTML = content;
     }
 });
-
-// == Refactored initMap ==
-// an den Anfang von app.js, nach den Imports und AppState Definition
 let elevationCache = new Map();
 let qfeCache = new Map();
 let lastTapTime = 0;
-
 export const debouncedGetElevationAndQFE = Utils.debounce(async (lat, lng, requestLatLng, callback) => {
     const cacheKey = `${lat.toFixed(5)},${lng.toFixed(5)}`;
     const sliderIndex = getSliderValue(); // getSliderValue muss hier zugreifbar sein
@@ -110,42 +105,6 @@ export const debouncedGetElevationAndQFE = Utils.debounce(async (lat, lng, reque
     }
     callback({ elevation, qfe }, requestLatLng);
 }, 500);
-
-async function _fetchInitialWeather(lat, lng) {
-    const lastFullHourUTC = Utils.getLastFullHourUTC();
-    let utcIsoString;
-    try {
-        utcIsoString = lastFullHourUTC.toISOString();
-    } catch (error) {
-        console.error('Failed to get UTC time:', error);
-        const now = new Date();
-        now.setMinutes(0, 0, 0);
-        utcIsoString = now.toISOString();
-    }
-
-    let initialTime;
-    if (Settings.state.userSettings.timeZone === 'Z') {
-        initialTime = utcIsoString.replace(':00.000Z', 'Z');
-    } else {
-        try {
-            const localTimeStr = await Utils.formatLocalTime(utcIsoString, lat, lng);
-            const match = localTimeStr.match(/^(\d{4}-\d{2}-\d{2}) (\d{2})(\d{2}) GMT([+-]\d+)/);
-            if (!match) throw new Error(`Local time string format mismatch: ${localTimeStr}`);
-            const [, datePart, hour, minute, offset] = match;
-            const offsetSign = offset.startsWith('+') ? '+' : '-';
-            const offsetHours = Math.abs(parseInt(offset, 10)).toString().padStart(2, '0');
-            const formattedOffset = `${offsetSign}${offsetHours}:00`;
-            const isoFormatted = `${datePart}T${hour}:${minute}:00${formattedOffset}`;
-            const localDate = new Date(isoFormatted);
-            if (isNaN(localDate.getTime())) throw new Error(`Failed to parse localDate from ${isoFormatted}`);
-            initialTime = localDate.toISOString().replace(':00.000Z', 'Z');
-        } catch (error) {
-            console.error('Error converting to local time for initial weather:', error);
-            initialTime = utcIsoString.replace(':00.000Z', 'Z');
-        }
-    }
-    await fetchWeatherForLocation(lat, lng, initialTime, true);
-}
 
 // == Marker and popup functions ==
 function reinitializeCoordsControl() {
@@ -796,6 +755,41 @@ export function updateJumpMasterLine() {
 }
 
 // == Weather Data Handling ==
+async function _fetchInitialWeather(lat, lng) {
+    const lastFullHourUTC = Utils.getLastFullHourUTC();
+    let utcIsoString;
+    try {
+        utcIsoString = lastFullHourUTC.toISOString();
+    } catch (error) {
+        console.error('Failed to get UTC time:', error);
+        const now = new Date();
+        now.setMinutes(0, 0, 0);
+        utcIsoString = now.toISOString();
+    }
+
+    let initialTime;
+    if (Settings.state.userSettings.timeZone === 'Z') {
+        initialTime = utcIsoString.replace(':00.000Z', 'Z');
+    } else {
+        try {
+            const localTimeStr = await Utils.formatLocalTime(utcIsoString, lat, lng);
+            const match = localTimeStr.match(/^(\d{4}-\d{2}-\d{2}) (\d{2})(\d{2}) GMT([+-]\d+)/);
+            if (!match) throw new Error(`Local time string format mismatch: ${localTimeStr}`);
+            const [, datePart, hour, minute, offset] = match;
+            const offsetSign = offset.startsWith('+') ? '+' : '-';
+            const offsetHours = Math.abs(parseInt(offset, 10)).toString().padStart(2, '0');
+            const formattedOffset = `${offsetSign}${offsetHours}:00`;
+            const isoFormatted = `${datePart}T${hour}:${minute}:00${formattedOffset}`;
+            const localDate = new Date(isoFormatted);
+            if (isNaN(localDate.getTime())) throw new Error(`Failed to parse localDate from ${isoFormatted}`);
+            initialTime = localDate.toISOString().replace(':00.000Z', 'Z');
+        } catch (error) {
+            console.error('Error converting to local time for initial weather:', error);
+            initialTime = utcIsoString.replace(':00.000Z', 'Z');
+        }
+    }
+    await fetchWeatherForLocation(lat, lng, initialTime, true);
+}
 export async function checkAvailableModels(lat, lon) {
     console.log(`[checkAvailableModels] Starting for lat: ${lat}, lon: ${lon}`);
     const modelList = [
@@ -3331,7 +3325,7 @@ function restoreUIInteractivity() {
     console.log('UI interactivity check completed');
 }
 
-// Setup values
+// == Setup values ==
 export function getSliderValue() {
     return parseInt(document.getElementById('timeSlider')?.value) || 0;
 }
@@ -3361,7 +3355,6 @@ function setRadioValue(name, value) {
     if (radio) radio.checked = true;
     else console.warn(`Radio ${name} with value ${value} not found`);
 }
-
 export async function updateAllDisplays() {
     console.log('updateAllDisplays called');
     try {
@@ -3406,7 +3399,7 @@ export async function updateAllDisplays() {
     }
 }
 
-// No londer used functions, check if removable
+// No longer used functions, check if removable
 function setupAndHandleInput(inputId, settingName, isNumeric = true) {
     const inputElement = document.getElementById(inputId);
     if (inputElement) {
@@ -3551,44 +3544,3 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     });
 });
-
-/*document.addEventListener('DOMContentLoaded', () => {
-    // 1. Grundlegende Settings initialisieren, die keine Karte brauchen.
-    Settings.initialize();
-    initializeApp();
-    initializeUIElements();
-
-    // 2. Rufe initializeMap auf und WARTE auf das Ergebnis (die fertige Karte).
-    const mapInstance = mapManager.initializeMap();
-
-    // 3. Erst wenn die Karte garantiert existiert, die abhängigen Funktionen aufrufen.
-    if (mapInstance) {
-        console.log("App: Karte ist bereit, richte abhängige Events ein.");
-        setupMapEventListeners();
-        setupMenuEvents(); // Für das allgemeine Menü-Toggling
-        setupMenuItemEvents();
-        setupModelSelectEvents();
-        setupSliderEvents();
-        setupCheckboxEvents();
-        setupCoordinateEvents(); // HIER wird initializeLocationSearch aufgerufen
-        setupRadioEvents();
-        setupInputEvents();
-        setupCutawayRadioButtons();
-        setupDownloadEvents();
-        setupResetButton();
-        setupResetCutAwayMarkerButton();
-        setupClearHistoricalDate();
-        setupTrackEvents();
-        setupCacheManagement();
-        setupCacheSettings({ map: AppState.map, lastLat: AppState.lastLat, lastLng: AppState.lastLng, baseMaps: AppState.baseMaps });
-        setupAutoupdate();
-        setupJumpRunTrackEvents();
-        // Entfernen Sie diesen direkten Aufruf:
-        // initializeLocationSearch(); // <-- DIESER AUFRUF WIRD ENTFERNT
-    } else {
-        console.error("App: Karteninitialisierung ist fehlgeschlagen. UI-Events werden nicht eingerichtet.");
-        Utils.handleError("Map could not be loaded. Please refresh the page.");
-    }
-
-
-});*/
