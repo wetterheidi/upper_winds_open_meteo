@@ -11,7 +11,7 @@ import {
     processAndVisualizeEnsemble, clearEnsembleVisualizations, debouncedPositionUpdate,
     updateJumpMasterLine, refreshMarkerPopup, calculateJumpRunTrack, updateWeatherDisplay,
     updateLivePositionControl, debouncedGetElevationAndQFE, getDownloadFormat,
-    validateLegHeights, debouncedCalculateJump
+    validateLegHeights, debouncedCalculateJump, setInputValue, setInputValueSilently
 } from './app.js';
 import * as mapManager from './mapManager.js';
 import * as Coordinates from './coordinates.js';
@@ -1190,30 +1190,14 @@ function setupInputEvents() {
             }
         }
     });
-    setupInput('aircraftSpeedKt', 'change', 300, (value) => {
-        const speed = parseFloat(value);
-        if (!isNaN(speed) && speed >= 10 && speed <= 150) {
-            Settings.state.userSettings.aircraftSpeedKt = speed;
-            Settings.save();
-            // Update jumperSeparation if not manually set
-            if (!AppState.isJumperSeparationManual) {
-                const separation = JumpPlanner.getSeparationFromTAS(speed);
-                setInputValue('jumperSeparation', separation);
-                Settings.state.userSettings.jumperSeparation = separation;
-                Settings.save();
-                console.log(`Auto-updated jumperSeparation to ${separation}s for IAS ${speed}kt`);
-            }
-            if (Settings.state.userSettings.calculateJump && AppState.weatherData && AppState.lastLat && AppState.lastLng) {
-                console.log('Recalculating jump for aircraft speed change');
-                debouncedCalculateJump(); // Use debounced version
-                JumpPlanner.calculateCutAway();
-            }
-        } else {
-            Utils.handleError('Aircraft speed must be between 10 and 150 kt.');
-            setInputValue('aircraftSpeedKt', defaultSettings.aircraftSpeedKt);
-            Settings.state.userSettings.aircraftSpeedKt = defaultSettings.aircraftSpeedKt;
-            Settings.save();
-        }
+    setupInput('aircraftSpeedKt', 'change', 300, (speed) => {
+        const separation = JumpPlanner.getSeparationFromTAS(speed);
+        document.getElementById('jumperSeparation').value = separation;
+        Settings.state.userSettings.jumperSeparation = separation;
+        Settings.state.userSettings.aircraftSpeedKt = parseFloat(speed); // Sicherstellen, dass der Wert gespeichert wird
+        Settings.save();
+        calculateJump();
+        updateJumpRunTrackDisplay();
     });
     setupInput('numberOfJumpers', 'change', 300, (value) => {
         const number = parseFloat(value);

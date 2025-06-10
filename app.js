@@ -3344,11 +3344,11 @@ function setElementValue(id, value) {
     if (element) element.value = value;
     else console.warn(`Element ${id} not found`);
 }
-function setInputValue(id, value) {
+export function setInputValue(id, value) {
     const element = document.getElementById(id);
     if (element) element.value = value;
 }
-function setInputValueSilently(id, value) {
+export function setInputValueSilently(id, value) {
     const input = document.getElementById(id);
     if (input) {
         const lastValue = input.value;

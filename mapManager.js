@@ -628,9 +628,10 @@ export function drawJumpVisualization(jumpData) {
     }
 }
 function clearJumpVisualization() {
-    if (jumpVisualizationLayerGroup) {
-        jumpVisualizationLayerGroup.clearLayers();
+    if (AppState.map && jumpVisualizationLayerGroup) {
+        AppState.map.removeLayer(jumpVisualizationLayerGroup);
     }
+    jumpVisualizationLayerGroup = L.layerGroup().addTo(AppState.map);
 }
 function clearJumpCircles() {
     // Greift auf die LayerGroup zu, die wir in initializeMap erstellt haben.
@@ -694,9 +695,10 @@ function createArrowIcon(lat, lng, bearing, color) {
     });
 }
 function clearJumpRunTrack() {
-    if (jumpRunTrackLayerGroup) {
-        jumpRunTrackLayerGroup.clearLayers();
+    if (AppState.map && jumpRunTrackLayerGroup) {
+        AppState.map.removeLayer(jumpRunTrackLayerGroup);
     }
+    jumpRunTrackLayerGroup = L.layerGroup().addTo(AppState.map);
 }
 export function createCutAwayMarker(lat, lng) {
     const cutAwayIcon = L.icon({
