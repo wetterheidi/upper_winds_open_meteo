@@ -2864,7 +2864,7 @@ export function calculateJumpRunTrack() {
     const trackData = JumpPlanner.jumpRunTrack();
     return trackData;
 }
-function validateLegHeights(final, base, downwind) {
+export function validateLegHeights(final, base, downwind) {
     const finalVal = parseInt(final.value) || 100;
     const baseVal = parseInt(base.value) || 200;
     const downwindVal = parseInt(downwind.value) || 300;
@@ -3302,20 +3302,6 @@ function initializeUIElements() {
     const directionSpan = document.getElementById('jumpRunTrackDirection');
     if (directionSpan) directionSpan.textContent = '-'; // Initial placeholder
     updateUIState();
-}
-function updateUIState() {
-    const info = document.getElementById('info');
-    if (info) info.style.display = Settings.state.userSettings.showTable ? 'block' : 'none';
-    const customLL = document.getElementById('customLandingDirectionLL');
-    const customRR = document.getElementById('customLandingDirectionRR');
-    const showJumpRunTrackCheckbox = document.getElementById('showJumpRunTrack');
-    const showExitAreaCheckbox = document.getElementById('showExitAreaCheckbox');
-    if (customLL) customLL.disabled = Settings.state.userSettings.landingDirection !== 'LL';
-    if (customRR) customRR.disabled = Settings.state.userSettings.landingDirection !== 'RR';
-    if (showJumpRunTrackCheckbox) showJumpRunTrackCheckbox.disabled = !Settings.state.userSettings.calculateJump;
-    if (showExitAreaCheckbox) showExitAreaCheckbox.disabled = !Settings.state.userSettings.calculateJump; // Disable unless calculateJump is on
-    Settings.updateUnitLabels();
-    Settings.updateUnitLabels();
 }
 function restoreUIInteractivity() {
     const menu = document.getElementById('menu');

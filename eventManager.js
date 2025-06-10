@@ -10,10 +10,11 @@ import {
     startPositionTracking, stopPositionTracking, calculateMeanWind, fetchEnsembleWeatherData,
     processAndVisualizeEnsemble, clearEnsembleVisualizations, debouncedPositionUpdate,
     updateJumpMasterLine, refreshMarkerPopup, calculateJumpRunTrack, updateWeatherDisplay,
-    updateLivePositionControl, debouncedGetElevationAndQFE, getDownloadFormat
+    updateLivePositionControl, debouncedGetElevationAndQFE, getDownloadFormat,
+    validateLegHeights, debouncedCalculateJump
 } from './app.js';
 import * as mapManager from './mapManager.js';
-import * as Coordinates from './coordinates.js'; 
+import * as Coordinates from './coordinates.js';
 import * as JumpPlanner from './jumpPlanner.js';
 import { handleHarpPlacement, clearHarpMarker } from './harpMarker.js';
 import { TileCache, cacheTilesForDIP } from './tileCache.js';
@@ -61,7 +62,7 @@ function toggleSubmenu(element, submenu, isVisible) {
         if (!submenu.classList.contains('submenu')) {
             submenu.classList.add('submenu');
         }
-        
+
         // Klasse umschalten und Aria-Attribut für Barrierefreiheit setzen
         submenu.classList.toggle('hidden', !isVisible);
         element.setAttribute('aria-expanded', isVisible);
@@ -75,7 +76,7 @@ function toggleSubmenu(element, submenu, isVisible) {
                 isHidden: submenu.classList.contains('hidden'),
                 displayStyle: window.getComputedStyle(submenu).display
             };
-            
+
             // Wenn das Menü geöffnet sein SOLL, aber aus irgendeinem Grund versteckt ist...
             if (isVisible && (currentState.isHidden || currentState.displayStyle === 'none')) {
                 console.warn(`Submenu for ${element.textContent || element.id} was hidden unexpectedly. Forcing it to be visible.`);
@@ -182,6 +183,21 @@ function setupLegHeightInput(id, defaultValue) {
             Utils.handleError(`Adjusted ${id} to ${adjustedValue} to maintain valid leg order.`);
         }
     });
+}
+
+function updateUIState() {
+    const info = document.getElementById('info');
+    if (info) info.style.display = Settings.state.userSettings.showTable ? 'block' : 'none';
+    const customLL = document.getElementById('customLandingDirectionLL');
+    const customRR = document.getElementById('customLandingDirectionRR');
+    const showJumpRunTrackCheckbox = document.getElementById('showJumpRunTrack');
+    const showExitAreaCheckbox = document.getElementById('showExitAreaCheckbox');
+    if (customLL) customLL.disabled = Settings.state.userSettings.landingDirection !== 'LL';
+    if (customRR) customRR.disabled = Settings.state.userSettings.landingDirection !== 'RR';
+    if (showJumpRunTrackCheckbox) showJumpRunTrackCheckbox.disabled = !Settings.state.userSettings.calculateJump;
+    if (showExitAreaCheckbox) showExitAreaCheckbox.disabled = !Settings.state.userSettings.calculateJump; // Disable unless calculateJump is on
+    Settings.updateUnitLabels();
+    Settings.updateUnitLabels();
 }
 
 // SETUP-FUNKTIONEN FÜR DIE EINZELNEN BEREICHE
@@ -329,57 +345,31 @@ function setupCheckboxEvents() {
     });
 
     setupCheckbox('showLandingPattern', 'showLandingPattern', (checkbox) => {
-        console.log('showLandingPattern checkbox changed to:', checkbox.checked);
+        const feature = 'landingPattern';
         const enableFeature = () => {
             Settings.state.userSettings.showLandingPattern = true;
             Settings.save();
             const submenu = checkbox.closest('li')?.querySelector('ul');
             toggleSubmenu(checkbox, submenu, true);
-            if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
-                updateLandingPatternDisplay();
-                mapManager.recenterMap();
-            }
+            updateLandingPatternDisplay();
         };
+
         const disableFeature = () => {
             Settings.state.userSettings.showLandingPattern = false;
             Settings.save();
             checkbox.checked = false;
             const submenu = checkbox.closest('li')?.querySelector('ul');
             toggleSubmenu(checkbox, submenu, false);
-            // Clear landing pattern layers
-            if (AppState.map) {
-                const layers = [
-                    AppState.landingPatternPolygon,
-                    AppState.secondlandingPatternPolygon,
-                    AppState.thirdLandingPatternLine,
-                    AppState.finalArrow,
-                    AppState.baseArrow,
-                    AppState.downwindArrow
-                ];
-                layers.forEach((layer, index) => {
-                    if (layer && AppState.map.hasLayer(layer)) {
-                        AppState.map.removeLayer(layer);
-                        console.log(`Removed landing pattern layer ${index}:`, layer);
-                    }
-                });
-                // Reset state
-                AppState.landingPatternPolygon = null;
-                AppState.secondlandingPatternPolygon = null;
-                AppState.thirdLandingPatternLine = null;
-                AppState.finalArrow = null;
-                AppState.baseArrow = null;
-                AppState.downwindArrow = null;
-                AppState.landingWindDir = null;
-                console.log('Cleared landing pattern layers and reset state');
-            } else {
-                console.warn('Map not initialized, cannot clear landing pattern layers');
-            }
+
+            // KORREKTUR: Rufen Sie einfach die zentrale Funktion auf, die alles löscht.
+            mapManager.drawLandingPattern(null);
         };
+
         if (checkbox.checked) {
-            if (Settings.isFeatureUnlocked('landingPattern')) {
+            if (Settings.isFeatureUnlocked(feature)) {
                 enableFeature();
             } else {
-                Settings.showPasswordModal('landingPattern', enableFeature, disableFeature);
+                Settings.showPasswordModal(feature, enableFeature, disableFeature);
             }
         } else {
             disableFeature();
@@ -782,7 +772,7 @@ function setupRadioEvents() {
             } else {
                 coordText = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
             }
-            debouncedGetElevation(lat, lng, { lat, lng }, (elevation, requestLatLng) => {
+            debouncedGetElevationAndQFE(lat, lng, { lat, lng }, (elevation, requestLatLng) => {
                 if (AppState.lastMouseLatLng) {
                     const deltaLat = Math.abs(AppState.lastMouseLatLng.lat - requestLatLng.lat);
                     const deltaLng = Math.abs(AppState.lastMouseLatLng.lng - requestLatLng.lng);
