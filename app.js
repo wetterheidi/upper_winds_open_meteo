@@ -107,21 +107,6 @@ export const debouncedGetElevationAndQFE = Utils.debounce(async (lat, lng, reque
 }, 500);
 
 // == Marker and popup functions ==
-function reinitializeCoordsControl() {
-    if (!AppState.map) {
-        console.warn('Map not initialized, cannot reinitialize coords control');
-        return;
-    }
-
-    console.log('Before reinitialize - coordsControl:', AppState.coordsControl);
-    if (AppState.coordsControl) {
-        AppState.coordsControl.remove();
-        console.log('Removed existing coordsControl');
-    }
-    AppState.coordsControl = new L.Control.Coordinates();
-    AppState.coordsControl.addTo(AppState.map);
-    console.log('After reinitialize - coordsControl:', AppState.coordsControl);
-}
 export async function refreshMarkerPopup() {
     if (!AppState.currentMarker || AppState.lastLat === null) {
         return;
@@ -432,61 +417,6 @@ function createLiveMarker(lat, lng) {
     console.log('Created liveMarker:', { lat, lng });
     return marker;
 }
-function updateLiveMarkerPopup(marker, lat, lng, terrainAltitude, deviceAltitude, altitudeAccuracy, accuracy, speed, direction, open = false) {
-    const coordFormat = Settings.getValue('coordFormat', 'radio', 'Decimal');
-    const coords = Utils.convertCoords(lat, lng, coordFormat);
-    const windUnit = Settings.getValue('windUnit', 'radio', 'kt');
-    const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
-    let popupContent = `<b>Live Position</b><br>`;
-    if (coordFormat === 'MGRS') {
-        popupContent += `MGRS: ${coords.lat}<br>`;
-    } else {
-        popupContent += `Lat: ${coords.lat}<br>Lng: ${coords.lng}<br>`;
-    }
-
-    if (deviceAltitude !== null && deviceAltitude !== undefined) {
-        const deviceAlt = Utils.convertHeight(deviceAltitude, heightUnit);
-        popupContent += `Device Alt: ${Math.round(deviceAlt)} ${heightUnit} MSL (±${Math.round(altitudeAccuracy || 0)} m)<br>`;
-        if (terrainAltitude !== 'N/A') {
-            const agl = Utils.convertHeight(deviceAltitude - terrainAltitude, heightUnit);
-            popupContent += `AGL: ${Math.round(agl)} ${heightUnit}<br>`;
-        } else {
-            popupContent += `AGL: N/A<br>`;
-        }
-    } else {
-        popupContent += `Device Alt: N/A<br>`;
-        popupContent += `AGL: N/A<br>`;
-    }
-
-    const terrainAlt = terrainAltitude !== 'N/A' ? Utils.convertHeight(terrainAltitude, heightUnit) : 'N/A';
-    popupContent += `Terrain Alt: ${terrainAlt !== 'N/A' ? Math.round(terrainAlt) : 'N/A'} ${heightUnit}<br>`;
-
-    popupContent += `Accuracy: ${Math.round(accuracy)} m<br>`;
-    popupContent += `Speed: ${speed} ${windUnit}<br>`;
-    popupContent += `Direction: ${direction}°`;
-
-    // Rebind popup to ensure fresh state
-    marker.unbindPopup();
-    marker.bindPopup(popupContent);
-    console.log('Rebound liveMarker popup with content:', { popupContent, open });
-
-    marker._accuracy = accuracy;
-    marker._speed = speed;
-    marker._direction = direction;
-    marker._deviceAltitude = deviceAltitude;
-    marker._altitudeAccuracy = altitudeAccuracy;
-
-    if (open) {
-        console.log('Attempting to open liveMarker popup');
-        marker.openPopup();
-        const isOpen = marker.getPopup()?.isOpen();
-        console.log('LiveMarker popup open status after openPopup():', isOpen);
-        if (!isOpen) {
-            console.warn('LiveMarker popup failed to open, retrying');
-            marker.openPopup();
-        }
-    }
-}
 export function updateLivePositionControl() {
     if (!AppState.livePositionControl || AppState.lastLatitude === null || AppState.lastLongitude === null) {
         console.log('Skipping livePositionControl update: no control or position data', { livePositionControl: !!AppState.livePositionControl, lastLatitude: AppState.lastLatitude });
@@ -755,41 +685,6 @@ export function updateJumpMasterLine() {
 }
 
 // == Weather Data Handling ==
-async function _fetchInitialWeather(lat, lng) {
-    const lastFullHourUTC = Utils.getLastFullHourUTC();
-    let utcIsoString;
-    try {
-        utcIsoString = lastFullHourUTC.toISOString();
-    } catch (error) {
-        console.error('Failed to get UTC time:', error);
-        const now = new Date();
-        now.setMinutes(0, 0, 0);
-        utcIsoString = now.toISOString();
-    }
-
-    let initialTime;
-    if (Settings.state.userSettings.timeZone === 'Z') {
-        initialTime = utcIsoString.replace(':00.000Z', 'Z');
-    } else {
-        try {
-            const localTimeStr = await Utils.formatLocalTime(utcIsoString, lat, lng);
-            const match = localTimeStr.match(/^(\d{4}-\d{2}-\d{2}) (\d{2})(\d{2}) GMT([+-]\d+)/);
-            if (!match) throw new Error(`Local time string format mismatch: ${localTimeStr}`);
-            const [, datePart, hour, minute, offset] = match;
-            const offsetSign = offset.startsWith('+') ? '+' : '-';
-            const offsetHours = Math.abs(parseInt(offset, 10)).toString().padStart(2, '0');
-            const formattedOffset = `${offsetSign}${offsetHours}:00`;
-            const isoFormatted = `${datePart}T${hour}:${minute}:00${formattedOffset}`;
-            const localDate = new Date(isoFormatted);
-            if (isNaN(localDate.getTime())) throw new Error(`Failed to parse localDate from ${isoFormatted}`);
-            initialTime = localDate.toISOString().replace(':00.000Z', 'Z');
-        } catch (error) {
-            console.error('Error converting to local time for initial weather:', error);
-            initialTime = utcIsoString.replace(':00.000Z', 'Z');
-        }
-    }
-    await fetchWeatherForLocation(lat, lng, initialTime, true);
-}
 export async function updateWeatherDisplay(index, originalTime = null) {
     console.log(`updateWeatherDisplay called with index: ${index}, Time: ${AppState.weatherData.time[index]}`);
     if (!AppState.weatherData || !AppState.weatherData.time || index < 0 || index >= AppState.weatherData.time.length) {
@@ -2276,63 +2171,6 @@ export function visualizeFreeFallPath(path) {
 
     freeFallPolyline.bindPopup(`Free Fall Path<br>Duration: ${path[path.length - 1].time.toFixed(1)}s<br>Distance: ${Math.sqrt(path[path.length - 1].latLng[0] ** 2 + path[path.length - 1].latLng[1] ** 2).toFixed(1)}m`);
 }
-export function clearIsolineMarkers() {
-    console.log('clearIsolineMarkers called');
-    if (!AppState.map) {
-        console.warn('Map not available in clearIsolineMarkers');
-        return;
-    }
-
-    let markerCount = 0;
-    AppState.map.eachLayer(layer => {
-        if (layer instanceof L.Marker &&
-            layer !== AppState.currentMarker &&
-            layer !== AppState.cutAwayMarker &&
-            layer !== AppState.liveMarker &&
-            layer !== AppState.harpMarker && // Skip harpMarker
-            layer.options.icon &&
-            layer.options.icon.options &&
-            typeof layer.options.icon.options.className === 'string' &&
-            layer.options.icon.options.className.match(/isoline-label/) &&
-            !layer.options.icon.options.className.match(/landing-pattern-arrow|wind-arrow-icon/)) {
-            console.log('Removing isoline-label marker:', layer, 'className:', layer.options.icon.options.className);
-            layer.remove();
-            markerCount++;
-        } else if (layer === AppState.currentMarker) {
-            console.log('Skipping currentMarker:', layer, 'className:', layer.options?.icon?.options?.className || 'none');
-        } else if (layer === AppState.cutAwayMarker) {
-            console.log('Skipping cutAwayMarker:', layer, 'className:', layer.options?.icon?.options?.className || 'none');
-        } else if (layer === AppState.liveMarker) {
-            console.log('Skipping liveMarker:', layer, 'className:', layer.options?.icon?.options?.className || 'none');
-        } else if (layer === AppState.harpMarker) {
-            console.log('Skipping harpMarker:', layer, 'className:', layer.options?.icon?.options?.className || 'none');
-        } else if (layer instanceof L.Marker &&
-            layer.options.icon &&
-            layer.options.icon.options &&
-            typeof layer.options.icon.options.className === 'string' &&
-            layer.options.icon.options.className.match(/landing-pattern-arrow|wind-arrow-icon/)) {
-            console.log('Skipping landing pattern arrow marker:', layer, 'className:', layer.options.icon.options.className);
-        }
-    });
-    console.log('Cleared', markerCount, 'isoline-label markers');
-    // Fallback: Remove only markers that are not currentMarker, AppState.cutAwayMarker, AppState.liveMarker, or AppState.harpMarker
-    if (markerCount === 0) {
-        AppState.map.eachLayer(layer => {
-            if (layer instanceof L.Marker &&
-                layer !== AppState.currentMarker &&
-                layer !== AppState.cutAwayMarker &&
-                layer !== AppState.liveMarker &&
-                layer !== AppState.harpMarker &&
-                (!layer.options.icon ||
-                    !layer.options.icon.options ||
-                    !layer.options.icon.options.className ||
-                    !layer.options.icon.options.className.match(/landing-pattern-arrow|wind-arrow-icon/))) {
-                console.log('Fallback: Removing marker:', layer, 'className:', layer.options?.icon?.options?.className || 'none');
-                layer.remove();
-            }
-        });
-    }
-}
 export function resetJumpRunDirection(triggerUpdate = true) {
     AppState.customJumpRunDirection = null;
     const directionInput = document.getElementById('jumpRunTrackDirection');
@@ -2806,33 +2644,6 @@ function updateUIState() {
     if (showExitAreaCheckbox) showExitAreaCheckbox.disabled = !Settings.state.userSettings.calculateJump; // Disable unless calculateJump is on
     Settings.updateUnitLabels();
 }
-function restoreUIInteractivity() {
-    const menu = document.getElementById('menu');
-    const checkboxes = menu.querySelectorAll('input[type="checkbox"]');
-    const inputs = menu.querySelectorAll('input[type="number"], input[type="text"]');
-
-    // Check if elements are disabled unexpectedly
-    checkboxes.forEach(cb => {
-        if (cb.disabled && cb.id !== 'showJumpRunTrack' && cb.id !== 'showExitAreaCheckbox') {
-            console.warn(`Checkbox ${cb.id} is disabled unexpectedly, re-enabling`);
-            cb.disabled = false;
-        }
-    });
-
-    inputs.forEach(input => {
-        if (input.disabled && input.id !== 'customLandingDirectionLL' && input.id !== 'customLandingDirectionRR') {
-            console.warn(`Input ${input.id} is disabled unexpectedly, re-enabling`);
-            input.disabled = false;
-        }
-    });
-
-    // Force a DOM refresh
-    menu.style.display = 'none';
-    void menu.offsetHeight; // Trigger reflow
-    menu.style.display = 'block';
-
-    console.log('UI interactivity check completed');
-}
 
 // == Setup values ==
 export function getSliderValue() {
@@ -2905,31 +2716,6 @@ export async function updateAllDisplays() {
 
     } catch (error) {
         console.error('Error in updateAllDisplays:', error);
-    }
-}
-
-// No longer used functions, check if removable
-function setupAndHandleInput(inputId, settingName, isNumeric = true) {
-    const inputElement = document.getElementById(inputId);
-    if (inputElement) {
-        inputElement.addEventListener('input', () => {
-            // 1. Lese den Wert aus dem Feld.
-            let value = inputElement.value;
-            // 2. Wandle ihn bei Bedarf in eine Zahl um.
-            if (isNumeric) {
-                value = parseFloat(value);
-                if (isNaN(value)) return; // Bei ungültiger Eingabe abbrechen
-            }
-
-            // 3. HIER IST DER ENTSCHEIDENDE SCHRITT: Speichere den neuen Wert im Settings-Objekt.
-            Settings.state.userSettings[settingName] = value;
-            Settings.save();
-
-            console.log(`Setting '${settingName}' aktualisiert auf:`, value);
-
-            // 4. Erst DANACH die Anzeige neu zeichnen lassen.
-            updateJumpRunTrackDisplay();
-        });
     }
 }
 
