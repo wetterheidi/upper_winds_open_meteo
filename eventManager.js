@@ -6,7 +6,7 @@ import { Settings } from './settings.js';
 import { Utils } from './utils.js';
 import {
     updateAllDisplays, calculateJump, updateLandingPatternDisplay, updateJumpRunTrackDisplay,
-    getSliderValue, downloadTableAsAscii, fetchWeatherForLocation,
+    getSliderValue, downloadTableAsAscii,
     startPositionTracking, stopPositionTracking, calculateMeanWind, fetchEnsembleWeatherData,
     processAndVisualizeEnsemble, clearEnsembleVisualizations, debouncedPositionUpdate,
     updateJumpMasterLine, refreshMarkerPopup, calculateJumpRunTrack, updateWeatherDisplay,
@@ -19,6 +19,8 @@ import * as JumpPlanner from './jumpPlanner.js';
 import { handleHarpPlacement, clearHarpMarker } from './harpMarker.js';
 import { TileCache, cacheTilesForDIP } from './tileCache.js';
 import { loadGpxTrack, loadCsvTrackUTC } from './trackManager.js';
+import * as weatherManager from './weatherManager.js';
+
 
 export const getTemperatureUnit = () => Settings.getValue('temperatureUnit', 'radio', 'C');
 export const getHeightUnit = () => Settings.getValue('heightUnit', 'radio', 'm');
@@ -673,63 +675,28 @@ function setupModelSelectEvents() {
         return;
     }
 
-    // Function to initialize modelSelect with stored value
-    const initializeModelSelect = () => {
-        const storedModel = Settings.state.userSettings.model;
-        const options = Array.from(modelSelect.options).map(option => option.value);
-        console.log('modelSelect options during initialization:', options);
-        if (storedModel && options.includes(storedModel)) {
-            modelSelect.value = storedModel;
-            console.log(`Initialized modelSelect to stored value: ${storedModel}`);
-            return true; // Stop polling when stored model is found
-        } else {
-            console.log(`Stored model ${storedModel} not found in options, keeping current value: ${modelSelect.value}`);
-            return false; // Continue polling
-        }
-    };
-
-    // Initial attempt to set modelSelect
-    initializeModelSelect();
-
-    // Poll for options until the stored model is found or timeout
-    const maxAttempts = 20; // 10 seconds
-    let attempts = 0;
-    const pollInterval = setInterval(() => {
-        if (initializeModelSelect() || attempts >= maxAttempts) {
-            clearInterval(pollInterval);
-            console.log(`Stopped polling for modelSelect options after ${attempts} attempts`);
-            if (attempts >= maxAttempts && !Array.from(modelSelect.options).some(opt => opt.value === Settings.state.userSettings.model)) {
-                console.warn(`Timeout: Stored model ${Settings.state.userSettings.model} never found, keeping ${modelSelect.value}`);
-            }
-        } else {
-            attempts++;
-            console.log(`Polling attempt ${attempts}: modelSelect options`, Array.from(modelSelect.options).map(opt => opt.value));
-        }
-    }, 500);
-
-    // Observe changes to modelSelect's parent container
-    const parentContainer = modelSelect.parentElement || document.body;
-    const observer = new MutationObserver(() => {
-        console.log('modelSelect or parent DOM changed, reinitializing');
-        initializeModelSelect();
-    });
-    observer.observe(parentContainer, { childList: true, subtree: true });
-
-    // Handle changes
     modelSelect.addEventListener('change', async () => {
         console.log('Model select changed to:', modelSelect.value);
 
-        // Speichere die neue Modellauswahl direkt in den Einstellungen
         Settings.state.userSettings.model = modelSelect.value;
         Settings.save();
 
         if (AppState.lastLat && AppState.lastLng) {
-            // Behalte die aktuell ausgewählte Zeit bei
             const currentIndex = getSliderValue();
             const currentTime = AppState.weatherData?.time?.[currentIndex] || null;
 
-            // Rufe die zentrale Funktion auf, die den gesamten Prozess steuert
-            await fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, currentTime);
+            // *** HIER IST DIE KORREKTUR ***
+            // Rufe die Funktion aus dem importierten Modul auf
+            const newWeatherData = await weatherManager.fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, currentTime);
+
+            // Verarbeite die zurückgegebenen Daten
+            if (newWeatherData) {
+                AppState.weatherData = newWeatherData;
+                // updateAllDisplays muss in app.js aufgerufen werden, da es UI-Logik ist.
+                // Für eine noch sauberere Architektur könnte man hier ein Custom Event senden.
+                // Aber für den Moment ist der direkte Aufruf der importierten Funktion in Ordnung.
+                await updateAllDisplays();
+            }
 
         } else {
             Utils.handleError('Please select a position on the map first.');
@@ -1241,7 +1208,13 @@ function setupInputEvents() {
     setupInput('historicalDatePicker', 'change', 300, (value) => {
         console.log('historicalDatePicker changed to:', value);
         if (AppState.lastLat && AppState.lastLng) {
-            fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, value ? `${value}T00:00:00Z` : null);
+            // *** KORREKTUR HIER ***
+            weatherManager.fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, value ? `${value}T00:00:00Z` : null).then(newWeatherData => {
+                if (newWeatherData) {
+                    AppState.weatherData = newWeatherData;
+                    updateAllDisplays();
+                }
+            });
         } else {
             Utils.handleError('Please select a position on the map first.');
         }
@@ -1264,37 +1237,18 @@ function setupClearHistoricalDate() {
         clearButton.addEventListener('click', () => {
             const datePicker = document.getElementById('historicalDatePicker');
             if (datePicker) {
-                datePicker.value = '';
+                datePicker.value = ''; // Datum leeren
                 console.log('Cleared historical date, refetching forecast data');
                 if (AppState.lastLat && AppState.lastLng) {
-                    fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, null);
-                    // Re-enable autoupdate if previously enabled
-                    if (Settings.state.userSettings.autoupdate) {
-                        startAutoupdate();
-                    }
-                } else {
-                    Utils.handleError('Please select a position on the map first.');
+                    // *** KORREKTUR HIER ***
+                    // Lade die aktuellen (nicht-historischen) Wetterdaten neu
+                    weatherManager.fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, null).then(newWeatherData => {
+                         if (newWeatherData) {
+                            AppState.weatherData = newWeatherData;
+                            updateAllDisplays();
+                        }
+                    });
                 }
-            }
-        });
-    }
-
-    // Add listener for historical date changes
-    const datePicker = document.getElementById('historicalDatePicker');
-    if (datePicker) {
-        datePicker.addEventListener('change', () => {
-            if (datePicker.value && Settings.state.userSettings.autoupdate) {
-                console.log('Historical date set, disabling autoupdate');
-                stopAutoupdate();
-                document.getElementById('autoupdateCheckbox').checked = false;
-                Settings.state.userSettings.autoupdate = false;
-                Settings.save();
-                Utils.handleMessage('Autoupdate disabled due to historical date selection.');
-            }
-            if (AppState.lastLat && AppState.lastLng) {
-                fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, datePicker.value);
-            } else {
-                Utils.handleError('Please select a position on the map first.');
             }
         });
     }
