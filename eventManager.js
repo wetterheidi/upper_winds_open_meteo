@@ -46,7 +46,6 @@ function setupCheckbox(id, setting, callback) {
             console.log(`Click event on ${id}, checked: ${checkbox.checked}, target:`, event.target);
         });
         console.log(`Attached change and click listeners to ${id}`);
-        // checkbox.checked = Settings.state.userSettings[setting]; // DIESE ZEILE ENTFERNEN ODER AUSKOMMENTIEREN
         // Apply visual indication for locked features
         if (id === 'showLandingPattern' && !(Settings.isFeatureUnlocked('landingPattern') && Settings.state.isLandingPatternUnlocked)) {
             checkbox.style.opacity = '0.5';

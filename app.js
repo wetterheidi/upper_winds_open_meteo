@@ -19,23 +19,6 @@ import * as weatherManager from './weatherManager.js';
 
 "use strict";
 
-let userSettings;
-try {
-    const storedSettings = localStorage.getItem('upperWindsSettings');
-    userSettings = storedSettings ? JSON.parse(storedSettings) : { ...Settings.defaultSettings };
-    // Stelle sicher, dass bestimmte Einstellungen zurückgesetzt werden
-    userSettings.customJumpRunDirection = null;
-    userSettings.jumpRunTrackOffset = 0;
-    userSettings.jumpRunTrackForwardOffset = 0;
-    // Speichere die aktualisierten Settings, um localStorage zu überschreiben
-    localStorage.setItem('upperWindsSettings', JSON.stringify(userSettings));
-    console.log('Settings initialized and saved with reset offsets:', userSettings);
-} catch (error) {
-    console.error('Failed to parse upperWindsSettings from localStorage:', error);
-    userSettings = { ...Settings.defaultSettings, customJumpRunDirection: null, jumpRunTrackOffset: 0, jumpRunTrackForwardOffset: 0 };
-    localStorage.setItem('upperWindsSettings', JSON.stringify(userSettings));
-}
-
 const HEATMAP_BASE_RADIUS = 20;
 const HEATMAP_REFERENCE_ZOOM = 13;
 export const debouncedCalculateJump = Utils.debounce(calculateJump, 300);
@@ -44,7 +27,6 @@ export const getDownloadFormat = () => Settings.getValue('downloadFormat', 'radi
 
 // == Tile caching ==
 Utils.handleMessage = displayMessage;
-let isCachingCancelled = false;
 
 // == Map Initialization and Interaction ==
 L.Control.Coordinates = L.Control.extend({
@@ -2158,19 +2140,6 @@ export function calculateJump() {
     // Übergib die fertige Bauanleitung an den Zeichner (auch wenn sie 'null' ist, um alte Kreise zu löschen).
     mapManager.drawCutAwayVisualization(cutawayDrawData);
 }
-export function visualizeFreeFallPath(path) {
-    if (!AppState.map || !Settings.state.userSettings.calculateJump) return;
-
-    const latLngs = path.map(point => point.latLng);
-    const freeFallPolyline = L.polyline(latLngs, {
-        color: 'purple',
-        weight: 3,
-        opacity: 0.7,
-        dashArray: '10, 10'
-    }).addTo(AppState.map);
-
-    freeFallPolyline.bindPopup(`Free Fall Path<br>Duration: ${path[path.length - 1].time.toFixed(1)}s<br>Distance: ${Math.sqrt(path[path.length - 1].latLng[0] ** 2 + path[path.length - 1].latLng[1] ** 2).toFixed(1)}m`);
-}
 export function resetJumpRunDirection(triggerUpdate = true) {
     AppState.customJumpRunDirection = null;
     const directionInput = document.getElementById('jumpRunTrackDirection');
@@ -2562,11 +2531,6 @@ function initializeApp() {
     }
     AppState.isInitialized = true;
     console.log('Initializing app');
-
-    console.log('Initial userSettings:', userSettings);
-    // Settings.state.userSettings.calculateJump = true; // ENTFERNEN
-    // Settings.save(); // ENTFERNEN
-
 }
 function initializeUIElements() {
     setElementValue('modelSelect', Settings.state.userSettings.model);
