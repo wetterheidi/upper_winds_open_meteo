@@ -965,4 +965,97 @@ export function recenterMap(force = false) {
     }
 }
 
+//Live Position Funktionen
+export function drawJumpMasterLine(start, end) {
+    const line = [[start.lat, start.lng], [end.lat, end.lng]];
+    if (AppState.jumpMasterLine) {
+        AppState.jumpMasterLine.setLatLngs(line);
+    } else {
+        AppState.jumpMasterLine = L.polyline(line, { color: 'blue', weight: 3, dashArray: '5, 5' }).addTo(AppState.map);
+    }
+}
+
+export function clearJumpMasterLine() {
+    if (AppState.jumpMasterLine) {
+        AppState.map.removeLayer(AppState.jumpMasterLine);
+        AppState.jumpMasterLine = null;
+    }
+}
+
+export function hideLivePositionControl() {
+    if (AppState.livePositionControl) {
+        AppState.livePositionControl._container.style.display = 'none';
+    }
+}
+
+export function updateLivePositionControl(data) {
+    if (!AppState.livePositionControl) return;
+
+    // Setze Standardwerte für alle möglichen Daten, falls sie fehlen
+    const {
+        latitude = AppState.lastLat || 0,
+        longitude = AppState.lastLng || 0,
+        deviceAltitude = null,
+        altitudeAccuracy = null,
+        accuracy = null,
+        speedMs = 0,
+        direction = 'N/A',
+        jumpMasterLineData = null
+    } = data;
+
+    const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
+    const speedUnit = Settings.getValue('windUnit', 'radio', 'kt') === 'bft' ? 'kt' : Settings.getValue('windUnit', 'radio', 'kt');
+    
+    // --- ABGESICHERTE FORMATIERUNG ---
+
+    let speed = 'N/A';
+    const convertedSpeed = Utils.convertWind(speedMs, speedUnit, 'm/s');
+    if (typeof convertedSpeed === 'number') {
+        speed = convertedSpeed.toFixed(1);
+    }
+
+    let convertedAccuracy = 'N/A';
+    if (accuracy !== null) {
+        const accuracyInUnit = Utils.convertHeight(accuracy, heightUnit);
+        if (typeof accuracyInUnit === 'number') {
+            convertedAccuracy = accuracyInUnit.toFixed(0);
+        }
+    }
+    
+    let altitudeText = "N/A";
+    if (deviceAltitude !== null) {
+        const altInUnit = Utils.convertHeight(deviceAltitude, heightUnit);
+        const altAccuracyInUnit = Utils.convertHeight(altitudeAccuracy, heightUnit);
+        
+        const convertedAlt = (typeof altInUnit === 'number') ? altInUnit.toFixed(0) : 'N/A';
+        const convertedAltAccuracy = (typeof altAccuracyInUnit === 'number') ? altAccuracyInUnit.toFixed(0) : 'N/A';
+        
+        altitudeText = `${convertedAlt} ± ${convertedAltAccuracy} ${heightUnit} MSL`;
+    }
+
+    // --- ZUSAMMENBAU DES HTML ---
+
+    let content = `<b>Live Position</b><br>`;
+    content += `Lat: ${latitude.toFixed(5)}<br>Lng: ${longitude.toFixed(5)}<br>`;
+    content += `Altitude: ${altitudeText}<br>`;
+    content += `Accuracy: ${convertedAccuracy} ${heightUnit}<br>`;
+    content += `Speed: ${speed} ${speedUnit}<br>`;
+    content += `Direction: ${direction}°`;
+
+    if (jumpMasterLineData) {
+        let dist = 'N/A';
+        const distInUnit = Utils.convertHeight(jumpMasterLineData.distance, heightUnit);
+        if(typeof distInUnit === 'number') {
+            dist = distInUnit.toFixed(0);
+        }
+
+        content += `<br><br><span style="font-weight: bold;">JML to ${jumpMasterLineData.target}</span><br>`;
+        content += `Bearing: ${jumpMasterLineData.bearing}°<br>`;
+        content += `Distance: ${dist} ${heightUnit}<br>`;
+        content += `TOT: X - ${jumpMasterLineData.tot} s`;
+    }
+
+    AppState.livePositionControl.update(content);
+    AppState.livePositionControl._container.style.display = 'block';
+}
 // --- ENDE DES NEUEN BLOCKS ---

@@ -6,11 +6,10 @@ import { Settings } from './settings.js';
 import { Utils } from './utils.js';
 import {
     updateAllDisplays, calculateJump, updateLandingPatternDisplay, updateJumpRunTrackDisplay,
-    getSliderValue, downloadTableAsAscii,
-    startPositionTracking, stopPositionTracking, calculateMeanWind, fetchEnsembleWeatherData,
-    processAndVisualizeEnsemble, clearEnsembleVisualizations, debouncedPositionUpdate,
-    updateJumpMasterLine, refreshMarkerPopup, calculateJumpRunTrack, updateWeatherDisplay,
-    updateLivePositionControl, debouncedGetElevationAndQFE, getDownloadFormat,
+    getSliderValue, downloadTableAsAscii, calculateMeanWind, fetchEnsembleWeatherData,
+    processAndVisualizeEnsemble, clearEnsembleVisualizations,
+    refreshMarkerPopup, calculateJumpRunTrack, updateWeatherDisplay,
+    debouncedGetElevationAndQFE, getDownloadFormat,
     validateLegHeights, debouncedCalculateJump, setInputValue, setInputValueSilently
 } from './app.js';
 import * as mapManager from './mapManager.js';
@@ -20,6 +19,7 @@ import { handleHarpPlacement, clearHarpMarker } from './harpMarker.js';
 import { TileCache, cacheTilesForDIP } from './tileCache.js';
 import { loadGpxTrack, loadCsvTrackUTC } from './trackManager.js';
 import * as weatherManager from './weatherManager.js';
+import * as liveTrackingManager from './liveTrackingManager.js';
 
 
 export const getTemperatureUnit = () => Settings.getValue('temperatureUnit', 'radio', 'C');
@@ -362,79 +362,6 @@ function setupCheckboxEvents() {
         }
     });
 
-    setupCheckbox('trackPositionCheckbox', 'trackPosition', (checkbox) => {
-        console.log('trackPositionCheckbox changed to:', checkbox.checked);
-        Settings.state.userSettings.trackPosition = checkbox.checked;
-        Settings.save();
-        const parentLi = checkbox.closest('li');
-        const submenu = parentLi?.querySelector('ul');
-        console.log('Submenu lookup for trackPositionCheckbox:', {
-            parentLi: parentLi ? 'Found' : 'Not found',
-            submenu: submenu ? 'Found' : 'Not found',
-            submenuClasses: submenu?.classList.toString(),
-            parentLiInnerHTML: parentLi?.innerHTML
-        });
-        if (submenu) {
-            toggleSubmenu(checkbox, submenu, checkbox.checked);
-        } else {
-            console.log('No submenu for trackPositionCheckbox, skipping toggleSubmenu');
-        }
-        if (checkbox.checked) {
-            startPositionTracking();
-            // Enable Jump Master Line checkbox if it exists
-            const jumpMasterCheckbox = document.getElementById('showJumpMasterLine');
-            if (jumpMasterCheckbox) {
-                jumpMasterCheckbox.disabled = false;
-                jumpMasterCheckbox.style.opacity = '1';
-                jumpMasterCheckbox.title = '';
-                console.log('Enabled showJumpMasterLine checkbox due to trackPosition being enabled');
-            }
-        } else {
-            stopPositionTracking();
-            // Disable and uncheck Jump Master Line checkbox
-            const jumpMasterCheckbox = document.getElementById('showJumpMasterLine');
-            if (jumpMasterCheckbox) {
-                jumpMasterCheckbox.disabled = true;
-                jumpMasterCheckbox.checked = false;
-                jumpMasterCheckbox.style.opacity = '0.5';
-                jumpMasterCheckbox.title = 'Enable Live Tracking to use Jump Master Line';
-                Settings.state.userSettings.showJumpMasterLine = false;
-                Settings.save();
-                const jumpMasterSubmenu = jumpMasterCheckbox.closest('li')?.querySelector('ul');
-                if (jumpMasterSubmenu) {
-                    toggleSubmenu(jumpMasterCheckbox, jumpMasterSubmenu, false);
-                }
-                console.log('Disabled and unchecked showJumpMasterLine checkbox');
-            }
-        }
-        // Remove Jump Master Line from map
-        if (AppState.jumpMasterLine) {
-            if (AppState.map && typeof AppState.map.removeLayer === 'function') {
-                AppState.map.removeLayer(AppState.jumpMasterLine);
-            } else {
-                console.warn('Map not initialized, cannot remove jumpMasterLine');
-            }
-            AppState.jumpMasterLine = null;
-            console.log('Removed Jump Master Line due to trackPosition disabled');
-        }
-        if (AppState.livePositionControl) {
-            AppState.livePositionControl.update(
-                0,
-                0,
-                null,
-                null,
-                0,
-                'N/A',
-                'kt',
-                'N/A',
-                false,
-                null
-            );
-            AppState.livePositionControl._container.style.display = 'none';
-            console.log('Cleared livePositionControl content and hid panel');
-        }
-    });
-
     setupCheckbox('showJumpMasterLine', 'showJumpMasterLine', (checkbox) => {
         console.log('showJumpMasterLine checkbox changed to:', checkbox.checked);
         // Only allow changes if trackPosition is enabled
@@ -547,6 +474,21 @@ function setupCheckboxEvents() {
             }
         }
     });
+
+    const trackPositionCheckbox = document.getElementById('trackPositionCheckbox');
+    if (trackPositionCheckbox) {
+        trackPositionCheckbox.addEventListener('change', () => {
+            const isChecked = trackPositionCheckbox.checked;
+            Settings.state.userSettings.trackPosition = isChecked;
+            Settings.save();
+
+            if (isChecked) {
+                liveTrackingManager.startPositionTracking();
+            } else {
+                liveTrackingManager.stopPositionTracking();
+            }
+        });
+    }
 
     const harpRadio = document.querySelector('input[name="jumpMasterLineTarget"][value="HARP"]');
     if (harpRadio) {
@@ -1242,7 +1184,7 @@ function setupClearHistoricalDate() {
                     // *** KORREKTUR HIER ***
                     // Lade die aktuellen (nicht-historischen) Wetterdaten neu
                     weatherManager.fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, null).then(newWeatherData => {
-                         if (newWeatherData) {
+                        if (newWeatherData) {
                             AppState.weatherData = newWeatherData;
                             updateAllDisplays();
                         }
