@@ -298,19 +298,32 @@ async function _geolocationErrorCallback(error, defaultCenter, defaultZoom) {
     console.warn(`Geolocation error: ${error.message}`);
     Utils.handleMessage('Unable to retrieve your location. Using default location.');
 
+    // 1. Setzt den Marker auf den Standardort
     await createOrUpdateMarker(defaultCenter[0], defaultCenter[1]);
-
     AppState.map.setView(defaultCenter, defaultZoom);
     recenterMap(true);
     AppState.isManualPanning = false;
 
-    // Anwendungslogik sollte hier nicht sein, diese wird über Events in app.js gehandhabt
+    // 2. Löst das Event aus, damit die App weitermachen kann
+    const mapSelectEvent = new CustomEvent('location:selected', {
+        detail: {
+            lat: defaultCenter[0],
+            lng: defaultCenter[1],
+            source: 'geolocation_fallback'
+        },
+        bubbles: true,
+        cancelable: true
+    });
+    AppState.map.getContainer().dispatchEvent(mapSelectEvent);
+    console.log("Dispatched 'location:selected' event from geolocation fallback.");
 }
 
 async function _handleGeolocation(defaultCenter, defaultZoom) {
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
+            // Bei ERFOLG wird diese Funktion aufgerufen
             (position) => _geolocationSuccessCallback(position, defaultZoom),
+            // Bei FEHLER wird diese Funktion aufgerufen
             (geoError) => _geolocationErrorCallback(geoError, defaultCenter, defaultZoom),
             {
                 enableHighAccuracy: true,
@@ -319,6 +332,7 @@ async function _handleGeolocation(defaultCenter, defaultZoom) {
             }
         );
     } else {
+        // Fallback, wenn der Browser gar keine Ortung unterstützt
         console.warn('Geolocation not supported.');
         await _geolocationErrorCallback({ message: "Geolocation not supported by this browser." }, defaultCenter, defaultZoom);
     }

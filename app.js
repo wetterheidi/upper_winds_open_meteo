@@ -1969,16 +1969,16 @@ export function clearEnsembleVisualizations() {
         //    Leaflet ist robust genug, um damit umzugehen, wenn der Layer nicht mehr da ist.
         AppState.map.removeLayer(AppState.ensembleLayerGroup);
     }
-    
+
     // 3. Dasselbe für den Heatmap-Layer.
     if (AppState.heatmapLayer) {
         AppState.map.removeLayer(AppState.heatmapLayer);
     }
-    
+
     // 4. Referenzen sicher zurücksetzen.
     AppState.heatmapLayer = null;
     AppState.ensembleScenarioCircles = {};
-    
+
     // 5. Eine brandneue, garantiert saubere Layer-Gruppe erstellen und zur Karte hinzufügen.
     AppState.ensembleLayerGroup = L.layerGroup().addTo(AppState.map);
 
@@ -2258,7 +2258,7 @@ function calculateCanopyCirclesForEnsemble(profileIdentifier, specificProfileDat
 
     const originalGlobalWeatherData = AppState.weatherData;
     AppState.weatherData = weatherDataForProfile.hourly;
-    
+
     // Temporär die Bedingungen für die Berechnung erfüllen
     const originalShowCanopyArea = Settings.state.userSettings.showCanopyArea;
     const originalCalculateJump = Settings.state.userSettings.calculateJump;
@@ -2270,7 +2270,7 @@ function calculateCanopyCirclesForEnsemble(profileIdentifier, specificProfileDat
         // KORREKTUR: Auch hier die Interpolation explizit aufrufen
         const sliderIndex = getSliderValue();
         const interpolatedData = interpolateWeatherData(sliderIndex);
-        
+
         // Und die interpolierten Daten an die Funktion übergeben
         result = JumpPlanner.calculateCanopyCircles(interpolatedData);
 
@@ -2337,16 +2337,16 @@ function calculateExitCircleForEnsemble(profileIdentifier, specificProfileData =
         // KORREKTUR: Hier die Interpolation explizit aufrufen
         const sliderIndex = getSliderValue();
         const interpolatedData = interpolateWeatherData(sliderIndex);
-        
+
         // Und die interpolierten Daten an die Funktion übergeben
         result = JumpPlanner.calculateExitCircle(interpolatedData);
 
         // ... (Rest der Funktion bleibt gleich)
         if (interpolatedData && interpolatedData.length > 0) {
-             const heights = interpolatedData.map(d => d.height);
+            const heights = interpolatedData.map(d => d.height);
             const uComponents = interpolatedData.map(d => -Utils.convertWind(d.spd, 'm/s', 'km/h') * Math.sin(d.dir * Math.PI / 180));
             const vComponents = interpolatedData.map(d => -Utils.convertWind(d.spd, 'm/s', 'km/h') * Math.cos(d.dir * Math.PI / 180));
-            
+
             const openingAltitudeAGL = parseInt(document.getElementById('openingAltitude')?.value) || 1200;
             const legHeightDownwind = parseInt(document.getElementById('legHeightDownwind')?.value) || 0;
             const elevation = Math.round(AppState.lastAltitude);
@@ -2361,7 +2361,7 @@ function calculateExitCircleForEnsemble(profileIdentifier, specificProfileData =
                 };
             }
         }
-        
+
         Settings.state.userSettings.calculateJump = originalCalculateJump;
         Settings.state.userSettings.showExitArea = originalShowExitArea;
 
@@ -3228,11 +3228,9 @@ function initializeApp() {
     console.log('Initializing app');
 
     console.log('Initial userSettings:', userSettings);
-    Settings.state.userSettings.calculateJump = true;
-    Settings.save();
+    // Settings.state.userSettings.calculateJump = true; // ENTFERNEN
+    // Settings.save(); // ENTFERNEN
 
-    //setupCheckboxEvents();
-    //setupSliderEvents();
 }
 function initializeUIElements() {
     setElementValue('modelSelect', Settings.state.userSettings.model);
@@ -3296,6 +3294,19 @@ function initializeUIElements() {
     const directionSpan = document.getElementById('jumpRunTrackDirection');
     if (directionSpan) directionSpan.textContent = '-'; // Initial placeholder
     updateUIState();
+}
+function updateUIState() {
+    const info = document.getElementById('info');
+    if (info) info.style.display = Settings.state.userSettings.showTable ? 'block' : 'none';
+    const customLL = document.getElementById('customLandingDirectionLL');
+    const customRR = document.getElementById('customLandingDirectionRR');
+    const showJumpRunTrackCheckbox = document.getElementById('showJumpRunTrack');
+    const showExitAreaCheckbox = document.getElementById('showExitAreaCheckbox');
+    if (customLL) customLL.disabled = Settings.state.userSettings.landingDirection !== 'LL';
+    if (customRR) customRR.disabled = Settings.state.userSettings.landingDirection !== 'RR';
+    if (showJumpRunTrackCheckbox) showJumpRunTrackCheckbox.disabled = !Settings.state.userSettings.calculateJump;
+    if (showExitAreaCheckbox) showExitAreaCheckbox.disabled = !Settings.state.userSettings.calculateJump; // Disable unless calculateJump is on
+    Settings.updateUnitLabels();
 }
 function restoreUIInteractivity() {
     const menu = document.getElementById('menu');
@@ -3426,6 +3437,7 @@ function setupAndHandleInput(inputId, settingName, isNumeric = true) {
 
 document.addEventListener('DOMContentLoaded', async () => {
     initializeApp();
+    initializeUIElements(); // <-- HIER DEN AUFRUF HINZUFÜGEN
     await mapManager.initializeMap();
 
     // EINZIGER AUFRUF FÜR ALLE EVENT LISTENER

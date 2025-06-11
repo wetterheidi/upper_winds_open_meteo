@@ -44,7 +44,7 @@ function setupCheckbox(id, setting, callback) {
             console.log(`Click event on ${id}, checked: ${checkbox.checked}, target:`, event.target);
         });
         console.log(`Attached change and click listeners to ${id}`);
-        checkbox.checked = Settings.state.userSettings[setting];
+        // checkbox.checked = Settings.state.userSettings[setting]; // DIESE ZEILE ENTFERNEN ODER AUSKOMMENTIEREN
         // Apply visual indication for locked features
         if (id === 'showLandingPattern' && !(Settings.isFeatureUnlocked('landingPattern') && Settings.state.isLandingPatternUnlocked)) {
             checkbox.style.opacity = '0.5';
@@ -183,21 +183,6 @@ function setupLegHeightInput(id, defaultValue) {
             Utils.handleError(`Adjusted ${id} to ${adjustedValue} to maintain valid leg order.`);
         }
     });
-}
-
-function updateUIState() {
-    const info = document.getElementById('info');
-    if (info) info.style.display = Settings.state.userSettings.showTable ? 'block' : 'none';
-    const customLL = document.getElementById('customLandingDirectionLL');
-    const customRR = document.getElementById('customLandingDirectionRR');
-    const showJumpRunTrackCheckbox = document.getElementById('showJumpRunTrack');
-    const showExitAreaCheckbox = document.getElementById('showExitAreaCheckbox');
-    if (customLL) customLL.disabled = Settings.state.userSettings.landingDirection !== 'LL';
-    if (customRR) customRR.disabled = Settings.state.userSettings.landingDirection !== 'RR';
-    if (showJumpRunTrackCheckbox) showJumpRunTrackCheckbox.disabled = !Settings.state.userSettings.calculateJump;
-    if (showExitAreaCheckbox) showExitAreaCheckbox.disabled = !Settings.state.userSettings.calculateJump; // Disable unless calculateJump is on
-    Settings.updateUnitLabels();
-    Settings.updateUnitLabels();
 }
 
 // SETUP-FUNKTIONEN FÜR DIE EINZELNEN BEREICHE
