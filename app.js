@@ -3439,6 +3439,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     initializeApp();
     initializeUIElements(); // <-- HIER DEN AUFRUF HINZUFÜGEN
     await mapManager.initializeMap();
+    setupCacheManagement(); // <-- NEUER AUFRUF HIER
+    setupCacheSettings();
+
 
     // EINZIGER AUFRUF FÜR ALLE EVENT LISTENER
     EventManager.initializeEventListeners();

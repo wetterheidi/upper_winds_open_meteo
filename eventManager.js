@@ -1258,71 +1258,6 @@ function setupDownloadEvents() {
     }
 }
 
-function setupResetButton() {
-    const bottomContainer = document.getElementById('bottom-container');
-    const resetButton = document.createElement('button');
-    resetButton.id = 'resetButton';
-    resetButton.textContent = 'Reset Settings';
-    resetButton.title = 'Resets all settings to their default values and locks all features';
-
-    const buttonWrapper = document.createElement('div');
-    buttonWrapper.id = 'settings-cache-buttons';
-    buttonWrapper.className = 'button-wrapper';
-
-    buttonWrapper.appendChild(resetButton);
-    bottomContainer.appendChild(buttonWrapper);
-
-    resetButton.addEventListener('click', () => {
-        // Reset settings to defaults
-        Settings.state.userSettings = { ...Settings.defaultSettings };
-        // Reset feature unlock status
-        Settings.state.unlockedFeatures = { landingPattern: false, calculateJump: false };
-        Settings.state.isLandingPatternUnlocked = false;
-        Settings.state.isCalculateJumpUnlocked = false;
-        // Clear localStorage
-        localStorage.removeItem('unlockedFeatures');
-        localStorage.removeItem('upperWindsSettings');
-        console.log('Reset feature unlock status:', { isLandingPatternUnlocked: Settings.state.isLandingPatternUnlocked, isCalculateJumpUnlocked: Settings.state.isCalculateJumpUnlocked, unlockedFeatures: Settings.state.unlockedFeatures });
-        // Save and reinitialize settings
-        Settings.save();
-        Settings.initialize();
-        console.log('Settings reset to defaults:', Settings.state.userSettings);
-
-        // Update UI to reflect locked state
-        const landingPatternCheckbox = document.getElementById('showLandingPattern');
-        if (landingPatternCheckbox) {
-            landingPatternCheckbox.checked = false;
-            landingPatternCheckbox.style.opacity = '0.5';
-            landingPatternCheckbox.title = 'Feature locked. Click to enter password.';
-            console.log('Updated landingPatternCheckbox UI: locked');
-        }
-        const calculateJumpMenuItem = document.getElementById('calculateJumpCheckbox');
-        if (calculateJumpMenuItem) {
-            calculateJumpMenuItem.checked = false;
-            calculateJumpMenuItem.style.opacity = '0.5';
-            calculateJumpMenuItem.title = 'Feature locked. Click to enter password.';
-            // Hide submenu
-            const submenu = calculateJumpMenuItem.parentElement.nextElementSibling;
-            if (submenu && submenu.classList.contains('submenu')) {
-                submenu.classList.add('hidden');
-                console.log('Hid calculateJump submenu');
-            }
-        }
-
-        // Reinitialize UI elements
-        initializeUIElements();
-        console.log('Reinitialized UI elements after reset');
-
-        // Trigger tile caching if position is available
-        if (AppState.lastLat && AppState.lastLng) {
-            cacheTilesForDIP({ map: AppState.map, lastLat: AppState.lastLat, lastLng: AppState.lastLng, baseMaps: AppState.baseMaps });
-            console.log('Triggered tile caching after reset');
-        }
-
-        Utils.handleMessage('Settings and feature locks reset to default values.');
-    });
-}
-
 function setupClearHistoricalDate() {
     const clearButton = document.getElementById('clearHistoricalDate');
     if (clearButton) {
@@ -1718,7 +1653,6 @@ export function initializeEventListeners() {
     setupInputEvents();
     setupDownloadEvents();
     setupTrackEvents();
-    setupResetButton();
     setupClearHistoricalDate();
     setupCoordinateEvents();
     setupCutawayRadioButtons();
