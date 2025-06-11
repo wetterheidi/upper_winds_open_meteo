@@ -2561,6 +2561,7 @@ function initializeUIElements() {
     setCheckboxValue('showLandingPattern', Settings.state.userSettings.showLandingPattern);
     setCheckboxValue('showJumpRunTrack', Settings.state.userSettings.showJumpRunTrack);
     setInputValue('jumpRunTrackOffset', Settings.state.userSettings.jumpRunTrackOffset);
+    setCheckboxValue('showCanopyAreaCheckbox', Settings.state.userSettings.showCanopyArea);
     setCheckboxValue('showExitAreaCheckbox', Settings.state.userSettings.showExitArea);
     Settings.state.userSettings.isCustomJumpRunDirection = Settings.state.userSettings.isCustomJumpRunDirection || false;
 
