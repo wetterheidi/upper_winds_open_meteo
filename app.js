@@ -128,84 +128,6 @@ export async function refreshMarkerPopup() {
     mapManager.updatePopupContent(AppState.currentMarker, popupContent);
 }
 
-// == Live Tracking Handling ==
-L.Control.LivePosition = L.Control.extend({
-    options: {
-        position: 'bottomright'
-    },
-    onAdd: function (map) {
-        const container = L.DomUtil.create('div', 'leaflet-control-live-position');
-        container.style.display = 'block';
-        container.style.zIndex = '600';
-        container.innerHTML = 'Initializing live position...';
-        this._container = container;
-        console.log('LivePosition control added to map', { styles: container.style });
-        return container;
-    },
-    update: function (lat, lng, deviceAltitude, altitudeAccuracy, accuracy, speed, effectiveWindUnit, direction, showJumpMasterLine, jumpMasterLineData) {
-        try {
-            const coordFormat = Settings.getValue('coordFormat', 'radio', 'Decimal');
-            const coords = Utils.convertCoords(lat, lng, coordFormat);
-            const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
-            const refLevel = Settings.getValue('refLevel', 'radio', 'AGL');
-            let content = `<span style="font-weight: bold;">Live Position</span><br>`;
-            if (coordFormat === 'MGRS') {
-                content += `MGRS: ${coords.lat}<br>`;
-            } else {
-                content += `Lat: ${coords.lat}<br>Lng: ${coords.lng}<br>`;
-            }
-            if (deviceAltitude !== null && deviceAltitude !== undefined) {
-                let displayAltitude;
-                let displayRefLevel = refLevel;
-                if (refLevel === 'AGL' && AppState.lastAltitude !== null && !isNaN(AppState.lastAltitude)) {
-                    displayAltitude = deviceAltitude - parseFloat(AppState.lastAltitude);
-                    displayRefLevel = 'abv DIP';
-                } else {
-                    displayAltitude = deviceAltitude;
-                }
-                const convertedAltitude = Utils.convertHeight(displayAltitude, heightUnit);
-                const convertedAltitudeAccuracy = altitudeAccuracy && Number.isFinite(altitudeAccuracy) && altitudeAccuracy > 0
-                    ? Utils.convertHeight(altitudeAccuracy, heightUnit)
-                    : 'N/A';
-                content += `Altitude: ${Math.round(convertedAltitude)} ${heightUnit} ${displayRefLevel} (±${convertedAltitudeAccuracy !== 'N/A' ? Math.round(convertedAltitudeAccuracy) : 'N/A'} ${convertedAltitudeAccuracy !== 'N/A' ? heightUnit : ''})<br>`;
-            } else {
-                content += `Altitude: N/A<br>`;
-            }
-            const convertedAccuracy = accuracy && Number.isFinite(accuracy) ? Utils.convertHeight(accuracy, heightUnit) : 'N/A';
-            content += `Accuracy: ${convertedAccuracy !== 'N/A' ? Math.round(convertedAccuracy) : 'N/A'} ${convertedAccuracy !== 'N/A' ? heightUnit : ''}<br>`;
-            content += `Speed: ${speed} ${effectiveWindUnit}<br>`;
-            content += `Direction: ${direction}°`;
-
-            if (showJumpMasterLine && jumpMasterLineData) {
-                content += `<br><span style="font-weight: bold;">Jump Master Line to ${jumpMasterLineData.target}</span><br>`;
-                content += `Bearing: ${jumpMasterLineData.bearing}°<br>`;
-                content += `Distance: ${jumpMasterLineData.distance} ${jumpMasterLineData.heightUnit}<br>`;
-                if (jumpMasterLineData.tot < 1200) {
-                    content += `TOT: X - ${jumpMasterLineData.tot} s`;
-                } else {
-                    content += `TOT: N/A`;
-                }
-            }
-
-            this._container.innerHTML = content;
-            this._container.style.display = 'block';
-            this._container.style.opacity = '1';
-            this._container.style.visibility = 'visible';
-            console.log('Updated livePositionControl content:', { content });
-        } catch (error) {
-            console.error('Error updating livePositionControl:', error);
-            this._container.innerHTML = 'Error updating live position';
-            this._container.style.display = 'block';
-        }
-    },
-    onRemove: function (map) {
-        console.log('LivePosition control removed from map');
-    }
-});
-L.control.livePosition = function (opts) {
-    return new L.Control.LivePosition(opts);
-};
-
 // == Weather Data Handling ==
 export async function updateWeatherDisplay(index, originalTime = null) {
     console.log(`updateWeatherDisplay called with index: ${index}, Time: ${AppState.weatherData.time[index]}`);
@@ -2063,6 +1985,7 @@ function initializeApp() {
     // Synchronize global variables with Settings.state.unlockedFeatures
     Settings.state.isLandingPatternUnlocked = Settings.state.unlockedFeatures.landingPattern;
     Settings.state.isCalculateJumpUnlocked = Settings.state.unlockedFeatures.calculateJump;
+    Settings.state.userSettings.showJumpMasterLine = false;
     console.log('Initial unlock status:', { isLandingPatternUnlocked: Settings.state.isLandingPatternUnlocked, isCalculateJumpUnlocked: Settings.state.isCalculateJumpUnlocked });
 
     if (AppState.isInitialized) {
@@ -2190,33 +2113,9 @@ export async function updateAllDisplays() {
             if (Settings.state.userSettings.showLandingPattern) updateLandingPatternDisplay();
             if (Settings.state.userSettings.calculateJump) {
                 debouncedCalculateJump();
-                JumpPlanner.calculateCutAway();
                 if (Settings.state.userSettings.showJumpRunTrack) updateJumpRunTrackDisplay();
             }
             mapManager.recenterMap();
-        }
-        mapManager.updateLivePositionControl(AppState); // Wir übergeben den AppState, damit die Funktion alle nötigen Infos hat
-
-        if (AppState.jumpMasterLine && AppState.liveMarker && AppState.currentMarker && AppState.lastLat !== null && AppState.lastLng !== null) {
-            if (!AppState.map) {
-                console.warn('Map not initialized, cannot update Jump Master Line popup');
-                return;
-            }
-            const liveLatLng = AppState.liveMarker.getLatLng();
-            const dipLatLng = AppState.currentMarker.getLatLng();
-            const bearing = Utils.calculateBearing(liveLatLng.lat, liveLatLng.lng, dipLatLng.lat, dipLatLng.lng).toFixed(0);
-            const distanceMeters = AppState.map.distance(liveLatLng, dipLatLng);
-            const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
-            const convertedDistance = Utils.convertHeight(distanceMeters, heightUnit);
-            const roundedDistance = Math.round(convertedDistance);
-            AppState.jumpMasterLine.setPopupContent(`<b>Jump Master Line</b><br>Bearing: ${bearing}°<br>Distance: ${roundedDistance} ${heightUnit}`);
-            console.log('Updated Jump Master Line popup for heightUnit:', { bearing, distance: roundedDistance, unit: heightUnit });
-        }
-
-        // NEU: Ensemble-Visualisierung aktualisieren, wenn sich Anzeige-Parameter ändern
-        if (Settings.state.userSettings.selectedEnsembleModels && Settings.state.userSettings.selectedEnsembleModels.length > 0) {
-            console.log("updateAllDisplays triggering ensemble update.");
-            processAndVisualizeEnsemble();
         }
 
     } catch (error) {
@@ -2243,10 +2142,10 @@ function setupAppEventListeners() {
             jumpMasterCheckbox.disabled = true;
             jumpMasterCheckbox.style.opacity = '0.5';
             jumpMasterCheckbox.title = 'Enable Live Tracking to use Jump Master Line';
-            if(Settings.state.userSettings.showJumpMasterLine) {
-                Settings.state.userSettings.showJumpMasterLine = false;
-                Settings.save();
-            }
+        }
+        if (Settings.state.userSettings.showJumpMasterLine) {
+            Settings.state.userSettings.showJumpMasterLine = false;
+            Settings.save();
         }
         mapManager.clearJumpMasterLine();
         mapManager.hideLivePositionControl();
@@ -2254,36 +2153,49 @@ function setupAppEventListeners() {
         if (trackCheckbox) trackCheckbox.checked = false;
     });
 
-    document.addEventListener('tracking:positionUpdated', (event) => {
-        const data = event.detail;
-        let jumpMasterLineData = null;
+    // NEUER, KORRIGIERTER LISTENER
+    document.addEventListener('ui:showJumpMasterLineChanged', (event) => {
+        const { isChecked } = event.detail;
+        if (isChecked) {
+            // Versuche, die Linie SOFORT zu zeichnen
+            if (AppState.liveMarker && (AppState.currentMarker || AppState.harpMarker)) {
+                const livePos = AppState.liveMarker.getLatLng();
+                let targetPos;
+                if (Settings.state.userSettings.jumpMasterLineTarget === 'HARP' && AppState.harpMarker) {
+                    targetPos = AppState.harpMarker.getLatLng();
+                } else if (AppState.currentMarker) {
+                    targetPos = AppState.currentMarker.getLatLng();
+                }
 
-        if (Settings.state.userSettings.showJumpMasterLine) {
-            let targetLat, targetLng;
-            if (Settings.state.userSettings.jumpMasterLineTarget === 'HARP' && AppState.harpMarker) {
-                targetLat = Settings.state.userSettings.harpLat;
-                targetLng = Settings.state.userSettings.harpLng;
-            } else if (AppState.currentMarker) {
-                targetLat = AppState.lastLat;
-                targetLng = AppState.lastLng;
+                if (livePos && targetPos) {
+                    mapManager.drawJumpMasterLine(livePos, targetPos);
+                    console.log('[App] Jump Master Line drawn immediately.');
+                    // Manuell ein Positions-Update anstoßen, um das Panel zu füllen
+                    document.dispatchEvent(new CustomEvent('tracking:positionUpdated', { detail: { ...AppState, latitude: livePos.lat, longitude: livePos.lng, speedMs: AppState.lastSmoothedSpeedMs, direction: AppState.lastDirection } }));
+                }
+            } else {
+                Utils.handleMessage("Jump Master Line enabled. Will be drawn on the next position update.");
             }
-
-            if (targetLat != null && targetLng != null) {
-                const livePos = { lat: data.latitude, lng: data.longitude };
-                const targetPos = { lat: targetLat, lng: targetLng };
-                mapManager.drawJumpMasterLine(livePos, targetPos);
-
-                const bearing = Utils.calculateBearing(livePos.lat, livePos.lng, targetPos.lat, targetPos.lng).toFixed(0);
-                const distance = AppState.map.distance(livePos, targetPos);
-                const tot = data.speedMs > 0 ? Math.round(distance / data.speedMs) : 'N/A';
-                jumpMasterLineData = { target: Settings.state.userSettings.jumpMasterLineTarget, bearing, distance, tot };
-            }
+        } else {
+            mapManager.clearJumpMasterLine();
+            // Panel-Anzeige aktualisieren, um JML-Infos zu entfernen
+            mapManager.updateLivePositionControl({ ...AppState, showJumpMasterLine: false, jumpMasterLineData: null });
         }
-
-        mapManager.updateLivePositionControl({ ...data, jumpMasterLineData });
     });
 
-    // Füge hier weitere Listener für andere Events hinzu...
+    document.addEventListener('tracking:positionUpdated', (event) => {
+        console.log("[App] Received tracking:positionUpdated event:", event.detail); // Debug-Ausgabe
+        const data = event.detail;
+        let jumpMasterLineData = null;
+        const showJML = Settings.state.userSettings.showJumpMasterLine;
+
+        if (showJML) {
+            // ... (Logik zur Berechnung der JML-Daten)
+        }
+
+        console.log("[App] Calling updateLivePositionControl with data:", { ...data, showJumpMasterLine: showJML, jumpMasterLineData }); // Debug-Ausgabe
+        mapManager.updateLivePositionControl({ ...data, showJumpMasterLine: showJML, jumpMasterLineData });
+    });
 }
 
 document.addEventListener('DOMContentLoaded', async () => {

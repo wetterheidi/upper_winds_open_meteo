@@ -237,13 +237,9 @@ function _setupCustomPanes() {
     console.log('Custom map panes created.');
 }
 function _initializeLivePositionControl() {
-    AppState.livePositionControl = L.control.livePosition({ position: 'bottomright' }).addTo(AppState.map);
-    if (AppState.livePositionControl._container) {
-        AppState.livePositionControl._container.style.display = 'none';
-        console.log('Initialized livePositionControl and hid by default');
-    } else {
-        console.warn('livePositionControl._container not initialized in initMap');
-    }
+    // Erstelle das Control mit der neuen Definition
+    AppState.livePositionControl = new LivePositionControl({ position: 'bottomright' }).addTo(AppState.map);
+    console.log('Initialized livePositionControl and hid by default');
 }
 async function _initializeDefaultMarker(defaultCenter, initialAltitude) {
     console.log("MapManager: Initialisiere den Standard-Marker...");
@@ -735,7 +731,7 @@ export function attachCutAwayMarkerDragend(marker) {
         AppState.cutAwayLat = position.lat;
         AppState.cutAwayLng = position.lng;
         console.log('Cut-away marker dragged to:', { lat: AppState.cutAwayLat, lng: AppState.cutAwayLng });
-        
+
         // Popup aktualisieren und Neuberechnung anstoßen
         updateCutAwayMarkerPopup(marker, AppState.cutAwayLat, AppState.cutAwayLng);
         const cutawayEvent = new CustomEvent('cutaway:marker_placed', { bubbles: true });
@@ -746,16 +742,16 @@ export function updateCutAwayMarkerPopup(marker, lat, lng, open = false) {
     const coordFormat = Settings.getValue('coordFormat', 'radio', 'Decimal');
     const coords = Utils.convertCoords(lat, lng, coordFormat);
     let popupContent = `<b>Cut-Away Start</b><br>`;
-    
+
     if (coordFormat === 'MGRS') {
         popupContent += `MGRS: ${coords.lat}`;
     } else {
         // Nutzt die korrekte Formatierung auch hier
         const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
         if (coordFormat === 'DMS') {
-             popupContent += `Lat: ${formatDMS(Utils.decimalToDms(lat, true))}<br>Lng: ${formatDMS(Utils.decimalToDms(lng, false))}`;
+            popupContent += `Lat: ${formatDMS(Utils.decimalToDms(lat, true))}<br>Lng: ${formatDMS(Utils.decimalToDms(lng, false))}`;
         } else {
-             popupContent += `Lat: ${lat.toFixed(5)}<br>Lng: ${lng.toFixed(5)}`;
+            popupContent += `Lat: ${lat.toFixed(5)}<br>Lng: ${lng.toFixed(5)}`;
         }
     }
 
@@ -966,6 +962,72 @@ export function recenterMap(force = false) {
 }
 
 //Live Position Funktionen
+const LivePositionControl = L.Control.extend({
+    options: {
+        position: 'bottomright'
+    },
+    onAdd: function (map) {
+        const container = L.DomUtil.create('div', 'leaflet-control-live-position');
+        container.style.display = 'none'; // Standardmäßig ausgeblendet
+        container.style.background = 'rgba(255, 255, 255, 0.8)';
+        container.style.padding = '5px';
+        container.style.borderRadius = '4px';
+        container.innerHTML = 'Initializing...';
+        return container;
+    },
+    update: function (data) {
+        console.log("[LivePositionControl] Update called with data:", data);
+        if (!data || !data.latitude || !data.longitude) {
+            console.warn("[LivePositionControl] Missing latitude or longitude, hiding control:", data);
+            this._container.style.display = 'none';
+            return;
+        }
+
+        const {
+            latitude, longitude, deviceAltitude, altitudeAccuracy, accuracy,
+            speedMs, direction, showJumpMasterLine, jumpMasterLineData
+        } = data;
+
+        const coordFormat = Settings.getValue('coordFormat', 'radio', 'Decimal');
+        const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
+        const refLevel = Settings.getValue('refLevel', 'radio', 'AGL');
+        const speedUnitSetting = Settings.getValue('windUnit', 'radio', 'kt');
+        const effectiveWindUnit = speedUnitSetting === 'bft' ? 'kt' : speedUnitSetting;
+
+        // Formatierung
+        const coords = Utils.convertCoords(latitude, longitude, coordFormat);
+        const coordText = (coordFormat === 'MGRS') ? `MGRS: ${coords.lat}<br>` : `Lat: ${latitude.toFixed(5)}<br>Lng: ${longitude.toFixed(5)}<br>`;
+
+        let altitudeText = "Altitude: N/A<br>";
+        if (deviceAltitude !== null) {
+            let displayAltitude = (refLevel === 'AGL' && AppState.lastAltitude) ? deviceAltitude - parseFloat(AppState.lastAltitude) : deviceAltitude;
+            let displayRefLevel = (refLevel === 'AGL' && AppState.lastAltitude) ? 'abv DIP' : refLevel;
+            const convertedAlt = Math.round(Utils.convertHeight(displayAltitude, heightUnit));
+            const convertedAcc = Math.round(Utils.convertHeight(altitudeAccuracy, heightUnit));
+            altitudeText = `Altitude: ${convertedAlt} ${heightUnit} ${displayRefLevel} (±${convertedAcc || 'N/A'} ${heightUnit})<br>`;
+        }
+
+        const accuracyText = `Accuracy: ${Math.round(Utils.convertHeight(accuracy, heightUnit))} ${heightUnit}<br>`;
+        const speedText = `Speed: ${Utils.convertWind(speedMs, effectiveWindUnit, 'm/s').toFixed(1)} ${effectiveWindUnit}<br>`;
+        const directionText = `Direction: ${direction}°`;
+
+        let content = `<span style="font-weight: bold;">Live Position</span><br>${coordText}${altitudeText}${accuracyText}${speedText}${directionText}`;
+
+        if (showJumpMasterLine && jumpMasterLineData) {
+            const distText = Math.round(Utils.convertHeight(jumpMasterLineData.distance, heightUnit));
+            const totText = jumpMasterLineData.tot !== 'N/A' && jumpMasterLineData.tot < 1200 ? `TOT: X - ${jumpMasterLineData.tot} s` : 'TOT: N/A';
+            content += `<br><br><span style="font-weight: bold;">JML to ${jumpMasterLineData.target}</span><br>`;
+            content += `Bearing: ${jumpMasterLineData.bearing}°<br>`;
+            content += `Distance: ${distText} ${heightUnit}<br>`;
+            content += totText;
+        }
+
+        this._container.innerHTML = content;
+        this._container.style.display = 'block';
+        console.log("[LivePositionControl] Updated display with content:", content);
+    }
+});
+
 export function drawJumpMasterLine(start, end) {
     const line = [[start.lat, start.lng], [end.lat, end.lng]];
     if (AppState.jumpMasterLine) {
@@ -984,78 +1046,33 @@ export function clearJumpMasterLine() {
 
 export function hideLivePositionControl() {
     if (AppState.livePositionControl) {
-        AppState.livePositionControl._container.style.display = 'none';
+        // Rufe update mit null auf, um es auszublenden
+        AppState.livePositionControl.update(null);
     }
 }
 
+// in mapManager.js
+
 export function updateLivePositionControl(data) {
-    if (!AppState.livePositionControl) return;
-
-    // Setze Standardwerte für alle möglichen Daten, falls sie fehlen
-    const {
-        latitude = AppState.lastLat || 0,
-        longitude = AppState.lastLng || 0,
-        deviceAltitude = null,
-        altitudeAccuracy = null,
-        accuracy = null,
-        speedMs = 0,
-        direction = 'N/A',
-        jumpMasterLineData = null
-    } = data;
-
-    const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
-    const speedUnit = Settings.getValue('windUnit', 'radio', 'kt') === 'bft' ? 'kt' : Settings.getValue('windUnit', 'radio', 'kt');
-    
-    // --- ABGESICHERTE FORMATIERUNG ---
-
-    let speed = 'N/A';
-    const convertedSpeed = Utils.convertWind(speedMs, speedUnit, 'm/s');
-    if (typeof convertedSpeed === 'number') {
-        speed = convertedSpeed.toFixed(1);
+    if (!AppState.livePositionControl) {
+        console.warn("[mapManager] LivePositionControl not initialized.");
+        return;
     }
 
-    let convertedAccuracy = 'N/A';
-    if (accuracy !== null) {
-        const accuracyInUnit = Utils.convertHeight(accuracy, heightUnit);
-        if (typeof accuracyInUnit === 'number') {
-            convertedAccuracy = accuracyInUnit.toFixed(0);
-        }
-    }
-    
-    let altitudeText = "N/A";
-    if (deviceAltitude !== null) {
-        const altInUnit = Utils.convertHeight(deviceAltitude, heightUnit);
-        const altAccuracyInUnit = Utils.convertHeight(altitudeAccuracy, heightUnit);
-        
-        const convertedAlt = (typeof altInUnit === 'number') ? altInUnit.toFixed(0) : 'N/A';
-        const convertedAltAccuracy = (typeof altAccuracyInUnit === 'number') ? altAccuracyInUnit.toFixed(0) : 'N/A';
-        
-        altitudeText = `${convertedAlt} ± ${convertedAltAccuracy} ${heightUnit} MSL`;
-    }
+    // Standardwerte für Robustheit
+    const formattedData = {
+        latitude: data.latitude ?? AppState.lastLat ?? 0,
+        longitude: data.longitude ?? AppState.lastLng ?? 0,
+        deviceAltitude: data.deviceAltitude ?? null,
+        altitudeAccuracy: data.altitudeAccuracy ?? null,
+        accuracy: data.accuracy ?? null,
+        speedMs: data.speedMs ?? 0,
+        direction: data.direction ?? 'N/A',
+        showJumpMasterLine: data.showJumpMasterLine ?? false,
+        jumpMasterLineData: data.jumpMasterLineData ?? null
+    };
 
-    // --- ZUSAMMENBAU DES HTML ---
-
-    let content = `<b>Live Position</b><br>`;
-    content += `Lat: ${latitude.toFixed(5)}<br>Lng: ${longitude.toFixed(5)}<br>`;
-    content += `Altitude: ${altitudeText}<br>`;
-    content += `Accuracy: ${convertedAccuracy} ${heightUnit}<br>`;
-    content += `Speed: ${speed} ${speedUnit}<br>`;
-    content += `Direction: ${direction}°`;
-
-    if (jumpMasterLineData) {
-        let dist = 'N/A';
-        const distInUnit = Utils.convertHeight(jumpMasterLineData.distance, heightUnit);
-        if(typeof distInUnit === 'number') {
-            dist = distInUnit.toFixed(0);
-        }
-
-        content += `<br><br><span style="font-weight: bold;">JML to ${jumpMasterLineData.target}</span><br>`;
-        content += `Bearing: ${jumpMasterLineData.bearing}°<br>`;
-        content += `Distance: ${dist} ${heightUnit}<br>`;
-        content += `TOT: X - ${jumpMasterLineData.tot} s`;
-    }
-
-    AppState.livePositionControl.update(content);
-    AppState.livePositionControl._container.style.display = 'block';
+    console.log("[mapManager] Passing data to LivePositionControl.update:", formattedData);
+    AppState.livePositionControl.update(formattedData); // Übergibt das Datenobjekt
 }
 // --- ENDE DES NEUEN BLOCKS ---
