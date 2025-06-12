@@ -376,9 +376,8 @@ function setupCheckboxEvents() {
         showJumpMasterLineCheckbox.addEventListener('change', () => {
             const isChecked = showJumpMasterLineCheckbox.checked;
 
-            // Prüfen, ob die Funktion überhaupt aktiviert werden darf
             if (isChecked && showJumpMasterLineCheckbox.disabled) {
-                showJumpMasterLineCheckbox.checked = false; // Aktion verhindern
+                showJumpMasterLineCheckbox.checked = false;
                 Utils.handleError('Please start Live Tracking first.');
                 return;
             }
@@ -386,6 +385,16 @@ function setupCheckboxEvents() {
             Settings.state.userSettings.showJumpMasterLine = isChecked;
             Settings.save();
             dispatchAppEvent('ui:showJumpMasterLineChanged', { isChecked });
+
+            // --- START DER ERWEITERUNG ---
+            // Finde das zugehörige Submenü
+            const submenu = showJumpMasterLineCheckbox.closest('li')?.querySelector('ul.submenu');
+
+            // Rufe die Hilfsfunktion auf, um das Menü basierend auf dem Status der Checkbox ein- oder auszublenden
+            if (submenu) {
+                toggleSubmenu(showJumpMasterLineCheckbox, submenu, isChecked);
+            }
+            // --- ENDE DER ERWEITERUNG ---
         });
     }
 
@@ -696,18 +705,14 @@ function setupRadioEvents() {
         Settings.state.userSettings.jumpMasterLineTarget = Settings.getValue('jumpMasterLineTarget', 'radio', 'DIP');
         Settings.save();
         console.log('jumpMasterLineTarget changed:', Settings.state.userSettings.jumpMasterLineTarget);
-        if (Settings.state.userSettings.showJumpMasterLine && AppState.liveMarker) {
-            debouncedPositionUpdate({
-                coords: {
-                    latitude: AppState.lastLatitude,
-                    longitude: AppState.lastLongitude,
-                    accuracy: AppState.lastAccuracy,
-                    altitude: AppState.lastDeviceAltitude,
-                    altitudeAccuracy: AppState.lastAltitudeAccuracy
-                }
-            });
-        }
-        // Disable HARP if no marker
+
+        // --- START DER KORREKTUR ---
+        // Problem: Direkter Aufruf von debouncedPositionUpdate(...) war hier und verursachte den Fehler.
+        // Lösung: Stattdessen ein Event auslösen, auf das app.js lauschen kann.
+        dispatchAppEvent('jml:targetChanged');
+        // --- ENDE DER KORREKTUR ---
+
+        // Der restliche Teil der Funktion (HARP Radio-Button deaktivieren) bleibt unverändert.
         const harpRadio = document.querySelector('input[name="jumpMasterLineTarget"][value="HARP"]');
         if (harpRadio) {
             harpRadio.disabled = !AppState.harpMarker || Settings.state.userSettings.harpLat === null || Settings.state.userSettings.harpLng === null;

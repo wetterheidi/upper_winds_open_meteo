@@ -1979,6 +1979,84 @@ export function updateJumpRunTrackDisplay() {
     }
 }
 
+// == Live Tracking ==
+/**
+ * Aktualisiert die Jump Master Line und das Live-Info-Panel.
+ * Holt sich die Position vom Live-Marker und berechnet alle Werte neu.
+ * @param {object|null} positionData - Optionale, frische Positionsdaten von einem Event.
+ */
+function updateJumpMasterLineAndPanel(positionData = null) {
+    // Wenn es noch keinen Live-Marker gibt, können wir nichts tun.
+    if (!AppState.liveMarker) {
+        return;
+    }
+
+    const livePos = AppState.liveMarker.getLatLng();
+    if (!livePos) { 
+        return;
+    }
+
+    // 1. Baue IMMER das Basis-Datenobjekt mit den Live-Positionsdaten.
+    //    Nutze frische Daten vom Event, falls vorhanden, sonst die zuletzt gespeicherten.
+    const data = positionData ? positionData : {
+        latitude: livePos.lat,
+        longitude: livePos.lng,
+        speedMs: AppState.lastSmoothedSpeedMs,
+        direction: AppState.lastDirection,
+        deviceAltitude: AppState.lastDeviceAltitude,
+        altitudeAccuracy: AppState.lastAltitudeAccuracy,
+        accuracy: AppState.lastAccuracy
+    };
+
+    let jumpMasterLineData = null;
+    const showJML = Settings.state.userSettings.showJumpMasterLine;
+
+    // 2. Prüfe, ob die JML-Logik ausgeführt werden soll.
+    if (showJML) {
+        let targetPos = null;
+        let targetName = '';
+
+        // Ziel bestimmen (DIP oder HARP)
+        if (Settings.state.userSettings.jumpMasterLineTarget === 'HARP' && AppState.harpMarker) {
+            targetPos = AppState.harpMarker.getLatLng();
+            targetName = 'HARP';
+        } else if (AppState.currentMarker) {
+            targetPos = AppState.currentMarker.getLatLng();
+            targetName = 'DIP';
+        }
+
+        // Wenn ein Ziel da ist, berechne die JML-Daten und zeichne die Linie.
+        if (targetPos) {
+            const distance = AppState.map.distance(livePos, targetPos);
+            const bearing = Math.round(Utils.calculateBearing(livePos.lat, livePos.lng, targetPos.lat, targetPos.lng));
+            const speedMs = data.speedMs > 1 ? data.speedMs : 1;
+            const tot = Math.round(distance / speedMs);
+            jumpMasterLineData = { distance, bearing, tot, target: targetName };
+            mapManager.drawJumpMasterLine(livePos, targetPos);
+        }
+    } else {
+        // Wenn die JML nicht angezeigt werden soll, stelle sicher, dass die Linie auf der Karte entfernt wird.
+        mapManager.clearJumpMasterLine();
+    }
+    
+    // 3. Sammle die Einstellungen für die Anzeige.
+    const settingsForPanel = {
+        heightUnit: Settings.getValue('heightUnit', 'radio', 'm'),
+        effectiveWindUnit: Settings.getValue('windUnit', 'radio', 'kt') === 'bft' ? 'kt' : Settings.getValue('windUnit', 'radio', 'kt'),
+        coordFormat: Settings.getValue('coordFormat', 'radio', 'Decimal'),
+        refLevel: Settings.getValue('refLevel', 'radio', 'AGL')
+    };
+
+    // 4. Rufe IMMER die Funktion zur Panel-Aktualisierung auf.
+    //    Sie bekommt alle Basisdaten und die (potenziell leeren) JML-Daten.
+    mapManager.updateLivePositionControl({ 
+        ...data, 
+        showJumpMasterLine: showJML, 
+        jumpMasterLineData, 
+        ...settingsForPanel 
+    });
+}
+
 // == UI and Event Handling ==
 function initializeApp() {
     Settings.initialize();
@@ -2055,6 +2133,14 @@ function initializeUIElements() {
         calculateJumpCheckbox.style.opacity = (Settings.isFeatureUnlocked('calculateJump') && Settings.state.isCalculateJumpUnlocked) ? '1' : '0.5';
         console.log('Initialized calculateJumpCheckbox UI:', { checked: calculateJumpCheckbox.checked, opacity: calculateJumpCheckbox.style.opacity });
     }
+
+    const jumpMasterCheckbox = document.getElementById('showJumpMasterLine');
+    if (jumpMasterCheckbox) {
+        jumpMasterCheckbox.disabled = !Settings.state.userSettings.trackPosition;
+        jumpMasterCheckbox.style.opacity = jumpMasterCheckbox.disabled ? '0.5' : '1';
+        jumpMasterCheckbox.title = jumpMasterCheckbox.disabled ? 'Enable Live Tracking to use Jump Master Line' : '';
+    }
+
     const directionSpan = document.getElementById('jumpRunTrackDirection');
     if (directionSpan) directionSpan.textContent = '-'; // Initial placeholder
     updateUIState();
@@ -2147,54 +2233,19 @@ function setupAppEventListeners() {
             Settings.state.userSettings.showJumpMasterLine = false;
             Settings.save();
         }
-        mapManager.clearJumpMasterLine();
-        mapManager.hideLivePositionControl();
-        const trackCheckbox = document.getElementById('trackPositionCheckbox');
-        if (trackCheckbox) trackCheckbox.checked = false;
+        updateJumpMasterLineAndPanel();
     });
 
-    // NEUER, KORRIGIERTER LISTENER
-    document.addEventListener('ui:showJumpMasterLineChanged', (event) => {
-        const { isChecked } = event.detail;
-        if (isChecked) {
-            // Versuche, die Linie SOFORT zu zeichnen
-            if (AppState.liveMarker && (AppState.currentMarker || AppState.harpMarker)) {
-                const livePos = AppState.liveMarker.getLatLng();
-                let targetPos;
-                if (Settings.state.userSettings.jumpMasterLineTarget === 'HARP' && AppState.harpMarker) {
-                    targetPos = AppState.harpMarker.getLatLng();
-                } else if (AppState.currentMarker) {
-                    targetPos = AppState.currentMarker.getLatLng();
-                }
+    document.addEventListener('ui:showJumpMasterLineChanged', () => {
+        updateJumpMasterLineAndPanel();
+    });
 
-                if (livePos && targetPos) {
-                    mapManager.drawJumpMasterLine(livePos, targetPos);
-                    console.log('[App] Jump Master Line drawn immediately.');
-                    // Manuell ein Positions-Update anstoßen, um das Panel zu füllen
-                    document.dispatchEvent(new CustomEvent('tracking:positionUpdated', { detail: { ...AppState, latitude: livePos.lat, longitude: livePos.lng, speedMs: AppState.lastSmoothedSpeedMs, direction: AppState.lastDirection } }));
-                }
-            } else {
-                Utils.handleMessage("Jump Master Line enabled. Will be drawn on the next position update.");
-            }
-        } else {
-            mapManager.clearJumpMasterLine();
-            // Panel-Anzeige aktualisieren, um JML-Infos zu entfernen
-            mapManager.updateLivePositionControl({ ...AppState, showJumpMasterLine: false, jumpMasterLineData: null });
-        }
+    document.addEventListener('jml:targetChanged', () => {
+        updateJumpMasterLineAndPanel();
     });
 
     document.addEventListener('tracking:positionUpdated', (event) => {
-        console.log("[App] Received tracking:positionUpdated event:", event.detail); // Debug-Ausgabe
-        const data = event.detail;
-        let jumpMasterLineData = null;
-        const showJML = Settings.state.userSettings.showJumpMasterLine;
-
-        if (showJML) {
-            // ... (Logik zur Berechnung der JML-Daten)
-        }
-
-        console.log("[App] Calling updateLivePositionControl with data:", { ...data, showJumpMasterLine: showJML, jumpMasterLineData }); // Debug-Ausgabe
-        mapManager.updateLivePositionControl({ ...data, showJumpMasterLine: showJML, jumpMasterLineData });
+        updateJumpMasterLineAndPanel(event.detail);
     });
 }
 

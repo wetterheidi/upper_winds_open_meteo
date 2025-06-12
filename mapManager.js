@@ -968,33 +968,26 @@ const LivePositionControl = L.Control.extend({
     },
     onAdd: function (map) {
         const container = L.DomUtil.create('div', 'leaflet-control-live-position');
-        container.style.display = 'none'; // Standardmäßig ausgeblendet
+        container.style.display = 'none';
         container.style.background = 'rgba(255, 255, 255, 0.8)';
         container.style.padding = '5px';
         container.style.borderRadius = '4px';
-        container.innerHTML = 'Initializing...';
+        this._container = container;
         return container;
     },
     update: function (data) {
-        console.log("[LivePositionControl] Update called with data:", data);
-        if (!data || !data.latitude || !data.longitude) {
-            console.warn("[LivePositionControl] Missing latitude or longitude, hiding control:", data);
+        // Wenn keine Daten oder keine Koordinaten da sind -> ausblenden.
+        if (!data || data.latitude === null || data.latitude === undefined) {
             this._container.style.display = 'none';
             return;
         }
 
         const {
             latitude, longitude, deviceAltitude, altitudeAccuracy, accuracy,
-            speedMs, direction, showJumpMasterLine, jumpMasterLineData
+            speedMs, direction, showJumpMasterLine, jumpMasterLineData,
+            heightUnit, effectiveWindUnit, coordFormat, refLevel
         } = data;
-
-        const coordFormat = Settings.getValue('coordFormat', 'radio', 'Decimal');
-        const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
-        const refLevel = Settings.getValue('refLevel', 'radio', 'AGL');
-        const speedUnitSetting = Settings.getValue('windUnit', 'radio', 'kt');
-        const effectiveWindUnit = speedUnitSetting === 'bft' ? 'kt' : speedUnitSetting;
-
-        // Formatierung
+        
         const coords = Utils.convertCoords(latitude, longitude, coordFormat);
         const coordText = (coordFormat === 'MGRS') ? `MGRS: ${coords.lat}<br>` : `Lat: ${latitude.toFixed(5)}<br>Lng: ${longitude.toFixed(5)}<br>`;
 
@@ -1016,6 +1009,7 @@ const LivePositionControl = L.Control.extend({
         if (showJumpMasterLine && jumpMasterLineData) {
             const distText = Math.round(Utils.convertHeight(jumpMasterLineData.distance, heightUnit));
             const totText = jumpMasterLineData.tot !== 'N/A' && jumpMasterLineData.tot < 1200 ? `TOT: X - ${jumpMasterLineData.tot} s` : 'TOT: N/A';
+            
             content += `<br><br><span style="font-weight: bold;">JML to ${jumpMasterLineData.target}</span><br>`;
             content += `Bearing: ${jumpMasterLineData.bearing}°<br>`;
             content += `Distance: ${distText} ${heightUnit}<br>`;
@@ -1024,7 +1018,6 @@ const LivePositionControl = L.Control.extend({
 
         this._container.innerHTML = content;
         this._container.style.display = 'block';
-        console.log("[LivePositionControl] Updated display with content:", content);
     }
 });
 
@@ -1051,28 +1044,9 @@ export function hideLivePositionControl() {
     }
 }
 
-// in mapManager.js
-
 export function updateLivePositionControl(data) {
-    if (!AppState.livePositionControl) {
-        console.warn("[mapManager] LivePositionControl not initialized.");
-        return;
+    if (AppState.livePositionControl) {
+        AppState.livePositionControl.update(data);
     }
-
-    // Standardwerte für Robustheit
-    const formattedData = {
-        latitude: data.latitude ?? AppState.lastLat ?? 0,
-        longitude: data.longitude ?? AppState.lastLng ?? 0,
-        deviceAltitude: data.deviceAltitude ?? null,
-        altitudeAccuracy: data.altitudeAccuracy ?? null,
-        accuracy: data.accuracy ?? null,
-        speedMs: data.speedMs ?? 0,
-        direction: data.direction ?? 'N/A',
-        showJumpMasterLine: data.showJumpMasterLine ?? false,
-        jumpMasterLineData: data.jumpMasterLineData ?? null
-    };
-
-    console.log("[mapManager] Passing data to LivePositionControl.update:", formattedData);
-    AppState.livePositionControl.update(formattedData); // Übergibt das Datenobjekt
 }
 // --- ENDE DES NEUEN BLOCKS ---
