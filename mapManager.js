@@ -1010,7 +1010,7 @@ const LivePositionControl = L.Control.extend({
             const distText = Math.round(Utils.convertHeight(jumpMasterLineData.distance, heightUnit));
             const totText = jumpMasterLineData.tot !== 'N/A' && jumpMasterLineData.tot < 1200 ? `TOT: X - ${jumpMasterLineData.tot} s` : 'TOT: N/A';
             
-            content += `<br><br><span style="font-weight: bold;">JML to ${jumpMasterLineData.target}</span><br>`;
+            content += `<br><br><span style="font-weight: bold;">Jump Master Line to ${jumpMasterLineData.target}</span><br>`;
             content += `Bearing: ${jumpMasterLineData.bearing}°<br>`;
             content += `Distance: ${distText} ${heightUnit}<br>`;
             content += totText;

@@ -9,7 +9,7 @@ import {
     getSliderValue, downloadTableAsAscii, calculateMeanWind, fetchEnsembleWeatherData,
     processAndVisualizeEnsemble, clearEnsembleVisualizations,
     refreshMarkerPopup, calculateJumpRunTrack, updateWeatherDisplay,
-    debouncedGetElevationAndQFE, getDownloadFormat,
+    debouncedGetElevationAndQFE, getDownloadFormat, updateJumpMasterLineAndPanel,
     validateLegHeights, debouncedCalculateJump, setInputValue, setInputValueSilently
 } from './app.js';
 import * as mapManager from './mapManager.js';
@@ -577,6 +577,7 @@ function setupRadioEvents() {
     setupRadioGroup('heightUnit', () => {
         Settings.updateUnitLabels();
         updateAllDisplays();
+        updateJumpMasterLineAndPanel();
         if (AppState.lastMouseLatLng && AppState.coordsControl) {
             const coordFormat = getCoordinateFormat();
             const lat = AppState.lastMouseLatLng.lat;
@@ -601,7 +602,7 @@ function setupRadioEvents() {
                             displayElevation = Math.round(displayElevation);
                         }
                         console.log('Updating elevation display after heightUnit change:', { lat, lng, elevation, heightUnit, displayElevation });
-                        coordsControl.update(`${coordText}<br>Elevation: ${displayElevation} ${displayElevation === 'N/A' ? '' : heightUnit}`);
+                        AppState.coordsControl.update(`${coordText}<br>Elevation: ${displayElevation} ${displayElevation === 'N/A' ? '' : heightUnit}`);
                     }
                 }
             });
@@ -637,6 +638,7 @@ function setupRadioEvents() {
     setupRadioGroup('windUnit', () => {
         Settings.updateUnitLabels();
         updateAllDisplays();
+        updateJumpMasterLineAndPanel(); // <-- HINZUFÜGEN
         if (AppState.gpxLayer && AppState.gpxPoints.length > 0) {
             const groundAltitude = AppState.lastAltitude !== 'N/A' && !isNaN(AppState.lastAltitude) ? parseFloat(AppState.lastAltitude) : null;
             const windUnit = getWindSpeedUnit();
@@ -666,13 +668,10 @@ function setupRadioEvents() {
         updateAllDisplays();
     });
     setupRadioGroup('coordFormat', () => {
-        // Die fehlerhafte Zeile wurde entfernt.
-        // Die Funktion `updateCoordInputs` existiert im `Coordinates`-Modul nicht mehr.
-
-        // Korrekter Aufruf, um das Marker-Popup zu aktualisieren.
         if (AppState.lastLat && AppState.lastLng) {
             refreshMarkerPopup();
         }
+        updateJumpMasterLineAndPanel(); // <-- HINZUFÜGEN
     });
     setupRadioGroup('downloadFormat', () => {
         console.log('Download format changed:', getDownloadFormat());

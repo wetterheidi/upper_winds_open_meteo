@@ -1985,14 +1985,14 @@ export function updateJumpRunTrackDisplay() {
  * Holt sich die Position vom Live-Marker und berechnet alle Werte neu.
  * @param {object|null} positionData - Optionale, frische Positionsdaten von einem Event.
  */
-function updateJumpMasterLineAndPanel(positionData = null) {
+export function updateJumpMasterLineAndPanel(positionData = null) {
     // Wenn es noch keinen Live-Marker gibt, können wir nichts tun.
     if (!AppState.liveMarker) {
         return;
     }
 
     const livePos = AppState.liveMarker.getLatLng();
-    if (!livePos) { 
+    if (!livePos) {
         return;
     }
 
@@ -2038,7 +2038,7 @@ function updateJumpMasterLineAndPanel(positionData = null) {
         // Wenn die JML nicht angezeigt werden soll, stelle sicher, dass die Linie auf der Karte entfernt wird.
         mapManager.clearJumpMasterLine();
     }
-    
+
     // 3. Sammle die Einstellungen für die Anzeige.
     const settingsForPanel = {
         heightUnit: Settings.getValue('heightUnit', 'radio', 'm'),
@@ -2049,11 +2049,11 @@ function updateJumpMasterLineAndPanel(positionData = null) {
 
     // 4. Rufe IMMER die Funktion zur Panel-Aktualisierung auf.
     //    Sie bekommt alle Basisdaten und die (potenziell leeren) JML-Daten.
-    mapManager.updateLivePositionControl({ 
-        ...data, 
-        showJumpMasterLine: showJML, 
-        jumpMasterLineData, 
-        ...settingsForPanel 
+    mapManager.updateLivePositionControl({
+        ...data,
+        showJumpMasterLine: showJML,
+        jumpMasterLineData,
+        ...settingsForPanel
     });
 }
 
@@ -2381,6 +2381,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             mapManager.recenterMap(true);
             AppState.isManualPanning = false;
 
+            if (Settings.state.userSettings.showJumpMasterLine) {
+                updateJumpMasterLineAndPanel();
+            }
         } catch (error) {
             console.error('Fehler beim Verarbeiten von "location:selected":', error);
             displayError(error.message);
