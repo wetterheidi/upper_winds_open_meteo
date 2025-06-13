@@ -1,8 +1,5 @@
 "use strict";
 
-// Assuming Leaflet is available globally (L) or imported if using modules
-// import L from 'leaflet'; // Uncomment if using a module bundler
-
 import { Settings } from './settings.js';
 
 // Maps an AGL height to a color gradient (red -> yellow -> green)

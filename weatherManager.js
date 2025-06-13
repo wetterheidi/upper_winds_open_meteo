@@ -4,6 +4,7 @@ import { Settings, getInterpolationStep } from './settings.js';
 import { displayError } from './ui.js';
 import { fetchEnsembleWeatherData, clearEnsembleVisualizations } from './ensembleManager.js';
 import { WEATHER_MODELS } from './constants.js';
+import { updateModelSelectUI, updateEnsembleModelUI, cleanupSelectedEnsembleModels } from './ui.js'; 
 
 // Diese Funktion ist der neue, zentrale Einstiegspunkt von außen.
 export async function fetchWeatherForLocation(lat, lng, currentTime = null) {
@@ -113,60 +114,6 @@ async function checkAvailableModels(lat, lon) {
     updateEnsembleModelUI(availableModels);
     cleanupSelectedEnsembleModels(availableModels);
     return availableModels;
-}
-
-function updateModelSelectUI(availableModels) {
-    const modelSelect = document.getElementById('modelSelect');
-    if (!modelSelect) return;
-    const currentSelected = modelSelect.value;
-    modelSelect.innerHTML = '';
-    availableModels.forEach(model => {
-        const option = document.createElement('option');
-        option.value = model;
-        option.textContent = model.replace(/_/g, ' ').toUpperCase();
-        modelSelect.appendChild(option);
-    });
-    if (availableModels.includes(Settings.state.userSettings.model)) {
-        modelSelect.value = Settings.state.userSettings.model;
-    } else if (availableModels.includes(currentSelected)) {
-        modelSelect.value = currentSelected;
-    } else if (availableModels.length > 0) {
-        modelSelect.value = availableModels[0];
-    }
-}
-
-function updateEnsembleModelUI(availableModels) {
-    const submenu = document.getElementById('ensembleModelsSubmenu');
-    if (!submenu) return;
-    submenu.innerHTML = '';
-    availableModels.forEach(model => {
-        const li = document.createElement('li');
-        const label = document.createElement('label');
-        label.className = 'radio-label';
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.name = 'ensembleModel';
-        checkbox.value = model;
-        checkbox.checked = Settings.state.userSettings.selectedEnsembleModels.includes(model);
-        checkbox.addEventListener('change', () => {
-            const selected = Array.from(submenu.querySelectorAll('input:checked')).map(cb => cb.value);
-            Settings.state.userSettings.selectedEnsembleModels = selected;
-            Settings.save();
-            fetchEnsembleWeatherData();
-        });
-        label.append(checkbox, ` ${model.replace(/_/g, ' ').toUpperCase()}`);
-        li.appendChild(label);
-        submenu.appendChild(li);
-    });
-}
-
-function cleanupSelectedEnsembleModels(availableModels) {
-    let selected = Settings.state.userSettings.selectedEnsembleModels || [];
-    let updated = selected.filter(m => availableModels.includes(m));
-    if (selected.length !== updated.length) {
-        Settings.state.userSettings.selectedEnsembleModels = updated;
-        Settings.save();
-    }
 }
 
 export function interpolateWeatherData(sliderIndex) {
