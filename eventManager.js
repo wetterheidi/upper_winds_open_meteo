@@ -4,9 +4,10 @@
 import { AppState } from './state.js';
 import { Settings } from './settings.js';
 import { Utils } from './utils.js';
+import { updateUIState } from './app.js';
 import {
     updateAllDisplays, calculateJump, updateLandingPatternDisplay, updateJumpRunTrackDisplay,
-    downloadTableAsAscii, calculateMeanWind, 
+    downloadTableAsAscii, calculateMeanWind,
     refreshMarkerPopup, calculateJumpRunTrack, updateWeatherDisplay,
     debouncedGetElevationAndQFE, getDownloadFormat, updateJumpMasterLineAndPanel,
     validateLegHeights, debouncedCalculateJump, setInputValue, setInputValueSilently
@@ -14,13 +15,18 @@ import {
 import * as mapManager from './mapManager.js';
 import * as Coordinates from './coordinates.js';
 import * as JumpPlanner from './jumpPlanner.js';
-import { handleHarpPlacement, clearHarpMarker } from './harpMarker.js';
+import { handleHarpPlacement, clearHarpMarker } from './harpMarker.js'
 import { TileCache, cacheTilesForDIP } from './tileCache.js';
 import { loadGpxTrack, loadCsvTrackUTC } from './trackManager.js';
 import * as weatherManager from './weatherManager.js';
 import * as liveTrackingManager from './liveTrackingManager.js';
 import { fetchEnsembleWeatherData, processAndVisualizeEnsemble, clearEnsembleVisualizations } from './ensembleManager.js';
 import { getSliderValue } from './ui.js';
+import * as L from 'leaflet';
+window.L = L;
+import 'leaflet/dist/leaflet.css'; // Nicht vergessen!
+import * as mgrs from 'mgrs';
+import 'leaflet-gpx';
 
 function dispatchAppEvent(eventName, detail = {}) {
     console.log(`[EventManager] Dispatching event: ${eventName}`, detail);
@@ -1224,7 +1230,7 @@ function setupMapEventListeners() {
 
         // 2. Kernlogik ausführen
         resetJumpRunDirection(true); // resetJumpRunDirection muss in app.js sein
-        await fetchWeatherForLocation(lat, lng); // fetchWeather... muss in app.js sein
+        await weatherManager.fetchWeatherForLocation(lat, lng); // fetchWeather... muss in app.js sein
 
         if (Settings.state.userSettings.calculateJump) {
             calculateJump(); // calculateJump muss in app.js sein
@@ -1424,8 +1430,36 @@ function setupTrackEvents() {
 
                 await mapManager.createOrUpdateMarker(lat, lng);
 
-                // 2. WICHTIG: Wir WARTEN hier, bis der langsame Wetterabruf komplett fertig ist.
-                await fetchWeatherForLocation(lat, lng, timestamp);
+                // 1. Wetterdaten für den historischen Zeitpunkt abrufen
+                const newWeatherData = await weatherManager.fetchWeatherForLocation(lat, lng, timestamp);
+
+                if (newWeatherData) {
+                    AppState.weatherData = newWeatherData; // Daten im AppState speichern
+
+                    // 2. Den Slider auf den richtigen Zeitpunkt setzen
+                    const slider = document.getElementById('timeSlider');
+                    if (slider && AppState.weatherData.time) {
+                        slider.max = AppState.weatherData.time.length - 1;
+                        slider.disabled = slider.max <= 0;
+
+                        // Finde den Index, der am besten zum Track-Zeitstempel passt
+                        const targetTimestamp = new Date(timestamp).getTime();
+                        let bestIndex = 0;
+                        let minDiff = Infinity;
+                        AppState.weatherData.time.forEach((time, idx) => {
+                            const diff = Math.abs(new Date(time).getTime() - targetTimestamp);
+                            if (diff < minDiff) {
+                                minDiff = diff;
+                                bestIndex = idx;
+                            }
+                        });
+                        slider.value = bestIndex; // Slider positionieren!
+                    }
+                }
+                // HIER ENDET DIE ÄNDERUNG
+
+                // Erst jetzt, nachdem der Slider korrekt steht, die Anzeigen aktualisieren
+                await updateAllDisplays();
 
                 // Erst danach die restlichen UI-Updates durchführen
                 if (Settings.state.isCalculateJumpUnlocked && Settings.state.userSettings.calculateJump) calculateJump();

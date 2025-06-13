@@ -1,7 +1,7 @@
 // ui.js
 import { Utils } from './utils.js';
 import { Settings, getInterpolationStep } from './settings.js';
-
+import { fetchEnsembleWeatherData } from './ensembleManager.js';
 
 export function isMobileDevice() {
     const isMobile = window.innerWidth < 768;

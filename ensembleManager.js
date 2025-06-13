@@ -5,6 +5,11 @@ import { Utils } from './utils.js';
 import * as JumpPlanner from './jumpPlanner.js';
 import { displayMessage, displayError, getSliderValue } from './ui.js';
 import { interpolateWeatherData } from './weatherManager.js';
+import { DateTime } from 'luxon';
+import * as L from 'leaflet';
+window.L = L; // <-- DIESE ZEILE MUSS BLEIBEN
+import 'leaflet/dist/leaflet.css'; // Nicht vergessen!
+import 'leaflet.heat';
 
 const HEATMAP_BASE_RADIUS = 20;
 const HEATMAP_REFERENCE_ZOOM = 13;
@@ -53,8 +58,8 @@ export async function fetchEnsembleWeatherData() {
 
     const historicalDatePicker = document.getElementById('historicalDatePicker');
     const selectedDateValue = historicalDatePicker ? historicalDatePicker.value : null;
-    const selectedDate = selectedDateValue ? luxon.DateTime.fromISO(selectedDateValue, { zone: 'utc' }) : null;
-    const today = luxon.DateTime.utc().startOf('day');
+    const selectedDate = selectedDateValue ? DateTime.fromISO(selectedDateValue, { zone: 'utc' }) : null;
+    const today = DateTime.utc().startOf('day');
     const isHistorical = selectedDate && selectedDate < today;
 
     let startDateStr, endDateStr;
@@ -65,7 +70,7 @@ export async function fetchEnsembleWeatherData() {
         startDateStr = selectedDate.toFormat('yyyy-MM-dd');
         endDateStr = startDateStr;
     } else {
-        const now = luxon.DateTime.utc();
+        const now = DateTime.utc();
         startDateStr = now.toFormat('yyyy-MM-dd');
         endDateStr = now.plus({ days: 7 }).toFormat('yyyy-MM-dd'); // Standard-Vorhersagezeitraum
     }

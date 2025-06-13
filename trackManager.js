@@ -4,6 +4,14 @@ import { Settings } from "./settings.js";
 import { Utils } from "./utils.js";
 import { interpolateColor } from "./uiHelpers.js";
 import { attachMarkerDragend, createCustomMarker, updatePopupContent } from './mapManager.js';
+import { DateTime } from 'luxon';
+import * as L from 'leaflet';
+window.L = L; // <-- DIESE ZEILE MUSS BLEIBEN
+import 'leaflet/dist/leaflet.css'; // Nicht vergessen!
+import * as mgrs from 'mgrs';
+import Papa from 'papaparse';
+import 'leaflet-gpx';
+
 "use strict";
 
 
@@ -69,7 +77,7 @@ export async function loadGpxTrack(file) {
                     if (isNaN(lat) || isNaN(lng)) continue;
                     const ele = trackpoints[i].getElementsByTagName('ele')[0]?.textContent;
                     const time = trackpoints[i].getElementsByTagName('time')[0]?.textContent;
-                    points.push({ lat, lng, ele: ele ? parseFloat(ele) : null, time: time ? luxon.DateTime.fromISO(time, { zone: 'utc' }) : null });
+                    points.push({ lat, lng, ele: ele ? parseFloat(ele) : null, time: time ? DateTime.fromISO(time, { zone: 'utc' }) : null });
                 }
                 if (points.length < 2) throw new Error('GPX track has insufficient points.');
 
@@ -121,7 +129,7 @@ export async function loadCsvTrackUTC(file) {
                             let time = null;
                             try {
                                 // Standard-Zeitparsing (ggf. anpassen, falls UTC/Lokal unterschiedlich behandelt werden muss)
-                                time = luxon.DateTime.fromISO(timeStr, { setZone: true }).toUTC();
+                                time = DateTime.fromISO(timeStr, { setZone: true }).toUTC();
                                 if (!time.isValid) time = null;
                             } catch (parseError) { /* istanbul ignore next */ time = null; }
                             points.push({ lat, lng, ele, time });
@@ -189,7 +197,7 @@ async function renderTrack(points, fileName) {
 
             if (points[0].time && points[0].time.isValid) {
                 const initialTimestamp = points[0].time;
-                const today = luxon.DateTime.utc().startOf('day');
+                const today = DateTime.utc().startOf('day');
                 const trackDateLuxon = initialTimestamp.startOf('day');
                 
                 if (trackDateLuxon < today) {

@@ -3,9 +3,19 @@
     "version": "1.4.0",
     "description": "Upper winds visualization with Mapbox and OpenMeteo",
     "scripts": {
-      "start": "npx live-server"
+        "start": "vite",
+        "build": "vite build"
     },
     "devDependencies": {
-      "live-server": "^1.2.2"
+        "vite": "^6.3.5"
+    },
+    "dependencies": {
+        "leaflet": "^1.9.4",
+        "leaflet-gpx": "^2.2.0",
+        "leaflet-rotatedmarker": "^0.2.0",
+        "leaflet.heat": "^0.2.0",
+        "luxon": "^3.6.1",
+        "mgrs": "^2.1.0",
+        "papaparse": "^5.5.3"
     }
-  }
+}

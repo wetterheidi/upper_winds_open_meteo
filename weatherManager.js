@@ -5,6 +5,7 @@ import { displayError } from './ui.js';
 import { fetchEnsembleWeatherData, clearEnsembleVisualizations } from './ensembleManager.js';
 import { WEATHER_MODELS } from './constants.js';
 import { updateModelSelectUI, updateEnsembleModelUI, cleanupSelectedEnsembleModels } from './ui.js'; 
+import { DateTime } from 'luxon';
 
 // Diese Funktion ist der neue, zentrale Einstiegspunkt von außen.
 export async function fetchWeatherForLocation(lat, lng, currentTime = null) {
@@ -28,11 +29,11 @@ async function fetchWeather(lat, lon, currentTime = null) {
 
         let isHistorical = false;
         let startDateStr, endDateStr;
-        const today = luxon.DateTime.utc().startOf('day');
+        const today = DateTime.utc().startOf('day');
         let targetDateForAPI = null;
 
         if (currentTime) {
-            let parsedTime = luxon.DateTime.fromISO(currentTime, { zone: 'utc' });
+            let parsedTime = DateTime.fromISO(currentTime, { zone: 'utc' });
             if (parsedTime.isValid) {
                 targetDateForAPI = parsedTime.startOf('day');
                 if (targetDateForAPI < today) isHistorical = true;
@@ -40,7 +41,7 @@ async function fetchWeather(lat, lon, currentTime = null) {
         } else {
              const pickerDate = document.getElementById('historicalDatePicker')?.value;
              if(pickerDate){
-                let parsedPickerDate = luxon.DateTime.fromISO(pickerDate, { zone: 'utc' }).startOf('day');
+                let parsedPickerDate = DateTime.fromISO(pickerDate, { zone: 'utc' }).startOf('day');
                 if(parsedPickerDate < today) {
                     isHistorical = true;
                     targetDateForAPI = parsedPickerDate;
@@ -66,8 +67,8 @@ async function fetchWeather(lat, lon, currentTime = null) {
                 runDate = new Date();
                 AppState.lastModelRun = "N/A";
              }
-            let forecastStart = luxon.DateTime.fromJSDate(runDate).setZone('utc').plus({ hours: 6 });
-            if (forecastStart > luxon.DateTime.utc()) forecastStart = luxon.DateTime.utc();
+            let forecastStart = DateTime.fromJSDate(runDate).setZone('utc').plus({ hours: 6 });
+            if (forecastStart > DateTime.utc()) forecastStart = DateTime.utc();
             startDateStr = forecastStart.toFormat('yyyy-MM-dd');
             const forecastDays = selectedModelValue.includes('_d2') ? 2 : 7;
             endDateStr = forecastStart.plus({ days: forecastDays }).toFormat('yyyy-MM-dd');

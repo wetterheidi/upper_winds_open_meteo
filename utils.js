@@ -1,10 +1,13 @@
 import { displayError } from './ui.js';
+import { DateTime } from 'luxon';
+import * as L from 'leaflet';
+window.L = L; // <-- DIESE ZEILE MUSS BLEIBEN
+import 'leaflet/dist/leaflet.css'; // Nicht vergessen!
+import * as mgrs from 'mgrs';
 
 export class Utils {
     // Format ISO time string to UTC (e.g., "2025-03-15T00:00Z" -> "2025-03-15 0000Z")
     static formatTime(timeStr) {
-        if (!window.luxon) return timeStr; // Fallback
-        const { DateTime } = luxon;
         return DateTime.fromISO(timeStr, { zone: 'UTC' }).toFormat('yyyy-MM-dd HHmm') + 'Z';
     }
 
@@ -306,12 +309,7 @@ export class Utils {
 
     // Updated formatLocalTime using Open-Meteo time zone
     static async formatLocalTime(utcTimeStr, lat, lng) {
-        if (!window.luxon) {
-            console.warn('Luxon not available, falling back to UTC');
-            return Utils.formatTime(utcTimeStr);
-        }
-        const { DateTime } = luxon;
-
+        // Die Prüfung und die Deklaration sind nicht mehr nötig.
         const { timezone, timezone_abbreviation } = await Utils.getLocationData(lat, lng);
         const utcDate = DateTime.fromISO(utcTimeStr, { zone: 'UTC' });
         const localDate = utcDate.setZone(timezone);

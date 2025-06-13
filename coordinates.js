@@ -4,6 +4,7 @@
 
 import { Settings } from './settings.js';
 import { Utils } from './utils.js';
+import * as mgrs from 'mgrs';
 
 
 let currentMarkerPosition = { lat: null, lng: null }; // Interne Variable

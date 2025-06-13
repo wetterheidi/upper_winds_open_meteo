@@ -7,6 +7,16 @@ import { Utils } from './utils.js';
 import { TileCache } from './tileCache.js';
 import { updateOfflineIndicator } from './ui.js';
 import * as Coordinates from './coordinates.js';
+import * as L from 'leaflet';
+window.L = L; // <--- DIESE ZEILE IST DIE LÖSUNG!
+import 'leaflet/dist/leaflet.css'; // Wichtig: importiert das CSS von Leaflet
+import './vendor/Leaflet.PolylineMeasure.js'; // Pfad ggf. anpassen
+import './vendor/Leaflet.PolylineMeasure.css';
+import 'leaflet-gpx';
+import 'leaflet.heat';
+import 'leaflet-rotatedmarker';
+import * as mgrs from 'mgrs';
+
 
 let jumpVisualizationLayerGroup = null; // Unsere "Kiste" für alle Sprung-Visualisierungen
 let landingPatternLayerGroup = null;
@@ -987,7 +997,7 @@ const LivePositionControl = L.Control.extend({
             speedMs, direction, showJumpMasterLine, jumpMasterLineData,
             heightUnit, effectiveWindUnit, coordFormat, refLevel
         } = data;
-        
+
         const coords = Utils.convertCoords(latitude, longitude, coordFormat);
         const coordText = (coordFormat === 'MGRS') ? `MGRS: ${coords.lat}<br>` : `Lat: ${latitude.toFixed(5)}<br>Lng: ${longitude.toFixed(5)}<br>`;
 
@@ -1009,7 +1019,7 @@ const LivePositionControl = L.Control.extend({
         if (showJumpMasterLine && jumpMasterLineData) {
             const distText = Math.round(Utils.convertHeight(jumpMasterLineData.distance, heightUnit));
             const totText = jumpMasterLineData.tot !== 'N/A' && jumpMasterLineData.tot < 1200 ? `TOT: X - ${jumpMasterLineData.tot} s` : 'TOT: N/A';
-            
+
             content += `<br><br><span style="font-weight: bold;">Jump Master Line to ${jumpMasterLineData.target}</span><br>`;
             content += `Bearing: ${jumpMasterLineData.bearing}°<br>`;
             content += `Distance: ${distText} ${heightUnit}<br>`;

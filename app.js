@@ -9,7 +9,7 @@ import { displayMessage, displayProgress, displayError, hideProgress, updateOffl
 import { TileCache, cacheTilesForDIP, debouncedCacheVisibleTiles } from './tileCache.js';
 import { setupCacheManagement, setupCacheSettings } from './cacheUI.js';
 import * as Coordinates from './coordinates.js';
-import { initializeLocationSearch } from './coordinates.js'; // <-- HIER ERGÄNZEN
+import { initializeLocationSearch } from './coordinates.js'; 
 import { interpolateColor, generateWindBarb } from "./uiHelpers.js";
 import { handleHarpPlacement, createHarpMarker, clearHarpMarker } from './harpMarker.js';
 import { loadGpxTrack, loadCsvTrackUTC } from './trackManager.js';
@@ -19,6 +19,11 @@ import * as weatherManager from './weatherManager.js';
 import * as EnsembleManager from './ensembleManager.js';
 import { getSliderValue } from './ui.js';
 import * as AutoupdateManager from './autoupdateManager.js';
+import * as L from 'leaflet';
+window.L = L; // <-- DIESE ZEILE MUSS BLEIBEN
+import 'leaflet/dist/leaflet.css'; // Nicht vergessen!
+import { DateTime } from 'luxon';
+import 'leaflet-gpx';
 
 "use strict";
 
@@ -1236,7 +1241,7 @@ function initializeUIElements() {
     if (directionSpan) directionSpan.textContent = '-'; // Initial placeholder
     updateUIState();
 }
-function updateUIState() {
+export function updateUIState() {
     const info = document.getElementById('info');
     if (info) info.style.display = Settings.state.userSettings.showTable ? 'block' : 'none';
     const customLL = document.getElementById('customLandingDirectionLL');
@@ -1410,10 +1415,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     // *** HIER IST DIE KORREKTUR ***
                     if (currentTimeToPreserve && AppState.weatherData.time) {
                         // Dieser Block ist für das Beibehalten der Zeit bei Standortwechsel (funktioniert bereits)
-                        const targetTimestamp = luxon.DateTime.fromISO(currentTimeToPreserve, { zone: 'utc' }).toMillis();
+                        const targetTimestamp = DateTime.fromISO(currentTimeToPreserve, { zone: 'utc' }).toMillis();
                         let minDiff = Infinity;
                         AppState.weatherData.time.forEach((time, idx) => {
-                            const diff = Math.abs(luxon.DateTime.fromISO(time, { zone: 'utc' }).toMillis() - targetTimestamp);
+                            const diff = Math.abs(DateTime.fromISO(time, { zone: 'utc' }).toMillis() - targetTimestamp);
                             if (diff < minDiff) {
                                 minDiff = diff;
                                 initialIndex = idx;
@@ -1422,10 +1427,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     } else if (AppState.weatherData && AppState.weatherData.time) {
                         // NEUER BLOCK: Dieser else-if-Block ist für den initialen Ladevorgang.
                         // Er findet den Index, der der aktuellen Uhrzeit am nächsten ist.
-                        const now = luxon.DateTime.utc().toMillis();
+                        const now = DateTime.utc().toMillis();
                         let minDiff = Infinity;
                         AppState.weatherData.time.forEach((time, idx) => {
-                            const timeMillis = luxon.DateTime.fromISO(time, { zone: 'utc' }).toMillis();
+                            const timeMillis = DateTime.fromISO(time, { zone: 'utc' }).toMillis();
                             const diff = Math.abs(timeMillis - now);
                             if (diff < minDiff) {
                                 minDiff = diff;
