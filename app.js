@@ -17,7 +17,8 @@ import * as JumpPlanner from './jumpPlanner.js';
 import * as mapManager from './mapManager.js';
 import * as weatherManager from './weatherManager.js';
 import * as EnsembleManager from './ensembleManager.js';
-import { getSliderValue} from './ui.js';
+import { getSliderValue } from './ui.js';
+import * as AutoupdateManager from './autoupdateManager.js';
 
 "use strict";
 
@@ -500,90 +501,27 @@ export function downloadTableAsAscii(format) {
     Settings.updateUnitLabels();
 
 }
+export async function updateAllDisplays() {
+    console.log('updateAllDisplays called');
+    try {
+        const sliderIndex = getSliderValue();
+        if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
+            await updateWeatherDisplay(sliderIndex);
+            if (AppState.lastAltitude !== 'N/A') calculateMeanWind();
+            if (Settings.state.userSettings.showLandingPattern) updateLandingPatternDisplay();
+            if (Settings.state.userSettings.calculateJump) {
+                debouncedCalculateJump();
+                if (Settings.state.userSettings.showJumpRunTrack) updateJumpRunTrackDisplay();
+            }
+            mapManager.recenterMap();
+        }
 
-// == Ensemble Data Handling ==
-
+    } catch (error) {
+        console.error('Error in updateAllDisplays:', error);
+    }
+}
 
 // == Autoupdate Functionality ==
-export function setupAutoupdate() {
-    const autoupdateCheckbox = document.getElementById('autoupdateCheckbox');
-    if (!autoupdateCheckbox) {
-        console.warn('Autoupdate checkbox not found');
-        return;
-    }
-
-    // Initialize checkbox state
-    autoupdateCheckbox.checked = Settings.state.userSettings.autoupdate;
-    console.log('Autoupdate checkbox initialized:', autoupdateCheckbox.checked);
-
-    autoupdateCheckbox.addEventListener('change', () => {
-        Settings.state.userSettings.autoupdate = autoupdateCheckbox.checked;
-        Settings.save();
-        console.log('Autoupdate changed to:', autoupdateCheckbox.checked);
-
-        // Check if historical date is set
-        const historicalDatePicker = document.getElementById('historicalDatePicker');
-        if (autoupdateCheckbox.checked && historicalDatePicker?.value) {
-            autoupdateCheckbox.checked = false;
-            Settings.state.userSettings.autoupdate = false;
-            Settings.save();
-            Utils.handleError('Autoupdate cannot be enabled with a historical date set.');
-            return;
-        }
-
-        if (autoupdateCheckbox.checked) {
-            startAutoupdate();
-        } else {
-            stopAutoupdate();
-        }
-    });
-
-    // Start autoupdate if enabled on load
-    if (Settings.state.userSettings.autoupdate && !document.getElementById('historicalDatePicker')?.value) {
-        startAutoupdate();
-    }
-}
-export function startAutoupdate() {
-    if (AppState.autoupdateInterval) {
-        console.log('Autoupdate already running, skipping start');
-        return;
-    }
-
-    if (!navigator.onLine) {
-        console.warn('Cannot start autoupdate: offline');
-        Utils.handleError('Cannot enable autoupdate while offline.');
-        document.getElementById('autoupdateCheckbox').checked = false;
-        Settings.state.userSettings.autoupdate = false;
-        Settings.save();
-        return;
-    }
-
-    console.log('Starting autoupdate');
-    updateToCurrentHour();
-
-    // Check every minute for hour changes
-    AppState.autoupdateInterval = setInterval(() => {
-        const now = new Date();
-        const currentHour = now.getUTCHours();
-        const slider = document.getElementById('timeSlider');
-        const currentSliderHour = parseInt(slider?.value) || 0;
-
-        if (currentHour !== currentSliderHour) {
-            console.log(`Hour changed to ${currentHour}, updating weather data`);
-            updateToCurrentHour();
-        }
-    }, 60 * 1000); // Every minute
-
-    Utils.handleMessage('Autoupdate enabled');
-}
-export function stopAutoupdate() {
-    if (AppState.autoupdateInterval) {
-        clearInterval(AppState.autoupdateInterval);
-        AppState.autoupdateInterval = null;
-        console.log('Autoupdate stopped');
-        Utils.handleMessage('Autoupdate disabled');
-    }
-}
 export async function updateToCurrentHour() {
     if (!AppState.lastLat || !AppState.lastLng) {
         console.warn('No location selected, cannot update weather data');
@@ -617,14 +555,14 @@ export async function updateToCurrentHour() {
     console.log(`Set slider to current hour: ${currentHour}`);
 
     try {
-        await fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, null, false);
+        await weatherManager.fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, null, false);
         console.log('Weather data fetched for current hour');
 
         await updateWeatherDisplay(currentHour);
         if (AppState.lastAltitude !== 'N/A') {
             calculateMeanWind();
         }
-        if (Settings.state.userSettings.calculateJump && isCalculateJumpUnlocked) {
+        if (Settings.state.userSettings.calculateJump && Settings.state.isCalculateJumpUnlocked) {
             debouncedCalculateJump();
             JumpPlanner.calculateCutAway();
             if (Settings.state.userSettings.showJumpRunTrack) {
@@ -1332,26 +1270,6 @@ function setRadioValue(name, value) {
     if (radio) radio.checked = true;
     else console.warn(`Radio ${name} with value ${value} not found`);
 }
-export async function updateAllDisplays() {
-    console.log('updateAllDisplays called');
-    try {
-        const sliderIndex = getSliderValue();
-        if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
-            await updateWeatherDisplay(sliderIndex);
-            if (AppState.lastAltitude !== 'N/A') calculateMeanWind();
-            if (Settings.state.userSettings.showLandingPattern) updateLandingPatternDisplay();
-            if (Settings.state.userSettings.calculateJump) {
-                debouncedCalculateJump();
-                if (Settings.state.userSettings.showJumpRunTrack) updateJumpRunTrackDisplay();
-            }
-            mapManager.recenterMap();
-        }
-
-    } catch (error) {
-        console.error('Error in updateAllDisplays:', error);
-    }
-}
-
 function setupAppEventListeners() {
     console.log("[App] Setting up application event listeners...");
 
@@ -1399,6 +1317,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupCacheManagement(); // <-- NEUER AUFRUF HIER
     setupCacheSettings();
     setupAppEventListeners();
+    AutoupdateManager.setupAutoupdate();
 
     // EINZIGER AUFRUF FÜR ALLE EVENT LISTENER
     EventManager.initializeEventListeners();
@@ -1549,5 +1468,25 @@ document.addEventListener('DOMContentLoaded', async () => {
             updateLandingPatternDisplay();
         }
 
+    });
+
+    document.addEventListener('autoupdate:tick', async (event) => {
+        // Nur reagieren, wenn Autoupdate in den Settings auch wirklich aktiv ist
+        if (!Settings.state.userSettings.autoupdate) {
+            return;
+        }
+
+        const now = new Date();
+        const slider = document.getElementById('timeSlider');
+        if (!slider) return;
+
+        const currentUtcHour = now.getUTCHours();
+        const sliderHour = parseInt(slider.value, 10);
+
+        // Nur updaten, wenn sich die Stunde geändert hat, oder beim allerersten Start des Timers
+        if (currentUtcHour !== sliderHour || event.detail.isInitialTick) {
+            console.log(`[App] Autoupdate triggered. Current Hour: ${currentUtcHour}, Slider Hour: ${sliderHour}`);
+            await updateToCurrentHour();
+        }
     });
 });
