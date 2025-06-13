@@ -3,6 +3,7 @@ import { Utils } from './utils.js';
 import { Settings, getInterpolationStep } from './settings.js';
 import { displayError } from './ui.js';
 import { fetchEnsembleWeatherData, clearEnsembleVisualizations } from './ensembleManager.js';
+import { WEATHER_MODELS } from './constants.js';
 
 // Diese Funktion ist der neue, zentrale Einstiegspunkt von außen.
 export async function fetchWeatherForLocation(lat, lng, currentTime = null) {
@@ -21,9 +22,7 @@ async function fetchWeather(lat, lon, currentTime = null) {
         const selectedModelValue = document.getElementById('modelSelect')?.value || Settings.defaultSettings.model;
         if (!selectedModelValue) throw new Error("No weather model selected.");
 
-        const modelMap = {
-            'icon_seamless': 'dwd_icon', 'icon_global': 'dwd_icon', 'icon_eu': 'dwd_icon_eu', 'icon_d2': 'dwd_icon_d2', 'ecmwf_ifs025': 'ecmwf_ifs025', 'ecmwf_aifs025_single': 'ecmwf_aifs025_single', 'gfs_seamless': 'ncep_gfs013', 'gfs_global': 'ncep_gfs025', 'gfs_hrrr': 'ncep_hrrr_conus', 'arome_france': 'meteofrance_arome_france0025', 'gem_hrdps_continental': 'cmc_gem_hrdps', 'gem_regional': 'cmc_gem_rdps'
-        };
+        const modelMap = WEATHER_MODELS.API_MAP; 
         const modelApiIdentifierForMeta = modelMap[selectedModelValue] || selectedModelValue;
 
         let isHistorical = false;
@@ -91,7 +90,7 @@ async function fetchWeather(lat, lon, currentTime = null) {
 }
 
 async function checkAvailableModels(lat, lon) {
-    const modelList = ['icon_seamless', 'icon_global', 'icon_eu', 'icon_d2', 'ecmwf_ifs025', 'ecmwf_aifs025_single', 'gfs_seamless', 'gfs_global', 'gfs_hrrr', 'arome_france', 'gem_hrdps_continental', 'gem_regional'];
+    const modelList = WEATHER_MODELS.LIST; 
     let availableModels = [];
     for (const model of modelList) {
         try {
@@ -101,8 +100,14 @@ async function checkAvailableModels(lat, lon) {
                 if (data.hourly && data.hourly.temperature_2m && data.hourly.temperature_2m.some(t => t !== null)) {
                     availableModels.push(model);
                 }
+            } else {
+                // NEU: Dieser Block wird bei HTTP-Fehlern wie 400 Bad Request ausgeführt.
+                console.warn(`Modell '${model}' ist nicht verfügbar (Server-Antwort: ${response.status})`);
             }
-        } catch (e) { /* ignore */ }
+        } catch (e) {
+            // Dieser Block wird nur noch bei reinen Netzwerkfehlern ausgeführt.
+            console.error(`Netzwerkfehler beim Abruf von Modell '${model}':`, e);
+        }
     }
     updateModelSelectUI(availableModels);
     updateEnsembleModelUI(availableModels);

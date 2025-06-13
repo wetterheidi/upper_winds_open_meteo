@@ -165,9 +165,9 @@ export async function updateWeatherDisplay(index, originalTime = null) {
         return;
     }
 
-    let output = `<table id="weatherTable">`;
-    output += `<tr><th>Height (${heightUnit} ${refLevel})</th><th>Dir (deg)</th><th>Spd (${windSpeedUnit})</th><th>Wind</th><th>T (${temperatureUnit === 'C' ? '°C' : '°F'})</th></tr>`;
-    interpolatedData.forEach((data, idx) => {
+// NEU: Zuerst alle Zeilen als HTML-Strings generieren
+    const tableRowsHtml = interpolatedData.map(data => {
+        // ... (Die gesamte Logik zur Berechnung von windClass, humidityClass, displayHeight, etc. bleibt hier drin) ...
         const spd = parseFloat(data.spd);
         let windClass = '';
         if (windSpeedUnit === 'bft') {
@@ -184,27 +184,17 @@ export async function updateWeatherDisplay(index, originalTime = null) {
             else if (spdInKt <= 16) windClass = 'wind-high';
             else windClass = 'wind-very-high';
         }
-
-        // Apply conditional background color based on RH
         const humidity = data.rh;
         let humidityClass = '';
         if (humidity !== 'N/A' && Number.isFinite(humidity)) {
-            if (humidity < 65) {
-                humidityClass = 'humidity-low';
-            } else if (humidity >= 65 && humidity <= 85) {
-                humidityClass = 'humidity-moderate';
-            } else if (humidity > 85 && humidity < 100) {
-                humidityClass = 'humidity-high';
-            } else if (humidity === 100) {
-                humidityClass = 'humidity-saturated';
-            }
+            if (humidity < 65) humidityClass = 'humidity-low';
+            else if (humidity >= 65 && humidity <= 85) humidityClass = 'humidity-moderate';
+            else if (humidity > 85 && humidity < 100) humidityClass = 'humidity-high';
+            else if (humidity === 100) humidityClass = 'humidity-saturated';
         }
-        console.log(`Row ${idx}: RH=${humidity}, windClass=${windClass}, humidityClass=${humidityClass}`);
-
         const displayHeight = refLevel === 'AMSL' ? data.displayHeight + (heightUnit === 'ft' ? Math.round(surfaceHeight * 3.28084) : surfaceHeight) : data.displayHeight;
         const displayTemp = Utils.convertTemperature(data.temp, temperatureUnit === 'C' ? '°C' : '°F');
         const formattedTemp = displayTemp === 'N/A' ? 'N/A' : displayTemp.toFixed(0);
-
         const convertedSpd = Utils.convertWind(spd, windSpeedUnit, 'km/h');
         let formattedWind;
         const surfaceDisplayHeight = refLevel === 'AMSL' ? (heightUnit === 'ft' ? Math.round(surfaceHeight * 3.28084) : surfaceHeight) : 0;
@@ -217,19 +207,36 @@ export async function updateWeatherDisplay(index, originalTime = null) {
         } else {
             formattedWind = convertedSpd === 'N/A' ? 'N/A' : (windSpeedUnit === 'bft' ? Math.round(convertedSpd) : convertedSpd.toFixed(0));
         }
-
         const speedKt = Math.round(Utils.convertWind(spd, 'kt', 'km/h') / 5) * 5;
         const windBarbSvg = data.dir === 'N/A' || isNaN(speedKt) ? 'N/A' : generateWindBarb(data.dir, speedKt);
 
-        output += `<tr class="${windClass} ${humidityClass}">
-            <td>${Math.round(displayHeight)}</td>
-            <td>${Utils.roundToTens(data.dir)}</td>
-            <td>${formattedWind}</td>
-            <td>${windBarbSvg}</td>
-            <td>${formattedTemp}</td>
-        </tr>`;
-    });
-    output += `</table>`;
+        // Gibt den fertigen HTML-String für eine Zeile zurück
+        return `<tr class="${windClass} ${humidityClass}">
+                    <td>${Math.round(displayHeight)}</td>
+                    <td>${Utils.roundToTens(data.dir)}</td>
+                    <td>${formattedWind}</td>
+                    <td>${windBarbSvg}</td>
+                    <td>${formattedTemp}</td>
+                </tr>`;
+    }).join(''); // .join('') fügt alle Zeilen zu einem einzigen String zusammen
+
+    // NEU: Die gesamte Tabelle in einer einzigen, lesbaren Vorlage erstellen
+    const output = `
+        <table id="weatherTable">
+            <thead>
+                <tr>
+                    <th>Height (${heightUnit} ${refLevel})</th>
+                    <th>Dir (deg)</th>
+                    <th>Spd (${windSpeedUnit})</th>
+                    <th>Wind</th>
+                    <th>T (${temperatureUnit === 'C' ? '°C' : '°F'})</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${tableRowsHtml}
+            </tbody>
+        </table>`;
+
     document.getElementById('info').innerHTML = output;
     document.getElementById('selectedTime').innerHTML = `Selected Time: ${time}`;
     updateLandingPatternDisplay();
