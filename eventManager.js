@@ -6,8 +6,7 @@ import { Settings } from './settings.js';
 import { Utils } from './utils.js';
 import {
     updateAllDisplays, calculateJump, updateLandingPatternDisplay, updateJumpRunTrackDisplay,
-    getSliderValue, downloadTableAsAscii, calculateMeanWind, fetchEnsembleWeatherData,
-    processAndVisualizeEnsemble, clearEnsembleVisualizations,
+    getSliderValue, downloadTableAsAscii, calculateMeanWind, 
     refreshMarkerPopup, calculateJumpRunTrack, updateWeatherDisplay,
     debouncedGetElevationAndQFE, getDownloadFormat, updateJumpMasterLineAndPanel,
     validateLegHeights, debouncedCalculateJump, setInputValue, setInputValueSilently
@@ -20,6 +19,8 @@ import { TileCache, cacheTilesForDIP } from './tileCache.js';
 import { loadGpxTrack, loadCsvTrackUTC } from './trackManager.js';
 import * as weatherManager from './weatherManager.js';
 import * as liveTrackingManager from './liveTrackingManager.js';
+import { fetchEnsembleWeatherData, processAndVisualizeEnsemble, clearEnsembleVisualizations } from './ensembleManager.js';
+
 
 function dispatchAppEvent(eventName, detail = {}) {
     console.log(`[EventManager] Dispatching event: ${eventName}`, detail);
@@ -472,7 +473,7 @@ function setupSliderEvents() {
                 updateJumpRunTrackDisplay();
             }
             //mapManager.recenterMap();
-            updateLivePositionControl();
+            updateJumpMasterLineAndPanel();
         } else {
             // Aktualisiere zumindest die Zeitanzeige, auch wenn keine vollständigen Wetterdaten für das Hauptmodell da sind
             let timeToDisplay = 'N/A';

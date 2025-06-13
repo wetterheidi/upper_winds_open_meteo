@@ -2,7 +2,7 @@ import { AppState } from './state.js';
 import { Utils } from './utils.js';
 import { Settings } from './settings.js';
 import { displayError } from './ui.js';
-import { fetchEnsembleWeatherData, clearEnsembleVisualizations } from './app.js';
+import { fetchEnsembleWeatherData, clearEnsembleVisualizations } from './ensembleManager.js';
 
 // Diese Funktion ist der neue, zentrale Einstiegspunkt von außen.
 export async function fetchWeatherForLocation(lat, lng, currentTime = null) {
