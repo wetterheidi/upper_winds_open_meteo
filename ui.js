@@ -151,3 +151,7 @@ export function displayError(message) {
         console.log('Error hidden after 3s');
     }, 3000);
 }
+
+export function getSliderValue() {
+    return parseInt(document.getElementById('timeSlider')?.value) || 0;
+}

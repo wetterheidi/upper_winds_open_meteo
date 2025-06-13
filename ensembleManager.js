@@ -3,10 +3,8 @@ import { AppState } from './state.js';
 import { Settings } from './settings.js';
 import { Utils } from './utils.js';
 import * as JumpPlanner from './jumpPlanner.js';
-import { displayMessage, displayError } from './ui.js';
-
-// Funktionen, die wir weiterhin aus app.js benötigen:
-import { getSliderValue, interpolateWeatherData } from './app.js';
+import { displayMessage, displayError, getSliderValue } from './ui.js';
+import { interpolateWeatherData } from './weatherManager.js';
 
 const HEATMAP_BASE_RADIUS = 20;
 const HEATMAP_REFERENCE_ZOOM = 13;
