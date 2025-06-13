@@ -22,6 +22,7 @@ import * as weatherManager from './weatherManager.js';
 import * as liveTrackingManager from './liveTrackingManager.js';
 import { fetchEnsembleWeatherData, processAndVisualizeEnsemble, clearEnsembleVisualizations } from './ensembleManager.js';
 import { getSliderValue } from './ui.js';
+import * as AutoupdateManager from './autoupdateManager.js';
 import * as L from 'leaflet';
 window.L = L;
 import 'leaflet/dist/leaflet.css'; // Nicht vergessen!
@@ -1427,6 +1428,26 @@ function setupTrackEvents() {
             try {
                 const { lat, lng, timestamp, historicalDate, summary } = event.detail;
                 console.log('Event "track:loaded" empfangen, starte Aktionen.');
+
+                // =======================================================
+                // HIER DIE NEUE LOGIK EINFÜGEN
+                // =======================================================
+                if (historicalDate) {
+                    console.log("Historischer Track geladen, deaktiviere Autoupdate.");
+                    const autoupdateCheckbox = document.getElementById('autoupdateCheckbox');
+                    if (autoupdateCheckbox) {
+                        autoupdateCheckbox.checked = false;
+                    }
+                    // Stoppe den laufenden Autoupdate-Prozess
+                    AutoupdateManager.stopAutoupdate();
+                    // Speichere die neue Einstellung
+                    Settings.state.userSettings.autoupdate = false;
+                    Settings.save();
+                    Utils.handleMessage("Autoupdate disabled for historical track viewing.");
+                }
+                // =======================================================
+                // ENDE DER NEUEN LOGIK
+                // =======================================================
 
                 await mapManager.createOrUpdateMarker(lat, lng);
 

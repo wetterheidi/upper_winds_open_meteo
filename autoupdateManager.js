@@ -33,7 +33,7 @@ function startAutoupdate() {
     displayMessage('Autoupdate enabled');
 }
 
-function stopAutoupdate() {
+export function stopAutoupdate() {
     if (AppState.autoupdateInterval) {
         clearInterval(AppState.autoupdateInterval);
         AppState.autoupdateInterval = null;
