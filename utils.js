@@ -4,7 +4,7 @@ import * as L from 'leaflet';
 window.L = L; // <-- DIESE ZEILE MUSS BLEIBEN
 import 'leaflet/dist/leaflet.css'; // Nicht vergessen!
 import * as mgrs from 'mgrs';
-import { CONVERSIONS, ISA_CONSTANTS, DEWPOINT_COEFFICIENTS, EARTH_RADIUS_METERS } from './constants.js';
+import { CONVERSIONS, ISA_CONSTANTS, DEWPOINT_COEFFICIENTS, EARTH_RADIUS_METERS, PHYSICAL_CONSTANTS, BEAUFORT } from './constants.js';
 
 export class Utils {
     // Format ISO time string to UTC (e.g., "2025-03-15T00:00Z" -> "2025-03-15 0000Z")
@@ -75,24 +75,14 @@ export class Utils {
 
     // Helper functions (assuming you have or need these)
     static knotsToBeaufort(knots) {
-        if (knots < 1) return 0;
-        if (knots <= 3) return 1;
-        if (knots <= 6) return 2;
-        if (knots <= 10) return 3;
-        if (knots <= 16) return 4;
-        if (knots <= 21) return 5;
-        if (knots <= 27) return 6;
-        if (knots <= 33) return 7;
-        if (knots <= 40) return 8;
-        if (knots <= 47) return 9;
-        if (knots <= 55) return 10;
-        if (knots <= 63) return 11;
-        return 12;
+        // Finde den ersten Schwellenwert, der größer ist als die Knotengeschwindigkeit
+        const beaufortLevel = BEAUFORT.KNOT_THRESHOLDS.findIndex(threshold => knots < threshold);
+        // Wenn kein Wert gefunden wird (stärker als 63 Knoten), ist es Stufe 12. Sonst ist es der gefundene Index.
+        return beaufortLevel === -1 ? 12 : beaufortLevel;
     }
 
     static beaufortToKnots(bft) {
-        const thresholds = [0, 1, 3, 6, 10, 16, 21, 27, 33, 40, 47, 55, 63];
-        return thresholds[bft] || 63; // Default to max if bft > 12
+        return BEAUFORT.BEAUFORT_THRESHOLDS[bft] || 63; // Default to max if bft > 12
     }
 
     // Calculate dewpoint from temperature (°C) and relative humidity (%)
@@ -591,11 +581,11 @@ export class Utils {
         }
         console.log('QFE reference elevation: ', referenceElevation);
         // Constants for barometric formula
-        const g = 9.80665; // Gravitational acceleration (m/s²)
-        const M = 0.0289644; // Molar mass of air (kg/mol)
-        const R = 8.31447; // Universal gas constant (J/(mol·K))
-        const T = temperature + 273.15; // Temperature in Kelvin
-        const L = 0.0065; // Standard temperature lapse rate (K/m)
+        const g = ISA_CONSTANTS.GRAVITY; // Gravitational acceleration (m/s²)
+        const M = PHYSICAL_CONSTANTS.MOLAR_MASS_AIR; // Molar mass of air (kg/mol)
+        const R = PHYSICAL_CONSTANTS.UNIVERSAL_GAS_CONSTANT; // Universal gas constant (J/(mol·K))
+        const T = temperature + CONVERSIONS.CELSIUS_TO_KELVIN; // Temperature in Kelvin
+        const L = ISA_CONSTANTS.LAPSE_RATE; // Standard temperature lapse rate (K/m)
 
         // Calculate pressure at target elevation relative to reference elevation
         const P0 = surfacePressure * 100; // Convert hPa to Pa

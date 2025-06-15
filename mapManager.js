@@ -16,7 +16,7 @@ import 'leaflet-gpx';
 import 'leaflet.heat';
 import 'leaflet-rotatedmarker';
 import * as mgrs from 'mgrs';
-import { UI_DEFAULTS}  from './constants.js'; // Importiere UI-Defaults
+import { UI_DEFAULTS, ICON_URLS}  from './constants.js'; // Importiere UI-Defaults
 
 
 let jumpVisualizationLayerGroup = null; // Unsere "Kiste" für alle Sprung-Visualisierungen
@@ -334,7 +334,7 @@ async function _handleGeolocation(defaultCenter, defaultZoom) {
             (geoError) => _geolocationErrorCallback(geoError, defaultCenter, defaultZoom),
             {
                 enableHighAccuracy: true,
-                timeout: 20000,
+                timeout: UI_DEFAULTS.GEOLOCATION_TIMEOUT_MS,
                 maximumAge: 0
             }
         );
@@ -723,7 +723,7 @@ function clearJumpRunTrack() {
 }
 export function createCutAwayMarker(lat, lng) {
     const cutAwayIcon = L.icon({
-        iconUrl: 'schere_purple.png', // Du benötigst dieses Bild im Projektverzeichnis
+        iconUrl: ICON_URLS.CUTAWAY_MARKER, // Du benötigst dieses Bild im Projektverzeichnis
         iconSize: [25, 25],
         iconAnchor: [12, 12],
         popupAnchor: [0, -12],
@@ -831,7 +831,7 @@ export function drawJumpRunTrack(trackData) {
     }
 
     const airplaneIcon = L.icon({
-        iconUrl: 'airplane_orange.png',
+        iconUrl: ICON_URLS.AIRPLANE_MARKER,
         iconSize: [32, 32], iconAnchor: [16, 16],
         shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
         shadowSize: [41, 41], shadowAnchor: [13, 32]
@@ -933,7 +933,7 @@ export async function createOrUpdateMarker(lat, lng) {
 // Private Helferfunktion: Erstellt nur den Marker.
 export function createCustomMarker(lat, lng) {
     const customIcon = L.icon({
-        iconUrl: 'favicon.ico',
+        iconUrl: ICON_URLS.DEFAULT_MARKER,
         iconSize: [32, 32], iconAnchor: [16, 32], popupAnchor: [0, -32],
         shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
         shadowSize: [41, 41], shadowAnchor: [13, 32]

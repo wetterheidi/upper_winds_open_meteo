@@ -1,5 +1,5 @@
 // === Settings Module ===
-import { Constants, FEATURE_PASSWORD } from './constants.js';
+import { FEATURE_PASSWORD } from './constants.js';
 
 export const getInterpolationStep = () => Settings.getValue('interpStepSelect', 'select', 200); // Umbenannt von getInterpStepSelect für Konsistenz
 

@@ -3,7 +3,7 @@
 import { AppState } from './state.js';
 import { Utils } from './utils.js';
 import { Settings, getInterpolationStep } from './settings.js';
-import { Constants, FEATURE_PASSWORD } from './constants.js';
+import { UI_DEFAULTS, FEATURE_PASSWORD } from './constants.js';
 import * as EventManager from './eventManager.js'; // NEUER IMPORT
 import { displayMessage, displayProgress, displayError, hideProgress, updateOfflineIndicator, isMobileDevice } from './ui.js';
 import { TileCache, cacheTilesForDIP, debouncedCacheVisibleTiles } from './tileCache.js';
@@ -750,7 +750,7 @@ export function updateLandingPatternDisplay() {
     }
 
     const currentZoom = AppState.map.getZoom();
-    if (currentZoom < Constants.landingPatternMinZoom) {
+    if (currentZoom < UI_DEFAULTS.LANDING_PATTERN_MIN_ZOOM) {
         console.log('Landing pattern not displayed - zoom too low:', currentZoom);
         // Sende den Befehl "Alles wegmachen" an den Maler und beende die Funktion.
         mapManager.drawLandingPattern(null);

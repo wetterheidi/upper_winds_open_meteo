@@ -5,7 +5,7 @@ import { fetchEnsembleWeatherData } from './ensembleManager.js';
 import { UI_DEFAULTS } from './constants.js';
 
 export function isMobileDevice() {
-    const isMobile = window.innerWidth < 768;
+    const isMobile = window.innerWidth < UI_DEFAULTS.MOBILE_BREAKPOINT_PX;
     console.log(`isMobileDevice check: window.innerWidth=${window.innerWidth}, isMobile=${isMobile}`);
     return isMobile;
 }

@@ -2,7 +2,7 @@
 import { AppState } from './state.js';
 import { Settings } from './settings.js';
 import { Utils } from './utils.js';
-import { Constants, CONVERSIONS, FREEFALL_PHYSICS, ISA_CONSTANTS, CANOPY_OPENING_BUFFER_METERS, CUTAWAY_VERTICAL_SPEEDS_MPS } from './constants.js';
+import { CUTAWAY_VISUALIZATION_RADIUS_METERS, JUMPER_SEPARATION_TABLE, CONVERSIONS, FREEFALL_PHYSICS, ISA_CONSTANTS, CANOPY_OPENING_BUFFER_METERS, CUTAWAY_VERTICAL_SPEEDS_MPS } from './constants.js';
 
 export function getSeparationFromTAS(ias) {
     const exitAltitudeFt = Settings.state.userSettings.exitAltitude * CONVERSIONS.METERS_TO_FEET;
@@ -11,13 +11,13 @@ export function getSeparationFromTAS(ias) {
         console.warn('TAS calculation failed, using default separation');
         return Settings.defaultSettings.jumperSeparation;
     }
-    const speeds = Object.keys(Constants.jumperSeparationTable).map(Number).sort((a, b) => b - a);
+    const speeds = Object.keys(JUMPER_SEPARATION_TABLE).map(Number).sort((a, b) => b - a);
     let closestSpeed = speeds[0];
     for (const speed of speeds) {
         if (tas <= speed) closestSpeed = speed;
         else break;
     }
-    const separation = Constants.jumperSeparationTable[closestSpeed] || 7;
+    const separation = JUMPER_SEPARATION_TABLE[closestSpeed] || 7;
     return separation;
 }
 
@@ -174,7 +174,7 @@ export function calculateCutAway(interpolatedData) {
     const stateLabel = Settings.state.userSettings.cutAwayState.replace(/([A-Z])/g, ' $1').trim();
     const tooltipContent = `<b>Cut-Away (${stateLabel})</b><br>Cut-Away Altitude: ${cutAwayAltitude} m<br>Displacement: ${meanWindDirection.toFixed(0)}°, ${displacementDistance.toFixed(0)} m<br>Descent Time/Speed: ${descentTime.toFixed(0)} s at ${verticalSpeedSelected.toFixed(1)} m/s<br>`;
     
-    return { center: [centerLat, centerLng], radius: 150, tooltipContent };
+    return { center: [centerLat, centerLng], radius: CUTAWAY_VISUALIZATION_RADIUS_METERS, tooltipContent };
 }
 
 export function calculateCanopyCircles(interpolatedData) {

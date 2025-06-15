@@ -1,6 +1,7 @@
 // liveTrackingManager.js
 "use strict";
 
+import { UI_DEFAULTS, SMOOTHING_DEFAULTS } from './constants.js';
 import { AppState } from './state.js';
 import { Utils } from './utils.js';
 import * as L from 'leaflet';
@@ -40,7 +41,7 @@ const debouncedPositionUpdate = Utils.debounce(async (position) => {
     const { latitude, longitude, accuracy, altitude: deviceAltitude, altitudeAccuracy } = position.coords;
     console.log("[LiveTrackingManager] Position details:", { latitude, longitude, accuracy, deviceAltitude, altitudeAccuracy }); // Debug-Ausgabe
 
-    if (accuracy > 100) {
+    if (accuracy > UI_DEFAULTS.GEOLOCATION_ACCURACY_THRESHOLD_M) {
         console.log("[LiveTrackingManager] Skipping position update due to low accuracy:", accuracy);
         return;
     }
@@ -59,7 +60,7 @@ const debouncedPositionUpdate = Utils.debounce(async (position) => {
     }
 
     // WIEDERHERGESTELLT: Die wichtige Logik zur Glättung der Geschwindigkeit
-    const alpha = speedMs < 25 ? 0.5 : 0.2;
+    const alpha = speedMs < SMOOTHING_DEFAULTS.SPEED_SMOOTHING_TRESHOLD ? SMOOTHING_DEFAULTS.SPEED_SMOOTHING_LOW : SMOOTHING_DEFAULTS.SPEED_SMOOTHING_HIGH;
     AppState.lastSmoothedSpeedMs = alpha * speedMs + (1 - alpha) * AppState.lastSmoothedSpeedMs;
 
     // Aktualisiere die Marker-Position auf der Karte
