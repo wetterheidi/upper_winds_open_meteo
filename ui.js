@@ -2,6 +2,7 @@
 import { Utils } from './utils.js';
 import { Settings, getInterpolationStep } from './settings.js';
 import { fetchEnsembleWeatherData } from './ensembleManager.js';
+import { UI_DEFAULTS } from './constants.js';
 
 export function isMobileDevice() {
     const isMobile = window.innerWidth < 768;
@@ -35,7 +36,7 @@ export function displayMessage(message) {
     clearTimeout(window.messageTimeout);
     window.messageTimeout = setTimeout(() => {
         messageElement.style.display = 'none';
-    }, 3000);
+    }, UI_DEFAULTS.MESSAGE_TIMEOUT_MS);
 }
 
 export function displayProgress(current, total, cancelCallback) {
@@ -151,7 +152,7 @@ export function displayError(message) {
     window.errorTimeout = setTimeout(() => {
         errorElement.style.display = 'none';
         console.log('Error hidden after 3s');
-    }, 3000);
+    }, UI_DEFAULTS.MESSAGE_TIMEOUT_MS);
 }
 
 export function getSliderValue() {

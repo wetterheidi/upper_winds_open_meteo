@@ -4,6 +4,7 @@ import { displayProgress, hideProgress, displayMessage } from './ui.js';
 import * as L from 'leaflet';
 window.L = L; // <-- DIESE ZEILE MUSS BLEIBEN
 import 'leaflet/dist/leaflet.css'; // Nicht vergessen!
+import { CACHE_DEFAULTS } from './constants.js';
 
 let isCachingCancelled = false;
 
@@ -115,7 +116,7 @@ const TileCache = {
         });
     },
 
-    async clearOldTiles(maxAgeDays = 7) {
+    async clearOldTiles(maxAgeDays =  CACHE_DEFAULTS.MAX_AGE_DAYS) {
         if (!this.db) await this.init();
         const maxAgeMs = maxAgeDays * 24 * 60 * 60 * 1000;
         return new Promise((resolve, reject) => {
@@ -259,7 +260,7 @@ L.TileLayer.Cached = L.TileLayer.extend({
             });
         } else {
             tile.src = url;
-            fetch(url, { signal: AbortSignal.timeout(15000) })
+            fetch(url, { signal: AbortSignal.timeout(CACHE_DEFAULTS.FETCH_TIMEOUT_MS) })
                 .then(response => {
                     if (!response.ok) throw new Error(`HTTP ${response.status}`);
                     return response.blob();
@@ -332,7 +333,7 @@ async function cacheTileWithRetry(url, maxRetries = 3) {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 15000);
+            const timeoutId = setTimeout(() => controller.abort(), CACHE_DEFAULTS.FETCH_TIMEOUT_MS);
             const response = await fetch(url, { signal: controller.signal });
             clearTimeout(timeoutId);
             if (response.ok) {
@@ -512,7 +513,7 @@ async function cacheTilesForDIP({ map, lastLat, lastLng, baseMaps }) {
     try {
         const size = await TileCache.getCacheSize();
         console.log(`Cache size after DIP caching: ${size.toFixed(2)} MB`);
-        if (size > 500) {
+        if (size > CACHE_DEFAULTS.SIZE_LIMIT_MB_WARNING) {
             Utils.handleError(`Cache size large (${size.toFixed(2)} MB). Consider clearing cache to free up space.`);
         }
     } catch (error) {
@@ -654,7 +655,7 @@ const debouncedCacheVisibleTiles = Utils.debounce(async ({ map, baseMaps }) => {
     try {
         const size = await TileCache.getCacheSize();
         console.log(`Cache size after visible tiles caching: ${size.toFixed(2)} MB`);
-        if (size > 500) {
+        if (size > CACHE_DEFAULTS.SIZE_LIMIT_MB_WARNING) {
             Utils.handleError(`Cache size large (${size.toFixed(2)} MB). Consider clearing cache to free up space.`);
         }
     } catch (error) {

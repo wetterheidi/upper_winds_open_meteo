@@ -16,6 +16,7 @@ import 'leaflet-gpx';
 import 'leaflet.heat';
 import 'leaflet-rotatedmarker';
 import * as mgrs from 'mgrs';
+import { UI_DEFAULTS}  from './constants.js'; // Importiere UI-Defaults
 
 
 let jumpVisualizationLayerGroup = null; // Unsere "Kiste" für alle Sprung-Visualisierungen
@@ -48,8 +49,8 @@ async function initMap() {
     mapInitialized = true;
     console.log('initMap started...');
 
-    const defaultCenter = [48.0179, 11.1923];
-    const defaultZoom = 11;
+    const defaultCenter = UI_DEFAULTS.DEFAULT_MAP_CENTER;
+    const defaultZoom = UI_DEFAULTS.DEFAULT_MAP_ZOOM;
     const initialAltitude = 'N/A';
 
     _initializeBasicMapInstance(defaultCenter, defaultZoom);
