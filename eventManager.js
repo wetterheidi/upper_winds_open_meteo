@@ -6,12 +6,12 @@ import { Settings } from './settings.js';
 import { Utils } from './utils.js';
 import { updateUIState } from './app.js';
 import {
-    updateAllDisplays, calculateJump, updateLandingPatternDisplay, updateJumpRunTrackDisplay,
-    downloadTableAsAscii, calculateMeanWind,
-    refreshMarkerPopup, calculateJumpRunTrack, updateWeatherDisplay,
+    updateAllDisplays, calculateJump, updateJumpRunTrackDisplay,
+    downloadTableAsAscii, calculateMeanWind, calculateJumpRunTrack,
     debouncedGetElevationAndQFE, getDownloadFormat, updateJumpMasterLineAndPanel,
     validateLegHeights, debouncedCalculateJump, applySettingToInput, setInputValueSilently
 } from './app.js';
+import * as displayManager from './displayManager.js';
 import * as mapManager from './mapManager.js';
 import * as Coordinates from './coordinates.js';
 import * as JumpPlanner from './jumpPlanner.js';
@@ -255,7 +255,7 @@ function setupCheckboxEvents() {
             console.log('Info display set to:', info.style.display);
         }
         if (checkbox.checked && AppState.weatherData && AppState.lastLat && AppState.lastLng) {
-            updateWeatherDisplay(getSliderValue());
+            displayManager.updateWeatherDisplay(getSliderValue());
         }
         mapManager.recenterMap();
     });
@@ -350,7 +350,7 @@ function setupCheckboxEvents() {
             Settings.save();
             const submenu = checkbox.closest('li')?.querySelector('ul');
             toggleSubmenu(checkbox, submenu, true);
-            updateLandingPatternDisplay();
+            displayManager.updateLandingPatternDisplay();
         };
 
         const disableFeature = () => {
@@ -463,12 +463,12 @@ function setupSliderEvents() {
         console.log('Time slider moved to index:', sliderIndex);
 
         if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
-            await updateWeatherDisplay(sliderIndex);
-            await refreshMarkerPopup();
+            await displayManager.updateWeatherDisplay(sliderIndex);
+            await displayManager.refreshMarkerPopup();
             if (AppState.lastAltitude !== 'N/A') calculateMeanWind();
             if (Settings.state.userSettings.showLandingPattern) {
                 console.log('Updating landing pattern for slider index:', sliderIndex);
-                updateLandingPatternDisplay();
+                displayManager.updateLandingPatternDisplay();
             }
             if (Settings.state.userSettings.calculateJump) {
                 console.log('Recalculating jump for slider index:', sliderIndex);
@@ -677,7 +677,7 @@ function setupRadioEvents() {
     });
     setupRadioGroup('coordFormat', () => {
         if (AppState.lastLat && AppState.lastLng) {
-            refreshMarkerPopup();
+            displayManager.refreshMarkerPopup();
         }
         updateJumpMasterLineAndPanel(); // <-- HINZUFÜGEN
     });
@@ -869,7 +869,7 @@ function setupInputEvents() {
             Settings.save();
             if (Settings.state.userSettings.landingDirection === 'LL' && AppState.weatherData && AppState.lastLat && AppState.lastLng) {
                 console.log('Updating landing pattern for LL:', customDir);
-                updateLandingPatternDisplay();
+                displayManager.updateLandingPatternDisplay();
                 mapManager.recenterMap();
             }
         } else {
@@ -885,7 +885,7 @@ function setupInputEvents() {
             Settings.save();
             if (Settings.state.userSettings.landingDirection === 'RR' && AppState.weatherData && AppState.lastLat && AppState.lastLng) {
                 console.log('Updating landing pattern for RR:', customDir);
-                updateLandingPatternDisplay();
+                displayManager.updateLandingPatternDisplay();
                 mapManager.recenterMap();
             }
         } else {
@@ -1242,7 +1242,7 @@ function setupMapEventListeners() {
 
         // 3. UI-Updates anstoßen, die von den neuen Daten abhängen
         updateJumpRunTrackDisplay(); // update... Funktionen sind jetzt im mapManager
-        updateLandingPatternDisplay();
+        displayManager.updateLandingPatternDisplay();
     });
 
     document.addEventListener('map:mousemove', (event) => {
@@ -1483,7 +1483,7 @@ function setupTrackEvents() {
 
                 // Erst danach die restlichen UI-Updates durchführen
                 if (Settings.state.isCalculateJumpUnlocked && Settings.state.userSettings.calculateJump) calculateJump();
-                if (Settings.state.isLandingPatternUnlocked && Settings.state.userSettings.showLandingPattern) updateLandingPatternDisplay();
+                if (Settings.state.isLandingPatternUnlocked && Settings.state.userSettings.showLandingPattern) displayManager.updateLandingPatternDisplay();
 
                 const infoEl = document.getElementById('info');
                 if (infoEl && summary) {
