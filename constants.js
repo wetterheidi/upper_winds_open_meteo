@@ -52,6 +52,7 @@ export const CONVERSIONS = {
     KNOTS_TO_MPS: 0.514444,
     KNOTS_TO_KMH: 1.852,
     MPH_TO_KMH: 1.60934,
+    CELSIUS_TO_KELVIN: 273.15,
 };
 
 export const ISA_CONSTANTS = { // International Standard Atmosphere
@@ -91,7 +92,8 @@ export const CUTAWAY_VERTICAL_SPEEDS_MPS = {
 };
 
 export const FREEFALL_PHYSICS = {
-    DEFAULT_AREA_M2: 0.5,
+    DEFAULT_AREA_VERTICAL: 0.5,
+    DEFAULT_AREA_HORIZONTAL: 0.5,
     DEFAULT_MASS_KG: 80,
     DEFAULT_DRAG_COEFFICIENT: 1,
 };

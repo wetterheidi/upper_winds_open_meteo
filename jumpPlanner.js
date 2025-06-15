@@ -2,10 +2,10 @@
 import { AppState } from './state.js';
 import { Settings } from './settings.js';
 import { Utils } from './utils.js';
-import { Constants } from './constants.js';
+import { Constants, CONVERSIONS, FREEFALL_PHYSICS, ISA_CONSTANTS, CANOPY_OPENING_BUFFER_METERS, CUTAWAY_VERTICAL_SPEEDS_MPS } from './constants.js';
 
 export function getSeparationFromTAS(ias) {
-    const exitAltitudeFt = Settings.state.userSettings.exitAltitude * 3.28084;
+    const exitAltitudeFt = Settings.state.userSettings.exitAltitude * CONVERSIONS.METERS_TO_FEET;
     const tas = Utils.calculateTAS(ias, exitAltitudeFt);
     if (tas === 'N/A') {
         console.warn('TAS calculation failed, using default separation');
@@ -26,7 +26,7 @@ export function calculateFreeFall(weatherData, exitAltitude, openingAltitude, in
     if (!Number.isFinite(startLat) || !Number.isFinite(startLng) || !Number.isFinite(elevation)) return null;
 
     const hStart = elevation + exitAltitude;
-    const hStop = elevation + openingAltitude - 200;
+    const hStop = elevation + openingAltitude - CANOPY_OPENING_BUFFER_METERS;
     
     // Pass interpolatedData down to jumpRunTrack
     const jumpRunData = jumpRunTrack(interpolatedData);
@@ -34,7 +34,7 @@ export function calculateFreeFall(weatherData, exitAltitude, openingAltitude, in
     const aircraftSpeedKt = Settings.state.userSettings.aircraftSpeedKt;
     const exitAltitudeFt = exitAltitude / 0.3048;
     const aircraftSpeedTAS = Utils.calculateTAS(aircraftSpeedKt, exitAltitudeFt);
-    let aircraftSpeedMps = (aircraftSpeedTAS === 'N/A') ? (aircraftSpeedKt * 0.514444) : (aircraftSpeedTAS * 0.514444);
+    let aircraftSpeedMps = (aircraftSpeedTAS === 'N/A') ? (aircraftSpeedKt * CONVERSIONS.KNOTS_TO_MPS) : (aircraftSpeedTAS * CONVERSIONS.KNOTS_TO_MPS);
     
     const vxInitial = Math.cos(jumpRunDirection * Math.PI / 180) * aircraftSpeedMps;
     const vyInitial = Math.sin(jumpRunDirection * Math.PI / 180) * aircraftSpeedMps;
@@ -52,8 +52,8 @@ export function calculateFreeFall(weatherData, exitAltitude, openingAltitude, in
         const windDir = Utils.LIP(heights, windDirs, current.height);
         const windSpd = Utils.LIP(heights, windSpdsMps, current.height);
         const tempC = Utils.LIP(heights, tempsC, current.height);
-        const tempK = tempC + 273.15;
-        const Rl = 287.102, g = 9.81, dt = 0.5;
+        const tempK = tempC + CONVERSIONS.CELSIUS_TO_KELVIN;
+        const Rl = ISA_CONSTANTS.GAS_CONSTANT_AIR, g = ISA_CONSTANTS.GRAVITY, dt = 0.5;
         const rho = (surfacePressure * 100 * Math.exp(-g * (current.height - elevation) / (Rl * tempK))) / (Rl * tempK);
         const windDirTo = (windDir + 180) % 360;
         const vxWind = windSpd * Math.cos(windDirTo * Math.PI / 180);
@@ -61,7 +61,7 @@ export function calculateFreeFall(weatherData, exitAltitude, openingAltitude, in
         const vxAir = current.vxGround - vxWind;
         const vyAir = current.vyGround - vyWind;
         const vAirMag = Math.sqrt(vxAir * vxAir + vyAir * vyAir);
-        const cdVertical = 1, areaVertical = 0.5, mass = 80, cdHorizontal = 1, areaHorizontal = 0.5;
+        const cdVertical = 1, areaVertical = FREEFALL_PHYSICS.DEFAULT_AREA_VERTICAL, mass = FREEFALL_PHYSICS.DEFAULT_MASS_KG, cdHorizontal = FREEFALL_PHYSICS.DEFAULT_DRAG_COEFFICIENT, areaHorizontal = FREEFALL_PHYSICS.DEFAULT_AREA_HORIZONTAL;
         const bv = 0.5 * cdVertical * areaVertical * rho / mass;
         const bh = 0.5 * cdHorizontal * areaHorizontal * rho / mass;
         const az = -g - bv * current.vz * Math.abs(current.vz);
@@ -108,20 +108,20 @@ export function calculateExitCircle(interpolatedData) {
     const openingAltitude = parseInt(document.getElementById('openingAltitude')?.value) || 1200;
     const legHeightDownwind = parseInt(document.getElementById('legHeightDownwind')?.value) || 300;
     const descentRate = parseFloat(document.getElementById('descentRate')?.value) || 3.5;
-    const canopySpeedMps = (parseFloat(document.getElementById('canopySpeed')?.value) || 20) * 0.514444;
+    const canopySpeedMps = (parseFloat(document.getElementById('canopySpeed')?.value) || 20) * CONVERSIONS.KNOTS_TO_MPS;
 
     const heights = interpolatedData.map(d => d.height);
     const uComponents = interpolatedData.map(d => -Utils.convertWind(d.spd, 'm/s', 'km/h') * Math.sin(d.dir * Math.PI / 180));
     const vComponents = interpolatedData.map(d => -Utils.convertWind(d.spd, 'm/s', 'km/h') * Math.cos(d.dir * Math.PI / 180));
     const elevation = Math.round(AppState.lastAltitude);
     
-    const flyTime = (openingAltitude - 200 - legHeightDownwind) / descentRate;
+    const flyTime = (openingAltitude - CANOPY_OPENING_BUFFER_METERS - legHeightDownwind) / descentRate;
     const horizontalCanopyDistance = flyTime * canopySpeedMps;
-    const flyTimeFull = (openingAltitude - 200) / descentRate;
+    const flyTimeFull = (openingAltitude - CANOPY_OPENING_BUFFER_METERS) / descentRate;
     const horizontalCanopyDistanceFull = flyTimeFull * canopySpeedMps;
 
-    const meanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, elevation + legHeightDownwind, elevation + openingAltitude - 200);
-    const meanWindFull = Utils.calculateMeanWind(heights, uComponents, vComponents, elevation, elevation + openingAltitude - 200);
+    const meanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, elevation + legHeightDownwind, elevation + openingAltitude - CANOPY_OPENING_BUFFER_METERS);
+    const meanWindFull = Utils.calculateMeanWind(heights, uComponents, vComponents, elevation, elevation + openingAltitude - CANOPY_OPENING_BUFFER_METERS);
 
     const landingPatternCoords = calculateLandingPatternCoords(AppState.lastLat, AppState.lastLng, interpolatedData);
     let { downwindLat: blueLat, downwindLng: blueLng } = landingPatternCoords;
@@ -163,7 +163,7 @@ export function calculateCutAway(interpolatedData) {
     
     const [meanWindDirection, meanWindSpeedMps] = meanWind;
     
-    const verticalSpeeds = { 'Open': 4.1, 'Partially': 12.8, 'Collapsed': 39.2 }; // Pre-calculated speeds
+    const verticalSpeeds = { 'Open': CUTAWAY_VERTICAL_SPEEDS_MPS.OPEN, 'Partially': CUTAWAY_VERTICAL_SPEEDS_MPS.PARTIALLY, 'Collapsed': CUTAWAY_VERTICAL_SPEEDS_MPS.COLLAPSED }; // Pre-calculated speeds
     const verticalSpeedSelected = verticalSpeeds[Settings.state.userSettings.cutAwayState] || verticalSpeeds['Partially'];
     const descentTime = cutAwayAltitude / verticalSpeedSelected;
     const displacementDistance = meanWindSpeedMps * descentTime;
@@ -185,20 +185,20 @@ export function calculateCanopyCircles(interpolatedData) {
     const openingAltitude = parseInt(document.getElementById('openingAltitude')?.value) || 1200;
     const legHeightDownwind = parseInt(document.getElementById('legHeightDownwind')?.value) || 300;
     const descentRate = parseFloat(document.getElementById('descentRate')?.value) || 3.5;
-    const canopySpeedMps = (parseFloat(document.getElementById('canopySpeed')?.value) || 20) * 0.514444;
+    const canopySpeedMps = (parseFloat(document.getElementById('canopySpeed')?.value) || 20) * CONVERSIONS.KNOTS_TO_MPS;
 
     const heights = interpolatedData.map(d => d.height);
     const uComponents = interpolatedData.map(d => -Utils.convertWind(d.spd, 'm/s', 'km/h') * Math.sin(d.dir * Math.PI / 180));
     const vComponents = interpolatedData.map(d => -Utils.convertWind(d.spd, 'm/s', 'km/h') * Math.cos(d.dir * Math.PI / 180));
     const elevation = Math.round(AppState.lastAltitude);
     
-    const flyTime = (openingAltitude - 200 - legHeightDownwind) / descentRate;
+    const flyTime = (openingAltitude - CANOPY_OPENING_BUFFER_METERS - legHeightDownwind) / descentRate;
     const horizontalCanopyDistance = flyTime * canopySpeedMps;
-    const flyTimeFull = (openingAltitude - 200) / descentRate;
+    const flyTimeFull = (openingAltitude - CANOPY_OPENING_BUFFER_METERS) / descentRate;
     const horizontalCanopyDistanceFull = flyTimeFull * canopySpeedMps;
 
-    const meanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, elevation + legHeightDownwind, elevation + openingAltitude - 200);
-    const meanWindFull = Utils.calculateMeanWind(heights, uComponents, vComponents, elevation, elevation + openingAltitude - 200);
+    const meanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, elevation + legHeightDownwind, elevation + openingAltitude - CANOPY_OPENING_BUFFER_METERS);
+    const meanWindFull = Utils.calculateMeanWind(heights, uComponents, vComponents, elevation, elevation + openingAltitude - CANOPY_OPENING_BUFFER_METERS);
     
     const freeFallResult = calculateFreeFall(AppState.weatherData, exitAltitude, openingAltitude, interpolatedData, AppState.lastLat, AppState.lastLng, elevation);
     if (!freeFallResult) return null;
@@ -207,7 +207,7 @@ export function calculateCanopyCircles(interpolatedData) {
     let { downwindLat: blueLat, downwindLng: blueLng } = landingPatternCoords;
     if (!Number.isFinite(blueLat)) { blueLat = AppState.lastLat; blueLng = AppState.lastLng; }
     
-    const upperLimit = elevation + openingAltitude - 200;
+    const upperLimit = elevation + openingAltitude - CANOPY_OPENING_BUFFER_METERS;
     const lowerLimit = elevation + legHeightDownwind;
     const additionalBlueRadii = [], additionalBlueDisplacements = [], additionalBlueDirections = [], additionalBlueUpperLimits = [];
     let decrement = ((upperLimit - lowerLimit) <= 1000) ? 200 : 500;
@@ -262,7 +262,7 @@ export function jumpRunTrack(interpolatedData) {
     if(tasKt !== 'N/A' && Number.isFinite(tasKt)) {
         const windDirAtExit = Utils.LIP(heights.map(h => h - elevation), interpolatedData.map(d => d.dir), exitAltitude);
         const windSpeedMpsAtExit = Utils.LIP(heights.map(h => h - elevation), interpolatedData.map(d => Utils.convertWind(d.spd, 'm/s', 'km/h')), exitAltitude);
-        const tasMps = tasKt * 0.514444;
+        const tasMps = tasKt * CONVERSIONS.KNOTS_TO_MPS;
         const windToRad = (windDirAtExit + 180) * Math.PI / 180;
         const windU = windSpeedMpsAtExit * Math.sin(windToRad);
         const windV = windSpeedMpsAtExit * Math.cos(windToRad);
@@ -318,7 +318,7 @@ export function calculateLandingPatternCoords(lat, lng, interpolatedData) {
     let effectiveLandingWindDir = Number.isFinite(customLandingDir) ? customLandingDir : (Number.isFinite(AppState.landingWindDir) ? AppState.landingWindDir : interpolatedData[0].dir);
     
     const calculateLegEndpoint = (startLat, startLng, bearing, groundSpeedKt, timeSec) => {
-        const speedMps = groundSpeedKt * 0.514444;
+        const speedMps = groundSpeedKt * CONVERSIONS.KNOTS_TO_MPS;
         const lengthMeters = speedMps * timeSec;
         const [endLat, endLng] = Utils.calculateNewCenter(startLat, startLng, lengthMeters, bearing);
         return [endLat, endLng];
