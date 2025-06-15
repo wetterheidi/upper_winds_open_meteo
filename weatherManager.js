@@ -6,6 +6,7 @@ import { fetchEnsembleWeatherData, clearEnsembleVisualizations } from './ensembl
 import { WEATHER_MODELS } from './constants.js';
 import { updateModelSelectUI, updateEnsembleModelUI, cleanupSelectedEnsembleModels } from './ui.js'; 
 import { DateTime } from 'luxon';
+import { API_URLS, STANDARD_PRESSURE_LEVELS } from './constants.js';
 
 // Diese Funktion ist der neue, zentrale Einstiegspunkt von außen.
 export async function fetchWeatherForLocation(lat, lng, currentTime = null) {
@@ -49,9 +50,9 @@ async function fetchWeather(lat, lon, currentTime = null) {
              }
         }
         
-        let baseUrl = 'https://api.open-meteo.com/v1/forecast';
+        let baseUrl = API_URLS.FORECAST; 
         if (isHistorical && targetDateForAPI) {
-            baseUrl = 'https://historical-forecast-api.open-meteo.com/v1/forecast';
+            baseUrl = API_URLS.HISTORICAL;
             startDateStr = endDateStr = targetDateForAPI.toFormat('yyyy-MM-dd');
             AppState.lastModelRun = "N/A (Historical Data)";
         } else {
@@ -96,7 +97,7 @@ async function checkAvailableModels(lat, lon) {
     let availableModels = [];
     for (const model of modelList) {
         try {
-            const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m&models=${model}`);
+            const response = await fetch(`${API_URLS.FORECAST}?latitude=${lat}&longitude=${lon}&hourly=temperature_2m&models=${model}`);
             if (response.ok) {
                 const data = await response.json();
                 if (data.hourly && data.hourly.temperature_2m && data.hourly.temperature_2m.some(t => t !== null)) {
@@ -128,7 +129,7 @@ export function interpolateWeatherData(sliderIndex) {
     const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
 
     // Define all possible pressure levels
-    const allPressureLevels = [1000, 950, 925, 900, 850, 800, 700, 600, 500, 400, 300, 250, 200];
+    const allPressureLevels = STANDARD_PRESSURE_LEVELS;
 
     // Filter pressure levels with valid geopotential height data
     const validPressureLevels = allPressureLevels.filter(hPa => {
