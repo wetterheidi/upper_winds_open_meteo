@@ -49,9 +49,9 @@ export function calculateFreeFall(weatherData, exitAltitude, openingAltitude, in
 
     let current = trajectory[0];
     while (current.height > hStop) {
-        const windDir = Utils.LIP(heights, windDirs, current.height);
-        const windSpd = Utils.LIP(heights, windSpdsMps, current.height);
-        const tempC = Utils.LIP(heights, tempsC, current.height);
+        const windDir = Utils.linearInterpolate(heights, windDirs, current.height);
+        const windSpd = Utils.linearInterpolate(heights, windSpdsMps, current.height);
+        const tempC = Utils.linearInterpolate(heights, tempsC, current.height);
         const tempK = tempC + CONVERSIONS.CELSIUS_TO_KELVIN;
         const Rl = ISA_CONSTANTS.GAS_CONSTANT_AIR, g = ISA_CONSTANTS.GRAVITY, dt = 0.5;
         const rho = (surfacePressure * 100 * Math.exp(-g * (current.height - elevation) / (Rl * tempK))) / (Rl * tempK);
@@ -260,8 +260,8 @@ export function jumpRunTrack(interpolatedData) {
     let groundSpeedMps = null, trackLength = 2000, approachLength = 2000, approachLatLngs = null;
     
     if(tasKt !== 'N/A' && Number.isFinite(tasKt)) {
-        const windDirAtExit = Utils.LIP(heights.map(h => h - elevation), interpolatedData.map(d => d.dir), exitAltitude);
-        const windSpeedMpsAtExit = Utils.LIP(heights.map(h => h - elevation), interpolatedData.map(d => Utils.convertWind(d.spd, 'm/s', 'km/h')), exitAltitude);
+        const windDirAtExit = Utils.linearInterpolate(heights.map(h => h - elevation), interpolatedData.map(d => d.dir), exitAltitude);
+        const windSpeedMpsAtExit = Utils.linearInterpolate(heights.map(h => h - elevation), interpolatedData.map(d => Utils.convertWind(d.spd, 'm/s', 'km/h')), exitAltitude);
         const tasMps = tasKt * CONVERSIONS.KNOTS_TO_MPS;
         const windToRad = (windDirAtExit + 180) * Math.PI / 180;
         const windU = windSpeedMpsAtExit * Math.sin(windToRad);

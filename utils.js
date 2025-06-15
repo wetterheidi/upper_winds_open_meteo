@@ -122,15 +122,15 @@ export class Utils {
 
         // Step 1: Find p(z) using log interpolation of p with respect to h
         const log_pressureLevels = pressureLevels.map(p => Math.log(p));
-        const log_p_z = Utils.LIP(heights, log_pressureLevels, z);
+        const log_p_z = Utils.linearInterpolate(heights, log_pressureLevels, z);
         if (typeof log_p_z === 'string' && log_p_z.includes('error')) {
             return { u: 'Interpolation error', v: 'Interpolation error' };
         }
         const p_z = Math.exp(log_p_z);
 
         // Step 2: Interpolate u and v at p(z) using log(p) interpolation
-        const u_z = Utils.LIP(log_pressureLevels, uComponents, Math.log(p_z));
-        const v_z = Utils.LIP(log_pressureLevels, vComponents, Math.log(p_z));
+        const u_z = Utils.linearInterpolate(log_pressureLevels, uComponents, Math.log(p_z));
+        const v_z = Utils.linearInterpolate(log_pressureLevels, vComponents, Math.log(p_z));
         if (typeof u_z === 'string' && u_z.includes('error') || typeof v_z === 'string' && v_z.includes('error')) {
             return { u: 'Interpolation error', v: 'Interpolation error' };
         }
@@ -159,10 +159,10 @@ export class Utils {
         return 'N/A';
     };
 
-    // Linear interpolation (LIP)
-    static LIP(xVector, yVector, xValue) {
+    // Linear interpolation (linearInterpolate)
+    static linearInterpolate(xVector, yVector, xValue) {
         if (!xVector?.length || !yVector?.length || xVector.length !== yVector.length) {
-            return "invalid input for LIP";
+            return "invalid input for linearInterpolate";
         }
         let reversed = false;
         if (xVector[1] > xVector[0]) {
@@ -221,11 +221,11 @@ export class Utils {
             }
             const dddff = new Array(4);
             let hLayer = [upperLimit];
-            let xLayer = [Number(Utils.LIP(heights, xComponents, upperLimit))];
-            let yLayer = [Number(Utils.LIP(heights, yComponents, upperLimit))];
+            let xLayer = [Number(Utils.linearInterpolate(heights, xComponents, upperLimit))];
+            let yLayer = [Number(Utils.linearInterpolate(heights, yComponents, upperLimit))];
 
-            const xLower = Number(Utils.LIP(heights, xComponents, lowerLimit));
-            const yLower = Number(Utils.LIP(heights, yComponents, lowerLimit));
+            const xLower = Number(Utils.linearInterpolate(heights, xComponents, lowerLimit));
+            const yLower = Number(Utils.linearInterpolate(heights, yComponents, lowerLimit));
 
             for (let i = 0; i < heights.length; i++) {
                 if (heights[i] < upperLimit && heights[i] > lowerLimit) {

@@ -184,15 +184,15 @@ export function interpolateWeatherData(sliderIndex) {
             const logHeight = Math.log(h - baseHeight + 1);
             const logH0 = Math.log(1);
             const logH1 = Math.log(hLowest - baseHeight);
-            const u = Utils.LIP([logH0, logH1], [uSurface, uLowest], logHeight);
-            const v = Utils.LIP([logH0, logH1], [vSurface, vLowest], logHeight);
+            const u = Utils.linearInterpolate([logH0, logH1], [uSurface, uLowest], logHeight);
+            const v = Utils.linearInterpolate([logH0, logH1], [vSurface, vLowest], logHeight);
             const spd = Utils.windSpeed(u, v);
             const dir = Utils.windDirection(u, v);
 
             heightData.unshift(h);
             validPressureLevels.unshift(p);
-            tempData.unshift(Utils.LIP([baseHeight, hLowest], [AppState.weatherData.temperature_2m[sliderIndex], AppState.weatherData[`temperature_${lowestPressureLevel}hPa`][sliderIndex]], h));
-            rhData.unshift(Utils.LIP([baseHeight, hLowest], [AppState.weatherData.relative_humidity_2m[sliderIndex], AppState.weatherData[`relative_humidity_${lowestPressureLevel}hPa`][sliderIndex]], h));
+            tempData.unshift(Utils.linearInterpolate([baseHeight, hLowest], [AppState.weatherData.temperature_2m[sliderIndex], AppState.weatherData[`temperature_${lowestPressureLevel}hPa`][sliderIndex]], h));
+            rhData.unshift(Utils.linearInterpolate([baseHeight, hLowest], [AppState.weatherData.relative_humidity_2m[sliderIndex], AppState.weatherData[`relative_humidity_${lowestPressureLevel}hPa`][sliderIndex]], h));
             spdData.unshift(spd);
             dirData.unshift(dir);
             uComponents.unshift(u);
@@ -247,8 +247,8 @@ export function interpolateWeatherData(sliderIndex) {
             const windComponents = Utils.interpolateWindAtAltitude(heightASLInMeters, validPressureLevels, heightData, uComponents, vComponents);
             const spd = Utils.windSpeed(windComponents.u, windComponents.v);
             const dir = Utils.windDirection(windComponents.u, windComponents.v);
-            const temp = Utils.LIP(heightData, tempData, heightASLInMeters);
-            const rh = Utils.LIP(heightData, rhData, heightASLInMeters);
+            const temp = Utils.linearInterpolate(heightData, tempData, heightASLInMeters);
+            const rh = Utils.linearInterpolate(heightData, rhData, heightASLInMeters);
             const dew = Utils.calculateDewpoint(temp, rh);
 
             dataPoint = {

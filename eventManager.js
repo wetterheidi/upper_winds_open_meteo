@@ -10,7 +10,7 @@ import {
     downloadTableAsAscii, calculateMeanWind,
     refreshMarkerPopup, calculateJumpRunTrack, updateWeatherDisplay,
     debouncedGetElevationAndQFE, getDownloadFormat, updateJumpMasterLineAndPanel,
-    validateLegHeights, debouncedCalculateJump, setInputValue, setInputValueSilently
+    validateLegHeights, debouncedCalculateJump, applySettingToInput, setInputValueSilently
 } from './app.js';
 import * as mapManager from './mapManager.js';
 import * as Coordinates from './coordinates.js';
@@ -820,7 +820,7 @@ function setupInputEvents() {
             }
         } else {
             Utils.handleError('Opening altitude must be between 500 and 15000 meters.');
-            setInputValue('openingAltitude', 1200);
+            applySettingToInput('openingAltitude', 1200);
             Settings.state.userSettings.openingAltitude = 1200;
             Settings.save();
         }
@@ -830,7 +830,7 @@ function setupInputEvents() {
             if (Settings.state.userSettings.calculateJump && AppState.weatherData && AppState.lastLat && AppState.lastLng) debouncedCalculateJump(); // Use debounced version
         } else {
             Utils.handleError('Exit altitude must be between 500 and 15000 meters.');
-            setInputValue('exitAltitude', 3000);
+            applySettingToInput('exitAltitude', 3000);
             Settings.state.userSettings.exitAltitude = 3000;
             Settings.save();
         }
@@ -840,7 +840,7 @@ function setupInputEvents() {
             updateAllDisplays();
         } else {
             Utils.handleError('Canopy speed must be between 5 and 50 kt.');
-            setInputValue('canopySpeed', 20);
+            applySettingToInput('canopySpeed', 20);
             Settings.state.userSettings.canopySpeed = 20;
             Settings.save();
         }
@@ -850,7 +850,7 @@ function setupInputEvents() {
             updateAllDisplays();
         } else {
             Utils.handleError('Descent rate must be between 1 and 10 m/s.');
-            setInputValue('descentRate', 3);
+            applySettingToInput('descentRate', 3);
             Settings.state.userSettings.descentRate = 3;
             Settings.save();
         }
@@ -874,7 +874,7 @@ function setupInputEvents() {
             }
         } else {
             Utils.handleError('Landing direction must be between 0 and 359°.');
-            setInputValue('customLandingDirectionLL', Settings.state.userSettings.customLandingDirectionLL || 0);
+            applySettingToInput('customLandingDirectionLL', Settings.state.userSettings.customLandingDirectionLL || 0);
         }
     });
     setupInput('customLandingDirectionRR', 'input', 100, (value) => {
@@ -890,7 +890,7 @@ function setupInputEvents() {
             }
         } else {
             Utils.handleError('Landing direction must be between 0 and 359°.');
-            setInputValue('customLandingDirectionRR', Settings.state.userSettings.customLandingDirectionRR || 0);
+            applySettingToInput('customLandingDirectionRR', Settings.state.userSettings.customLandingDirectionRR || 0);
         }
     });
     setupInput('jumpRunTrackDirection', 'change', 0, (value) => {
@@ -1030,7 +1030,7 @@ function setupInputEvents() {
             }
         } else {
             Utils.handleError('Jumper number must be between 1 and 50.');
-            setInputValue('numberOfJumpers', defaultSettings.numberOfJumpers);
+            applySettingToInput('numberOfJumpers', defaultSettings.numberOfJumpers);
             Settings.state.userSettings.numberOfJumpers = defaultSettings.numberOfJumpers;
             Settings.save();
         }
@@ -1049,7 +1049,7 @@ function setupInputEvents() {
             }
         } else {
             Utils.handleError('Jumper separation must be between 1 and 50 seconds.');
-            setInputValue('jumperSeparation', defaultSettings.jumperSeparation);
+            applySettingToInput('jumperSeparation', defaultSettings.jumperSeparation);
             Settings.state.userSettings.jumperSeparation = defaultSettings.jumperSeparation;
             AppState.isJumperSeparationManual = false; // Reset to auto on invalid input
             Settings.save();
@@ -1067,7 +1067,7 @@ function setupInputEvents() {
             }
         } else {
             Utils.handleError('Cut away altitude must be between 400 and 15000 meters.');
-            setInputValue('cutAwayAltitude', 1000);
+            applySettingToInput('cutAwayAltitude', 1000);
             Settings.state.userSettings.cutAwayAltitude = 1000;
             Settings.save();
         }

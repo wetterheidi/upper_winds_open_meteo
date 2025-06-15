@@ -1184,36 +1184,36 @@ function initializeApp() {
     console.log('Initializing app');
 }
 function initializeUIElements() {
-    setElementValue('modelSelect', Settings.state.userSettings.model);
-    setRadioValue('refLevel', Settings.state.userSettings.refLevel);
-    setRadioValue('heightUnit', Settings.state.userSettings.heightUnit);
-    setRadioValue('temperatureUnit', Settings.state.userSettings.temperatureUnit);
-    setRadioValue('windUnit', Settings.state.userSettings.windUnit);
-    setRadioValue('timeZone', Settings.state.userSettings.timeZone);
-    setRadioValue('coordFormat', Settings.state.userSettings.coordFormat);
-    setRadioValue('downloadFormat', Settings.state.userSettings.downloadFormat);
-    setRadioValue('landingDirection', Settings.state.userSettings.landingDirection);
-    setInputValue('canopySpeed', Settings.state.userSettings.canopySpeed);
-    setInputValue('descentRate', Settings.state.userSettings.descentRate);
-    setInputValue('legHeightDownwind', Settings.state.userSettings.legHeightDownwind);
-    setInputValue('legHeightBase', Settings.state.userSettings.legHeightBase);
-    setInputValue('legHeightFinal', Settings.state.userSettings.legHeightFinal);
-    setInputValue('customLandingDirectionLL', Settings.state.userSettings.customLandingDirectionLL);
-    setInputValue('customLandingDirectionRR', Settings.state.userSettings.customLandingDirectionRR);
-    setInputValue('lowerLimit', Settings.state.userSettings.lowerLimit);
-    setInputValue('upperLimit', Settings.state.userSettings.upperLimit);
-    setInputValue('openingAltitude', Settings.state.userSettings.openingAltitude);
-    setInputValue('exitAltitude', Settings.state.userSettings.exitAltitude);
-    setInputValue('interpStepSelect', Settings.state.userSettings.interpStep);
-    setInputValue('aircraftSpeedKt', Settings.state.userSettings.aircraftSpeedKt);
-    setInputValue('numberOfJumpers', Settings.state.userSettings.numberOfJumpers);
-    setCheckboxValue('showTableCheckbox', Settings.state.userSettings.showTable);
-    setCheckboxValue('calculateJumpCheckbox', Settings.state.userSettings.calculateJump);
-    setCheckboxValue('showLandingPattern', Settings.state.userSettings.showLandingPattern);
-    setCheckboxValue('showJumpRunTrack', Settings.state.userSettings.showJumpRunTrack);
-    setInputValue('jumpRunTrackOffset', Settings.state.userSettings.jumpRunTrackOffset);
-    setCheckboxValue('showCanopyAreaCheckbox', Settings.state.userSettings.showCanopyArea);
-    setCheckboxValue('showExitAreaCheckbox', Settings.state.userSettings.showExitArea);
+    applySettingToSelect('modelSelect', Settings.state.userSettings.model);
+    applySettingToRadio('refLevel', Settings.state.userSettings.refLevel);
+    applySettingToRadio('heightUnit', Settings.state.userSettings.heightUnit);
+    applySettingToRadio('temperatureUnit', Settings.state.userSettings.temperatureUnit);
+    applySettingToRadio('windUnit', Settings.state.userSettings.windUnit);
+    applySettingToRadio('timeZone', Settings.state.userSettings.timeZone);
+    applySettingToRadio('coordFormat', Settings.state.userSettings.coordFormat);
+    applySettingToRadio('downloadFormat', Settings.state.userSettings.downloadFormat);
+    applySettingToRadio('landingDirection', Settings.state.userSettings.landingDirection);
+    applySettingToInput('canopySpeed', Settings.state.userSettings.canopySpeed);
+    applySettingToInput('descentRate', Settings.state.userSettings.descentRate);
+    applySettingToInput('legHeightDownwind', Settings.state.userSettings.legHeightDownwind);
+    applySettingToInput('legHeightBase', Settings.state.userSettings.legHeightBase);
+    applySettingToInput('legHeightFinal', Settings.state.userSettings.legHeightFinal);
+    applySettingToInput('customLandingDirectionLL', Settings.state.userSettings.customLandingDirectionLL);
+    applySettingToInput('customLandingDirectionRR', Settings.state.userSettings.customLandingDirectionRR);
+    applySettingToInput('lowerLimit', Settings.state.userSettings.lowerLimit);
+    applySettingToInput('upperLimit', Settings.state.userSettings.upperLimit);
+    applySettingToInput('openingAltitude', Settings.state.userSettings.openingAltitude);
+    applySettingToInput('exitAltitude', Settings.state.userSettings.exitAltitude);
+    applySettingToInput('interpStepSelect', Settings.state.userSettings.interpStep);
+    applySettingToInput('aircraftSpeedKt', Settings.state.userSettings.aircraftSpeedKt);
+    applySettingToInput('jumpRunTrackOffset', Settings.state.userSettings.jumpRunTrackOffset);
+    applySettingToInput('numberOfJumpers', Settings.state.userSettings.numberOfJumpers);
+    applySettingToCheckbox('showTableCheckbox', Settings.state.userSettings.showTable);
+    applySettingToCheckbox('calculateJumpCheckbox', Settings.state.userSettings.calculateJump);
+    applySettingToCheckbox('showLandingPattern', Settings.state.userSettings.showLandingPattern);
+    applySettingToCheckbox('showJumpRunTrack', Settings.state.userSettings.showJumpRunTrack);
+    applySettingToCheckbox('showCanopyAreaCheckbox', Settings.state.userSettings.showCanopyArea);
+    applySettingToCheckbox('showExitAreaCheckbox', Settings.state.userSettings.showExitArea);
     Settings.state.userSettings.isCustomJumpRunDirection = Settings.state.userSettings.isCustomJumpRunDirection || false;
 
     // Ensure UI reflects the stored custom direction without overwriting
@@ -1226,7 +1226,7 @@ function initializeUIElements() {
         customRR.value = Settings.state.userSettings.customLandingDirectionRR;
     }
     const separation = JumpPlanner.getSeparationFromTAS(Settings.state.userSettings.aircraftSpeedKt);
-    setInputValue('jumperSeparation', separation);
+    applySettingToInput('jumperSeparation', separation);
     Settings.state.userSettings.jumperSeparation = separation;
     Settings.save();
 
@@ -1270,16 +1270,16 @@ export function updateUIState() {
 }
 
 // == Setup values ==
-function setCheckboxValue(id, value) {
+function applySettingToCheckbox(id, value) {
     const element = document.getElementById(id);
     if (element) element.checked = value;
 }
-function setElementValue(id, value) {
+function applySettingToSelect(id, value) {
     const element = document.getElementById(id);
     if (element) element.value = value;
     else console.warn(`Element ${id} not found`);
 }
-export function setInputValue(id, value) {
+export function applySettingToInput(id, value) {
     const element = document.getElementById(id);
     if (element) element.value = value;
 }
@@ -1291,7 +1291,7 @@ export function setInputValueSilently(id, value) {
         console.log(`Set ${id} silently:`, { old: lastValue, new: value });
     }
 }
-function setRadioValue(name, value) {
+function applySettingToRadio(name, value) {
     const radio = document.querySelector(`input[name="${name}"][value="${value}"]`);
     if (radio) radio.checked = true;
     else console.warn(`Radio ${name} with value ${value} not found`);

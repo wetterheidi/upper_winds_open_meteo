@@ -50,7 +50,7 @@ export const AppState = {
     heatmapLayer: null, // Für die Referenz auf den Heatmap-Layer
 
     // --- NEUE ZUSTANDS-VARIABLEN ---
-    mapInitialized: false,              // von mapManager.js
+    ismapInitialized: false,              // von mapManager.js
     hasTileErrorSwitched: false,        // von mapManager.js
     isCachingCancelled: false,          // von tileCache.js
     
