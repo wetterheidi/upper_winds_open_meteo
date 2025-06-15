@@ -5,9 +5,9 @@
 import { Settings } from './settings.js';
 import { Utils } from './utils.js';
 import * as mgrs from 'mgrs';
+import { AppState } from './state.js';
 
 
-let currentMarkerPosition = { lat: null, lng: null }; // Interne Variable
 let isAddingFavorite = false; // Sperrvariable, um doppelte Aufrufe zu verhindern
 
 /**
@@ -43,7 +43,7 @@ function initializeLocationSearch() {
     }
     saveFavoriteBtn._clickHandler = (event) => {
         event.stopPropagation();
-        if (currentMarkerPosition.lat === null || currentMarkerPosition.lng === null) {
+        if (AppState.lastLat === null || AppState.lastLng === null) {
             Utils.handleError("Please select a location on the map first.");
             return;
         }
@@ -51,13 +51,13 @@ function initializeLocationSearch() {
             console.log('saveFavoriteBtn Klick blockiert: Ein Favorit wird bereits hinzugefügt.');
             return;
         }
-        const defaultName = `DIP at ${currentMarkerPosition.lat.toFixed(4)}, ${currentMarkerPosition.lng.toFixed(4)}`;
+        const defaultName = `DIP at ${AppState.lastLat.toFixed(4)}, ${AppState.lastLng.toFixed(4)}`;
         const name = prompt("Enter a name for this favorite:", defaultName);
         if (name) {
             isAddingFavorite = true;
             try {
-                addOrUpdateFavorite(currentMarkerPosition.lat, currentMarkerPosition.lng, name);
-                addCoordToHistory(currentMarkerPosition.lat, currentMarkerPosition.lng, name, true);
+                addOrUpdateFavorite(AppState.lastLat, AppState.lastLng, name);
+                addCoordToHistory(AppState.lastLat, AppState.lastLng, name, true);
             } finally {
                 isAddingFavorite = false;
                 console.log('saveFavoriteBtn Aktion abgeschlossen, Sperre aufgehoben.');
@@ -419,10 +419,6 @@ function removeLocationFromHistory(lat, lng) {
     saveCoordHistory(updatedHistory);
     Utils.handleMessage("Location deleted.");
     renderResultsList();
-}
-
-export function updateCurrentMarkerPosition(lat, lng) {
-    currentMarkerPosition = { lat, lng };
 }
 
 // --- Exportiere die notwendigen Funktionen ---

@@ -48,4 +48,15 @@ export const AppState = {
     ensembleLayerGroup: null, // Eigene LayerGroup für Ensemble-Visualisierungen
     ensembleScenarioCircles: {}, // Speichert die Leaflet-Layer für die Szenario-Kreise, z.B. { min_wind: circleLayer, mean_wind: circleLayer }
     heatmapLayer: null, // Für die Referenz auf den Heatmap-Layer
+
+    // --- NEUE ZUSTANDS-VARIABLEN ---
+    mapInitialized: false,              // von mapManager.js
+    hasTileErrorSwitched: false,        // von mapManager.js
+    isCachingCancelled: false,          // von tileCache.js
+    
+    // Layer-Gruppen und Listener
+    jumpVisualizationLayerGroup: null,  // von mapManager.js
+    landingPatternLayerGroup: null,     // von mapManager.js
+    jumpRunTrackLayerGroup: null,       // von mapManager.js
+    labelZoomListener: null,            // von mapManager.js
 };

@@ -1,7 +1,7 @@
 // mapManager.js
 "use strict";
 
-import { AppState } from './state.js'; // Annahme: AppState wurde wie besprochen ausgelagert
+import { AppState } from './state.js'; 
 import { Settings } from './settings.js';
 import { Utils } from './utils.js';
 import { TileCache } from './tileCache.js';
@@ -18,17 +18,6 @@ import 'leaflet-rotatedmarker';
 import * as mgrs from 'mgrs';
 import { UI_DEFAULTS, ICON_URLS, ENSEMBLE_VISUALIZATION}  from './constants.js'; // Importiere UI-Defaults
 
-
-let jumpVisualizationLayerGroup = null; // Unsere "Kiste" für alle Sprung-Visualisierungen
-let landingPatternLayerGroup = null;
-let jumpRunTrackLayerGroup = null; // Die neue "Kiste" für den Track
-let mapInitialized = false;
-let hasTileErrorSwitched = false;
-let labelZoomListener = null;
-
-
-// --- Hier werden wir alle kartenbezogenen Funktionen aus app.js einfügen ---
-
 // Haupt-Initialisierungsfunktion für dieses Modul
 export async function initializeMap() {
     console.log('MapManager: Starte Karteninitialisierung...');
@@ -42,11 +31,11 @@ export async function initializeMap() {
     return AppState.map;
 }
 async function initMap() {
-    if (mapInitialized || AppState.map) {
+    if (AppState.mapInitialized || AppState.map) {
         console.warn('Map already initialized or init in progress.');
         return;
     }
-    mapInitialized = true;
+    AppState.mapInitialized = true;
     console.log('initMap started...');
 
     const defaultCenter = UI_DEFAULTS.DEFAULT_MAP_CENTER;
@@ -56,9 +45,9 @@ async function initMap() {
     _initializeBasicMapInstance(defaultCenter, defaultZoom);
 
     // Direkt nachdem die Karte erstellt wurde, erstellen wir unsere "Kiste" für alle Sprung-Visualisierungen.
-    jumpVisualizationLayerGroup = L.layerGroup().addTo(AppState.map);
-    landingPatternLayerGroup = L.layerGroup().addTo(AppState.map);
-    jumpRunTrackLayerGroup = L.layerGroup().addTo(AppState.map);
+    AppState.jumpVisualizationLayerGroup = L.layerGroup().addTo(AppState.map);
+    AppState.landingPatternLayerGroup = L.layerGroup().addTo(AppState.map);
+    AppState.jumpRunTrackLayerGroup = L.layerGroup().addTo(AppState.map);
 
     _setupBaseLayersAndHandling();
     _addStandardMapControls();
@@ -158,14 +147,14 @@ function _setupBaseLayersAndHandling() {
     if (activeLayer && typeof activeLayer.on === 'function') {
         activeLayer.on('tileerror', () => {
             if (!navigator.onLine) {
-                if (!hasTileErrorSwitched) {
+                if (!AppState.hasTileErrorSwitched) {
                     console.warn(`${selectedBaseMapName} tiles unavailable offline. Zoom restricted.`);
                     Utils.handleMessage('Offline: Zoom restricted to levels 11–14 for cached tiles.');
-                    hasTileErrorSwitched = true;
+                    AppState.hasTileErrorSwitched = true;
                 }
                 return;
             }
-            if (!hasTileErrorSwitched && AppState.map.hasLayer(activeLayer)) {
+            if (!AppState.hasTileErrorSwitched && AppState.map.hasLayer(activeLayer)) {
                 const fallbackBaseMapName = "OpenStreetMap";
                 console.warn(`${selectedBaseMapName} tiles unavailable, switching to ${fallbackBaseMapName}`);
                 AppState.map.removeLayer(activeLayer);
@@ -173,8 +162,8 @@ function _setupBaseLayersAndHandling() {
                 Settings.state.userSettings.baseMaps = fallbackBaseMapName;
                 Settings.save();
                 Utils.handleMessage(`${selectedBaseMapName} tiles unavailable. Switched to ${fallbackBaseMapName}.`);
-                hasTileErrorSwitched = true;
-            } else if (!hasTileErrorSwitched) {
+                AppState.hasTileErrorSwitched = true;
+            } else if (!AppState.hasTileErrorSwitched) {
                 console.warn(`Tile error in ${selectedBaseMapName}, attempting to continue.`);
             }
         });
@@ -187,7 +176,7 @@ function _setupBaseLayersAndHandling() {
     if (AppState.map) AppState.map.invalidateSize();
 
     window.addEventListener('online', () => {
-        hasTileErrorSwitched = false;
+        AppState.hasTileErrorSwitched = false;
         if (AppState.map) AppState.map.options.minZoom = 6;
         updateOfflineIndicator(); // updateOfflineIndicator muss global/importiert sein
     });
@@ -212,7 +201,7 @@ function _addStandardMapControls() {
         } else {
             console.error("Settings object not properly available to save base map choice.");
         }
-        hasTileErrorSwitched = false;
+        AppState.hasTileErrorSwitched = false;
         if (AppState.lastLat && AppState.lastLng && typeof cacheTilesForDIP === 'function') {
             cacheTilesForDIP({ map: AppState.map, lastLat: AppState.lastLat, lastLng: AppState.lastLng, baseMaps: AppState.baseMaps });
         }
@@ -553,12 +542,12 @@ export function drawJumpVisualization(jumpData) {
     clearJumpVisualization(); // Umbenannt von clearJumpCircles für Klarheit
 
     // Entferne den alten Zoom-Listener, bevor neue Labels gezeichnet werden.
-    if (labelZoomListener && AppState.map) {
-        AppState.map.off('zoomend', labelZoomListener);
-        labelZoomListener = null;
+    if (AppState.labelZoomListener && AppState.map) {
+        AppState.map.off('zoomend', AppState.labelZoomListener);
+        AppState.labelZoomListener = null;
     }
 
-    if (!jumpData || !jumpVisualizationLayerGroup) {
+    if (!jumpData || !AppState.jumpVisualizationLayerGroup) {
         return;
     }
 
@@ -573,7 +562,7 @@ export function drawJumpVisualization(jumpData) {
                 fillColor: circleInfo.fillColor,
                 fillOpacity: circleInfo.fillOpacity,
                 weight: circleInfo.weight || 2
-            }).addTo(jumpVisualizationLayerGroup);
+            }).addTo(AppState.jumpVisualizationLayerGroup);
 
             // NEU: Wenn eine Tooltip-Information vorhanden ist, binde sie.
             if (circleInfo.tooltip) {
@@ -589,7 +578,7 @@ export function drawJumpVisualization(jumpData) {
     // Zeichne Canopy-Kreise
     if (jumpData.canopyCircles) {
         jumpData.canopyCircles.forEach(circleInfo => {
-            L.circle(circleInfo.center, circleInfo).addTo(jumpVisualizationLayerGroup);
+            L.circle(circleInfo.center, circleInfo).addTo(AppState.jumpVisualizationLayerGroup);
         });
     }
 
@@ -619,7 +608,7 @@ export function drawJumpVisualization(jumpData) {
                     iconAnchor: calculateLabelAnchor(labelInfo.center, labelInfo.radius)
                 }),
                 zIndexOffset: 2100 // Stellt sicher, dass Labels oben liegen
-            }).addTo(jumpVisualizationLayerGroup);
+            }).addTo(AppState.jumpVisualizationLayerGroup);
 
             // Speichere die notwendigen Infos für das spätere Update
             labelsToUpdate.push({
@@ -633,7 +622,7 @@ export function drawJumpVisualization(jumpData) {
 
     // Erstelle einen neuen Zoom-Listener, der alle gerade erstellten Labels kennt.
     if (labelsToUpdate.length > 0) {
-        labelZoomListener = function () {
+        AppState.labelZoomListener = function () {
             const currentZoom = AppState.map.getZoom();
             const isSmall = currentZoom <= 11;
             labelsToUpdate.forEach(item => {
@@ -645,24 +634,24 @@ export function drawJumpVisualization(jumpData) {
                 }));
             });
         };
-        AppState.map.on('zoomend', labelZoomListener);
+        AppState.map.on('zoomend', AppState.labelZoomListener);
     }
 }
 function clearJumpVisualization() {
-    if (AppState.map && jumpVisualizationLayerGroup) {
-        AppState.map.removeLayer(jumpVisualizationLayerGroup);
+    if (AppState.map && AppState.jumpVisualizationLayerGroup) {
+        AppState.map.removeLayer(AppState.jumpVisualizationLayerGroup);
     }
-    jumpVisualizationLayerGroup = L.layerGroup().addTo(AppState.map);
+    AppState.jumpVisualizationLayerGroup = L.layerGroup().addTo(AppState.map);
 }
 function clearJumpCircles() {
     // Greift auf die LayerGroup zu, die wir in initializeMap erstellt haben.
-    if (jumpVisualizationLayerGroup) {
-        jumpVisualizationLayerGroup.clearLayers();
+    if (AppState.jumpVisualizationLayerGroup) {
+        AppState.jumpVisualizationLayerGroup.clearLayers();
     }
 }
 function clearLandingPattern() {
-    if (landingPatternLayerGroup) {
-        landingPatternLayerGroup.clearLayers();
+    if (AppState.landingPatternLayerGroup) {
+        AppState.landingPatternLayerGroup.clearLayers();
     }
 }
 export function drawLandingPattern(patternData) {
@@ -681,7 +670,7 @@ export function drawLandingPattern(patternData) {
             weight: 3,
             opacity: 0.8,
             dashArray: '5, 10'
-        }).addTo(landingPatternLayerGroup); // Fügt es zur LayerGroup hinzu
+        }).addTo(AppState.landingPatternLayerGroup); // Fügt es zur LayerGroup hinzu
     });
 
     // 4. Zeichne die Pfeile.
@@ -690,7 +679,7 @@ export function drawLandingPattern(patternData) {
         const arrowIcon = createArrowIcon(arrow.position[0], arrow.position[1], arrow.bearing, arrow.color);
 
         const arrowMarker = L.marker(arrow.position, { icon: arrowIcon })
-            .addTo(landingPatternLayerGroup); // Fügt es zur LayerGroup hinzu
+            .addTo(AppState.landingPatternLayerGroup); // Fügt es zur LayerGroup hinzu
 
         arrowMarker.bindTooltip(arrow.tooltipText, {
             offset: [10, 0],
@@ -716,10 +705,10 @@ function createArrowIcon(lat, lng, bearing, color) {
     });
 }
 function clearJumpRunTrack() {
-    if (AppState.map && jumpRunTrackLayerGroup) {
-        AppState.map.removeLayer(jumpRunTrackLayerGroup);
+    if (AppState.map && AppState.jumpRunTrackLayerGroup) {
+        AppState.map.removeLayer(AppState.jumpRunTrackLayerGroup);
     }
-    jumpRunTrackLayerGroup = L.layerGroup().addTo(AppState.map);
+    AppState.jumpRunTrackLayerGroup = L.layerGroup().addTo(AppState.map);
 }
 export function createCutAwayMarker(lat, lng) {
     const cutAwayIcon = L.icon({
@@ -808,8 +797,8 @@ export function clearCutAwayMarker() {
 export function drawJumpRunTrack(trackData) {
     clearJumpRunTrack();
 
-    if (!trackData || !jumpRunTrackLayerGroup) {
-        console.warn('No valid trackData or jumpRunTrackLayerGroup');
+    if (!trackData || !AppState.jumpRunTrackLayerGroup) {
+        console.warn('No valid trackData or AppState.jumpRunTrackLayerGroup');
         return;
     }
 
@@ -821,13 +810,13 @@ export function drawJumpRunTrack(trackData) {
 
     const trackPolyline = L.polyline(trackData.path.latlngs, trackData.path.options)
         .bindTooltip(trackData.path.tooltipText)
-        .addTo(jumpRunTrackLayerGroup);
+        .addTo(AppState.jumpRunTrackLayerGroup);
 
     let approachPolyline = null;
     if (trackData.approachPath?.latlngs) {
         approachPolyline = L.polyline(trackData.approachPath.latlngs, trackData.approachPath.options)
             .bindTooltip(trackData.approachPath.tooltipText)
-            .addTo(jumpRunTrackLayerGroup);
+            .addTo(AppState.jumpRunTrackLayerGroup);
     }
 
     const airplaneIcon = L.icon({
@@ -845,7 +834,7 @@ export function drawJumpRunTrack(trackData) {
         zIndexOffset: 2000
     })
         .bindTooltip('Drag to move Jump Run Track')
-        .addTo(jumpRunTrackLayerGroup);
+        .addTo(AppState.jumpRunTrackLayerGroup);
 
     airplaneMarker.on('mousedown', () => AppState.map.dragging.disable());
     airplaneMarker.on('mouseup', () => AppState.map.dragging.enable());

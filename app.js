@@ -1465,7 +1465,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
 
             await mapManager.createOrUpdateMarker(lat, lng);
-            Coordinates.updateCurrentMarkerPosition(lat, lng);
             await refreshMarkerPopup();
             mapManager.recenterMap(true);
             AppState.isManualPanning = false;

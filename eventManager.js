@@ -1219,7 +1219,6 @@ function setupMapEventListeners() {
         AppState.lastAltitude = await Utils.getAltitude(lat, lng);
 
         // Informiere das Coordinates-Modul über die neue Position
-        Coordinates.updateCurrentMarkerPosition(lat, lng);
         Coordinates.addCoordToHistory(lat, lng);
 
         // Bewege den Marker (falls die Aktion nicht schon vom Marker selbst kam)
