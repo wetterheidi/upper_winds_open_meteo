@@ -2,7 +2,7 @@
 // == Constants and Global Variables ==
 import { AppState } from './state.js';
 import { Utils } from './utils.js';
-import { Settings } from './settings.js';
+import { Settings, getInterpolationStep } from './settings.js';
 import { Constants, FEATURE_PASSWORD } from './constants.js';
 import * as EventManager from './eventManager.js'; // NEUER IMPORT
 import { displayMessage, displayProgress, displayError, hideProgress, updateOfflineIndicator, isMobileDevice } from './ui.js';

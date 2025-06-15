@@ -4,6 +4,7 @@ import * as L from 'leaflet';
 window.L = L; // <-- DIESE ZEILE MUSS BLEIBEN
 import 'leaflet/dist/leaflet.css'; // Nicht vergessen!
 import * as mgrs from 'mgrs';
+import { CONVERSIONS, ISA_CONSTANTS, DEWPOINT_COEFFICIENTS, EARTH_RADIUS_METERS } from './constants.js';
 
 export class Utils {
     // Format ISO time string to UTC (e.g., "2025-03-15T00:00Z" -> "2025-03-15 0000Z")
@@ -30,7 +31,7 @@ export class Utils {
         if (isNaN(numericValue)) {
             return 'N/A';
         }
-        return toUnit === 'ft' ? parseFloat((value * 3.28084).toFixed(0)) : value; // m to ft or unchanged if m
+        return toUnit === 'ft' ? parseFloat((value * CONVERSIONS.METERS_TO_FEET).toFixed(0)) : value; // m to ft or unchanged if m
     }
 
     static convertWind(value, toUnit, fromUnit = 'km/h') {
@@ -44,13 +45,13 @@ export class Utils {
                 speedInKmH = value * 3.6;
                 break;
             case 'kt':
-                speedInKmH = value * 1.852;
+                speedInKmH = value * CONVERSIONS.KNOTS_TO_KMH;
                 break;
             case 'mph':
                 speedInKmH = value * 1.60934;
                 break; // Double-check this break is present
             case 'bft':
-                speedInKmH = Utils.beaufortToKnots(value) * 1.852;
+                speedInKmH = Utils.beaufortToKnots(value) * CONVERSIONS.KNOTS_TO_KMH;
                 break;
             default:
                 speedInKmH = value;
@@ -62,13 +63,13 @@ export class Utils {
             case 'm/s':
                 return speedInKmH / 3.6;
             case 'kt':
-                return speedInKmH / 1.852;
+                return speedInKmH / CONVERSIONS.KNOTS_TO_KMH;
             case 'mph':
                 return speedInKmH / 1.60934;
             case 'bft':
-                return Utils.knotsToBeaufort(speedInKmH / 1.852);
+                return Utils.knotsToBeaufort(speedInKmH / CONVERSIONS.KNOTS_TO_KMH);
             default:
-                return speedInKmH / 1.852;
+                return speedInKmH / CONVERSIONS.KNOTS_TO_KMH;
         }
     }
 
@@ -96,10 +97,10 @@ export class Utils {
 
     // Calculate dewpoint from temperature (°C) and relative humidity (%)
     static calculateDewpoint(temp, rh) {
-        const aLiquid = 17.27;
-        const bLiquid = 237.7;
-        const aIce = 21.87;
-        const bIce = 265.5;
+        const aLiquid = DEWPOINT_COEFFICIENTS.A_LIQUID;
+        const bLiquid = DEWPOINT_COEFFICIENTS.B_LIQUID;
+        const aIce = DEWPOINT_COEFFICIENTS.A_ICE;
+        const bIce = DEWPOINT_COEFFICIENTS.B_ICE;
 
         let alpha, dewpoint;
         if (temp >= 0) {
@@ -515,12 +516,12 @@ export class Utils {
             return 'N/A';
         }
 
-        const seaLevelDensity = 1.225;
-        const lapseRate = 0.0065;
-        const seaLevelTemp = 288.15;
-        const gravity = 9.80665;
-        const gasConstant = 287.05;
-        const metersPerFoot = 0.3048;
+        const seaLevelDensity = ISA_CONSTANTS.SEA_LEVEL_DENSITY;
+        const lapseRate = ISA_CONSTANTS.LAPSE_RATE;
+        const seaLevelTemp = ISA_CONSTANTS.SEA_LEVEL_TEMP_KELVIN;
+        const gravity = ISA_CONSTANTS.GRAVITY;
+        const gasConstant = ISA_CONSTANTS.GAS_CONSTANT_AIR;
+        const metersPerFoot = CONVERSIONS.FEET_TO_METERS;
 
         const heightM = heightFt * metersPerFoot;
         const tempAtAltitude = seaLevelTemp - lapseRate * heightM;
@@ -609,7 +610,7 @@ export class Utils {
     }
 
     static calculateNewCenter(lat, lng, distance, bearing) {
-        const R = 6371000; // Earth's radius in meters
+        const R = EARTH_RADIUS_METERS; // Earth's radius in meters
         const lat1 = lat * Math.PI / 180; // Convert to radians
         const lng1 = lng * Math.PI / 180;
         const bearingRad = bearing * Math.PI / 180; // Wind FROM direction
