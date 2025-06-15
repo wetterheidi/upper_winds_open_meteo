@@ -244,6 +244,7 @@ export async function updateWeatherDisplay(index, originalTime = null) {
 
     document.getElementById('info').innerHTML = output;
     document.getElementById('selectedTime').innerHTML = `Selected Time: ${time}`;
+    await refreshMarkerPopup();
     updateLandingPatternDisplay();
 }
 export function calculateMeanWind() {
@@ -1059,7 +1060,7 @@ export function updateJumpRunTrackDisplay() {
             },
             approachPath: trackData.approachLatLngs?.length === 2 && trackData.approachLatLngs.every(ll => Number.isFinite(ll[0]) && Number.isFinite(ll[1])) ? {
                 latlngs: trackData.approachLatLngs,
-                options: { color: 'orange', weight: 3, opacity: 0.6, dashArray: '5, 10' },
+                options: { color: 'orange', weight: 5, opacity: 0.8, dashArray: '5, 10' },
                 tooltipText: `Approach Path: ${trackData.direction}°, Length: ${trackData.approachLength} m`,
                 originalLatLngs: AppState.lastTrackData?.approachLatLngs?.length === 2 ? AppState.lastTrackData.approachLatLngs : trackData.approachLatLngs
             } : null,
@@ -1465,6 +1466,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             await mapManager.createOrUpdateMarker(lat, lng);
             Coordinates.updateCurrentMarkerPosition(lat, lng);
+            await refreshMarkerPopup();
             mapManager.recenterMap(true);
             AppState.isManualPanning = false;
 
