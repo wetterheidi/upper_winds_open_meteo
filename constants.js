@@ -84,6 +84,19 @@ export const API_URLS = {
     HISTORICAL: 'https://historical-forecast-api.open-meteo.com/v1/forecast',
 };
 
+export const ENSEMBLE_VISUALIZATION = {
+    SCENARIO_COLORS: {
+        MIN_WIND: 'rgba(0, 0, 255, 0.7)',
+        MEAN_WIND: 'rgba(0, 255, 0, 0.7)',
+        MAX_WIND: 'rgba(255, 0, 0, 0.7)'
+    },
+    HEATMAP_MIN_RADIUS_PX: 5,
+    HEATMAP_MAX_RADIUS_PX: 50,
+    HEATMAP_SCALING_BASE: 1.42,
+    HEATMAP_BASE_RADIUS: 20,
+    HEATMAP_REFERENCE_ZOOM: 13
+};
+
 export const STANDARD_PRESSURE_LEVELS = [1000, 950, 925, 900, 850, 800, 700, 600, 500, 400, 300, 250, 200];
 
 
@@ -105,6 +118,13 @@ export const FREEFALL_PHYSICS = {
     DEFAULT_DRAG_COEFFICIENT: 1,
 };
 
+export const JUMP_RUN_DEFAULTS = {
+    MIN_TRACK_LENGTH_M: 100,
+    MAX_TRACK_LENGTH_M: 10000,
+    MIN_APPROACH_LENGTH_M: 100,
+    MAX_APPROACH_LENGTH_M: 20000,
+    APPROACH_TIME_SECONDS: 120
+};
 
 // === UI & App Behavior ===
 export const UI_DEFAULTS = {
@@ -120,6 +140,7 @@ export const UI_DEFAULTS = {
 };
 
 export const SMOOTHING_DEFAULTS = {
+    MIN_TIME_DIFF_FOR_SPEED_CALC_S: 0.5,
     SPEED_SMOOTHING_LOW: 0.5, // Glättungsfaktor für Geschwindigkeit
     SPEED_SMOOTHING_HIGH: 0.2, // Glättungsfaktor für hohe Geschwindigkeiten
     SPEED_SMOOTHING_TRESHOLD: 25, // Radius für Positionsglättung
@@ -136,4 +157,3 @@ export const ICON_URLS = {
     CUTAWAY_MARKER: 'schere_purple.png',
     AIRPLANE_MARKER: 'airplane_orange.png'
 };
-

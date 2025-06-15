@@ -4,7 +4,8 @@ import * as L from 'leaflet';
 window.L = L; // <-- DIESE ZEILE MUSS BLEIBEN
 import 'leaflet/dist/leaflet.css'; // Nicht vergessen!
 import * as mgrs from 'mgrs';
-import { CONVERSIONS, ISA_CONSTANTS, DEWPOINT_COEFFICIENTS, EARTH_RADIUS_METERS, PHYSICAL_CONSTANTS, BEAUFORT } from './constants.js';
+import { AppState } from './state.js';
+import { CONVERSIONS, ISA_CONSTANTS, DEWPOINT_COEFFICIENTS, EARTH_RADIUS_METERS, PHYSICAL_CONSTANTS, BEAUFORT, ENSEMBLE_VISUALIZATION } from './constants.js';
 
 export class Utils {
     // Format ISO time string to UTC (e.g., "2025-03-15T00:00Z" -> "2025-03-15 0000Z")
@@ -669,6 +670,23 @@ export class Utils {
         }
     }
 
+    static calculateDynamicRadius(baseRadius = ENSEMBLE_VISUALIZATION.HEATMAP_SCALING_BASE, referenceZoom = ENSEMBLE_VISUALIZATION.HEATMAP_REFERENCE_ZOOM) {
+        const currentZoom = AppState.map.getZoom();
+        // NEU: Anstatt der festen "2" verwenden wir eine anpassbare Basis.
+        // Ein Wert um 1.6 ist oft ein guter Kompromiss.
+        // - Näher an 1: Sanftere Skalierung
+        // - Näher an 2: Aggressivere Skalierung
+        const scalingBase = ENSEMBLE_VISUALIZATION.HEATMAP_SCALING_BASE || 1.6; // Fallback auf 1.6, wenn nicht definiert
+    
+        const scaleFactor = Math.pow(scalingBase, currentZoom - referenceZoom);
+        const dynamicRadius = baseRadius * scaleFactor;
+        // Clamp radius to reasonable bounds to avoid extreme values
+        const minRadius = ENSEMBLE_VISUALIZATION.HEATMAP_MIN_RADIUS_PX;  // Minimum radius to avoid disappearing at high zooms
+        const maxRadius = ENSEMBLE_VISUALIZATION.HEATMAP_MAX_RADIUS_PX; // Maximum radius to avoid excessive spread at low zooms
+        const adjustedRadius = Math.max(minRadius, Math.min(maxRadius, dynamicRadius));
+        console.log('[calculateDynamicRadius] Calculated dynamic radius:', { currentZoom, baseRadius, scaleFactor, dynamicRadius, adjustedRadius });
+        return adjustedRadius;
+    }
     /*static configureMarker(map, lat, lng, altitude, openPopup = false, createCustomMarker, attachMarkerDragend, updateMarkerPopup, currentMarker, setCurrentMarker) {
         if (!map) {
             console.warn('Map not initialized, cannot configure marker');

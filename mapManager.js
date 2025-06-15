@@ -16,7 +16,7 @@ import 'leaflet-gpx';
 import 'leaflet.heat';
 import 'leaflet-rotatedmarker';
 import * as mgrs from 'mgrs';
-import { UI_DEFAULTS, ICON_URLS}  from './constants.js'; // Importiere UI-Defaults
+import { UI_DEFAULTS, ICON_URLS, ENSEMBLE_VISUALIZATION}  from './constants.js'; // Importiere UI-Defaults
 
 
 let jumpVisualizationLayerGroup = null; // Unsere "Kiste" für alle Sprung-Visualisierungen
@@ -446,7 +446,7 @@ function _setupCoreMapEventHandlers() {
 
         // Update heatmap radius on zoomend to adjust dynamically
         if (AppState.heatmapLayer) {
-            const newRadius = calculateDynamicRadius(HEATMAP_BASE_RADIUS, HEATMAP_REFERENCE_ZOOM);
+            const newRadius = Utils.calculateDynamicRadius(ENSEMBLE_VISUALIZATION.HEATMAP_BASE_RADIUS, ENSEMBLE_VISUALIZATION.HEATMAP_REFERENCE_ZOOM);
             AppState.heatmapLayer.setOptions({ radius: newRadius });
             console.log('Heatmap radius updated on zoom:', {
                 currentZoom: AppState.map.getZoom(),

@@ -10,9 +10,8 @@ import * as L from 'leaflet';
 window.L = L; // <-- DIESE ZEILE MUSS BLEIBEN
 import 'leaflet/dist/leaflet.css'; // Nicht vergessen!
 import 'leaflet.heat';
+import { ENSEMBLE_VISUALIZATION, API_URLS } from './constants.js';
 
-const HEATMAP_BASE_RADIUS = 20;
-const HEATMAP_REFERENCE_ZOOM = 13;
 
 export async function fetchEnsembleWeatherData() {
     if (!AppState.lastLat || !AppState.lastLng) {
@@ -63,10 +62,10 @@ export async function fetchEnsembleWeatherData() {
     const isHistorical = selectedDate && selectedDate < today;
 
     let startDateStr, endDateStr;
-    let baseUrl = 'https://api.open-meteo.com/v1/forecast';
+    let baseUrl = API_URLS.FORECAST; // Standard-URL für Vorhersage
 
     if (isHistorical) {
-        baseUrl = 'https://historical-forecast-api.open-meteo.com/v1/forecast';
+        baseUrl = API_URLS.HISTORICAL; // URL für historische Daten
         startDateStr = selectedDate.toFormat('yyyy-MM-dd');
         endDateStr = startDateStr;
     } else {
@@ -237,9 +236,9 @@ function getDistinctColorForModel(modelName) {
     return `hsl(${hue}, 70%, 60%)`; // HSL für bessere Farbverteilung
 }
 function getDistinctColorForScenario(scenario) {
-    if (scenario === 'min_wind') return 'rgba(0, 0, 255, 0.7)';    // Blau
-    if (scenario === 'mean_wind') return 'rgba(0, 255, 0, 0.7)';   // Grün
-    if (scenario === 'max_wind') return 'rgba(255, 0, 0, 0.7)';    // Rot
+    if (scenario === 'min_wind') return ENSEMBLE_VISUALIZATION.SCENARIO_COLORS.MIN_WIND;    // Blau
+    if (scenario === 'mean_wind') return ENSEMBLE_VISUALIZATION.SCENARIO_COLORS.MEAN_WIND;   // Grün
+    if (scenario === 'max_wind') return ENSEMBLE_VISUALIZATION.SCENARIO_COLORS.MAX_WIND;    // Rot
     return 'rgba(128, 128, 128, 0.7)'; // Grau für Fallback
 }
 function drawEnsembleCircle(exitResult, color, label) {
@@ -585,23 +584,6 @@ function calculateExitCircleForEnsemble(profileIdentifier, specificProfileData =
     console.warn(`calculateExitCircle returned null for profile ${profileIdentifier}`);
     return null;
 }
-export function calculateDynamicRadius(baseRadius = 20, referenceZoom = 13) {
-    const currentZoom = AppState.map.getZoom();
-    // NEU: Anstatt der festen "2" verwenden wir eine anpassbare Basis.
-    // Ein Wert um 1.6 ist oft ein guter Kompromiss.
-    // - Näher an 1: Sanftere Skalierung
-    // - Näher an 2: Aggressivere Skalierung
-    const scalingBase = 1.42;
-
-    const scaleFactor = Math.pow(scalingBase, currentZoom - referenceZoom);
-    const dynamicRadius = baseRadius * scaleFactor;
-    // Clamp radius to reasonable bounds to avoid extreme values
-    const minRadius = 5;  // Minimum radius to avoid disappearing at high zooms
-    const maxRadius = 50; // Maximum radius to avoid excessive spread at low zooms
-    const adjustedRadius = Math.max(minRadius, Math.min(maxRadius, dynamicRadius));
-    console.log('[calculateDynamicRadius] Calculated dynamic radius:', { currentZoom, baseRadius, scaleFactor, dynamicRadius, adjustedRadius });
-    return adjustedRadius;
-}
 function generateAndDisplayHeatmap() {
 
     // 1. Clear previous visualizations
@@ -704,7 +686,7 @@ function generateAndDisplayHeatmap() {
             AppState.map.removeLayer(AppState.heatmapLayer);
         }
 
-        const dynamicRadius = calculateDynamicRadius(HEATMAP_BASE_RADIUS, HEATMAP_REFERENCE_ZOOM);
+        const dynamicRadius = Utils.calculateDynamicRadius(ENSEMBLE_VISUALIZATION.HEATMAP_BASE_RADIUS, ENSEMBLE_VISUALIZATION.HEATMAP_REFERENCE_ZOOM);
 
         AppState.heatmapLayer = L.heatLayer(heatmapPoints, {
             radius: dynamicRadius,

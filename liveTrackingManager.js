@@ -53,7 +53,7 @@ const debouncedPositionUpdate = Utils.debounce(async (position) => {
     if (AppState.prevLat !== null && AppState.prevLng !== null && AppState.prevTime !== null) {
         const distance = AppState.map.distance([AppState.prevLat, AppState.prevLng], [latitude, longitude]);
         const timeDiff = (currentTime - AppState.prevTime) / 1000;
-        if (timeDiff > 0.5) { // Nur berechnen, wenn genug Zeit vergangen ist
+        if (timeDiff > SMOOTHING_DEFAULTS.MIN_TIME_DIFF_FOR_SPEED_CALC_S) { // Nur berechnen, wenn genug Zeit vergangen ist
             speedMs = distance / timeDiff;
             direction = Utils.calculateBearing(AppState.prevLat, AppState.prevLng, latitude, longitude).toFixed(0);
         }
