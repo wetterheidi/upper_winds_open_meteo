@@ -9,7 +9,7 @@ import { displayMessage, displayProgress, displayError, hideProgress, updateOffl
 import { TileCache, cacheTilesForDIP, debouncedCacheVisibleTiles } from './tileCache.js';
 import { setupCacheManagement, setupCacheSettings } from './cacheUI.js';
 import * as Coordinates from './coordinates.js';
-import { initializeLocationSearch } from './coordinates.js'; 
+import { initializeLocationSearch } from './coordinates.js';
 import { interpolateColor, generateWindBarb } from "./uiHelpers.js";
 import { handleHarpPlacement, createHarpMarker, clearHarpMarker } from './harpMarker.js';
 import { loadGpxTrack, loadCsvTrackUTC } from './trackManager.js';
@@ -170,7 +170,7 @@ export async function updateWeatherDisplay(index, originalTime = null) {
         return;
     }
 
-// NEU: Zuerst alle Zeilen als HTML-Strings generieren
+    // NEU: Zuerst alle Zeilen als HTML-Strings generieren
     const tableRowsHtml = interpolatedData.map(data => {
         // ... (Die gesamte Logik zur Berechnung von windClass, humidityClass, displayHeight, etc. bleibt hier drin) ...
         const spd = parseFloat(data.spd);
@@ -738,6 +738,20 @@ export function validateLegHeights(final, base, downwind) {
 }
 export function updateLandingPatternDisplay() {
 
+   // 1. Prüft, ob der Marker existiert UND ob es ein valides Objekt mit der getLatLng-Methode ist.
+    if (!AppState.currentMarker || typeof AppState.currentMarker.getLatLng !== 'function') {
+        console.warn("Landing pattern update skipped: AppState.currentMarker is not a valid marker object yet.", AppState.currentMarker);
+        return;
+    }
+
+    const markerLatLng = AppState.currentMarker.getLatLng();
+
+    // 2. Zusätzliche Sicherheitsprüfung für den Fall, dass getLatLng() aus irgendeinem Grund undefined zurückgibt.
+    if (!markerLatLng) {
+        console.error("Could not get LatLng from the current marker. Aborting landing pattern update.", AppState.currentMarker);
+        return;
+    }
+
     // --- TEIL A: DATEN SAMMELN UND PRÜFEN (1:1 aus Ihrer alten Funktion) ---
     if (!Settings.state.isLandingPatternUnlocked || !Settings.state.userSettings.showLandingPattern) {
         mapManager.drawLandingPattern(null); // Alte Visualisierungen löschen
@@ -771,7 +785,6 @@ export function updateLandingPatternDisplay() {
     const LEG_HEIGHT_BASE = parseInt(document.getElementById('legHeightBase').value) || 200;
 
     const LEG_HEIGHT_DOWNWIND = parseInt(document.getElementById('legHeightDownwind').value) || 300;
-    const markerLatLng = AppState.currentMarker.getLatLng();
     const lat = markerLatLng.lat;
     const lng = markerLatLng.lng;
     const baseHeight = Math.round(AppState.lastAltitude);
@@ -1469,12 +1482,28 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.addEventListener('map:zoomend', (event) => {
         console.log("App: Event 'map:zoomend' empfangen.");
 
+        const currentZoom = AppState.map.getZoom();
+
         // Hier ist jetzt das neue Zuhause für die Anwendungslogik!
         if (Settings.state.userSettings.calculateJump && AppState.weatherData && AppState.lastLat) {
-            calculateJump();
+            // Prüfe, ob der aktuelle Zoom im gewünschten Bereich liegt
+            if (currentZoom >= UI_DEFAULTS.MIN_ZOOM && currentZoom <= UI_DEFAULTS.MAX_ZOOM) {
+                // Ja, also Kreise berechnen und zeichnen
+                calculateJump();
+            } else {
+                // Nein, also alle bestehenden Sprung-Visualisierungen löschen
+                mapManager.drawJumpVisualization(null);
+                //mapManager.drawCutAwayVisualization(null);
+            }
         }
+
         if (Settings.state.userSettings.showJumpRunTrack) {
-            updateJumpRunTrackDisplay();
+            if (currentZoom >= UI_DEFAULTS.MIN_ZOOM && currentZoom <= UI_DEFAULTS.MAX_ZOOM) {
+                updateJumpRunTrackDisplay();
+            } else {
+                // Nein, also alle bestehenden Sprung-Visualisierungen löschen
+                mapManager.drawJumpRunTrack(null);
+            }
         }
         if (Settings.state.userSettings.showLandingPattern) {
             updateLandingPatternDisplay();
