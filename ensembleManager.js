@@ -3,15 +3,14 @@ import { AppState } from './state.js';
 import { Settings } from './settings.js';
 import { Utils } from './utils.js';
 import * as JumpPlanner from './jumpPlanner.js';
-import { displayMessage, displayError, getSliderValue } from './ui.js';
+import { getSliderValue } from './ui.js';
 import { interpolateWeatherData } from './weatherManager.js';
 import { DateTime } from 'luxon';
 import * as L from 'leaflet';
-window.L = L; // <-- DIESE ZEILE MUSS BLEIBEN
 import 'leaflet/dist/leaflet.css'; // Nicht vergessen!
 import 'leaflet.heat';
 import { ENSEMBLE_VISUALIZATION, API_URLS } from './constants.js';
-
+window.L = L; // <-- DIESE ZEILE MUSS BLEIBEN
 
 export async function fetchEnsembleWeatherData() {
     if (!AppState.lastLat || !AppState.lastLng) {

@@ -2,7 +2,6 @@
 
 "use strict";
 
-import { Settings } from './settings.js';
 import { Utils } from './utils.js';
 import * as mgrs from 'mgrs';
 import { AppState } from './state.js';

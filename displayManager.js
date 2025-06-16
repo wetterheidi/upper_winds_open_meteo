@@ -4,7 +4,6 @@ import { Utils } from './utils.js';
 import { getSliderValue } from './ui.js';
 import * as mapManager from './mapManager.js';
 import * as weatherManager from './weatherManager.js';
-import { generateWindBarb } from "./uiHelpers.js";
 import { UI_DEFAULTS } from './constants.js'; // UI_DEFAULTS für LANDING_PATTERN_MIN_ZOOM
 import * as JumpPlanner from './jumpPlanner.js';
 
@@ -127,7 +126,7 @@ export async function updateWeatherDisplay(index, originalTime = null) {
             formattedWind = convertedSpd === 'N/A' ? 'N/A' : (windSpeedUnit === 'bft' ? Math.round(convertedSpd) : convertedSpd.toFixed(0));
         }
         const speedKt = Math.round(Utils.convertWind(spd, 'kt', 'km/h') / 5) * 5;
-        const windBarbSvg = data.dir === 'N/A' || isNaN(speedKt) ? 'N/A' : generateWindBarb(data.dir, speedKt);
+        const windBarbSvg = data.dir === 'N/A' || isNaN(speedKt) ? 'N/A' : Utils.generateWindBarb(data.dir, speedKt);
 
         // Gibt den fertigen HTML-String für eine Zeile zurück
         return `<tr class="${windClass} ${humidityClass}">

@@ -1,16 +1,12 @@
 import { AppState } from './state.js';
-import { calculateCutAway } from "./jumpPlanner.js";
 import { Settings } from "./settings.js";
 import { Utils } from "./utils.js";
-import { interpolateColor } from "./uiHelpers.js";
-import { attachMarkerDragend, createCustomMarker, updatePopupContent } from './mapManager.js';
 import { DateTime } from 'luxon';
-import * as L from 'leaflet';
-window.L = L; // <-- DIESE ZEILE MUSS BLEIBEN
 import 'leaflet/dist/leaflet.css'; // Nicht vergessen!
-import * as mgrs from 'mgrs';
 import Papa from 'papaparse';
 import 'leaflet-gpx';
+import * as L from 'leaflet';
+window.L = L; // <-- DIESE ZEILE MUSS BLEIBEN
 
 "use strict";
 
@@ -245,7 +241,7 @@ async function renderTrack(points, fileName) {
             if (groundAltitude !== null && ele1 !== null && ele2 !== null) {
                 const agl1 = ele1 - groundAltitude; const agl2 = ele2 - groundAltitude;
                 const avgAgl = (agl1 + agl2) / 2;
-                color = interpolateColor(avgAgl);
+                color = Utils.interpolateColor(avgAgl);
             }
             const segment = L.polyline([[p1.lat, p1.lng], [p2.lat, p2.lng]], {
                 color: color, weight: 4, opacity: 0.75, pane: 'gpxTrackPane'

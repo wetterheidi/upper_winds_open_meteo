@@ -1,6 +1,6 @@
 // ui.js
 import { Utils } from './utils.js';
-import { Settings, getInterpolationStep } from './settings.js';
+import { Settings } from './settings.js';
 import { fetchEnsembleWeatherData } from './ensembleManager.js';
 import { UI_DEFAULTS } from './constants.js';
 

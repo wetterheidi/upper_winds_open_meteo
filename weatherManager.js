@@ -2,7 +2,6 @@ import { AppState } from './state.js';
 import { Utils } from './utils.js';
 import { Settings, getInterpolationStep } from './settings.js';
 import { displayError } from './ui.js';
-import { fetchEnsembleWeatherData, clearEnsembleVisualizations } from './ensembleManager.js';
 import { WEATHER_MODELS } from './constants.js';
 import { updateModelSelectUI, updateEnsembleModelUI, cleanupSelectedEnsembleModels } from './ui.js'; 
 import { DateTime } from 'luxon';
@@ -91,6 +90,7 @@ async function fetchWeather(lat, lon, currentTime = null) {
         if (loadingElement) loadingElement.style.display = 'none';
     }
 }
+
 
 async function checkAvailableModels(lat, lon) {
     const modelList = WEATHER_MODELS.LIST; 

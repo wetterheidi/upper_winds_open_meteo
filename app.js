@@ -3,28 +3,21 @@
 import { AppState } from './state.js';
 import { Utils } from './utils.js';
 import { Settings, getInterpolationStep } from './settings.js';
-import { UI_DEFAULTS, FEATURE_PASSWORD } from './constants.js';
-import * as EventManager from './eventManager.js'; // NEUER IMPORT
-import { displayMessage, displayProgress, displayError, hideProgress, updateOfflineIndicator, isMobileDevice } from './ui.js';
-import { TileCache, cacheTilesForDIP, debouncedCacheVisibleTiles } from './tileCache.js';
-import { setupCacheManagement, setupCacheSettings } from './cacheUI.js';
+import { UI_DEFAULTS } from './constants.js';
+import * as EventManager from './eventManager.js';
+import { displayMessage, displayError } from './ui.js';
 import * as Coordinates from './coordinates.js';
-import { initializeLocationSearch } from './coordinates.js';
-import { interpolateColor, generateWindBarb } from "./uiHelpers.js";
-import { handleHarpPlacement, createHarpMarker, clearHarpMarker } from './harpMarker.js';
-import { loadGpxTrack, loadCsvTrackUTC } from './trackManager.js';
 import * as JumpPlanner from './jumpPlanner.js';
 import * as mapManager from './mapManager.js';
 import * as weatherManager from './weatherManager.js';
-import * as EnsembleManager from './ensembleManager.js';
 import { getSliderValue } from './ui.js';
 import * as AutoupdateManager from './autoupdateManager.js';
-import * as L from 'leaflet';
-window.L = L; // <-- DIESE ZEILE MUSS BLEIBEN
-import 'leaflet/dist/leaflet.css'; // Nicht vergessen!
+import 'leaflet/dist/leaflet.css';
 import { DateTime } from 'luxon';
 import 'leaflet-gpx';
 import * as displayManager from './displayManager.js';
+import * as L from 'leaflet';
+window.L = L; // <-- DIESE ZEILE MUSS BLEIBEN
 
 "use strict";
 
@@ -362,47 +355,6 @@ export function downloadTableAsAscii(format) {
     Settings.updateUnitLabels();
 
 }
-// in app.js
-
-export async function updateAllDisplays() {
-    console.log('updateAllDisplays called');
-    try {
-        const sliderIndex = getSliderValue();
-        if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
-
-            // === DER DIRIGENT BEI DER ARBEIT ===
-            // Jeder Schritt wird explizit von hier aus gesteuert.
-
-            // 1. Die Haupt-Wettertabelle anzeigen lassen
-            await displayManager.updateWeatherDisplay(sliderIndex);
-
-            // 2. Das Popup des Markers aktualisieren lassen
-            await displayManager.refreshMarkerPopup();
-
-            // 3. Die Mittelwind-Berechnung UND Anzeige durchführen (lokale Funktion)
-            if (AppState.lastAltitude !== 'N/A') {
-                calculateMeanWind();
-            }
-
-            // 4. Das Landemuster anzeigen lassen (hat eigene Logik)
-            displayManager.updateLandingPatternDisplay();
-
-            // 5. Die Sprung-Visualisierungen steuern
-            if (Settings.state.userSettings.calculateJump) {
-                calculateJump(); // Diese Funktion kümmert sich um Exit/Canopy/Cutaway
-            }
-
-            // 6. Den Jump Run Track steuern
-            if (Settings.state.userSettings.showJumpRunTrack) {
-                displayManager.updateJumpRunTrackDisplay();
-            }
-        }
-
-    } catch (error) {
-        console.error('Error in updateAllDisplays:', error);
-        displayError(error.message);
-    }
-}
 
 // == Autoupdate Functionality ==
 export async function updateToCurrentHour() {
@@ -459,7 +411,7 @@ export async function updateToCurrentHour() {
     }
 }
 
-// == Landing Pattern, Jump and Free Fall Calculations ==
+// == Landing Pattern, Jump and Free Fall Stuff ==
 export function calculateJump() {
     if (!Settings.state.isCalculateJumpUnlocked || !Settings.state.userSettings.calculateJump) {
         mapManager.drawJumpVisualization(null);
@@ -608,26 +560,34 @@ export function validateLegHeights(final, base, downwind) {
     return true;
 }
 
-
 // == Live Tracking ==
-/**
- * Aktualisiert die Jump Master Line und das Live-Info-Panel.
- * Holt sich die Position vom Live-Marker und berechnet alle Werte neu.
- * @param {object|null} positionData - Optionale, frische Positionsdaten von einem Event.
- */
 export function updateJumpMasterLineAndPanel(positionData = null) {
-    // Wenn es noch keinen Live-Marker gibt, können wir nichts tun.
-    if (!AppState.liveMarker) {
+    // Die Variable, die steuert, ob die Linie angezeigt werden soll.
+    const showJML = Settings.state.userSettings.showJumpMasterLine;
+
+    // --- NEUE, ROBUSTERE LOGIK ---
+
+    // 1. Prüfe als Allererstes, ob die Linie überhaupt sichtbar sein soll.
+    if (!showJML) {
+        // Wenn nicht, lösche die Linie und blende das Info-Panel aus. Fertig.
+        mapManager.clearJumpMasterLine();
+        mapManager.hideLivePositionControl();
         return;
     }
 
+    // 2. Nur wenn die Linie angezeigt werden soll, prüfen wir, ob die dafür nötigen Daten da sind.
+    if (!AppState.liveMarker) {
+        // Wir können die Linie nicht ohne Live-Position zeichnen, also sicherheitshalber aufräumen.
+        mapManager.clearJumpMasterLine();
+        return;
+    }
+
+    // --- Ab hier bleibt die bestehende Logik zum Zeichnen der Linie unverändert ---
     const livePos = AppState.liveMarker.getLatLng();
     if (!livePos) {
         return;
     }
 
-    // 1. Baue IMMER das Basis-Datenobjekt mit den Live-Positionsdaten.
-    //    Nutze frische Daten vom Event, falls vorhanden, sonst die zuletzt gespeicherten.
     const data = positionData ? positionData : {
         latitude: livePos.lat,
         longitude: livePos.lng,
@@ -639,37 +599,26 @@ export function updateJumpMasterLineAndPanel(positionData = null) {
     };
 
     let jumpMasterLineData = null;
-    const showJML = Settings.state.userSettings.showJumpMasterLine;
+    let targetPos = null;
+    let targetName = '';
 
-    // 2. Prüfe, ob die JML-Logik ausgeführt werden soll.
-    if (showJML) {
-        let targetPos = null;
-        let targetName = '';
-
-        // Ziel bestimmen (DIP oder HARP)
-        if (Settings.state.userSettings.jumpMasterLineTarget === 'HARP' && AppState.harpMarker) {
-            targetPos = AppState.harpMarker.getLatLng();
-            targetName = 'HARP';
-        } else if (AppState.currentMarker) {
-            targetPos = AppState.currentMarker.getLatLng();
-            targetName = 'DIP';
-        }
-
-        // Wenn ein Ziel da ist, berechne die JML-Daten und zeichne die Linie.
-        if (targetPos) {
-            const distance = AppState.map.distance(livePos, targetPos);
-            const bearing = Math.round(Utils.calculateBearing(livePos.lat, livePos.lng, targetPos.lat, targetPos.lng));
-            const speedMs = data.speedMs > 1 ? data.speedMs : 1;
-            const tot = Math.round(distance / speedMs);
-            jumpMasterLineData = { distance, bearing, tot, target: targetName };
-            mapManager.drawJumpMasterLine(livePos, targetPos);
-        }
-    } else {
-        // Wenn die JML nicht angezeigt werden soll, stelle sicher, dass die Linie auf der Karte entfernt wird.
-        mapManager.clearJumpMasterLine();
+    if (Settings.state.userSettings.jumpMasterLineTarget === 'HARP' && AppState.harpMarker) {
+        targetPos = AppState.harpMarker.getLatLng();
+        targetName = 'HARP';
+    } else if (AppState.currentMarker) {
+        targetPos = AppState.currentMarker.getLatLng();
+        targetName = 'DIP';
     }
 
-    // 3. Sammle die Einstellungen für die Anzeige.
+    if (targetPos) {
+        const distance = AppState.map.distance(livePos, targetPos);
+        const bearing = Math.round(Utils.calculateBearing(livePos.lat, livePos.lng, targetPos.lat, targetPos.lng));
+        const speedMs = data.speedMs > 1 ? data.speedMs : 1;
+        const tot = Math.round(distance / speedMs);
+        jumpMasterLineData = { distance, bearing, tot, target: targetName };
+        mapManager.drawJumpMasterLine(livePos, targetPos);
+    }
+
     const settingsForPanel = {
         heightUnit: Settings.getValue('heightUnit', 'radio', 'm'),
         effectiveWindUnit: Settings.getValue('windUnit', 'radio', 'kt') === 'bft' ? 'kt' : Settings.getValue('windUnit', 'radio', 'kt'),
@@ -677,8 +626,6 @@ export function updateJumpMasterLineAndPanel(positionData = null) {
         refLevel: Settings.getValue('refLevel', 'radio', 'AGL')
     };
 
-    // 4. Rufe IMMER die Funktion zur Panel-Aktualisierung auf.
-    //    Sie bekommt alle Basisdaten und die (potenziell leeren) JML-Daten.
     mapManager.updateLivePositionControl({
         ...data,
         showJumpMasterLine: showJML,
@@ -788,6 +735,98 @@ export function updateUIState() {
     if (showExitAreaCheckbox) showExitAreaCheckbox.disabled = !Settings.state.userSettings.calculateJump; // Disable unless calculateJump is on
     Settings.updateUnitLabels();
 }
+// in app.js
+
+/**
+ * Aktualisiert den AppState und die UI-Komponenten (insb. den Slider)
+ * basierend auf neu geladenen Wetterdaten.
+ * @param {object} newWeatherData Die neu von der API abgerufenen Wetterdaten.
+ */
+export async function updateUIWithNewWeatherData(newWeatherData) {
+    AppState.weatherData = newWeatherData;
+    const slider = document.getElementById('timeSlider');
+
+    if (!slider) return;
+
+    // Hilfsfunktion, um den letzten gültigen Index zu finden
+    const findLastValidDataIndex = (weatherData) => {
+        // Wir nutzen temperature_2m als repräsentatives Array
+        const dataArray = weatherData?.temperature_2m;
+        if (!dataArray || dataArray.length === 0) return 0;
+        for (let i = dataArray.length - 1; i >= 0; i--) {
+            if (dataArray[i] !== null && dataArray[i] !== undefined) {
+                return i; // Das ist der letzte Index mit einem gültigen Wert
+            }
+        }
+        return 0; // Fallback, falls alle Werte null sind
+    };
+
+    const lastValidIndex = findLastValidDataIndex(newWeatherData);
+    console.log(`Daten sind gültig bis Index: ${lastValidIndex}. Setze Slider-Maximum.`);
+
+    slider.max = lastValidIndex;
+    slider.disabled = slider.max <= 0;
+
+    // Den initialen Wert des Sliders auf die aktuelle Zeit setzen,
+    // aber sicherstellen, dass er nicht außerhalb des neuen Maximums liegt.
+    const now = new Date().getTime();
+    let closestIndex = 0;
+    let minDiff = Infinity;
+    newWeatherData.time.forEach((time, idx) => {
+        if (idx <= lastValidIndex) { // Nur gültige Zeiten berücksichtigen
+            const diff = Math.abs(new Date(time).getTime() - now);
+            if (diff < minDiff) {
+                minDiff = diff;
+                closestIndex = idx;
+            }
+        }
+    });
+
+    slider.value = closestIndex;
+
+    // Nachdem der Slider korrekt eingestellt ist, die gesamte Anzeige aktualisieren
+    await updateAllDisplays();
+    Settings.updateModelRunInfo(AppState.lastModelRun, AppState.lastLat, AppState.lastLng);
+}
+export async function updateAllDisplays() {
+    console.log('updateAllDisplays called');
+    try {
+        const sliderIndex = getSliderValue();
+        if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
+
+            // === DER DIRIGENT BEI DER ARBEIT ===
+            // Jeder Schritt wird explizit von hier aus gesteuert.
+
+            // 1. Die Haupt-Wettertabelle anzeigen lassen
+            await displayManager.updateWeatherDisplay(sliderIndex);
+
+            // 2. Das Popup des Markers aktualisieren lassen
+            await displayManager.refreshMarkerPopup();
+
+            // 3. Die Mittelwind-Berechnung UND Anzeige durchführen (lokale Funktion)
+            if (AppState.lastAltitude !== 'N/A') {
+                calculateMeanWind();
+            }
+
+            // 4. Das Landemuster anzeigen lassen (hat eigene Logik)
+            displayManager.updateLandingPatternDisplay();
+
+            // 5. Die Sprung-Visualisierungen steuern
+            if (Settings.state.userSettings.calculateJump) {
+                calculateJump(); // Diese Funktion kümmert sich um Exit/Canopy/Cutaway
+            }
+
+            // 6. Den Jump Run Track steuern
+            if (Settings.state.userSettings.showJumpRunTrack) {
+                displayManager.updateJumpRunTrackDisplay();
+            }
+        }
+
+    } catch (error) {
+        console.error('Error in updateAllDisplays:', error);
+        displayError(error.message);
+    }
+}
 
 // == Setup values ==
 function applySettingToCheckbox(id, value) {
@@ -860,8 +899,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     initializeApp();
     initializeUIElements(); // <-- HIER DEN AUFRUF HINZUFÜGEN
     await mapManager.initializeMap();
-    setupCacheManagement(); // <-- NEUER AUFRUF HIER
-    setupCacheSettings();
     setupAppEventListeners();
     AutoupdateManager.setupAutoupdate();
 
@@ -936,50 +973,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const newWeatherData = await weatherManager.fetchWeatherForLocation(lat, lng, currentTimeToPreserve);
 
             if (newWeatherData) {
-                AppState.weatherData = newWeatherData;
-                AppState.lastLat = lat;
-                AppState.lastLng = lng;
-
-                const slider = document.getElementById('timeSlider');
-                if (slider) {
-                    slider.max = AppState.weatherData.time.length ? AppState.weatherData.time.length - 1 : 0;
-                    slider.disabled = slider.max <= 0;
-
-                    let initialIndex = 0;
-                    // *** HIER IST DIE KORREKTUR ***
-                    if (currentTimeToPreserve && AppState.weatherData.time) {
-                        // Dieser Block ist für das Beibehalten der Zeit bei Standortwechsel (funktioniert bereits)
-                        const targetTimestamp = DateTime.fromISO(currentTimeToPreserve, { zone: 'utc' }).toMillis();
-                        let minDiff = Infinity;
-                        AppState.weatherData.time.forEach((time, idx) => {
-                            const diff = Math.abs(DateTime.fromISO(time, { zone: 'utc' }).toMillis() - targetTimestamp);
-                            if (diff < minDiff) {
-                                minDiff = diff;
-                                initialIndex = idx;
-                            }
-                        });
-                    } else if (AppState.weatherData && AppState.weatherData.time) {
-                        // NEUER BLOCK: Dieser else-if-Block ist für den initialen Ladevorgang.
-                        // Er findet den Index, der der aktuellen Uhrzeit am nächsten ist.
-                        const now = DateTime.utc().toMillis();
-                        let minDiff = Infinity;
-                        AppState.weatherData.time.forEach((time, idx) => {
-                            const timeMillis = DateTime.fromISO(time, { zone: 'utc' }).toMillis();
-                            const diff = Math.abs(timeMillis - now);
-                            if (diff < minDiff) {
-                                minDiff = diff;
-                                initialIndex = idx;
-                            }
-                        });
-                        console.log(`[app.js] Initial load: Found closest time to now at index ${initialIndex}`);
-                    }
-
-                    slider.value = initialIndex; // Setze den Slider auf den korrekt ermittelten Index
-                }
-
-                await updateAllDisplays();
-                await displayManager.refreshMarkerPopup();
-                Settings.updateModelRunInfo(AppState.lastModelRun, lat, lng);
+                await updateUIWithNewWeatherData(newWeatherData);
             } else {
                 AppState.weatherData = null;
             }

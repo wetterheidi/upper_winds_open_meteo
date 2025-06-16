@@ -1,11 +1,11 @@
 import { Utils } from './utils.js';
 import { Settings } from './settings.js';
 import { displayProgress, hideProgress, displayMessage } from './ui.js';
-import * as L from 'leaflet';
-window.L = L; // <-- DIESE ZEILE MUSS BLEIBEN
 import 'leaflet/dist/leaflet.css'; // Nicht vergessen!
 import { CACHE_DEFAULTS } from './constants.js';
 import { AppState } from './state.js';
+import * as L from 'leaflet';
+window.L = L; // <-- DIESE ZEILE MUSS BLEIBEN
 
 const TileCache = {
     dbName: 'SkydivingTileCache',
