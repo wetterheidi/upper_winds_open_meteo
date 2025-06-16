@@ -1,7 +1,7 @@
 {
     "name": "upper_winds_open_meteo",
     "version": "1.4.0",
-    "description": "Upper winds visualization with Mapbox and OpenMeteo",
+    "description": "Upper winds visualization and jump planner with Leaflet and OpenMeteo",
     "scripts": {
         "start": "vite",
         "build": "vite build"
