@@ -41,20 +41,34 @@ A web application for visualizing upper-level winds and atmospheric data on inte
   - **Min/Mean/Max Wind:** Displays the landing circle for the scenario with the weakest, average, or strongest winds.
   - **Heatmap:** Creates a probability map of potential landing areas.
 
-## Code Architecture
+### Code Architecture
 
-The project has been consistently modularized to ensure high maintainability and extensibility. The main responsibilities are distributed as follows:
+The project has been refactored into a modular architecture to ensure high maintainability and a clear separation of concerns. The main responsibilities are distributed as follows:
 
-- **`app.js`**: The central orchestrator that controls the main logic and coordinates the other modules.
-- **`state.js`**: Defines the global `AppState` object for central state management.
-- **`settings.js`**: Manages all user settings, their persistence, and feature unlocking.
-- **`constants.js`**: Contains application-wide constants (e.g., model lists, passwords).
-- **`mapManager.js`**: Responsible for creating and manipulating the Leaflet map and all its layers (markers, circles, lines).
-- **`weatherManager.js`**: Exclusively handles fetching and preparing weather data from the Open-Meteo API.
-- **`ui.js`**: Responsible for manipulating UI elements outside the map (e.g., displaying messages, updating menus).
-- **`eventManager.js`**: Bundles the setup of all event listeners for the UI elements.
-- **`utils.js`**: A collection of helper functions for calculations (wind, coordinates, interpolation, etc.).
-- **`jumpPlanner.js`, `trackManager.js`, `ensembleManager.js`, `autoupdateManager.js`**: Specialized modules that encapsulate the logic for their respective features.
+**Core & State Management**
+* **`app.js`**: The central **Controller** and entry point of the application. It initializes all modules, orchestrates the main application logic, and handles high-level events.
+* **`state.js`**: Defines the global `AppState` object, serving as the single source of truth for the application's runtime state.
+* **`settings.js`**: Manages all user settings, their persistence in `localStorage`, and feature unlocking logic.
+* **`constants.js`**: Contains all global, static constants, such as physical conversion factors, API URLs, and default configuration values.
+
+**View & UI Management**
+* **`mapManager.js`**: Manages the Leaflet map instance, including the creation of base layers, controls, and primitive drawing functions for markers, circles, and polylines.
+* **`displayManager.js`**: A dedicated **View Logic** module responsible for updating the UI based on the current application state. It renders the weather table, updates marker popups, and draws complex visualizations like the landing pattern.
+* **`ui.js`**: Provides generic UI functions for user feedback, such as displaying messages, errors, and progress indicators.
+* **`coordinates.js`**: A self-contained component that manages the location search input, fetches geocoding data, and handles the favorites/history list UI.
+* **`eventManager.js`**: Centralizes the setup of all DOM event listeners for UI elements like buttons, checkboxes, and sliders.
+
+**Data Services & Logic (Model)**
+* **`weatherManager.js`**: Exclusively handles fetching and preparing weather data from the Open-Meteo API for a given location and time.
+* **`jumpPlanner.js`**: Contains the pure calculation logic ("business logic") for all skydiving-related aspects, such as freefall trajectory, canopy drift, and exit point calculation.
+* **`ensembleManager.js`**: Manages fetching, processing, and preparing data for ensemble forecast visualizations.
+* **`trackManager.js`**: Handles the loading and parsing of GPX and CSV track files.
+* **`liveTrackingManager.js`**: Encapsulates the logic for watching the user's live GPS position.
+* **`autoupdateManager.js`**: Manages the timer and logic for the forecast autoupdate feature.
+* **`tileCache.js`**: Contains all logic for interacting with IndexedDB to cache and retrieve map tiles for offline use.
+
+**Utilities**
+* **`utils.js`**: A collection of pure, stateless helper functions for mathematical calculations, unit conversions, coordinate transformations, etc.
 
 ## Setup & Dependencies
 
