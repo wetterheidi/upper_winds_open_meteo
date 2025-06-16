@@ -22,9 +22,9 @@ import * as liveTrackingManager from './liveTrackingManager.js';
 import { fetchEnsembleWeatherData, processAndVisualizeEnsemble, clearEnsembleVisualizations } from './ensembleManager.js';
 import { getSliderValue } from './ui.js';
 import * as AutoupdateManager from './autoupdateManager.js';
-import 'leaflet/dist/leaflet.css'; // Nicht vergessen!
+ 
 import 'leaflet-gpx';
-import L from 'leaflet';
+import * as L from 'leaflet';
 window.L = L;
 
 function dispatchAppEvent(eventName, detail = {}) {

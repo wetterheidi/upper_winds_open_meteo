@@ -2,10 +2,9 @@ import { AppState } from './state.js';
 import { Settings } from "./settings.js";
 import { Utils } from "./utils.js";
 import { DateTime } from 'luxon';
-import 'leaflet/dist/leaflet.css'; // Nicht vergessen!
 import * as Papa from 'papaparse';
 import 'leaflet-gpx';
-import L from 'leaflet';
+import * as L from 'leaflet';
 
 
 "use strict";

@@ -5,8 +5,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Upper Winds</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <link rel="stylesheet" href="vendor/Leaflet.PolylineMeasure.css" />
+    <link rel="stylesheet" href="styles.css">
+    
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css"> <link rel="stylesheet" href="https://ppete2.github.io/Leaflet.PolylineMeasure/Leaflet.PolylineMeasure.css" /> <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
 </head>
 
 <body>
@@ -344,7 +349,6 @@
                         <input type="checkbox" id="showCanopyAreaCheckbox"> Show Canopy Flight Area </label>
                 </li>
                 <li>
-                    <!--Cut away finder-->
                     <label class="radio-label">
                         <input type="checkbox" id="showCutAwayFinder" name="showCutAwayFinder"> Show Cut Away Finder
                     </label>
@@ -374,8 +378,7 @@
                             <button id="resetCutAwayMarker">Reset Cut-Away Marker</button>
                         </li>
                     </ul>
-                    <!--Cut away finder-->
-                </li>
+                    </li>
             </ul>
         </li>
         <li>

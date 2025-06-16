@@ -6,10 +6,10 @@ import { Settings } from './settings.js';
 import { Utils } from './utils.js';
 import { TileCache } from './tileCache.js';
 import { updateOfflineIndicator } from './ui.js';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css'; // Wichtig: importiert das CSS von Leaflet
+import * as L from 'leaflet';
+ // Wichtig: importiert das CSS von Leaflet
 import './vendor/Leaflet.PolylineMeasure.js'; // Pfad ggf. anpassen
-import './vendor/Leaflet.PolylineMeasure.css';
+
 import 'leaflet-gpx';
 import 'leaflet.heat';
 import 'leaflet-rotatedmarker';

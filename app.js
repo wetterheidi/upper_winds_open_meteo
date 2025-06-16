@@ -12,11 +12,11 @@ import * as mapManager from './mapManager.js';
 import * as weatherManager from './weatherManager.js';
 import { getSliderValue } from './ui.js';
 import * as AutoupdateManager from './autoupdateManager.js';
-import 'leaflet/dist/leaflet.css';
+
 import { DateTime } from 'luxon';
 import 'leaflet-gpx';
 import * as displayManager from './displayManager.js';
-import L from 'leaflet';
+import * as L from 'leaflet';
 
 
 "use strict";

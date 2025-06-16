@@ -1,10 +1,10 @@
 import { displayError } from './ui.js';
 import { DateTime } from 'luxon';
-import 'leaflet/dist/leaflet.css';
+
 import * as mgrs from 'mgrs';
 import { AppState } from './state.js';
 import { CONVERSIONS, ISA_CONSTANTS, DEWPOINT_COEFFICIENTS, EARTH_RADIUS_METERS, PHYSICAL_CONSTANTS, BEAUFORT, ENSEMBLE_VISUALIZATION } from './constants.js';
-import L from 'leaflet';
+import * as L from 'leaflet';
 
 
 export class Utils {

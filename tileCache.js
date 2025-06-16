@@ -1,10 +1,10 @@
 import { Utils } from './utils.js';
 import { Settings } from './settings.js';
 import { displayProgress, hideProgress, displayMessage } from './ui.js';
-import 'leaflet/dist/leaflet.css'; // Nicht vergessen!
+ 
 import { CACHE_DEFAULTS } from './constants.js';
 import { AppState } from './state.js';
-import L from 'leaflet';
+import * as L from 'leaflet';
 
 
 const TileCache = {
