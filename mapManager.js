@@ -9,7 +9,6 @@ import { updateOfflineIndicator } from './ui.js';
 import * as L from 'leaflet';
  // Wichtig: importiert das CSS von Leaflet
 import './vendor/Leaflet.PolylineMeasure.js'; // Pfad ggf. anpassen
-
 import 'leaflet-gpx';
 import 'leaflet.heat';
 import 'leaflet-rotatedmarker';

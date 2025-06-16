@@ -1,11 +1,9 @@
 import { Utils } from './utils.js';
 import { Settings } from './settings.js';
 import { displayProgress, hideProgress, displayMessage } from './ui.js';
- 
 import { CACHE_DEFAULTS } from './constants.js';
 import { AppState } from './state.js';
 import * as L from 'leaflet';
-
 
 const TileCache = {
     dbName: 'SkydivingTileCache',

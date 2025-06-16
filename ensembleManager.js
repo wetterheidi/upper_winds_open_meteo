@@ -7,10 +7,8 @@ import { getSliderValue } from './ui.js';
 import { interpolateWeatherData } from './weatherManager.js';
 import { DateTime } from 'luxon';
 import * as L from 'leaflet';
- 
 import 'leaflet.heat';
 import { ENSEMBLE_VISUALIZATION, API_URLS } from './constants.js';
-
 
 /**
  * Ruft die Wetterdaten für alle vom Benutzer ausgewählten Ensemble-Modelle ab.

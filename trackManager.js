@@ -6,7 +6,6 @@ import * as Papa from 'papaparse';
 import 'leaflet-gpx';
 import * as L from 'leaflet';
 
-
 "use strict";
 
 

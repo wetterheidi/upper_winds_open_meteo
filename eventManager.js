@@ -22,10 +22,8 @@ import * as liveTrackingManager from './liveTrackingManager.js';
 import { fetchEnsembleWeatherData, processAndVisualizeEnsemble, clearEnsembleVisualizations } from './ensembleManager.js';
 import { getSliderValue } from './ui.js';
 import * as AutoupdateManager from './autoupdateManager.js';
- 
 import 'leaflet-gpx';
 import * as L from 'leaflet';
-window.L = L;
 
 function dispatchAppEvent(eventName, detail = {}) {
     console.log(`[EventManager] Dispatching event: ${eventName}`, detail);

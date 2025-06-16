@@ -4,9 +4,7 @@
 import { UI_DEFAULTS, SMOOTHING_DEFAULTS } from './constants.js';
 import { AppState } from './state.js';
 import { Utils } from './utils.js';
- 
 import * as L from 'leaflet';
-
 
 // --- Private Hilfsfunktionen ---
 

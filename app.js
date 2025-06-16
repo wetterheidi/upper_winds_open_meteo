@@ -12,7 +12,6 @@ import * as mapManager from './mapManager.js';
 import * as weatherManager from './weatherManager.js';
 import { getSliderValue } from './ui.js';
 import * as AutoupdateManager from './autoupdateManager.js';
-
 import { DateTime } from 'luxon';
 import 'leaflet-gpx';
 import * as displayManager from './displayManager.js';
