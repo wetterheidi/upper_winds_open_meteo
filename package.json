@@ -4,9 +4,12 @@
     "description": "Upper winds visualization and jump planner with Leaflet and OpenMeteo",
     "scripts": {
         "start": "vite",
-        "build": "vite build"
+        "build": "vite build",
+        "predeploy": "npm run build",
+        "deploy": "gh-pages -d dist"
     },
     "devDependencies": {
+        "gh-pages": "^6.3.0",
         "vite": "^6.3.5"
     },
     "dependencies": {
