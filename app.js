@@ -788,30 +788,26 @@ export async function updateUIWithNewWeatherData(newWeatherData) {
     };
 
     const lastValidIndex = findLastValidDataIndex(newWeatherData);
-    console.log(`Daten sind gültig bis Index: ${lastValidIndex}. Setze Slider-Maximum.`);
-
     slider.max = lastValidIndex;
     slider.disabled = slider.max <= 0;
 
-    // Den initialen Wert des Sliders auf die aktuelle Zeit setzen,
-    // aber sicherstellen, dass er nicht außerhalb des neuen Maximums liegt.
-    const now = new Date().getTime();
-    let closestIndex = 0;
-    let minDiff = Infinity;
-    newWeatherData.time.forEach((time, idx) => {
-        if (idx <= lastValidIndex) { // Nur gültige Zeiten berücksichtigen
-            const diff = Math.abs(new Date(time).getTime() - now);
-            if (diff < minDiff) {
-                minDiff = diff;
-                closestIndex = idx;
-            }
-        }
-    });
+    const currentUtcHour = new Date().getUTCHours();
 
-    slider.value = closestIndex;
+    if (currentUtcHour <= lastValidIndex) {
+        slider.value = currentUtcHour;
+    } else {
+        slider.value = lastValidIndex;
+    }
+    console.log(`Slider set to current UTC hour index: ${slider.value}`);
 
-    // Nachdem der Slider korrekt eingestellt ist, die gesamte Anzeige aktualisieren
-    await updateAllDisplays();
+    // FINALER FIX V3: Statt eines allgemeinen Events rufen wir nur die absolut
+    // notwendigen Funktionen für die Erst-Anzeige auf. Dies verhindert die
+    // Überladung, die das Menü blockiert hat.
+    await displayManager.updateWeatherDisplay(slider.value);
+    await displayManager.refreshMarkerPopup();
+    if (AppState.lastAltitude !== 'N/A') {
+        calculateMeanWind();
+    }
     Settings.updateModelRunInfo(AppState.lastModelRun, AppState.lastLat, AppState.lastLng);
 }
 /**

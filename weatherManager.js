@@ -3,7 +3,7 @@ import { Utils } from './utils.js';
 import { Settings, getInterpolationStep } from './settings.js';
 import { displayError } from './ui.js';
 import { WEATHER_MODELS } from './constants.js';
-import { updateModelSelectUI, updateEnsembleModelUI, cleanupSelectedEnsembleModels } from './ui.js'; 
+import { updateModelSelectUI, updateEnsembleModelUI, cleanupSelectedEnsembleModels } from './ui.js';
 import { DateTime } from 'luxon';
 import { API_URLS, STANDARD_PRESSURE_LEVELS } from './constants.js';
 
@@ -40,7 +40,7 @@ async function fetchWeather(lat, lon, currentTime = null) {
         const selectedModelValue = document.getElementById('modelSelect')?.value || Settings.defaultSettings.model;
         if (!selectedModelValue) throw new Error("No weather model selected.");
 
-        const modelMap = WEATHER_MODELS.API_MAP; 
+        const modelMap = WEATHER_MODELS.API_MAP;
         const modelApiIdentifierForMeta = modelMap[selectedModelValue] || selectedModelValue;
 
         let isHistorical = false;
@@ -55,34 +55,34 @@ async function fetchWeather(lat, lon, currentTime = null) {
                 if (targetDateForAPI < today) isHistorical = true;
             }
         } else {
-             const pickerDate = document.getElementById('historicalDatePicker')?.value;
-             if(pickerDate){
+            const pickerDate = document.getElementById('historicalDatePicker')?.value;
+            if (pickerDate) {
                 let parsedPickerDate = DateTime.fromISO(pickerDate, { zone: 'utc' }).startOf('day');
-                if(parsedPickerDate < today) {
+                if (parsedPickerDate < today) {
                     isHistorical = true;
                     targetDateForAPI = parsedPickerDate;
                 }
-             }
+            }
         }
-        
-        let baseUrl = API_URLS.FORECAST; 
+
+        let baseUrl = API_URLS.FORECAST;
         if (isHistorical && targetDateForAPI) {
             baseUrl = API_URLS.HISTORICAL;
             startDateStr = endDateStr = targetDateForAPI.toFormat('yyyy-MM-dd');
             AppState.lastModelRun = "N/A (Historical Data)";
         } else {
             // Normale Forecast-Logik zur Bestimmung des Zeitfensters
-             let runDate;
-             try {
+            let runDate;
+            try {
                 const metaUrl = `https://api.open-meteo.com/data/${modelApiIdentifierForMeta}/static/meta.json`;
                 const metaResponse = await fetch(metaUrl);
                 const metaData = await metaResponse.json();
                 runDate = new Date(metaData.last_run_initialisation_time * 1000);
                 AppState.lastModelRun = runDate.toISOString().replace('T', ' ').substring(0, 17) + 'Z';
-             } catch(e) {
-                runDate = new Date();
+            } catch (e) {
+                runDate = DateTime.utc().toJSDate();
                 AppState.lastModelRun = "N/A";
-             }
+            }
             let forecastStart = DateTime.fromJSDate(runDate).setZone('utc').plus({ hours: 6 });
             if (forecastStart > DateTime.utc()) forecastStart = DateTime.utc();
             startDateStr = forecastStart.toFormat('yyyy-MM-dd');
@@ -116,7 +116,7 @@ async function fetchWeather(lat, lon, currentTime = null) {
  * @returns {Promise<string[]>} Ein Array mit den Namen der verfügbaren Modelle.
  */
 async function checkAvailableModels(lat, lon) {
-    const modelList = WEATHER_MODELS.LIST; 
+    const modelList = WEATHER_MODELS.LIST;
     let availableModels = [];
     for (const model of modelList) {
         try {
