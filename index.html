@@ -5,9 +5,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Upper Winds</title>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet"> <link rel="stylesheet" href="https://ppete2.github.io/Leaflet.PolylineMeasure/Leaflet.PolylineMeasure.css" /> <link rel="icon" type="image/x-icon" href="/upper_winds_open_meteo/assets/favicon-rK5Nsr_8.ico">
-  <script type="module" crossorigin src="/upper_winds_open_meteo/assets/index-zcnXMn4s.js"></script>
-  <link rel="stylesheet" crossorigin href="/upper_winds_open_meteo/assets/index-B53S4UW3.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
+    <link rel="stylesheet" href="https://ppete2.github.io/Leaflet.PolylineMeasure/Leaflet.PolylineMeasure.css" />
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-gpx/1.7.0/gpx.min.js"></script>
+    <script src="https://unpkg.com/leaflet-rotatedmarker@0.2.0/leaflet.rotatedMarker.js"></script>
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+    <script src="vendor/Leaflet.PolylineMeasure.js"></script>
+  <script type="module" crossorigin src="/upper_winds_open_meteo/assets/index-MkG57bwu.js"></script>
+  <link rel="stylesheet" crossorigin href="/upper_winds_open_meteo/assets/index-CIGW-MKW.css">
 </head>
 
 <body>
@@ -203,7 +216,7 @@
             </li>
         </ul>
         </li>
-         <li>
+        <li>
             <span>Search Location</span>
             <ul class="submenu hidden" id="locationSearchSubmenu">
                 <li>
@@ -212,7 +225,7 @@
                         <button id="saveCurrentLocationBtn" title="Save As Favorite">★+</button>
                     </div>
                     <ul id="locationResults" class="location-results-list">
-                        </ul>
+                    </ul>
                 </li>
             </ul>
         </li>
