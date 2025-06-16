@@ -92,8 +92,12 @@ const debouncedPositionUpdate = Utils.debounce(async (position) => {
     document.dispatchEvent(event);
 }, 300);
 
-// --- Öffentliche (exportierte) Funktionen ---
-
+/**
+ * Startet die kontinuierliche Abfrage der GPS-Position des Geräts.
+ * Verwendet `navigator.geolocation.watchPosition` für regelmäßige Updates.
+ * Löst ein 'tracking:started'-Event aus, um andere Teile der Anwendung zu informieren.
+ * @returns {void}
+ */
 export function startPositionTracking() {
     if (AppState.watchId !== null) return;
     if (!navigator.geolocation) {
@@ -113,6 +117,13 @@ export function startPositionTracking() {
     document.dispatchEvent(new CustomEvent('tracking:started'));
 }
 
+/**
+ * Beendet die kontinuierliche Abfrage der GPS-Position.
+ * Löscht den Watcher, entfernt die zugehörigen Marker und Kreise von der Karte
+ * und setzt die Tracking-Variablen im AppState zurück.
+ * Löst ein 'tracking:stopped'-Event aus.
+ * @returns {void}
+ */
 export function stopPositionTracking() {
     if (AppState.watchId !== null) {
         navigator.geolocation.clearWatch(AppState.watchId);

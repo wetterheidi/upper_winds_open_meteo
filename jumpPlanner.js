@@ -4,6 +4,13 @@ import { Settings } from './settings.js';
 import { Utils } from './utils.js';
 import { JUMP_RUN_DEFAULTS, CUTAWAY_VISUALIZATION_RADIUS_METERS, JUMPER_SEPARATION_TABLE, CONVERSIONS, FREEFALL_PHYSICS, ISA_CONSTANTS, CANOPY_OPENING_BUFFER_METERS, CUTAWAY_VERTICAL_SPEEDS_MPS } from './constants.js';
 
+/**
+ * Ermittelt die empfohlene zeitliche Separation zwischen Springern basierend auf der
+ * wahren Fluggeschwindigkeit (TAS) des Absetzflugzeugs.
+ * Nutzt eine vordefinierte Tabelle (jumperSeparationTable), um die Separation zu bestimmen.
+ * @param {number} ias - Die angezeigte Fluggeschwindigkeit (IAS) in Knoten.
+ * @returns {number} Die empfohlene Separation in Sekunden.
+ */
 export function getSeparationFromTAS(ias) {
     const exitAltitudeFt = Settings.state.userSettings.exitAltitude * CONVERSIONS.METERS_TO_FEET;
     const tas = Utils.calculateTAS(ias, exitAltitudeFt);
@@ -21,6 +28,18 @@ export function getSeparationFromTAS(ias) {
     return separation;
 }
 
+/**
+ * Simuliert die Freifall-Trajektorie eines Springers von der Exit- bis zur Öffnungshöhe.
+ * Berücksichtigt den anfänglichen Vorwärtswurf aus dem Flugzeug und den Windversatz auf verschiedenen Höhen.
+ * @param {object} weatherData - Das komplette Wetterdatenobjekt von der API.
+ * @param {number} exitAltitude - Die Ausstiegshöhe in Metern AGL.
+ * @param {number} openingAltitude - Die geplante Öffnungshöhe in Metern AGL.
+ * @param {object[]} interpolatedData - Die bereits interpolierten Wetterdaten für die Berechnung.
+ * @param {number} startLat - Die geographische Breite des Absetzpunktes (DIP).
+ * @param {number} startLng - Die geographische Länge des Absetzpunktes (DIP).
+ * @param {number} elevation - Die Geländehöhe am Absetzpunkt in Metern AMSL.
+ * @returns {{time: number, distance: number, directionDeg: number, path: object[]}|null} Ein Objekt mit Freifallzeit, Versatzdistanz, Richtung und dem Trajektorienpfad, oder null bei einem Fehler.
+ */
 export function calculateFreeFall(weatherData, exitAltitude, openingAltitude, interpolatedData, startLat, startLng, elevation) {
     if (!weatherData || !weatherData.time || !interpolatedData || interpolatedData.length === 0) return null;
     if (!Number.isFinite(startLat) || !Number.isFinite(startLng) || !Number.isFinite(elevation)) return null;
@@ -100,6 +119,13 @@ export function calculateFreeFall(weatherData, exitAltitude, openingAltitude, in
     };
 }
 
+/**
+ * Berechnet die Position und den Radius der möglichen Exit-Bereiche (grüne Kreise).
+ * Diese Kreise repräsentieren den Bereich, in dem sich der Springer nach dem Freifall befindet,
+ * relativ zum geplanten Landepunkt.
+ * @param {object[]} interpolatedData - Die interpolierten Wetterdaten.
+ * @returns {{greenLat: number, greenLng: number, darkGreenLat: number, darkGreenLng: number, greenRadius: number, darkGreenRadius: number, freeFallDirection: number, freeFallDistance: number, freeFallTime: number}|null} Ein Objekt mit den Koordinaten und Radien für die Visualisierung oder null.
+ */
 export function calculateExitCircle(interpolatedData) {
     if (!Settings.state.userSettings.showExitArea || !Settings.state.userSettings.calculateJump || !AppState.weatherData || !AppState.lastLat || !AppState.lastLng) return null;
     if (!interpolatedData || interpolatedData.length === 0) return null;
@@ -177,6 +203,13 @@ export function calculateCutAway(interpolatedData) {
     return { center: [centerLat, centerLng], radius: CUTAWAY_VISUALIZATION_RADIUS_METERS, tooltipContent };
 }
 
+/**
+ * Berechnet die potenziellen Reichweiten unter dem geöffneten Fallschirm (blaue und rote Kreise).
+ * Berücksichtigt den Windversatz während der Schirmfahrt und die Vorwärtsfahrt des Schirms.
+ * Das Ergebnis beinhaltet Daten für mehrere Höhenstufen (blaue Kreise), um den Öffnungsbereich darzustellen.
+ * @param {object[]} interpolatedData - Die interpolierten Wetterdaten.
+ * @returns {object|null} Ein Objekt mit allen notwendigen Daten für die Visualisierung der Schirmfahrtbereiche oder null.
+ */
 export function calculateCanopyCircles(interpolatedData) {
     if (!Settings.state.userSettings.showCanopyArea || !Settings.state.userSettings.calculateJump || !AppState.weatherData || !AppState.lastLat || !AppState.lastLng) return null;
     if (!interpolatedData || interpolatedData.length === 0) return null;
@@ -234,6 +267,14 @@ export function calculateCanopyCircles(interpolatedData) {
     };
 }
 
+/**
+ * Berechnet die Richtung und Länge des Absetzanflugs (Jump Run Track).
+ * Die Richtung wird standardmäßig gegen den mittleren Wind in der Öffnungshöhe berechnet,
+ * kann aber durch eine manuelle Eingabe überschrieben werden.
+ * Die Länge ergibt sich aus der Anzahl der Springer und deren Separation bei der errechneten Groundspeed.
+ * @param {object[]} interpolatedData - Die interpolierten Wetterdaten.
+ * @returns {{direction: number, trackLength: number, latlngs: number[][], approachLatLngs: number[][], approachLength: number, approachTime: number}|null} Ein Objekt mit den Daten des Anflugs oder null.
+ */
 export function jumpRunTrack(interpolatedData) {
     if (!AppState.weatherData || !AppState.lastLat || !AppState.lastLng || AppState.lastAltitude === 'N/A' || !interpolatedData || interpolatedData.length === 0) {
         return null;
@@ -299,6 +340,15 @@ export function jumpRunTrack(interpolatedData) {
     };
 }
 
+/**
+ * Berechnet die geographischen Koordinaten der Eckpunkte des Landemusters.
+ * Startet am Landepunkt (DIP) und rechnet von dort aus rückwärts (Final, Base, Downwind),
+ * um den Startpunkt des Downwind-Legs zu ermitteln.
+ * @param {number} lat - Die geographische Breite des Landepunkts (DIP).
+ * @param {number} lng - Die geographische Länge des Landepunkts (DIP).
+ * @param {object[]} interpolatedData - Die interpolierten Wetterdaten.
+ * @returns {{downwindLat: number, downwindLng: number}} Die Koordinaten des Startpunkts des Downwind-Legs.
+ */
 export function calculateLandingPatternCoords(lat, lng, interpolatedData) {
     if (!interpolatedData || interpolatedData.length === 0) return { downwindLat: lat, downwindLng: lng };
     

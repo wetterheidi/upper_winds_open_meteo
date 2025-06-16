@@ -7,7 +7,13 @@ import * as weatherManager from './weatherManager.js';
 import { UI_DEFAULTS } from './constants.js'; // UI_DEFAULTS für LANDING_PATTERN_MIN_ZOOM
 import * as JumpPlanner from './jumpPlanner.js';
 
-// == Marker and popup functions ==
+
+/**
+ * Aktualisiert den Inhalt des Popups für den Hauptmarker (`currentMarker`).
+ * Holt die aktuellen Koordinaten, die Höhe und den QFE-Wert aus dem AppState
+ * und rendert den Inhalt neu. Forciert das Öffnen des Popups.
+ * @returns {Promise<void>}
+ */
 export async function refreshMarkerPopup() {
     if (!AppState.currentMarker || AppState.lastLat === null) {
         return;
@@ -47,6 +53,14 @@ export async function refreshMarkerPopup() {
     mapManager.updatePopupContent(AppState.currentMarker, popupContent);
 }
 
+/**
+ * Rendert die detaillierte Wettertabelle basierend auf dem ausgewählten Zeitindex.
+ * Die Funktion interpoliert die Roh-Wetterdaten, erstellt die komplette HTML-Tabelle 
+ * mit allen Höhenstufen, Werten und Styling-Klassen und fügt sie in das Info-Element ein.
+ * @param {number} index - Der Index des Zeitschiebereglers, für den die Daten angezeigt werden sollen.
+ * @param {string|null} [originalTime=null] - Ein optionaler Zeitstempel, der für die Anzeige verwendet werden kann.
+ * @returns {Promise<void>}
+ */
 export async function updateWeatherDisplay(index, originalTime = null) {
     console.log(`updateWeatherDisplay called with index: ${index}, Time: ${AppState.weatherData.time[index]}`);
     if (!AppState.weatherData || !AppState.weatherData.time || index < 0 || index >= AppState.weatherData.time.length) {
@@ -159,6 +173,13 @@ export async function updateWeatherDisplay(index, originalTime = null) {
     document.getElementById('selectedTime').innerHTML = `Selected Time: ${time}`;
 }
 
+/**
+ * Zeichnet oder entfernt das Landemuster auf der Karte.
+ * Prüft den aktuellen Zoom-Level und ob das Feature aktiviert ist.
+ * Holt die berechneten Koordinaten vom jumpPlanner und weist den mapManager an,
+ * die Linien und Pfeile für das Muster zu zeichnen.
+ * @returns {void}
+ */
 export function updateLandingPatternDisplay() {
 
    // 1. Prüft, ob der Marker existiert UND ob es ein valides Objekt mit der getLatLng-Methode ist.
@@ -443,6 +464,12 @@ export function updateLandingPatternDisplay() {
     mapManager.drawLandingPattern(patternData);
 }
 
+/**
+ * Steuert die Anzeige des Jump Run Tracks auf der Karte.
+ * Holt die berechneten Track-Daten vom jumpPlanner und übergibt sie
+ * an den mapManager zum Zeichnen der Anfluglinie und des Flugzeug-Markers.
+ * @returns {void}
+ */
 export function updateJumpRunTrackDisplay() {
     console.log('updateJumpRunTrackDisplay called');
     if (!AppState.map) {

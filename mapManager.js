@@ -16,7 +16,13 @@ import 'leaflet-rotatedmarker';
 import { UI_DEFAULTS, ICON_URLS, ENSEMBLE_VISUALIZATION}  from './constants.js'; // Importiere UI-Defaults
 window.L = L; // <--- DIESE ZEILE IST DIE LÖSUNG!
 
-// Haupt-Initialisierungsfunktion für dieses Modul
+/**
+ * Initialisiert die Leaflet-Karte und alle zugehörigen Komponenten.
+ * Erstellt die Karteninstanz, richtet die Basiskarten (Tile-Layer),
+ * Standard-Steuerelemente (Zoom, Maßstab etc.) und benutzerdefinierte Panes ein.
+ * Startet ebenfalls die Logik für das Kachel-Caching und die Geolokalisierung.
+ * @returns {Promise<L.Map>} Ein Promise, das zur fertigen Leaflet-Karteninstanz auflöst.
+ */
 export async function initializeMap() {
     console.log('MapManager: Starte Karteninitialisierung...');
 
@@ -535,6 +541,12 @@ function _handleMapDblClick(e) {
     // 3. Alle direkten Aufrufe von calculateJump() etc. sind hier GELÖSCHT!
 }
 
+/**
+ * Zeichnet alle Visualisierungen für den Sprungablauf (Exit- und Canopy-Bereiche) auf die Karte.
+ * Löscht zuvor alle alten Visualisierungen, um eine saubere Anzeige zu gewährleisten.
+ * @param {object|null} jumpData - Ein Objekt, das die "Bauanleitungen" für alle zu zeichnenden Kreise und Labels enthält, oder null, um die Anzeige zu löschen.
+ * @returns {void}
+ */
 export function drawJumpVisualization(jumpData) {
     // 1. Immer alles sauber machen.
     clearJumpVisualization(); // Umbenannt von clearJumpCircles für Klarheit
@@ -652,6 +664,13 @@ function clearLandingPattern() {
         AppState.landingPatternLayerGroup.clearLayers();
     }
 }
+/**
+ * Zeichnet das Landemuster (Downwind, Base, Final) auf die Karte.
+ * Nimmt die berechneten Pfade und Pfeilpositionen entgegen und fügt sie
+ * einer dedizierten Layer-Gruppe hinzu.
+ * @param {object|null} patternData - Ein Objekt, das die Pfade und Pfeil-Informationen für das Muster enthält, oder null, um das Muster zu löschen.
+ * @returns {void}
+ */
 export function drawLandingPattern(patternData) {
     // 1. Immer zuerst alles sauber machen.
     clearLandingPattern();
@@ -792,6 +811,13 @@ export function clearCutAwayMarker() {
     drawCutAwayVisualization(null);
 }
 
+/**
+ * Zeichnet den kompletten Absetzanflug (Jump Run Track) inklusive des Anflugpfades auf die Karte.
+ * Erstellt eine verschiebbare Visualisierung mit einem Flugzeug-Marker am Ende des Tracks,
+ * dessen Verschiebung die Offsets neu berechnet.
+ * @param {object|null} trackData - Ein Objekt mit allen Daten für den Anflug oder null, um den Track zu löschen.
+ * @returns {void}
+ */
 export function drawJumpRunTrack(trackData) {
     clearJumpRunTrack();
 
@@ -888,7 +914,15 @@ export function drawJumpRunTrack(trackData) {
 export function moveMarker(lat, lng) {
     // ... Logik zum Bewegen des Markers ...
 }
-// Dies ist die NEUE ZENTRALE Funktion, die app.js aufrufen wird.
+
+/**
+ * Erstellt einen neuen Hauptmarker (DIP) oder aktualisiert die Position eines bestehenden Markers.
+ * Dies ist die zentrale Funktion, um den primären Auswahlpunkt auf der Karte zu setzen.
+ * Aktualisiert auch das zugehörige Popup mit den aktuellen Standortdaten.
+ * @param {number} lat - Die geographische Breite des Markers.
+ * @param {number} lng - Die geographische Länge des Markers.
+ * @returns {Promise<void>}
+ */
 export async function createOrUpdateMarker(lat, lng) {
     console.log("MapManager: Befehl erhalten, Marker zu erstellen/bewegen bei", lat, lng);
     if (typeof lat !== 'number' || typeof lng !== 'number' || lat < -90 || lat > 90 || lng < -180 || lng > 180) {

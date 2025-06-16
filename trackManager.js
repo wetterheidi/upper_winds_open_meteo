@@ -54,6 +54,12 @@ function getTooltipContent(point, index, points, groundAltitude) { // Entferne w
     return tooltipContent;
 }
 
+/**
+ * Lädt und verarbeitet eine GPX-Datei. Liest die Datei, extrahiert die Trackpunkte
+ * und ruft die renderTrack-Funktion auf, um sie auf der Karte darzustellen.
+ * @param {File} file - Das vom Benutzer ausgewählte GPX-Datei-Objekt.
+ * @returns {Promise<object|null>} Ein Promise, das zu den Metadaten des Tracks auflöst oder null bei einem Fehler.
+ */
 export async function loadGpxTrack(file) {
     if (!AppState.map) { /* istanbul ignore next */ Utils.handleError('Map not initialized.'); return null; }
     AppState.isLoadingGpx = true;
@@ -100,7 +106,14 @@ export async function loadGpxTrack(file) {
         reader.readAsText(file);
     });
 }
-//If FlySight stores Z time
+
+/**
+ * Lädt und verarbeitet eine CSV-Datei von einem FlySight-Gerät.
+ * Parst die CSV-Daten, extrahiert die Trackpunkte und stellt sie auf der Karte dar.
+ * Diese Funktion geht davon aus, dass die Zeitstempel in UTC ('Z-Time') vorliegen.
+ * @param {File} file - Das vom Benutzer ausgewählte CSV-Datei-Objekt.
+ * @returns {Promise<object|null>} Ein Promise, das zu den Metadaten des Tracks auflöst oder null bei einem Fehler.
+ */
 export async function loadCsvTrackUTC(file) {
     if (!AppState.map) { /* istanbul ignore next */ Utils.handleError('Map not initialized.'); return null; }
     AppState.isLoadingGpx = true;
@@ -160,6 +173,15 @@ export async function loadCsvTrackUTC(file) {
     });
 }
 
+/**
+ * Rendert einen gegebenen Satz von Trackpunkten auf der Karte.
+ * Erstellt eine farbkodierte Polylinie, bei der die Farbe die Höhe über Grund (AGL) anzeigt.
+ * Löst nach dem Rendern ein 'track:loaded'-Event aus, um die restliche Anwendung zu informieren.
+ * @param {object[]} points - Ein Array von Punkt-Objekten, die den Track definieren.
+ * @param {string} fileName - Der Name der geladenen Datei für Anzeigezwecke.
+ * @returns {Promise<object|null>} Ein Promise, das zu den Metadaten des Tracks auflöst oder null bei einem Fehler.
+ * @private
+ */
 async function renderTrack(points, fileName) {
     try {
         console.log(`[trackManager] renderTrack called for ${fileName} with ${points.length} points.`);

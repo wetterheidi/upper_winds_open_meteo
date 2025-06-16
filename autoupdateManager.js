@@ -6,6 +6,13 @@ import { Settings } from './settings.js';
 import { Utils } from './utils.js';
 import { displayError, displayMessage } from './ui.js';
 
+/**
+ * Startet den Intervall-Timer für die automatische Aktualisierung.
+ * Löst sofort ein initiales Update aus und prüft danach minütlich,
+ * ob eine neue Stunde begonnen hat, um dann ein 'autoupdate:tick'-Event auszulösen.
+ * @returns {void}
+ * @private
+ */
 function startAutoupdate() {
     if (AppState.autoupdateInterval) {
         console.log('[AutoupdateManager] Autoupdate is already running.');
@@ -33,6 +40,10 @@ function startAutoupdate() {
     displayMessage('Autoupdate enabled');
 }
 
+/**
+ * Stoppt den laufenden Intervall-Timer für die automatische Aktualisierung.
+ * @returns {void}
+ */
 export function stopAutoupdate() {
     if (AppState.autoupdateInterval) {
         clearInterval(AppState.autoupdateInterval);
@@ -42,7 +53,12 @@ export function stopAutoupdate() {
     }
 }
 
-// This function is the main entry point from the outside.
+/**
+ * Initialisiert die Autoupdate-Funktionalität.
+ * Richtet den Event-Listener für die Autoupdate-Checkbox in der UI ein
+ * und startet den Autoupdate-Prozess, falls er beim Laden der Seite bereits aktiviert war.
+ * @returns {void}
+ */
 export function setupAutoupdate() {
     const autoupdateCheckbox = document.getElementById('autoupdateCheckbox');
     if (!autoupdateCheckbox) {

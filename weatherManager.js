@@ -7,7 +7,14 @@ import { updateModelSelectUI, updateEnsembleModelUI, cleanupSelectedEnsembleMode
 import { DateTime } from 'luxon';
 import { API_URLS, STANDARD_PRESSURE_LEVELS } from './constants.js';
 
-// Diese Funktion ist der neue, zentrale Einstiegspunkt von außen.
+/**
+ * Der zentrale Einstiegspunkt, um alle notwendigen Wetterdaten für einen Standort abzurufen.
+ * Diese Funktion orchestriert die Prüfung der verfügbaren Modelle und den eigentlichen Datenabruf.
+ * @param {number} lat - Die geographische Breite des Standorts.
+ * @param {number} lng - Die geographische Länge des Standorts.
+ * @param {string|null} [currentTime=null] - Ein optionaler ISO-Zeitstempel für historische Daten.
+ * @returns {Promise<object|null>} Ein Promise, das zum 'hourly' Wetterdatenobjekt auflöst, oder null bei einem Fehler.
+ */
 export async function fetchWeatherForLocation(lat, lng, currentTime = null) {
     console.log('[weatherManager] Starting full weather fetch for location:', { lat, lng });
     await checkAvailableModels(lat, lng);
@@ -15,7 +22,16 @@ export async function fetchWeatherForLocation(lat, lng, currentTime = null) {
     return weatherData;
 }
 
-// Diese Funktion holt die reinen Wetterdaten.
+/**
+ * Stellt die eigentliche API-Anfrage an Open-Meteo, um die Roh-Wetterdaten abzurufen.
+ * Erstellt die korrekte URL für entweder eine Vorhersage oder eine historische Anfrage,
+ * basierend auf dem übergebenen Zeitstempel und dem ausgewählten Wettermodell.
+ * @param {number} lat - Die geographische Breite.
+ * @param {number} lon - Die geographische Länge.
+ * @param {string|null} [currentTime=null] - Ein optionaler ISO-Zeitstempel.
+ * @returns {Promise<object|null>} Das 'hourly' Objekt aus der API-Antwort oder null bei einem Fehler.
+ * @private
+ */
 async function fetchWeather(lat, lon, currentTime = null) {
     const loadingElement = document.getElementById('loading');
     if (loadingElement) loadingElement.style.display = 'block';
@@ -91,7 +107,14 @@ async function fetchWeather(lat, lon, currentTime = null) {
     }
 }
 
-
+/**
+ * Überprüft dynamisch, welche der vordefinierten Wettermodelle für die gegebenen
+ * Koordinaten verfügbar sind, indem es für jedes Modell eine Testanfrage sendet.
+ * Aktualisiert anschließend die Benutzeroberfläche (die Modell-Auswahlliste).
+ * @param {number} lat - Die geographische Breite.
+ * @param {number} lon - Die geographische Länge.
+ * @returns {Promise<string[]>} Ein Array mit den Namen der verfügbaren Modelle.
+ */
 async function checkAvailableModels(lat, lon) {
     const modelList = WEATHER_MODELS.LIST; 
     let availableModels = [];
@@ -118,6 +141,13 @@ async function checkAvailableModels(lat, lon) {
     return availableModels;
 }
 
+/**
+ * Interpoliert die Roh-Wetterdaten für einen bestimmten Zeitpunkt (sliderIndex),
+ * um eine detaillierte, höhenabhängige Wettertabelle zu erstellen.
+ * Fügt zusätzliche Datenpunkte nahe der Bodenoberfläche hinzu, um die Genauigkeit zu erhöhen.
+ * @param {number} sliderIndex - Der Index des Zeitschiebereglers, für den die Daten interpoliert werden sollen.
+ * @returns {object[]} Ein Array von Objekten, wobei jedes Objekt die Wetterdaten für eine bestimmte Höhenstufe enthält.
+ */
 export function interpolateWeatherData(sliderIndex) {
     if (!AppState.weatherData || !AppState.weatherData.time || sliderIndex >= AppState.weatherData.time.length) {
         console.warn('No weather data available for interpolation');

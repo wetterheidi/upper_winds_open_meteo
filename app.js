@@ -88,6 +88,12 @@ export const debouncedGetElevationAndQFE = Utils.debounce(async (lat, lng, reque
 }, 500);
 
 // == Weather Data Handling ==
+
+/**
+ * Holt die Benutzereingaben für die Höhenlimits, stößt die Berechnung des Mittelwindes
+ * in 'utils.js' an und schreibt das formatierte Ergebnis in das entsprechende HTML-Element.
+ * Dient als Controller-Funktion für die Mittelwind-Anzeige.
+ */
 export function calculateMeanWind() {
     console.log('Calculating mean wind with model:', document.getElementById('modelSelect').value, 'weatherData:', AppState.weatherData);
     const index = document.getElementById('timeSlider').value || 0;
@@ -148,6 +154,11 @@ export function calculateMeanWind() {
     document.getElementById('meanWindResult').innerHTML = result;
     console.log('Calculated Mean Wind:', result, 'u:', meanWind[2], 'v:', meanWind[3]);
 }
+/**
+ * Erstellt eine Textdatei mit den Wetterdaten im ausgewählten Format und stößt den Download an.
+ * Passt die Datenaufbereitung je nach gewähltem Format an (HEIDIS, ATAK, etc.).
+ * @param {string} format - Das gewünschte Ausgabeformat (z.B. 'HEIDIS', 'ATAK').
+ */
 export function downloadTableAsAscii(format) {
     if (!AppState.weatherData || !AppState.weatherData.time) {
         Utils.handleError('No weather data available to download.');
@@ -357,6 +368,12 @@ export function downloadTableAsAscii(format) {
 }
 
 // == Autoupdate Functionality ==
+
+/**
+ * Aktualisiert die Wetterdaten auf die aktuell laufende Stunde.
+ * Wird vom autoupdateManager aufgerufen, um sicherzustellen, dass die Anzeige
+ * immer die relevanteste Vorhersage zeigt.
+ */
 export async function updateToCurrentHour() {
     if (!AppState.lastLat || !AppState.lastLng) {
         console.warn('No location selected, cannot update weather data');
@@ -412,6 +429,13 @@ export async function updateToCurrentHour() {
 }
 
 // == Landing Pattern, Jump and Free Fall Stuff ==
+
+/**
+ * Orchestriert die gesamte Berechnung und Visualisierung des Sprungablaufs.
+ * Holt die notwendigen Daten aus dem AppState, ruft die Berechnungslogik
+ * im jumpPlanner auf und weist den mapManager an, die Ergebnisse (Exit-Kreise,
+ * Canopy-Bereiche, Cut-Away-Punkt) auf der Karte zu zeichnen.
+ */
 export function calculateJump() {
     if (!Settings.state.isCalculateJumpUnlocked || !Settings.state.userSettings.calculateJump) {
         mapManager.drawJumpVisualization(null);
@@ -788,6 +812,12 @@ export async function updateUIWithNewWeatherData(newWeatherData) {
     await updateAllDisplays();
     Settings.updateModelRunInfo(AppState.lastModelRun, AppState.lastLat, AppState.lastLng);
 }
+/**
+ * Stößt eine Aktualisierung verschiedener UI-Komponenten an.
+ * Diese Funktion dient als Wrapper, um nach einer Datenänderung mehrere
+ * Anzeige-Funktionen aus dem displayManager aufzurufen.
+ * @deprecated Diese Funktion wird schrittweise durch direktere Aufrufe in den Event-Handlern ersetzt, um die Logik klarer zu gestalten.
+ */
 export async function updateAllDisplays() {
     console.log('updateAllDisplays called');
     try {

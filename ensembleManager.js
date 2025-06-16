@@ -12,6 +12,12 @@ import 'leaflet.heat';
 import { ENSEMBLE_VISUALIZATION, API_URLS } from './constants.js';
 window.L = L; // <-- DIESE ZEILE MUSS BLEIBEN
 
+/**
+ * Ruft die Wetterdaten für alle vom Benutzer ausgewählten Ensemble-Modelle ab.
+ * Bündelt die Modellnamen in einer einzigen API-Anfrage an Open-Meteo
+ * und verarbeitet die Antwort, um die Daten den jeweiligen Modellen zuzuordnen.
+ * @returns {Promise<void>}
+ */
 export async function fetchEnsembleWeatherData() {
     if (!AppState.lastLat || !AppState.lastLng) {
         Utils.handleMessage("Please select a location first.");
@@ -158,6 +164,13 @@ export async function fetchEnsembleWeatherData() {
         }
     }
 }
+
+/**
+ * Entfernt alle aktuell auf der Karte sichtbaren Ensemble-Visualisierungen.
+ * Dies umfasst Kreise für einzelne Modelle, Szenarien und die Heatmap.
+ * Stellt sicher, dass die zugehörige Layer-Gruppe für neue Visualisierungen bereit ist.
+ * @returns {void}
+ */
 export function clearEnsembleVisualizations() {
     // 1. Zuerst prüfen, ob die Layer-Gruppe überhaupt existiert.
     if (AppState.ensembleLayerGroup) {
@@ -180,6 +193,13 @@ export function clearEnsembleVisualizations() {
 
     console.log("Ensemble visualizations cleared and a new, clean layer group was created.");
 }
+
+/**
+ * Verarbeitet die geladenen Ensemble-Daten und steuert die Visualisierung
+ * basierend auf dem vom Benutzer ausgewählten Szenario (z.B. 'all_models', 'heatmap', 'mean_wind').
+ * Ruft die entsprechenden Funktionen zur Berechnung und zum Zeichnen der Visualisierungen auf.
+ * @returns {void}
+ */
 export function processAndVisualizeEnsemble() {
     clearEnsembleVisualizations();
 
@@ -295,6 +315,15 @@ function drawEnsembleCircle(exitResult, color, label) {
     AppState.ensembleScenarioCircles[label] = circle;
     console.log(`Drew ensemble circle for ${label} at [${center.join(', ')}], radius ${exitResult.radius}`);
 }
+
+/**
+ * Berechnet ein aggregiertes Wetterprofil für ein gegebenes Szenario (min, mean, max).
+ * Iteriert durch alle Zeitpunkte und aggregiert die Werte aller geladenen Modelle,
+ * um ein einziges, repräsentatives "Szenario-Wetterprofil" zu erstellen.
+ * @param {string} scenarioType - Der Typ des zu berechnenden Szenarios ('min_wind', 'mean_wind', 'max_wind').
+ * @returns {object|null} Ein Wetterdatenobjekt, das dem API-Format entspricht, oder null bei einem Fehler.
+ * @private
+ */
 function calculateEnsembleScenarioProfile(scenarioType /* sliderIndex hier nicht mehr als direkter Parameter nötig, wird in der Schleife verwendet */) {
     if (!AppState.ensembleModelsData || Object.keys(AppState.ensembleModelsData).length === 0) {
         console.warn("No ensemble data available for profile calculation.");
@@ -583,6 +612,15 @@ function calculateExitCircleForEnsemble(profileIdentifier, specificProfileData =
     console.warn(`calculateExitCircle returned null for profile ${profileIdentifier}`);
     return null;
 }
+
+/**
+ * Erstellt und zeigt eine Heatmap der wahrscheinlichsten Landezonen an.
+ * Berechnet für jedes Ensemble-Modell den Exit-Bereich, legt ein Raster über alle Bereiche
+ * und berechnet für jede Rasterzelle die Anzahl der Überlappungen.
+ * Das Ergebnis wird als Heatmap-Layer auf der Karte visualisiert.
+ * @returns {void}
+ * @private
+ */
 function generateAndDisplayHeatmap() {
 
     // 1. Clear previous visualizations

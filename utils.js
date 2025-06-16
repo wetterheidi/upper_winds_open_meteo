@@ -1,6 +1,6 @@
 import { displayError } from './ui.js';
 import { DateTime } from 'luxon';
-import 'leaflet/dist/leaflet.css'; 
+import 'leaflet/dist/leaflet.css';
 import * as mgrs from 'mgrs';
 import { AppState } from './state.js';
 import { CONVERSIONS, ISA_CONSTANTS, DEWPOINT_COEFFICIENTS, EARTH_RADIUS_METERS, PHYSICAL_CONSTANTS, BEAUFORT, ENSEMBLE_VISUALIZATION } from './constants.js';
@@ -8,16 +8,32 @@ import * as L from 'leaflet';
 window.L = L; // <-- DIESE ZEILE MUSS BLEIBEN
 
 export class Utils {
-    // Format ISO time string to UTC (e.g., "2025-03-15T00:00Z" -> "2025-03-15 0000Z")
+    /**
+     * Formatiert einen ISO 8601 Zeit-String in ein spezifisches, lesbares UTC-Format.
+     * Beispiel: "2025-03-15T00:00:00.000Z" -> "2025-03-15 0000Z"
+     * @param {string} timeStr - Der Zeitstempel im ISO 8601 Format.
+     * @returns {string} Der formatierte Zeit-String.
+     */
     static formatTime(timeStr) {
         return DateTime.fromISO(timeStr, { zone: 'UTC' }).toFormat('yyyy-MM-dd HHmm') + 'Z';
     }
 
-    // Round a number to the nearest ten
+    /**
+     * Rundet eine gegebene Zahl auf die nächste Zehnerstelle.
+     * @param {number} value - Die zu rundende Zahl.
+     * @returns {number} Der auf die nächste Zehnerstelle gerundete Wert.
+     */
     static roundToTens(value) {
         return Math.round(value / 10) * 10;
     }
 
+    /**
+ * Rechnet eine Temperatur von Celsius in Fahrenheit um.
+ * Gibt 'N/A' zurück, wenn der Eingabewert keine gültige Zahl ist.
+ * @param {number|string} value - Der Temperaturwert in Celsius.
+ * @param {string} toUnit - Die Zieleinheit ('°F' oder '°C').
+ * @returns {number|string} Die umgerechnete Temperatur oder 'N/A'.
+ */
     static convertTemperature(value, toUnit) {
         // Check if value is a valid number; if not, return 'N/A'
         const numericValue = parseFloat(value);
@@ -27,6 +43,13 @@ export class Utils {
         return toUnit === '°F' ? numericValue * 9 / 5 + 32 : numericValue; // °C to °F or unchanged if °C
     }
 
+    /**
+ * Rechnet eine Höhe von Metern in Fuß um.
+ * Gibt 'N/A' zurück, wenn der Eingabewert keine gültige Zahl ist.
+ * @param {number|string} value - Der Höhenwert in Metern.
+ * @param {string} toUnit - Die Zieleinheit ('ft' oder 'm').
+ * @returns {number|string} Die umgerechnete Höhe oder 'N/A'.
+ */
     static convertHeight(value, toUnit) {
         const numericValue = parseFloat(value);
         if (isNaN(numericValue)) {
@@ -35,6 +58,14 @@ export class Utils {
         return toUnit === 'ft' ? parseFloat((value * CONVERSIONS.METERS_TO_FEET).toFixed(0)) : value; // m to ft or unchanged if m
     }
 
+    /**
+  * Rechnet Windgeschwindigkeiten zwischen verschiedenen Einheiten um.
+  * Unterstützte Einheiten: 'km/h', 'm/s', 'kt', 'mph', 'bft'.
+  * @param {number|string} value - Der Geschwindigkeitswert.
+  * @param {string} toUnit - Die Zieleinheit.
+  * @param {string} [fromUnit='km/h'] - Die Ausgangseinheit (optional, Standard ist 'km/h').
+  * @returns {number|string} Die umgerechnete Geschwindigkeit oder 'N/A'.
+  */
     static convertWind(value, toUnit, fromUnit = 'km/h') {
         if (value === undefined || value === null || isNaN(value)) return 'N/A';
         let speedInKmH;
@@ -86,7 +117,13 @@ export class Utils {
         return BEAUFORT.BEAUFORT_THRESHOLDS[bft] || 63; // Default to max if bft > 12
     }
 
-    // Calculate dewpoint from temperature (°C) and relative humidity (%)
+    /**
+     * Berechnet den Taupunkt anhand von Temperatur und relativer Luftfeuchtigkeit.
+     * Verwendet unterschiedliche Formeln für Temperaturen über und unter dem Gefrierpunkt.
+     * @param {number} temp - Die Temperatur in Grad Celsius.
+     * @param {number} rh - Die relative Luftfeuchtigkeit in Prozent (z.B. 75).
+     * @returns {number|null} Den berechneten Taupunkt in Grad Celsius oder null bei ungültiger Eingabe.
+     */
     static calculateDewpoint(temp, rh) {
         const aLiquid = DEWPOINT_COEFFICIENTS.A_LIQUID;
         const bLiquid = DEWPOINT_COEFFICIENTS.B_LIQUID;
@@ -115,6 +152,18 @@ export class Utils {
         return yp;
     }
 
+    /**
+ * Interpoliert die U- und V-Windkomponenten für eine bestimmte Höhe über dem Meeresspiegel.
+ * Die Methode verwendet eine zweistufige logarithmische Interpolation:
+ * 1. Der Druck auf der Zielhöhe wird durch Interpolation von log(Druck) über der Höhe ermittelt.
+ * 2. Die Windkomponenten werden für den ermittelten Druck durch Interpolation über log(Druck) ermittelt.
+ * @param {number} z - Die Zielhöhe in Metern über dem Meeresspiegel (AMSL).
+ * @param {number[]} pressureLevels - Array der Druckstufen in hPa.
+ * @param {number[]} heights - Array der geopotentiellen Höhen in Metern, korrespondierend zu den Druckstufen.
+ * @param {number[]} uComponents - Array der U-Windkomponenten (West/Ost).
+ * @param {number[]} vComponents - Array der V-Windkomponenten (Süd/Nord).
+ * @returns {{u: number, v: number}|{u: string, v: string}} Ein Objekt mit den interpolierten u- und v-Komponenten oder ein Fehlerobjekt.
+ */
     static interpolateWindAtAltitude(z, pressureLevels, heights, uComponents, vComponents) {
         if (pressureLevels.length != heights.length || pressureLevels.length != uComponents.length || pressureLevels.length != vComponents.length) {
             return { u: 'Invalid input', v: 'Invalid input' };
@@ -159,7 +208,15 @@ export class Utils {
         return 'N/A';
     };
 
-    // Linear interpolation (linearInterpolate)
+    /**
+     * Führt eine lineare Interpolation für einen gegebenen Wert durch.
+     * Findet den korrekten Abschnitt in den Vektordaten und interpoliert linear.
+     * Extrapoliert, falls der Wert außerhalb des definierten Bereichs liegt.
+     * @param {number[]} xVector - Der Vektor der Stützstellen (z.B. Höhen). Muss sortiert sein (auf- oder absteigend).
+     * @param {number[]} yVector - Der Vektor der zu interpolierenden Werte (z.B. Temperaturen).
+     * @param {number} xValue - Der Wert, für den ein y-Wert gefunden werden soll.
+     * @returns {number|string} Der interpolierte y-Wert oder eine Fehlermeldung als String.
+     */
     static linearInterpolate(xVector, yVector, xValue) {
         if (!xVector?.length || !yVector?.length || xVector.length !== yVector.length) {
             return "invalid input for linearInterpolate";
@@ -213,7 +270,17 @@ export class Utils {
         return (dir + 360) % 360;
     }
 
-    // Calculate mean wind over a height layer (renamed from Mittelwind for clarity)
+    /**
+     * Berechnet den mittleren Windvektor über eine definierte Höhenschicht.
+     * Nutzt die Trapez-Methode zur Integration der Windkomponenten über die Höhe,
+     * um einen präzisen, höhengewichteten Mittelwert zu erhalten.
+     * @param {number[]} heights - Array der Höhen-Stützstellen in Metern.
+     * @param {number[]} xComponents - Array der U-Windkomponenten.
+     * @param {number[]} yComponents - Array der V-Windkomponenten.
+     * @param {number} lowerLimit - Die untere Grenze der Schicht in Metern.
+     * @param {number} upperLimit - Die obere Grenze der Schicht in Metern.
+     * @returns {number[]|null} Ein Array `[Richtung, Geschwindigkeit, u-Komponente, v-Komponente]` oder null bei einem Fehler.
+     */
     static calculateMeanWind(heights, xComponents, yComponents, lowerLimit, upperLimit) {
         try {
             if (!heights || !xComponents || !yComponents || heights.length < 2) {
@@ -269,10 +336,14 @@ export class Utils {
         }
     }
 
-    // Cache for time zones and elevations
     static locationCache = new Map();
-
-    // New function to fetch time zone and elevation from Open-Meteo
+    /**
+     * Ruft Zeitzone und Geländehöhe für einen gegebenen Koordinatenpunkt von der Open-Meteo API ab.
+     * Die Ergebnisse werden zwischengespeichert (in-memory), um wiederholte API-Anfragen für denselben Ort zu vermeiden.
+     * @param {number} lat - Die geographische Breite.
+     * @param {number} lng - Die geographische Länge.
+     * @returns {Promise<{timezone: string, timezone_abbreviation: string, elevation: number|string}>} Ein Objekt mit den Standortdaten.
+     */
     static async getLocationData(lat, lng) {
         const cacheKey = `${lat.toFixed(4)},${lng.toFixed(4)}`;
         if (Utils.locationCache.has(cacheKey)) {
@@ -389,7 +460,13 @@ export class Utils {
     }
 
     /**
-     * Main function to calculate flight parameters
+     * Berechnet wesentliche Flugparameter wie Seitenwind, Gegenwind und den Windkorrekturwinkel (WCA).
+     * Diese Funktion ist ein Wrapper, der die Berechnungen für Windwinkel und -komponenten zusammenfasst.
+     * @param {number} trueCourse - Der wahre Kurs des Flugzeugs in Grad.
+     * @param {number} windDirection - Die Richtung, aus der der Wind kommt, in Grad.
+     * @param {number} windSpeed - Die Windgeschwindigkeit. Die Einheit muss mit der von `trueAirspeed` übereinstimmen.
+     * @param {number} trueAirspeed - Die wahre Eigengeschwindigkeit des Flugzeugs.
+     * @returns {{crosswind: number, headwind: number, wca: number, groundSpeed: number}} Ein Objekt mit den berechneten Flugparametern.
      */
     static calculateFlightParameters(trueCourse, windDirection, windSpeed, trueAirspeed) {
         const windAngle = Utils.calculateWindAngle(trueCourse, windDirection);
@@ -500,8 +577,15 @@ export class Utils {
                 return result.Decimal;
         }
     }
-    // Calculate True Airspeed (TAS) from Indicated Airspeed (IAS) and height above ground (in feet)
-    static calculateTAS(ias, heightFt) {
+
+/**
+ * Berechnet die wahre Fluggeschwindigkeit (True Airspeed, TAS) aus der angezeigten
+ * Fluggeschwindigkeit (Indicated Airspeed, IAS) und der Höhe.
+ * Verwendet ein vereinfachtes Modell der internationalen Standardatmosphäre (ISA).
+ * @param {number} ias - Die angezeigte Fluggeschwindigkeit (z.B. in Knoten).
+ * @param {number} heightFt - Die Höhe über dem Meeresspiegel in Fuß.
+ * @returns {number|string} Die berechnete TAS in der gleichen Einheit wie IAS, oder 'N/A' bei ungültigen Eingaben.
+ */    static calculateTAS(ias, heightFt) {
         if (isNaN(ias) || isNaN(heightFt) || ias < 0 || heightFt < 0) {
             console.warn('Invalid inputs for calculateTAS:', { ias, heightFt });
             return 'N/A';
@@ -569,12 +653,12 @@ export class Utils {
     }
 
     /**
-     * Calculate QFE (pressure at a specific altitude) using the barometric formula
-     * @param {number} surfacePressure - Pressure at reference elevation in hPa
-     * @param {number} elevation - Target elevation in meters
-     * @param {number} referenceElevation - Reference elevation (e.g., DIP elevation) in meters
-     * @param {number} temperature - Temperature in Celsius (optional, defaults to 15°C)
-     * @returns {number} QFE in hPa
+     * Berechnet den QFE-Druck (Druck auf einer bestimmten Höhe) mithilfe der barometrischen Höhenformel.
+     * @param {number} surfacePressure - Der Referenzdruck in hPa (z.B. QNH).
+     * @param {number} elevation - Die Zielhöhe in Metern, für die der Druck berechnet werden soll.
+     * @param {number} referenceElevation - Die Höhe in Metern, auf die sich der `surfacePressure` bezieht.
+     * @param {number} [temperature=15] - Die Temperatur in Grad Celsius (optional, Standard ist 15°C).
+     * @returns {number|string} Der berechnete QFE-Druck in hPa oder 'N/A'.
      */
     static calculateQFE(surfacePressure, elevation, referenceElevation, temperature = 15) {
         if (!surfacePressure || elevation === 'N/A' || referenceElevation === 'N/A' || isNaN(surfacePressure) || isNaN(elevation) || isNaN(referenceElevation)) {
