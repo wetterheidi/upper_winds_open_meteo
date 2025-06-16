@@ -24,7 +24,7 @@ import { getSliderValue } from './ui.js';
 import * as AutoupdateManager from './autoupdateManager.js';
 import 'leaflet/dist/leaflet.css'; // Nicht vergessen!
 import 'leaflet-gpx';
-import * as L from 'leaflet';
+import L from 'leaflet';
 window.L = L;
 
 function dispatchAppEvent(eventName, detail = {}) {

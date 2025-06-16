@@ -16,8 +16,8 @@ import 'leaflet/dist/leaflet.css';
 import { DateTime } from 'luxon';
 import 'leaflet-gpx';
 import * as displayManager from './displayManager.js';
-import * as L from 'leaflet';
-window.L = L; // <-- DIESE ZEILE MUSS BLEIBEN
+import L from 'leaflet';
+
 
 "use strict";
 

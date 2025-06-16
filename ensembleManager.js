@@ -6,11 +6,11 @@ import * as JumpPlanner from './jumpPlanner.js';
 import { getSliderValue } from './ui.js';
 import { interpolateWeatherData } from './weatherManager.js';
 import { DateTime } from 'luxon';
-import * as L from 'leaflet';
+import L from 'leaflet';
 import 'leaflet/dist/leaflet.css'; // Nicht vergessen!
 import 'leaflet.heat';
 import { ENSEMBLE_VISUALIZATION, API_URLS } from './constants.js';
-window.L = L; // <-- DIESE ZEILE MUSS BLEIBEN
+
 
 /**
  * Ruft die Wetterdaten für alle vom Benutzer ausgewählten Ensemble-Modelle ab.

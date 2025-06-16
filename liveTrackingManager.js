@@ -5,8 +5,8 @@ import { UI_DEFAULTS, SMOOTHING_DEFAULTS } from './constants.js';
 import { AppState } from './state.js';
 import { Utils } from './utils.js';
 import 'leaflet/dist/leaflet.css'; // Nicht vergessen!
-import * as L from 'leaflet';
-window.L = L; // <-- DIESE ZEILE MUSS BLEIBEN
+import L from 'leaflet';
+
 
 // --- Private Hilfsfunktionen ---
 

@@ -6,7 +6,7 @@ import { Settings } from './settings.js';
 import { Utils } from './utils.js';
 import { TileCache } from './tileCache.js';
 import { updateOfflineIndicator } from './ui.js';
-import * as L from 'leaflet';
+import L from 'leaflet';
 import 'leaflet/dist/leaflet.css'; // Wichtig: importiert das CSS von Leaflet
 import './vendor/Leaflet.PolylineMeasure.js'; // Pfad ggf. anpassen
 import './vendor/Leaflet.PolylineMeasure.css';

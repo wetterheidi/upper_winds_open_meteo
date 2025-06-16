@@ -3,10 +3,10 @@ import { Settings } from "./settings.js";
 import { Utils } from "./utils.js";
 import { DateTime } from 'luxon';
 import 'leaflet/dist/leaflet.css'; // Nicht vergessen!
-import Papa from 'papaparse';
+import * as Papa from 'papaparse';
 import 'leaflet-gpx';
-import * as L from 'leaflet';
-window.L = L; // <-- DIESE ZEILE MUSS BLEIBEN
+import L from 'leaflet';
+
 
 "use strict";
 
