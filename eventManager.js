@@ -6,7 +6,7 @@ import { Settings } from './settings.js';
 import { Utils } from './utils.js';
 import { updateUIState } from './app.js';
 import {
-    updateAllDisplays, calculateJump, updateJumpRunTrackDisplay,
+    updateAllDisplays, calculateJump, 
     downloadTableAsAscii, calculateMeanWind, calculateJumpRunTrack,
     debouncedGetElevationAndQFE, getDownloadFormat, updateJumpMasterLineAndPanel,
     validateLegHeights, debouncedCalculateJump, applySettingToInput, setInputValueSilently
@@ -477,7 +477,7 @@ function setupSliderEvents() {
             }
             if (Settings.state.userSettings.showJumpRunTrack) {
                 console.log('Updating jump run track for slider index:', sliderIndex);
-                updateJumpRunTrackDisplay();
+                displayManager.updateJumpRunTrackDisplay();
             }
             //mapManager.recenterMap();
             updateJumpMasterLineAndPanel();
@@ -911,7 +911,7 @@ function setupInputEvents() {
             if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
                 if (Settings.state.userSettings.showJumpRunTrack) {
                     console.log('Updating JRT for custom direction input');
-                    updateJumpRunTrackDisplay();
+                    displayManager.updateJumpRunTrackDisplay();
                 }
                 if (Settings.state.userSettings.calculateJump) {
                     console.log('Recalculating jump for custom JRT direction');
@@ -945,13 +945,13 @@ function setupInputEvents() {
                         console.log('Invalid direction, resetting to calculated.');
                     }
                     Settings.save();
-                    updateJumpRunTrackDisplay();
+                    displayManager.updateJumpRunTrackDisplay();
                 });
             }
             if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
                 if (Settings.state.userSettings.showJumpRunTrack) {
                     console.log('Updating JRT for invalid direction input');
-                    updateJumpRunTrackDisplay();
+                    displayManager.updateJumpRunTrackDisplay();
                 }
                 if (Settings.state.userSettings.calculateJump) {
                     console.log('Recalculating jump for reset JRT direction');
@@ -969,7 +969,7 @@ function setupInputEvents() {
             Settings.save();
             if (Settings.state.userSettings.calculateJump && Settings.state.userSettings.showJumpRunTrack && AppState.weatherData && AppState.lastLat && AppState.lastLng) {
                 console.log('Updating JRT for offset change');
-                updateJumpRunTrackDisplay();
+                displayManager.updateJumpRunTrackDisplay();
             }
         } else {
             Utils.handleError('Offset must be between -50000 and 50000 in steps of 100.');
@@ -981,7 +981,7 @@ function setupInputEvents() {
             Settings.save();
             if (Settings.state.userSettings.calculateJump && Settings.state.userSettings.showJumpRunTrack) {
                 console.log('Resetting JRT for invalid offset');
-                updateJumpRunTrackDisplay();
+                displayManager.updateJumpRunTrackDisplay();
             }
         }
     });
@@ -993,7 +993,7 @@ function setupInputEvents() {
             Settings.save();
             if (Settings.state.userSettings.calculateJump && Settings.state.userSettings.showJumpRunTrack && AppState.weatherData && AppState.lastLat && AppState.lastLng) {
                 console.log('Updating JRT for forward offset change');
-                updateJumpRunTrackDisplay();
+                displayManager.updateJumpRunTrackDisplay();
             }
         } else {
             Utils.handleError('Forward offset must be between -50000 and 50000 in steps of 100.');
@@ -1005,7 +1005,7 @@ function setupInputEvents() {
             Settings.save();
             if (Settings.state.userSettings.calculateJump && Settings.state.userSettings.showJumpRunTrack) {
                 console.log('Resetting JRT for invalid forward offset');
-                updateJumpRunTrackDisplay();
+                displayManager.updateJumpRunTrackDisplay();
             }
         }
     });
@@ -1016,7 +1016,7 @@ function setupInputEvents() {
         Settings.state.userSettings.aircraftSpeedKt = parseFloat(speed); // Sicherstellen, dass der Wert gespeichert wird
         Settings.save();
         calculateJump();
-        updateJumpRunTrackDisplay();
+        displayManager.updateJumpRunTrackDisplay();
     });
     setupInput('numberOfJumpers', 'change', 300, (value) => {
         const number = parseFloat(value);
@@ -1167,7 +1167,7 @@ function setupJumpRunTrackEvents() {
                 if (isNaN(value)) return;
                 Settings.state.userSettings[settingName] = value;
                 Settings.save();
-                updateJumpRunTrackDisplay();
+                displayManager.updateJumpRunTrackDisplay();
             });
         }
     };
@@ -1191,7 +1191,7 @@ function setupJumpRunTrackEvents() {
                 console.log('Invalid direction, resetting to calculated.');
             }
             Settings.save();
-            updateJumpRunTrackDisplay();
+            displayManager.updateJumpRunTrackDisplay();
         });
     }
 
@@ -1200,7 +1200,7 @@ function setupJumpRunTrackEvents() {
         showTrackCheckbox.addEventListener('change', (e) => {
             Settings.state.userSettings.showJumpRunTrack = e.target.checked;
             Settings.save();
-            updateJumpRunTrackDisplay();
+            displayManager.updateJumpRunTrackDisplay();
         });
     }
 }
@@ -1241,7 +1241,7 @@ function setupMapEventListeners() {
         AppState.isManualPanning = false;
 
         // 3. UI-Updates anstoßen, die von den neuen Daten abhängen
-        updateJumpRunTrackDisplay(); // update... Funktionen sind jetzt im mapManager
+        displayManager.updateJumpRunTrackDisplay(); // update... Funktionen sind jetzt im mapManager
         displayManager.updateLandingPatternDisplay();
     });
 

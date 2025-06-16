@@ -6,6 +6,7 @@ import * as mapManager from './mapManager.js';
 import * as weatherManager from './weatherManager.js';
 import { generateWindBarb } from "./uiHelpers.js";
 import { UI_DEFAULTS } from './constants.js'; // UI_DEFAULTS für LANDING_PATTERN_MIN_ZOOM
+import * as JumpPlanner from './jumpPlanner.js';
 
 // == Marker and popup functions ==
 export async function refreshMarkerPopup() {
@@ -441,4 +442,73 @@ export function updateLandingPatternDisplay() {
 
     // --- TEIL D: DEN KELLNER MIT DER FERTIGEN BESTELLUNG LOSSCHICKEN ---
     mapManager.drawLandingPattern(patternData);
+}
+
+export function updateJumpRunTrackDisplay() {
+    console.log('updateJumpRunTrackDisplay called');
+    if (!AppState.map) {
+        console.warn('Map not initialized, cannot update jump run track display');
+        return;
+    }
+
+    // Prüfe alle Bedingungen, ob der Track angezeigt werden soll.
+    const shouldShow =
+        Settings.state.userSettings.showJumpRunTrack &&
+        AppState.weatherData &&
+        AppState.lastLat &&
+        AppState.lastLng &&
+        Settings.state.isCalculateJumpUnlocked &&
+        Settings.state.userSettings.calculateJump;
+
+    // Wenn die Bedingungen NICHT erfüllt sind, lösche den Track.
+    if (!shouldShow) {
+        console.log('Conditions not met to show JRT, clearing display.');
+        mapManager.drawJumpRunTrack(null); // Sagt dem mapManager, alles zu löschen.
+        AppState.lastTrackData = null; // Setzt die gespeicherten Track-Daten zurück.
+        return; // Beendet die Funktion hier.
+    }
+
+    // Wenn die Bedingungen erfüllt sind, zeichne den Track.
+    // Neuer Code:
+    const sliderIndex = getSliderValue();
+    const interpolatedData = weatherManager.interpolateWeatherData(sliderIndex);
+    const trackData = JumpPlanner.jumpRunTrack(interpolatedData);
+    if (trackData && trackData.latlngs?.length === 2 && trackData.latlngs.every(ll => Number.isFinite(ll[0]) && Number.isFinite(ll[1]))) {
+        console.log('Drawing jump run track with data:', trackData);
+        const drawData = {
+            path: {
+                latlngs: trackData.latlngs,
+                options: { color: 'orange', weight: 5, opacity: 0.8 },
+                tooltipText: `Jump Run Track: ${trackData.direction}°, Length: ${trackData.trackLength} m`,
+                originalLatLngs: AppState.lastTrackData?.latlngs?.length === 2 ? AppState.lastTrackData.latlngs : trackData.latlngs
+            },
+            approachPath: trackData.approachLatLngs?.length === 2 && trackData.approachLatLngs.every(ll => Number.isFinite(ll[0]) && Number.isFinite(ll[1])) ? {
+                latlngs: trackData.approachLatLngs,
+                options: { color: 'orange', weight: 5, opacity: 0.8, dashArray: '5, 10' },
+                tooltipText: `Approach Path: ${trackData.direction}°, Length: ${trackData.approachLength} m`,
+                originalLatLngs: AppState.lastTrackData?.approachLatLngs?.length === 2 ? AppState.lastTrackData.approachLatLngs : trackData.approachLatLngs
+            } : null,
+            trackLength: trackData.trackLength, // Wichtig für Drag-and-Drop
+            airplane: {
+                position: L.latLng(trackData.latlngs[1][0], trackData.latlngs[1][1]),
+                bearing: trackData.direction,
+                originalPosition: AppState.lastTrackData?.latlngs?.[1] && Number.isFinite(AppState.lastTrackData.latlngs[1][0]) ?
+                    L.latLng(AppState.lastTrackData.latlngs[1][0], AppState.lastTrackData.latlngs[1][1]) :
+                    L.latLng(trackData.latlngs[1][0], trackData.latlngs[1][1]),
+            }
+        };
+        mapManager.drawJumpRunTrack(drawData);
+        AppState.lastTrackData = {
+            latlngs: trackData.latlngs,
+            approachLatLngs: trackData.approachLatLngs,
+            direction: trackData.direction,
+            trackLength: trackData.trackLength,
+            approachLength: trackData.approachLength
+        };
+        console.log('Updated AppState.lastTrackData:', AppState.lastTrackData);
+    } else {
+        console.warn('No valid track data to display:', trackData);
+        mapManager.drawJumpRunTrack(null); // Sicherheitshalber auch hier löschen
+        AppState.lastTrackData = null;
+    }
 }
