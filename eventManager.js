@@ -23,7 +23,7 @@ import { fetchEnsembleWeatherData, processAndVisualizeEnsemble, clearEnsembleVis
 import { getSliderValue } from './ui.js';
 import * as AutoupdateManager from './autoupdateManager.js';
 import 'leaflet-gpx';
-import * as L from 'leaflet';
+
 
 function dispatchAppEvent(eventName, detail = {}) {
     console.log(`[EventManager] Dispatching event: ${eventName}`, detail);

@@ -13,9 +13,8 @@ import * as weatherManager from './weatherManager.js';
 import { getSliderValue } from './ui.js';
 import * as AutoupdateManager from './autoupdateManager.js';
 import { DateTime } from 'luxon';
-import 'leaflet-gpx';
 import * as displayManager from './displayManager.js';
-import * as L from 'leaflet';
+
 
 
 "use strict";
@@ -113,17 +112,21 @@ export function calculateMeanWind() {
     lowerLimitInput = heightUnit === 'ft' ? lowerLimitInput / 3.28084 : lowerLimitInput;
     upperLimitInput = heightUnit === 'ft' ? upperLimitInput / 3.28084 : upperLimitInput;
 
-    if ((refLevel === 'AMSL') && lowerLimitInput < baseHeight) {
-        Utils.handleError(`Lower limit adjusted to terrain altitude (${baseHeight} m ${refLevel}) as it cannot be below ground level in ${refLevel} mode.`);
-        lowerLimitInput = baseHeight;
-        document.getElementById('lowerLimit').value = Utils.convertHeight(lowerLimitInput, heightUnit);
-    }
-
     const lowerLimit = refLevel === 'AGL' ? lowerLimitInput + baseHeight : lowerLimitInput;
     const upperLimit = refLevel === 'AGL' ? upperLimitInput + baseHeight : upperLimitInput;
 
     if (isNaN(lowerLimitInput) || isNaN(upperLimitInput) || lowerLimitInput >= upperLimitInput) {
         Utils.handleError('Invalid layer limits. Ensure Lower < Upper and both are numbers.');
+        return;
+    }
+
+    if (refLevel === 'AMSL' && upperLimit < baseHeight) {
+        Utils.handleError(`The entire selected layer (${Math.round(Utils.convertHeight(lowerLimit, heightUnit))}-${Math.round(Utils.convertHeight(upperLimit, heightUnit))} ${heightUnit}) is below the terrain altitude of ${Math.round(Utils.convertHeight(baseHeight, heightUnit))} ${heightUnit}.`);
+        return;
+    }
+
+    if (refLevel === 'AMSL' && lowerLimit < baseHeight) {
+        Utils.handleMessage(`Note: Lower limit adjusted to terrain altitude (${Math.round(Utils.convertHeight(baseHeight, heightUnit))} ${heightUnit}) as it cannot be below ground level.`);
         return;
     }
 

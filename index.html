@@ -5,13 +5,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Upper Winds</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <link rel="stylesheet" href="/vendor/Leaflet.PolylineMeasure.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js" defer></script>
+    <script src="/vendor/Leaflet.PolylineMeasure.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-gpx/1.7.0/gpx.min.js" defer></script>
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js" defer></script>
+    <script src="https://unpkg.com/leaflet-rotatedmarker@0.2.0/leaflet.rotatedMarker.js" defer></script>
 
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-    <link rel="stylesheet" href="vendor/Leaflet.PolylineMeasure.css" />
     <link rel="stylesheet" href="styles.css">
-    
+
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
-    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
 </head>
 
 <body>
@@ -207,7 +215,7 @@
             </li>
         </ul>
         </li>
-         <li>
+        <li>
             <span>Search Location</span>
             <ul class="submenu hidden" id="locationSearchSubmenu">
                 <li>
@@ -216,7 +224,7 @@
                         <button id="saveCurrentLocationBtn" title="Save As Favorite">★+</button>
                     </div>
                     <ul id="locationResults" class="location-results-list">
-                        </ul>
+                    </ul>
                 </li>
             </ul>
         </li>
@@ -378,7 +386,7 @@
                             <button id="resetCutAwayMarker">Reset Cut-Away Marker</button>
                         </li>
                     </ul>
-                    </li>
+                </li>
             </ul>
         </li>
         <li>
@@ -516,7 +524,7 @@
         </div>
     </div>
 
-   <script type="module" src="/app.js"></script>
+    <script type="module" src="/app.js" defer></script>
 </body>
 
 </html>
