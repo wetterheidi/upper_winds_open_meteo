@@ -1465,7 +1465,7 @@ input[type="checkbox"][style*="opacity: 1"] {
     .menu {
         left: 5px;
         min-width: 120px;
-        top: 30px;
+        top: calc(30px + env(safe-area-inset-top));
         border-radius: 8px;
     }
 
@@ -1523,7 +1523,7 @@ input[type="checkbox"][style*="opacity: 1"] {
 
     #error-message {
         position: fixed;
-        top: 5px;
+        top: calc(5px + env(safe-area-inset-top));
         right: 5px;
         width: 70%;
         background: #ffcccc;
@@ -1537,7 +1537,7 @@ input[type="checkbox"][style*="opacity: 1"] {
 
     #offline-indicator {
         position: fixed;
-        top: 5px;
+        top: calc(5px + env(safe-area-inset-top));
         right: 5px;
         width: 70%;
         background: #fff3cd;

@@ -17,7 +17,7 @@ export function displayMessage(message) {
         messageElement = document.createElement('div');
         messageElement.id = 'message';
         messageElement.style.position = 'fixed';
-        messageElement.style.top = '5px';
+        messageElement.style.top = 'calc(5px + env(safe-area-inset-top))';
         messageElement.style.right = '5px';
         messageElement.style.width = isMobileDevice() ? '70%' : '30%';
         messageElement.style.backgroundColor = '#ccffcc';
@@ -46,7 +46,7 @@ export function displayProgress(current, total, cancelCallback) {
         progressElement = document.createElement('div');
         progressElement.id = 'progress';
         progressElement.style.position = 'fixed';
-        progressElement.style.top = '5px';
+        progressElement.style.top = 'calc(5px + env(safe-area-inset-top))';
         progressElement.style.right = '5px';
         progressElement.style.width = isMobileDevice() ? '70%' : '30%';
         progressElement.style.backgroundColor = '#ccffcc';
