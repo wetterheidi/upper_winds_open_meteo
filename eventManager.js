@@ -1233,51 +1233,51 @@ function setupMapEventListeners() {
         displayManager.updateLandingPatternDisplay();
     });
 
-    document.addEventListener('map:mousemove', (event) => {
-        const { lat, lng } = event.detail;
-        AppState.lastMouseLatLng = { lat, lng }; // Position für den Callback speichern
+if (AppState.map) {
+    const updateCenterCoords = (center) => {
+        if (!AppState.coordsControl) return;
 
+        const { lat, lng } = center;
         const coordFormat = getCoordinateFormat();
         let coordText;
 
-        // Koordinaten-Text korrekt formatieren
+        // Koordinaten für die Anzeige formatieren
         if (coordFormat === 'MGRS') {
-            const mgrsVal = Utils.decimalToMgrs(lat, lng);
-            coordText = `MGRS: ${mgrsVal || 'N/A'}`;
-        } else if (coordFormat === 'DMS') {
-            const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
-            coordText = `Lat: ${formatDMS(Utils.decimalToDms(lat, true))}, Lng: ${formatDMS(Utils.decimalToDms(lng, false))}`;
+            coordText = `MGRS: ${Utils.decimalToMgrs(lat, lng)}`;
         } else {
             coordText = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
         }
 
-        // Sofortiges Update mit "Fetching..."
-        if (AppState.coordsControl) {
-            AppState.coordsControl.update(`${coordText}<br>Elevation: Fetching...<br>QFE: Fetching...`);
-        }
+        // Sofortiges Update der Anzeige mit "Fetching..." für gutes User-Feedback
+        AppState.coordsControl.update(`${coordText}<br>Elevation: Fetching...<br>QFE: Fetching...`);
 
-        // Debounced-Funktion aufrufen, um API-Anfragen zu begrenzen
-        debouncedGetElevationAndQFE(lat, lng, { lat, lng }, ({ elevation, qfe }, requestLatLng) => {
-            // Callback wird ausgeführt, wenn die Daten da sind
-            if (AppState.lastMouseLatLng && AppState.coordsControl) {
-                // Nur aktualisieren, wenn die Maus noch in der Nähe ist
-                const deltaLat = Math.abs(AppState.lastMouseLatLng.lat - requestLatLng.lat);
-                const deltaLng = Math.abs(AppState.lastMouseLatLng.lng - requestLatLng.lng);
-                const threshold = 0.05;
+        // Die zentrale, debounced Funktion aus app.js aufrufen
+        debouncedGetElevationAndQFE(lat, lng, center, ({ elevation, qfe }, requestLatLng) => {
+            // Dieser Callback wird ausgeführt, wenn die Daten da sind.
+            // Sicherheitscheck: Nur updaten, wenn sich die Karte in der Zwischenzeit nicht schon wieder stark bewegt hat.
+            const currentCenter = AppState.map.getCenter();
+            if (Math.abs(currentCenter.lat - requestLatLng.lat) > 0.001 || Math.abs(currentCenter.lng - requestLatLng.lng) > 0.001) {
+                return; 
+            }
 
-                if (deltaLat < threshold && deltaLng < threshold) {
-                    const heightUnit = getHeightUnit();
-                    let displayElevation = elevation === 'N/A' ? 'N/A' : elevation;
-                    if (displayElevation !== 'N/A') {
-                        displayElevation = Utils.convertHeight(displayElevation, heightUnit);
-                        displayElevation = Math.round(displayElevation);
-                    }
-                    const qfeText = qfe === 'N/A' ? 'N/A' : `${qfe} hPa`;
-                    AppState.coordsControl.update(`${coordText}<br>Elevation: ${displayElevation} ${displayElevation === 'N/A' ? '' : heightUnit}<br>QFE: ${qfeText}`);
-                }
+            const heightUnit = getHeightUnit();
+            const displayElevation = elevation === 'N/A' ? 'N/A' : `${Math.round(Utils.convertHeight(elevation, heightUnit))} ${heightUnit}`;
+            const displayQFE = qfe === 'N/A' ? 'N/A' : `${qfe} hPa`;
+
+            if (AppState.coordsControl) {
+                AppState.coordsControl.update(`${coordText}<br>Elevation: ${displayElevation}<br>QFE: ${displayQFE}`);
             }
         });
+    };
+
+    // Den Event-Listener an das 'move'-Event der Karte binden
+    AppState.map.on('move', () => updateCenterCoords(AppState.map.getCenter()));
+
+    // Einmal initial auslösen, damit die Anzeige direkt beim Start befüllt wird
+    AppState.map.whenReady(() => {
+        updateCenterCoords(AppState.map.getCenter());
     });
+}
 }
 function setupMenuItemEvents() {
     console.log("setupMenuItemEvents wird aufgerufen für 'Calculate Jump'.");

@@ -23,3 +23,6 @@ npm-debug.log*
 *.njsproj
 *.sln
 *.swp
+
+# NEU HINZUFÜGEN: Android Keystore-Dateien ignorieren
+*.jks

@@ -44,10 +44,14 @@ html {
 .leaflet-bottom .leaflet-control-scale {
     margin-bottom: 40px;
     margin-left: 10px;
-    z-index: 1000; /* Ensure scale is above attribution */
-    background-color: rgba(255, 255, 255, 0.9); /* Slightly more opaque for readability */
-    padding: 2px 5px; /* Add padding for better appearance */
-    border-radius: 4px; /* Rounded corners */
+    z-index: 1000;
+    /* Ensure scale is above attribution */
+    background-color: rgba(255, 255, 255, 0.9);
+    /* Slightly more opaque for readability */
+    padding: 2px 5px;
+    /* Add padding for better appearance */
+    border-radius: 4px;
+    /* Rounded corners */
 }
 
 /* Style the attribution control */
@@ -57,10 +61,28 @@ html {
     background-color: rgba(255, 255, 255, 0.8);
     padding: 2px 5px;
     font-size: 11px;
-    z-index: 900; /* Below the scale control */
-    white-space: normal; /* Allow text to wrap */
-    max-width: 100%; /* Limit width to prevent stretching across the map */
-    text-align: right; /* Align text to the right */
+    z-index: 900;
+    /* Below the scale control */
+    white-space: normal;
+    /* Allow text to wrap */
+    max-width: 100%;
+    /* Limit width to prevent stretching across the map */
+    text-align: right;
+    /* Align text to the right */
+}
+
+/* NEU HINZUFÜGEN: Styling für das Fadenkreuz */
+#crosshair {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 24px;
+    color: #333;
+    font-weight: bold;
+    z-index: 1001; /* Über der Karte, aber unter Menüs */
+    pointer-events: none; /* Klicks "fallen durch" auf die Karte */
+    text-shadow: 0 0 4px white;
 }
 
 .leaflet-control-live-position {
@@ -92,18 +114,24 @@ html {
 }
 
 .leaflet-overlay-pane {
-    z-index: 400; /* Leaflet default */
-    pointer-events: none; /* Overlays don’t need clicks */
+    z-index: 400;
+    /* Leaflet default */
+    pointer-events: none;
+    /* Overlays don’t need clicks */
 }
 
 .leaflet-marker-pane {
-    z-index: 600; /* Leaflet default ~600 */
-    pointer-events: auto; /* Allow marker clicks */
+    z-index: 600;
+    /* Leaflet default ~600 */
+    pointer-events: auto;
+    /* Allow marker clicks */
 }
 
 .leaflet-popup-pane {
-    z-index: 700; /* Leaflet default ~700 */
-    pointer-events: auto; /* Allow popup interactions */
+    z-index: 700;
+    /* Leaflet default ~700 */
+    pointer-events: auto;
+    /* Allow popup interactions */
 }
 
 .leaflet-overlay-pane>*,
@@ -117,26 +145,32 @@ html {
 }
 
 .ensemble-tooltip {
-    background-color: rgba(255, 255, 255, 0.9); /* Heller Hintergrund */
-    color: #333; /* Dunkler Text */
+    background-color: rgba(255, 255, 255, 0.9);
+    /* Heller Hintergrund */
+    color: #333;
+    /* Dunkler Text */
     border: 1px solid #ccc;
     border-radius: 3px;
     padding: 5px 8px;
     font-size: 12px;
     white-space: nowrap;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .hamburger-menu {
     position: fixed;
-    top: 5px;
-    left: 5px;
+    /* KORREKTUR: Berücksichtigt den Abstand zur Statusleiste auf mobilen Geräten */
+    top: calc(5px + env(safe-area-inset-top));
+    left: calc(5px + env(safe-area-inset-left));
+    /* Bonus: Berücksichtigt auch seitliche Aussparungen */
     z-index: 4000;
-    pointer-events: auto; /* Only interactive elements should capture events */
+    pointer-events: auto;
+    /* Only interactive elements should capture events */
 }
 
 .hamburger-menu-overlay {
-    pointer-events: none; /* Allow events to pass through to the map */
+    pointer-events: none;
+    /* Allow events to pass through to the map */
 }
 
 #hamburgerBtn {
@@ -390,7 +424,8 @@ html {
 
 /* Ensure the submenu items have consistent padding and font */
 .submenu li {
-    padding: 10px; /* Increased padding for better spacing */
+    padding: 10px;
+    /* Increased padding for better spacing */
     border-bottom: 1px solid #eee;
     font-size: 13px;
     font-family: 'Roboto', sans-serif;
@@ -400,30 +435,36 @@ html {
 .cache-setting-label {
     display: flex;
     align-items: center;
-    justify-content: space-between; /* Align label and dropdown */
+    justify-content: space-between;
+    /* Align label and dropdown */
     width: 100%;
     font-family: 'Roboto', sans-serif;
     font-size: 13px;
     font-weight: 400;
     color: #000;
-    padding-right: 10px; /* Add space between label and dropdown */
+    padding-right: 10px;
+    /* Add space between label and dropdown */
 }
 
 /* Style the dropdowns */
 .cache-setting-select {
-    appearance: none; /* Remove default browser styling */
+    appearance: none;
+    /* Remove default browser styling */
     -webkit-appearance: none;
     -moz-appearance: none;
     background-color: #fff;
     border: 1px solid #ccc;
     border-radius: 4px;
-    padding: 6px 24px 6px 8px; /* Space for custom arrow */
+    padding: 6px 24px 6px 8px;
+    /* Space for custom arrow */
     font-size: 13px;
     font-family: 'Roboto', sans-serif;
     color: #000;
     cursor: pointer;
-    width: 120px; /* Increased width for better alignment */
-    background-image: url('data:image/svg+xml;utf8,<svg fill="%234da8da" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>'); /* Custom dropdown arrow */
+    width: 120px;
+    /* Increased width for better alignment */
+    background-image: url('data:image/svg+xml;utf8,<svg fill="%234da8da" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>');
+    /* Custom dropdown arrow */
     background-repeat: no-repeat;
     background-position: right 8px center;
     background-size: 12px;
@@ -432,7 +473,8 @@ html {
 /* Hover and focus states for dropdowns */
 .cache-setting-select:hover {
     border-color: #4da8da;
-    background-color: #f0f8ff; /* Light blue background on hover */
+    background-color: #f0f8ff;
+    /* Light blue background on hover */
 }
 
 .cache-setting-select:focus {
@@ -451,10 +493,13 @@ html {
     font-size: 13px;
     font-family: 'Roboto', sans-serif;
     cursor: pointer;
-    width: 120px; /* Match dropdown width */
+    width: 120px;
+    /* Match dropdown width */
     text-align: center;
-    display: block; /* Ensure it takes full width of the li */
-    margin: 0 auto; /* Center the button */
+    display: block;
+    /* Ensure it takes full width of the li */
+    margin: 0 auto;
+    /* Center the button */
 }
 
 #recacheNowButton:hover {
@@ -511,6 +556,7 @@ body {
     display: flex;
     flex-direction: column;
     box-sizing: border-box;
+    overflow-y: auto; 
 }
 
 * {
@@ -568,7 +614,7 @@ button {
     width: 90%;
     max-width: 300px;
     position: fixed;
-    top: 10px;
+    top: calc(10px + env(safe-area-inset-top));
     left: 50%;
     transform: translateX(-50%);
     z-index: 200;
@@ -576,33 +622,43 @@ button {
 
 .time-row {
     display: flex;
-    align-items: center; /* Vertically center all items */
-    gap: 5px; /* Consistent spacing between elements */
+    align-items: center;
+    /* Vertically center all items */
+    gap: 5px;
+    /* Consistent spacing between elements */
 }
 
 #selectedTime {
-    line-height: 1; /* Prevent line-height from adding extra space */
+    line-height: 1;
+    /* Prevent line-height from adding extra space */
 }
 
 #autoupdateToggle {
     display: flex;
-    align-items: center; /* Ensure internal elements are centered */
-    gap: 5px; /* Space between the "⟳" and checkbox */
+    align-items: center;
+    /* Ensure internal elements are centered */
+    gap: 5px;
+    /* Space between the "⟳" and checkbox */
 }
 
 #autoupdateToggle label {
     font-size: 24px;
-    line-height: 1; /* Match the font size to prevent vertical offset */
-    margin-top: -12px; /* Remove any default margins */
-    display: inline-flex; /* Ensure the label behaves consistently in flex */
-    align-items: center; /* Center the symbol vertically */
+    line-height: 1;
+    /* Match the font size to prevent vertical offset */
+    margin-top: -12px;
+    /* Remove any default margins */
+    display: inline-flex;
+    /* Ensure the label behaves consistently in flex */
+    align-items: center;
+    /* Center the symbol vertically */
     margin-left: 10px;
     color: #4da8da;
     font-weight: bold;
 }
 
 #autoupdateToggle input[type="checkbox"] {
-    margin-top: -4px; /* Remove default margins */
+    margin-top: -4px;
+    /* Remove default margins */
     appearance: none;
     width: 16px;
     height: 16px;
@@ -611,7 +667,8 @@ button {
     background-color: #fff;
     cursor: pointer;
     position: relative;
-    vertical-align: middle; /* Fallback for older browsers */
+    vertical-align: middle;
+    /* Fallback for older browsers */
 }
 
 #autoupdateToggle input[type="checkbox"]:checked::after {
@@ -665,9 +722,12 @@ button {
 .button-wrapper {
     display: flex;
     flex-direction: row;
-    gap: 10px; /* Space between buttons */
-    justify-content: center; /* Center the buttons */
-    margin: 10px 0; /* Add vertical spacing */
+    gap: 10px;
+    /* Space between buttons */
+    justify-content: center;
+    /* Center the buttons */
+    margin: 10px 0;
+    /* Add vertical spacing */
 }
 
 /* Style for the buttons */
@@ -681,7 +741,8 @@ button {
     font-size: 13px;
     font-family: 'Roboto', sans-serif;
     cursor: pointer;
-    flex: 1; /* Buttons take equal width */
+    flex: 1;
+    /* Buttons take equal width */
     text-align: center;
 }
 
@@ -953,7 +1014,7 @@ input[type="number"]:focus {
 
 #error-message {
     position: absolute;
-    top: 5px;
+    top: calc(5px + env(safe-area-inset-top));
     right: 5px;
     width: 30%;
     background: #ffcccc;
@@ -967,7 +1028,7 @@ input[type="number"]:focus {
 
 #offline-indicator {
     position: fixed;
-    top: 35px;
+    top: calc(35px + env(safe-area-inset-top));
     right: 5px;
     width: 30%;
     background: #fff3cd;
@@ -1132,7 +1193,8 @@ input[type="checkbox"][style*="opacity: 1"] {
 
 /* Stile für das neue Orts-Management-Panel */
 #locationSearchSubmenu {
-    padding: 5px; /* Etwas weniger Innenabstand für ein kompakteres Design */
+    padding: 5px;
+    /* Etwas weniger Innenabstand für ein kompakteres Design */
 }
 
 .search-container {
@@ -1143,7 +1205,8 @@ input[type="checkbox"][style*="opacity: 1"] {
 }
 
 #locationSearchInput {
-    flex-grow: 1; /* Das Eingabefeld nimmt den meisten Platz ein */
+    flex-grow: 1;
+    /* Das Eingabefeld nimmt den meisten Platz ein */
     padding: 8px;
     border: 1px solid #ccc;
     border-radius: 4px;
@@ -1154,12 +1217,14 @@ input[type="checkbox"][style*="opacity: 1"] {
     background-color: #4da8da;
     color: white;
     border: none;
-    border-radius: 3px; /* Rund */
+    border-radius: 3px;
+    /* Rund */
     width: 30px;
     height: 30px;
     font-size: 16px;
     cursor: pointer;
-    flex-shrink: 0; /* Verhindert, dass der Button schrumpft */
+    flex-shrink: 0;
+    /* Verhindert, dass der Button schrumpft */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1173,8 +1238,10 @@ input[type="checkbox"][style*="opacity: 1"] {
     list-style: none;
     padding: 0;
     margin: 0;
-    max-height: 250px; /* Begrenzt die Höhe der Liste */
-    overflow-y: auto; /* Fügt einen Scrollbalken hinzu, wenn nötig */
+    max-height: 250px;
+    /* Begrenzt die Höhe der Liste */
+    overflow-y: auto;
+    /* Fügt einen Scrollbalken hinzu, wenn nötig */
     border-top: 1px solid #eee;
 }
 
@@ -1205,7 +1272,8 @@ input[type="checkbox"][style*="opacity: 1"] {
 }
 
 .location-results-list .favorite-toggle.is-favorite {
-    color: #f3d131; /* Gold für Favoriten */
+    color: #f3d131;
+    /* Gold für Favoriten */
 }
 
 .location-results-list .location-info {
@@ -1217,7 +1285,8 @@ input[type="checkbox"][style*="opacity: 1"] {
 .location-item-buttons {
     display: flex;
     align-items: center;
-    gap: 5px; /* Abstand zwischen den Buttons */
+    gap: 5px;
+    /* Abstand zwischen den Buttons */
 }
 
 .delete-location-btn {
@@ -1232,19 +1301,22 @@ input[type="checkbox"][style*="opacity: 1"] {
     min-height: 24px !important;
     padding: 0;
     cursor: pointer;
-    font-size: 20px; /* Leicht vergrößert für bessere Sichtbarkeit */
+    font-size: 20px;
+    /* Leicht vergrößert für bessere Sichtbarkeit */
     font-weight: bold;
-    
+
     /* Perfekte Zentrierung des '×' */
     display: flex;
     align-items: center;
     justify-content: center;
     line-height: 1;
-    box-sizing: border-box !important; /* Verhindert, dass Padding/Border die Größe beeinflusst */
+    box-sizing: border-box !important;
+    /* Verhindert, dass Padding/Border die Größe beeinflusst */
 }
 
 .delete-location-btn:hover {
-    background-color: #fee; /* Etwas dezenter als das vorherige Rot */
+    background-color: #fee;
+    /* Etwas dezenter als das vorherige Rot */
     color: #d63031;
     border-color: #d63031;
 }
@@ -1279,11 +1351,12 @@ input[type="checkbox"][style*="opacity: 1"] {
 
     body {
         flex-direction: column;
+        overflow-y: auto; 
     }
 
     #slider-container {
         width: 90%;
-        top: 10px;
+        top: calc(10px + env(safe-area-inset-top));
         left: 50%;
         transform: translateX(-50%);
     }
@@ -1342,25 +1415,30 @@ input[type="checkbox"][style*="opacity: 1"] {
 
     .button-wrapper {
         flex-direction: column;
-        gap: 8px; /* Reduced gap for mobile */
+        gap: 8px;
+        /* Reduced gap for mobile */
     }
 
     #resetButton,
     #clearCacheButton {
-        width: 100%; /* Full width on mobile */
+        width: 100%;
+        /* Full width on mobile */
     }
 
     @media (max-width: 768px) {
         .leaflet-bottom .leaflet-control-scale {
-            margin-bottom: 30px; /* Ensure enough space above attribution */
+            margin-bottom: 30px;
+            /* Ensure enough space above attribution */
             margin-left: 5px;
         }
-    
+
         .leaflet-bottom .leaflet-control-attribution {
             margin-bottom: 5px;
             margin-right: 5px;
-            margin-left: auto; /* Push to the right */
-            max-width: 60%; /* Slightly wider on mobile, but still wraps */
+            margin-left: auto;
+            /* Push to the right */
+            max-width: 60%;
+            /* Slightly wider on mobile, but still wraps */
             box-sizing: border-box;
         }
     }
@@ -1374,7 +1452,7 @@ input[type="checkbox"][style*="opacity: 1"] {
     }
 
     #slider-container {
-        top: 40px;
+        top: calc(40px + env(safe-area-inset-top));
         padding: 8px;
         max-width: 90%;
     }
@@ -1506,7 +1584,7 @@ input[type="checkbox"][style*="opacity: 1"] {
     }
 
     #slider-container {
-        top: 35px;
+        top: calc(35px + env(safe-area-inset-top));
         width: 90%;
         padding: 5px;
     }
