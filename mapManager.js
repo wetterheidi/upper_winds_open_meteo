@@ -726,9 +726,9 @@ export function createCutAwayMarker(lat, lng) {
         iconSize: [25, 25],
         iconAnchor: [12, 12],
         popupAnchor: [0, -12],
-        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-        shadowSize: [41, 41],
-        shadowAnchor: [13, 41]
+        //shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+        //shadowSize: [41, 41],
+        //shadowAnchor: [13, 41]
     });
     return L.marker([lat, lng], {
         icon: cutAwayIcon,
@@ -949,8 +949,8 @@ export function createCustomMarker(lat, lng) {
     const customIcon = L.icon({
         iconUrl: ICON_URLS.DEFAULT_MARKER,
         iconSize: [32, 32], iconAnchor: [16, 32], popupAnchor: [0, -32],
-        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-        shadowSize: [41, 41], shadowAnchor: [13, 32]
+        //shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+        //shadowSize: [41, 41], shadowAnchor: [13, 32]
     });
     return L.marker([lat, lng], { icon: customIcon, draggable: true });
 }
