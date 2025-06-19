@@ -159,7 +159,6 @@ html {
 
 .hamburger-menu {
     position: fixed;
-    /* KORREKTUR: Berücksichtigt den Abstand zur Statusleiste auf mobilen Geräten */
     top: calc(5px + env(safe-area-inset-top));
     left: calc(5px + env(safe-area-inset-left));
     /* Bonus: Berücksichtigt auch seitliche Aussparungen */
