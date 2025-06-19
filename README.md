@@ -1,4 +1,4 @@
-# Upper Winds - OpenMeteo & Skydive Planner
+# DZMaster - OpenMeteo & Skydive Planner
 
 A web application for visualizing upper-level winds and atmospheric data on interactive maps, powered by the Open-Meteo API. The application includes advanced features for skydive planning, including landing pattern visualization, jump trajectory calculation, and live tracking.
 
