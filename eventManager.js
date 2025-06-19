@@ -24,6 +24,7 @@ import { getSliderValue } from './ui.js';
 import * as AutoupdateManager from './autoupdateManager.js';
 import 'leaflet-gpx';
 
+let listenersInitialized = false; 
 
 function dispatchAppEvent(eventName, detail = {}) {
     console.log(`[EventManager] Dispatching event: ${eventName}`, detail);
@@ -1608,6 +1609,9 @@ function setupCacheSettings() {
 
 // HAUPT-INITIALISIERUNGSFUNKTION
 export function initializeEventListeners() {
+    if (listenersInitialized) {
+        return; // Bricht die Funktion sofort ab, wenn sie schon einmal lief
+    }
     console.log("Initializing all UI event listeners...");
     setupMenuEvents();
     setupCheckboxEvents();
@@ -1626,4 +1630,7 @@ export function initializeEventListeners() {
     setupResetCutAwayMarkerButton();
     setupCacheManagement();
     setupCacheSettings();
+     listenersInitialized = true;
+    console.log("Event listeners initialized successfully (first and only time).");
+       
 }
