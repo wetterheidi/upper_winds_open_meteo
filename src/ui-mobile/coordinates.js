@@ -2,9 +2,9 @@
 
 "use strict";
 
-import { Utils } from './utils.js';
+import { Utils } from '../core/utils.js';
 import * as mgrs from 'mgrs';
-import { AppState } from './state.js';
+import { AppState } from '../core/state.js';
 
 
 let isAddingFavorite = false; // Sperrvariable, um doppelte Aufrufe zu verhindern

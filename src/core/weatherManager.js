@@ -1,9 +1,9 @@
 import { AppState } from './state.js';
 import { Utils } from './utils.js';
 import { Settings, getInterpolationStep } from './settings.js';
-import { displayError } from './ui.js';
+import { displayError } from '../ui-web/ui.js';
 import { WEATHER_MODELS } from './constants.js';
-import { updateModelSelectUI, updateEnsembleModelUI, cleanupSelectedEnsembleModels } from './ui.js';
+import { updateModelSelectUI, updateEnsembleModelUI, cleanupSelectedEnsembleModels } from '../ui-web/ui.js';
 import { DateTime } from 'luxon';
 import { API_URLS, STANDARD_PRESSURE_LEVELS } from './constants.js';
 

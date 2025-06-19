@@ -1,8 +1,8 @@
 // ui.js
-import { Utils } from './utils.js';
-import { Settings } from './settings.js';
-import { fetchEnsembleWeatherData } from './ensembleManager.js';
-import { UI_DEFAULTS } from './constants.js';
+import { Utils } from '../core/utils.js';
+import { Settings } from '../core/settings.js';
+import { fetchEnsembleWeatherData } from '../core/ensembleManager.js';
+import { UI_DEFAULTS } from '../core/constants.js';
 
 export function isMobileDevice() {
     const isMobile = window.innerWidth < UI_DEFAULTS.MOBILE_BREAKPOINT_PX;

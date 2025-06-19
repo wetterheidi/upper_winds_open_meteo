@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>DZMaster</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="/vendor/Leaflet.PolylineMeasure.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js" defer></script>
+    <script src="/vendor/Leaflet.PolylineMeasure.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-gpx/1.7.0/gpx.min.js" defer></script>
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js" defer></script>
+    <script src="https://unpkg.com/leaflet-rotatedmarker@0.2.0/leaflet.rotatedMarker.js" defer></script>
+    
+    <link rel="stylesheet" href="/src/ui-web/styles.css">
+
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/x-icon" href="/icon-48.png">
+</head>
+
+<body>
+    <div id="map" aria-label="Interactive map for selecting weather location"></div>
+    <div id="coords">Move mouse over map</div>
+    <div class="hamburger-menu">
+        <button id="hamburgerBtn" aria-label="Open menu">☰</button>
+        <ul id="menu" class="menu hidden">
+            <li>
+                <label class="radio-label">
+                    <input type="checkbox" id="showTableCheckbox" name="showTable"> Show Wind Table
+                </label>
+            </li>
+            <li>
+                <span>Settings</span>
+                <ul class="submenu hidden">
+                    <li>
+                        <span>Reference Level</span>
+                        <ul class="submenu hidden">
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="refLevel" value="AGL" checked> AGL
+                                </label>
+                            </li>
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="refLevel" value="AMSL"> AMSL
+                                </label>
+                            </li>
+                        </ul>
+                    </li>
+                    <li>
+                        <span>Height Unit</span>
+                        <ul class="submenu hidden">
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="heightUnit" value="m" checked> m
+                                </label>
+                            </li>
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="heightUnit" value="ft"> ft
+                                </label>
+                            </li>
+                        </ul>
+                    </li>
+                    <li>
+                        <span>Temperature Unit</span>
+                        <ul class="submenu hidden">
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="temperatureUnit" value="C" checked> C
+                                </label>
+                            </li>
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="temperatureUnit" value="F"> F
+                                </label>
+                            </li>
+                        </ul>
+                    </li>
+                    <li>
+                        <span>Speed Unit</span>
+                        <ul class="submenu hidden">
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="windUnit" value="kt" checked> kt
+                                </label>
+                            </li>
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="windUnit" value="km/h"> km/h
+                                </label>
+                            </li>
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="windUnit" value="m/s"> m/s
+                                </label>
+                            </li>
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="windUnit" value="mph"> mph
+                                </label>
+                            </li>
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="windUnit" value="bft"> bft
+                                </label>
+                            </li>
+                        </ul>
+                    </li>
+                    <li>
+                        <span>Time Zone</span>
+                        <ul class="submenu hidden">
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="timeZone" value="Z" checked> Z
+                                </label>
+                            </li>
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="timeZone" value="loc"> loc
+                                </label>
+                            </li>
+                        </ul>
+                    </li>
+                    <li>
+                        <span>Coordinate Format</span>
+                        <ul class="submenu hidden">
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="coordFormat" value="Decimal" checked> Decimal Degrees
+                                </label>
+                            </li>
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="coordFormat" value="DMS"> Degrees Minutes Seconds
+                                </label>
+                            </li>
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="coordFormat" value="MGRS"> MGRS
+                                </label>
+                            </li>
+                        </ul>
+                    </li>
+                    <li>
+                        <span>Download Format</span>
+                        <ul class="submenu hidden">
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="downloadFormat" value="HEIDIS" checked> HEIDIS
+                                </label>
+                            </li>
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="downloadFormat" value="ATAK"> ATAK
+                                </label>
+                            </li>
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="downloadFormat" value="Windwatch"> Windwatch
+                                </label>
+                            </li>
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="downloadFormat" value="Customized"> Customized
+                                </label>
+                            </li>
+                        </ul>
+                    </li>
+                    <li>
+                        <span>Cache Settings</span>
+                        <ul class="submenu hidden">
+                            <li>
+                                <label class="radio-label cache-setting-label">
+                                    Cache Radius (km):
+                                    <select id="cacheRadiusSelect" class="cache-setting-select">
+                                        <option value="5" selected>5 km</option>
+                                        <option value="10">10 km</option>
+                                        <option value="15">15 km</option>
+                                    </select>
+                                </label>
+                            </li>
+                            <li>
+                                <label class="radio-label cache-setting-label">
+                                    Zoom Levels:
+                                    <select id="cacheZoomLevelsSelect" class="cache-setting-select">
+                                        <option value="10-14">10–14</option>
+                                        <option value="11-14" selected>11–14</option>
+                                        <option value="12-15">12–15</option>
+                                    </select>
+                                </label>
+                            </li>
+                            <li>
+                                <button id="recacheNowButton">Recache Now</button>
+                            </li>
+                        </ul>
+                    </li>
+                    <li>
+                        <span>Historical Date</span>
+                        <ul class="submenu hidden">
+                            <li>
+                                <label class="radio-label">
+                                    Select Date:
+                                    <input type="date" id="historicalDatePicker" min="2022-01-01">
+                            <li>
+                                <button id="clearHistoricalDate">Clear</button>
+                            </li>
+                            </label>
+                    </li>
+                </ul>
+            </li>
+        </ul>
+        </li>
+        <li>
+            <span>Search Location</span>
+            <ul class="submenu hidden" id="locationSearchSubmenu">
+                <li>
+                    <div class="search-container">
+                        <input type="text" id="locationSearchInput" placeholder="Look up location or city...">
+                        <button id="saveCurrentLocationBtn" title="Save As Favorite">★+</button>
+                    </div>
+                    <ul id="locationResults" class="location-results-list">
+                    </ul>
+                </li>
+            </ul>
+        </li>
+        <li>
+            <span>Track Upload</span>
+            <ul class="submenu hidden">
+                <li>
+                    <label class="radio-label" title="GPX or FlySight-CSV">
+                        Upload File:
+                        <input type="file" id="trackFileInput" accept=".gpx,.csv" style="margin-top: 5px;">
+                <li>
+                    <button id="clearTrack">Clear</button>
+                </li>
+                </label>
+        </li>
+        </ul>
+        </li>
+        <li>
+            <label class="radio-label">
+                <input type="checkbox" id="showLandingPattern" name="showLandingPattern"> Landing Pattern
+            </label>
+            <ul class="submenu hidden">
+                <li>
+                    <label class="radio-label">
+                        <input type="radio" name="landingDirection" value="LL" checked> LL
+                        <input type="number" id="customLandingDirectionLL" min="0" max="359" placeholder="0-359°">
+                        <label>°</label>
+                    </label>
+                </li>
+                <li>
+                    <label class="radio-label">
+                        <input type="radio" name="landingDirection" value="RR"> RR
+                        <input type="number" id="customLandingDirectionRR" min="0" max="359" placeholder="0-359°">
+                        <label>°</label>
+                    </label>
+                </li>
+                <li>
+                    <label class="radio-label">
+                        Start Downwind Leg at m AGL:
+                        <input type="number" id="legHeightDownwind" min="50" max="1000" step="50" value="300">
+                    </label>
+                </li>
+                <li>
+                    <label class="radio-label">
+                        Start Base Leg at m AGL:
+                        <input type="number" id="legHeightBase" min="50" max="1000" step="50" value="200">
+                    </label>
+                </li>
+                <li>
+                    <label class="radio-label">
+                        Start Final Leg at m AGL:
+                        <input type="number" id="legHeightFinal" min="50" max="1000" step="50" value="100">
+                    </label>
+                </li>
+                <li>
+                    <label class="radio-label" title="Expert: 28 kt, Advanced: 22 kt, Student: 18 kt">
+                        Canopy Speed (kt):
+                        <input type="number" id="canopySpeed" min="5" max="50" step="1" value="20">
+                    </label>
+                </li>
+                <li>
+                    <label class="radio-label" title="Expert: 8 m/s, Advanced: 5 m/s, Student: 4 m/s">
+                        Descent Rate (m/s):
+                        <input type="number" id="descentRate" min="1" max="10" step="0.1" value="3.5">
+                    </label>
+                </li>
+            </ul>
+        </li>
+        <li>
+            <span class="menu-label">Calculate Jump</span>
+            <ul class="submenu hidden">
+                <li>
+                    <label class="radio-label">
+                        Exit Altitude (m AGL):
+                        <input type="number" id="exitAltitude" min="500" max="15000" step="100" value="3000">
+                    </label>
+                </li>
+                <li>
+                    <label class="radio-label" title="Canopy open 200 m below opening altitude!">
+                        Opening Altitude (m AGL):
+                        <input type="number" id="openingAltitude" min="500" max="10000" step="100" value="1200">
+                    </label>
+                </li>
+                <li>
+                    <label class="radio-label">
+                        Aircraft Speed (ktIAS):
+                        <input type="number" id="aircraftSpeedKt" min="10" max="150" step="5" value="90">
+                    </label>
+                </li>
+                <li>
+                    <label class="radio-label">
+                        Number Of Jumpers:
+                        <input type="number" id="numberOfJumpers" min="1" max="50" step="1" value="5">
+                    </label>
+                </li>
+                <li>
+                    <label class="radio-label">
+                        Separation (s):
+                        <input type="number" id="jumperSeparation" min="1" max="50" step="1" value="5">
+                    </label>
+                </li>
+                <li>
+                    <label class="radio-label">
+                        <input type="checkbox" id="showJumpRunTrack" /> Show Jump Run Track:
+                        <input type="number" id="jumpRunTrackDirection" min="0" max="359" step="1"
+                            placeholder="Calculated">
+                        <label>°</label>
+                    </label>
+                </li>
+                <li>
+                    <label class="radio-label">
+                        Jump Run Offset (m):
+                        <input type="number" id="jumpRunTrackOffset" min="-50000" max="50000" step="100" value="0"
+                            style="width: 80px;">
+                    </label>
+                </li>
+                <li>
+                    <label class="radio-label">
+                        Jump Run Forward Offset (m):
+                        <input type="number" id="jumpRunTrackForwardOffset" min="-50000" max="50000" step="100"
+                            value="0" style="width: 80px;">
+                    </label>
+                </li>
+                <li>
+                    <label class="radio-label">
+                        <input type="checkbox" id="showExitAreaCheckbox"> Show Exit Area </label>
+                </li>
+                <li>
+                    <label class="radio-label">
+                        <input type="checkbox" id="showCanopyAreaCheckbox"> Show Canopy Flight Area </label>
+                </li>
+                <li>
+                    <label class="radio-label">
+                        <input type="checkbox" id="showCutAwayFinder" name="showCutAwayFinder"> Show Cut Away Finder
+                    </label>
+                    <ul class="submenu hidden">
+                        <li>
+                            <label class="radio-label">
+                                Cut Away Altitude (m):
+                                <input type="number" id="cutAwayAltitude" min="400" max="15000" step="100" value="1000">
+                            </label>
+                        </li>
+                        <li>
+                            <label class="radio-label">
+                                <input type="radio" name="cutAwayState" value="Collapsed"> Fully Collapsed
+                            </label>
+                        </li>
+                        <li>
+                            <label class="radio-label">
+                                <input type="radio" name="cutAwayState" value="Partially" checked> Partially Collapsed
+                            </label>
+                        </li>
+                        <li>
+                            <label class="radio-label">
+                                <input type="radio" name="cutAwayState" value="Open"> Fully Open
+                            </label>
+                        </li>
+                        <li>
+                            <button id="resetCutAwayMarker">Reset Cut-Away Marker</button>
+                        </li>
+                    </ul>
+                </li>
+            </ul>
+        </li>
+        <li>
+            <span>Jump Master</span>
+            <ul class="submenu hidden">
+                <li>
+                    <button id="placeHarpButton">Place HARP</button>
+                    <button id="clearHarpButton">Clear HARP</button>
+                </li>
+                <li>
+                    <label class="radio-label">
+                        <input type="checkbox" id="trackPositionCheckbox" name="trackPosition"> Start Live Tracking
+                    </label>
+                </li>
+                <li>
+                    <label class="radio-label">
+                        <input type="checkbox" id="showJumpMasterLine" name="showJumpMasterLine"> Show Jump Master Line
+                        To
+                    </label>
+                    <ul class="submenu hidden">
+                        <li>
+                            <label class="radio-label">
+                                <input type="radio" name="jumpMasterLineTarget" value="DIP" checked> DIP
+                            </label>
+                        </li>
+                        <li>
+                            <label class="radio-label">
+                                <input type="radio" name="jumpMasterLineTarget" value="HARP"> HARP
+                            </label>
+                        </li>
+                    </ul>
+                </li>
+            </ul>
+        </li>
+        <li>
+            <span>Ensemble</span>
+            <ul class="submenu hidden">
+                <li>
+                    <span>Models</span>
+                    <ul class="submenu hidden" id="ensembleModelsSubmenu">
+                    </ul>
+                </li>
+                <li>
+                    <span>Scenarios</span>
+                    <ul class="submenu hidden" id="ensembleScenariosSubmenu">
+                        <li>
+                            <label class="radio-label">
+                                <input type="radio" name="ensembleScenario" value="all_models" checked> All Selected
+                                Models
+                            </label>
+                        </li>
+                        <li>
+                            <label class="radio-label">
+                                <input type="radio" name="ensembleScenario" value="heatmap"> Heatmap
+                            </label>
+                        </li>
+                        <li>
+                            <label class="radio-label">
+                                <input type="radio" name="ensembleScenario" value="min_wind"> Minimum Wind
+                            </label>
+                        </li>
+                        <li>
+                            <label class="radio-label">
+                                <input type="radio" name="ensembleScenario" value="mean_wind"> Mean Wind
+                            </label>
+                        </li>
+                        <li>
+                            <label class="radio-label">
+                                <input type="radio" name="ensembleScenario" value="max_wind"> Maximum Wind
+                            </label>
+                        </li>
+                    </ul>
+                </li>
+            </ul>
+        </li>
+        </ul>
+    </div>
+    <div id="slider-container">
+        <div class="time-row">
+            <span id="selectedTime">Selected Time: </span>
+            <div id="autoupdateToggle">
+                <label for="autoupdateCheckbox" title="Autoupdate">⟳</label>
+                <input type="checkbox" id="autoupdateCheckbox">
+            </div>
+        </div>
+        <input type="range" id="timeSlider" min="0" max="167" value="0" disabled>
+        <div id="model-row">
+            <label id="modelLabel" for="modelSelect" title="Model Run">Forecast Model:</label>
+            <select id="modelSelect">
+                <option value="icon_global" selected>ICON GLOBAL</option>
+                <option value="gfs">GFS</option>
+                <option value="ecmwf">ECMWF</option>
+            </select>
+        </div>
+        <div id="modelInfoPopup"></div>
+    </div>
+    <div id="loading">
+        <div class="spinner"></div>
+        <p>Fetching Weather...</p>
+    </div>
+    <div id="bottom-container">
+        <div id="meanWindControls">
+            <label for="lowerLimit" title="Lower altitude for mean wind calculation">Lower Limit (m):</label>
+            <input type="number" id="lowerLimit" min="0" step="100" value="0">
+            <label for="upperLimit" title="Upper altitude for mean wind calculation">Upper Limit (m):</label>
+            <input type="number" id="upperLimit" min="0" step="100" value="3000">
+            <div id="meanWindResult"></div>
+        </div>
+        <div id="controls-row">
+            <label for="interpStepSelect"
+                title="Select the altitude interval for weather data interpolation">Step:</label>
+            <select id="interpStepSelect" aria-label="Interpolation step interval">
+                <option value="100">100</option>
+                <option value="200" selected>200</option>
+                <option value="500">500</option>
+                <option value="1000">1000</option>
+                <option value="2000">2000</option>
+            </select>
+            <button id="downloadButton">Download Table</button>
+            <div id="info">Click on the map to fetch weather data.</div>
+            <div class="spinner"></div>
+        </div>
+    </div>
+    </div>
+    <div id="passwordModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3 id="modalHeader">Restricted Feature</h3>
+            <p id="modalMessage">Please enter the password to enable this feature:</p>
+            <input type="password" id="passwordInput" placeholder="Password">
+            <div class="modal-buttons">
+                <button id="passwordSubmit">Submit</button>
+                <button id="passwordCancel">Cancel</button>
+            </div>
+            <p id="passwordError" style="color: red; display: none;">Incorrect password!</p>
+        </div>
+    </div>
+
+    <script type="module" src="/src/ui-web/main-web.js" defer></script>
+</body>
+
+</html>

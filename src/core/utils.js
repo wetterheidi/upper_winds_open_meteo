@@ -1,4 +1,4 @@
-import { displayError } from './ui.js';
+import { displayError } from '../ui-web/ui.js';
 import { DateTime } from 'luxon';
 import * as mgrs from 'mgrs';
 import { AppState } from './state.js';

@@ -4,7 +4,7 @@
 import { AppState } from './state.js';
 import { Settings } from './settings.js';
 import { Utils } from './utils.js';
-import { displayError, displayMessage } from './ui.js';
+import { displayError, displayMessage } from '../ui-web/ui.js';
 
 /**
  * Startet den Intervall-Timer für die automatische Aktualisierung.

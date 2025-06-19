@@ -1,17 +1,17 @@
 // == Project: Skydiving Weather and Jump Planner ==
 // == Constants and Global Variables ==
-import { AppState } from './state.js';
-import { Utils } from './utils.js';
-import { Settings, getInterpolationStep } from './settings.js';
-import { UI_DEFAULTS } from './constants.js';
+import { AppState } from '../core/state.js';
+import { Utils } from '../core/utils.js';
+import { Settings, getInterpolationStep } from '../core/settings.js';
+import { UI_DEFAULTS } from '../core/constants.js';
 import * as EventManager from './eventManager.js';
 import { displayMessage, displayError } from './ui.js';
 import * as Coordinates from './coordinates.js';
-import * as JumpPlanner from './jumpPlanner.js';
+import * as JumpPlanner from '../core/jumpPlanner.js';
 import * as mapManager from './mapManager.js';
-import * as weatherManager from './weatherManager.js';
+import * as weatherManager from '../core/weatherManager.js';
 import { getSliderValue } from './ui.js';
-import * as AutoupdateManager from './autoupdateManager.js';
+import * as AutoupdateManager from '../core/autoupdateManager.js';
 import { DateTime } from 'luxon';
 import * as displayManager from './displayManager.js';
 

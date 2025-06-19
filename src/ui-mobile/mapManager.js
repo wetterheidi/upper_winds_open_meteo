@@ -1,13 +1,13 @@
 // mapManager.js
 "use strict";
 
-import { AppState } from './state.js'; 
-import { Settings } from './settings.js';
-import { Utils } from './utils.js';
-import { TileCache } from './tileCache.js';
+import { AppState } from '../core/state.js'; 
+import { Settings } from '../core/settings.js';
+import { Utils } from '../core/utils.js';
+import { TileCache } from '../core/tileCache.js';
 import { updateOfflineIndicator } from './ui.js';
 //import './public/vendor/Leaflet.PolylineMeasure.js'; // Pfad ggf. anpassen
-import { UI_DEFAULTS, ICON_URLS, ENSEMBLE_VISUALIZATION}  from './constants.js'; // Importiere UI-Defaults
+import { UI_DEFAULTS, ICON_URLS, ENSEMBLE_VISUALIZATION}  from '../core/constants.js'; // Importiere UI-Defaults
 
 /**
  * Initialisiert die Leaflet-Karte und alle zugehörigen Komponenten.

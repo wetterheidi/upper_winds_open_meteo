@@ -3,7 +3,7 @@ import { AppState } from './state.js';
 import { Settings } from './settings.js';
 import { Utils } from './utils.js';
 import * as JumpPlanner from './jumpPlanner.js';
-import { getSliderValue } from './ui.js';
+import { getSliderValue } from '../ui-web/ui.js';
 import { interpolateWeatherData } from './weatherManager.js';
 import { DateTime } from 'luxon';
 import { ENSEMBLE_VISUALIZATION, API_URLS } from './constants.js';

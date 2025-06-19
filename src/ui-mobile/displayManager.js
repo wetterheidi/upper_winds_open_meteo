@@ -1,11 +1,11 @@
-import { AppState } from './state.js';
-import { Settings } from './settings.js';
-import { Utils } from './utils.js';
+import { AppState } from '../core/state.js';
+import { Settings } from '../core/settings.js';
+import { Utils } from '../core/utils.js';
 import { getSliderValue } from './ui.js';
 import * as mapManager from './mapManager.js';
-import * as weatherManager from './weatherManager.js';
-import { UI_DEFAULTS } from './constants.js'; // UI_DEFAULTS für LANDING_PATTERN_MIN_ZOOM
-import * as JumpPlanner from './jumpPlanner.js';
+import * as weatherManager from '../core/weatherManager.js';
+import { UI_DEFAULTS } from '../core/constants.js'; // UI_DEFAULTS für LANDING_PATTERN_MIN_ZOOM
+import * as JumpPlanner from '../core/jumpPlanner.js';
 
 
 /**

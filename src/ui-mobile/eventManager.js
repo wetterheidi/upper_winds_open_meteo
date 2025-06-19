@@ -1,27 +1,27 @@
 // eventManager.js
 "use strict";
 
-import { AppState } from './state.js';
-import { Settings } from './settings.js';
-import { Utils } from './utils.js';
-import { updateUIState } from './app.js';
+import { AppState } from '../core/state.js';
+import { Settings } from '../core/settings.js';
+import { Utils } from '../core/utils.js';
+import { updateUIState } from '../ui-web/main-web.js';
 import {
     updateAllDisplays, calculateJump, updateUIWithNewWeatherData,
     downloadTableAsAscii, calculateMeanWind, calculateJumpRunTrack,
     debouncedGetElevationAndQFE, getDownloadFormat, updateJumpMasterLineAndPanel,
     validateLegHeights, debouncedCalculateJump, applySettingToInput, setInputValueSilently
-} from './app.js';
+} from '../ui-web/main-web.js';
 import * as displayManager from './displayManager.js';
 import * as mapManager from './mapManager.js';
 import * as Coordinates from './coordinates.js';
-import * as JumpPlanner from './jumpPlanner.js';
-import { TileCache, cacheTilesForDIP } from './tileCache.js';
-import { loadGpxTrack, loadCsvTrackUTC } from './trackManager.js';
-import * as weatherManager from './weatherManager.js';
-import * as liveTrackingManager from './liveTrackingManager.js';
-import { fetchEnsembleWeatherData, processAndVisualizeEnsemble, clearEnsembleVisualizations } from './ensembleManager.js';
+import * as JumpPlanner from '../core/jumpPlanner.js';
+import { TileCache, cacheTilesForDIP } from '../core/tileCache.js';
+import { loadGpxTrack, loadCsvTrackUTC } from '../core/trackManager.js';
+import * as weatherManager from '../core/weatherManager.js';
+import * as liveTrackingManager from '../core/liveTrackingManager.js';
+import { fetchEnsembleWeatherData, processAndVisualizeEnsemble, clearEnsembleVisualizations } from '../core/ensembleManager.js';
 import { getSliderValue } from './ui.js';
-import * as AutoupdateManager from './autoupdateManager.js';
+import * as AutoupdateManager from '../core/autoupdateManager.js';
 import 'leaflet-gpx';
 
 let listenersInitialized = false; 
