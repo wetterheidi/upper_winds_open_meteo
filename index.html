@@ -5,10 +5,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Upper Winds</title>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet"> <link rel="stylesheet" href="https://ppete2.github.io/Leaflet.PolylineMeasure/Leaflet.PolylineMeasure.css" /> 
-    <link rel="icon" type="image/x-icon" href="icon-48.png">
-  <script type="module" crossorigin src="/upper_winds_open_meteo/assets/index-CosIJo8B.js"></script>
-  <link rel="stylesheet" crossorigin href="/upper_winds_open_meteo/assets/index-B53S4UW3.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <link rel="stylesheet" href="/upper_winds_open_meteo/vendor/Leaflet.PolylineMeasure.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js" defer></script>
+    <script src="/upper_winds_open_meteo/vendor/Leaflet.PolylineMeasure.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-gpx/1.7.0/gpx.min.js" defer></script>
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js" defer></script>
+    <script src="https://unpkg.com/leaflet-rotatedmarker@0.2.0/leaflet.rotatedMarker.js" defer></script>
+
+
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/x-icon" href="/upper_winds_open_meteo/icon-48.png">
+  <script type="module" crossorigin src="/upper_winds_open_meteo/assets/index-DzgK_btn.js"></script>
+  <link rel="stylesheet" crossorigin href="/upper_winds_open_meteo/assets/index-OiDkl6MY.css">
 </head>
 
 <body>
@@ -204,7 +216,7 @@
             </li>
         </ul>
         </li>
-         <li>
+        <li>
             <span>Search Location</span>
             <ul class="submenu hidden" id="locationSearchSubmenu">
                 <li>
@@ -213,7 +225,7 @@
                         <button id="saveCurrentLocationBtn" title="Save As Favorite">★+</button>
                     </div>
                     <ul id="locationResults" class="location-results-list">
-                        </ul>
+                    </ul>
                 </li>
             </ul>
         </li>
@@ -346,7 +358,6 @@
                         <input type="checkbox" id="showCanopyAreaCheckbox"> Show Canopy Flight Area </label>
                 </li>
                 <li>
-                    <!--Cut away finder-->
                     <label class="radio-label">
                         <input type="checkbox" id="showCutAwayFinder" name="showCutAwayFinder"> Show Cut Away Finder
                     </label>
@@ -376,7 +387,6 @@
                             <button id="resetCutAwayMarker">Reset Cut-Away Marker</button>
                         </li>
                     </ul>
-                    <!--Cut away finder-->
                 </li>
             </ul>
         </li>
