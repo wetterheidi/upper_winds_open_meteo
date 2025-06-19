@@ -153,7 +153,7 @@ export const CACHE_DEFAULTS = {
 };
 
 export const ICON_URLS = {
-    DEFAULT_MARKER: './assets/favicon.ico',
+    DEFAULT_MARKER: './assets/icon-48.png',
     CUTAWAY_MARKER: './assets/schere_purple.png',
     AIRPLANE_MARKER: './assets/airplane_orange.png'
 };

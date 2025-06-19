@@ -2,8 +2,8 @@ import { defineConfig } from 'vite'
 import commonjs from '@rollup/plugin-commonjs' // Importiere das Plugin
 
 export default defineConfig({
-  //base: '/upper_winds_open_meteo/',
-  base: './', // Für mobilde Builds
+  base: '/upper_winds_open_meteo/',
+  //base: './', // Für mobilde Builds
   plugins: [
     commonjs(),
   ],
