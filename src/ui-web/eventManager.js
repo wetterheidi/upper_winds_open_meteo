@@ -24,7 +24,7 @@ import { getSliderValue } from './ui.js';
 import * as AutoupdateManager from '../core/autoupdateManager.js';
 import 'leaflet-gpx';
 
-let listenersInitialized = false; 
+let listenersInitialized = false;
 
 function dispatchAppEvent(eventName, detail = {}) {
     console.log(`[EventManager] Dispatching event: ${eventName}`, detail);
@@ -551,12 +551,14 @@ function setupModelSelectEvents() {
         Settings.save();
 
         if (AppState.lastLat && AppState.lastLng) {
-            const currentIndex = getSliderValue();
-            const currentTime = AppState.weatherData?.time?.[currentIndex] || null;
+            // Speichern Sie den aktuellen Index, bevor neue Daten geholt werden.
+            const timeIndexToPreserve = getSliderValue();
+            const currentTime = AppState.weatherData?.time?.[timeIndexToPreserve] || null;
 
             const newWeatherData = await weatherManager.fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, currentTime);
             if (newWeatherData) {
-                await updateUIWithNewWeatherData(newWeatherData);
+                // Geben Sie den gespeicherten Index an die Update-Funktion weiter.
+                await updateUIWithNewWeatherData(newWeatherData, timeIndexToPreserve);
             }
 
         } else {
@@ -1630,7 +1632,7 @@ export function initializeEventListeners() {
     setupResetCutAwayMarkerButton();
     setupCacheManagement();
     setupCacheSettings();
-     listenersInitialized = true;
+    listenersInitialized = true;
     console.log("Event listeners initialized successfully (first and only time).");
-       
+
 }

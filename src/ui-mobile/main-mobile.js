@@ -768,41 +768,45 @@ export function updateUIState() {
  * basierend auf neu geladenen Wetterdaten.
  * @param {object} newWeatherData Die neu von der API abgerufenen Wetterdaten.
  */
-export async function updateUIWithNewWeatherData(newWeatherData) {
+export async function updateUIWithNewWeatherData(newWeatherData, preservedIndex = null) {
     AppState.weatherData = newWeatherData;
     const slider = document.getElementById('timeSlider');
 
     if (!slider) return;
 
-    // Hilfsfunktion, um den letzten gültigen Index zu finden
+    // ... (Logik für lastValidIndex bleibt unverändert) ...
     const findLastValidDataIndex = (weatherData) => {
-        // Wir nutzen temperature_2m als repräsentatives Array
         const dataArray = weatherData?.temperature_2m;
         if (!dataArray || dataArray.length === 0) return 0;
         for (let i = dataArray.length - 1; i >= 0; i--) {
             if (dataArray[i] !== null && dataArray[i] !== undefined) {
-                return i; // Das ist der letzte Index mit einem gültigen Wert
+                return i;
             }
         }
-        return 0; // Fallback, falls alle Werte null sind
+        return 0;
     };
 
     const lastValidIndex = findLastValidDataIndex(newWeatherData);
     slider.max = lastValidIndex;
     slider.disabled = slider.max <= 0;
 
-    const currentUtcHour = new Date().getUTCHours();
-
-    if (currentUtcHour <= lastValidIndex) {
-        slider.value = currentUtcHour;
+    // NEUE LOGIK:
+    // Wenn ein Index übergeben wurde und dieser gültig ist, verwenden wir ihn.
+    // Ansonsten verwenden wir das Standardverhalten (aktuelle Stunde).
+    if (preservedIndex !== null && preservedIndex <= lastValidIndex) {
+        slider.value = preservedIndex;
+        console.log(`Slider restored to preserved index: ${preservedIndex}`);
     } else {
-        slider.value = lastValidIndex;
+        const currentUtcHour = new Date().getUTCHours();
+        if (currentUtcHour <= lastValidIndex) {
+            slider.value = currentUtcHour;
+        } else {
+            slider.value = lastValidIndex;
+        }
+        console.log(`Slider set to default (current hour or max): ${slider.value}`);
     }
-    console.log(`Slider set to current UTC hour index: ${slider.value}`);
-
-    // FINALER FIX V3: Statt eines allgemeinen Events rufen wir nur die absolut
-    // notwendigen Funktionen für die Erst-Anzeige auf. Dies verhindert die
-    // Überladung, die das Menü blockiert hat.
+    
+    // ... (restliche Funktion bleibt unverändert)
     await displayManager.updateWeatherDisplay(slider.value);
     await displayManager.refreshMarkerPopup();
     if (AppState.lastAltitude !== 'N/A') {
@@ -1001,7 +1005,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             const newWeatherData = await weatherManager.fetchWeatherForLocation(lat, lng, currentTimeToPreserve);
 
             if (newWeatherData) {
-                await updateUIWithNewWeatherData(newWeatherData);
+                // NEUE LOGIK:
+                // Prüfen, ob das Event vom initialen Laden der Seite kommt.
+                const isInitialLoad = (source === 'geolocation' || source === 'geolocation_fallback');
+                
+                if (isInitialLoad) {
+                    // Beim initialen Laden den Zeit-Index NICHT übergeben, 
+                    // damit die Funktion die aktuelle Stunde verwendet.
+                    await updateUIWithNewWeatherData(newWeatherData);
+                } else {
+                    // Bei allen anderen Aktionen (Marker ziehen, Suche, etc.)
+                    // den eingestellten Zeit-Index beibehalten.
+                    await updateUIWithNewWeatherData(newWeatherData, sliderIndex);
+                }
             } else {
                 AppState.weatherData = null;
             }

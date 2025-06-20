@@ -551,12 +551,14 @@ function setupModelSelectEvents() {
         Settings.save();
 
         if (AppState.lastLat && AppState.lastLng) {
-            const currentIndex = getSliderValue();
-            const currentTime = AppState.weatherData?.time?.[currentIndex] || null;
+            // Speichern Sie den aktuellen Index, bevor neue Daten geholt werden.
+            const timeIndexToPreserve = getSliderValue(); 
+            const currentTime = AppState.weatherData?.time?.[timeIndexToPreserve] || null;
 
             const newWeatherData = await weatherManager.fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, currentTime);
             if (newWeatherData) {
-                await updateUIWithNewWeatherData(newWeatherData);
+                // Geben Sie den gespeicherten Index an die Update-Funktion weiter.
+                await updateUIWithNewWeatherData(newWeatherData, timeIndexToPreserve); 
             }
 
         } else {
