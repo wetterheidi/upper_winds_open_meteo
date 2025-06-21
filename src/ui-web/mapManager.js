@@ -9,6 +9,8 @@ import { updateOfflineIndicator } from './ui.js';
 //import './public/vendor/Leaflet.PolylineMeasure.js'; // Pfad ggf. anpassen
 import { UI_DEFAULTS, ICON_URLS, ENSEMBLE_VISUALIZATION}  from '../core/constants.js'; // Importiere UI-Defaults
 
+let lastTapTime = 0; // Add this line
+
 /**
  * Initialisiert die Leaflet-Karte und alle zugehörigen Komponenten.
  * Erstellt die Karteninstanz, richtet die Basiskarten (Tile-Layer),
@@ -507,6 +509,25 @@ function _setupCoreMapEventHandlers() {
     AppState.map.on('mousedown', (e) => {
         // console.log('Map mousedown event, target:', e.originalEvent.target);
     });
+
+    // --- START: Add Double-Tap/Touch Functionality ---
+    mapContainer.addEventListener('touchstart', async (e) => {
+        if (e.touches.length !== 1 || e.target.closest('.leaflet-marker-icon')) return; // Ignore Multi-Touch or taps on markers
+        const currentTime = new Date().getTime();
+        const timeSinceLastTap = currentTime - lastTapTime;
+        const tapThreshold = 300; // Milliseconds
+        if (timeSinceLastTap < tapThreshold && timeSinceLastTap > 0) {
+            e.preventDefault(); // Prevent default zoom on double-tap
+            const rect = mapContainer.getBoundingClientRect();
+            const touchX = e.touches[0].clientX - rect.left;
+            const touchY = e.touches[0].clientY - rect.top;
+            const latlng = AppState.map.containerPointToLatLng([touchX, touchY]);
+
+            await _handleMapDblClick({ latlng: latlng, containerPoint: L.point(touchX, touchY), layerPoint: AppState.map.latLngToLayerPoint(latlng) });
+        }
+        lastTapTime = currentTime; // Update the time of the last tap
+    }, { passive: false }); // passive: false is required to allow preventDefault
+    // --- END: Add Double-Tap/Touch Functionality ---
 
     console.log('All core map event handlers have been set up.');
 }
