@@ -969,7 +969,9 @@ export async function createOrUpdateMarker(lat, lng) {
 export function createCustomMarker(lat, lng) {
     const customIcon = L.icon({
         iconUrl: ICON_URLS.DEFAULT_MARKER,
-        iconSize: [32, 32], iconAnchor: [16, 32], popupAnchor: [0, -32],
+        iconSize: [32, 32], 
+        iconAnchor: [16, 20], 
+        popupAnchor: [0, -32],
         //shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
         //shadowSize: [41, 41], shadowAnchor: [13, 32]
     });
