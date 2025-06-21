@@ -240,9 +240,10 @@ export function updateLandingPatternDisplay() {
     const lng = markerLatLng.lng;
     const baseHeight = Math.round(AppState.lastAltitude);
     const interpStep = getInterpolationStep(); // Wert in der UI-Schicht holen
+    const heightUnit = Settings.getValue('heightUnit', 'radio', 'm'); // Höheinheit aus den Einstellungen
     const interpolatedData = weatherManager.interpolateWeatherData(
         AppState.weatherData, // Das Haupt-Wetterdatenobjekt
-        index,
+        sliderIndex,
         interpStep,
         Math.round(AppState.lastAltitude),
         heightUnit
@@ -512,9 +513,10 @@ export function updateJumpRunTrackDisplay() {
     // Neuer Code:
     const sliderIndex = getSliderValue();
     const interpStep = getInterpolationStep(); // Wert in der UI-Schicht holen
+    const heightUnit = Settings.getValue('heightUnit', 'radio', 'm'); // Höheinheit aus den Einstellungen
     const interpolatedData = weatherManager.interpolateWeatherData(
         AppState.weatherData, // Das Haupt-Wetterdatenobjekt
-        index,
+        sliderIndex,
         interpStep,
         Math.round(AppState.lastAltitude),
         heightUnit

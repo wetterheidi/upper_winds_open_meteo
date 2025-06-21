@@ -886,6 +886,22 @@ export class Utils {
             console.log(message);
         }
     }
+
+    static validateLegHeights(final, base, downwind) {
+        const finalVal = parseInt(final.value) || 100;
+        const baseVal = parseInt(base.value) || 200;
+        const downwindVal = parseInt(downwind.value) || 300;
+
+        if (baseVal <= finalVal) {
+            Utils.handleError('Base leg must start higher than final leg.');
+            return false;
+        }
+        if (downwindVal <= baseVal) {
+            Utils.handleError('Downwind leg must start higher than base leg.');
+            return false;
+        }
+        return true;
+    }
 }
 
 window.Utils = Utils;
