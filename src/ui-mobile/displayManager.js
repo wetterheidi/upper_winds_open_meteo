@@ -22,20 +22,40 @@ export async function refreshMarkerPopup() {
     const lat = AppState.lastLat;
     const lng = AppState.lastLng;
     const altitude = AppState.lastAltitude;
+
+    // NEU: Die aktuell ausgewählte Höheneinheit abfragen
+    const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
+
+    // NEU: Höhe und Einheit für die Anzeige vorbereiten
+    let displayAltitude = 'N/A';
+    let displayUnit = '';
+
+    if (altitude !== 'N/A') {
+        if (heightUnit === 'ft') {
+            displayAltitude = Math.round(Utils.convertHeight(altitude, 'ft'));
+            displayUnit = 'ft';
+        } else {
+            displayAltitude = altitude; // bleibt in Metern
+            displayUnit = 'm';
+        }
+    }
+
     const coordFormat = Settings.getValue('coordFormat', 'radio', 'Decimal');
     const sliderIndex = getSliderValue();
 
     const coords = Utils.convertCoords(lat, lng, coordFormat);
 
+
+
     let popupContent;
     if (coordFormat === 'MGRS') {
-        popupContent = `MGRS: ${coords.lat}<br>Alt: ${altitude} m`;
+        popupContent = `MGRS: ${coords.lat}<br>Alt: ${displayAltitude} ${displayUnit}`;
     } else {
         const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
         if (coordFormat === 'DMS') {
-            popupContent = `Lat: ${formatDMS(Utils.decimalToDms(lat, true))}<br>Lng: ${formatDMS(Utils.decimalToDms(lng, false))}<br>Alt: ${altitude} m`;
+            popupContent = `Lat: ${formatDMS(Utils.decimalToDms(lat, true))}<br>Lng: ${formatDMS(Utils.decimalToDms(lng, false))}<br>Alt: ${displayAltitude} ${displayUnit}`;
         } else {
-            popupContent = `Lat: ${lat.toFixed(5)}<br>Lng: ${lng.toFixed(5)}<br>Alt: ${altitude} m`;
+            popupContent = `Lat: ${lat.toFixed(5)}<br>Lng: ${lng.toFixed(5)}<br>Alt: ${displayAltitude} ${displayUnit}`;
         }
     }
 
@@ -189,7 +209,7 @@ export async function updateWeatherDisplay(index, originalTime = null) {
  */
 export function updateLandingPatternDisplay() {
 
-   // 1. Prüft, ob der Marker existiert UND ob es ein valides Objekt mit der getLatLng-Methode ist.
+    // 1. Prüft, ob der Marker existiert UND ob es ein valides Objekt mit der getLatLng-Methode ist.
     if (!AppState.currentMarker || typeof AppState.currentMarker.getLatLng !== 'function') {
         console.warn("Landing pattern update skipped: AppState.currentMarker is not a valid marker object yet.", AppState.currentMarker);
         return;
@@ -240,9 +260,10 @@ export function updateLandingPatternDisplay() {
     const lng = markerLatLng.lng;
     const baseHeight = Math.round(AppState.lastAltitude);
     const interpStep = getInterpolationStep(); // Wert in der UI-Schicht holen
+    const heightUnit = Settings.getValue('heightUnit', 'radio', 'm'); // Höheinheit aus den Einstellungen
     const interpolatedData = weatherManager.interpolateWeatherData(
         AppState.weatherData, // Das Haupt-Wetterdatenobjekt
-        index,
+        sliderIndex,
         interpStep,
         Math.round(AppState.lastAltitude),
         heightUnit
@@ -512,9 +533,10 @@ export function updateJumpRunTrackDisplay() {
     // Neuer Code:
     const sliderIndex = getSliderValue();
     const interpStep = getInterpolationStep(); // Wert in der UI-Schicht holen
+    const heightUnit = Settings.getValue('heightUnit', 'radio', 'm'); // Höheinheit aus den Einstellungen
     const interpolatedData = weatherManager.interpolateWeatherData(
         AppState.weatherData, // Das Haupt-Wetterdatenobjekt
-        index,
+        sliderIndex,
         interpStep,
         Math.round(AppState.lastAltitude),
         heightUnit

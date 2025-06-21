@@ -528,7 +528,7 @@ function _setupCoreMapEventHandlers() {
         lastTapTime = currentTime; // Update the time of the last tap
     }, { passive: false }); // passive: false is required to allow preventDefault
     // --- END: Add Double-Tap/Touch Functionality ---
-
+    
     console.log('All core map event handlers have been set up.');
 }
 

@@ -14,7 +14,13 @@ import { getSliderValue, displayError, displayMessage, displayProgress, hideProg
 import * as AutoupdateManager from '../core/autoupdateManager.js';
 import { DateTime } from 'luxon';
 import * as displayManager from './displayManager.js';
+import * as liveTrackingManager from '../core/liveTrackingManager.js'; // <-- DIESE ZEILE HINZUFÜGEN
 
+
+export const getTemperatureUnit = () => Settings.getValue('temperatureUnit', 'radio', 'C');
+export const getHeightUnit = () => Settings.getValue('heightUnit', 'radio', 'm');
+export const getWindSpeedUnit = () => Settings.getValue('windUnit', 'radio', 'kt');
+export const getCoordinateFormat = () => Settings.getValue('coordFormat', 'radio', 'Decimal');
 
 
 "use strict";
@@ -22,7 +28,7 @@ import * as displayManager from './displayManager.js';
 export const debouncedCalculateJump = Utils.debounce(calculateJump, 300);
 export const getDownloadFormat = () => Settings.getValue('downloadFormat', 'radio', 'csv');
 
-// == Tile caching ==   s
+// == Tile caching ==
 Utils.setErrorHandler(displayError);
 Utils.setMessageHandler(displayMessage);
 Utils.handleMessage = displayMessage;
@@ -96,24 +102,26 @@ export const debouncedGetElevationAndQFE = Utils.debounce(async (lat, lng, reque
  */
 export function calculateMeanWind() {
     console.log('Calculating mean wind with model:', document.getElementById('modelSelect').value, 'weatherData:', AppState.weatherData);
+
+    // KORREKTUR: Deklarationen an den Anfang der Funktion verschoben
+    const refLevel = document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL';
+    const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
+    const windSpeedUnit = Settings.getValue('windUnit', 'radio', 'kt');
+
     const index = document.getElementById('timeSlider').value || 0;
-    const interpStep = getInterpolationStep(); // Wert in der UI-Schicht holen
     const interpolatedData = weatherManager.interpolateWeatherData(
-        AppState.weatherData, // Das Haupt-Wetterdatenobjekt
+        AppState.weatherData,
         index,
-        interpStep,
+        getInterpolationStep(),
         Math.round(AppState.lastAltitude),
         heightUnit
     );
     let lowerLimitInput = parseFloat(document.getElementById('lowerLimit').value) || 0;
     let upperLimitInput = parseFloat(document.getElementById('upperLimit').value);
-    const refLevel = document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL';
-    const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
-    const windSpeedUnit = Settings.getValue('windUnit', 'radio', 'kt');
     const baseHeight = Math.round(AppState.lastAltitude);
 
     if (!AppState.weatherData || AppState.lastAltitude === 'N/A') {
-        handleError('Cannot calculate mean wind: missing data or altitude');
+        Utils.handleError('Cannot calculate mean wind: missing data or altitude');
         return;
     }
 
@@ -121,8 +129,8 @@ export function calculateMeanWind() {
     lowerLimitInput = heightUnit === 'ft' ? lowerLimitInput / 3.28084 : lowerLimitInput;
     upperLimitInput = heightUnit === 'ft' ? upperLimitInput / 3.28084 : upperLimitInput;
 
-    const lowerLimit = refLevel === 'AGL' ? lowerLimitInput + baseHeight : lowerLimitInput;
-    const upperLimit = refLevel === 'AGL' ? upperLimitInput + baseHeight : upperLimitInput;
+    let lowerLimit = refLevel === 'AGL' ? lowerLimitInput + baseHeight : lowerLimitInput;
+    let upperLimit = refLevel === 'AGL' ? upperLimitInput + baseHeight : upperLimitInput;
 
     if (isNaN(lowerLimitInput) || isNaN(upperLimitInput) || lowerLimitInput >= upperLimitInput) {
         Utils.handleError('Invalid layer limits. Ensure Lower < Upper and both are numbers.');
@@ -131,12 +139,29 @@ export function calculateMeanWind() {
 
     if (refLevel === 'AMSL' && upperLimit < baseHeight) {
         Utils.handleError(`The entire selected layer (${Math.round(Utils.convertHeight(lowerLimit, heightUnit))}-${Math.round(Utils.convertHeight(upperLimit, heightUnit))} ${heightUnit}) is below the terrain altitude of ${Math.round(Utils.convertHeight(baseHeight, heightUnit))} ${heightUnit}.`);
+
+        // NEU: Setze das Ergebnisfeld auf einen klaren Status
+        document.getElementById('meanWindResult').innerHTML = 'Mean wind: N/A (Layer is below ground)';
+
         return;
     }
 
     if (refLevel === 'AMSL' && lowerLimit < baseHeight) {
+        // Die Benachrichtigung bleibt erhalten
         Utils.handleMessage(`Note: Lower limit adjusted to terrain altitude (${Math.round(Utils.convertHeight(baseHeight, heightUnit))} ${heightUnit}) as it cannot be below ground level.`);
-        return;
+
+        // NEU: Berechne den korrigierten Wert in der aktuell angezeigten Einheit
+        const correctedLowerLimit = Math.round(Utils.convertHeight(baseHeight, heightUnit));
+
+        // NEU: Aktualisiere das Input-Feld in der UI
+        applySettingToInput('lowerLimit', correctedLowerLimit);
+
+        // NEU: Speichere die Korrektur in den Settings
+        Settings.state.userSettings.lowerLimit = correctedLowerLimit;
+        Settings.save();
+
+        // NEU: Setze die lokale Variable für die laufende Berechnung auf den korrekten Wert (in Metern)
+        lowerLimit = baseHeight;
     }
 
     // Check if interpolatedData is valid
@@ -181,182 +206,82 @@ export function downloadTableAsAscii(format) {
     const time = Utils.formatTime(AppState.weatherData.time[index]).replace(' ', '_');
     const filename = `${time}_${model}_${format}.txt`;
 
-    // Define format-specific required settings
+    // 1. Anforderungen für das gewählte Format holen
     const formatRequirements = {
-        'ATAK': {
-            interpStep: 1000,
-            heightUnit: 'ft',
-            refLevel: 'AGL',
-            windUnit: 'kt'
-        },
-        'Windwatch': {
-            interpStep: 100,
-            heightUnit: 'ft',
-            refLevel: 'AGL',
-            windUnit: 'km/h'
-        },
-        'HEIDIS': {
-            interpStep: 100,
-            heightUnit: 'm',
-            refLevel: 'AGL',
-            temperatureUnit: 'C',
-            windUnit: 'm/s'
-        },
-        'Customized': {} // No strict requirements, use current settings
+        'ATAK': { interpStep: 1000, heightUnit: 'ft', refLevel: 'AGL', windUnit: 'kt' },
+        'Windwatch': { interpStep: 100, heightUnit: 'ft', refLevel: 'AGL', windUnit: 'km/h' },
+        'HEIDIS': { interpStep: 100, heightUnit: 'm', refLevel: 'AGL', temperatureUnit: 'C', windUnit: 'm/s' },
+        'Customized': {} // Keine festen Anforderungen
     };
 
-    // Store original settings
-    const originalSettings = {
-        interpStep: getInterpolationStep(),
-        heightUnit: Settings.getValue('heightUnit', 'radio', 'm'),
-        refLevel: document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL',
-        windUnit: Settings.getValue('windUnit', 'radio', 'kt'),
-        temperatureUnit: Settings.getValue('temperatureUnit', 'radio', 'C')
+    const requirements = formatRequirements[format] || {};
+
+ // 2. Export-Einstellungen definieren: Entweder aus den Requirements oder aus der UI
+    const exportSettings = {
+        interpStep: requirements.interpStep || getInterpolationStep(),
+        heightUnit: requirements.heightUnit || Settings.getValue('heightUnit', 'radio', 'm'),
+        refLevel: requirements.refLevel || document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL',
+        windUnit: requirements.windUnit || Settings.getValue('windUnit', 'radio', 'kt'),
+        temperatureUnit: requirements.temperatureUnit || Settings.getValue('temperatureUnit', 'radio', 'C')
     };
+    console.log(`Generating export for '${format}' with settings:`, exportSettings);
 
-    // Get current settings
-    let currentSettings = { ...originalSettings };
-
-    // Check and adjust settings if format has specific requirements
-    const requiredSettings = formatRequirements[format];
-    if (requiredSettings && Object.keys(requiredSettings).length > 0) {
-        let settingsAdjusted = false;
-
-        // Check each required setting and adjust if necessary
-        for (const [key, requiredValue] of Object.entries(requiredSettings)) {
-            if (currentSettings[key] !== requiredValue) {
-                settingsAdjusted = true;
-                switch (key) {
-                    case 'interpStep':
-                        document.getElementById('interpStepSelect').value = requiredValue;
-                        Settings.state.userSettings.interpStep = requiredValue;
-                        break;
-                    case 'heightUnit':
-                        document.querySelector(`input[name="heightUnit"][value="${requiredValue}"]`).checked = true;
-                        Settings.state.userSettings.heightUnit = requiredValue;
-                        break;
-                    case 'refLevel':
-                        document.querySelector(`input[name="refLevel"][value="${requiredValue}"]`).checked = true;
-                        Settings.state.userSettings.refLevel = requiredValue;
-                        break;
-                    case 'windUnit':
-                        document.querySelector(`input[name="windUnit"][value="${requiredValue}"]`).checked = true;
-                        Settings.state.userSettings.windUnit = requiredValue;
-                        break;
-                    case 'temperatureUnit':
-                        document.querySelector(`input[name="temperatureUnit"][value="${requiredValue}"]`).checked = true;
-                        Settings.state.userSettings.temperatureUnit = requiredValue;
-                        break;
-                }
-                currentSettings[key] = requiredValue;
-            }
-        }
-
-        if (settingsAdjusted) {
-            Settings.save();
-            console.log(`Adjusted settings for ${format} compatibility:`, requiredSettings);
-            Settings.updateUnitLabels(); // Update UI labels if heightUnit changes
-            Settings.updateUnitLabels();   // Update UI labels if windUnit changes
-            Settings.updateUnitLabels();
-            // Update UI labels if refLevel changes
-        }
-    }
-
-    // Prepare content based on format
-    let content = '';
-    let separator = ' '; // Default separator "space"
-    const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
-    const temperatureUnit = Settings.getValue('temperatureUnit', 'radio', 'C');
-    const windSpeedUnit = Settings.getValue('windUnit', 'radio', 'kt');
-    const refLevel = document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL';
-
-    if (format === 'ATAK') {
-        content = `Alt Dir Spd\n${heightUnit}${refLevel}\n`;
-    } else if (format === 'Windwatch') {
-        const elevation = heightUnit === 'ft' ? Math.round(AppState.lastAltitude * 3.28084) : Math.round(AppState.lastAltitude);
-        content = `Version 1.0, ID = 9999999999\n${time}, Ground Level: ${elevation} ft\nWindsond ${model}\n AGL[ft] Wind[°] Speed[km/h]\n`;
-    } else if (format === 'HEIDIS') {
-        const heightHeader = refLevel === 'AGL' ? `h(${heightUnit}AGL)` : `h(${heightUnit}AMSL)`;
-        const temperatureHeader = temperatureUnit === 'C' ? '°C' : '°F';
-        const windSpeedHeader = windSpeedUnit;
-        content = `${heightHeader} p(hPa) T(${temperatureHeader}) Dew(${temperatureHeader}) Dir(°) Spd(${windSpeedHeader}) RH(%)`;
-    } else if (format === 'Customized') {
-        const heightHeader = refLevel === 'AGL' ? `h(${heightUnit}AGL)` : `h(${heightUnit}AMSL)`;
-        const temperatureHeader = temperatureUnit === 'C' ? '°C' : '°F';
-        const windSpeedHeader = windSpeedUnit;
-        content = `${heightHeader} p(hPa) T(${temperatureHeader}) Dew(${temperatureHeader}) Dir(°) Spd(${windSpeedHeader}) RH(%)`;
-    }
-
-    // Generate surface data with fetched surface_pressure
-    const baseHeight = Math.round(AppState.lastAltitude);
-    const surfaceHeight = refLevel === 'AGL' ? 0 : baseHeight;
-    const surfaceTemp = AppState.weatherData.temperature_2m?.[index];
-    const surfaceRH = AppState.weatherData.relative_humidity_2m?.[index];
-    const surfaceSpd = AppState.weatherData.wind_speed_10m?.[index];
-    const surfaceDir = AppState.weatherData.wind_direction_10m?.[index];
-    const surfaceDew = Utils.calculateDewpoint(surfaceTemp, surfaceRH);
-    const surfacePressure = AppState.weatherData.surface_pressure[index]; // Use fetched surface pressure directly
-
-    const displaySurfaceHeight = Math.round(Utils.convertHeight(surfaceHeight, heightUnit));
-    const displaySurfaceTemp = Utils.convertTemperature(surfaceTemp, temperatureUnit);
-    const displaySurfaceDew = Utils.convertTemperature(surfaceDew, temperatureUnit);
-    const displaySurfaceSpd = Utils.convertWind(surfaceSpd, windSpeedUnit, 'km/h');
-    const formattedSurfaceTemp = displaySurfaceTemp === 'N/A' ? 'N/A' : displaySurfaceTemp.toFixed(1);
-    const formattedSurfaceDew = displaySurfaceDew === 'N/A' ? 'N/A' : displaySurfaceDew.toFixed(1);
-    const formattedSurfaceSpd = displaySurfaceSpd === 'N/A' ? 'N/A' : (windSpeedUnit === 'bft' ? Math.round(displaySurfaceSpd) : displaySurfaceSpd.toFixed(1));
-    const formattedSurfaceDir = surfaceDir === 'N/A' || surfaceDir === undefined ? 'N/A' : Math.round(surfaceDir);
-    const formattedSurfaceRH = surfaceRH === 'N/A' || surfaceRH === undefined ? 'N/A' : Math.round(surfaceRH);
-
-    if (format === 'ATAK') {
-        content += `${displaySurfaceHeight}${separator}${formattedSurfaceDir}${separator}${formattedSurfaceSpd}\n`;
-    } else if (format === 'Windwatch') {
-        content += `${displaySurfaceHeight}${separator}${formattedSurfaceDir}${separator}${formattedSurfaceSpd}\n`;
-    } else if (format === 'HEIDIS') {
-        content += `\n${displaySurfaceHeight}${separator}${surfacePressure === 'N/A' ? 'N/A' : surfacePressure.toFixed(1)}${separator}${formattedSurfaceTemp}${separator}${formattedSurfaceDew}${separator}${formattedSurfaceDir}${separator}${formattedSurfaceSpd}${separator}${formattedSurfaceRH}\n`;
-    } else if (format === 'Customized') {
-        content += `\n${displaySurfaceHeight}${separator}${surfacePressure === 'N/A' ? 'N/A' : surfacePressure.toFixed(1)}${separator}${formattedSurfaceTemp}${separator}${formattedSurfaceDew}${separator}${formattedSurfaceDir}${separator}${formattedSurfaceSpd}${separator}${formattedSurfaceRH}\n`;
-    }
-
-    // Generate interpolated data
-    const interpStep = getInterpolationStep(); // Wert in der UI-Schicht holen
+    // 3. Wetterdaten mit den korrekten Export-Einstellungen interpolieren
     const interpolatedData = weatherManager.interpolateWeatherData(
-        AppState.weatherData, // Das Haupt-Wetterdatenobjekt
+        AppState.weatherData,
         index,
-        interpStep,
+        exportSettings.interpStep,
         Math.round(AppState.lastAltitude),
-        heightUnit
+        exportSettings.heightUnit // WICHTIG: Die korrekte Einheit wird hier übergeben
     );
+
     if (!interpolatedData || interpolatedData.length === 0) {
         Utils.handleError('No interpolated data available to download.');
         return;
     }
 
-    interpolatedData.forEach(data => {
-        if (data.displayHeight !== surfaceHeight) {
-            const displayHeight = Math.round(Utils.convertHeight(data.displayHeight, heightUnit));
-            const displayPressure = data.pressure === 'N/A' ? 'N/A' : data.pressure.toFixed(1);
-            const displayTemperature = Utils.convertTemperature(data.temp, temperatureUnit);
-            const displayDew = Utils.convertTemperature(data.dew, temperatureUnit);
-            const displaySpd = Utils.convertWind(data.spd, windSpeedUnit, Settings.getValue('windUnit', 'radio', 'kt')); // Use current windUnit
-            const formattedTemp = displayTemperature === 'N/A' ? 'N/A' : displayTemperature.toFixed(1);
-            const formattedDew = displayDew === 'N/A' ? 'N/A' : displayDew.toFixed(1);
-            const formattedSpd = displaySpd === 'N/A' ? 'N/A' : (windSpeedUnit === 'bft' ? Math.round(displaySpd) : displaySpd.toFixed(1));
-            const formattedDir = data.dir === 'N/A' ? 'N/A' : Math.round(data.dir);
-            const formattedRH = data.rh === 'N/A' ? 'N/A' : Math.round(data.rh);
+    // 4. Header und Datenzeilen basierend auf den Export-Einstellungen erstellen
+    let content = '';
+    let header = '';
 
-            if (format === 'ATAK') {
-                content += `${displayHeight}${separator}${formattedDir}${separator}${formattedSpd}\n`;
-            } else if (format === 'Windwatch') {
-                content += `${displayHeight}${separator}${formattedDir}${separator}${formattedSpd}\n`;
-            } else if (format === 'HEIDIS') {
-                content += `${displayHeight}${separator}${displayPressure}${separator}${formattedTemp}${separator}${formattedDew}${separator}${formattedDir}${separator}${formattedSpd}${separator}${formattedRH}\n`;
-            } else if (format === 'Customized') {
-                content += `${displayHeight}${separator}${displayPressure}${separator}${formattedTemp}${separator}${formattedDew}${separator}${formattedDir}${separator}${formattedSpd}${separator}${formattedRH}\n`;
-            }
+    switch (format) {
+        case 'ATAK':
+            header = `Alt Dir Spd\n${exportSettings.heightUnit}${exportSettings.refLevel}\n`;
+            break;
+        case 'Windwatch':
+            const elevationFt = Math.round(Utils.convertHeight(AppState.lastAltitude, 'ft'));
+            header = `Version 1.0, ID = 9999999999\n${time}, Ground Level: ${elevationFt} ft\nWindsond ${model}\nAGL[ft] Wind[°] Speed[km/h]\n`;
+            break;
+        case 'HEIDIS':
+        case 'Customized':
+        default:
+            header = `h(${exportSettings.heightUnit}${exportSettings.refLevel}) p(hPa) T(${exportSettings.temperatureUnit}) Dew(${exportSettings.temperatureUnit}) Dir(°) Spd(${exportSettings.windUnit}) RH(%)\n`;
+            break;
+    }
+    content += header;
+
+    // Datenzeilen generieren
+    interpolatedData.forEach(data => {
+        const displayHeight = Math.round(data.displayHeight);
+        const displayDir = Math.round(data.dir);
+        // Werte explizit in die Ziel-Einheit des Exports umrechnen
+        const displaySpd = Utils.convertWind(data.spd, exportSettings.windUnit, 'km/h');
+        const formattedSpd = Number.isFinite(displaySpd) ? (exportSettings.windUnit === 'bft' ? Math.round(displaySpd) : displaySpd.toFixed(1)) : 'N/A';
+        
+        if (format === 'ATAK' || format === 'Windwatch') {
+            content += `${displayHeight} ${displayDir} ${Math.round(displaySpd)}\n`;
+        } else { // HEIDIS & Customized
+            const displayPressure = data.pressure === 'N/A' ? 'N/A' : data.pressure.toFixed(1);
+            const displayTemp = Utils.convertTemperature(data.temp, exportSettings.temperatureUnit);
+            const formattedTemp = displayTemp === 'N/A' ? 'N/A' : displayTemp.toFixed(1);
+            const displayDew = Utils.convertTemperature(data.dew, exportSettings.temperatureUnit);
+            const formattedDew = displayDew === 'N/A' ? 'N/A' : displayDew.toFixed(1);
+            const formattedRH = data.rh === 'N/A' ? 'N/A' : Math.round(data.rh);
+            content += `${displayHeight} ${displayPressure} ${formattedTemp} ${formattedDew} ${displayDir} ${formattedSpd} ${formattedRH}\n`;
         }
     });
 
-    // Create and trigger the download
+    // 5. Download auslösen (bleibt unverändert)
     const blob = new Blob([content], { type: 'text/plain' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -366,23 +291,6 @@ export function downloadTableAsAscii(format) {
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
-
-    // Optionally revert settings (commented out to persist changes in UI)
-    document.getElementById('interpStepSelect').value = originalSettings.interpStep;
-    document.querySelector(`input[name="heightUnit"][value="${originalSettings.heightUnit}"]`).checked = true;
-    document.querySelector(`input[name="refLevel"][value="${originalSettings.refLevel}"]`).checked = true;
-    document.querySelector(`input[name="windUnit"][value="${originalSettings.windUnit}"]`).checked = true;
-    document.querySelector(`input[name="temperatureUnit"][value="${originalSettings.temperatureUnit}"]`).checked = true;
-    Settings.state.userSettings.interpStep = originalSettings.interpStep;
-    Settings.state.userSettings.heightUnit = originalSettings.heightUnit;
-    Settings.state.userSettings.refLevel = originalSettings.refLevel;
-    Settings.state.userSettings.windUnit = originalSettings.windUnit;
-    Settings.state.userSettings.temperatureUnit = originalSettings.temperatureUnit;
-    Settings.save();
-    Settings.updateUnitLabels();
-    Settings.updateUnitLabels();
-    Settings.updateUnitLabels();
-
 }
 
 // == Autoupdate Functionality ==
@@ -456,6 +364,8 @@ export async function updateToCurrentHour() {
  */
 export function calculateJump() {
     const index = getSliderValue();
+    const interpStep = getInterpolationStep();
+    const heightUnit = Settings.getValue('heightUnit', 'radio', 'm'); // <-- DIE FEHLENDE ZEILE
     if (!Settings.state.isCalculateJumpUnlocked || !Settings.state.userSettings.calculateJump) {
         mapManager.drawJumpVisualization(null);
         mapManager.drawCutAwayVisualization(null);
@@ -469,7 +379,6 @@ export function calculateJump() {
 
     // Daten einmal zentral vorbereiten
     const sliderIndex = getSliderValue();
-    const interpStep = getInterpolationStep(); // Wert in der UI-Schicht holen
     const interpolatedData = weatherManager.interpolateWeatherData(
         AppState.weatherData, // Das Haupt-Wetterdatenobjekt
         index,
@@ -612,33 +521,19 @@ export function validateLegHeights(final, base, downwind) {
 
 // == Live Tracking ==
 export function updateJumpMasterLineAndPanel(positionData = null) {
-    // Die Variable, die steuert, ob die Linie angezeigt werden soll.
-    const showJML = Settings.state.userSettings.showJumpMasterLine;
-
-    // --- NEUE, ROBUSTERE LOGIK ---
-
-    // 1. Prüfe als Allererstes, ob die Linie überhaupt sichtbar sein soll.
-    if (!showJML) {
-        // Wenn nicht, lösche die Linie und blende das Info-Panel aus. Fertig.
+    // 1. Grundvoraussetzung: Ist Live-Tracking überhaupt aktiv?
+    // Wenn kein Live-Marker da ist, ist Tracking aus -> alles aufräumen und beenden.
+    if (!AppState.liveMarker) {
         mapManager.clearJumpMasterLine();
         mapManager.hideLivePositionControl();
         return;
     }
 
-    // 2. Nur wenn die Linie angezeigt werden soll, prüfen wir, ob die dafür nötigen Daten da sind.
-    if (!AppState.liveMarker) {
-        // Wir können die Linie nicht ohne Live-Position zeichnen, also sicherheitshalber aufräumen.
-        mapManager.clearJumpMasterLine();
-        return;
-    }
-
-    // --- Ab hier bleibt die bestehende Logik zum Zeichnen der Linie unverändert ---
+    // 2. Basis-Positionsdaten zusammenstellen
     const livePos = AppState.liveMarker.getLatLng();
-    if (!livePos) {
-        return;
-    }
+    if (!livePos) return; // Sicherheitsabfrage
 
-    const data = positionData ? positionData : {
+    const data = positionData || { // Fallback, falls keine neuen Daten übergeben wurden
         latitude: livePos.lat,
         longitude: livePos.lng,
         speedMs: AppState.lastSmoothedSpeedMs,
@@ -648,38 +543,49 @@ export function updateJumpMasterLineAndPanel(positionData = null) {
         accuracy: AppState.lastAccuracy
     };
 
-    let jumpMasterLineData = null;
-    let targetPos = null;
-    let targetName = '';
+    // 3. Jump-Master-Line-Daten NUR berechnen, wenn die Checkbox aktiv ist
+    const showJML = Settings.state.userSettings.showJumpMasterLine;
+    let jumpMasterLineData = null; // Standardmäßig leer
 
-    if (Settings.state.userSettings.jumpMasterLineTarget === 'HARP' && AppState.harpMarker) {
-        targetPos = AppState.harpMarker.getLatLng();
-        targetName = 'HARP';
-    } else if (AppState.currentMarker) {
-        targetPos = AppState.currentMarker.getLatLng();
-        targetName = 'DIP';
+    if (showJML) {
+        let targetPos = null;
+        let targetName = '';
+
+        if (Settings.state.userSettings.jumpMasterLineTarget === 'HARP' && AppState.harpMarker) {
+            targetPos = AppState.harpMarker.getLatLng();
+            targetName = 'HARP';
+        } else if (AppState.currentMarker) {
+            targetPos = AppState.currentMarker.getLatLng();
+            targetName = 'DIP';
+        }
+
+        if (targetPos) {
+            const distance = AppState.map.distance(livePos, targetPos);
+            const bearing = Math.round(Utils.calculateBearing(livePos.lat, livePos.lng, targetPos.lat, targetPos.lng));
+            const speedMs = data.speedMs > 1 ? data.speedMs : 1;
+            const tot = Math.round(distance / speedMs);
+            jumpMasterLineData = { distance, bearing, tot, target: targetName };
+            mapManager.drawJumpMasterLine(livePos, targetPos);
+        }
+    } else {
+        // Wenn die Checkbox nicht aktiv ist, sicherstellen, dass die Linie entfernt wird
+        mapManager.clearJumpMasterLine();
     }
 
-    if (targetPos) {
-        const distance = AppState.map.distance(livePos, targetPos);
-        const bearing = Math.round(Utils.calculateBearing(livePos.lat, livePos.lng, targetPos.lat, targetPos.lng));
-        const speedMs = data.speedMs > 1 ? data.speedMs : 1;
-        const tot = Math.round(distance / speedMs);
-        jumpMasterLineData = { distance, bearing, tot, target: targetName };
-        mapManager.drawJumpMasterLine(livePos, targetPos);
-    }
-
+    // 4. Das Panel IMMER aktualisieren, solange das Tracking läuft
+    // Die updateLivePositionControl-Funktion im mapManager ist schlau genug, die JML-Infos
+    // nur anzuzeigen, wenn jumpMasterLineData nicht null ist.
     const settingsForPanel = {
         heightUnit: Settings.getValue('heightUnit', 'radio', 'm'),
         effectiveWindUnit: Settings.getValue('windUnit', 'radio', 'kt') === 'bft' ? 'kt' : Settings.getValue('windUnit', 'radio', 'kt'),
         coordFormat: Settings.getValue('coordFormat', 'radio', 'Decimal'),
         refLevel: Settings.getValue('refLevel', 'radio', 'AGL')
     };
-
+    
     mapManager.updateLivePositionControl({
         ...data,
         showJumpMasterLine: showJML,
-        jumpMasterLineData,
+        jumpMasterLineData, // ist entweder ein Objekt mit Daten oder null
         ...settingsForPanel
     });
 }
@@ -829,7 +735,7 @@ export async function updateUIWithNewWeatherData(newWeatherData, preservedIndex 
         }
         console.log(`Slider set to default (current hour or max): ${slider.value}`);
     }
-    
+
     // ... (restliche Funktion bleibt unverändert)
     await displayManager.updateWeatherDisplay(slider.value);
     await displayManager.refreshMarkerPopup();
@@ -938,6 +844,88 @@ function setupAppEventListeners() {
         updateJumpMasterLineAndPanel();
     });
 
+    document.addEventListener('track:loaded', async (event) => {
+        const loadingElement = document.getElementById('loading');
+        try {
+            const { lat, lng, timestamp, historicalDate, summary } = event.detail;
+            console.log('[main-mobile] Event "track:loaded" empfangen, starte Aktionen.');
+
+            // =======================================================
+            // HIER DIE NEUE LOGIK EINFÜGEN
+            // =======================================================
+            if (historicalDate) {
+                console.log("Historischer Track geladen, deaktiviere Autoupdate.");
+                const autoupdateCheckbox = document.getElementById('autoupdateCheckbox');
+                if (autoupdateCheckbox) {
+                    autoupdateCheckbox.checked = false;
+                }
+                // Stoppe den laufenden Autoupdate-Prozess
+                AutoupdateManager.stopAutoupdate();
+                // Speichere die neue Einstellung
+                Settings.state.userSettings.autoupdate = false;
+                Settings.save();
+                Utils.handleMessage("Autoupdate disabled for historical track viewing.");
+            }
+            // =======================================================
+            // ENDE DER NEUEN LOGIK
+            // =======================================================
+
+            await mapManager.createOrUpdateMarker(lat, lng);
+            const newWeatherData = await weatherManager.fetchWeatherForLocation(lat, lng, timestamp);
+            if (newWeatherData) {
+                AppState.weatherData = newWeatherData; // Daten im AppState speichern
+
+                // 2. Den Slider auf den richtigen Zeitpunkt setzen
+                const slider = document.getElementById('timeSlider');
+                if (slider && AppState.weatherData.time) {
+                    slider.max = AppState.weatherData.time.length - 1;
+                    slider.disabled = slider.max <= 0;
+
+                    // Finde den Index, der am besten zum Track-Zeitstempel passt
+                    const targetTimestamp = new Date(timestamp).getTime();
+                    let bestIndex = 0;
+                    let minDiff = Infinity;
+                    AppState.weatherData.time.forEach((time, idx) => {
+                        const diff = Math.abs(new Date(time).getTime() - targetTimestamp);
+                        if (diff < minDiff) {
+                            minDiff = diff;
+                            bestIndex = idx;
+                        }
+                    });
+                    slider.value = bestIndex; // Slider positionieren!
+                }
+            }
+            await updateAllDisplays();
+
+            if (Settings.state.isCalculateJumpUnlocked && Settings.state.userSettings.calculateJump) {
+                calculateJump();
+            }
+            if (Settings.state.isLandingPatternUnlocked && Settings.state.userSettings.showLandingPattern) {
+                displayManager.updateLandingPatternDisplay();
+            }
+
+            const infoEl = document.getElementById('info');
+            if (infoEl && summary) {
+                const modelDisplayRegex = /(<br><strong>Available Models:<\/strong><ul>.*?<\/ul>|<br><strong>Available Models:<\/strong> None)/s;
+                const modelInfoMatch = infoEl.innerHTML.match(modelDisplayRegex);
+                infoEl.innerHTML = summary + (modelInfoMatch ? modelInfoMatch[0] : '');
+            }
+
+            if (historicalDate) {
+                const historicalDatePicker = document.getElementById('historicalDatePicker');
+                if (historicalDatePicker) historicalDatePicker.value = historicalDate;
+            }
+
+        } catch (error) {
+            console.error('Fehler bei der Verarbeitung von track:loaded:', error);
+            Utils.handleError('Konnte Track-Daten nicht vollständig verarbeiten.');
+        } finally {
+            if (loadingElement) {
+                loadingElement.style.display = 'none';
+            }
+        }
+    });
+
     document.addEventListener('ui:showJumpMasterLineChanged', () => {
         updateJumpMasterLineAndPanel();
     });
@@ -948,6 +936,454 @@ function setupAppEventListeners() {
 
     document.addEventListener('tracking:positionUpdated', (event) => {
         updateJumpMasterLineAndPanel(event.detail);
+    });
+
+    document.addEventListener('ui:sliderChanged', async (e) => {
+        console.log("[main-mobile] Event 'ui:sliderChanged' empfangen.");
+        if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
+            await updateAllDisplays(); // Aufruf der lokalen Funktion
+        }
+    });
+
+    document.addEventListener('ui:modelChanged', async (e) => {
+        console.log(`[main-mobile] Model changed to ${e.detail.model}. Fetching new data.`);
+
+        if (AppState.lastLat && AppState.lastLng) {
+            const timeIndexToPreserve = getSliderValue();
+            const currentTime = AppState.weatherData?.time?.[timeIndexToPreserve] || null;
+
+            const newWeatherData = await weatherManager.fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, currentTime);
+            if (newWeatherData) {
+                await updateUIWithNewWeatherData(newWeatherData, timeIndexToPreserve);
+            }
+        } else {
+            Utils.handleError('Please select a position on the map first.');
+        }
+    });
+
+    document.addEventListener('ui:jumpFeatureChanged', () => {
+        console.log("[main-mobile] Jump feature changed, recalculating jump.");
+        if (AppState.weatherData && AppState.lastLat && AppState.lastLng && Settings.state.userSettings.calculateJump) {
+            calculateJump();
+        }
+    });
+
+    document.addEventListener('ui:showJumpRunTrackChanged', (e) => {
+        const isChecked = e.detail.checked;
+        console.log(`[main-mobile] Jump Run Track toggled: ${isChecked}`);
+
+        // Die komplette if/else-Logik wird hierher verschoben:
+        if (isChecked && AppState.weatherData && AppState.lastLat && AppState.lastLng && Settings.state.isCalculateJumpUnlocked && Settings.state.userSettings.calculateJump) {
+            calculateJumpRunTrack();
+        } else {
+            // Die komplette Aufräumlogik
+            mapManager.drawJumpRunTrack(null); // Eine saubere Funktion im mapManager ist hier ideal
+            const directionInput = document.getElementById('jumpRunTrackDirection');
+            if (directionInput) {
+                const trackData = JumpPlanner.jumpRunTrack();
+                directionInput.value = trackData ? trackData.direction : '';
+            }
+        }
+    });
+
+    document.addEventListener('ui:showCutAwayFinderChanged', (e) => {
+        const isChecked = e.detail.checked;
+        console.log(`[main-mobile] Cut Away Finder toggled: ${isChecked}`);
+
+        // Die komplette if/else-Logik hierher:
+        const submenu = document.getElementById('showCutAwayFinder').closest('li')?.querySelector('ul.submenu');
+        if (submenu) {
+            submenu.classList.toggle('hidden', !isChecked);
+        }
+
+        if (!isChecked) {
+            mapManager.clearCutAwayMarker();
+            AppState.cutAwayLat = null;
+            AppState.cutAwayLng = null;
+        }
+
+        if (AppState.weatherData && AppState.lastLat && AppState.lastLng && Settings.state.userSettings.calculateJump) {
+            calculateJump();
+        }
+    });
+
+    document.addEventListener('ui:trackPositionToggled', (e) => {
+        const isChecked = e.detail.checked;
+        console.log(`[main-mobile] Live Tracking toggled: ${isChecked}`);
+
+        if (isChecked) {
+            liveTrackingManager.startPositionTracking();
+        } else {
+            liveTrackingManager.stopPositionTracking();
+        }
+    });
+
+    document.addEventListener('ui:landingPatternEnabled', () => {
+        console.log('[main-mobile] Landing pattern enabled, updating display.');
+        displayManager.updateLandingPatternDisplay();
+    });
+
+    document.addEventListener('ui:landingPatternDisabled', () => {
+        console.log('[main-mobile] Landing pattern disabled, clearing display.');
+        mapManager.drawLandingPattern(null);
+    });
+
+    document.addEventListener('ui:showTableChanged', (e) => {
+        const isChecked = e.detail.checked;
+        console.log(`[main-mobile] Show Table toggled: ${isChecked}`);
+
+        const info = document.getElementById('info');
+        if (info) {
+            info.style.display = isChecked ? 'block' : 'none';
+        }
+
+        // Wenn die Tabelle eingeschaltet wird, muss sie mit den aktuellen Daten gefüllt werden.
+        if (isChecked && AppState.weatherData && AppState.lastLat && AppState.lastLng) {
+            displayManager.updateWeatherDisplay(getSliderValue());
+        }
+
+        mapManager.recenterMap();
+    });
+
+    document.addEventListener('ui:radioGroupChanged', (e) => {
+        console.log(`[main-mobile] Radio group '${e.detail.name}' changed. Updating all displays.`);
+
+        // NEU: Spezifische Aktion für die Landing Direction hinzufügen
+        if (e.detail.name === 'landingDirection') {
+            updateUIState(); // Die Funktion wird jetzt hier aufgerufen!
+        }
+
+        if (e.detail.name === 'windUnit' || e.detail.name === 'coordFormat') {
+            updateJumpMasterLineAndPanel();
+        }
+
+        if (e.detail.name === 'heightUnit') {
+            updateJumpMasterLineAndPanel(); // Aktualisiert das Live-Tracking-Panel
+
+            if (AppState.lastMouseLatLng && AppState.coordsControl) {
+                const coordFormat = getCoordinateFormat();
+                const lat = AppState.lastMouseLatLng.lat;
+                const lng = AppState.lastMouseLatLng.lng;
+                let coordText;
+                if (coordFormat === 'MGRS') {
+                    const mgrs = Utils.decimalToMgrs(lat, lng);
+                    coordText = `MGRS: ${mgrs}`;
+                } else {
+                    coordText = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
+                }
+                debouncedGetElevationAndQFE(lat, lng, { lat, lng }, (elevation, requestLatLng) => {
+                    if (AppState.lastMouseLatLng) {
+                        const deltaLat = Math.abs(AppState.lastMouseLatLng.lat - requestLatLng.lat);
+                        const deltaLng = Math.abs(AppState.lastMouseLatLng.lng - requestLatLng.lng);
+                        const threshold = 0.05;
+                        if (deltaLat < threshold && deltaLng < threshold) {
+                            const heightUnit = getHeightUnit();
+                            let displayElevation = elevation === 'N/A' ? 'N/A' : elevation;
+                            if (displayElevation !== 'N/A') {
+                                displayElevation = Utils.convertHeight(displayElevation, heightUnit);
+                                displayElevation = Math.round(displayElevation);
+                            }
+                            console.log('Updating elevation display after heightUnit change:', { lat, lng, elevation, heightUnit, displayElevation });
+                            AppState.coordsControl.update(`${coordText}<br>Elevation: ${displayElevation} ${displayElevation === 'N/A' ? '' : heightUnit}`);
+                        }
+                    }
+                });
+            }
+            if (AppState.gpxLayer && AppState.gpxPoints.length > 0) {
+                const groundAltitude = AppState.lastAltitude !== 'N/A' && !isNaN(AppState.lastAltitude) ? parseFloat(AppState.lastAltitude) : null;
+                const windUnit = getWindSpeedUnit();
+                const heightUnit = getHeightUnit();
+                AppState.gpxLayer.eachLayer(layer => {
+                    if (layer instanceof L.Polyline) {
+                        layer.on('mousemove', function (e) {
+                            const latlng = e.latlng;
+                            let closestPoint = AppState.gpxPoints[0];
+                            let minDist = Infinity;
+                            let closestIndex = 0;
+                            AppState.gpxPoints.forEach((p, index) => {
+                                const dist = Math.sqrt(Math.pow(p.lat - latlng.lat, 2) + Math.pow(p.lng - latlng.lng, 2));
+                                if (dist < minDist) {
+                                    minDist = dist;
+                                    closestPoint = p;
+                                    closestIndex = index;
+                                }
+                            });
+                            layer.setTooltipContent(getTooltipContent(closestPoint, closestIndex, AppState.gpxPoints, groundAltitude, windUnit, heightUnit)).openTooltip(latlng);
+                        });
+                    }
+                });
+            }
+        }
+        // Hier wird die Logik ausgeführt, die vorher direkt im Callback stand
+        updateAllDisplays();
+
+        if (e.detail.name === 'coordFormat') {
+            displayManager.refreshMarkerPopup();
+            updateJumpMasterLineAndPanel();
+        }
+
+        if (e.detail.name === 'heightUnit' || e.detail.name === 'windUnit') {
+            updateJumpMasterLineAndPanel();
+            // Hier könnte auch die Gpx-Tooltip-Logik rein
+        }
+    });
+
+    document.addEventListener('ui:jumpMasterLineTargetChanged', () => {
+        console.log('[main-mobile] Jump Master Line target changed, updating panel and line.');
+        updateJumpMasterLineAndPanel();
+    });
+
+    document.addEventListener('ui:inputChanged', (e) => {
+        const { name, value } = e.detail;
+        console.log(`[main-mobile] Input for '${name}' changed to '${value}'.`);
+
+        // Mit einem switch steuern wir, welche Aktion bei welchem Input ausgeführt wird
+        switch (name) {
+            case 'openingAltitude':
+            case 'exitAltitude':
+            case 'numberOfJumpers':
+            case 'jumperSeparation':
+            case 'cutAwayAltitude':
+                if (AppState.weatherData) {
+                    debouncedCalculateJump();
+                    // Der CutAway muss auch neu berechnet werden, wenn sich diese Werte ändern
+                    JumpPlanner.calculateCutAway();
+                }
+                break;
+
+            case 'aircraftSpeedKt':
+                // Spezielle Logik für Flugzeuggeschwindigkeit
+                const separation = JumpPlanner.getSeparationFromTAS(value);
+                setInputValueSilently('jumperSeparation', separation); // UI-Helfer
+                Settings.state.userSettings.jumperSeparation = separation;
+                Settings.save();
+                if (AppState.weatherData) {
+                    debouncedCalculateJump();
+                }
+                displayManager.updateJumpRunTrackDisplay();
+                break;
+
+            case 'lowerLimit':
+            case 'upperLimit':
+                if (AppState.weatherData) {
+                    calculateMeanWind();
+                }
+                break;
+
+            case 'canopySpeed':
+            case 'descentRate':
+            case 'interpStepSelect':
+                updateAllDisplays();
+                break;
+
+            case 'legHeightFinal':
+            case 'legHeightBase':
+                updateAllDisplays();
+                break;
+
+            case 'legHeightDownwind':
+                // Bei Downwind ändert sich auch der Sprungablauf
+                updateAllDisplays();
+                if (AppState.weatherData && Settings.state.userSettings.calculateJump) {
+                    debouncedCalculateJump();
+                }
+                break;
+
+            case 'customLandingDirectionLL':
+            case 'customLandingDirectionRR':
+                if (AppState.weatherData) {
+                    displayManager.updateLandingPatternDisplay();
+                }
+                break;
+
+            case 'jumpRunTrackDirection':
+            case 'jumpRunTrackOffset':
+            case 'jumpRunTrackForwardOffset':
+                if (AppState.weatherData) {
+                    displayManager.updateJumpRunTrackDisplay();
+                }
+                break;
+
+            case 'historicalDatePicker':
+                if (AppState.lastLat && AppState.lastLng) {
+                    const isoTime = value ? `${value}T00:00:00Z` : null;
+                    weatherManager.fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, isoTime)
+                        .then(newWeatherData => {
+                            if (newWeatherData) {
+                                updateUIWithNewWeatherData(newWeatherData);
+                            }
+                        });
+                }
+                break;
+        }
+    });
+
+    document.addEventListener('ui:downloadClicked', () => {
+        console.log('[main-mobile] Download button clicked.');
+
+        // Logik, die vorher im eventManager war:
+        const downloadFormat = getDownloadFormat();
+        downloadTableAsAscii(downloadFormat);
+    });
+
+    document.addEventListener('ui:clearDateClicked', () => {
+        console.log('[main-mobile] Clear date button clicked.');
+
+        const datePicker = document.getElementById('historicalDatePicker');
+        if (datePicker) {
+            datePicker.value = ''; // UI-Element direkt hier ändern
+            if (AppState.lastLat && AppState.lastLng) {
+                // Aktuelle Wetterdaten neu laden
+                weatherManager.fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, null)
+                    .then(newWeatherData => {
+                        if (newWeatherData) {
+                            AppState.weatherData = newWeatherData;
+                            updateAllDisplays();
+                        }
+                    });
+            }
+        }
+    });
+
+    document.addEventListener('ui:recalculateJump', () => {
+        console.log('[main-mobile] Recalculate jump triggered.');
+        if (AppState.weatherData && AppState.lastLat && AppState.lastLng && Settings.state.userSettings.calculateJump) {
+            calculateJump();
+        }
+    });
+
+    document.addEventListener('ui:invalidInput', (e) => {
+        const { id, defaultValue } = e.detail;
+        console.log(`[main-mobile] Received invalid input for ${id}. Resetting UI to ${defaultValue}.`);
+
+        // Hier wird die Funktion aufgerufen, die vorher im eventManager stand
+        applySettingToInput(id, defaultValue);
+    });
+
+    document.addEventListener('map:moved', () => {
+        console.log('[main-mobile] Map has moved or zoomed. Updating visualizations based on new view.');
+
+        // Die komplette Logik aus dem alten mapMoveHandler kommt hierher:
+        const currentZoom = AppState.map.getZoom();
+
+        if (Settings.state.userSettings.calculateJump && AppState.weatherData && AppState.lastLat) {
+            if (currentZoom >= UI_DEFAULTS.MIN_ZOOM && currentZoom <= UI_DEFAULTS.MAX_ZOOM) {
+                calculateJump();
+            } else {
+                mapManager.drawJumpVisualization(null);
+            }
+        }
+        if (Settings.state.userSettings.showJumpRunTrack) {
+            if (currentZoom >= UI_DEFAULTS.MIN_ZOOM && currentZoom <= UI_DEFAULTS.MAX_ZOOM) {
+                displayManager.updateJumpRunTrackDisplay();
+            } else {
+                mapManager.drawJumpRunTrack(null);
+            }
+        }
+        if (Settings.state.userSettings.showLandingPattern) {
+            displayManager.updateLandingPatternDisplay();
+        }
+
+        // Die Caching-Logik kann hier ebenfalls angestoßen werden, falls gewünscht,
+        // oder separat bleiben, wie im eventManager gezeigt.
+        cacheVisibleTiles({
+            map: AppState.map,
+            baseMaps: AppState.baseMaps,
+            onProgress: displayProgress,
+            onComplete: (message) => {
+                hideProgress();
+                if (message) Utils.handleMessage(message);
+            },
+            onCancel: () => {
+                hideProgress();
+                Utils.handleMessage('Caching cancelled.');
+            }
+        });
+    });
+
+
+    document.addEventListener('map:mousemove', (event) => {
+        const { lat, lng } = event.detail;
+        AppState.lastMouseLatLng = { lat, lng }; // Position für den Callback speichern
+
+        const coordFormat = getCoordinateFormat();
+        let coordText;
+
+        // Koordinaten-Text korrekt formatieren
+        if (coordFormat === 'MGRS') {
+            const mgrsVal = Utils.decimalToMgrs(lat, lng);
+            coordText = `MGRS: ${mgrsVal || 'N/A'}`;
+        } else if (coordFormat === 'DMS') {
+            const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
+            coordText = `Lat: ${formatDMS(Utils.decimalToDms(lat, true))}, Lng: ${formatDMS(Utils.decimalToDms(lng, false))}`;
+        } else {
+            coordText = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
+        }
+
+        // Sofortiges Update mit "Fetching..."
+        if (AppState.coordsControl) {
+            AppState.coordsControl.update(`${coordText}<br>Elevation: Fetching...<br>QFE: Fetching...`);
+        }
+
+        // Debounced-Funktion aufrufen, um API-Anfragen zu begrenzen
+        debouncedGetElevationAndQFE(lat, lng, { lat, lng }, ({ elevation, qfe }, requestLatLng) => {
+            // Callback wird ausgeführt, wenn die Daten da sind
+            if (AppState.lastMouseLatLng && AppState.coordsControl) {
+                // Nur aktualisieren, wenn die Maus noch in der Nähe ist
+                const deltaLat = Math.abs(AppState.lastMouseLatLng.lat - requestLatLng.lat);
+                const deltaLng = Math.abs(AppState.lastMouseLatLng.lng - requestLatLng.lng);
+                const threshold = 0.05;
+
+                if (deltaLat < threshold && deltaLng < threshold) {
+                    const heightUnit = getHeightUnit();
+                    let displayElevation = elevation === 'N/A' ? 'N/A' : elevation;
+                    if (displayElevation !== 'N/A') {
+                        displayElevation = Utils.convertHeight(displayElevation, heightUnit);
+                        displayElevation = Math.round(displayElevation);
+                    }
+                    const qfeText = qfe === 'N/A' ? 'N/A' : `${qfe} hPa`;
+                    AppState.coordsControl.update(`${coordText}<br>Elevation: ${displayElevation} ${displayElevation === 'N/A' ? '' : heightUnit}<br>QFE: ${qfeText}`);
+                }
+            }
+        });
+    });
+
+    document.addEventListener('map:location_selected', async (event) => {
+        const { lat, lng, source } = event.detail;
+        console.log(`App: Event 'map:location_selected' von '${source}' empfangen.`);
+
+        // --- HIER IST JETZT DIE GESAMTE ANWENDUNGSLOGIK ---
+
+        // 1. Marker-Position im AppState und UI aktualisieren
+        AppState.lastLat = lat;
+        AppState.lastLng = lng;
+        AppState.lastAltitude = await Utils.getAltitude(lat, lng);
+
+        // Informiere das Coordinates-Modul über die neue Position
+        Coordinates.addCoordToHistory(lat, lng);
+
+        // Bewege den Marker (falls die Aktion nicht schon vom Marker selbst kam)
+        if (source !== 'marker_drag') {
+            // Annahme: Sie haben eine moveMarker-Funktion im mapManager
+            // Dies ist ein Befehl von app.js an mapManager.js
+            mapManager.moveMarker(lat, lng);
+        }
+
+        // 2. Kernlogik ausführen
+        resetJumpRunDirection(true); // resetJumpRunDirection muss in app.js sein
+        await weatherManager.fetchWeatherForLocation(lat, lng); // fetchWeather... muss in app.js sein
+
+        if (Settings.state.userSettings.calculateJump) {
+            calculateJump(); // calculateJump muss in app.js sein
+            JumpPlanner.calculateCutAway();
+        }
+
+        mapManager.recenterMap(true); // recenterMap ist jetzt im mapManager
+        AppState.isManualPanning = false;
+
+        // 3. UI-Updates anstoßen, die von den neuen Daten abhängen
+        displayManager.updateJumpRunTrackDisplay(); // update... Funktionen sind jetzt im mapManager
+        displayManager.updateLandingPatternDisplay();
     });
 }
 
@@ -1032,7 +1468,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 // NEUE LOGIK:
                 // Prüfen, ob das Event vom initialen Laden der Seite kommt.
                 const isInitialLoad = (source === 'geolocation' || source === 'geolocation_fallback');
-                
+
                 if (isInitialLoad) {
                     // Beim initialen Laden den Zeit-Index NICHT übergeben, 
                     // damit die Funktion die aktuelle Stunde verwendet.
@@ -1067,6 +1503,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                 });
             }
+
             if (Settings.state.userSettings.showJumpMasterLine) {
                 updateJumpMasterLineAndPanel();
             }
