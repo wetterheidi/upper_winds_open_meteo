@@ -521,33 +521,19 @@ export function validateLegHeights(final, base, downwind) {
 
 // == Live Tracking ==
 export function updateJumpMasterLineAndPanel(positionData = null) {
-    // Die Variable, die steuert, ob die Linie angezeigt werden soll.
-    const showJML = Settings.state.userSettings.showJumpMasterLine;
-
-    // --- NEUE, ROBUSTERE LOGIK ---
-
-    // 1. Prüfe als Allererstes, ob die Linie überhaupt sichtbar sein soll.
-    if (!showJML) {
-        // Wenn nicht, lösche die Linie und blende das Info-Panel aus. Fertig.
+    // 1. Grundvoraussetzung: Ist Live-Tracking überhaupt aktiv?
+    // Wenn kein Live-Marker da ist, ist Tracking aus -> alles aufräumen und beenden.
+    if (!AppState.liveMarker) {
         mapManager.clearJumpMasterLine();
         mapManager.hideLivePositionControl();
         return;
     }
 
-    // 2. Nur wenn die Linie angezeigt werden soll, prüfen wir, ob die dafür nötigen Daten da sind.
-    if (!AppState.liveMarker) {
-        // Wir können die Linie nicht ohne Live-Position zeichnen, also sicherheitshalber aufräumen.
-        mapManager.clearJumpMasterLine();
-        return;
-    }
-
-    // --- Ab hier bleibt die bestehende Logik zum Zeichnen der Linie unverändert ---
+    // 2. Basis-Positionsdaten zusammenstellen
     const livePos = AppState.liveMarker.getLatLng();
-    if (!livePos) {
-        return;
-    }
+    if (!livePos) return; // Sicherheitsabfrage
 
-    const data = positionData ? positionData : {
+    const data = positionData || { // Fallback, falls keine neuen Daten übergeben wurden
         latitude: livePos.lat,
         longitude: livePos.lng,
         speedMs: AppState.lastSmoothedSpeedMs,
@@ -557,38 +543,49 @@ export function updateJumpMasterLineAndPanel(positionData = null) {
         accuracy: AppState.lastAccuracy
     };
 
-    let jumpMasterLineData = null;
-    let targetPos = null;
-    let targetName = '';
+    // 3. Jump-Master-Line-Daten NUR berechnen, wenn die Checkbox aktiv ist
+    const showJML = Settings.state.userSettings.showJumpMasterLine;
+    let jumpMasterLineData = null; // Standardmäßig leer
 
-    if (Settings.state.userSettings.jumpMasterLineTarget === 'HARP' && AppState.harpMarker) {
-        targetPos = AppState.harpMarker.getLatLng();
-        targetName = 'HARP';
-    } else if (AppState.currentMarker) {
-        targetPos = AppState.currentMarker.getLatLng();
-        targetName = 'DIP';
+    if (showJML) {
+        let targetPos = null;
+        let targetName = '';
+
+        if (Settings.state.userSettings.jumpMasterLineTarget === 'HARP' && AppState.harpMarker) {
+            targetPos = AppState.harpMarker.getLatLng();
+            targetName = 'HARP';
+        } else if (AppState.currentMarker) {
+            targetPos = AppState.currentMarker.getLatLng();
+            targetName = 'DIP';
+        }
+
+        if (targetPos) {
+            const distance = AppState.map.distance(livePos, targetPos);
+            const bearing = Math.round(Utils.calculateBearing(livePos.lat, livePos.lng, targetPos.lat, targetPos.lng));
+            const speedMs = data.speedMs > 1 ? data.speedMs : 1;
+            const tot = Math.round(distance / speedMs);
+            jumpMasterLineData = { distance, bearing, tot, target: targetName };
+            mapManager.drawJumpMasterLine(livePos, targetPos);
+        }
+    } else {
+        // Wenn die Checkbox nicht aktiv ist, sicherstellen, dass die Linie entfernt wird
+        mapManager.clearJumpMasterLine();
     }
 
-    if (targetPos) {
-        const distance = AppState.map.distance(livePos, targetPos);
-        const bearing = Math.round(Utils.calculateBearing(livePos.lat, livePos.lng, targetPos.lat, targetPos.lng));
-        const speedMs = data.speedMs > 1 ? data.speedMs : 1;
-        const tot = Math.round(distance / speedMs);
-        jumpMasterLineData = { distance, bearing, tot, target: targetName };
-        mapManager.drawJumpMasterLine(livePos, targetPos);
-    }
-
+    // 4. Das Panel IMMER aktualisieren, solange das Tracking läuft
+    // Die updateLivePositionControl-Funktion im mapManager ist schlau genug, die JML-Infos
+    // nur anzuzeigen, wenn jumpMasterLineData nicht null ist.
     const settingsForPanel = {
         heightUnit: Settings.getValue('heightUnit', 'radio', 'm'),
         effectiveWindUnit: Settings.getValue('windUnit', 'radio', 'kt') === 'bft' ? 'kt' : Settings.getValue('windUnit', 'radio', 'kt'),
         coordFormat: Settings.getValue('coordFormat', 'radio', 'Decimal'),
         refLevel: Settings.getValue('refLevel', 'radio', 'AGL')
     };
-
+    
     mapManager.updateLivePositionControl({
         ...data,
         showJumpMasterLine: showJML,
-        jumpMasterLineData,
+        jumpMasterLineData, // ist entweder ein Objekt mit Daten oder null
         ...settingsForPanel
     });
 }
