@@ -1,9 +1,7 @@
 import { AppState } from './state.js';
 import { Utils } from './utils.js';
 import { Settings, getInterpolationStep } from './settings.js';
-import { displayError } from '../ui-web/ui.js';
 import { WEATHER_MODELS } from './constants.js';
-import { updateModelSelectUI, updateEnsembleModelUI, cleanupSelectedEnsembleModels } from '../ui-web/ui.js';
 import { DateTime } from 'luxon';
 import { API_URLS, STANDARD_PRESSURE_LEVELS } from './constants.js';
 
@@ -17,7 +15,16 @@ import { API_URLS, STANDARD_PRESSURE_LEVELS } from './constants.js';
  */
 export async function fetchWeatherForLocation(lat, lng, currentTime = null) {
     console.log('[weatherManager] Starting full weather fetch for location:', { lat, lng });
-    await checkAvailableModels(lat, lng);
+    
+    // 1. Prüfen, welche Modelle verfügbar sind
+    const availableModels = await checkAvailableModels(lat, lng);
+    
+    // 2. Ein Event auslösen, damit die UI sich aktualisieren kann
+    document.dispatchEvent(new CustomEvent('models:available', {
+        detail: { availableModels }
+    }));
+    
+    // 3. Die eigentlichen Wetterdaten für das aktuell ausgewählte Modell abrufen
     const weatherData = await fetchWeather(lat, lng, currentTime);
     return weatherData;
 }
@@ -135,9 +142,9 @@ async function checkAvailableModels(lat, lon) {
             console.error(`Netzwerkfehler beim Abruf von Modell '${model}':`, e);
         }
     }
-    updateModelSelectUI(availableModels);
+    /*updateModelSelectUI(availableModels);
     updateEnsembleModelUI(availableModels);
-    cleanupSelectedEnsembleModels(availableModels);
+    cleanupSelectedEnsembleModels(availableModels);*/
     return availableModels;
 }
 
@@ -148,22 +155,21 @@ async function checkAvailableModels(lat, lon) {
  * @param {number} sliderIndex - Der Index des Zeitschiebereglers, für den die Daten interpoliert werden sollen.
  * @returns {object[]} Ein Array von Objekten, wobei jedes Objekt die Wetterdaten für eine bestimmte Höhenstufe enthält.
  */
-export function interpolateWeatherData(sliderIndex) {
-    if (!AppState.weatherData || !AppState.weatherData.time || sliderIndex >= AppState.weatherData.time.length) {
-        console.warn('No weather data available for interpolation');
+export function interpolateWeatherData(weatherData, sliderIndex, interpStep, baseHeight, heightUnit) {
+    if (!weatherData || !weatherData.time || sliderIndex >= weatherData.time.length) {
+        console.warn('No weather data provided or index out of bounds for interpolation');
         return [];
     }
 
-    const baseHeight = Math.round(AppState.lastAltitude);
-    const interpStep = parseInt(getInterpolationStep()) || 100;
-    const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
+    baseHeight = Math.round(AppState.lastAltitude);
+    heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
 
     // Define all possible pressure levels
     const allPressureLevels = STANDARD_PRESSURE_LEVELS;
 
     // Filter pressure levels with valid geopotential height data
     const validPressureLevels = allPressureLevels.filter(hPa => {
-        const height = AppState.weatherData[`geopotential_height_${hPa}hPa`]?.[sliderIndex];
+        const height = weatherData[`geopotential_height_${hPa}hPa`]?.[sliderIndex];
         return height !== null && height !== undefined;
     });
 
@@ -173,13 +179,13 @@ export function interpolateWeatherData(sliderIndex) {
     }
 
     // Collect data for valid pressure levels
-    let heightData = validPressureLevels.map(hPa => AppState.weatherData[`geopotential_height_${hPa}hPa`][sliderIndex]);
-    let tempData = validPressureLevels.map(hPa => AppState.weatherData[`temperature_${hPa}hPa`][sliderIndex]);
-    let rhData = validPressureLevels.map(hPa => AppState.weatherData[`relative_humidity_${hPa}hPa`][sliderIndex]);
-    let spdData = validPressureLevels.map(hPa => AppState.weatherData[`wind_speed_${hPa}hPa`][sliderIndex]);
-    let dirData = validPressureLevels.map(hPa => AppState.weatherData[`wind_direction_${hPa}hPa`][sliderIndex]);
+    let heightData = validPressureLevels.map(hPa => weatherData[`geopotential_height_${hPa}hPa`][sliderIndex]);
+    let tempData = validPressureLevels.map(hPa => weatherData[`temperature_${hPa}hPa`][sliderIndex]);
+    let rhData = validPressureLevels.map(hPa => weatherData[`relative_humidity_${hPa}hPa`][sliderIndex]);
+    let spdData = validPressureLevels.map(hPa => weatherData[`wind_speed_${hPa}hPa`][sliderIndex]);
+    let dirData = validPressureLevels.map(hPa => weatherData[`wind_direction_${hPa}hPa`][sliderIndex]);
 
-    const surfacePressure = AppState.weatherData.surface_pressure[sliderIndex];
+    const surfacePressure = weatherData.surface_pressure[sliderIndex];
     if (surfacePressure === null || surfacePressure === undefined) {
         console.warn('Surface pressure missing');
         return [];
@@ -191,13 +197,13 @@ export function interpolateWeatherData(sliderIndex) {
 
     // Add surface and intermediate points if surfacePressure > lowest valid pressure level
     const lowestPressureLevel = Math.max(...validPressureLevels);
-    const hLowest = AppState.weatherData[`geopotential_height_${lowestPressureLevel}hPa`][sliderIndex];
+    const hLowest = weatherData[`geopotential_height_${lowestPressureLevel}hPa`][sliderIndex];
     if (surfacePressure > lowestPressureLevel && Number.isFinite(hLowest) && hLowest > baseHeight) {
         const stepsBetween = Math.floor((hLowest - baseHeight) / interpStep);
 
         // Surface wind components
-        const uSurface = -AppState.weatherData.wind_speed_10m[sliderIndex] * Math.sin(AppState.weatherData.wind_direction_10m[sliderIndex] * Math.PI / 180);
-        const vSurface = -AppState.weatherData.wind_speed_10m[sliderIndex] * Math.cos(AppState.weatherData.wind_direction_10m[sliderIndex] * Math.PI / 180);
+        const uSurface = -weatherData.wind_speed_10m[sliderIndex] * Math.sin(weatherData.wind_direction_10m[sliderIndex] * Math.PI / 180);
+        const vSurface = -weatherData.wind_speed_10m[sliderIndex] * Math.cos(weatherData.wind_direction_10m[sliderIndex] * Math.PI / 180);
         const uLowest = uComponents[validPressureLevels.indexOf(lowestPressureLevel)];
         const vLowest = vComponents[validPressureLevels.indexOf(lowestPressureLevel)];
 
@@ -221,8 +227,8 @@ export function interpolateWeatherData(sliderIndex) {
 
             heightData.unshift(h);
             validPressureLevels.unshift(p);
-            tempData.unshift(Utils.linearInterpolate([baseHeight, hLowest], [AppState.weatherData.temperature_2m[sliderIndex], AppState.weatherData[`temperature_${lowestPressureLevel}hPa`][sliderIndex]], h));
-            rhData.unshift(Utils.linearInterpolate([baseHeight, hLowest], [AppState.weatherData.relative_humidity_2m[sliderIndex], AppState.weatherData[`relative_humidity_${lowestPressureLevel}hPa`][sliderIndex]], h));
+            tempData.unshift(Utils.linearInterpolate([baseHeight, hLowest], [weatherData.temperature_2m[sliderIndex], weatherData[`temperature_${lowestPressureLevel}hPa`][sliderIndex]], h));
+            rhData.unshift(Utils.linearInterpolate([baseHeight, hLowest], [weatherData.relative_humidity_2m[sliderIndex], weatherData[`relative_humidity_${lowestPressureLevel}hPa`][sliderIndex]], h));
             spdData.unshift(spd);
             dirData.unshift(dir);
             uComponents.unshift(u);
@@ -232,10 +238,10 @@ export function interpolateWeatherData(sliderIndex) {
         // Add surface data
         heightData.unshift(baseHeight);
         validPressureLevels.unshift(surfacePressure);
-        tempData.unshift(AppState.weatherData.temperature_2m[sliderIndex]);
-        rhData.unshift(AppState.weatherData.relative_humidity_2m[sliderIndex]);
-        spdData.unshift(AppState.weatherData.wind_speed_10m[sliderIndex]);
-        dirData.unshift(AppState.weatherData.wind_direction_10m[sliderIndex]);
+        tempData.unshift(weatherData.temperature_2m[sliderIndex]);
+        rhData.unshift(weatherData.relative_humidity_2m[sliderIndex]);
+        spdData.unshift(weatherData.wind_speed_10m[sliderIndex]);
+        dirData.unshift(weatherData.wind_direction_10m[sliderIndex]);
         uComponents.unshift(uSurface);
         vComponents.unshift(vSurface);
     }
@@ -266,11 +272,11 @@ export function interpolateWeatherData(sliderIndex) {
             dataPoint = {
                 height: heightASLInMeters,
                 pressure: surfacePressure,
-                temp: AppState.weatherData.temperature_2m[sliderIndex],
-                rh: AppState.weatherData.relative_humidity_2m[sliderIndex],
-                spd: AppState.weatherData.wind_speed_10m[sliderIndex],
-                dir: AppState.weatherData.wind_direction_10m[sliderIndex],
-                dew: Utils.calculateDewpoint(AppState.weatherData.temperature_2m[sliderIndex], AppState.weatherData.relative_humidity_2m[sliderIndex])
+                temp: weatherData.temperature_2m[sliderIndex],
+                rh: weatherData.relative_humidity_2m[sliderIndex],
+                spd: weatherData.wind_speed_10m[sliderIndex],
+                dir: weatherData.wind_direction_10m[sliderIndex],
+                dew: Utils.calculateDewpoint(weatherData.temperature_2m[sliderIndex], weatherData.relative_humidity_2m[sliderIndex])
             };
         } else {
             const pressure = Utils.interpolatePressure(heightASLInMeters, validPressureLevels, heightData);

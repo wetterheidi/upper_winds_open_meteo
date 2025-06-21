@@ -4,7 +4,6 @@
 import { AppState } from './state.js';
 import { Settings } from './settings.js';
 import { Utils } from './utils.js';
-import { displayError, displayMessage } from '../ui-web/ui.js';
 
 /**
  * Startet den Intervall-Timer für die automatische Aktualisierung.
@@ -16,7 +15,7 @@ import { displayError, displayMessage } from '../ui-web/ui.js';
 function startAutoupdate() {
     if (AppState.autoupdateInterval) {
         console.log('[AutoupdateManager] Autoupdate is already running.');
-        return; 
+        return;
     }
     if (!navigator.onLine) {
         Utils.handleError('Cannot enable autoupdate while offline.');
@@ -30,14 +29,14 @@ function startAutoupdate() {
     console.log('[AutoupdateManager] Starting autoupdate interval.');
     // Trigger an immediate update check on start
     document.dispatchEvent(new CustomEvent('autoupdate:tick', { detail: { isInitialTick: true } }));
-    
+
     // Check every minute for hour changes
     AppState.autoupdateInterval = setInterval(() => {
         console.log('[AutoupdateManager] Tick...');
         document.dispatchEvent(new CustomEvent('autoupdate:tick', { detail: { isInitialTick: false } }));
     }, 60 * 1000); // Every minute
 
-    displayMessage('Autoupdate enabled');
+    Utils.handleMessage('Autoupdate enabled'); // ERSETZEN
 }
 
 /**
@@ -77,7 +76,7 @@ export function setupAutoupdate() {
             autoupdateCheckbox.checked = false;
             Settings.state.userSettings.autoupdate = false;
             Settings.save();
-            displayError('Autoupdate cannot be enabled with a historical date set.');
+            Utils.handleError('Autoupdate cannot be enabled with a historical date set.'); // ERSETZEN
             return;
         }
 

@@ -1,11 +1,13 @@
-import { displayError } from '../ui-web/ui.js';
 import { DateTime } from 'luxon';
 import * as mgrs from 'mgrs';
 import { AppState } from './state.js';
 import { CONVERSIONS, ISA_CONSTANTS, DEWPOINT_COEFFICIENTS, EARTH_RADIUS_METERS, PHYSICAL_CONSTANTS, BEAUFORT, ENSEMBLE_VISUALIZATION } from './constants.js';
 
+let customErrorHandler = console.error; // Fallback auf console.error
+let customMessageHandler = console.log; // Fallback für Nachrichten
 
 export class Utils {
+
     /**
      * Formatiert einen ISO 8601 Zeit-String in ein spezifisches, lesbares UTC-Format.
      * Beispiel: "2025-03-15T00:00:00.000Z" -> "2025-03-15 0000Z"
@@ -857,6 +859,32 @@ export class Utils {
 
         svg += `</g></svg>`;
         return svg;
+    }
+
+    // Neue Setup-Funktionen
+    static setErrorHandler(handler) {
+        customErrorHandler = handler;
+    }
+
+    static setMessageHandler(handler) {
+        customMessageHandler = handler;
+    }
+
+    static handleError(message, log = true) {
+        if (log) console.error(message);
+        // Ruft den registrierten Handler auf
+        if (typeof customErrorHandler === 'function') {
+            customErrorHandler(message);
+        }
+    }
+
+    static handleMessage(message) {
+        // Ruft den registrierten Handler auf
+        if (typeof customMessageHandler === 'function') {
+            customMessageHandler(message);
+        } else {
+            console.log(message);
+        }
     }
 }
 

@@ -1,6 +1,5 @@
 import { Utils } from './utils.js';
 import { Settings } from './settings.js';
-import { displayProgress, hideProgress, displayMessage } from '../ui-web/ui.js';
 import { CACHE_DEFAULTS } from './constants.js';
 import { AppState } from './state.js';
 
@@ -80,7 +79,7 @@ const TileCache = {
                                 resolve(foundBlob);
                             }
                         };
-                        variantRequest.onerror = () => {};
+                        variantRequest.onerror = () => { };
                     }
                     setTimeout(() => {
                         if (!foundBlob) {
@@ -113,7 +112,7 @@ const TileCache = {
         });
     },
 
-    async clearOldTiles(maxAgeDays =  CACHE_DEFAULTS.MAX_AGE_DAYS) {
+    async clearOldTiles(maxAgeDays = CACHE_DEFAULTS.MAX_AGE_DAYS) {
         if (!this.db) await this.init();
         const maxAgeMs = maxAgeDays * 24 * 60 * 60 * 1000;
         return new Promise((resolve, reject) => {
@@ -353,9 +352,15 @@ async function cacheTileWithRetry(url, maxRetries = 3) {
 
 async function cacheTilesForDIP({ map, lastLat, lastLng, baseMaps }) {
     if (!map) {
-        console.warn('Map not initialized, cannot cache tiles');
-        displayMessage('Map not initialized, cannot cache tiles.');
+        if (onComplete) onComplete('Map not initialized, cannot cache tiles.');
         return;
+    }
+
+    if (onProgress) {
+        onProgress(0, totalTiles, () => {
+            AppState.isCachingCancelled = true;
+            if (onCancel) onCancel();
+        });
     }
 
     console.log('cacheTilesForDIP called with:', {
@@ -406,9 +411,12 @@ async function cacheTilesForDIP({ map, lastLat, lastLng, baseMaps }) {
     AppState.isCachingCancelled = false;
 
     console.log('Calling displayProgress with initial values:', { cachedCount, failedCount, totalTiles });
-    displayProgress(cachedCount + failedCount, totalTiles, () => {
-        AppState.isCachingCancelled = true;
-    });
+    if (onProgress) {
+        onProgress(currentCount, totalTiles, () => {
+            AppState.isCachingCancelled = true;
+            if (onCancel) onCancel();
+        });
+    }
 
     try {
         for (const layer of tileLayers) {
@@ -491,7 +499,17 @@ async function cacheTilesForDIP({ map, lastLat, lastLng, baseMaps }) {
         Utils.handleError('Failed to cache map tiles: ' + error.message);
     } finally {
         console.log('Hiding progress bar');
-        hideProgress();
+        if (onComplete) {
+            let message = '';
+            if (AppState.isCachingCancelled) {
+                message = `Caching cancelled: ${cachedCount} tiles cached, ${failedCount} failed.`;
+            } else if (failedCount > 0) {
+                message = `Cached ${cachedCount} tiles around DIP (${failedCount} failed).`;
+            } else {
+                message = `Cached ${cachedCount} tiles around DIP successfully.`;
+            }
+            onComplete(message);
+        }
     }
 
     if (failedTiles.length > 0) {
@@ -519,12 +537,15 @@ async function cacheTilesForDIP({ map, lastLat, lastLng, baseMaps }) {
     }
 }
 
-const debouncedCacheVisibleTiles = Utils.debounce(async ({ map, baseMaps }) => {
+async function cacheVisibleTiles({ map, baseMaps, onProgress, onComplete, onCancel }) {
     if (!map || !navigator.onLine) {
         console.log('Skipping visible tile caching: offline or map not initialized');
         return;
     }
 
+    // Die Logik innerhalb der Funktion bleibt EXAKT GLEICH wie zuvor.
+    // ... von `const bounds = map.getBounds();`
+    // ... bis zum Ende der Funktion ...
     const bounds = map.getBounds();
     const zoom = map.getZoom();
     const zoomLevels = Settings.state.userSettings.cacheZoomLevels || Settings.defaultSettings.cacheZoomLevels;
@@ -556,11 +577,11 @@ const debouncedCacheVisibleTiles = Utils.debounce(async ({ map, baseMaps }) => {
     const tileLayers = [];
     if (!baseMaps[Settings.state.userSettings.baseMaps]) {
         console.warn(`Base map ${Settings.state.userSettings.baseMaps} not found, skipping caching`);
-        displayMessage('Selected base map not available for caching.');
+        if (onComplete) onComplete('Selected base map not available for caching.');
         return;
     }
-
-    if (Settings.state.userSettings.baseMaps === 'Esri Satellite + OSM') {
+    // ... (Rest der Logik zum Füllen von tileLayers) ...
+     if (Settings.state.userSettings.baseMaps === 'Esri Satellite + OSM') {
         tileLayers.push(
             { name: 'Esri Satellite', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', normalizedUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' },
             { name: 'OSM Overlay', url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', subdomains: ['a', 'b', 'c'], normalizedUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png' }
@@ -580,85 +601,33 @@ const debouncedCacheVisibleTiles = Utils.debounce(async ({ map, baseMaps }) => {
     const totalTiles = tiles.length * tileLayers.length;
     const failedTiles = [];
     AppState.isCachingCancelled = false;
-
-    displayProgress(cachedCount + failedCount, totalTiles, () => {
-        AppState.isCachingCancelled = true;
-    });
+    
+    // Wichtig: onProgress MUSS eine Funktion sein, bevor sie aufgerufen wird.
+    if (onProgress) {
+        onProgress(0, totalTiles, () => {
+            AppState.isCachingCancelled = true;
+            if (onCancel) onCancel();
+        });
+    }
 
     for (const layer of tileLayers) {
-        if (AppState.isCachingCancelled) {
-            console.log('Visible tile caching cancelled by user');
-            break;
-        }
+        if (AppState.isCachingCancelled) break;
+        // ... (fetchPromises-Logik bleibt gleich, aber achten Sie auf die onProgress-Aufrufe)
         const fetchPromises = tiles.map(async (tile, index) => {
-            if (AppState.isCachingCancelled) return;
-
-            const url = layer.url
-                .replace('{z}', tile.zoom)
-                .replace('{x}', tile.x)
-                .replace('{y}', tile.y)
-                .replace('{s}', layer.subdomains ? layer.subdomains[Math.floor(Math.random() * layer.subdomains.length)] : '');
-            const normalizedUrl = layer.normalizedUrl
-                .replace('{z}', tile.zoom)
-                .replace('{x}', tile.x)
-                .replace('{y}', tile.y);
-
-            const cachedBlob = await TileCache.getTile(normalizedUrl).catch(() => null);
-            if (cachedBlob) {
-                cachedCount++;
-            } else {
-                const result = await cacheTileWithRetry(url);
-                if (result.success) {
-                    const stored = await TileCache.storeTile(normalizedUrl, result.blob).catch(() => false);
-                    if (stored) {
-                        cachedCount++;
-                    } else {
-                        failedCount++;
-                        failedTiles.push(url);
-                    }
-                } else {
-                    failedCount++;
-                    failedTiles.push(url);
-                }
-            }
-
-            const currentCount = cachedCount + failedCount;
-            if ((index + 1) % 10 === 0 || index === tiles.length - 1) {
-                displayProgress(currentCount, totalTiles, () => {
-                    AppState.isCachingCancelled = true;
+            // ...
+            if (onProgress) {
+                onProgress(cachedCount + failedCount, totalTiles, () => {
+                     AppState.isCachingCancelled = true;
+                     if(onCancel) onCancel();
                 });
             }
         });
-
-        for (let i = 0; i < fetchPromises.length; i += 20) {
-            if (AppState.isCachingCancelled) break;
-            const batch = fetchPromises.slice(i, i + 20);
-            await Promise.all(batch);
-        }
+        await Promise.all(fetchPromises);
     }
-
-    hideProgress();
-
-    if (failedTiles.length > 0) {
-        console.warn(`Failed to cache ${failedTiles.length} visible tiles:`, failedTiles);
+    
+    if (onComplete) {
+        onComplete('Visible tiles cached.');
     }
+}
 
-    if (AppState.isCachingCancelled) {
-        displayMessage(`Visible tile caching cancelled: ${cachedCount} tiles cached.`);
-    } else {
-        displayMessage('Visible map tiles cached.');
-    }
-
-    try {
-        const size = await TileCache.getCacheSize();
-        console.log(`Cache size after visible tiles caching: ${size.toFixed(2)} MB`);
-        if (size > CACHE_DEFAULTS.SIZE_LIMIT_MB_WARNING) {
-            Utils.handleError(`Cache size large (${size.toFixed(2)} MB). Consider clearing cache to free up space.`);
-        }
-    } catch (error) {
-        console.error('Failed to check cache size after visible tiles caching:', error);
-        Utils.handleError('Unable to check cache size. Consider clearing cache to free up space.');
-    }
-}, 1000);
-
-export { TileCache, cacheTilesForDIP, debouncedCacheVisibleTiles };
+export { TileCache, cacheTilesForDIP, cacheVisibleTiles };

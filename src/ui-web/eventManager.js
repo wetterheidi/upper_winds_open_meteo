@@ -15,13 +15,15 @@ import * as displayManager from './displayManager.js';
 import * as mapManager from './mapManager.js';
 import * as Coordinates from './coordinates.js';
 import * as JumpPlanner from '../core/jumpPlanner.js';
-import { TileCache, cacheTilesForDIP } from '../core/tileCache.js';
+import { TileCache, cacheTilesForDIP, cacheVisibleTiles } from '../core/tileCache.js';
 import { loadGpxTrack, loadCsvTrackUTC } from '../core/trackManager.js';
 import * as weatherManager from '../core/weatherManager.js';
 import * as liveTrackingManager from '../core/liveTrackingManager.js';
 import { fetchEnsembleWeatherData, processAndVisualizeEnsemble, clearEnsembleVisualizations } from '../core/ensembleManager.js';
-import { getSliderValue } from './ui.js';
+import { getSliderValue, displayMessage, hideProgress, displayProgress } from './ui.js';
 import * as AutoupdateManager from '../core/autoupdateManager.js';
+import { UI_DEFAULTS } from '../core/constants.js'; // <-- DIESE ZEILE HINZUFÜGEN
+import { updateModelSelectUI, cleanupSelectedEnsembleModels } from './ui.js';
 import 'leaflet-gpx';
 
 let listenersInitialized = false;
@@ -476,6 +478,12 @@ function setupSliderEvents() {
                 console.log('Updating jump run track for slider index:', sliderIndex);
                 displayManager.updateJumpRunTrackDisplay();
             }
+            if (Settings.state.userSettings.selectedEnsembleModels?.length > 0) {
+                if (AppState.ensembleModelsData && Object.keys(AppState.ensembleModelsData).length > 0) {
+                    // Wert an die Core-Funktion übergeben
+                    processAndVisualizeEnsemble(sliderIndex);
+                }
+            }
             //mapManager.recenterMap();
             updateJumpMasterLineAndPanel();
         } else {
@@ -500,12 +508,12 @@ function setupSliderEvents() {
         if (Settings.state.userSettings.selectedEnsembleModels && Settings.state.userSettings.selectedEnsembleModels.length > 0) {
             console.log("Time slider change triggering ensemble update for index:", sliderIndex);
             if (AppState.ensembleModelsData && Object.keys(AppState.ensembleModelsData).length > 0) {
-                processAndVisualizeEnsemble(); // Diese Funktion verwendet intern den aktuellen sliderIndex via getSliderValue()
+                processAndVisualizeEnsemble(sliderIndex); // Diese Funktion verwendet intern den aktuellen sliderIndex via getSliderValue()
             } else {
                 console.warn("Ensemble update skipped: AppState.ensembleModelsData is not populated yet.");
                 // Optional: Daten erneut abrufen, falls sie fehlen sollten
                 // await fetchEnsembleWeatherData();
-                // processAndVisualizeEnsemble();
+                // processAndVisualizeEnsemble(sliderIndex);
             }
         }
     });
@@ -564,6 +572,13 @@ function setupModelSelectEvents() {
         } else {
             Utils.handleError('Please select a position on the map first.');
         }
+    });
+
+    document.addEventListener('models:available', (event) => {
+        const { availableModels } = event.detail;
+        updateModelSelectUI(availableModels);
+        updateEnsembleModelUI(availableModels);
+        cleanupSelectedEnsembleModels(availableModels);
     });
 }
 
@@ -747,37 +762,29 @@ function setupRadioEvents() {
     //Ensemble stuff
     const scenarioRadios = document.querySelectorAll('input[name="ensembleScenario"]');
     scenarioRadios.forEach(radio => {
-        radio.addEventListener('change', () => {
+        radio.addEventListener('change', async () => { // Die Funktion zu 'async' machen
             if (radio.checked) {
                 Settings.state.userSettings.currentEnsembleScenario = radio.value;
-                AppState.currentEnsembleScenario = radio.value; // Auch AppState aktualisieren
+                AppState.currentEnsembleScenario = radio.value;
                 Settings.save();
                 console.log('Ensemble scenario changed to:', radio.value);
 
-                // Daten abrufen (falls noch nicht geschehen) und dann visualisieren
-                if (Settings.state.userSettings.selectedEnsembleModels.length > 0) {
-                    // Prüfen, ob Daten für die ausgewählten Modelle bereits geladen sind
-                    const modelsLoaded = Settings.state.userSettings.selectedEnsembleModels.every(
-                        m => AppState.ensembleModelsData && AppState.ensembleModelsData[m]
-                    );
+                const modelsLoaded = Settings.state.userSettings.selectedEnsembleModels.every(
+                    m => AppState.ensembleModelsData && AppState.ensembleModelsData[m]
+                );
 
-                    if (!modelsLoaded && radio.value !== 'all_models') { // Min/Mean/Max benötigen alle Modelldaten
-                        fetchEnsembleWeatherData(); // processAndVisualizeEnsemble wird am Ende von fetchEnsembleWeatherData aufgerufen
-                    } else if (!modelsLoaded && radio.value === 'all_models' && AppState.ensembleModelsData && Object.keys(AppState.ensembleModelsData).length > 0) {
-                        // 'all_models' kann auch mit unvollständigen Daten etwas anzeigen
-                        processAndVisualizeEnsemble();
-                    } else if (modelsLoaded) {
-                        processAndVisualizeEnsemble();
-                    } else { // Keine Modelle ausgewählt oder Daten fehlen komplett
-                        Utils.handleMessage("Please select models and ensure data is fetched.");
-                        clearEnsembleVisualizations();
+                // Zuerst prüfen, ob Daten geholt werden müssen
+                if (!modelsLoaded && radio.value !== 'all_models') {
+                    const success = await fetchEnsembleWeatherData();
+                    if (!success) {
+                        Utils.handleError("Failed to fetch data for scenario.");
+                        return; // Abbrechen bei Fehler
                     }
-                } else if (radio.value !== 'all_models') {
-                    Utils.handleMessage("Please select models from the 'Ensemble > Models' menu first.");
-                    clearEnsembleVisualizations();
-                } else { // 'all_models' aber keine Modelle selektiert
-                    clearEnsembleVisualizations();
                 }
+
+                // JETZT, da die Daten sicher vorhanden sind, die Visualisierung mit dem Index aufrufen
+                const sliderIndex = getSliderValue(); // Den Index aus der UI holen
+                processAndVisualizeEnsemble(sliderIndex); // Den Index an die Core-Funktion übergeben
             }
         });
     });
@@ -1198,6 +1205,97 @@ function setupJumpRunTrackEvents() {
 function setupMapEventListeners() {
     console.log("App: Richte Event-Listener für Karten-Events ein.");
 
+    if (!AppState.map) {
+        console.error("Karte nicht initialisiert, Event-Listener können nicht gesetzt werden.");
+        return;
+    }
+
+    // Wir definieren den Handler als Konstante direkt hier drin, um Scope-Probleme zu vermeiden.
+    const mapMoveHandler = () => {
+        console.log("Zentraler 'moveend/zoomend' Handler wird ausgeführt.");
+        const currentZoom = AppState.map.getZoom();
+
+        // 1. Logik für die Aktualisierung der Visualisierungen
+        if (Settings.state.userSettings.calculateJump && AppState.weatherData && AppState.lastLat) {
+            if (currentZoom >= UI_DEFAULTS.MIN_ZOOM && currentZoom <= UI_DEFAULTS.MAX_ZOOM) {
+                calculateJump();
+            } else {
+                mapManager.drawJumpVisualization(null);
+            }
+        }
+        if (Settings.state.userSettings.showJumpRunTrack) {
+            if (currentZoom >= UI_DEFAULTS.MIN_ZOOM && currentZoom <= UI_DEFAULTS.MAX_ZOOM) {
+                displayManager.updateJumpRunTrackDisplay();
+            } else {
+                mapManager.drawJumpRunTrack(null);
+            }
+        }
+        if (Settings.state.userSettings.showLandingPattern) {
+            displayManager.updateLandingPatternDisplay();
+        }
+
+        // 2. Logik für das Caching der Kacheln mit korrekten Callbacks
+        /* debouncedCacheVisibleTiles({
+            map: AppState.map,
+            baseMaps: AppState.baseMaps,
+            onProgress: displayProgress,
+            onComplete: (message) => {
+                hideProgress();
+                if (message) Utils.handleMessage(message);
+            },
+            onCancel: () => {
+                hideProgress();
+                Utils.handleMessage('Caching cancelled.');
+            }
+        });
+        */
+    };
+
+    const debouncedMapMoveHandler = Utils.debounce(() => {
+        console.log("Zentraler, debounced 'move/zoom' Handler wird ausgeführt.");
+
+        // Caching-Logik mit korrekten Callbacks
+        cacheVisibleTiles({
+            map: AppState.map,
+            baseMaps: AppState.baseMaps,
+            onProgress: displayProgress,
+            onComplete: (message) => {
+                hideProgress();
+                if (message) Utils.handleMessage(message);
+            },
+            onCancel: () => {
+                hideProgress();
+                Utils.handleMessage('Caching cancelled.');
+            }
+        });
+
+        // Logik für Visualisierungen (kann auch außerhalb des debounce sein, wenn sie sofort reagieren soll)
+        const currentZoom = AppState.map.getZoom();
+        if (Settings.state.userSettings.calculateJump && AppState.weatherData && AppState.lastLat) {
+            if (currentZoom >= UI_DEFAULTS.MIN_ZOOM && currentZoom <= UI_DEFAULTS.MAX_ZOOM) {
+                calculateJump();
+            } else {
+                mapManager.drawJumpVisualization(null);
+            }
+        }
+        if (Settings.state.userSettings.showJumpRunTrack) {
+            if (currentZoom >= UI_DEFAULTS.MIN_ZOOM && currentZoom <= UI_DEFAULTS.MAX_ZOOM) {
+                displayManager.updateJumpRunTrackDisplay();
+            } else {
+                mapManager.drawJumpRunTrack(null);
+            }
+        }
+        if (Settings.state.userSettings.showLandingPattern) {
+            displayManager.updateLandingPatternDisplay();
+        }
+
+    }, 1000); // 1 Sekunde Verzögerung nach der letzten Bewegung
+
+
+    // Wir registrieren den einen, zentralen Handler für beide Events
+    AppState.map.on('zoomend', mapMoveHandler);
+    AppState.map.on('moveend', mapMoveHandler);
+
     document.addEventListener('map:location_selected', async (event) => {
         const { lat, lng, source } = event.detail;
         console.log(`App: Event 'map:location_selected' von '${source}' empfangen.`);
@@ -1586,27 +1684,105 @@ function setupCacheSettings() {
 
     const recacheNowButton = document.getElementById('recacheNowButton');
     if (recacheNowButton) {
-        recacheNowButton.addEventListener('click', (e) => {
-            e.stopPropagation();
-            console.log('Recache Now button clicked');
-            if (!navigator.onLine) {
-                Utils.handleError('Cannot recache while offline.');
-                return;
-            }
-
-            const { map, lastLat, lastLng, baseMaps } = AppState;
-
-            if (!map) {
-                console.warn('Map not initialized, cannot recache tiles');
-                Utils.handleMessage('Map not initialized, cannot recache tiles.');
-                return;
-            }
-            cacheTilesForDIP({ map, lastLat, lastLng, baseMaps });
+        recacheNowButton.addEventListener('click', () => {
+            cacheTilesForDIP({
+                map: AppState.map,
+                lastLat: AppState.lastLat,
+                lastLng: AppState.lastLng,
+                baseMaps: AppState.baseMaps,
+                onProgress: (current, total, cancelCallback) => {
+                    displayProgress(current, total, cancelCallback);
+                },
+                onComplete: (message) => {
+                    hideProgress();
+                    displayMessage(message);
+                },
+                onCancel: () => {
+                    hideProgress();
+                    displayMessage('Caching cancelled.');
+                }
+            });
         });
         console.log('recacheNowButton listener attached');
     } else {
         console.warn('recacheNowButton not found in DOM');
     }
+}
+
+export function updateEnsembleModelUI(availableModels) {
+    const submenu = document.getElementById('ensembleModelsSubmenu');
+    if (!submenu) return;
+    submenu.innerHTML = '';
+    availableModels.forEach(model => {
+        const li = document.createElement('li');
+        const label = document.createElement('label');
+        label.className = 'radio-label';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.name = 'ensembleModel';
+        checkbox.value = model;
+        checkbox.checked = Settings.state.userSettings.selectedEnsembleModels.includes(model);
+
+        // Den Event-Listener zu async machen
+        checkbox.addEventListener('change', async () => {
+            const selected = Array.from(submenu.querySelectorAll('input:checked')).map(cb => cb.value);
+            Settings.state.userSettings.selectedEnsembleModels = selected;
+            Settings.save();
+
+            // KORREKTUR: Die Logik aufteilen
+            // 1. Daten abrufen und auf Erfolg warten
+            const success = await fetchEnsembleWeatherData();
+
+            // 2. Nur wenn die Daten erfolgreich geladen wurden, die Visualisierung anstoßen
+            if (success) {
+                const sliderIndex = getSliderValue(); // Den UI-Zustand hier abrufen
+                processAndVisualizeEnsemble(sliderIndex); // Und an die Core-Funktion übergeben
+            }
+        });
+
+        label.append(checkbox, ` ${model.replace(/_/g, ' ').toUpperCase()}`);
+        li.appendChild(label);
+        submenu.appendChild(li);
+    });
+}
+export function handleMapMovement() {
+    console.log("Zentraler 'handleMapMovement' Handler wird ausgeführt.");
+    const currentZoom = AppState.map.getZoom();
+
+    // 1. Logik für die Aktualisierung der Sprung-Visualisierungen
+    if (Settings.state.userSettings.calculateJump && AppState.weatherData && AppState.lastLat) {
+        if (currentZoom >= UI_DEFAULTS.MIN_ZOOM && currentZoom <= UI_DEFAULTS.MAX_ZOOM) {
+            calculateJump();
+        } else {
+            mapManager.drawJumpVisualization(null);
+        }
+    }
+    if (Settings.state.userSettings.showJumpRunTrack) {
+        if (currentZoom >= UI_DEFAULTS.MIN_ZOOM && currentZoom <= UI_DEFAULTS.MAX_ZOOM) {
+            displayManager.updateJumpRunTrackDisplay();
+        } else {
+            mapManager.drawJumpRunTrack(null);
+        }
+    }
+    if (Settings.state.userSettings.showLandingPattern) {
+        displayManager.updateLandingPatternDisplay();
+    }
+
+    // 2. Logik für das Caching der Kacheln mit korrekten Callbacks
+    debouncedCacheVisibleTiles({
+        map: AppState.map,
+        baseMaps: AppState.baseMaps,
+        onProgress: displayProgress,
+        onComplete: (message) => {
+            hideProgress();
+            // Utils.handleMessage ist bereits über main-*.js konfiguriert
+            if (message) Utils.handleMessage(message);
+        },
+        onCancel: () => {
+            hideProgress();
+            Utils.handleMessage('Caching cancelled.');
+        }
+    });
 }
 
 // HAUPT-INITIALISIERUNGSFUNKTION

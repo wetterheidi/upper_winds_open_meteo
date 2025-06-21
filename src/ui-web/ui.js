@@ -1,7 +1,7 @@
 // ui.js
 import { Utils } from '../core/utils.js';
 import { Settings } from '../core/settings.js';
-import { fetchEnsembleWeatherData } from '../core/ensembleManager.js';
+import { fetchEnsembleWeatherData, processAndVisualizeEnsemble } from '../core/ensembleManager.js';
 import { UI_DEFAULTS } from '../core/constants.js';
 
 export function isMobileDevice() {
@@ -184,6 +184,7 @@ export function updateEnsembleModelUI(availableModels) {
     if (!submenu) return;
     submenu.innerHTML = '';
     availableModels.forEach(model => {
+        // ... (Code zum Erstellen von li, label, checkbox bleibt gleich)
         const li = document.createElement('li');
         const label = document.createElement('label');
         label.className = 'radio-label';
@@ -192,12 +193,23 @@ export function updateEnsembleModelUI(availableModels) {
         checkbox.name = 'ensembleModel';
         checkbox.value = model;
         checkbox.checked = Settings.state.userSettings.selectedEnsembleModels.includes(model);
-        checkbox.addEventListener('change', () => {
+
+        // Diesen Event-Listener anpassen
+        checkbox.addEventListener('change', async () => {
             const selected = Array.from(submenu.querySelectorAll('input:checked')).map(cb => cb.value);
             Settings.state.userSettings.selectedEnsembleModels = selected;
             Settings.save();
-            fetchEnsembleWeatherData();
+
+            // 1. Daten abrufen und auf Erfolg warten
+            const success = await fetchEnsembleWeatherData();
+            
+            // 2. NUR wenn die Daten erfolgreich waren, die Visualisierung anstoßen
+            if (success) {
+                const sliderIndex = getSliderValue(); // Den UI-Zustand HIER abrufen
+                processAndVisualizeEnsemble(sliderIndex); // Und an die Core-Funktion übergeben
+            }
         });
+        
         label.append(checkbox, ` ${model.replace(/_/g, ' ').toUpperCase()}`);
         li.appendChild(label);
         submenu.appendChild(li);

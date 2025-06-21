@@ -5,12 +5,12 @@ import { Utils } from '../core/utils.js';
 import { Settings, getInterpolationStep } from '../core/settings.js';
 import { UI_DEFAULTS } from '../core/constants.js';
 import * as EventManager from './eventManager.js';
-import { displayMessage, displayError } from './ui.js';
 import * as Coordinates from './coordinates.js';
 import * as JumpPlanner from '../core/jumpPlanner.js';
 import * as mapManager from './mapManager.js';
 import * as weatherManager from '../core/weatherManager.js';
-import { getSliderValue } from './ui.js';
+import { cacheVisibleTiles } from '../core/tileCache.js';
+import { getSliderValue, displayError, displayMessage, displayProgress, hideProgress } from './ui.js';
 import * as AutoupdateManager from '../core/autoupdateManager.js';
 import { DateTime } from 'luxon';
 import * as displayManager from './displayManager.js';
@@ -23,6 +23,8 @@ export const debouncedCalculateJump = Utils.debounce(calculateJump, 300);
 export const getDownloadFormat = () => Settings.getValue('downloadFormat', 'radio', 'csv');
 
 // == Tile caching ==
+Utils.setErrorHandler(displayError);
+Utils.setMessageHandler(displayMessage);
 Utils.handleMessage = displayMessage;
 
 // == Map Initialization and Interaction ==
@@ -94,17 +96,26 @@ export const debouncedGetElevationAndQFE = Utils.debounce(async (lat, lng, reque
  */
 export function calculateMeanWind() {
     console.log('Calculating mean wind with model:', document.getElementById('modelSelect').value, 'weatherData:', AppState.weatherData);
-    const index = document.getElementById('timeSlider').value || 0;
-    const interpolatedData = weatherManager.interpolateWeatherData(index);
-    let lowerLimitInput = parseFloat(document.getElementById('lowerLimit').value) || 0;
-    let upperLimitInput = parseFloat(document.getElementById('upperLimit').value);
+    
+    // KORREKTUR: Deklarationen an den Anfang der Funktion verschoben
     const refLevel = document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL';
     const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
     const windSpeedUnit = Settings.getValue('windUnit', 'radio', 'kt');
+
+    const index = document.getElementById('timeSlider').value || 0;
+    const interpolatedData = weatherManager.interpolateWeatherData(
+        AppState.weatherData,
+        index,
+        getInterpolationStep(),
+        Math.round(AppState.lastAltitude),
+        heightUnit
+    );
+    let lowerLimitInput = parseFloat(document.getElementById('lowerLimit').value) || 0;
+    let upperLimitInput = parseFloat(document.getElementById('upperLimit').value);
     const baseHeight = Math.round(AppState.lastAltitude);
 
     if (!AppState.weatherData || AppState.lastAltitude === 'N/A') {
-        handleError('Cannot calculate mean wind: missing data or altitude');
+        Utils.handleError('Cannot calculate mean wind: missing data or altitude');
         return;
     }
 
@@ -309,7 +320,14 @@ export function downloadTableAsAscii(format) {
     }
 
     // Generate interpolated data
-    const interpolatedData = weatherManager.interpolateWeatherData(index);
+     const interpStep = getInterpolationStep(); // Wert in der UI-Schicht holen
+    const interpolatedData = weatherManager.interpolateWeatherData(
+        AppState.weatherData, // Das Haupt-Wetterdatenobjekt
+        index,
+        interpStep,
+        Math.round(AppState.lastAltitude),
+        heightUnit
+    );
     if (!interpolatedData || interpolatedData.length === 0) {
         Utils.handleError('No interpolated data available to download.');
         return;
@@ -439,6 +457,9 @@ export async function updateToCurrentHour() {
  * Canopy-Bereiche, Cut-Away-Punkt) auf der Karte zu zeichnen.
  */
 export function calculateJump() {
+    const index = getSliderValue();
+    const interpStep = getInterpolationStep();
+    const heightUnit = Settings.getValue('heightUnit', 'radio', 'm'); // <-- DIE FEHLENDE ZEILE
     if (!Settings.state.isCalculateJumpUnlocked || !Settings.state.userSettings.calculateJump) {
         mapManager.drawJumpVisualization(null);
         mapManager.drawCutAwayVisualization(null);
@@ -452,7 +473,13 @@ export function calculateJump() {
 
     // Daten einmal zentral vorbereiten
     const sliderIndex = getSliderValue();
-    const interpolatedData = weatherManager.interpolateWeatherData(sliderIndex);
+    const interpolatedData = weatherManager.interpolateWeatherData(
+        AppState.weatherData, // Das Haupt-Wetterdatenobjekt
+        index,
+        interpStep,
+        Math.round(AppState.lastAltitude),
+        heightUnit
+    );
 
 
     const visualizationData = {
@@ -1027,6 +1054,23 @@ document.addEventListener('DOMContentLoaded', async () => {
             mapManager.recenterMap(true);
             AppState.isManualPanning = false;
 
+            if (source === 'geolocation' || source === 'geolocation_fallback') {
+                console.log("Starte initiales Caching nach Geolocation...");
+                cacheVisibleTiles({
+                    map: AppState.map,
+                    baseMaps: AppState.baseMaps,
+                    onProgress: displayProgress,
+                    onComplete: (message) => {
+                        hideProgress();
+                        if (message) displayMessage(message);
+                    },
+                    onCancel: () => {
+                        hideProgress();
+                        displayMessage('Caching cancelled.');
+                    }
+                });
+            }
+
             if (Settings.state.userSettings.showJumpMasterLine) {
                 updateJumpMasterLineAndPanel();
             }
@@ -1036,38 +1080,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         } finally {
             if (loadingElement) loadingElement.style.display = 'none';
         }
-    });
-
-    document.addEventListener('map:zoomend', (event) => {
-        console.log("App: Event 'map:zoomend' empfangen.");
-
-        const currentZoom = AppState.map.getZoom();
-
-        // Hier ist jetzt das neue Zuhause für die Anwendungslogik!
-        if (Settings.state.userSettings.calculateJump && AppState.weatherData && AppState.lastLat) {
-            // Prüfe, ob der aktuelle Zoom im gewünschten Bereich liegt
-            if (currentZoom >= UI_DEFAULTS.MIN_ZOOM && currentZoom <= UI_DEFAULTS.MAX_ZOOM) {
-                // Ja, also Kreise berechnen und zeichnen
-                calculateJump();
-            } else {
-                // Nein, also alle bestehenden Sprung-Visualisierungen löschen
-                mapManager.drawJumpVisualization(null);
-                //mapManager.drawCutAwayVisualization(null);
-            }
-        }
-
-        if (Settings.state.userSettings.showJumpRunTrack) {
-            if (currentZoom >= UI_DEFAULTS.MIN_ZOOM && currentZoom <= UI_DEFAULTS.MAX_ZOOM) {
-                displayManager.updateJumpRunTrackDisplay();
-            } else {
-                // Nein, also alle bestehenden Sprung-Visualisierungen löschen
-                mapManager.drawJumpRunTrack(null);
-            }
-        }
-        if (Settings.state.userSettings.showLandingPattern) {
-            displayManager.updateLandingPatternDisplay();
-        }
-
     });
 
     document.addEventListener('autoupdate:tick', async (event) => {

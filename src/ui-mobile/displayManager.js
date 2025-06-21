@@ -1,5 +1,5 @@
 import { AppState } from '../core/state.js';
-import { Settings } from '../core/settings.js';
+import { Settings, getInterpolationStep } from '../core/settings.js';
 import { Utils } from '../core/utils.js';
 import { getSliderValue } from './ui.js';
 import * as mapManager from './mapManager.js';
@@ -88,7 +88,14 @@ export async function updateWeatherDisplay(index, originalTime = null) {
     const temperatureUnit = Settings.getValue('temperatureUnit', 'radio', 'C');
     // Pass lat and lng to getDisplayTime
     const time = await Utils.getDisplayTime(AppState.weatherData.time[index], AppState.lastLat, AppState.lastLng);
-    const interpolatedData = weatherManager.interpolateWeatherData(index);
+    const interpStep = getInterpolationStep(); // Wert in der UI-Schicht holen
+    const interpolatedData = weatherManager.interpolateWeatherData(
+        AppState.weatherData, // Das Haupt-Wetterdatenobjekt
+        index,
+        interpStep,
+        Math.round(AppState.lastAltitude),
+        heightUnit
+    ); // Und an die Core-Funktion übergeben
     const surfaceHeight = refLevel === 'AMSL' && AppState.lastAltitude !== 'N/A' ? Math.round(AppState.lastAltitude) : 0;
 
     if (!Settings.state.userSettings.showTable) {
@@ -232,7 +239,14 @@ export function updateLandingPatternDisplay() {
     const lat = markerLatLng.lat;
     const lng = markerLatLng.lng;
     const baseHeight = Math.round(AppState.lastAltitude);
-    const interpolatedData = weatherManager.interpolateWeatherData(sliderIndex);
+    const interpStep = getInterpolationStep(); // Wert in der UI-Schicht holen
+    const interpolatedData = weatherManager.interpolateWeatherData(
+        AppState.weatherData, // Das Haupt-Wetterdatenobjekt
+        index,
+        interpStep,
+        Math.round(AppState.lastAltitude),
+        heightUnit
+    ); // Und an die Core-Funktion übergeben
     if (!interpolatedData || interpolatedData.length === 0) return;
 
 
@@ -497,7 +511,14 @@ export function updateJumpRunTrackDisplay() {
     // Wenn die Bedingungen erfüllt sind, zeichne den Track.
     // Neuer Code:
     const sliderIndex = getSliderValue();
-    const interpolatedData = weatherManager.interpolateWeatherData(sliderIndex);
+    const interpStep = getInterpolationStep(); // Wert in der UI-Schicht holen
+    const interpolatedData = weatherManager.interpolateWeatherData(
+        AppState.weatherData, // Das Haupt-Wetterdatenobjekt
+        index,
+        interpStep,
+        Math.round(AppState.lastAltitude),
+        heightUnit
+    ); // Und an die Core-Funktion übergeben
     const trackData = JumpPlanner.jumpRunTrack(interpolatedData);
     if (trackData && trackData.latlngs?.length === 2 && trackData.latlngs.every(ll => Number.isFinite(ll[0]) && Number.isFinite(ll[1]))) {
         console.log('Drawing jump run track with data:', trackData);
