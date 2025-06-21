@@ -139,7 +139,7 @@ export function calculateMeanWind() {
 
     if (refLevel === 'AMSL' && upperLimit < baseHeight) {
         Utils.handleError(`The entire selected layer (${Math.round(Utils.convertHeight(lowerLimit, heightUnit))}-${Math.round(Utils.convertHeight(upperLimit, heightUnit))} ${heightUnit}) is below the terrain altitude of ${Math.round(Utils.convertHeight(baseHeight, heightUnit))} ${heightUnit}.`);
-        
+
         // NEU: Setze das Ergebnisfeld auf einen klaren Status
         document.getElementById('meanWindResult').innerHTML = 'Mean wind: N/A (Layer is below ground)';
 
@@ -206,182 +206,82 @@ export function downloadTableAsAscii(format) {
     const time = Utils.formatTime(AppState.weatherData.time[index]).replace(' ', '_');
     const filename = `${time}_${model}_${format}.txt`;
 
-    // Define format-specific required settings
+    // 1. Anforderungen für das gewählte Format holen
     const formatRequirements = {
-        'ATAK': {
-            interpStep: 1000,
-            heightUnit: 'ft',
-            refLevel: 'AGL',
-            windUnit: 'kt'
-        },
-        'Windwatch': {
-            interpStep: 100,
-            heightUnit: 'ft',
-            refLevel: 'AGL',
-            windUnit: 'km/h'
-        },
-        'HEIDIS': {
-            interpStep: 100,
-            heightUnit: 'm',
-            refLevel: 'AGL',
-            temperatureUnit: 'C',
-            windUnit: 'm/s'
-        },
-        'Customized': {} // No strict requirements, use current settings
+        'ATAK': { interpStep: 1000, heightUnit: 'ft', refLevel: 'AGL', windUnit: 'kt' },
+        'Windwatch': { interpStep: 100, heightUnit: 'ft', refLevel: 'AGL', windUnit: 'km/h' },
+        'HEIDIS': { interpStep: 100, heightUnit: 'm', refLevel: 'AGL', temperatureUnit: 'C', windUnit: 'm/s' },
+        'Customized': {} // Keine festen Anforderungen
     };
 
-    // Store original settings
-    const originalSettings = {
-        interpStep: getInterpolationStep(),
-        heightUnit: Settings.getValue('heightUnit', 'radio', 'm'),
-        refLevel: document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL',
-        windUnit: Settings.getValue('windUnit', 'radio', 'kt'),
-        temperatureUnit: Settings.getValue('temperatureUnit', 'radio', 'C')
+    const requirements = formatRequirements[format] || {};
+
+ // 2. Export-Einstellungen definieren: Entweder aus den Requirements oder aus der UI
+    const exportSettings = {
+        interpStep: requirements.interpStep || getInterpolationStep(),
+        heightUnit: requirements.heightUnit || Settings.getValue('heightUnit', 'radio', 'm'),
+        refLevel: requirements.refLevel || document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL',
+        windUnit: requirements.windUnit || Settings.getValue('windUnit', 'radio', 'kt'),
+        temperatureUnit: requirements.temperatureUnit || Settings.getValue('temperatureUnit', 'radio', 'C')
     };
+    console.log(`Generating export for '${format}' with settings:`, exportSettings);
 
-    // Get current settings
-    let currentSettings = { ...originalSettings };
-
-    // Check and adjust settings if format has specific requirements
-    const requiredSettings = formatRequirements[format];
-    if (requiredSettings && Object.keys(requiredSettings).length > 0) {
-        let settingsAdjusted = false;
-
-        // Check each required setting and adjust if necessary
-        for (const [key, requiredValue] of Object.entries(requiredSettings)) {
-            if (currentSettings[key] !== requiredValue) {
-                settingsAdjusted = true;
-                switch (key) {
-                    case 'interpStep':
-                        document.getElementById('interpStepSelect').value = requiredValue;
-                        Settings.state.userSettings.interpStep = requiredValue;
-                        break;
-                    case 'heightUnit':
-                        document.querySelector(`input[name="heightUnit"][value="${requiredValue}"]`).checked = true;
-                        Settings.state.userSettings.heightUnit = requiredValue;
-                        break;
-                    case 'refLevel':
-                        document.querySelector(`input[name="refLevel"][value="${requiredValue}"]`).checked = true;
-                        Settings.state.userSettings.refLevel = requiredValue;
-                        break;
-                    case 'windUnit':
-                        document.querySelector(`input[name="windUnit"][value="${requiredValue}"]`).checked = true;
-                        Settings.state.userSettings.windUnit = requiredValue;
-                        break;
-                    case 'temperatureUnit':
-                        document.querySelector(`input[name="temperatureUnit"][value="${requiredValue}"]`).checked = true;
-                        Settings.state.userSettings.temperatureUnit = requiredValue;
-                        break;
-                }
-                currentSettings[key] = requiredValue;
-            }
-        }
-
-        if (settingsAdjusted) {
-            Settings.save();
-            console.log(`Adjusted settings for ${format} compatibility:`, requiredSettings);
-            Settings.updateUnitLabels(); // Update UI labels if heightUnit changes
-            Settings.updateUnitLabels();   // Update UI labels if windUnit changes
-            Settings.updateUnitLabels();
-            // Update UI labels if refLevel changes
-        }
-    }
-
-    // Prepare content based on format
-    let content = '';
-    let separator = ' '; // Default separator "space"
-    const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
-    const temperatureUnit = Settings.getValue('temperatureUnit', 'radio', 'C');
-    const windSpeedUnit = Settings.getValue('windUnit', 'radio', 'kt');
-    const refLevel = document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL';
-
-    if (format === 'ATAK') {
-        content = `Alt Dir Spd\n${heightUnit}${refLevel}\n`;
-    } else if (format === 'Windwatch') {
-        const elevation = heightUnit === 'ft' ? Math.round(AppState.lastAltitude * 3.28084) : Math.round(AppState.lastAltitude);
-        content = `Version 1.0, ID = 9999999999\n${time}, Ground Level: ${elevation} ft\nWindsond ${model}\n AGL[ft] Wind[°] Speed[km/h]\n`;
-    } else if (format === 'HEIDIS') {
-        const heightHeader = refLevel === 'AGL' ? `h(${heightUnit}AGL)` : `h(${heightUnit}AMSL)`;
-        const temperatureHeader = temperatureUnit === 'C' ? '°C' : '°F';
-        const windSpeedHeader = windSpeedUnit;
-        content = `${heightHeader} p(hPa) T(${temperatureHeader}) Dew(${temperatureHeader}) Dir(°) Spd(${windSpeedHeader}) RH(%)`;
-    } else if (format === 'Customized') {
-        const heightHeader = refLevel === 'AGL' ? `h(${heightUnit}AGL)` : `h(${heightUnit}AMSL)`;
-        const temperatureHeader = temperatureUnit === 'C' ? '°C' : '°F';
-        const windSpeedHeader = windSpeedUnit;
-        content = `${heightHeader} p(hPa) T(${temperatureHeader}) Dew(${temperatureHeader}) Dir(°) Spd(${windSpeedHeader}) RH(%)`;
-    }
-
-    // Generate surface data with fetched surface_pressure
-    const baseHeight = Math.round(AppState.lastAltitude);
-    const surfaceHeight = refLevel === 'AGL' ? 0 : baseHeight;
-    const surfaceTemp = AppState.weatherData.temperature_2m?.[index];
-    const surfaceRH = AppState.weatherData.relative_humidity_2m?.[index];
-    const surfaceSpd = AppState.weatherData.wind_speed_10m?.[index];
-    const surfaceDir = AppState.weatherData.wind_direction_10m?.[index];
-    const surfaceDew = Utils.calculateDewpoint(surfaceTemp, surfaceRH);
-    const surfacePressure = AppState.weatherData.surface_pressure[index]; // Use fetched surface pressure directly
-
-    const displaySurfaceHeight = Math.round(Utils.convertHeight(surfaceHeight, heightUnit));
-    const displaySurfaceTemp = Utils.convertTemperature(surfaceTemp, temperatureUnit);
-    const displaySurfaceDew = Utils.convertTemperature(surfaceDew, temperatureUnit);
-    const displaySurfaceSpd = Utils.convertWind(surfaceSpd, windSpeedUnit, 'km/h');
-    const formattedSurfaceTemp = displaySurfaceTemp === 'N/A' ? 'N/A' : displaySurfaceTemp.toFixed(1);
-    const formattedSurfaceDew = displaySurfaceDew === 'N/A' ? 'N/A' : displaySurfaceDew.toFixed(1);
-    const formattedSurfaceSpd = displaySurfaceSpd === 'N/A' ? 'N/A' : (windSpeedUnit === 'bft' ? Math.round(displaySurfaceSpd) : displaySurfaceSpd.toFixed(1));
-    const formattedSurfaceDir = surfaceDir === 'N/A' || surfaceDir === undefined ? 'N/A' : Math.round(surfaceDir);
-    const formattedSurfaceRH = surfaceRH === 'N/A' || surfaceRH === undefined ? 'N/A' : Math.round(surfaceRH);
-
-    if (format === 'ATAK') {
-        content += `${displaySurfaceHeight}${separator}${formattedSurfaceDir}${separator}${formattedSurfaceSpd}\n`;
-    } else if (format === 'Windwatch') {
-        content += `${displaySurfaceHeight}${separator}${formattedSurfaceDir}${separator}${formattedSurfaceSpd}\n`;
-    } else if (format === 'HEIDIS') {
-        content += `\n${displaySurfaceHeight}${separator}${surfacePressure === 'N/A' ? 'N/A' : surfacePressure.toFixed(1)}${separator}${formattedSurfaceTemp}${separator}${formattedSurfaceDew}${separator}${formattedSurfaceDir}${separator}${formattedSurfaceSpd}${separator}${formattedSurfaceRH}\n`;
-    } else if (format === 'Customized') {
-        content += `\n${displaySurfaceHeight}${separator}${surfacePressure === 'N/A' ? 'N/A' : surfacePressure.toFixed(1)}${separator}${formattedSurfaceTemp}${separator}${formattedSurfaceDew}${separator}${formattedSurfaceDir}${separator}${formattedSurfaceSpd}${separator}${formattedSurfaceRH}\n`;
-    }
-
-    // Generate interpolated data
-    const interpStep = getInterpolationStep(); // Wert in der UI-Schicht holen
+    // 3. Wetterdaten mit den korrekten Export-Einstellungen interpolieren
     const interpolatedData = weatherManager.interpolateWeatherData(
-        AppState.weatherData, // Das Haupt-Wetterdatenobjekt
+        AppState.weatherData,
         index,
-        interpStep,
+        exportSettings.interpStep,
         Math.round(AppState.lastAltitude),
-        heightUnit
+        exportSettings.heightUnit // WICHTIG: Die korrekte Einheit wird hier übergeben
     );
+
     if (!interpolatedData || interpolatedData.length === 0) {
         Utils.handleError('No interpolated data available to download.');
         return;
     }
 
-    interpolatedData.forEach(data => {
-        if (data.displayHeight !== surfaceHeight) {
-            const displayHeight = Math.round(Utils.convertHeight(data.displayHeight, heightUnit));
-            const displayPressure = data.pressure === 'N/A' ? 'N/A' : data.pressure.toFixed(1);
-            const displayTemperature = Utils.convertTemperature(data.temp, temperatureUnit);
-            const displayDew = Utils.convertTemperature(data.dew, temperatureUnit);
-            const displaySpd = Utils.convertWind(data.spd, windSpeedUnit, Settings.getValue('windUnit', 'radio', 'kt')); // Use current windUnit
-            const formattedTemp = displayTemperature === 'N/A' ? 'N/A' : displayTemperature.toFixed(1);
-            const formattedDew = displayDew === 'N/A' ? 'N/A' : displayDew.toFixed(1);
-            const formattedSpd = displaySpd === 'N/A' ? 'N/A' : (windSpeedUnit === 'bft' ? Math.round(displaySpd) : displaySpd.toFixed(1));
-            const formattedDir = data.dir === 'N/A' ? 'N/A' : Math.round(data.dir);
-            const formattedRH = data.rh === 'N/A' ? 'N/A' : Math.round(data.rh);
+    // 4. Header und Datenzeilen basierend auf den Export-Einstellungen erstellen
+    let content = '';
+    let header = '';
 
-            if (format === 'ATAK') {
-                content += `${displayHeight}${separator}${formattedDir}${separator}${formattedSpd}\n`;
-            } else if (format === 'Windwatch') {
-                content += `${displayHeight}${separator}${formattedDir}${separator}${formattedSpd}\n`;
-            } else if (format === 'HEIDIS') {
-                content += `${displayHeight}${separator}${displayPressure}${separator}${formattedTemp}${separator}${formattedDew}${separator}${formattedDir}${separator}${formattedSpd}${separator}${formattedRH}\n`;
-            } else if (format === 'Customized') {
-                content += `${displayHeight}${separator}${displayPressure}${separator}${formattedTemp}${separator}${formattedDew}${separator}${formattedDir}${separator}${formattedSpd}${separator}${formattedRH}\n`;
-            }
+    switch (format) {
+        case 'ATAK':
+            header = `Alt Dir Spd\n${exportSettings.heightUnit}${exportSettings.refLevel}\n`;
+            break;
+        case 'Windwatch':
+            const elevationFt = Math.round(Utils.convertHeight(AppState.lastAltitude, 'ft'));
+            header = `Version 1.0, ID = 9999999999\n${time}, Ground Level: ${elevationFt} ft\nWindsond ${model}\nAGL[ft] Wind[°] Speed[km/h]\n`;
+            break;
+        case 'HEIDIS':
+        case 'Customized':
+        default:
+            header = `h(${exportSettings.heightUnit}${exportSettings.refLevel}) p(hPa) T(${exportSettings.temperatureUnit}) Dew(${exportSettings.temperatureUnit}) Dir(°) Spd(${exportSettings.windUnit}) RH(%)\n`;
+            break;
+    }
+    content += header;
+
+    // Datenzeilen generieren
+    interpolatedData.forEach(data => {
+        const displayHeight = Math.round(data.displayHeight);
+        const displayDir = Math.round(data.dir);
+        // Werte explizit in die Ziel-Einheit des Exports umrechnen
+        const displaySpd = Utils.convertWind(data.spd, exportSettings.windUnit, 'km/h');
+        const formattedSpd = Number.isFinite(displaySpd) ? (exportSettings.windUnit === 'bft' ? Math.round(displaySpd) : displaySpd.toFixed(1)) : 'N/A';
+        
+        if (format === 'ATAK' || format === 'Windwatch') {
+            content += `${displayHeight} ${displayDir} ${Math.round(displaySpd)}\n`;
+        } else { // HEIDIS & Customized
+            const displayPressure = data.pressure === 'N/A' ? 'N/A' : data.pressure.toFixed(1);
+            const displayTemp = Utils.convertTemperature(data.temp, exportSettings.temperatureUnit);
+            const formattedTemp = displayTemp === 'N/A' ? 'N/A' : displayTemp.toFixed(1);
+            const displayDew = Utils.convertTemperature(data.dew, exportSettings.temperatureUnit);
+            const formattedDew = displayDew === 'N/A' ? 'N/A' : displayDew.toFixed(1);
+            const formattedRH = data.rh === 'N/A' ? 'N/A' : Math.round(data.rh);
+            content += `${displayHeight} ${displayPressure} ${formattedTemp} ${formattedDew} ${displayDir} ${formattedSpd} ${formattedRH}\n`;
         }
     });
 
-    // Create and trigger the download
+    // 5. Download auslösen (bleibt unverändert)
     const blob = new Blob([content], { type: 'text/plain' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -391,23 +291,6 @@ export function downloadTableAsAscii(format) {
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
-
-    // Optionally revert settings (commented out to persist changes in UI)
-    document.getElementById('interpStepSelect').value = originalSettings.interpStep;
-    document.querySelector(`input[name="heightUnit"][value="${originalSettings.heightUnit}"]`).checked = true;
-    document.querySelector(`input[name="refLevel"][value="${originalSettings.refLevel}"]`).checked = true;
-    document.querySelector(`input[name="windUnit"][value="${originalSettings.windUnit}"]`).checked = true;
-    document.querySelector(`input[name="temperatureUnit"][value="${originalSettings.temperatureUnit}"]`).checked = true;
-    Settings.state.userSettings.interpStep = originalSettings.interpStep;
-    Settings.state.userSettings.heightUnit = originalSettings.heightUnit;
-    Settings.state.userSettings.refLevel = originalSettings.refLevel;
-    Settings.state.userSettings.windUnit = originalSettings.windUnit;
-    Settings.state.userSettings.temperatureUnit = originalSettings.temperatureUnit;
-    Settings.save();
-    Settings.updateUnitLabels();
-    Settings.updateUnitLabels();
-    Settings.updateUnitLabels();
-
 }
 
 // == Autoupdate Functionality ==
