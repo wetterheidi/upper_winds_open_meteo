@@ -350,43 +350,21 @@ async function cacheTileWithRetry(url, maxRetries = 3) {
     return { success: false, error: lastError };
 }
 
-async function cacheTilesForDIP({ map, lastLat, lastLng, baseMaps }) {
+async function cacheTilesForDIP({ map, lastLat, lastLng, baseMaps, onProgress, onComplete, onCancel }) {
     if (!map) {
         if (onComplete) onComplete('Map not initialized, cannot cache tiles.');
         return;
     }
 
-    if (onProgress) {
-        onProgress(0, totalTiles, () => {
-            AppState.isCachingCancelled = true;
-            if (onCancel) onCancel();
-        });
-    }
-
-    console.log('cacheTilesForDIP called with:', {
-        lastLat,
-        lastLng,
-        cacheRadiusKm: Settings.state.userSettings.cacheRadiusKm,
-        cacheZoomLevels: Settings.state.userSettings.cacheZoomLevels
-    });
-
     if (!lastLat || !lastLng) {
-        console.warn('No DIP coordinates for caching, skipping');
-        displayMessage('Please select a location to cache map tiles.');
-        return;
-    }
-
-    if (!Settings.state.userSettings.baseMaps || !baseMaps[Settings.state.userSettings.baseMaps]) {
-        console.warn(`Base map ${Settings.state.userSettings.baseMaps} not found, skipping caching`);
-        displayMessage('Selected base map not available for caching.');
+        // KORREKTUR: onComplete verwenden statt displayMessage
+        if (onComplete) onComplete('Please select a location to cache map tiles.');
         return;
     }
 
     const radiusKm = Settings.state.userSettings.cacheRadiusKm || Settings.defaultSettings.cacheRadiusKm;
     const zoomLevels = Settings.state.userSettings.cacheZoomLevels || Settings.defaultSettings.cacheZoomLevels;
     const tiles = getTilesInRadius(lastLat, lastLng, radiusKm, zoomLevels, map);
-
-    console.log(`Caching ${tiles.length} tiles for DIP:`, { lat: lastLat, lng: lastLng, radiusKm, zoomLevels, baseMap: Settings.state.userSettings.baseMaps });
 
     const tileLayers = [];
     if (Settings.state.userSettings.baseMaps === 'Esri Satellite + OSM') {
@@ -396,23 +374,31 @@ async function cacheTilesForDIP({ map, lastLat, lastLng, baseMaps }) {
         );
     } else {
         const layer = baseMaps[Settings.state.userSettings.baseMaps];
-        tileLayers.push({
-            name: Settings.state.userSettings.baseMaps,
-            url: layer.options.url || layer._url,
-            subdomains: layer.options.subdomains,
-            normalizedUrl: (layer.options.url || layer._url).replace(/{s}\./, '')
-        });
+        if (layer) {
+            tileLayers.push({
+                name: Settings.state.userSettings.baseMaps,
+                url: layer.options.url || layer._url,
+                subdomains: layer.options.subdomains,
+                normalizedUrl: (layer.options.url || layer._url).replace(/{s}\./, '')
+            });
+        }
+    }
+    
+    const totalTiles = tiles.length * tileLayers.length;
+    if (totalTiles === 0) {
+        if(onComplete) onComplete('No tiles to cache for this basemap.');
+        return;
     }
 
     let cachedCount = 0;
     let failedCount = 0;
-    const totalTiles = tiles.length * tileLayers.length;
     const failedTiles = [];
     AppState.isCachingCancelled = false;
 
     console.log('Calling displayProgress with initial values:', { cachedCount, failedCount, totalTiles });
     if (onProgress) {
-        onProgress(currentCount, totalTiles, () => {
+        // KORREKTUR: Der Startwert für den Fortschritt ist immer 0
+        onProgress(0, totalTiles, () => {
             AppState.isCachingCancelled = true;
             if (onCancel) onCancel();
         });
@@ -475,9 +461,12 @@ async function cacheTilesForDIP({ map, lastLat, lastLng, baseMaps }) {
                 const currentCount = cachedCount + failedCount;
                 if ((index + 1) % 10 === 0 || index === tiles.length - 1) {
                     console.log('Updating progress:', { currentCount, totalTiles });
-                    displayProgress(currentCount, totalTiles, () => {
-                        AppState.isCachingCancelled = true;
-                    });
+                    // KORREKTUR: Die übergebene Callback-Funktion verwenden
+                    if (onProgress) {
+                        onProgress(currentCount, totalTiles, () => {
+                            AppState.isCachingCancelled = true;
+                        });
+                    }
                 }
             });
 
@@ -517,12 +506,17 @@ async function cacheTilesForDIP({ map, lastLat, lastLng, baseMaps }) {
     }
 
     console.log(`DIP caching complete: ${cachedCount} tiles cached, ${failedCount} failed`);
+    let completionMessage = '';
     if (AppState.isCachingCancelled) {
-        displayMessage(`Caching cancelled: ${cachedCount} tiles cached, ${failedCount} failed.`);
+        completionMessage = `Caching cancelled: ${cachedCount} tiles cached, ${failedCount} failed.`;
     } else if (failedCount > 0) {
-        displayMessage(`Cached ${cachedCount} tiles around DIP (${failedCount} failed). Pan or zoom to cache more tiles.`);
+        completionMessage = `Cached ${cachedCount} tiles around DIP (${failedCount} failed).`;
     } else {
-        displayMessage(`Cached ${cachedCount} tiles around DIP successfully.`);
+        completionMessage = `Cached ${cachedCount} tiles around DIP successfully.`;
+    }
+    
+    if (onComplete) {
+        onComplete(completionMessage);
     }
 
     try {

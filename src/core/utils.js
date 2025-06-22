@@ -354,7 +354,13 @@ export class Utils {
             const response = await fetch(
                 `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&timezone=auto`
             );
-            if (!response.ok) throw new Error(`Open-Meteo fetch failed: ${response.status}`);
+            if (!response.ok) {
+                 if (response.status === 429) {
+                    // Hier reicht eine Konsolennachricht, da es keine kritische Funktion ist
+                    console.warn('API rate limit hit while fetching location data.');
+                 }
+                throw new Error(`Open-Meteo fetch failed: ${response.status}`);
+            }
             const data = await response.json();
             const locationData = {
                 timezone: data.timezone || 'GMT', // Fallback to UTC

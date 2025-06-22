@@ -15,7 +15,7 @@ import * as liveTrackingManager from '../core/liveTrackingManager.js';
 import { fetchEnsembleWeatherData, processAndVisualizeEnsemble, clearEnsembleVisualizations } from '../core/ensembleManager.js';
 import { getSliderValue, displayMessage, hideProgress, displayProgress } from './ui.js';
 import * as AutoupdateManager from '../core/autoupdateManager.js';
-import { UI_DEFAULTS } from '../core/constants.js'; // <-- DIESE ZEILE HINZUFÜGEN
+import { UI_DEFAULTS } from '../core/constants.js';
 import { updateModelSelectUI, cleanupSelectedEnsembleModels } from './ui.js';
 import 'leaflet-gpx';
 
@@ -939,12 +939,11 @@ function setupCacheSettings() {
                 lastLat: AppState.lastLat,
                 lastLng: AppState.lastLng,
                 baseMaps: AppState.baseMaps,
-                onProgress: (current, total, cancelCallback) => {
-                    displayProgress(current, total, cancelCallback);
-                },
+                // NEU: Die Callback-Funktionen übergeben
+                onProgress: displayProgress,
                 onComplete: (message) => {
                     hideProgress();
-                    displayMessage(message);
+                    if (message) displayMessage(message);
                 },
                 onCancel: () => {
                     hideProgress();

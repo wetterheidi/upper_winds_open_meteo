@@ -69,7 +69,13 @@ export async function fetchEnsembleWeatherData() {
         }
         const url = `${baseUrl}?latitude=${lat}&longitude=${lon}&hourly=${hourlyVariablesString}&models=${modelString}&start_date=${startDateStr}&end_date=${endDateStr}`;
         const response = await fetch(url);
-        if (!response.ok) throw new Error(`API request failed: ${response.status}`);
+        if (!response.ok) {
+            // NEU: Spezifische Fehlermeldung für Rate-Limiting
+            if (response.status === 429) {
+                throw new Error("API-Limit für Ensemble-Daten erreicht. Bitte warten Sie einen Moment.");
+            }
+            throw new Error(`API request failed: ${response.status}`);
+        }
         const apiResponseData = await response.json();
         AppState.ensembleModelsData = {}; // Initialisieren
 

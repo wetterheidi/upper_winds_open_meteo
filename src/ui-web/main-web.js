@@ -9,7 +9,7 @@ import * as Coordinates from './coordinates.js';
 import * as JumpPlanner from '../core/jumpPlanner.js';
 import * as mapManager from './mapManager.js';
 import * as weatherManager from '../core/weatherManager.js';
-import { cacheVisibleTiles } from '../core/tileCache.js';
+import { cacheVisibleTiles, cacheTilesForDIP } from '../core/tileCache.js';
 import { getSliderValue, displayError, displayMessage, displayProgress, hideProgress } from './ui.js';
 import * as AutoupdateManager from '../core/autoupdateManager.js';
 import { DateTime } from 'luxon';
@@ -216,7 +216,7 @@ export function downloadTableAsAscii(format) {
 
     const requirements = formatRequirements[format] || {};
 
- // 2. Export-Einstellungen definieren: Entweder aus den Requirements oder aus der UI
+    // 2. Export-Einstellungen definieren: Entweder aus den Requirements oder aus der UI
     const exportSettings = {
         interpStep: requirements.interpStep || getInterpolationStep(),
         heightUnit: requirements.heightUnit || Settings.getValue('heightUnit', 'radio', 'm'),
@@ -267,7 +267,7 @@ export function downloadTableAsAscii(format) {
         // Werte explizit in die Ziel-Einheit des Exports umrechnen
         const displaySpd = Utils.convertWind(data.spd, exportSettings.windUnit, 'km/h');
         const formattedSpd = Number.isFinite(displaySpd) ? (exportSettings.windUnit === 'bft' ? Math.round(displaySpd) : displaySpd.toFixed(1)) : 'N/A';
-        
+
         if (format === 'ATAK' || format === 'Windwatch') {
             content += `${displayHeight} ${displayDir} ${Math.round(displaySpd)}\n`;
         } else { // HEIDIS & Customized
@@ -581,7 +581,7 @@ export function updateJumpMasterLineAndPanel(positionData = null) {
         coordFormat: Settings.getValue('coordFormat', 'radio', 'Decimal'),
         refLevel: Settings.getValue('refLevel', 'radio', 'AGL')
     };
-    
+
     mapManager.updateLivePositionControl({
         ...data,
         showJumpMasterLine: showJML,
@@ -1506,6 +1506,26 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             if (Settings.state.userSettings.showJumpMasterLine) {
                 updateJumpMasterLineAndPanel();
+            }
+            // Caching für die neue Position anstoßen
+            // Die 'geolocation'-Fälle sind schon abgedeckt, jetzt fügen wir die anderen hinzu.
+            if (source === 'marker_drag' || source === 'dblclick' || source === 'search') {
+                console.log(`Starte Caching für neue Position via ${source}...`);
+                cacheTilesForDIP({ // Wichtig: cacheTilesForDIP, nicht cacheVisibleTiles
+                    map: AppState.map,
+                    lastLat: lat,
+                    lastLng: lng,
+                    baseMaps: AppState.baseMaps,
+                    onProgress: displayProgress,
+                    onComplete: (message) => {
+                        hideProgress();
+                        if (message) displayMessage(message);
+                    },
+                    onCancel: () => {
+                        hideProgress();
+                        displayMessage('Caching cancelled.');
+                    }
+                });
             }
         } catch (error) {
             console.error('Fehler beim Verarbeiten von "location:selected":', error);
