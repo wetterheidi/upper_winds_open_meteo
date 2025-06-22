@@ -365,7 +365,16 @@ export async function updateToCurrentHour() {
 export function calculateJump() {
     const index = getSliderValue();
     const interpStep = getInterpolationStep();
-    const heightUnit = Settings.getValue('heightUnit', 'radio', 'm'); // <-- DIE FEHLENDE ZEILE
+    const heightUnit = getHeightUnit();
+    let openingAltitude = Settings.state.userSettings.openingAltitude;
+    let exitAltitude = Settings.state.userSettings.exitAltitude;
+
+    // NEU: Konvertiere die Höhen in Meter, bevor sie an die Physik-Engine gehen
+    if (heightUnit === 'ft') {
+        openingAltitude = Utils.convertFeetToMeters(openingAltitude);
+        exitAltitude = Utils.convertFeetToMeters(exitAltitude);
+    }
+
     if (!Settings.state.isCalculateJumpUnlocked || !Settings.state.userSettings.calculateJump) {
         mapManager.drawJumpVisualization(null);
         mapManager.drawCutAwayVisualization(null);
@@ -480,6 +489,7 @@ export function calculateJump() {
     // Übergib die fertige Bauanleitung an den Zeichner (auch wenn sie 'null' ist, um alte Kreise zu löschen).
     mapManager.drawCutAwayVisualization(cutawayDrawData);
 }
+
 export function resetJumpRunDirection(triggerUpdate = true) {
     AppState.customJumpRunDirection = null;
     const directionInput = document.getElementById('jumpRunTrackDirection');

@@ -355,10 +355,10 @@ export class Utils {
                 `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&timezone=auto`
             );
             if (!response.ok) {
-                 if (response.status === 429) {
+                if (response.status === 429) {
                     // Hier reicht eine Konsolennachricht, da es keine kritische Funktion ist
                     console.warn('API rate limit hit while fetching location data.');
-                 }
+                }
                 throw new Error(`Open-Meteo fetch failed: ${response.status}`);
             }
             const data = await response.json();
@@ -584,14 +584,15 @@ export class Utils {
         }
     }
 
-/**
- * Berechnet die wahre Fluggeschwindigkeit (True Airspeed, TAS) aus der angezeigten
- * Fluggeschwindigkeit (Indicated Airspeed, IAS) und der Höhe.
- * Verwendet ein vereinfachtes Modell der internationalen Standardatmosphäre (ISA).
- * @param {number} ias - Die angezeigte Fluggeschwindigkeit (z.B. in Knoten).
- * @param {number} heightFt - Die Höhe über dem Meeresspiegel in Fuß.
- * @returns {number|string} Die berechnete TAS in der gleichen Einheit wie IAS, oder 'N/A' bei ungültigen Eingaben.
- */    static calculateTAS(ias, heightFt) {
+    /**
+     * Berechnet die wahre Fluggeschwindigkeit (True Airspeed, TAS) aus der angezeigten
+     * Fluggeschwindigkeit (Indicated Airspeed, IAS) und der Höhe.
+     * Verwendet ein vereinfachtes Modell der internationalen Standardatmosphäre (ISA).
+     * @param {number} ias - Die angezeigte Fluggeschwindigkeit (z.B. in Knoten).
+     * @param {number} heightFt - Die Höhe über dem Meeresspiegel in Fuß.
+     * @returns {number|string} Die berechnete TAS in der gleichen Einheit wie IAS, oder 'N/A' bei ungültigen Eingaben.
+     */
+    static calculateTAS(ias, heightFt) {
         if (isNaN(ias) || isNaN(heightFt) || ias < 0 || heightFt < 0) {
             console.warn('Invalid inputs for calculateTAS:', { ias, heightFt });
             return 'N/A';
@@ -907,6 +908,13 @@ export class Utils {
             return false;
         }
         return true;
+    }
+
+    static convertFeetToMeters(feet) {
+        if (feet === null || feet === undefined || isNaN(feet)) {
+            return 0;
+        }
+        return feet / 3.28084;
     }
 }
 
