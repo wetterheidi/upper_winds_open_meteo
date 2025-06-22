@@ -4,19 +4,19 @@
 import { AppState } from '../core/state.js';
 import { Settings } from '../core/settings.js';
 import { Utils } from '../core/utils.js';
-import * as displayManager from './displayManager.js';
-import * as mapManager from './mapManager.js';
-import * as Coordinates from './coordinates.js';
+import * as displayManager from '../ui-common/displayManager.js';
+import * as mapManager from '../ui-common/mapManager.js';
+import * as Coordinates from '../ui-common/coordinates.js';
 import * as JumpPlanner from '../core/jumpPlanner.js';
 import { TileCache, cacheTilesForDIP, cacheVisibleTiles } from '../core/tileCache.js';
 import { loadGpxTrack, loadCsvTrackUTC } from '../core/trackManager.js';
 import * as weatherManager from '../core/weatherManager.js';
 import * as liveTrackingManager from '../core/liveTrackingManager.js';
 import { fetchEnsembleWeatherData, processAndVisualizeEnsemble, clearEnsembleVisualizations } from '../core/ensembleManager.js';
-import { getSliderValue, displayMessage, hideProgress, displayProgress } from './ui.js';
+import { getSliderValue, displayMessage, hideProgress, displayProgress } from '../ui-common/ui.js';
 import * as AutoupdateManager from '../core/autoupdateManager.js';
 import { UI_DEFAULTS } from '../core/constants.js';
-import { updateModelSelectUI, cleanupSelectedEnsembleModels } from './ui.js';
+import { updateModelSelectUI, cleanupSelectedEnsembleModels } from '../ui-common/ui.js';
 import 'leaflet-gpx';
 
 let listenersInitialized = false;

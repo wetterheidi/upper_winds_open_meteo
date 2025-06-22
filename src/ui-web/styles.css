@@ -1,3 +1,5 @@
+@import '../ui-common/styles-shared.css';
+
 /* Existing root variables */
 :root {
     --label-width: 135px;
