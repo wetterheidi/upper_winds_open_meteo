@@ -754,9 +754,10 @@ button {
 }
 
 #meanWindResult {
-    font-size: 13px;
+    font-size: 16px !important;
     font-family: 'Roboto', sans-serif;
     font-weight: bold;
+    color: #4da8da;
     text-align: left;
     white-space: nowrap;
     overflow: hidden;
