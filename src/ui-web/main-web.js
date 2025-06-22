@@ -744,51 +744,6 @@ export async function updateUIWithNewWeatherData(newWeatherData, preservedIndex 
     }
     Settings.updateModelRunInfo(AppState.lastModelRun, AppState.lastLat, AppState.lastLng);
 }
-/**
- * Stößt eine Aktualisierung verschiedener UI-Komponenten an.
- * Diese Funktion dient als Wrapper, um nach einer Datenänderung mehrere
- * Anzeige-Funktionen aus dem displayManager aufzurufen.
- * @deprecated Diese Funktion wird schrittweise durch direktere Aufrufe in den Event-Handlern ersetzt, um die Logik klarer zu gestalten.
- */
-export async function updateAllDisplays() {
-    console.log('updateAllDisplays called');
-    try {
-        const sliderIndex = getSliderValue();
-        if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
-
-            // === DER DIRIGENT BEI DER ARBEIT ===
-            // Jeder Schritt wird explizit von hier aus gesteuert.
-
-            // 1. Die Haupt-Wettertabelle anzeigen lassen
-            await displayManager.updateWeatherDisplay(sliderIndex);
-
-            // 2. Das Popup des Markers aktualisieren lassen
-            await displayManager.refreshMarkerPopup();
-
-            // 3. Die Mittelwind-Berechnung UND Anzeige durchführen (lokale Funktion)
-            if (AppState.lastAltitude !== 'N/A') {
-                calculateMeanWind();
-            }
-
-            // 4. Das Landemuster anzeigen lassen (hat eigene Logik)
-            displayManager.updateLandingPatternDisplay();
-
-            // 5. Die Sprung-Visualisierungen steuern
-            if (Settings.state.userSettings.calculateJump) {
-                calculateJump(); // Diese Funktion kümmert sich um Exit/Canopy/Cutaway
-            }
-
-            // 6. Den Jump Run Track steuern
-            if (Settings.state.userSettings.showJumpRunTrack) {
-                displayManager.updateJumpRunTrackDisplay();
-            }
-        }
-
-    } catch (error) {
-        console.error('Error in updateAllDisplays:', error);
-        displayError(error.message);
-    }
-}
 
 // == Setup values ==
 function applySettingToCheckbox(id, value) {
@@ -819,6 +774,131 @@ function applySettingToRadio(name, value) {
 }
 function setupAppEventListeners() {
     console.log("[App] Setting up application event listeners...");
+
+    document.addEventListener('map:moved', () => {
+        console.log('[main-web] Map has moved or zoomed. Updating visualizations based on new view.');
+
+        // Die komplette Logik aus dem alten mapMoveHandler kommt hierher:
+        const currentZoom = AppState.map.getZoom();
+
+        if (Settings.state.userSettings.calculateJump && AppState.weatherData && AppState.lastLat) {
+            if (currentZoom >= UI_DEFAULTS.MIN_ZOOM && currentZoom <= UI_DEFAULTS.MAX_ZOOM) {
+                calculateJump();
+            } else {
+                mapManager.drawJumpVisualization(null);
+            }
+        }
+        if (Settings.state.userSettings.showJumpRunTrack) {
+            if (currentZoom >= UI_DEFAULTS.MIN_ZOOM && currentZoom <= UI_DEFAULTS.MAX_ZOOM) {
+                displayManager.updateJumpRunTrackDisplay();
+            } else {
+                mapManager.drawJumpRunTrack(null);
+            }
+        }
+        if (Settings.state.userSettings.showLandingPattern) {
+            displayManager.updateLandingPatternDisplay();
+        }
+
+        // Die Caching-Logik kann hier ebenfalls angestoßen werden, falls gewünscht,
+        // oder separat bleiben, wie im eventManager gezeigt.
+        cacheVisibleTiles({
+            map: AppState.map,
+            baseMaps: AppState.baseMaps,
+            onProgress: displayProgress,
+            onComplete: (message) => {
+                hideProgress();
+                if (message) Utils.handleMessage(message);
+            },
+            onCancel: () => {
+                hideProgress();
+                Utils.handleMessage('Caching cancelled.');
+            }
+        });
+    });
+
+    document.addEventListener('map:mousemove', (event) => {
+        const { lat, lng } = event.detail;
+        AppState.lastMouseLatLng = { lat, lng }; // Position für den Callback speichern
+
+        const coordFormat = getCoordinateFormat();
+        let coordText;
+
+        // Koordinaten-Text korrekt formatieren
+        if (coordFormat === 'MGRS') {
+            const mgrsVal = Utils.decimalToMgrs(lat, lng);
+            coordText = `MGRS: ${mgrsVal || 'N/A'}`;
+        } else if (coordFormat === 'DMS') {
+            const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
+            coordText = `Lat: ${formatDMS(Utils.decimalToDms(lat, true))}, Lng: ${formatDMS(Utils.decimalToDms(lng, false))}`;
+        } else {
+            coordText = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
+        }
+
+        // Sofortiges Update mit "Fetching..."
+        if (AppState.coordsControl) {
+            AppState.coordsControl.update(`${coordText}<br>Elevation: Fetching...<br>QFE: Fetching...`);
+        }
+
+        // Debounced-Funktion aufrufen, um API-Anfragen zu begrenzen
+        debouncedGetElevationAndQFE(lat, lng, { lat, lng }, ({ elevation, qfe }, requestLatLng) => {
+            // Callback wird ausgeführt, wenn die Daten da sind
+            if (AppState.lastMouseLatLng && AppState.coordsControl) {
+                // Nur aktualisieren, wenn die Maus noch in der Nähe ist
+                const deltaLat = Math.abs(AppState.lastMouseLatLng.lat - requestLatLng.lat);
+                const deltaLng = Math.abs(AppState.lastMouseLatLng.lng - requestLatLng.lng);
+                const threshold = 0.05;
+
+                if (deltaLat < threshold && deltaLng < threshold) {
+                    const heightUnit = getHeightUnit();
+                    let displayElevation = elevation === 'N/A' ? 'N/A' : elevation;
+                    if (displayElevation !== 'N/A') {
+                        displayElevation = Utils.convertHeight(displayElevation, heightUnit);
+                        displayElevation = Math.round(displayElevation);
+                    }
+                    const qfeText = qfe === 'N/A' ? 'N/A' : `${qfe} hPa`;
+                    AppState.coordsControl.update(`${coordText}<br>Elevation: ${displayElevation} ${displayElevation === 'N/A' ? '' : heightUnit}<br>QFE: ${qfeText}`);
+                }
+            }
+        });
+    });
+
+    document.addEventListener('map:location_selected', async (event) => {
+        const { lat, lng, source } = event.detail;
+        console.log(`App: Event 'map:location_selected' von '${source}' empfangen.`);
+
+        // --- HIER IST JETZT DIE GESAMTE ANWENDUNGSLOGIK ---
+
+        // 1. Marker-Position im AppState und UI aktualisieren
+        AppState.lastLat = lat;
+        AppState.lastLng = lng;
+        AppState.lastAltitude = await Utils.getAltitude(lat, lng);
+
+        // Informiere das Coordinates-Modul über die neue Position
+        Coordinates.addCoordToHistory(lat, lng);
+
+        // Bewege den Marker (falls die Aktion nicht schon vom Marker selbst kam)
+        if (source !== 'marker_drag') {
+            // Annahme: Sie haben eine moveMarker-Funktion im mapManager
+            // Dies ist ein Befehl von app.js an mapManager.js
+            mapManager.moveMarker(lat, lng);
+        }
+
+        // 2. Kernlogik ausführen
+        resetJumpRunDirection(true); // resetJumpRunDirection muss in app.js sein
+        await weatherManager.fetchWeatherForLocation(lat, lng); // fetchWeather... muss in app.js sein
+
+        if (Settings.state.userSettings.calculateJump) {
+            calculateJump(); // calculateJump muss in app.js sein
+            JumpPlanner.calculateCutAway();
+        }
+
+        mapManager.recenterMap(true); // recenterMap ist jetzt im mapManager
+        AppState.isManualPanning = false;
+
+        // 3. UI-Updates anstoßen, die von den neuen Daten abhängen
+        displayManager.updateJumpRunTrackDisplay(); // update... Funktionen sind jetzt im mapManager
+        displayManager.updateLandingPatternDisplay();
+    });
 
     document.addEventListener('tracking:started', () => {
         const jumpMasterCheckbox = document.getElementById('showJumpMasterLine');
@@ -895,14 +975,13 @@ function setupAppEventListeners() {
                     slider.value = bestIndex; // Slider positionieren!
                 }
             }
-            await updateAllDisplays();
-
-            if (Settings.state.isCalculateJumpUnlocked && Settings.state.userSettings.calculateJump) {
-                calculateJump();
-            }
-            if (Settings.state.isLandingPatternUnlocked && Settings.state.userSettings.showLandingPattern) {
-                displayManager.updateLandingPatternDisplay();
-            }
+            console.log("Performing specific updates after track load...");
+            await displayManager.updateWeatherDisplay(getSliderValue());
+            await displayManager.refreshMarkerPopup();
+            calculateMeanWind();
+            calculateJump(); // Diese Funktion beinhaltet bereits die nötigen Checks und ruft auch calculateCutAway auf
+            displayManager.updateLandingPatternDisplay();
+            updateJumpMasterLineAndPanel();
 
             const infoEl = document.getElementById('info');
             if (infoEl && summary) {
@@ -926,23 +1005,204 @@ function setupAppEventListeners() {
         }
     });
 
-    document.addEventListener('ui:showJumpMasterLineChanged', () => {
-        updateJumpMasterLineAndPanel();
+    document.addEventListener('tracking:positionUpdated', (event) => {
+        updateJumpMasterLineAndPanel(event.detail);
     });
 
     document.addEventListener('jml:targetChanged', () => {
         updateJumpMasterLineAndPanel();
     });
 
-    document.addEventListener('tracking:positionUpdated', (event) => {
-        updateJumpMasterLineAndPanel(event.detail);
+    document.addEventListener('ui:sliderChanged', async (e) => {
+        console.log("[main-web] Event 'ui:sliderChanged' empfangen, spezifische Updates werden ausgeführt.");
+
+        try {
+            const sliderIndex = getSliderValue();
+            if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
+                // 1. Die Haupt-Wettertabelle anzeigen lassen
+                await displayManager.updateWeatherDisplay(sliderIndex);
+                // 2. Das Popup des Markers aktualisieren lassen
+                await displayManager.refreshMarkerPopup();
+                // 3. Die Mittelwind-Berechnung UND Anzeige durchführen
+                if (AppState.lastAltitude !== 'N/A') {
+                    calculateMeanWind();
+                }
+                // 4. Das Landemuster anzeigen lassen
+                displayManager.updateLandingPatternDisplay();
+                // 5. Die Sprung-Visualisierungen steuern
+                if (Settings.state.userSettings.calculateJump) {
+                    calculateJump();
+                }
+                // 6. Den Jump Run Track steuern
+                if (Settings.state.userSettings.showJumpRunTrack) {
+                    displayManager.updateJumpRunTrackDisplay();
+                }
+            }
+        } catch (error) {
+            console.error('Error during slider update:', error);
+            displayError(error.message);
+        }
     });
 
-    document.addEventListener('ui:sliderChanged', async (e) => {
-        console.log("[main-web] Event 'ui:sliderChanged' empfangen.");
-        if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
-            await updateAllDisplays(); // Aufruf der lokalen Funktion
+    document.addEventListener('ui:radioGroupChanged', async (e) => {
+        const { name } = e.detail;
+        console.log(`[main-web] Radio group '${name}' changed. Performing specific updates.`);
+
+        // Zuerst führen wir Aktionen aus, die fast immer nötig sind,
+        // oder die die Grundlage für weitere Berechnungen bilden.
+        await displayManager.updateWeatherDisplay(getSliderValue());
+
+        // Jetzt steuern wir spezifische Aktionen basierend auf der geänderten Einstellung
+        switch (name) {
+            case 'heightUnit':
+                // Ihr Wunsch: Koordinaten-Anzeige bei Mausover aktualisieren
+                if (AppState.lastMouseLatLng) {
+                    const { lat, lng } = AppState.lastMouseLatLng;
+                    const coordFormat = getCoordinateFormat();
+                    let coordText = coordFormat === 'MGRS' ? `MGRS: ${Utils.decimalToMgrs(lat, lng)}` : `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
+                    debouncedGetElevationAndQFE(lat, lng, { lat, lng }, ({ elevation, qfe }, requestLatLng) => {
+                        if (AppState.lastMouseLatLng && Math.abs(AppState.lastMouseLatLng.lat - requestLatLng.lat) < 0.05) {
+                            const heightUnit = getHeightUnit(); // Holt die *neue* Einheit
+                            let displayElevation = (elevation !== 'N/A') ? Math.round(Utils.convertHeight(elevation, heightUnit)) : 'N/A';
+                            AppState.coordsControl.update(`${coordText}<br>Elevation: ${displayElevation} ${displayElevation === 'N/A' ? '' : heightUnit}`);
+                        }
+                    });
+                }
+                // Ihr Wunsch: GPX-Tooltips aktualisieren (Logik bleibt hier, wird bei Bedarf getriggert)
+                if (AppState.gpxLayer && AppState.gpxPoints.length > 0) {
+                    const groundAltitude = AppState.lastAltitude !== 'N/A' && !isNaN(AppState.lastAltitude) ? parseFloat(AppState.lastAltitude) : null;
+                    const windUnit = getWindSpeedUnit();
+                    const heightUnit = getHeightUnit();
+                    AppState.gpxLayer.eachLayer(layer => {
+                        if (layer instanceof L.Polyline) {
+                            layer.on('mousemove', function (e) {
+                                const latlng = e.latlng;
+                                let closestPoint = AppState.gpxPoints[0];
+                                let minDist = Infinity;
+                                let closestIndex = 0;
+                                AppState.gpxPoints.forEach((p, index) => {
+                                    const dist = Math.sqrt(Math.pow(p.lat - latlng.lat, 2) + Math.pow(p.lng - latlng.lng, 2));
+                                    if (dist < minDist) {
+                                        minDist = dist;
+                                        closestPoint = p;
+                                        closestIndex = index;
+                                    }
+                                });
+                                layer.setTooltipContent(getTooltipContent(closestPoint, closestIndex, AppState.gpxPoints, groundAltitude, windUnit, heightUnit)).openTooltip(latlng);
+                            });
+                        }
+                    });
+                }
+            // Fall-through: Nach den spezifischen Aktionen sollen auch die allgemeinen Updates für diese Einheit laufen.
+
+            case 'windUnit':
+            case 'refLevel':
+                // Diese Einheiten beeinflussen alle Berechnungen
+                calculateMeanWind();
+                calculateJump();
+                displayManager.updateLandingPatternDisplay();
+                updateJumpMasterLineAndPanel();
+                await displayManager.refreshMarkerPopup(); // Das Popup muss auch die neuen Einheiten zeigen
+                break;
+
+            case 'coordFormat':
+                // Beeinflusst nur das Marker-Popup und das Live-Tracking Panel
+                await displayManager.refreshMarkerPopup();
+                updateJumpMasterLineAndPanel();
+                break;
+
+            case 'landingDirection':
+                // Beeinflusst das UI-State und das Landemuster
+                updateUIState();
+                displayManager.updateLandingPatternDisplay();
+                break;
+
+            // Für 'temperatureUnit', 'timeZone', 'downloadFormat' ist keine zusätzliche Aktion nötig,
+            // da das `updateWeatherDisplay` am Anfang bereits alles Notwendige erledigt.
         }
+    });
+
+    document.addEventListener('ui:inputChanged', async (e) => {
+        const { name, value } = e.detail;
+        console.log(`[main-web] Input for '${name}' changed to '${value}'.`);
+
+        switch (name) {
+            // --- Spezialfall: Flugzeuggeschwindigkeit ---
+            case 'aircraftSpeedKt':
+                const separation = JumpPlanner.getSeparationFromTAS(value);
+                setInputValueSilently('jumperSeparation', separation);
+                Settings.state.userSettings.jumperSeparation = separation;
+                Settings.save();
+                if (AppState.weatherData) {
+                    debouncedCalculateJump();
+                }
+                displayManager.updateJumpRunTrackDisplay();
+                break;
+
+            // --- NEU: Eigener Fall für die Cut-Away-Höhe ---
+            case 'cutAwayAltitude':
+                if (AppState.weatherData && AppState.cutAwayLat !== null) {
+                    // calculateJump() ruft intern auch die Neuberechnung des Cut-Aways auf.
+                    // Dies ist der sauberste Weg, ohne Code zu duplizieren.
+                    calculateJump();
+                }
+                break;
+
+            // --- Fälle, die den kompletten Sprungablauf und das Landemuster beeinflussen ---
+            case 'openingAltitude':
+            case 'exitAltitude':
+            case 'numberOfJumpers':
+            case 'jumperSeparation':
+            case 'canopySpeed':
+            case 'descentRate':
+            case 'legHeightFinal':
+            case 'legHeightBase':
+            case 'legHeightDownwind':
+                if (AppState.weatherData) {
+                    calculateJump();
+                    displayManager.updateLandingPatternDisplay();
+                }
+                break;
+
+            // ... (die restlichen cases bleiben wie im vorherigen Schritt) ...
+            case 'jumpRunTrackDirection':
+            case 'jumpRunTrackOffset':
+            case 'jumpRunTrackForwardOffset':
+                if (AppState.weatherData) {
+                    displayManager.updateJumpRunTrackDisplay();
+                }
+                break;
+
+            case 'lowerLimit':
+            case 'upperLimit':
+            case 'interpStepSelect':
+                if (AppState.weatherData) {
+                    await displayManager.updateWeatherDisplay(getSliderValue());
+                    calculateMeanWind();
+                }
+                break;
+
+            case 'customLandingDirectionLL':
+            case 'customLandingDirectionRR':
+                if (AppState.weatherData) {
+                    displayManager.updateLandingPatternDisplay();
+                }
+                break;
+
+            case 'historicalDatePicker':
+                if (AppState.lastLat && AppState.lastLng) {
+                    const isoTime = value ? `${value}T00:00:00Z` : null;
+                    const newWeatherData = await weatherManager.fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, isoTime);
+                    if (newWeatherData) {
+                        await updateUIWithNewWeatherData(newWeatherData);
+                    }
+                }
+                break;
+        }
+    });
+
+    document.addEventListener('ui:showJumpMasterLineChanged', () => {
+        updateJumpMasterLineAndPanel();
     });
 
     document.addEventListener('ui:modelChanged', async (e) => {
@@ -1045,177 +1305,9 @@ function setupAppEventListeners() {
         mapManager.recenterMap();
     });
 
-    document.addEventListener('ui:radioGroupChanged', (e) => {
-        console.log(`[main-web] Radio group '${e.detail.name}' changed. Updating all displays.`);
-
-        // NEU: Spezifische Aktion für die Landing Direction hinzufügen
-        if (e.detail.name === 'landingDirection') {
-            updateUIState(); // Die Funktion wird jetzt hier aufgerufen!
-        }
-
-        if (e.detail.name === 'windUnit' || e.detail.name === 'coordFormat') {
-            updateJumpMasterLineAndPanel();
-        }
-
-        if (e.detail.name === 'heightUnit') {
-            updateJumpMasterLineAndPanel(); // Aktualisiert das Live-Tracking-Panel
-
-            if (AppState.lastMouseLatLng && AppState.coordsControl) {
-                const coordFormat = getCoordinateFormat();
-                const lat = AppState.lastMouseLatLng.lat;
-                const lng = AppState.lastMouseLatLng.lng;
-                let coordText;
-                if (coordFormat === 'MGRS') {
-                    const mgrs = Utils.decimalToMgrs(lat, lng);
-                    coordText = `MGRS: ${mgrs}`;
-                } else {
-                    coordText = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
-                }
-                debouncedGetElevationAndQFE(lat, lng, { lat, lng }, (elevation, requestLatLng) => {
-                    if (AppState.lastMouseLatLng) {
-                        const deltaLat = Math.abs(AppState.lastMouseLatLng.lat - requestLatLng.lat);
-                        const deltaLng = Math.abs(AppState.lastMouseLatLng.lng - requestLatLng.lng);
-                        const threshold = 0.05;
-                        if (deltaLat < threshold && deltaLng < threshold) {
-                            const heightUnit = getHeightUnit();
-                            let displayElevation = elevation === 'N/A' ? 'N/A' : elevation;
-                            if (displayElevation !== 'N/A') {
-                                displayElevation = Utils.convertHeight(displayElevation, heightUnit);
-                                displayElevation = Math.round(displayElevation);
-                            }
-                            console.log('Updating elevation display after heightUnit change:', { lat, lng, elevation, heightUnit, displayElevation });
-                            AppState.coordsControl.update(`${coordText}<br>Elevation: ${displayElevation} ${displayElevation === 'N/A' ? '' : heightUnit}`);
-                        }
-                    }
-                });
-            }
-            if (AppState.gpxLayer && AppState.gpxPoints.length > 0) {
-                const groundAltitude = AppState.lastAltitude !== 'N/A' && !isNaN(AppState.lastAltitude) ? parseFloat(AppState.lastAltitude) : null;
-                const windUnit = getWindSpeedUnit();
-                const heightUnit = getHeightUnit();
-                AppState.gpxLayer.eachLayer(layer => {
-                    if (layer instanceof L.Polyline) {
-                        layer.on('mousemove', function (e) {
-                            const latlng = e.latlng;
-                            let closestPoint = AppState.gpxPoints[0];
-                            let minDist = Infinity;
-                            let closestIndex = 0;
-                            AppState.gpxPoints.forEach((p, index) => {
-                                const dist = Math.sqrt(Math.pow(p.lat - latlng.lat, 2) + Math.pow(p.lng - latlng.lng, 2));
-                                if (dist < minDist) {
-                                    minDist = dist;
-                                    closestPoint = p;
-                                    closestIndex = index;
-                                }
-                            });
-                            layer.setTooltipContent(getTooltipContent(closestPoint, closestIndex, AppState.gpxPoints, groundAltitude, windUnit, heightUnit)).openTooltip(latlng);
-                        });
-                    }
-                });
-            }
-        }
-        // Hier wird die Logik ausgeführt, die vorher direkt im Callback stand
-        updateAllDisplays();
-
-        if (e.detail.name === 'coordFormat') {
-            displayManager.refreshMarkerPopup();
-            updateJumpMasterLineAndPanel();
-        }
-
-        if (e.detail.name === 'heightUnit' || e.detail.name === 'windUnit') {
-            updateJumpMasterLineAndPanel();
-            // Hier könnte auch die Gpx-Tooltip-Logik rein
-        }
-    });
-
     document.addEventListener('ui:jumpMasterLineTargetChanged', () => {
         console.log('[main-web] Jump Master Line target changed, updating panel and line.');
         updateJumpMasterLineAndPanel();
-    });
-
-    document.addEventListener('ui:inputChanged', (e) => {
-        const { name, value } = e.detail;
-        console.log(`[main-web] Input for '${name}' changed to '${value}'.`);
-
-        // Mit einem switch steuern wir, welche Aktion bei welchem Input ausgeführt wird
-        switch (name) {
-            case 'openingAltitude':
-            case 'exitAltitude':
-            case 'numberOfJumpers':
-            case 'jumperSeparation':
-            case 'cutAwayAltitude':
-                if (AppState.weatherData) {
-                    debouncedCalculateJump();
-                    // Der CutAway muss auch neu berechnet werden, wenn sich diese Werte ändern
-                    JumpPlanner.calculateCutAway();
-                }
-                break;
-
-            case 'aircraftSpeedKt':
-                // Spezielle Logik für Flugzeuggeschwindigkeit
-                const separation = JumpPlanner.getSeparationFromTAS(value);
-                setInputValueSilently('jumperSeparation', separation); // UI-Helfer
-                Settings.state.userSettings.jumperSeparation = separation;
-                Settings.save();
-                if (AppState.weatherData) {
-                    debouncedCalculateJump();
-                }
-                displayManager.updateJumpRunTrackDisplay();
-                break;
-
-            case 'lowerLimit':
-            case 'upperLimit':
-                if (AppState.weatherData) {
-                    calculateMeanWind();
-                }
-                break;
-
-            case 'canopySpeed':
-            case 'descentRate':
-            case 'interpStepSelect':
-                updateAllDisplays();
-                break;
-
-            case 'legHeightFinal':
-            case 'legHeightBase':
-                updateAllDisplays();
-                break;
-
-            case 'legHeightDownwind':
-                // Bei Downwind ändert sich auch der Sprungablauf
-                updateAllDisplays();
-                if (AppState.weatherData && Settings.state.userSettings.calculateJump) {
-                    debouncedCalculateJump();
-                }
-                break;
-
-            case 'customLandingDirectionLL':
-            case 'customLandingDirectionRR':
-                if (AppState.weatherData) {
-                    displayManager.updateLandingPatternDisplay();
-                }
-                break;
-
-            case 'jumpRunTrackDirection':
-            case 'jumpRunTrackOffset':
-            case 'jumpRunTrackForwardOffset':
-                if (AppState.weatherData) {
-                    displayManager.updateJumpRunTrackDisplay();
-                }
-                break;
-
-            case 'historicalDatePicker':
-                if (AppState.lastLat && AppState.lastLng) {
-                    const isoTime = value ? `${value}T00:00:00Z` : null;
-                    weatherManager.fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, isoTime)
-                        .then(newWeatherData => {
-                            if (newWeatherData) {
-                                updateUIWithNewWeatherData(newWeatherData);
-                            }
-                        });
-                }
-                break;
-        }
     });
 
     document.addEventListener('ui:downloadClicked', () => {
@@ -1226,21 +1318,24 @@ function setupAppEventListeners() {
         downloadTableAsAscii(downloadFormat);
     });
 
-    document.addEventListener('ui:clearDateClicked', () => {
+    document.addEventListener('ui:clearDateClicked', async () => {
         console.log('[main-web] Clear date button clicked.');
 
         const datePicker = document.getElementById('historicalDatePicker');
         if (datePicker) {
-            datePicker.value = ''; // UI-Element direkt hier ändern
+            datePicker.value = '';
             if (AppState.lastLat && AppState.lastLng) {
-                // Aktuelle Wetterdaten neu laden
-                weatherManager.fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, null)
-                    .then(newWeatherData => {
-                        if (newWeatherData) {
-                            AppState.weatherData = newWeatherData;
-                            updateAllDisplays();
-                        }
-                    });
+                try {
+                    // Aktuelle Wetterdaten neu laden
+                    const newWeatherData = await weatherManager.fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, null);
+
+                    if (newWeatherData) {
+                        // NEU: Rufe die zentrale Funktion auf, die alle spezifischen Updates durchführt
+                        await updateUIWithNewWeatherData(newWeatherData);
+                    }
+                } catch (error) {
+                    displayError(error.message);
+                }
             }
         }
     });
@@ -1258,132 +1353,6 @@ function setupAppEventListeners() {
 
         // Hier wird die Funktion aufgerufen, die vorher im eventManager stand
         applySettingToInput(id, defaultValue);
-    });
-
-    document.addEventListener('map:moved', () => {
-        console.log('[main-web] Map has moved or zoomed. Updating visualizations based on new view.');
-
-        // Die komplette Logik aus dem alten mapMoveHandler kommt hierher:
-        const currentZoom = AppState.map.getZoom();
-
-        if (Settings.state.userSettings.calculateJump && AppState.weatherData && AppState.lastLat) {
-            if (currentZoom >= UI_DEFAULTS.MIN_ZOOM && currentZoom <= UI_DEFAULTS.MAX_ZOOM) {
-                calculateJump();
-            } else {
-                mapManager.drawJumpVisualization(null);
-            }
-        }
-        if (Settings.state.userSettings.showJumpRunTrack) {
-            if (currentZoom >= UI_DEFAULTS.MIN_ZOOM && currentZoom <= UI_DEFAULTS.MAX_ZOOM) {
-                displayManager.updateJumpRunTrackDisplay();
-            } else {
-                mapManager.drawJumpRunTrack(null);
-            }
-        }
-        if (Settings.state.userSettings.showLandingPattern) {
-            displayManager.updateLandingPatternDisplay();
-        }
-
-        // Die Caching-Logik kann hier ebenfalls angestoßen werden, falls gewünscht,
-        // oder separat bleiben, wie im eventManager gezeigt.
-        cacheVisibleTiles({
-            map: AppState.map,
-            baseMaps: AppState.baseMaps,
-            onProgress: displayProgress,
-            onComplete: (message) => {
-                hideProgress();
-                if (message) Utils.handleMessage(message);
-            },
-            onCancel: () => {
-                hideProgress();
-                Utils.handleMessage('Caching cancelled.');
-            }
-        });
-    });
-
-
-    document.addEventListener('map:mousemove', (event) => {
-        const { lat, lng } = event.detail;
-        AppState.lastMouseLatLng = { lat, lng }; // Position für den Callback speichern
-
-        const coordFormat = getCoordinateFormat();
-        let coordText;
-
-        // Koordinaten-Text korrekt formatieren
-        if (coordFormat === 'MGRS') {
-            const mgrsVal = Utils.decimalToMgrs(lat, lng);
-            coordText = `MGRS: ${mgrsVal || 'N/A'}`;
-        } else if (coordFormat === 'DMS') {
-            const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
-            coordText = `Lat: ${formatDMS(Utils.decimalToDms(lat, true))}, Lng: ${formatDMS(Utils.decimalToDms(lng, false))}`;
-        } else {
-            coordText = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
-        }
-
-        // Sofortiges Update mit "Fetching..."
-        if (AppState.coordsControl) {
-            AppState.coordsControl.update(`${coordText}<br>Elevation: Fetching...<br>QFE: Fetching...`);
-        }
-
-        // Debounced-Funktion aufrufen, um API-Anfragen zu begrenzen
-        debouncedGetElevationAndQFE(lat, lng, { lat, lng }, ({ elevation, qfe }, requestLatLng) => {
-            // Callback wird ausgeführt, wenn die Daten da sind
-            if (AppState.lastMouseLatLng && AppState.coordsControl) {
-                // Nur aktualisieren, wenn die Maus noch in der Nähe ist
-                const deltaLat = Math.abs(AppState.lastMouseLatLng.lat - requestLatLng.lat);
-                const deltaLng = Math.abs(AppState.lastMouseLatLng.lng - requestLatLng.lng);
-                const threshold = 0.05;
-
-                if (deltaLat < threshold && deltaLng < threshold) {
-                    const heightUnit = getHeightUnit();
-                    let displayElevation = elevation === 'N/A' ? 'N/A' : elevation;
-                    if (displayElevation !== 'N/A') {
-                        displayElevation = Utils.convertHeight(displayElevation, heightUnit);
-                        displayElevation = Math.round(displayElevation);
-                    }
-                    const qfeText = qfe === 'N/A' ? 'N/A' : `${qfe} hPa`;
-                    AppState.coordsControl.update(`${coordText}<br>Elevation: ${displayElevation} ${displayElevation === 'N/A' ? '' : heightUnit}<br>QFE: ${qfeText}`);
-                }
-            }
-        });
-    });
-
-    document.addEventListener('map:location_selected', async (event) => {
-        const { lat, lng, source } = event.detail;
-        console.log(`App: Event 'map:location_selected' von '${source}' empfangen.`);
-
-        // --- HIER IST JETZT DIE GESAMTE ANWENDUNGSLOGIK ---
-
-        // 1. Marker-Position im AppState und UI aktualisieren
-        AppState.lastLat = lat;
-        AppState.lastLng = lng;
-        AppState.lastAltitude = await Utils.getAltitude(lat, lng);
-
-        // Informiere das Coordinates-Modul über die neue Position
-        Coordinates.addCoordToHistory(lat, lng);
-
-        // Bewege den Marker (falls die Aktion nicht schon vom Marker selbst kam)
-        if (source !== 'marker_drag') {
-            // Annahme: Sie haben eine moveMarker-Funktion im mapManager
-            // Dies ist ein Befehl von app.js an mapManager.js
-            mapManager.moveMarker(lat, lng);
-        }
-
-        // 2. Kernlogik ausführen
-        resetJumpRunDirection(true); // resetJumpRunDirection muss in app.js sein
-        await weatherManager.fetchWeatherForLocation(lat, lng); // fetchWeather... muss in app.js sein
-
-        if (Settings.state.userSettings.calculateJump) {
-            calculateJump(); // calculateJump muss in app.js sein
-            JumpPlanner.calculateCutAway();
-        }
-
-        mapManager.recenterMap(true); // recenterMap ist jetzt im mapManager
-        AppState.isManualPanning = false;
-
-        // 3. UI-Updates anstoßen, die von den neuen Daten abhängen
-        displayManager.updateJumpRunTrackDisplay(); // update... Funktionen sind jetzt im mapManager
-        displayManager.updateLandingPatternDisplay();
     });
 }
 
