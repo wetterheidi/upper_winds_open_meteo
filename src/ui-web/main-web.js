@@ -336,7 +336,7 @@ export async function updateToCurrentHour() {
         await weatherManager.fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, null, false);
         console.log('Weather data fetched for current hour');
 
-        await displayManager.updateWeatherDisplay(currentHour);
+        await displayManager.updateWeatherDisplay(currentHour, 'info', 'selectedTime');
         if (AppState.lastAltitude !== 'N/A') {
             calculateMeanWind();
         }
@@ -747,7 +747,7 @@ export async function updateUIWithNewWeatherData(newWeatherData, preservedIndex 
     }
 
     // ... (restliche Funktion bleibt unverändert)
-    await displayManager.updateWeatherDisplay(slider.value);
+    await displayManager.updateWeatherDisplay(slider.value, 'info', 'selectedTime');
     await displayManager.refreshMarkerPopup();
     if (AppState.lastAltitude !== 'N/A') {
         calculateMeanWind();
@@ -986,7 +986,7 @@ function setupAppEventListeners() {
                 }
             }
             console.log("Performing specific updates after track load...");
-            await displayManager.updateWeatherDisplay(getSliderValue());
+            await displayManager.updateWeatherDisplay(getSliderValue(), 'info', 'selectedTime');
             await displayManager.refreshMarkerPopup();
             calculateMeanWind();
             calculateJump(); // Diese Funktion beinhaltet bereits die nötigen Checks und ruft auch calculateCutAway auf
@@ -1030,7 +1030,7 @@ function setupAppEventListeners() {
             const sliderIndex = getSliderValue();
             if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
                 // 1. Die Haupt-Wettertabelle anzeigen lassen
-                await displayManager.updateWeatherDisplay(sliderIndex);
+                await displayManager.updateWeatherDisplay(sliderIndex, 'info', 'selectedTime');
                 // 2. Das Popup des Markers aktualisieren lassen
                 await displayManager.refreshMarkerPopup();
                 // 3. Die Mittelwind-Berechnung UND Anzeige durchführen
@@ -1060,7 +1060,7 @@ function setupAppEventListeners() {
 
         // Zuerst führen wir Aktionen aus, die fast immer nötig sind,
         // oder die die Grundlage für weitere Berechnungen bilden.
-        await displayManager.updateWeatherDisplay(getSliderValue());
+        await displayManager.updateWeatherDisplay(getSliderValue(), 'info', 'selectedTime');
 
         // Jetzt steuern wir spezifische Aktionen basierend auf der geänderten Einstellung
         switch (name) {
@@ -1187,7 +1187,7 @@ function setupAppEventListeners() {
             case 'upperLimit':
             case 'interpStepSelect':
                 if (AppState.weatherData) {
-                    await displayManager.updateWeatherDisplay(getSliderValue());
+                    await displayManager.updateWeatherDisplay(getSliderValue(), 'info', 'selectedTime');
                     calculateMeanWind();
                 }
                 break;
@@ -1309,7 +1309,7 @@ function setupAppEventListeners() {
 
         // Wenn die Tabelle eingeschaltet wird, muss sie mit den aktuellen Daten gefüllt werden.
         if (isChecked && AppState.weatherData && AppState.lastLat && AppState.lastLng) {
-            displayManager.updateWeatherDisplay(getSliderValue());
+            displayManager.updateWeatherDisplay(getSliderValue(), 'info', 'selectedTime');
         }
 
         mapManager.recenterMap();

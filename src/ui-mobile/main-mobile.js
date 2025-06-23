@@ -747,7 +747,7 @@ export async function updateUIWithNewWeatherData(newWeatherData, preservedIndex 
     }
 
     // ... (restliche Funktion bleibt unverändert)
-    await displayManager.updateWeatherDisplay(slider.value);
+    await displayManager.updateWeatherDisplay(slider.value, 'weather-table-container', 'selectedTime');
     await displayManager.refreshMarkerPopup();
     if (AppState.lastAltitude !== 'N/A') {
         calculateMeanWind();

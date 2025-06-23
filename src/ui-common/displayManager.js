@@ -81,12 +81,22 @@ export async function refreshMarkerPopup() {
  * @param {string|null} [originalTime=null] - Ein optionaler Zeitstempel, der für die Anzeige verwendet werden kann.
  * @returns {Promise<void>}
  */
-export async function updateWeatherDisplay(index, originalTime = null) {
-    console.log(`updateWeatherDisplay called with index: ${index}, Time: ${AppState.weatherData.time[index]}`);
+export async function updateWeatherDisplay(index, tableContainerId, timeContainerId, originalTime = null) {
+    console.log(`updateWeatherDisplay called for index: ${index} -> into ${tableContainerId}`);
+
+    const tableContainer = document.getElementById(tableContainerId);
+    const timeContainer = document.getElementById(timeContainerId);
+
+    // Sicherheitsprüfung: Stellen sicher, dass die Container existieren
+    if (!tableContainer || !timeContainer) {
+        console.error('Target container(s) for weather display not found!', { tableContainerId, timeContainerId });
+        return;
+    }
+
     if (!AppState.weatherData || !AppState.weatherData.time || index < 0 || index >= AppState.weatherData.time.length) {
         console.error('No weather data available or index out of bounds:', index);
-        document.getElementById('info').innerHTML = 'No weather data available';
-        document.getElementById('selectedTime').innerHTML = 'Selected Time: ';
+        tableContainer.innerHTML = '<p style="padding: 20px; text-align: center;">No weather data available</p>';
+        timeContainer.innerHTML = 'Selected Time: ';
         const slider = document.getElementById('timeSlider');
         if (slider) slider.value = 0;
         return;
@@ -119,8 +129,8 @@ export async function updateWeatherDisplay(index, originalTime = null) {
     const surfaceHeight = refLevel === 'AMSL' && AppState.lastAltitude !== 'N/A' ? Math.round(AppState.lastAltitude) : 0;
 
     if (!Settings.state.userSettings.showTable) {
-        document.getElementById('info').innerHTML = '';
-        document.getElementById('selectedTime').innerHTML = `Selected Time: ${time}`;
+        tableContainer.innerHTML = ''; // Leert den Tabellen-Container
+        timeContainer.innerHTML = `Selected Time: ${time}`; // Setzt die Zeit
         return;
     }
 
@@ -196,8 +206,8 @@ export async function updateWeatherDisplay(index, originalTime = null) {
             </tbody>
         </table>`;
 
-    document.getElementById('info').innerHTML = output;
-    document.getElementById('selectedTime').innerHTML = `Selected Time: ${time}`;
+    tableContainer.innerHTML = output; // <-- Nutzt den Parameter
+    timeContainer.innerHTML = `Selected Time: ${time}`; // <-- Nutzt den Parameter
 }
 
 /**
