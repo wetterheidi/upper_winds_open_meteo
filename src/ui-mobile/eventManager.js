@@ -27,6 +27,67 @@ function dispatchAppEvent(eventName, detail = {}) {
     document.dispatchEvent(event);
 }
 
+// Tab Bar Setup for Mobile UI
+function setupTabBarEvents() {
+    const tabBar = document.getElementById('tab-bar');
+    if (!tabBar) return;
+
+    tabBar.addEventListener('click', (e) => {
+        const button = e.target.closest('.tab-button');
+        if (!button) return;
+
+        // 1. Daten aus dem geklickten Button holen
+        const panelIdToShow = `panel-${button.dataset.panel}`;
+
+        // Sonderfall für die Karte: Alle Panels ausblenden
+        if (button.dataset.panel === 'map') {
+            document.querySelectorAll('.content-panel').forEach(p => p.classList.add('hidden'));
+        } else {
+            // Alle Panels ausblenden
+            document.querySelectorAll('.content-panel').forEach(p => p.classList.add('hidden'));
+            // Das richtige Panel anzeigen
+            const panelToShow = document.getElementById(panelIdToShow);
+            if (panelToShow) {
+                panelToShow.classList.remove('hidden');
+            }
+        }
+
+        // 2. Visuelles Feedback für den aktiven Tab
+        document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+        button.classList.add('active');
+    });
+}
+
+function setupAccordionEvents() {
+    const accordionHeaders = document.querySelectorAll('.accordion-header');
+
+    accordionHeaders.forEach(header => {
+        header.addEventListener('click', () => {
+            const currentlyActiveHeader = document.querySelector('.accordion-header.active');
+            // Wenn ein anderer Header aktiv war, schließen wir ihn zuerst
+            if (currentlyActiveHeader && currentlyActiveHeader !== header) {
+                currentlyActiveHeader.classList.remove('active');
+                currentlyActiveHeader.nextElementSibling.style.maxHeight = 0;
+                currentlyActiveHeader.nextElementSibling.style.padding = '0 15px';
+            }
+
+            // Den geklickten Header umschalten (auf/zu)
+            header.classList.toggle('active');
+            const content = header.nextElementSibling;
+            if (content.style.maxHeight) {
+                // Wenn es offen ist -> schließen
+                content.style.maxHeight = null;
+                content.style.padding = '0 15px';
+            } else {
+                // Wenn es geschlossen ist -> öffnen
+                // scrollHeight gibt uns die volle Höhe des Inhalts
+                content.style.maxHeight = content.scrollHeight + 'px';
+                content.style.padding = '15px';
+            }
+        });
+    });
+}
+
 // HILFSFUNKTIONEN FÜR EVENT SETUP
 function setupCheckbox(id, setting, callback) {
     console.log(`setupCheckbox called for id: ${id}`);
@@ -1017,6 +1078,8 @@ export function initializeEventListeners() {
     setupResetCutAwayMarkerButton();
     setupCacheManagement();
     setupCacheSettings();
+    setupTabBarEvents();
+    setupAccordionEvents();
     listenersInitialized = true;
     console.log("Event listeners initialized successfully (first and only time).");
 
