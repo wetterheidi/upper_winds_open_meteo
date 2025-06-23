@@ -128,3 +128,15 @@
 .accordion-content li:last-child {
     border-bottom: none;
 }
+
+#crosshair {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 32px;
+    font-weight: bold;
+    color: rgba(0, 0, 0, 0.6);
+    pointer-events: none; /* Wichtig! */
+    z-index: 1001;
+}
