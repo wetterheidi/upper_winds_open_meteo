@@ -10,7 +10,7 @@ import * as JumpPlanner from '../core/jumpPlanner.js';
 import * as mapManager from '../ui-common/mapManager.js';
 import * as weatherManager from '../core/weatherManager.js';
 import { cacheVisibleTiles, cacheTilesForDIP } from '../core/tileCache.js';
-import { getSliderValue, displayError, displayMessage, displayProgress, hideProgress } from '../ui-common/ui.js';
+import { getSliderValue, displayError, displayMessage, displayProgress, hideProgress, applyDeviceSpecificStyles } from '../ui-common/ui.js';
 import * as AutoupdateManager from '../core/autoupdateManager.js';
 import { DateTime } from 'luxon';
 import * as displayManager from '../ui-common/displayManager.js';
@@ -1309,63 +1309,6 @@ function setupAppEventListeners() {
         applySettingToInput(id, defaultValue);
     });
 }
-function setupCrosshairDisplay(map) {
-    // 1. Nur EINEN Control erstellen und im AppState speichern
-    AppState.coordsControl = new L.Control.Coordinates();
-    AppState.map.addControl(AppState.coordsControl);
-
-    // 2. Die Callback-Funktion, die auf die verzögerten Daten wartet
-    const updateWithDebouncedData = ({ elevation, qfe }, requestLatLng) => {
-        const currentCenter = AppState.map.getCenter();
-        if (Math.abs(currentCenter.lat - requestLatLng.lat) > 0.00001) return;
-
-        // Wir holen den aktuellen Koordinaten-Text, der schon im Display steht
-        const currentHTML = AppState.coordsControl._container.innerHTML;
-        const coordPart = currentHTML.split('|')[0].trim();
-
-        // === HIER IST DIE KORREKTUR ===
-        const heightUnit = Settings.getValue('heightUnit', 'radio', 'm'); // Holt die Einheit ('m' oder 'ft')
-        let displayElevation = 'N/A';
-        if (elevation !== 'N/A') {
-            const convertedElevation = Utils.convertHeight(elevation, heightUnit);
-            displayElevation = Math.round(convertedElevation);
-        }
-        const altString = displayElevation === 'N/A' ? 'N/A' : `${displayElevation}${heightUnit}`; // Fügt die Einheit hinzu, z.B. "1200ft"
-        // === ENDE DER KORREKTUR ===
-
-        const qfeString = (qfe !== 'N/A') ? `${qfe.toFixed(0)}hPa` : 'N/A';
-        
-        // Wir setzen den Text neu zusammen
-        const displayText = `${coordPart}<br>Elevation: ${altString}<br>QFE: ${qfeString}`;
-        AppState.coordsControl.update(displayText);
-    };
-
-    // 3. Event-Listener für das ENDE der Bewegung
-    AppState.map.on('moveend', () => {
-        const center = AppState.map.getCenter();
-        const currentHTML = AppState.coordsControl._container.innerHTML;
-        const coordPart = currentHTML.split('|')[0].trim();
-        AppState.coordsControl.update(`${coordPart}<br>Elevation: Fetching...<br>QFE: Fetching...`);
-        debouncedGetElevationAndQFE(center.lat, center.lng, center, updateWithDebouncedData);
-    });
-
-    // 4. Event-Listener für die KONTINUIERLICHE Bewegung
-    AppState.map.on('move', () => {
-        const center = AppState.map.getCenter();
-        const coordFormat = Settings.getValue('coordFormat', 'radio', 'Decimal');
-        const coords = Utils.convertCoords(center.lat, center.lng, coordFormat);
-        const coordString = (coordFormat === 'MGRS') ? `MGRS: ${coords.lat}` : `${center.lat.toFixed(5)}, ${center.lng.toFixed(5)}`;
-        AppState.coordsControl.update(`${coordString}<br>Elevation: Fetching...<br>QFE: Fetching...`);
-    });
-
-    // 5. Einmalig auslösen, um den initialen Zustand zu laden
-    setTimeout(() => {
-        if(map) {
-            AppState.map.fireEvent('move');
-            AppState.map.fireEvent('moveend');
-        }
-    }, 200);
-}
 
 document.addEventListener('DOMContentLoaded', async () => {
     initializeApp();
@@ -1373,9 +1316,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // In der mobilen App soll die Tabelle im Data-Panel immer angezeigt werden.
     Settings.state.userSettings.showTable = true;
+    applyDeviceSpecificStyles();
 
     await mapManager.initializeMap();
-    setupCrosshairDisplay(map);
     setupAppEventListeners();
     AutoupdateManager.setupAutoupdate();
 

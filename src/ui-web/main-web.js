@@ -10,7 +10,7 @@ import * as JumpPlanner from '../core/jumpPlanner.js';
 import * as mapManager from '../ui-common/mapManager.js';
 import * as weatherManager from '../core/weatherManager.js';
 import { cacheVisibleTiles, cacheTilesForDIP } from '../core/tileCache.js';
-import { getSliderValue, displayError, displayMessage, displayProgress, hideProgress } from '../ui-common/ui.js';
+import { getSliderValue, displayError, displayMessage, displayProgress, hideProgress, applyDeviceSpecificStyles } from '../ui-common/ui.js';
 import * as AutoupdateManager from '../core/autoupdateManager.js';
 import { DateTime } from 'luxon';
 import * as displayManager from '../ui-common/displayManager.js';
@@ -1369,6 +1369,7 @@ function setupAppEventListeners() {
 document.addEventListener('DOMContentLoaded', async () => {
     initializeApp();
     initializeUIElements(); // <-- HIER DEN AUFRUF HINZUFÜGEN
+    applyDeviceSpecificStyles();
     await mapManager.initializeMap();
     setupAppEventListeners();
     AutoupdateManager.setupAutoupdate();

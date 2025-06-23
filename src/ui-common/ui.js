@@ -5,9 +5,25 @@ import { fetchEnsembleWeatherData, processAndVisualizeEnsemble } from '../core/e
 import { UI_DEFAULTS } from '../core/constants.js';
 
 export function isMobileDevice() {
-    const isMobile = window.innerWidth < UI_DEFAULTS.MOBILE_BREAKPOINT_PX;
-    console.log(`isMobileDevice check: window.innerWidth=${window.innerWidth}, isMobile=${isMobile}`);
-    return isMobile;
+    /**
+     * Diese Prüfung ist deutlich zuverlässiger als die alte Methode.
+     * Sie prüft auf echte Touch-Fähigkeiten des Browsers.
+     */
+    const hasTouchSupport = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+    /**
+     * In der nativen App setzt Capacitor eine globale Variable.
+     * Dies ist der sicherste Weg, die App-Umgebung zu erkennen.
+     */
+    const isCapacitorApp = window.Capacitor && window.Capacitor.isNativePlatform();
+
+    return hasTouchSupport || isCapacitorApp;
+}
+
+export function applyDeviceSpecificStyles() {
+    if (isMobileDevice()) {
+        document.body.classList.add('touch-device');
+    }
 }
 
 export function displayMessage(message) {
@@ -202,14 +218,14 @@ export function updateEnsembleModelUI(availableModels) {
 
             // 1. Daten abrufen und auf Erfolg warten
             const success = await fetchEnsembleWeatherData();
-            
+
             // 2. NUR wenn die Daten erfolgreich waren, die Visualisierung anstoßen
             if (success) {
                 const sliderIndex = getSliderValue(); // Den UI-Zustand HIER abrufen
                 processAndVisualizeEnsemble(sliderIndex); // Und an die Core-Funktion übergeben
             }
         });
-        
+
         label.append(checkbox, ` ${model.replace(/_/g, ' ').toUpperCase()}`);
         li.appendChild(label);
         submenu.appendChild(li);

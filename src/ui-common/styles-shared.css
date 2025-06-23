@@ -1250,6 +1250,54 @@ input[type="checkbox"][style*="opacity: 1"] {
     border-color: #d63031;
 }
 
+/* Das Fadenkreuz-Element selbst ist nur ein unsichtbarer Ankerpunkt.
+   Es wird standardmäßig mit display: none versteckt. */
+#crosshair {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 16px;  /* Breite des Kreuzes */
+  height: 16px; /* Höhe des Kreuzes */
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 999;
+  display: none; /* SEHR WICHTIG: Standardmäßig unsichtbar */
+}
+
+/* Die Sichtbarkeit wird NUR über diese Klasse gesteuert. */
+.touch-device #crosshair {
+  display: block;
+}
+
+/* Die zwei Linien (horizontal und vertikal) für das "+" 
+   werden mit sog. Pseudo-Elementen erstellt. */
+#crosshair::before,
+#crosshair::after {
+  content: '';
+  position: absolute;
+  background-color: #333; /* Farbe des Kreuzes */
+  /* Ein leichter Schatten macht das Kreuz auf jedem Untergrund besser sichtbar */
+  box-shadow: 0 0 2px rgba(255, 255, 255, 0.8); 
+}
+
+/* Vertikale Linie des Kreuzes */
+#crosshair::before {
+  left: 50%;
+  top: 0;
+  width: 2px; /* Dicke der Linie */
+  height: 100%;
+  transform: translateX(-50%);
+}
+
+/* Horizontale Linie des Kreuzes */
+#crosshair::after {
+  top: 50%;
+  left: 0;
+  height: 2px; /* Dicke der Linie */
+  width: 100%;
+  transform: translateY(-50%);
+}
+
 @keyframes spin {
     0% {
         transform: rotate(0deg);

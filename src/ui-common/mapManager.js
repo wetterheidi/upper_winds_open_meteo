@@ -5,9 +5,10 @@ import { AppState } from '../core/state.js';
 import { Settings } from '../core/settings.js';
 import { Utils } from '../core/utils.js';
 import { TileCache } from '../core/tileCache.js';
-import { updateOfflineIndicator } from './ui.js';
+import { updateOfflineIndicator, isMobileDevice } from './ui.js';
 //import './public/vendor/Leaflet.PolylineMeasure.js'; // Pfad ggf. anpassen
 import { UI_DEFAULTS, ICON_URLS, ENSEMBLE_VISUALIZATION}  from '../core/constants.js'; // Importiere UI-Defaults
+import { debouncedGetElevationAndQFE } from '../ui-mobile/main-mobile.js';
 
 let lastTapTime = 0; // Add this line
 
@@ -374,19 +375,26 @@ function _setupCoreMapEventHandlers() {
         console.error("Karte nicht initialisiert in _setupCoreMapEventHandlers");
         return;
     }
-    if (!AppState.coordsControl) {
-        AppState.coordsControl = new L.Control.Coordinates();
+
+    // A. Das Control wird jetzt immer hier erstellt, egal für welchen Modus.
+     if (!AppState.coordsControl) {
+        // WICHTIG: Deaktivieren der Standard-Handler des Plugins.
+        // Wir steuern die Updates jetzt zu 100% selbst.
+        const coordOptions = {
+            enableUserInput: false
+        };
+        AppState.coordsControl = new L.Control.Coordinates(coordOptions);
         AppState.coordsControl.addTo(AppState.map);
-        console.log('CoordsControl initialized in _setupCoreMapEventHandlers.');
     }
 
-    AppState.map.on('mousemove', _handleMapMouseMove);
-    AppState.map.on('mouseout', function () {
-        if (AppState.coordsControl && AppState.coordsControl.getContainer()) {
-            AppState.coordsControl.getContainer().innerHTML = 'Move mouse over map';
-        }
-    });
+    // B. Die zentrale Entscheidung: Fadenkreuz oder Maus?
+    if (isMobileDevice()) {
+        _setupCrosshairCoordinateHandler(AppState.map);
+    } else {
+        _setupMouseCoordinateHandler(AppState.map);
+    }
 
+    // Die restlichen Event-Handler bleiben für beide Plattformen aktiv.
     AppState.map.on('dblclick', _handleMapDblClick);
 
     // Zoom Events
@@ -530,6 +538,48 @@ function _setupCoreMapEventHandlers() {
     // --- END: Add Double-Tap/Touch Functionality ---
     
     console.log('All core map event handlers have been set up.');
+}
+function _setupCrosshairCoordinateHandler(map) {
+    const updateWithDebouncedData = ({ elevation, qfe }, requestLatLng) => {
+        const currentCenter = map.getCenter();
+        if (Math.abs(currentCenter.lat - requestLatLng.lat) > 0.0001 || Math.abs(currentCenter.lng - requestLatLng.lng) > 0.0001) {
+            return;
+        }
+        const currentHTML = AppState.coordsControl._container.innerHTML;
+        const coordPart = currentHTML.split('<br>')[0];
+        const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
+        let displayElevation = 'N/A';
+        if (elevation !== 'N/A') {
+            const convertedElevation = Utils.convertHeight(elevation, heightUnit);
+            displayElevation = Math.round(convertedElevation);
+        }
+        const altString = displayElevation === 'N/A' ? 'N/A' : `${displayElevation}${heightUnit}`;
+        const qfeString = (qfe !== 'N/A') ? `${qfe.toFixed(0)}hPa` : 'N/A';
+        const displayText = `${coordPart}<br>Elevation: ${altString}<br>QFE: ${qfeString}`;
+        AppState.coordsControl.update(displayText);
+    };
+
+    const handleMapMove = () => {
+        const center = map.getCenter();
+        const coordFormat = Settings.getValue('coordFormat', 'radio', 'Decimal');
+        const coords = Utils.convertCoords(center.lat, center.lng, coordFormat);
+        const coordString = (coordFormat === 'MGRS') ? `MGRS: ${coords.lat}` : `${center.lat.toFixed(5)}, ${center.lng.toFixed(5)}`;
+        AppState.coordsControl.update(`${coordString}<br>Elevation: ...<br>QFE: ...`);
+        debouncedGetElevationAndQFE(center.lat, center.lng, center, updateWithDebouncedData);
+    };
+
+    map.on('move', handleMapMove);
+    setTimeout(() => map.fire('move'), 200);
+    console.log('Crosshair coordinate handler initialized.');
+}
+function _setupMouseCoordinateHandler(map) {
+    map.on('mousemove', _handleMapMouseMove);
+    map.on('mouseout', function () {
+        if (AppState.coordsControl && AppState.coordsControl.getContainer()) {
+            AppState.coordsControl.getContainer().innerHTML = 'Move mouse over map';
+        }
+    });
+    console.log('Mouse coordinate handler initialized.');
 }
 
 // Die einzelnen komplexen Event-Handler
