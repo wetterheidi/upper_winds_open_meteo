@@ -60,11 +60,13 @@ export const Settings = {
         userSettings: null,
         unlockedFeatures: {
             landingPattern: false,
-            calculateJump: false
+            calculateJump: false,
+            planner: false
         },
         isJumperSeparationManual: false,
         isLandingPatternUnlocked: false,
-        isCalculateJumpUnlocked: false
+        isCalculateJumpUnlocked: false,
+        isPlannerUnlocked: false
     },
 
     /**
@@ -162,6 +164,9 @@ export const Settings = {
             } else if (feature === 'calculateJump') {
                 this.state.unlockedFeatures.calculateJump = isUnlocked;
                 this.state.isCalculateJumpUnlocked = isUnlocked;
+            } else if (feature === 'planner') { // <-- NEUEN ELSE-IF-BLOCK HINZUFÜGEN
+                this.state.unlockedFeatures.planner = isUnlocked;
+                this.state.isPlannerUnlocked = isUnlocked;
             }
             this.saveUnlockedFeatures();
             console.log('Saved unlock status:', {
@@ -188,9 +193,9 @@ export const Settings = {
             return;
         }
 
-        const featureName = feature === 'landingPattern' ? 'Landing Pattern' : 'Calculate Jump';
+        const featureName = feature.charAt(0).toUpperCase() + feature.slice(1); // Macht aus 'planner' -> 'Planner'
         header.textContent = `${featureName} Access`;
-        message.textContent = `Please enter the password to enable ${featureName.toLowerCase()}:`;
+        message.textContent = `Please enter the password to enable the ${featureName.toLowerCase()} functionality:`;
 
         input.value = '';
         error.style.display = 'none';

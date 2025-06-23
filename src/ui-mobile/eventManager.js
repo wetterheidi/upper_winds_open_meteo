@@ -27,32 +27,66 @@ function dispatchAppEvent(eventName, detail = {}) {
     document.dispatchEvent(event);
 }
 
-// Tab Bar Setup for Mobile UI
 function setupTabBarEvents() {
     const tabBar = document.getElementById('tab-bar');
     if (!tabBar) return;
+
+    // Diese Funktion wird den visuellen Zustand des Planner-Tabs steuern
+    const setPlannerLockState = () => {
+        const plannerTabButton = document.getElementById('planner-tab-button');
+        if (!plannerTabButton) return;
+
+        if (Settings.isFeatureUnlocked('planner')) {
+            plannerTabButton.style.opacity = '1';
+            plannerTabButton.title = 'Open Planner';
+        } else {
+            plannerTabButton.style.opacity = '0.5'; // Visuell ausgrauen
+            plannerTabButton.title = 'Feature locked. Tap to enter password.';
+        }
+    };
+
+    // Initialen Zustand beim Start der App setzen
+    setPlannerLockState();
 
     tabBar.addEventListener('click', (e) => {
         const button = e.target.closest('.tab-button');
         if (!button) return;
 
-        // 1. Daten aus dem geklickten Button holen
-        const panelIdToShow = `panel-${button.dataset.panel}`;
+        const panelId = button.dataset.panel;
 
-        // Sonderfall für die Karte: Alle Panels ausblenden
-        if (button.dataset.panel === 'map') {
+        // --- NEUE PASSWORT-LOGIK ---
+        // Prüfen, ob der Planner-Tab geklickt wurde UND ob er gesperrt ist
+        if (panelId === 'planner' && !Settings.isFeatureUnlocked('planner')) {
+            Settings.showPasswordModal('planner',
+                () => { // onSuccess: Wenn das Passwort korrekt war
+                    Settings.saveUnlockStatus('planner', true);
+                    setPlannerLockState();
+                    // Zeige das Panel direkt an, anstatt einen zweiten Klick zu erfordern
+                    document.querySelectorAll('.content-panel').forEach(p => p.classList.add('hidden'));
+                    document.getElementById(`panel-${panelId}`).classList.remove('hidden');
+                    document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+                    button.classList.add('active');
+                },
+                () => { // onCancel: Wenn der Dialog abgebrochen wurde
+                    // Nichts tun, der Lock-State bleibt
+                }
+            );
+            return; // Wichtig: Die Funktion hier beenden, damit der normale Panel-Wechsel nicht stattfindet
+        }
+        // --- ENDE NEUE PASSWORT-LOGIK ---
+
+
+        // Normale Logik zum Wechseln der Panels (wie bisher)
+        if (panelId === 'map') {
             document.querySelectorAll('.content-panel').forEach(p => p.classList.add('hidden'));
         } else {
-            // Alle Panels ausblenden
             document.querySelectorAll('.content-panel').forEach(p => p.classList.add('hidden'));
-            // Das richtige Panel anzeigen
-            const panelToShow = document.getElementById(panelIdToShow);
+            const panelToShow = document.getElementById(`panel-${panelId}`);
             if (panelToShow) {
                 panelToShow.classList.remove('hidden');
             }
         }
 
-        // 2. Visuelles Feedback für den aktiven Tab
         document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
         button.classList.add('active');
     });
@@ -768,50 +802,7 @@ function setupMapEventListeners() {
     AppState.map.on('moveend', debouncedCacheHandler); // Caching kann parallel laufen
 
 }
-function setupMenuItemEvents() {
-    console.log("setupMenuItemEvents wird aufgerufen für 'Calculate Jump'.");
-    const calculateJumpMenuItem = Array.from(document.querySelectorAll('.menu-label'))
-        .find(item => item.textContent.trim() === 'Calculate Jump');
 
-    if (!calculateJumpMenuItem) {
-        console.error('Calculate Jump menu item not found');
-        return;
-    }
-
-    const submenu = calculateJumpMenuItem.closest('li').querySelector('ul.submenu');
-
-    const setVisualLockState = () => {
-        if (Settings.isFeatureUnlocked('calculateJump')) {
-            calculateJumpMenuItem.style.opacity = '1';
-            calculateJumpMenuItem.title = 'Click to open/close jump calculation settings';
-        } else {
-            calculateJumpMenuItem.style.opacity = '0.5';
-            calculateJumpMenuItem.title = 'Feature locked. Click to enter password.';
-            if (submenu) submenu.classList.add('hidden');
-        }
-    };
-
-    setVisualLockState(); // Setzt den initialen Zustand
-
-    calculateJumpMenuItem.addEventListener('click', (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-
-        if (Settings.isFeatureUnlocked('calculateJump')) {
-            if (submenu) submenu.classList.toggle('hidden');
-        } else {
-            Settings.showPasswordModal('calculateJump',
-                () => { // onSuccess
-                    setVisualLockState();
-                    if (submenu) submenu.classList.remove('hidden');
-                },
-                () => { // onCancel
-                    setVisualLockState();
-                }
-            );
-        }
-    });
-}
 function setupResetCutAwayMarkerButton() {
     const resetButton = document.getElementById('resetCutAwayMarker');
     if (resetButton) {
@@ -1063,7 +1054,6 @@ export function initializeEventListeners() {
     setupCutawayRadioButtons();
     setupJumpRunTrackEvents();
     setupMapEventListeners();
-    setupMenuItemEvents();
     setupResetCutAwayMarkerButton();
     setupCacheManagement();
     setupCacheSettings();

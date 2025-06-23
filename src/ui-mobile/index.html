@@ -64,7 +64,7 @@
 
     <div id="content-panels">
         <div id="panel-data" class="content-panel hidden">
-            
+
             <div id="selectedTime" style="text-align: center; padding: 10px; font-weight: bold;"></div>
 
             <div id="bottom-container">
@@ -86,21 +86,21 @@
                         <option value="2000">2000</option>
                     </select>
                 </div>
-            </div>
-            <div id="weather-table-container">
-                <table id="weather-table">
-                    <thead>
-                        <tr>
-                            <th>Altitude (m)</th>
-                            <th>Altitude (ft)</th>
-                            <th>Direction (°)</th>
-                            <th>Speed (kt)</th>
-                            <th>Speed (m/s)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    </tbody>
-                </table>
+                <div id="weather-table-container">
+                    <table id="table">
+                        <thead>
+                            <tr>
+                                <th>Altitude (m)</th>
+                                <th>Altitude (ft)</th>
+                                <th>Direction (°)</th>
+                                <th>Speed (kt)</th>
+                                <th>Speed (m/s)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
@@ -165,7 +165,7 @@
             </div>
 
             <div class="accordion-item">
-                <button class="accordion-header">Calculate Jump</button>
+                <button class="accordion-header" data-planner-section="calculateJump">Calculate Jump</button>
                 <div class="accordion-content">
                     <ul>
                         <li>
@@ -475,7 +475,7 @@
             <span class="icon">📊</span>
             <span class="label">Data</span>
         </button>
-        <button class="tab-button" data-panel="planner">
+        <button class="tab-button" data-panel="planner" id="planner-tab-button">
             <span class="icon">🪂</span>
             <span class="label">Planner</span>
         </button>
