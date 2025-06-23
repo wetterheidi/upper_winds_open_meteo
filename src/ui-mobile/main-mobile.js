@@ -617,15 +617,6 @@ function initializeApp() {
     console.log('Initializing app');
 }
 function initializeUIElements() {
-    applySettingToSelect('modelSelect', Settings.state.userSettings.model);
-    applySettingToRadio('refLevel', Settings.state.userSettings.refLevel);
-    applySettingToRadio('heightUnit', Settings.state.userSettings.heightUnit);
-    applySettingToRadio('temperatureUnit', Settings.state.userSettings.temperatureUnit);
-    applySettingToRadio('windUnit', Settings.state.userSettings.windUnit);
-    applySettingToRadio('timeZone', Settings.state.userSettings.timeZone);
-    applySettingToRadio('coordFormat', Settings.state.userSettings.coordFormat);
-    applySettingToRadio('downloadFormat', Settings.state.userSettings.downloadFormat);
-    applySettingToRadio('landingDirection', Settings.state.userSettings.landingDirection);
     applySettingToInput('canopySpeed', Settings.state.userSettings.canopySpeed);
     applySettingToInput('descentRate', Settings.state.userSettings.descentRate);
     applySettingToInput('legHeightDownwind', Settings.state.userSettings.legHeightDownwind);
@@ -1368,7 +1359,11 @@ function setupAppEventListeners() {
 
 document.addEventListener('DOMContentLoaded', async () => {
     initializeApp();
-    initializeUIElements(); // <-- HIER DEN AUFRUF HINZUFÜGEN
+    initializeUIElements(); 
+
+    // In der mobilen App soll die Tabelle im Data-Panel immer angezeigt werden.
+    Settings.state.userSettings.showTable = true;
+
     await mapManager.initializeMap();
     setupAppEventListeners();
     AutoupdateManager.setupAutoupdate();

@@ -244,21 +244,42 @@ export const Settings = {
     },
 
     /**
-     * Retrieves the value of a setting from a UI element or returns a default.
-     * @param {string} name - The name of the setting.
-     * @param {string} type - The UI element type ('radio', 'select').
-     * @param {*} defaultValue - The default value if not found.
+     * Retrieves the value of a setting.
+     * NEU: Liest den Wert zuerst aus dem Settings-State. Nur wenn der nicht existiert,
+     * wird als Fallback das DOM durchsucht.
+     * @param {string} name - The name of the setting (key in userSettings).
+     * @param {string} type - The UI element type ('radio', 'select', 'checkbox', 'number', 'text').
+     * @param {*} defaultValue - The default value if not found anywhere.
      * @returns {*} The setting value.
      */
-    getValue(name, type = 'radio', defaultValue) {
+    getValue(name, type, defaultValue) {
+        // 1. Priorität: Versuche, den Wert aus dem geladenen State zu lesen.
+        if (this.state.userSettings && typeof this.state.userSettings[name] !== 'undefined') {
+            return this.state.userSettings[name];
+        }
+
+        // 2. Priorität (Fallback): Wenn im State nichts gefunden wurde, durchsuche das DOM.
+        // Das ist nur noch für Elemente nötig, die nicht explizit in den Settings gespeichert werden.
         const selector = type === 'radio' ? `input[name="${name}"]:checked` : `#${name}`;
         const element = document.querySelector(selector);
+
         if (!element) {
-            console.warn(`Setting element not found: ${selector}`);
+            // Diese Warnung erscheint jetzt nur noch, wenn ein Element WIRKLICH fehlt.
+            console.warn(`Setting element not found in DOM for fallback: ${selector}`);
             return defaultValue;
         }
-        const value = type === 'select' ? element.value : element.value;
-        console.log(`Retrieved setting ${name}: ${value}`);
+
+        let value;
+        switch (type) {
+            case 'checkbox':
+                value = element.checked;
+                break;
+            case 'number':
+                value = parseFloat(element.value);
+                break;
+            default:
+                value = element.value;
+        }
         return value;
     },
 

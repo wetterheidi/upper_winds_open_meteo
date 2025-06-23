@@ -269,17 +269,6 @@ function setupCheckboxEvents() {
         return;
     }
 
-    setupCheckbox('showTableCheckbox', 'showTable', (checkbox) => {
-        // 1. Setting speichern (ist okay hier)
-        Settings.state.userSettings.showTable = checkbox.checked;
-        Settings.save();
-
-        // 2. Event auslösen und den neuen Zustand mitteilen
-        document.dispatchEvent(new CustomEvent('ui:showTableChanged', {
-            detail: { checked: checkbox.checked }
-        }));
-    });
-
     setupCheckbox('showExitAreaCheckbox', 'showExitArea', (checkbox) => {
         Settings.state.userSettings.showExitArea = checkbox.checked;
         Settings.save();
