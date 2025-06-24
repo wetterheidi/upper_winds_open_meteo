@@ -1144,7 +1144,7 @@ input[type="checkbox"][style*="opacity: 1"] {
     margin-bottom: 5px;
 }
 
-#locationSearchInput {
+#locationSearchInputWeb {
     flex-grow: 1; /* Das Eingabefeld nimmt den meisten Platz ein */
     padding: 8px;
     border: 1px solid #ccc;

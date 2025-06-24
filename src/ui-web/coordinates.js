@@ -15,8 +15,8 @@ let isAddingFavorite = false; // Sperrvariable, um doppelte Aufrufe zu verhinder
  */
 
 function initializeLocationSearch() {
-    const searchInput = document.getElementById('locationSearchInput');
-    const resultsList = document.getElementById('locationResults');
+    const searchInput = document.getElementById('locationSearchInputWeb');
+    const resultsList = document.getElementById('locationResultsWeb');
     const saveFavoriteBtn = document.getElementById('saveCurrentLocationBtn');
 
     if (!searchInput || !resultsList || !saveFavoriteBtn) {
@@ -168,7 +168,7 @@ function parseQueryAsCoordinates(query) {
  * @param {Array} searchResults - Ein Array mit Suchergebnissen von der API.
  */
 function renderResultsList(searchResults = []) {
-    const resultsList = document.getElementById('locationResults');
+    const resultsList = document.getElementById('locationResultsWeb');
     if (!resultsList) {
         console.error('resultsList nicht gefunden.');
         return;

@@ -5,17 +5,16 @@ import { Utils } from '../core/utils.js';
 import { Settings, getInterpolationStep } from '../core/settings.js';
 import { UI_DEFAULTS } from '../core/constants.js';
 import * as EventManager from './eventManager.js';
-import * as Coordinates from '../ui-common/coordinates.js';
+import * as Coordinates from '../ui-mobile/coordinates.js';
 import * as JumpPlanner from '../core/jumpPlanner.js';
-import * as mapManager from '../ui-common/mapManager.js';
+import * as mapManager from './mapManager.js';
 import * as weatherManager from '../core/weatherManager.js';
 import { cacheVisibleTiles, cacheTilesForDIP } from '../core/tileCache.js';
-import { getSliderValue, displayError, displayMessage, displayProgress, hideProgress, applyDeviceSpecificStyles } from '../ui-common/ui.js';
+import { getSliderValue, displayError, displayMessage, displayProgress, hideProgress, applyDeviceSpecificStyles } from './ui.js';
 import * as AutoupdateManager from '../core/autoupdateManager.js';
 import { DateTime } from 'luxon';
-import * as displayManager from '../ui-common/displayManager.js';
+import * as displayManager from './displayManager.js';
 import * as liveTrackingManager from '../core/liveTrackingManager.js'; // <-- DIESE ZEILE HINZUFÜGEN
-
 
 export const getTemperatureUnit = () => Settings.getValue('temperatureUnit', 'radio', 'C');
 export const getHeightUnit = () => Settings.getValue('heightUnit', 'radio', 'm');

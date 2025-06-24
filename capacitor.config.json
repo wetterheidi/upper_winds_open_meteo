@@ -1,5 +1,17 @@
 {
   "appId": "com.wetterheidi.dzmaster",
-  "appName": "DZMaster",
-  "webDir": "dist/mobile"
+  "appName": "Wetterheidi",
+  "webDir": "dist/mobile",
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 3000,
+      "launchAutoHide": true,
+      "backgroundColor": "#FFFFFF",
+      "androidSplashResourceName": "splash",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": false,
+      "splashFullScreen": true,
+      "splashImmersive": true
+    }
+  }
 }

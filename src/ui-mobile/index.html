@@ -3,8 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport"
-        content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>DZMaster</title>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -457,13 +456,27 @@
         </div>
 
         <div id="panel-search" class="content-panel hidden">
-            <h4>Search Location</h4>
-            <div id="search-container">
-                <input type="text" id="locationSearchInput" placeholder="Look up location or city...">
-                <button id="saveCurrentLocationBtn" title="Save As Favorite">★+</button>
+            <div class="search-bar-container">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="locationSearchInput" placeholder="Look up city or coordinates...">
             </div>
-            <ul id="locationResults" class="location-results-list">
-            </ul>
+
+            <div id="locationResults" class="location-results-container">
+                <div id="favorites-section" class="search-section">
+                    <h5>Favorites</h5>
+                    <ul id="favorites-list"></ul>
+                </div>
+
+                <div id="recents-section" class="search-section">
+                    <h5>Recent Searches</h5>
+                    <ul id="recents-list"></ul>
+                </div>
+
+                <div id="search-results-section" class="search-section" style="display: none;">
+                    <h5>Results</h5>
+                    <ul id="search-results-list"></ul>
+                </div>
+            </div>
         </div>
     </div>
 

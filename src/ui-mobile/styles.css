@@ -1,5 +1,6 @@
 @import '../ui-common/styles-shared.css';
 
+
 /* Stile für die neue Tab-Bar und Panels */
 
 /* Die Tab-Bar selbst */
@@ -7,15 +8,22 @@
     position: fixed;
     bottom: 0;
     left: 0;
-    width: 100%;
-    height: 60px; /* Feste Höhe für die Leiste */
-    background-color: #ffffff;
-    border-top: 1px solid #e0e0e0;
+    right: 0;
+    
+    /* NEU: Höhe passt sich an die Safe Area an */
+    height: calc(50px + env(safe-area-inset-bottom));
+    padding-bottom: env(safe-area-inset-bottom); /* Innenabstand für den Home-Indikator */
+
     display: flex;
-    justify-content: space-around; /* Buttons gleichmäßig verteilen */
-    align-items: center;
-    box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
-    z-index: 5000; /* Muss über allem außer Modals liegen */
+    justify-content: space-around;
+    align-items: flex-start; /* Stellt sicher, dass Icons oben bleiben */
+    padding-top: 5px;
+    background-color: #fff;
+    border-top: 1px solid #ddd;
+    box-sizing: border-box; /* Wichtig, damit Padding die Höhe nicht zusätzlich erhöht */
+
+    /* NEU: Wichtigste Änderung, um die Tab-Bar über die Panels zu heben */
+    z-index: 1001; 
 }
 
 /* Die einzelnen Buttons in der Leiste */
@@ -49,16 +57,28 @@
 
 /* Styling für die Content-Panels */
 .content-panel {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: calc(100% - 60px); /* Füllt den Bildschirm über der Tab-Bar */
-    background-color: rgba(245, 245, 245, 0.95); /* Leicht durchsichtiger Hintergrund */
-    z-index: 4500; /* Liegt unter der Tab-Bar, aber über der Karte */
-    overflow-y: auto; /* Scrollbar, falls der Inhalt zu lang ist */
-    padding: 10px;
+    position: absolute;
+    /* ALT: top: 0; */
+    /* ALT: height: 100%; */
+    
+    /* NEU: Das Panel wird durch die Safe Areas und die Tab-Bar begrenzt */
+    top: env(safe-area-inset-top);
+    bottom: calc(50px + env(safe-area-inset-bottom));
+    left: env(safe-area-inset-left);
+    right: env(safe-area-inset-right);
+    
+    width: auto; /* wird durch left/right ersetzt */
+    height: auto; /* wird durch top/bottom ersetzt */
+    
+    background-color: rgba(245, 245, 245, 0.98);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-radius: 0;
+    padding: 20px;
+    overflow-y: auto;
+    z-index: 999;
     box-sizing: border-box;
+    transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
 }
 
 .content-panel.hidden {
@@ -92,7 +112,7 @@
 }
 
 .accordion-header:hover {
-    background-color: #efefef;
+    background-color: #0056b3;
 }
 
 /* Icon für auf/zu Zustand hinzufügen */
@@ -107,12 +127,11 @@
     transform: rotate(180deg); /* Pfeil drehen, wenn aktiv */
 }
 
+/* Stellt sicher, dass der Inhaltsbereich des Akkordeons seine Kinder (die Reihen) untereinander anordnet. */
 .accordion-content {
-    /* Wichtig: Mit max-height animieren wir das auf/zu klappen */
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height 0.3s ease-out, padding 0.3s ease-out;
-    padding: 0 15px; /* Abstand links/rechts, aber kein Abstand oben/unten im geschlossenen Zustand */
+    display: flex;
+    flex-direction: column;
+    gap: 15px; /* Fügt etwas Abstand zwischen den einzelnen Einstellungs-Reihen hinzu */
 }
 
 .accordion-content ul {
@@ -129,6 +148,20 @@
     border-bottom: none;
 }
 
+/* Neue Klasse für eine einzelne Einstellungs-Reihe */
+.setting-row {
+    display: flex;
+    justify-content: space-between; /* Verteilt Label und Steuerelement an die Enden */
+    align-items: center; /* Zentriert die Elemente vertikal zueinander */
+    width: 100%;
+}
+
+/* Stellt sicher, dass das Label nicht die gesamte Breite einnimmt */
+.setting-row label {
+    flex-grow: 1;
+    margin-right: 15px; /* Abstand zum Steuerelement */
+}
+
 /* 1. Den Body zum Haupt-Container machen */
 html, body {
     height: 100%;
@@ -142,6 +175,11 @@ html, body {
     flex-direction: column; /* Ordnet die Kinder (Karte, Panels) untereinander an */
 }
 
+/* Fügen Sie dies hinzu, um globale Safe Areas für den Body zu definieren. */
+/* Dies verhindert, dass Inhalte bei seitlicher Drehung an den Rändern kleben. */
+body {
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
 
 /* 2. Den Karten-Container anweisen, den verfügbaren Platz zu füllen */
 #map-container {
@@ -179,4 +217,136 @@ html, body {
     /* Eine Hintergrundfarbe hilft beim Debuggen und sorgt für eine saubere Optik */
     background-color: white; /* Passen Sie die Farbe an Ihre UI an */
     z-index: 1000; /* Stellt sicher, dass das Panel über der Karte liegt */
+}
+
+/* Container für die Suchleiste */
+.search-bar-container {
+    position: relative;
+    margin-bottom: 15px;
+}
+
+.search-bar-container .search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 18px;
+    color: #888;
+    pointer-events: none; /* Klicks gehen durch das Icon durch */
+}
+
+#locationSearchInput {
+    width: 100%;
+    padding: 12px 15px 12px 40px; /* Mehr Platz für das Icon */
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+#locationSearchInput:focus {
+    border-color: #4da8da;
+    box-shadow: 0 0 5px rgba(77, 168, 218, 0.5);
+    outline: none;
+}
+
+/* Container für alle Ergebnislisten */
+.location-results-container {
+    max-height: calc(100% - 120px); /* Höhe anpassen */
+    overflow-y: auto;
+}
+
+/* Styling für die einzelnen Sektionen (Favoriten, Verlauf) */
+.search-section {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    margin-bottom: 15px;
+    overflow: hidden; /* Stellt sicher, dass die border-radius greift */
+}
+
+.search-section h5 {
+    padding: 10px 15px;
+    margin: 0;
+    color: #4da8da; /* Ihre Hauptfarbe */
+    background-color: #f7f7f7;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 14px;
+}
+
+.search-section ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+/* Styling für jeden einzelnen Eintrag in der Liste */
+.search-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 15px;
+    border-bottom: 1px solid #f0f0f0;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.search-item:last-child {
+    border-bottom: none;
+}
+
+.search-item:hover {
+    background-color: #f9f9f9;
+}
+
+.search-item-icon {
+    font-size: 20px;
+    margin-right: 15px;
+    color: #888;
+    width: 24px; /* Feste Breite für Ausrichtung */
+    text-align: center;
+}
+
+.search-item-text {
+    flex-grow: 1;
+}
+
+.search-item-text .name {
+    font-weight: bold;
+    color: #333;
+}
+
+.search-item-text .details {
+    font-size: 12px;
+    color: #777;
+}
+
+.search-item-actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+}
+
+.search-item-actions button {
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: #ccc;
+    cursor: pointer;
+    padding: 5px;
+}
+
+.search-item-actions button.is-favorite {
+    color: #f3d131; /* Gold für Favoriten */
+}
+
+.search-item-actions button.delete-btn:hover {
+    color: #e74c3c; /* Rot beim Hovern */
+}
+
+/* Styling für das neue Dropdown-Menü */
+.model-select {
+    padding: 8px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+    background-color: white;
 }
