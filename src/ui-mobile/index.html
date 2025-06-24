@@ -17,40 +17,40 @@
     <script src="https://unpkg.com/leaflet-rotatedmarker@0.2.0/leaflet.rotatedMarker.js" defer></script>
 
     <link rel="stylesheet" href="/styles.css">
-
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="/icon-48.png">
 </head>
 
 <body>
-    <div id="map" aria-label="Interactive map for selecting weather location">
+    <div id="map">
         <div id="crosshair"></div>
     </div>
     <div id="slider-container">
-        <div class="time-row">
-            <span id="selectedTime">Selected Time: </span>
-            <div id="autoupdateToggle">
-                <label for="autoupdateCheckbox" title="Autoupdate">⟳</label>
-                <input type="checkbox" id="autoupdateCheckbox">
+        <div class="slider-content-wrapper">
+            <div class="time-row">
+                <span id="selectedTime">Selected Time: </span>
+                <div id="autoupdateToggle">
+                    <label for="autoupdateCheckbox" title="Autoupdate">⟳</label>
+                    <input type="checkbox" id="autoupdateCheckbox">
+                </div>
             </div>
+            <input type="range" id="timeSlider" min="0" max="167" value="0" disabled>
+            <div id="model-row">
+                <label id="modelLabel" for="modelSelect" title="Model Run">Forecast Model:</label>
+                <select id="modelSelect">
+                    <option value="icon_global" selected>ICON GLOBAL</option>
+                    <option value="gfs">GFS</option>
+                    <option value="ecmwf">ECMWF</option>
+                </select>
+            </div>
+            <div id="modelInfoPopup"></div>
         </div>
-        <input type="range" id="timeSlider" min="0" max="167" value="0" disabled>
-        <div id="model-row">
-            <label id="modelLabel" for="modelSelect" title="Model Run">Forecast Model:</label>
-            <select id="modelSelect">
-                <option value="icon_global" selected>ICON GLOBAL</option>
-                <option value="gfs">GFS</option>
-                <option value="ecmwf">ECMWF</option>
-            </select>
-        </div>
-        <div id="modelInfoPopup"></div>
     </div>
     <div id="loading">
         <div class="spinner"></div>
         <p>Fetching Weather...</p>
     </div>
 
-    </div>
     <div id="passwordModal" class="modal" style="display: none;">
         <div class="modal-content">
             <h3 id="modalHeader">Restricted Feature</h3>

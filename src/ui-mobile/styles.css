@@ -36,13 +36,13 @@
     border: none;
     color: #888888;
     font-size: 10px;
-    padding: 5px 0;
-    flex-grow: 1; /* Alle Buttons nehmen gleich viel Platz ein */
+    padding: 2px 0;
+    flex-grow: 1;
     transition: color 0.2s ease;
 }
 
 .tab-button .icon {
-    font-size: 24px; /* Größere Icons */
+    font-size: 24px;
 }
 
 .tab-button .label {
@@ -55,30 +55,32 @@
     color: #4da8da; /* Ihre Hauptfarbe */
 }
 
+#content-panels {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none; /* Klicks gehen durch den Container durch */
+    z-index: 1000;
+}
+
 /* Styling für die Content-Panels */
 .content-panel {
     position: absolute;
-    /* ALT: top: 0; */
-    /* ALT: height: 100%; */
-    
-    /* NEU: Das Panel wird durch die Safe Areas und die Tab-Bar begrenzt */
-    top: env(safe-area-inset-top);
-    bottom: calc(50px + env(safe-area-inset-bottom));
-    left: env(safe-area-inset-left);
-    right: env(safe-area-inset-right);
-    
-    width: auto; /* wird durch left/right ersetzt */
-    height: auto; /* wird durch top/bottom ersetzt */
-    
-    background-color: rgba(245, 245, 245, 0.98);
+    top: env(safe-area-inset-top); /* Berücksichtigt die obere Safe Area */
+    bottom: calc(55px + env(safe-area-inset-bottom)); /* Endet über der Tab-Bar */
+    left: 0;
+    right: 0;
+    width: 100%;
+    height: auto;
+    background-color: rgba(249, 249, 249, 0.95);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
-    border-radius: 0;
-    padding: 20px;
+    padding: 15px;
     overflow-y: auto;
-    z-index: 999;
     box-sizing: border-box;
-    transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
+    pointer-events: auto; /* Panels selbst sind klickbar */
 }
 
 .content-panel.hidden {
@@ -91,26 +93,19 @@
     margin-bottom: 10px;
     border-radius: 8px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    overflow: hidden; /* Wichtig für abgerundete Ecken */
+    overflow: hidden;
 }
 
 .accordion-header {
     width: 100%;
     padding: 15px;
-    background-color: #fff;
+    background-color: #4da8da;
     border: none;
     border-bottom: 1px solid #e0e0e0;
-    cursor: pointer; /* Zeigt dem Nutzer, dass das Element klickbar ist */
-    padding: 15px;
+    cursor: pointer;
     font-size: 16px;
     font-weight: bold;
     text-align: left;
-    cursor: pointer;
-    background-color: #4da8da;
-    transition: background-color 0.3s ease;
-    display: flex; /* Für das Icon */
-    justify-content: space-between; /* Icon am Ende platzieren */
-    align-items: center;
 }
 
 .accordion-header:hover {
@@ -131,12 +126,9 @@
 
 /* Stellt sicher, dass der Inhaltsbereich des Akkordeons seine Kinder (die Reihen) untereinander anordnet. */
 .accordion-content {
-    display: none; /* Standardmäßig wieder ausblenden */
-    flex-direction: column;
-    gap: 15px; 
-    padding: 15px; /* Etwas Innenabstand für den Inhalt schadet nicht */
-    background-color: #fafafa; /* Leicht anderer Hintergrund zur Abgrenzung */
-    border-top: 1px solid #e0e0e0; /* Klare Trennlinie zum Header */
+    display: none; /* Standardmäßig versteckt */
+    padding: 15px;
+    border-top: 1px solid #e0e0e0;
 }
 
 .accordion-item.active .accordion-content {
@@ -177,11 +169,8 @@ html, body {
     width: 100%;
     margin: 0;
     padding: 0;
-    overflow: hidden; /* Verhindert das Scrollen der Seite */
-
-    /* NEU: Wir machen den Body zum Flexbox-Container */
-    display: flex;
-    flex-direction: column; /* Ordnet die Kinder (Karte, Panels) untereinander an */
+    overflow: hidden; /* Verhindert das Scrollen der gesamten Seite */
+    position: fixed; /* Wichtig für die Kontrolle über den Viewport */
 }
 
 /* Fügen Sie dies hinzu, um globale Safe Areas für den Body zu definieren. */
@@ -206,26 +195,100 @@ body {
 
 /* 3. Die Karte füllt ihren (jetzt flexiblen) Container aus */
 #map {
+    position: absolute;
+    top: 0;
+    left: 0;
     width: 100%;
     height: 100%;
+    z-index: 0; /* Die Karte liegt ganz hinten */
+}
 
-    /* Das Padding für die obere Statusleiste bleibt wichtig */
+/* Der Slider-Container wird oben positioniert und berücksichtigt die Safe Area */
+#slider-container {
+    position: fixed !important; /* Wichtig, um 'absolute' zu überschreiben */
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    transform: none !important; /* Hebt das translateX(-50%) auf */
+
+    /* Stile für den Hintergrund bleiben erhalten */
     padding-top: env(safe-area-inset-top);
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    border-bottom: 1px solid #ddd;
+    z-index: 1000;
     box-sizing: border-box;
 }
 
+/*
+ * NEU: Der Wrapper, der den Inhalt perfekt zentriert.
+ * Diese Klasse gibt es im Desktop-CSS nicht, daher gibt es keine Konflikte.
+ */
+.slider-content-wrapper {
+    margin: 0 auto; /* Klassische und robuste Methode zur horizontalen Zentrierung */
+    padding: 10px 15px;
+    width: 100%;
+    max-width: 500px; /* Begrenzt die Breite auf großen Handys für eine bessere Optik */
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* Die Regeln für die Inhalte können gleich bleiben, beziehen sich aber jetzt auf den Wrapper */
+.slider-content-wrapper .time-row,
+.slider-content-wrapper .model-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    margin-bottom: 8px;
+}
+
+.slider-content-wrapper #timeSlider {
+    width: 100%;
+    margin: 5px 0;
+}
+
+/* Der Zeit-Slider selbst */
+#timeSlider {
+    width: 100%; /* Volle Breite des Containers nutzen */
+    max-width: 400px; /* Maximale Breite auf größeren Handys */
+    margin: 5px 0;
+}
+
+/* Kleinere Anpassungen für die Lesbarkeit */
+#selectedTime,
+#modelLabel {
+    font-size: 14px;
+    color: #333;
+}
+
+#modelSelect {
+    font-size: 14px;
+    padding: 4px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+}
 
 /* 4. Das untere Panel verhält sich normal, bekommt aber Abstand für den Home-Indikator */
 #tab-bar {
-    /* Verhindert, dass dieses Panel schrumpft */
-    flex-shrink: 0;
-
-    /* Abstand für den Home-Indikator des Handys direkt an das untere Panel anfügen */
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: calc(55px + env(safe-area-inset-bottom)); /* Höhe + Platz für Home-Indicator */
     padding-bottom: env(safe-area-inset-bottom);
-
-    /* Eine Hintergrundfarbe hilft beim Debuggen und sorgt für eine saubere Optik */
-    background-color: white; /* Passen Sie die Farbe an Ihre UI an */
-    z-index: 1000; /* Stellt sicher, dass das Panel über der Karte liegt */
+    display: flex;
+    justify-content: space-around;
+    align-items: flex-start; /* Icons bleiben obenbündig */
+    padding-top: 5px;
+    background-color: #fff;
+    border-top: 1px solid #ddd;
+    box-sizing: border-box;
+    z-index: 1001; /* Liegt über den Panels */
 }
 
 /* Container für die Suchleiste */

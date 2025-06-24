@@ -59,9 +59,11 @@ function setupTabBarEvents() {
         if (panelId === 'planner' && !Settings.isFeatureUnlocked('planner')) {
             Settings.showPasswordModal('planner',
                 () => { // onSuccess: Wenn das Passwort korrekt war
-                    Settings.saveUnlockStatus('planner', true);
+                    /*Settings.saveUnlockStatus('planner', true);
                     setPlannerLockState();
-                    // Zeige das Panel direkt an, anstatt einen zweiten Klick zu erfordern
+                    // Zeige das Panel direkt an, anstatt einen zweiten Klick zu erfordern*/
+                    setPlannerLockState(); // Entsperrten Zustand anzeigen
+                    // Zeige das Panel direkt an
                     document.querySelectorAll('.content-panel').forEach(p => p.classList.add('hidden'));
                     document.getElementById(`panel-${panelId}`).classList.remove('hidden');
                     document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
@@ -89,6 +91,12 @@ function setupTabBarEvents() {
 
         document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
         button.classList.add('active');
+
+               
+        // Nach dem Wechseln des Panels die Kartengröße neu berechnen lassen
+        if (AppState.map) {
+             setTimeout(() => AppState.map.invalidateSize(), 10);
+        }
     });
 }
 
