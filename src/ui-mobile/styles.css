@@ -96,9 +96,11 @@
 
 .accordion-header {
     width: 100%;
-    background-color: #f7f7f7;
+    padding: 15px;
+    background-color: #fff;
     border: none;
     border-bottom: 1px solid #e0e0e0;
+    cursor: pointer; /* Zeigt dem Nutzer, dass das Element klickbar ist */
     padding: 15px;
     font-size: 16px;
     font-weight: bold;
@@ -129,9 +131,16 @@
 
 /* Stellt sicher, dass der Inhaltsbereich des Akkordeons seine Kinder (die Reihen) untereinander anordnet. */
 .accordion-content {
-    display: flex;
+    display: none; /* Standardmäßig wieder ausblenden */
     flex-direction: column;
-    gap: 15px; /* Fügt etwas Abstand zwischen den einzelnen Einstellungs-Reihen hinzu */
+    gap: 15px; 
+    padding: 15px; /* Etwas Innenabstand für den Inhalt schadet nicht */
+    background-color: #fafafa; /* Leicht anderer Hintergrund zur Abgrenzung */
+    border-top: 1px solid #e0e0e0; /* Klare Trennlinie zum Header */
+}
+
+.accordion-item.active .accordion-content {
+    display: flex; /* Nur wenn aktiv, als flex-Container anzeigen */
 }
 
 .accordion-content ul {
@@ -349,4 +358,51 @@ body {
     border-radius: 5px;
     border: 1px solid #ccc;
     background-color: white;
+}
+
+/* In src/ui-mobile/styles.css */
+
+/* Eine neue, generische Klasse für alle Einstellungs-Container */
+.settings-grid {
+    display: grid;
+    /* Erzeugt zwei Spalten: 
+       1. Spalte (für Labels) passt sich der Breite des Inhalts an.
+       2. Spalte (für Inputs/Selects) füllt den Rest des verfügbaren Platzes. */
+    grid-template-columns: auto 1fr;
+    
+    /* Abstand zwischen den Zeilen und Spalten */
+    gap: 16px 10px;
+
+    /* Zentriert die Elemente in jeder Zeile vertikal zueinander */
+    align-items: center;
+}
+
+/* Stellt sicher, dass die Labels rechtsbündig sind für eine saubere Kante */
+.settings-grid label {
+    text-align: right;
+    font-weight: 500; /* Etwas dicker für bessere Lesbarkeit */
+}
+
+/* Stellt sicher, dass die Eingabefelder und Buttons die volle Spaltenbreite nutzen */
+.settings-grid select,
+.settings-grid input,
+.settings-grid button {
+    width: 100%;
+    box-sizing: border-box; /* Verhindert, dass Padding/Border die Breite sprengt */
+    padding: 8px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+}
+
+.settings-grid button {
+    background-color: #4da8da; /* Ihre Hauptfarbe */
+    color: white;
+    font-weight: bold;
+    border: none;
+    cursor: pointer;
+    
+    /* Buttons sollen oft nicht die ganze Breite einnehmen, 
+       also platzieren wir sie in der zweiten Spalte, aber mit normaler Breite */
+    width: auto;
+    justify-self: start; /* Richtet den Button links in seiner Spalte aus */
 }

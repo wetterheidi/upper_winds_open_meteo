@@ -6,7 +6,7 @@ import { Settings } from '../core/settings.js';
 import { Utils } from '../core/utils.js';
 import * as displayManager from './displayManager.js';
 import * as mapManager from './mapManager.js';
-import * as Coordinates from '../ui-mobile/coordinates.js';
+import * as Coordinates from './coordinates.js';
 import * as JumpPlanner from '../core/jumpPlanner.js';
 import { TileCache, cacheTilesForDIP, cacheVisibleTiles } from '../core/tileCache.js';
 import { loadGpxTrack, loadCsvTrackUTC } from '../core/trackManager.js';
@@ -94,29 +94,22 @@ function setupTabBarEvents() {
 
 function setupAccordionEvents() {
     const accordionHeaders = document.querySelectorAll('.accordion-header');
+    const allAccordionItems = document.querySelectorAll('.accordion-item'); // Alle Elemente holen
 
     accordionHeaders.forEach(header => {
         header.addEventListener('click', () => {
-            const currentlyActiveHeader = document.querySelector('.accordion-header.active');
-            // Wenn ein anderer Header aktiv war, schließen wir ihn zuerst
-            if (currentlyActiveHeader && currentlyActiveHeader !== header) {
-                currentlyActiveHeader.classList.remove('active');
-                currentlyActiveHeader.nextElementSibling.style.maxHeight = 0;
-                currentlyActiveHeader.nextElementSibling.style.padding = '0 15px';
-            }
+            const currentItem = header.parentElement;
+            const isOpen = currentItem.classList.contains('active');
 
-            // Den geklickten Header umschalten (auf/zu)
-            header.classList.toggle('active');
-            const content = header.nextElementSibling;
-            if (content.style.maxHeight) {
-                // Wenn es offen ist -> schließen
-                content.style.maxHeight = null;
-                content.style.padding = '0 15px';
-            } else {
-                // Wenn es geschlossen ist -> öffnen
-                // scrollHeight gibt uns die volle Höhe des Inhalts
-                content.style.maxHeight = content.scrollHeight + 'px';
-                content.style.padding = '15px';
+            // Zuerst alle Elemente schließen
+            allAccordionItems.forEach(item => {
+                item.classList.remove('active');
+            });
+
+            // Das geklickte Element nur dann öffnen, wenn es vorher geschlossen war.
+            // Dies ermöglicht das Schließen des aktuell offenen Elements durch erneutes Klicken.
+            if (!isOpen) {
+                currentItem.classList.add('active');
             }
         });
     });
@@ -998,6 +991,67 @@ function setupCacheSettings() {
     }
 }
 
+function setupSettingsPanels() {
+    console.log("Setting up settings panel interactions...");
+
+    // Eine Hilfsfunktion, um die Logik nicht zu wiederholen
+    const setupSelectControl = (elementId, settingPath) => {
+        const selectElement = document.getElementById(elementId);
+        if (!selectElement) {
+            console.error(`Settings element not found: #${elementId}`);
+            return;
+        }
+
+        // 1. Initialen Wert aus den Settings setzen
+        // Der Pfad kann einfach (z.B. 'timeZone') oder verschachtelt (z.B. 'units.heightUnit') sein
+        let currentValue = Settings.state.userSettings;
+        const pathKeys = settingPath.split('.');
+        pathKeys.forEach(key => {
+            currentValue = currentValue ? currentValue[key] : undefined;
+        });
+        
+        if (currentValue !== undefined) {
+            selectElement.value = currentValue;
+        }
+
+        // 2. Event-Listener hinzufügen, um Änderungen zu speichern
+        selectElement.addEventListener('change', (event) => {
+            let settingRef = Settings.state.userSettings;
+            for (let i = 0; i < pathKeys.length - 1; i++) {
+                settingRef = settingRef[pathKeys[i]];
+            }
+            settingRef[pathKeys[pathKeys.length - 1]] = event.target.value;
+            
+            Settings.save();
+            console.log(`Setting '${settingPath}' changed to:`, event.target.value);
+            // Optional: Event für andere App-Teile auslösen
+            document.dispatchEvent(new CustomEvent('setting:changed', { detail: { key: settingPath, value: event.target.value } }));
+        });
+    };
+
+    // Jetzt rufen wir die Hilfsfunktion für jedes Setting auf
+    // Units Panel
+    setupSelectControl('refLevel', 'units.refLevel');
+    setupSelectControl('heightUnit', 'units.heightUnit');
+    setupSelectControl('temperatureUnit', 'units.temperatureUnit');
+    setupSelectControl('windUnit', 'units.windUnit');
+    setupSelectControl('timeZone', 'timeZone'); // Dies ist kein verschachteltes Setting
+    setupSelectControl('coordFormat', 'coordFormat'); // Ebenfalls nicht verschachtelt
+
+    // Download Panel
+    setupSelectControl('downloadFormat', 'downloadFormat');
+    // Event-Listener für Buttons können hier auch hinzugefügt werden
+    // document.getElementById('downloadButton').addEventListener('click', () => { ... });
+
+    // Cache Panel
+    setupSelectControl('cacheRadiusSelect', 'cache.radius');
+    setupSelectControl('cacheZoomLevelsSelect', 'cache.zoomLevels');
+    // document.getElementById('recacheNowButton').addEventListener('click', () => { ... });
+    
+    // Usw. für die anderen Panels...
+}
+
+
 export function updateEnsembleModelUI(availableModels) {
     const submenu = document.getElementById('ensembleModelsSubmenu');
     if (!submenu) return;
@@ -1059,6 +1113,7 @@ export function initializeEventListeners() {
     setupCacheSettings();
     setupTabBarEvents();
     setupAccordionEvents();
+    setupSettingsPanels();
     listenersInitialized = true;
     console.log("Event listeners initialized successfully (first and only time).");
 

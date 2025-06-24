@@ -8,7 +8,7 @@ import { TileCache } from '../core/tileCache.js';
 import { updateOfflineIndicator, isMobileDevice } from './ui.js';
 //import './public/vendor/Leaflet.PolylineMeasure.js'; // Pfad ggf. anpassen
 import { UI_DEFAULTS, ICON_URLS, ENSEMBLE_VISUALIZATION}  from '../core/constants.js'; // Importiere UI-Defaults
-import { debouncedGetElevationAndQFE } from '../ui-mobile/main-mobile.js';
+import { debouncedGetElevationAndQFE } from './main-mobile.js';
 
 let lastTapTime = 0; // Add this line
 

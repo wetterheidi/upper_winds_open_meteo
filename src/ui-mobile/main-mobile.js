@@ -5,7 +5,7 @@ import { Utils } from '../core/utils.js';
 import { Settings, getInterpolationStep } from '../core/settings.js';
 import { UI_DEFAULTS } from '../core/constants.js';
 import * as EventManager from './eventManager.js';
-import * as Coordinates from '../ui-mobile/coordinates.js';
+import * as Coordinates from './coordinates.js';
 import * as JumpPlanner from '../core/jumpPlanner.js';
 import * as mapManager from './mapManager.js';
 import * as weatherManager from '../core/weatherManager.js';
