@@ -1482,4 +1482,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             await updateToCurrentHour();
         }
     });
+
+    // Teilt Leaflet die neue, korrekte Kartengröße mit.
+    setTimeout(() => {
+        if (AppState.map) {
+            AppState.map.invalidateSize();
+        }
+    }, 100); // Eine kleine Verzögerung von 100ms ist sicher.
 });

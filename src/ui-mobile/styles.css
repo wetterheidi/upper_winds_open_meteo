@@ -128,3 +128,55 @@
 .accordion-content li:last-child {
     border-bottom: none;
 }
+
+/* 1. Den Body zum Haupt-Container machen */
+html, body {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden; /* Verhindert das Scrollen der Seite */
+
+    /* NEU: Wir machen den Body zum Flexbox-Container */
+    display: flex;
+    flex-direction: column; /* Ordnet die Kinder (Karte, Panels) untereinander an */
+}
+
+
+/* 2. Den Karten-Container anweisen, den verfügbaren Platz zu füllen */
+#map-container {
+    /* NEU: Dies ist die entscheidende Regel. 
+       Der Container wächst und füllt den gesamten freien Platz. */
+    flex-grow: 1;
+
+    /* Verhindert, dass der Container bei sehr kleinem Bildschirm kollabiert */
+    min-height: 0;
+    
+    /* Notwendig, damit absolut positionierte Kinder wie das Fadenkreuz korrekt ausgerichtet werden */
+    position: relative; 
+}
+
+
+/* 3. Die Karte füllt ihren (jetzt flexiblen) Container aus */
+#map {
+    width: 100%;
+    height: 100%;
+
+    /* Das Padding für die obere Statusleiste bleibt wichtig */
+    padding-top: env(safe-area-inset-top);
+    box-sizing: border-box;
+}
+
+
+/* 4. Das untere Panel verhält sich normal, bekommt aber Abstand für den Home-Indikator */
+#tab-bar {
+    /* Verhindert, dass dieses Panel schrumpft */
+    flex-shrink: 0;
+
+    /* Abstand für den Home-Indikator des Handys direkt an das untere Panel anfügen */
+    padding-bottom: env(safe-area-inset-bottom);
+
+    /* Eine Hintergrundfarbe hilft beim Debuggen und sorgt für eine saubere Optik */
+    background-color: white; /* Passen Sie die Farbe an Ihre UI an */
+    z-index: 1000; /* Stellt sicher, dass das Panel über der Karte liegt */
+}
