@@ -228,7 +228,7 @@ body {
  */
 .slider-content-wrapper {
     margin: 0 auto; /* Klassische und robuste Methode zur horizontalen Zentrierung */
-    padding: 10px 15px;
+    padding: 5px 5px;
     width: 100%;
     max-width: 500px; /* Begrenzt die Breite auf großen Handys für eine bessere Optik */
     box-sizing: border-box;
@@ -487,3 +487,38 @@ body {
     user-select: none; /* Verhindert das Markieren des "i" */
 }
 
+/* ================================== */
+/* Leaflet Control-Anpassungen        */
+/* ================================== */
+
+/*
+ * Schritt 1: Hebt die gesamte Ebene der Leaflet-Controls
+ * über unsere Panels (z-index: 1000) und die Tab-Bar (z-index: 1001).
+ * Dadurch werden sie wieder sichtbar und klickbar.
+ */
+.leaflet-control-container {
+    z-index: 1010;
+}
+
+/*
+ * Schritt 2: Verschiebt die unteren Controls (Maßstab, Koordinaten, Attribution)
+ * um die Höhe der Tab-Bar nach oben, damit sie nicht verdeckt werden.
+ * Sie "schweben" jetzt quasi über der Tab-Bar.
+ */
+.leaflet-control-container .leaflet-bottom {
+    bottom: calc(170px + env(safe-area-inset-bottom, 10px)); /* Höhe der Tab-Bar + Safe Area */
+    transition: bottom 0.3s ease; /* Fügt eine kleine Animation hinzu */
+}
+
+/*
+ * Optional: Verbessert die Lesbarkeit der Texte auf dem gläsernen Hintergrund
+ * der Panels, indem ein leichter Schlagschatten hinzugefügt wird.
+ */
+.leaflet-control-scale-line,
+.leaflet-control-attribution a,
+.leaflet-control-attribution,
+.leaflet-control.coordinates {
+    color: #333;
+    text-shadow: 0 0 5px white, 0 0 3px white; /* Weißer "Glow"-Effekt für Kontrast */
+    font-weight: bold;
+}

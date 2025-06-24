@@ -225,7 +225,10 @@ function _addStandardMapControls() {
         position: 'bottomleft',
         metric: true,
         imperial: false,
-        maxWidth: 100
+        maxWidth: 100,
+        background: 'rgba(255, 255, 255, 0.8)',
+        padding: '5px',
+        borderRadius: '4px'
     }).addTo(AppState.map);
     console.log('Standard map controls and baselayerchange handler added.');
 }

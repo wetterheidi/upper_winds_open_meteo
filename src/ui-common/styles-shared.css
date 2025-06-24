@@ -42,10 +42,10 @@ html {
 }
 
 .leaflet-bottom .leaflet-control-scale {
-    margin-bottom: 20px;
-    margin-left: 10px;
+    margin-bottom: 5px;
+    margin-left: 5px;
     z-index: 1000; /* Ensure scale is above attribution */
-    background-color: rgba(255, 255, 255, 0.9); /* Slightly more opaque for readability */
+    background-color: rgba(255, 255, 255, 0.8); /* Slightly more opaque for readability */
     padding: 2px 5px; /* Add padding for better appearance */
     border-radius: 4px; /* Rounded corners */
 }
@@ -1254,7 +1254,7 @@ input[type="checkbox"][style*="opacity: 1"] {
    Es wird standardmäßig mit display: none versteckt. */
 #crosshair {
   position: absolute;
-  top: 50%;
+  top: 40%;
   left: 50%;
   width: 16px;  /* Breite des Kreuzes */
   height: 16px; /* Höhe des Kreuzes */
@@ -1401,7 +1401,7 @@ input[type="checkbox"][style*="opacity: 1"] {
 
     @media (max-width: 768px) {
         .leaflet-bottom .leaflet-control-scale {
-            margin-bottom: 30px; /* Ensure enough space above attribution */
+            margin-bottom: 5px; /* Ensure enough space above attribution */
             margin-left: 5px;
         }
     
