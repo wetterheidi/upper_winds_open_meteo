@@ -995,39 +995,53 @@ function setupSettingsPanels() {
     console.log("Setting up settings panel interactions...");
 
     // Eine Hilfsfunktion, um die Logik nicht zu wiederholen
-    const setupSelectControl = (elementId, settingPath) => {
-        const selectElement = document.getElementById(elementId);
-        if (!selectElement) {
-            console.error(`Settings element not found: #${elementId}`);
-            return;
-        }
+const setupSelectControl = (elementId, settingPath) => {
+    const selectElement = document.getElementById(elementId);
+    if (!selectElement) {
+        console.error(`Settings element not found: #${elementId}`);
+        return;
+    }
 
-        // 1. Initialen Wert aus den Settings setzen
-        // Der Pfad kann einfach (z.B. 'timeZone') oder verschachtelt (z.B. 'units.heightUnit') sein
-        let currentValue = Settings.state.userSettings;
-        const pathKeys = settingPath.split('.');
-        pathKeys.forEach(key => {
-            currentValue = currentValue ? currentValue[key] : undefined;
-        });
+    // --- Teil 1: Initialen Wert aus den Settings setzen (bleibt gleich) ---
+    let currentValue = Settings.state.userSettings;
+    const pathKeys = settingPath.split('.');
+    pathKeys.forEach(key => {
+        currentValue = currentValue ? currentValue[key] : undefined;
+    });
+    
+    if (currentValue !== undefined) {
+        selectElement.value = currentValue;
+    }
+
+    // --- Teil 2: Event-Listener mit NEUER, ROBUSTER Speicherlogik ---
+    selectElement.addEventListener('change', (event) => {
+        let settingRef = Settings.state.userSettings;
         
-        if (currentValue !== undefined) {
-            selectElement.value = currentValue;
+        // Gehe den Pfad entlang bis zum vorletzten Schlüssel
+        for (let i = 0; i < pathKeys.length - 1; i++) {
+            const key = pathKeys[i];
+            // NEU: Wenn ein Teil des Pfades nicht existiert, erstelle ihn als leeres Objekt
+            if (settingRef[key] === undefined || typeof settingRef[key] !== 'object') {
+                console.warn(`Creating missing settings path: ${key}`);
+                settingRef[key] = {};
+            }
+            settingRef = settingRef[key];
         }
 
-        // 2. Event-Listener hinzufügen, um Änderungen zu speichern
-        selectElement.addEventListener('change', (event) => {
-            let settingRef = Settings.state.userSettings;
-            for (let i = 0; i < pathKeys.length - 1; i++) {
-                settingRef = settingRef[pathKeys[i]];
-            }
-            settingRef[pathKeys[pathKeys.length - 1]] = event.target.value;
-            
-            Settings.save();
+        // Der letzte Schlüssel im Pfad (z.B. 'refLevel')
+        const finalKey = pathKeys[pathKeys.length - 1];
+
+        // Jetzt ist sichergestellt, dass settingRef ein gültiges Objekt ist
+        if (settingRef) {
+            settingRef[finalKey] = event.target.value;
+            Settings.save(); // Speichern
             console.log(`Setting '${settingPath}' changed to:`, event.target.value);
-            // Optional: Event für andere App-Teile auslösen
             document.dispatchEvent(new CustomEvent('setting:changed', { detail: { key: settingPath, value: event.target.value } }));
-        });
-    };
+        } else {
+            console.error(`Failed to save setting. Parent object for path '${settingPath}' is not valid.`);
+        }
+    });
+};
 
     // Jetzt rufen wir die Hilfsfunktion für jedes Setting auf
     // Units Panel
