@@ -406,3 +406,21 @@ body {
     width: auto;
     justify-self: start; /* Richtet den Button links in seiner Spalte aus */
 }
+
+.info-icon {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background-color: #adb5bd; /* Unauffälliges Grau */
+    color: white;
+    font-style: italic;
+    font-weight: bold;
+    font-family: 'Times New Roman', serif;
+    margin-left: 8px;
+    cursor: pointer;
+    user-select: none; /* Verhindert das Markieren des "i" */
+}
+

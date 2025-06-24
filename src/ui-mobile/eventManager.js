@@ -1065,6 +1065,25 @@ const setupSelectControl = (elementId, settingPath) => {
     // Usw. für die anderen Panels...
 }
 
+function setupInfoIcons() {
+    // Findet alle Elemente mit der Klasse .info-icon
+    const infoIcons = document.querySelectorAll('.info-icon');
+
+    infoIcons.forEach(icon => {
+        icon.addEventListener('click', (event) => {
+            // Verhindert, dass durch den Klick auch das Label/Input aktiviert wird
+            event.preventDefault(); 
+            event.stopPropagation();
+
+            const infoText = icon.dataset.info; // Holt den Text aus dem data-info Attribut
+            if (infoText) {
+                // Zeigt eine einfache System-Benachrichtigung an.
+                // Für eine schönere Darstellung könnte man hier ein eigenes Modal-Fenster öffnen.
+                alert(infoText);
+            }
+        });
+    });
+}
 
 export function updateEnsembleModelUI(availableModels) {
     const submenu = document.getElementById('ensembleModelsSubmenu');
@@ -1128,6 +1147,7 @@ export function initializeEventListeners() {
     setupTabBarEvents();
     setupAccordionEvents();
     setupSettingsPanels();
+    setupInfoIcons();
     listenersInitialized = true;
     console.log("Event listeners initialized successfully (first and only time).");
 

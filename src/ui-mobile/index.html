@@ -3,7 +3,8 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>DZMaster</title>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -387,7 +388,7 @@
                         <label for="coordFormat">Coordinate Format:</label>
                         <select id="coordFormat">
                             <option value="Decimal">Decimal</option>
-                            <option value="DMS">DMS</option>
+                            <option value="DMS">Deg Min Sec</option>
                             <option value="MGRS">MGRS</option>
                         </select>
                     </div>
@@ -398,7 +399,7 @@
                 <button class="accordion-header">Download Files</button>
                 <div class="accordion-content">
                     <div id="download-files" class="settings-grid">
-                        <label for="downloadFormat">Coordinate Format:</label>
+                        <label for="downloadFormat">Download Format:</label>
                         <select id="downloadFormat">
                             <option value="HEIDIS">HEIDIS</option>
                             <option value="ATAK">ATAK</option>
@@ -447,7 +448,12 @@
                 <button class="accordion-header">Track Upload</button>
                 <div class="accordion-content">
                     <div id="track-upload" class="settings-grid">
-                        <label for="trackFileInput" title="GPX or FlySight-CSV">Upload File:</label>
+                        <div>
+                            <label for="trackFileInput">
+                                Upload File:
+                                <span class="info-icon" data-info="GPX or FlySight-CSV">i</span>
+                            </label>
+                        </div>
                         <input type="file" id="trackFileInput" accept=".gpx,.csv" style="margin-top: 5px;">
                         <button id="clearTrack">Clear</button>
                     </div>
