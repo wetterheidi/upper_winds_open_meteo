@@ -3,9 +3,20 @@ import { FEATURE_PASSWORD } from './constants.js';
 
 export const getInterpolationStep = () => Settings.getValue('interpStepSelect', 'select', 200); // Umbenannt von getInterpStepSelect für Konsistenz
 
+// Kontextkonstante (muss von main-mobile.js oder main-web.js gesetzt werden)
+let IS_MOBILE_APP = false; // Standardmäßig false, wird in main-mobile.js überschrieben
+
+// Funktion zum Setzen des Kontexts
+export function setAppContext(isMobile) {
+    IS_MOBILE_APP = isMobile;
+    console.log(`App context set to: ${IS_MOBILE_APP ? 'Mobile' : 'Web'}`);
+}
+
 export const Settings = {
     // Constants
     FEATURE_PASSWORD: 'skydiver2025',
+
+
 
     defaultSettings: {
         model: 'icon_global',
@@ -125,7 +136,8 @@ export const Settings = {
         // Update unlocked features
         this.state.unlockedFeatures = {
             landingPattern: storedUnlockedFeatures.landingPattern || false,
-            calculateJump: storedUnlockedFeatures.calculateJump || false
+            calculateJump: storedUnlockedFeatures.calculateJump || false,
+            planner: storedUnlockedFeatures.planner || false // Hinzufügen
         };
 
         // Validate baseMaps
@@ -171,7 +183,8 @@ export const Settings = {
             this.saveUnlockedFeatures();
             console.log('Saved unlock status:', {
                 landingPattern: this.state.isLandingPatternUnlocked,
-                calculateJump: this.state.isCalculateJumpUnlocked
+                calculateJump: this.state.isCalculateJumpUnlocked,
+                planner: this.state.isPlannerUnlocked // Hinzufügen
             });
         } catch (error) {
             Utils.handleError('Failed to save unlock status.');
@@ -437,6 +450,10 @@ export const Settings = {
      * @returns {boolean} True if unlocked.
      */
     isFeatureUnlocked(feature) {
-        return !!this.state.unlockedFeatures[feature];
+        // In der mobilen App sind landingPattern und calculateJump immer freigeschaltet
+        if (IS_MOBILE_APP && (feature === 'landingPattern' || feature === 'calculateJump')) {
+            return true;
+        }
+        return !!this.state.unlockedFeatures[feature] || false;
     }
 };

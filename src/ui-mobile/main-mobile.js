@@ -2,7 +2,7 @@
 // == Constants and Global Variables ==
 import { AppState } from '../core/state.js';
 import { Utils } from '../core/utils.js';
-import { Settings, getInterpolationStep } from '../core/settings.js';
+import { Settings, getInterpolationStep, setAppContext } from '../core/settings.js';
 import { UI_DEFAULTS } from '../core/constants.js';
 import * as EventManager from './eventManager.js';
 import * as Coordinates from './coordinates.js';
@@ -600,12 +600,17 @@ export function updateJumpMasterLineAndPanel(positionData = null) {
 
 // == UI and Event Handling ==
 function initializeApp() {
+    setAppContext(true);
     Settings.initialize();
     // Synchronize global variables with Settings.state.unlockedFeatures
-    Settings.state.isLandingPatternUnlocked = Settings.state.unlockedFeatures.landingPattern;
-    Settings.state.isCalculateJumpUnlocked = Settings.state.unlockedFeatures.calculateJump;
-    Settings.state.userSettings.showJumpMasterLine = false;
-    console.log('Initial unlock status:', { isLandingPatternUnlocked: Settings.state.isLandingPatternUnlocked, isCalculateJumpUnlocked: Settings.state.isCalculateJumpUnlocked });
+    Settings.state.isLandingPatternUnlocked = true;
+    Settings.state.isCalculateJumpUnlocked = true;
+    Settings.state.isPlannerUnlocked = Settings.state.unlockedFeatures.planner; // Hinzufügen
+    console.log('Initial unlock status:', {
+        isLandingPatternUnlocked: Settings.state.isLandingPatternUnlocked,
+        isCalculateJumpUnlocked: Settings.state.isCalculateJumpUnlocked,
+        isPlannerUnlocked: Settings.state.isPlannerUnlocked // Hinzufügen
+    });
 
     if (AppState.isInitialized) {
         console.log('App already initialized, skipping');
@@ -631,14 +636,11 @@ function initializeUIElements() {
     applySettingToInput('jumpRunTrackOffset', Settings.state.userSettings.jumpRunTrackOffset);
     applySettingToInput('numberOfJumpers', Settings.state.userSettings.numberOfJumpers);
     applySettingToCheckbox('showTableCheckbox', Settings.state.userSettings.showTable);
-    applySettingToCheckbox('calculateJumpCheckbox', Settings.state.userSettings.calculateJump);
-    applySettingToCheckbox('showLandingPattern', Settings.state.userSettings.showLandingPattern);
     applySettingToCheckbox('showJumpRunTrack', Settings.state.userSettings.showJumpRunTrack);
     applySettingToCheckbox('showCanopyAreaCheckbox', Settings.state.userSettings.showCanopyArea);
     applySettingToCheckbox('showExitAreaCheckbox', Settings.state.userSettings.showExitArea);
     Settings.state.userSettings.isCustomJumpRunDirection = Settings.state.userSettings.isCustomJumpRunDirection || false;
 
-    // Ensure UI reflects the stored custom direction without overwriting
     const customLL = document.getElementById('customLandingDirectionLL');
     const customRR = document.getElementById('customLandingDirectionRR');
     if (customLL && Settings.state.userSettings.customLandingDirectionLL !== '' && !isNaN(Settings.state.userSettings.customLandingDirectionLL)) {
@@ -652,20 +654,6 @@ function initializeUIElements() {
     Settings.state.userSettings.jumperSeparation = separation;
     Settings.save();
 
-    // Set initial tooltip and style for locked state
-    const landingPatternCheckbox = document.getElementById('showLandingPattern');
-    const calculateJumpCheckbox = document.getElementById('calculateJumpCheckbox');
-    if (landingPatternCheckbox) {
-        landingPatternCheckbox.title = (Settings.isFeatureUnlocked('landingPattern') && Settings.state.isLandingPatternUnlocked) ? '' : 'Feature locked. Click to enter password.';
-        landingPatternCheckbox.style.opacity = (Settings.isFeatureUnlocked('landingPattern') && Settings.state.isLandingPatternUnlocked) ? '1' : '0.5';
-        console.log('Initialized showLandingPattern UI:', { checked: landingPatternCheckbox.checked, opacity: landingPatternCheckbox.style.opacity });
-    }
-    if (calculateJumpCheckbox) {
-        calculateJumpCheckbox.title = (Settings.isFeatureUnlocked('calculateJump') && Settings.state.isCalculateJumpUnlocked) ? '' : 'Feature locked. Click to enter password.';
-        calculateJumpCheckbox.style.opacity = (Settings.isFeatureUnlocked('calculateJump') && Settings.state.isCalculateJumpUnlocked) ? '1' : '0.5';
-        console.log('Initialized calculateJumpCheckbox UI:', { checked: calculateJumpCheckbox.checked, opacity: calculateJumpCheckbox.style.opacity });
-    }
-
     const jumpMasterCheckbox = document.getElementById('showJumpMasterLine');
     if (jumpMasterCheckbox) {
         jumpMasterCheckbox.disabled = !Settings.state.userSettings.trackPosition;
@@ -674,7 +662,7 @@ function initializeUIElements() {
     }
 
     const directionSpan = document.getElementById('jumpRunTrackDirection');
-    if (directionSpan) directionSpan.textContent = '-'; // Initial placeholder
+    if (directionSpan) directionSpan.textContent = '-';
     updateUIState();
 }
 export function updateUIState() {
@@ -686,8 +674,8 @@ export function updateUIState() {
     const showExitAreaCheckbox = document.getElementById('showExitAreaCheckbox');
     if (customLL) customLL.disabled = Settings.state.userSettings.landingDirection !== 'LL';
     if (customRR) customRR.disabled = Settings.state.userSettings.landingDirection !== 'RR';
-    if (showJumpRunTrackCheckbox) showJumpRunTrackCheckbox.disabled = !Settings.state.userSettings.calculateJump;
-    if (showExitAreaCheckbox) showExitAreaCheckbox.disabled = !Settings.state.userSettings.calculateJump; // Disable unless calculateJump is on
+    if (showJumpRunTrackCheckbox) showJumpRunTrackCheckbox.disabled = false; // Keine Sperre durch calculateJump
+    if (showExitAreaCheckbox) showExitAreaCheckbox.disabled = false; // Keine Sperre durch calculateJump
     Settings.updateUnitLabels();
 }
 
@@ -1237,16 +1225,6 @@ function setupAppEventListeners() {
         }
     });
 
-    document.addEventListener('ui:landingPatternEnabled', () => {
-        console.log('[main-mobile] Landing pattern enabled, updating display.');
-        displayManager.updateLandingPatternDisplay();
-    });
-
-    document.addEventListener('ui:landingPatternDisabled', () => {
-        console.log('[main-mobile] Landing pattern disabled, clearing display.');
-        mapManager.drawLandingPattern(null);
-    });
-
     document.addEventListener('ui:showTableChanged', (e) => {
         const isChecked = e.detail.checked;
         console.log(`[main-mobile] Show Table toggled: ${isChecked}`);
@@ -1317,7 +1295,7 @@ function setupAppEventListeners() {
 
 document.addEventListener('DOMContentLoaded', async () => {
     initializeApp();
-    initializeUIElements(); 
+    initializeUIElements();
 
     // In der mobilen App soll die Tabelle im Data-Panel immer angezeigt werden.
     Settings.state.userSettings.showTable = true;
@@ -1339,7 +1317,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         mapManager.updateFavoriteMarkers(initialFavorites);
     }
     // --- ENDE NEUER BLOCK ---
-    
+
     document.addEventListener('cutaway:marker_placed', () => {
         console.log("App: Event 'cutaway:marker_placed' empfangen. Neuberechnung wird ausgelöst.");
         if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {

@@ -141,12 +141,7 @@ function setupCheckbox(id, setting, callback) {
         checkbox.addEventListener('click', (event) => {
             console.log(`Click event on ${id}, checked: ${checkbox.checked}, target:`, event.target);
         });
-        console.log(`Attached change and click listeners to ${id}`);
-        // Apply visual indication for locked features
-        if (id === 'showLandingPattern' && !(Settings.isFeatureUnlocked('landingPattern') && Settings.state.isLandingPatternUnlocked)) {
-            checkbox.style.opacity = '0.5';
-            checkbox.title = 'Feature locked. Click to enter password.';
-        }
+        console.log(`Attached change and click listeners to ${id}`);        
     } else {
         console.warn(`Checkbox ${id} not found`);
     }
@@ -339,12 +334,6 @@ function setupCheckboxEvents() {
     setupCheckbox('showLandingPattern', 'showLandingPattern', (checkbox) => {
         Settings.state.userSettings.showLandingPattern = checkbox.checked;
         Settings.save();
-
-        if (checkbox.checked) {
-            document.dispatchEvent(new CustomEvent('ui:landingPatternEnabled'));
-        } else {
-            document.dispatchEvent(new CustomEvent('ui:landingPatternDisabled'));
-        }
     });
 
     setupCheckbox('trackPositionCheckbox', 'trackPosition', (checkbox) => {

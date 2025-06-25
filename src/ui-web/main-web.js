@@ -2,7 +2,7 @@
 // == Constants and Global Variables ==
 import { AppState } from '../core/state.js';
 import { Utils } from '../core/utils.js';
-import { Settings, getInterpolationStep } from '../core/settings.js';
+import { Settings, getInterpolationStep, setAppContext } from '../core/settings.js';
 import { UI_DEFAULTS } from '../core/constants.js';
 import * as EventManager from './eventManager.js';
 import * as Coordinates from '../ui-web/coordinates.js';
@@ -603,6 +603,7 @@ export function updateJumpMasterLineAndPanel(positionData = null) {
 // == UI and Event Handling ==
 function initializeApp() {
     Settings.initialize();
+    setAppContext(false);
     // Synchronize global variables with Settings.state.unlockedFeatures
     Settings.state.isLandingPatternUnlocked = Settings.state.unlockedFeatures.landingPattern;
     Settings.state.isCalculateJumpUnlocked = Settings.state.unlockedFeatures.calculateJump;
