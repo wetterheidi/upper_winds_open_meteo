@@ -892,9 +892,9 @@ function setupTrackEvents() {
 
 
 function setupCacheManagement() {
-    const bottomContainer = document.getElementById('bottom-container');
-    if (!bottomContainer) {
-        console.error('Bottom container not found; cannot create settings/cache buttons.');
+    const targetContainer = document.getElementById('app-management-settings');
+    if (!targetContainer) {
+        console.error('Ziel-Container für App-Management-Buttons nicht gefunden.');
         return;
     }
 
@@ -937,7 +937,7 @@ function setupCacheManagement() {
     buttonWrapper.appendChild(clearCacheButton); // Füge den Clear-Cache-Button zum Wrapper hinzu
 
     // 4. Füge den fertigen Wrapper zum DOM hinzu
-    bottomContainer.appendChild(buttonWrapper);
+    targetContainer.appendChild(buttonWrapper);
 }
 
 function setupCacheSettings() {
