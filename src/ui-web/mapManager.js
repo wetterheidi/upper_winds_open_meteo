@@ -48,7 +48,9 @@ async function initMap() {
     AppState.jumpVisualizationLayerGroup = L.layerGroup().addTo(AppState.map);
     AppState.landingPatternLayerGroup = L.layerGroup().addTo(AppState.map);
     AppState.jumpRunTrackLayerGroup = L.layerGroup().addTo(AppState.map);
-
+    AppState.favoritesLayerGroup = L.layerGroup().addTo(AppState.map); // <-- NEUE ZEILE HINZUFÜGEN
+    console.log('Favorite marker layer added!');
+    
     _setupBaseLayersAndHandling();
     _addStandardMapControls();
     _setupCustomPanes();
@@ -1237,3 +1239,49 @@ export function clearHarpMarker() {
     Utils.handleMessage('HARP marker cleared');
 }
 // --- ENDE DES NEUEN BLOCKS ---
+
+/**
+ * Zeichnet Marker für alle favorisierten Orte auf der Karte.
+ * @param {Array<Object>} favorites - Ein Array von Favoriten-Objekten ({lat, lng, label}).
+ */
+export function updateFavoriteMarkers(favorites) {
+    if (!AppState.map || !AppState.favoritesLayerGroup) {
+        console.warn('Cannot update favorite markers: map or layer group not ready.');
+        return;
+    }
+
+    // Zuerst alle alten Favoriten-Marker entfernen
+    AppState.favoritesLayerGroup.clearLayers();
+
+    if (!favorites || favorites.length === 0) {
+        return; // Nichts zu zeichnen
+    }
+
+    // Ein Icon für die Favoriten-Marker erstellen (z.B. ein Stern)
+    const starIcon = L.divIcon({
+        html: '★',
+        className: 'favorite-marker-icon',
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+    });
+
+    favorites.forEach(fav => {
+        const marker = L.marker([fav.lat, fav.lng], { icon: starIcon })
+            .bindTooltip(fav.label, {
+                permanent: false,
+                direction: 'top'
+            })
+            .on('click', () => {
+                // Wenn auf einen Favoriten-Marker geklickt wird, die Position auswählen
+                 const selectEvent = new CustomEvent('location:selected', {
+                    detail: { lat: fav.lat, lng: fav.lng, source: 'favorite_marker' },
+                    bubbles: true,
+                    cancelable: true
+                });
+                AppState.map.getContainer().dispatchEvent(selectEvent);
+            });
+
+        AppState.favoritesLayerGroup.addLayer(marker);
+        console.log('FAVORITE marker added');
+    });
+}

@@ -271,6 +271,7 @@ function addOrUpdateFavorite(lat, lng, name, skipMessage = false) {
             Utils.handleMessage(`"${name}" als Favorit gespeichert.`);
         }
         renderResultsList();
+        _dispatchFavoritesUpdate(); // <-- NEU: Karte über die Änderung informieren
     } catch (error) {
         console.error('Fehler in addOrUpdateFavorite:', error);
     } finally {
@@ -288,6 +289,7 @@ function toggleFavorite(lat, lng, label) {
     }
     saveCoordHistory();
     renderResultsList();
+    _dispatchFavoritesUpdate(); // <-- NEU: Karte über die Änderung informieren
 }
 
 function removeLocationFromHistory(lat, lng) {
@@ -301,10 +303,28 @@ function removeLocationFromHistory(lat, lng) {
     saveCoordHistory(updatedHistory);
     Utils.handleMessage("Location deleted.");
     renderResultsList();
+    _dispatchFavoritesUpdate(); // <-- NEU: Karte über die Änderung informieren
+}
+
+/**
+ * Liest die Favoriten aus dem Verlauf und löst ein Event aus.
+ * @private
+ */
+function _dispatchFavoritesUpdate() {
+    const history = getCoordHistory();
+    const favorites = history.filter(item => item.isFavorite);
+
+    const event = new CustomEvent('favorites:updated', {
+        detail: { favorites: favorites },
+        bubbles: true,
+        cancelable: true
+    });
+    document.dispatchEvent(event);
 }
 
 // --- Exportiere die notwendigen Funktionen ---
 export {
     initializeLocationSearch,
-    addCoordToHistory
+    addCoordToHistory,
+    getCoordHistory // <-- NEUER EXPORT
 };

@@ -853,6 +853,12 @@ function setupAppEventListeners() {
         displayManager.updateLandingPatternDisplay();
     });
 
+    document.addEventListener('favorites:updated', (event) => {
+        const { favorites } = event.detail;
+        console.log('[App] Favorites updated, redrawing markers on map.');
+        mapManager.updateFavoriteMarkers(favorites);
+    });
+
     document.addEventListener('tracking:started', () => {
         const jumpMasterCheckbox = document.getElementById('showJumpMasterLine');
         if (jumpMasterCheckbox) {
@@ -1325,6 +1331,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     EventManager.initializeEventListeners();
 
     Coordinates.initializeLocationSearch();
+    // --- NEUER BLOCK ---
+    // Initiales Zeichnen der Favoriten-Marker beim Start
+    const initialFavorites = Coordinates.getCoordHistory().filter(item => item.isFavorite);
+    if (initialFavorites.length > 0) {
+        console.log(`[App] Found ${initialFavorites.length} favorite(s) on startup, plotting on map.`);
+        mapManager.updateFavoriteMarkers(initialFavorites);
+    }
+    // --- ENDE NEUER BLOCK ---
+    
     document.addEventListener('cutaway:marker_placed', () => {
         console.log("App: Event 'cutaway:marker_placed' empfangen. Neuberechnung wird ausgelöst.");
         if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
