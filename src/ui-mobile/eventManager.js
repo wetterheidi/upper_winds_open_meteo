@@ -340,9 +340,6 @@ function setupCheckboxEvents() {
         Settings.state.userSettings.showLandingPattern = checkbox.checked;
         Settings.save();
 
-        const submenu = checkbox.closest('li')?.querySelector('ul');
-        toggleSubmenu(checkbox, submenu, checkbox.checked);
-
         if (checkbox.checked) {
             document.dispatchEvent(new CustomEvent('ui:landingPatternEnabled'));
         } else {
