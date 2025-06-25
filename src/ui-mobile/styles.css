@@ -206,11 +206,10 @@ body {
 /* Der Slider-Container wird oben positioniert und berücksichtigt die Safe Area */
 #slider-container {
     position: fixed !important; /* Wichtig, um 'absolute' zu überschreiben */
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    width: 100% !important;
-    transform: none !important; /* Hebt das translateX(-50%) auf */
+    top: 20px;
+    
+    left: 50%;
+    transform: translateX(-50%);
 
     /* Stile für den Hintergrund bleiben erhalten */
     padding-top: env(safe-area-inset-top);
