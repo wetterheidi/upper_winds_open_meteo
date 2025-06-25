@@ -18,12 +18,14 @@
 
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="/upper_winds_open_meteo/icon-48.png">
-  <script type="module" crossorigin src="/upper_winds_open_meteo/assets/index-87UYg7Jf.js"></script>
-  <link rel="stylesheet" crossorigin href="/upper_winds_open_meteo/assets/index-OiDkl6MY.css">
+  <script type="module" crossorigin src="/upper_winds_open_meteo/assets/index-BfsOeeyy.js"></script>
+  <link rel="stylesheet" crossorigin href="/upper_winds_open_meteo/assets/index-B1BBR8_h.css">
 </head>
 
 <body>
-    <div id="map" aria-label="Interactive map for selecting weather location"></div>
+    <div id="map" aria-label="Interactive map for selecting weather location">
+        <div id="crosshair"></div>
+    </div>
     <div id="coords">Move mouse over map</div>
     <div class="hamburger-menu">
         <button id="hamburgerBtn" aria-label="Open menu">☰</button>
@@ -169,6 +171,7 @@
                                     <input type="radio" name="downloadFormat" value="Customized"> Customized
                                 </label>
                             </li>
+                            <button id="downloadButton">Download Table</button>
                         </ul>
                     </li>
                     <li>
@@ -220,10 +223,10 @@
             <ul class="submenu hidden" id="locationSearchSubmenu">
                 <li>
                     <div class="search-container">
-                        <input type="text" id="locationSearchInput" placeholder="Look up location or city...">
+                        <input type="text" id="locationSearchInputWeb" placeholder="Look up location or city...">
                         <button id="saveCurrentLocationBtn" title="Save As Favorite">★+</button>
                     </div>
-                    <ul id="locationResults" class="location-results-list">
+                    <ul id="locationResultsWeb" class="location-results-list">
                     </ul>
                 </li>
             </ul>
@@ -505,7 +508,6 @@
                 <option value="1000">1000</option>
                 <option value="2000">2000</option>
             </select>
-            <button id="downloadButton">Download Table</button>
             <div id="info">Click on the map to fetch weather data.</div>
             <div class="spinner"></div>
         </div>
