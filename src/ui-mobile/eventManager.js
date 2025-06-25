@@ -59,7 +59,7 @@ function setupTabBarEvents() {
         if (panelId === 'planner' && !Settings.isFeatureUnlocked('planner')) {
             Settings.showPasswordModal('planner',
                 () => { // onSuccess: Wenn das Passwort korrekt war
-                    /*Settings.saveUnlockStatus('planner', true);
+                    Settings.saveUnlockStatus('planner', true);
                     setPlannerLockState();
                     // Zeige das Panel direkt an, anstatt einen zweiten Klick zu erfordern*/
                     setPlannerLockState(); // Entsperrten Zustand anzeigen
@@ -92,10 +92,10 @@ function setupTabBarEvents() {
         document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
         button.classList.add('active');
 
-               
+
         // Nach dem Wechseln des Panels die Kartengröße neu berechnen lassen
         if (AppState.map) {
-             setTimeout(() => AppState.map.invalidateSize(), 10);
+            setTimeout(() => AppState.map.invalidateSize(), 10);
         }
     });
 }
@@ -337,38 +337,16 @@ function setupCheckboxEvents() {
     });
 
     setupCheckbox('showLandingPattern', 'showLandingPattern', (checkbox) => {
-        const feature = 'landingPattern';
+        Settings.state.userSettings.showLandingPattern = checkbox.checked;
+        Settings.save();
 
-        // Die Logik, die entscheidet, ob das Feature freigeschaltet ist und das Modal anzeigt,
-        // kann hier bleiben, da sie eine reine UI-Aktion ist.
-
-        const enableFeature = () => {
-            Settings.state.userSettings.showLandingPattern = true;
-            Settings.save();
-            const submenu = checkbox.closest('li')?.querySelector('ul');
-            toggleSubmenu(checkbox, submenu, true); // Lokale UI-Aktion
-            // Statt direkter Aufrufe, Event senden:
-            document.dispatchEvent(new CustomEvent('ui:landingPatternEnabled'));
-        };
-
-        const disableFeature = () => {
-            Settings.state.userSettings.showLandingPattern = false;
-            Settings.save();
-            checkbox.checked = false;
-            const submenu = checkbox.closest('li')?.querySelector('ul');
-            toggleSubmenu(checkbox, submenu, false); // Lokale UI-Aktion
-            // Statt direkter Aufrufe, Event senden:
-            document.dispatchEvent(new CustomEvent('ui:landingPatternDisabled'));
-        };
+        const submenu = checkbox.closest('li')?.querySelector('ul');
+        toggleSubmenu(checkbox, submenu, checkbox.checked);
 
         if (checkbox.checked) {
-            if (Settings.isFeatureUnlocked(feature)) {
-                enableFeature();
-            } else {
-                Settings.showPasswordModal(feature, enableFeature, disableFeature);
-            }
+            document.dispatchEvent(new CustomEvent('ui:landingPatternEnabled'));
         } else {
-            disableFeature();
+            document.dispatchEvent(new CustomEvent('ui:landingPatternDisabled'));
         }
     });
 
@@ -1003,53 +981,53 @@ function setupSettingsPanels() {
     console.log("Setting up settings panel interactions...");
 
     // Eine Hilfsfunktion, um die Logik nicht zu wiederholen
-const setupSelectControl = (elementId, settingPath) => {
-    const selectElement = document.getElementById(elementId);
-    if (!selectElement) {
-        console.error(`Settings element not found: #${elementId}`);
-        return;
-    }
+    const setupSelectControl = (elementId, settingPath) => {
+        const selectElement = document.getElementById(elementId);
+        if (!selectElement) {
+            console.error(`Settings element not found: #${elementId}`);
+            return;
+        }
 
-    // --- Teil 1: Initialen Wert aus den Settings setzen (bleibt gleich) ---
-    let currentValue = Settings.state.userSettings;
-    const pathKeys = settingPath.split('.');
-    pathKeys.forEach(key => {
-        currentValue = currentValue ? currentValue[key] : undefined;
-    });
-    
-    if (currentValue !== undefined) {
-        selectElement.value = currentValue;
-    }
+        // --- Teil 1: Initialen Wert aus den Settings setzen (bleibt gleich) ---
+        let currentValue = Settings.state.userSettings;
+        const pathKeys = settingPath.split('.');
+        pathKeys.forEach(key => {
+            currentValue = currentValue ? currentValue[key] : undefined;
+        });
 
-    // --- Teil 2: Event-Listener mit NEUER, ROBUSTER Speicherlogik ---
-    selectElement.addEventListener('change', (event) => {
-        let settingRef = Settings.state.userSettings;
-        
-        // Gehe den Pfad entlang bis zum vorletzten Schlüssel
-        for (let i = 0; i < pathKeys.length - 1; i++) {
-            const key = pathKeys[i];
-            // NEU: Wenn ein Teil des Pfades nicht existiert, erstelle ihn als leeres Objekt
-            if (settingRef[key] === undefined || typeof settingRef[key] !== 'object') {
-                console.warn(`Creating missing settings path: ${key}`);
-                settingRef[key] = {};
+        if (currentValue !== undefined) {
+            selectElement.value = currentValue;
+        }
+
+        // --- Teil 2: Event-Listener mit NEUER, ROBUSTER Speicherlogik ---
+        selectElement.addEventListener('change', (event) => {
+            let settingRef = Settings.state.userSettings;
+
+            // Gehe den Pfad entlang bis zum vorletzten Schlüssel
+            for (let i = 0; i < pathKeys.length - 1; i++) {
+                const key = pathKeys[i];
+                // NEU: Wenn ein Teil des Pfades nicht existiert, erstelle ihn als leeres Objekt
+                if (settingRef[key] === undefined || typeof settingRef[key] !== 'object') {
+                    console.warn(`Creating missing settings path: ${key}`);
+                    settingRef[key] = {};
+                }
+                settingRef = settingRef[key];
             }
-            settingRef = settingRef[key];
-        }
 
-        // Der letzte Schlüssel im Pfad (z.B. 'refLevel')
-        const finalKey = pathKeys[pathKeys.length - 1];
+            // Der letzte Schlüssel im Pfad (z.B. 'refLevel')
+            const finalKey = pathKeys[pathKeys.length - 1];
 
-        // Jetzt ist sichergestellt, dass settingRef ein gültiges Objekt ist
-        if (settingRef) {
-            settingRef[finalKey] = event.target.value;
-            Settings.save(); // Speichern
-            console.log(`Setting '${settingPath}' changed to:`, event.target.value);
-            document.dispatchEvent(new CustomEvent('setting:changed', { detail: { key: settingPath, value: event.target.value } }));
-        } else {
-            console.error(`Failed to save setting. Parent object for path '${settingPath}' is not valid.`);
-        }
-    });
-};
+            // Jetzt ist sichergestellt, dass settingRef ein gültiges Objekt ist
+            if (settingRef) {
+                settingRef[finalKey] = event.target.value;
+                Settings.save(); // Speichern
+                console.log(`Setting '${settingPath}' changed to:`, event.target.value);
+                document.dispatchEvent(new CustomEvent('setting:changed', { detail: { key: settingPath, value: event.target.value } }));
+            } else {
+                console.error(`Failed to save setting. Parent object for path '${settingPath}' is not valid.`);
+            }
+        });
+    };
 
     // Jetzt rufen wir die Hilfsfunktion für jedes Setting auf
     // Units Panel
@@ -1069,7 +1047,7 @@ const setupSelectControl = (elementId, settingPath) => {
     setupSelectControl('cacheRadiusSelect', 'cache.radius');
     setupSelectControl('cacheZoomLevelsSelect', 'cache.zoomLevels');
     // document.getElementById('recacheNowButton').addEventListener('click', () => { ... });
-    
+
     // Usw. für die anderen Panels...
 }
 
@@ -1080,7 +1058,7 @@ function setupInfoIcons() {
     infoIcons.forEach(icon => {
         icon.addEventListener('click', (event) => {
             // Verhindert, dass durch den Klick auch das Label/Input aktiviert wird
-            event.preventDefault(); 
+            event.preventDefault();
             event.stopPropagation();
 
             const infoText = icon.dataset.info; // Holt den Text aus dem data-info Attribut
