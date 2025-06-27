@@ -16,13 +16,15 @@
     <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js" defer></script>
     <script src="https://unpkg.com/leaflet-rotatedmarker@0.2.0/leaflet.rotatedMarker.js" defer></script>
 
-    <link rel="stylesheet" href="/styles.css">
+    <link rel="stylesheet" href="styles-shared.css">
+    <link rel="stylesheet" href="styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="/icon-48.png">
 </head>
 
 <body>
-    <div id="map">
+    <div id="map-container">
+        <div id="map"></div>
         <div id="crosshair"></div>
     </div>
     <div id="slider-container">
@@ -114,7 +116,8 @@
                     <ul>
                         <li>
                             <label class="radio-label">
-                                <input type="checkbox" id="showLandingPattern" name="showLandingPattern"> Show Landing Pattern
+                                <input type="checkbox" id="showLandingPattern" name="showLandingPattern"> Show Landing
+                                Pattern
                             </label>
                         </li>
                         <li>

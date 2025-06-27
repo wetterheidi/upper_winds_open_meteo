@@ -31,21 +31,18 @@ function setupTabBarEvents() {
     const tabBar = document.getElementById('tab-bar');
     if (!tabBar) return;
 
-    // Diese Funktion wird den visuellen Zustand des Planner-Tabs steuern
     const setPlannerLockState = () => {
         const plannerTabButton = document.getElementById('planner-tab-button');
         if (!plannerTabButton) return;
-
         if (Settings.isFeatureUnlocked('planner')) {
             plannerTabButton.style.opacity = '1';
             plannerTabButton.title = 'Open Planner';
         } else {
-            plannerTabButton.style.opacity = '0.5'; // Visuell ausgrauen
+            plannerTabButton.style.opacity = '0.5';
             plannerTabButton.title = 'Feature locked. Tap to enter password.';
         }
     };
 
-    // Initialen Zustand beim Start der App setzen
     setPlannerLockState();
 
     tabBar.addEventListener('click', (e) => {
@@ -54,35 +51,23 @@ function setupTabBarEvents() {
 
         const panelId = button.dataset.panel;
 
-        // --- NEUE PASSWORT-LOGIK ---
-        // Prüfen, ob der Planner-Tab geklickt wurde UND ob er gesperrt ist
         if (panelId === 'planner' && !Settings.isFeatureUnlocked('planner')) {
-            Settings.showPasswordModal('planner',
-                () => { // onSuccess: Wenn das Passwort korrekt war
-                    Settings.saveUnlockStatus('planner', true);
-                    setPlannerLockState();
-                    // Zeige das Panel direkt an, anstatt einen zweiten Klick zu erfordern*/
-                    setPlannerLockState(); // Entsperrten Zustand anzeigen
-                    // Zeige das Panel direkt an
-                    document.querySelectorAll('.content-panel').forEach(p => p.classList.add('hidden'));
-                    document.getElementById(`panel-${panelId}`).classList.remove('hidden');
-                    document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
-                    button.classList.add('active');
-                },
-                () => { // onCancel: Wenn der Dialog abgebrochen wurde
-                    // Nichts tun, der Lock-State bleibt
+            Settings.showPasswordModal('planner', () => {
+                Settings.saveUnlockStatus('planner', true);
+                setPlannerLockState();
+                document.querySelectorAll('.content-panel').forEach(p => p.classList.add('hidden'));
+                document.getElementById(`panel-${panelId}`).classList.remove('hidden');
+                document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+                if (AppState.map) {
+                    setTimeout(() => AppState.map.invalidateSize(), 100);
                 }
-            );
-            return; // Wichtig: Die Funktion hier beenden, damit der normale Panel-Wechsel nicht stattfindet
+            }, () => {});
+            return;
         }
-        // --- ENDE NEUE PASSWORT-LOGIK ---
 
-
-        // Normale Logik zum Wechseln der Panels (wie bisher)
-        if (panelId === 'map') {
-            document.querySelectorAll('.content-panel').forEach(p => p.classList.add('hidden'));
-        } else {
-            document.querySelectorAll('.content-panel').forEach(p => p.classList.add('hidden'));
+        document.querySelectorAll('.content-panel').forEach(p => p.classList.add('hidden'));
+        if (panelId !== 'map') {
             const panelToShow = document.getElementById(`panel-${panelId}`);
             if (panelToShow) {
                 panelToShow.classList.remove('hidden');
@@ -92,10 +77,9 @@ function setupTabBarEvents() {
         document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
         button.classList.add('active');
 
-
-        // Nach dem Wechseln des Panels die Kartengröße neu berechnen lassen
-        if (AppState.map) {
-            setTimeout(() => AppState.map.invalidateSize(), 10);
+        // Only call invalidateSize when showing a panel
+        if (AppState.map && panelId !== 'map') {
+            setTimeout(() => AppState.map.invalidateSize(), 100);
         }
     });
 }

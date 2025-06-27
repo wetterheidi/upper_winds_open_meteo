@@ -1307,7 +1307,7 @@ input[type="checkbox"][style*="opacity: 1"] {
    Es wird standardmäßig mit display: none versteckt. */
 #crosshair {
   position: absolute;
-  top: 40%;
+  top: 50%;
   left: 50%;
   width: 16px;  /* Breite des Kreuzes */
   height: 16px; /* Höhe des Kreuzes */

@@ -1333,89 +1333,83 @@ document.addEventListener('DOMContentLoaded', async () => {
         displayManager.updateJumpRunTrackDisplay();
     });
 
-    document.addEventListener('location:selected', async (event) => {
-        const { lat, lng, source } = event.detail;
-        console.log(`App: Event 'location:selected' empfangen. Quelle: ${source}`);
+document.addEventListener('location:selected', async (event) => {
+    const { lat, lng, source } = event.detail;
+    console.log(`App: Event 'location:selected' empfangen. Quelle: ${source}`);
 
-        const loadingElement = document.getElementById('loading');
-        if (loadingElement) loadingElement.style.display = 'block';
+    const loadingElement = document.getElementById('loading');
+    if (loadingElement) loadingElement.style.display = 'block';
 
-        try {
-            const sliderIndex = getSliderValue();
-            const currentTimeToPreserve = AppState.weatherData?.time?.[sliderIndex] || null;
+    try {
+        const sliderIndex = getSliderValue();
+        const currentTimeToPreserve = AppState.weatherData?.time?.[sliderIndex] || null;
 
-            const newWeatherData = await weatherManager.fetchWeatherForLocation(lat, lng, currentTimeToPreserve);
+        const newWeatherData = await weatherManager.fetchWeatherForLocation(lat, lng, currentTimeToPreserve);
 
-            if (newWeatherData) {
-                // NEUE LOGIK:
-                // Prüfen, ob das Event vom initialen Laden der Seite kommt.
-                const isInitialLoad = (source === 'geolocation' || source === 'geolocation_fallback');
-
-                if (isInitialLoad) {
-                    // Beim initialen Laden den Zeit-Index NICHT übergeben, 
-                    // damit die Funktion die aktuelle Stunde verwendet.
-                    await updateUIWithNewWeatherData(newWeatherData);
-                } else {
-                    // Bei allen anderen Aktionen (Marker ziehen, Suche, etc.)
-                    // den eingestellten Zeit-Index beibehalten.
-                    await updateUIWithNewWeatherData(newWeatherData, sliderIndex);
-                }
-            } else {
-                AppState.weatherData = null;
-            }
-
-            await mapManager.createOrUpdateMarker(lat, lng);
-            await displayManager.refreshMarkerPopup();
-            mapManager.recenterMap(true);
-            AppState.isManualPanning = false;
-
-            if (source === 'geolocation' || source === 'geolocation_fallback') {
-                console.log("Starte initiales Caching nach Geolocation...");
-                cacheVisibleTiles({
-                    map: AppState.map,
-                    baseMaps: AppState.baseMaps,
-                    onProgress: displayProgress,
-                    onComplete: (message) => {
-                        hideProgress();
-                        if (message) displayMessage(message);
-                    },
-                    onCancel: () => {
-                        hideProgress();
-                        displayMessage('Caching cancelled.');
-                    }
-                });
-            }
-
-            if (Settings.state.userSettings.showJumpMasterLine) {
-                updateJumpMasterLineAndPanel();
-            }
-            // Caching für die neue Position anstoßen
-            // Die 'geolocation'-Fälle sind schon abgedeckt, jetzt fügen wir die anderen hinzu.
-            if (source === 'marker_drag' || source === 'dblclick' || source === 'search') {
-                console.log(`Starte Caching für neue Position via ${source}...`);
-                cacheTilesForDIP({ // Wichtig: cacheTilesForDIP, nicht cacheVisibleTiles
-                    map: AppState.map,
-                    lastLat: lat,
-                    lastLng: lng,
-                    baseMaps: AppState.baseMaps,
-                    onProgress: displayProgress,
-                    onComplete: (message) => {
-                        hideProgress();
-                        if (message) displayMessage(message);
-                    },
-                    onCancel: () => {
-                        hideProgress();
-                        displayMessage('Caching cancelled.');
-                    }
-                });
-            }
-        } catch (error) {
-            console.error('Fehler beim Verarbeiten von "location:selected":', error);
-            displayError(error.message);
-        } finally {
-            if (loadingElement) loadingElement.style.display = 'none';
+        if (newWeatherData) {
+            const isInitialLoad = (source === 'geolocation' || source === 'geolocation_fallback');
+            await updateUIWithNewWeatherData(newWeatherData, isInitialLoad ? null : sliderIndex);
+        } else {
+            AppState.weatherData = null;
         }
-    });
+
+        await mapManager.createOrUpdateMarker(lat, lng);
+        await displayManager.refreshMarkerPopup();
+
+        // Only recenter for non-marker-click interactions
+        if (source !== 'marker_click') {
+            mapManager.recenterMap(true);
+        }
+        AppState.isManualPanning = false;
+
+        if (source === 'geolocation' || source === 'geolocation_fallback') {
+            console.log("Starte initiales Caching nach Geolocation...");
+            cacheTilesForDIP({
+                map: AppState.map,
+                lastLat: lat,
+                lastLng: lng,
+                baseMaps: AppState.baseMaps,
+                onProgress: displayProgress,
+                onComplete: (message) => {
+                    hideProgress();
+                    if (message) displayMessage(message);
+                },
+                onCancel: () => {
+                    hideProgress();
+                    displayMessage('Caching cancelled.');
+                }
+            });
+        }
+
+        if (source === 'marker_drag' || source === 'dblclick' || source === 'search' || source === 'favorite_marker') {
+            console.log(`Starte Caching für neue Position via ${source}...`);
+            cacheTilesForDIP({
+                map: AppState.map,
+                lastLat: lat,
+                lastLng: lng,
+                baseMaps: AppState.baseMaps,
+                onProgress: displayProgress,
+                onComplete: (message) => {
+                    hideProgress();
+                    if (message) displayMessage(message);
+                },
+                onCancel: () => {
+                    hideProgress();
+                    displayMessage('Caching cancelled.');
+                }
+            });
+        }
+
+        if (Settings.state.userSettings.showJumpMasterLine) {
+            updateJumpMasterLineAndPanel();
+        }
+    } catch (error) {
+        console.error('Fehler beim Verarbeiten von "location:selected":', error);
+        displayError(error.message);
+    } finally {
+        if (loadingElement) loadingElement.style.display = 'none';
+    }
+});
 
     document.addEventListener('autoupdate:tick', async (event) => {
         // Nur reagieren, wenn Autoupdate in den Settings auch wirklich aktiv ist

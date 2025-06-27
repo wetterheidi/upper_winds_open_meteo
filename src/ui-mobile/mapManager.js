@@ -1019,18 +1019,27 @@ export async function createOrUpdateMarker(lat, lng) {
         console.log("MapManager: Kein Marker vorhanden, erstelle einen neuen.");
         const newMarker = createCustomMarker(lat, lng);
         attachMarkerDragend(newMarker);
+        newMarker.on('click', () => {
+            const position = newMarker.getLatLng();
+            const mapSelectEvent = new CustomEvent('location:selected', {
+                detail: { lat: position.lat, lng: position.lng, source: 'marker_click' },
+                bubbles: true,
+                cancelable: true
+            });
+            AppState.map.getContainer().dispatchEvent(mapSelectEvent);
+        });
         AppState.currentMarker = newMarker;
         AppState.currentMarker.addTo(AppState.map);
     }
 
-    // HIER IST DIE ÄNDERUNG:
     const popupContent = `Lat: ${lat.toFixed(5)}<br>Lng: ${lng.toFixed(5)}<br>Alt: ${altitude} m`;
-    updatePopupContent(AppState.currentMarker, popupContent); // Ruft die neue Funktion auf
+    updatePopupContent(AppState.currentMarker, popupContent);
 
     AppState.lastLat = lat;
     AppState.lastLng = lng;
     AppState.lastAltitude = altitude;
-    AppState.map.invalidateSize();
+    // Remove invalidateSize to prevent layout recalculation
+    // AppState.map.invalidateSize();
 }
 
 // Private Helferfunktion: Erstellt nur den Marker.
@@ -1070,10 +1079,25 @@ export function updatePopupContent(marker, content, open = false) {
 }
 
 // Helferfunktion zum Zentrieren der Karte.
-export function recenterMap(force = false) {
+export function recenterMap(force = false, moveMarkerToCenter = false) {
     if (AppState.isManualPanning && !force) return;
     if (AppState.map && AppState.currentMarker) {
-        AppState.map.panTo(AppState.currentMarker.getLatLng());
+        if (moveMarkerToCenter) {
+            const mapCenter = AppState.map.getCenter();
+            AppState.currentMarker.setLatLng(mapCenter);
+            const mapSelectEvent = new CustomEvent('location:selected', {
+                detail: { lat: mapCenter.lat, lng: mapCenter.lng, source: 'recenter' },
+                bubbles: true,
+                cancelable: true
+            });
+            AppState.map.getContainer().dispatchEvent(mapSelectEvent);
+        } else {
+            // Apply offset to keep marker below center
+            const offsetY = 50; // Pixels below center
+            const mapHeight = AppState.map.getSize().y;
+            const offsetLat = (offsetY / mapHeight) * (AppState.map.getBounds().getNorth() - AppState.map.getBounds().getSouth());
+            AppState.map.panTo([AppState.currentMarker.getLatLng().lat - offsetLat, AppState.currentMarker.getLatLng().lng], { animate: force });
+        }
     }
 }
 
