@@ -1025,4 +1025,5 @@ export function initializeEventListeners() {
     listenersInitialized = true;
     console.log("Event listeners initialized successfully (first and only time).");
 
+    
 }
