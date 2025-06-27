@@ -1067,7 +1067,10 @@ function setupAppEventListeners() {
 
         // Zuerst führen wir Aktionen aus, die fast immer nötig sind,
         // oder die die Grundlage für weitere Berechnungen bilden.
-        await displayManager.updateWeatherDisplay(getSliderValue(), 'info', 'selectedTime');
+        // Prüfen, ob ein Update der Wetteranzeige notwendig ist
+        if (['refLevel', 'heightUnit', 'temperatureUnit', 'windUnit', 'timeZone'].includes(name)) {
+            await displayManager.updateWeatherDisplay(getSliderValue(), 'info', 'selectedTime');
+        }
 
         // Jetzt steuern wir spezifische Aktionen basierend auf der geänderten Einstellung
         switch (name) {
@@ -1393,7 +1396,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         mapManager.updateFavoriteMarkers(initialFavorites);
     }
     // --- ENDE NEUER BLOCK ---
-    
+
     document.addEventListener('cutaway:marker_placed', () => {
         console.log("App: Event 'cutaway:marker_placed' empfangen. Neuberechnung wird ausgelöst.");
         if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {

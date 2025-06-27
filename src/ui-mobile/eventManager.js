@@ -190,8 +190,14 @@ function setupRadioGroup(name, callback) {
     const radios = document.querySelectorAll(`input[name="${name}"]`);
     radios.forEach(radio => {
         radio.addEventListener('change', () => {
-            const newValue = Settings.getValue(name, 'radio', Settings.defaultSettings[name]);
-            Settings.state.userSettings[name] = newValue;
+
+           // KORREKTUR: Liest den Wert direkt vom ausgewählten Radio-Button
+            const checkedRadio = document.querySelector(`input[name="${name}"]:checked`);
+            if (!checkedRadio) return;
+            const newValue = checkedRadio.value;
+
+            // Speichert den korrekten neuen Wert
+             Settings.state.userSettings[name] = newValue;
             Settings.save();
             console.log(`${name} changed to: ${newValue} and saved to localStorage`);
 

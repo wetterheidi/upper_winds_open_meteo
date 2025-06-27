@@ -997,8 +997,9 @@ function setupAppEventListeners() {
 
         // Zuerst führen wir Aktionen aus, die fast immer nötig sind,
         // oder die die Grundlage für weitere Berechnungen bilden.
-        await displayManager.updateWeatherDisplay(getSliderValue());
-
+        if (['refLevel', 'heightUnit', 'temperatureUnit', 'windUnit'].includes(name)) {
+            await displayManager.updateWeatherDisplay(getSliderValue(), 'weather-table-container', 'selectedTime');
+        }
         // Jetzt steuern wir spezifische Aktionen basierend auf der geänderten Einstellung
         switch (name) {
             case 'heightUnit':
