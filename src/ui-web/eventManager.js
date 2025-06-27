@@ -1020,7 +1020,7 @@ export function initializeEventListeners() {
     setupMapEventListeners();
     setupMenuItemEvents();
     setupResetCutAwayMarkerButton();
-    //setupCacheManagement();
+    setupCacheManagement();
     setupCacheSettings();
     listenersInitialized = true;
     console.log("Event listeners initialized successfully (first and only time).");
