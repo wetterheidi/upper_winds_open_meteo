@@ -1005,7 +1005,7 @@ export function initializeEventListeners() {
         return; // Bricht die Funktion sofort ab, wenn sie schon einmal lief
     }
     console.log("Initializing all UI event listeners...");
-    //setupMenuEvents();
+    setupMenuEvents();
     setupCheckboxEvents();
     setupSliderEvents();
     setupModelSelectEvents();
