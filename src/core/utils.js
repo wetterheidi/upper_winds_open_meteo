@@ -735,6 +735,31 @@ export class Utils {
         return bearing;
     }
 
+    /**
+     * Holt die Höhe und den QFE-Wert für eine gegebene Koordinate mit Debouncing.
+     * @param {number} lat - Die geographische Breite.
+     * @param {number} lng - Die geographische Länge.
+     * @param {function} callback - Die Funktion, die mit dem Ergebnis aufgerufen wird.
+     */
+    static debouncedGetElevationAndQFE = Utils.debounce(async (lat, lng, callback) => {
+        const cacheKey = `${lat.toFixed(5)},${lng.toFixed(5)}`;
+        // Hinweis: Da diese Funktion jetzt in utils.js ist, hat sie keinen direkten Zugriff mehr auf den Slider.
+        // Die QFE-Berechnung muss daher in dem Modul erfolgen, das die Funktion aufruft.
+        // Diese Funktion konzentriert sich nur auf das Holen der Höhe.
+
+        try {
+            const elevation = await Utils.getAltitude(lat, lng);
+            if (callback) {
+                callback({ elevation });
+            }
+        } catch (error) {
+            console.warn('Failed to fetch elevation in debouncedGetElevationAndQFE:', error);
+            if (callback) {
+                callback({ elevation: 'N/A' });
+            }
+        }
+    }, 500);
+
     static async getAltitude(lat, lng) {
         const { elevation } = await Utils.getLocationData(lat, lng);
         console.log('Fetched elevation from Open-Meteo:', elevation);

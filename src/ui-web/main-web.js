@@ -53,45 +53,6 @@ L.Control.Coordinates = L.Control.extend({
 let elevationCache = new Map();
 let qfeCache = new Map();
 let lastTapTime = 0;
-export const debouncedGetElevationAndQFE = Utils.debounce(async (lat, lng, requestLatLng, callback) => {
-    const cacheKey = `${lat.toFixed(5)},${lng.toFixed(5)}`;
-    const sliderIndex = getSliderValue(); // getSliderValue muss hier zugreifbar sein
-    const weatherCacheKey = `${cacheKey}-${sliderIndex}`;
-    let elevation, qfe;
-
-    if (elevationCache.has(cacheKey)) {
-        elevation = elevationCache.get(cacheKey);
-    } else {
-        try {
-            elevation = await Utils.getAltitude(lat, lng);
-            elevationCache.set(cacheKey, elevation);
-        } catch (error) {
-            console.warn('Failed to fetch elevation:', error);
-            elevation = 'N/A';
-        }
-    }
-
-    if (qfeCache.has(weatherCacheKey)) {
-        qfe = qfeCache.get(weatherCacheKey);
-    } else {
-        if (AppState.weatherData && AppState.weatherData.surface_pressure && sliderIndex >= 0 && sliderIndex < AppState.weatherData.surface_pressure.length) {
-            const surfacePressure = AppState.weatherData.surface_pressure[sliderIndex];
-            const temperature = AppState.weatherData.temperature_2m?.[sliderIndex] || 16.1;
-            const referenceElevation = AppState.lastAltitude !== 'N/A' ? AppState.lastAltitude : 339;
-            qfe = Utils.calculateQFE(surfacePressure, elevation, referenceElevation, temperature);
-            qfeCache.set(weatherCacheKey, qfe);
-            console.log('Calculated QFE:', { lat, lng, surfacePressure, elevation, referenceElevation, temperature, qfe });
-        } else {
-            console.warn('Surface pressure not available for QFE:', {
-                hasWeatherData: !!AppState.weatherData,
-                hasSurfacePressure: !!AppState.weatherData?.surface_pressure,
-                sliderIndexValid: sliderIndex >= 0 && sliderIndex < (AppState.weatherData?.surface_pressure?.length || 0)
-            });
-            qfe = 'N/A';
-        }
-    }
-    callback({ elevation, qfe }, requestLatLng);
-}, 500);
 
 // == Weather Data Handling ==
 
@@ -851,7 +812,7 @@ function setupAppEventListeners() {
         }
 
         // Debounced-Funktion aufrufen, um API-Anfragen zu begrenzen
-        debouncedGetElevationAndQFE(lat, lng, { lat, lng }, ({ elevation, qfe }, requestLatLng) => {
+        Utils.debouncedGetElevationAndQFE(lat, lng, { lat, lng }, ({ elevation, qfe }, requestLatLng) => {
             // Callback wird ausgeführt, wenn die Daten da sind
             if (AppState.lastMouseLatLng && AppState.coordsControl) {
                 // Nur aktualisieren, wenn die Maus noch in der Nähe ist
@@ -1080,7 +1041,7 @@ function setupAppEventListeners() {
                     const { lat, lng } = AppState.lastMouseLatLng;
                     const coordFormat = getCoordinateFormat();
                     let coordText = coordFormat === 'MGRS' ? `MGRS: ${Utils.decimalToMgrs(lat, lng)}` : `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
-                    debouncedGetElevationAndQFE(lat, lng, { lat, lng }, ({ elevation, qfe }, requestLatLng) => {
+                    Utils.debouncedGetElevationAndQFE(lat, lng, { lat, lng }, ({ elevation, qfe }, requestLatLng) => {
                         if (AppState.lastMouseLatLng && Math.abs(AppState.lastMouseLatLng.lat - requestLatLng.lat) < 0.05) {
                             const heightUnit = getHeightUnit(); // Holt die *neue* Einheit
                             let displayElevation = (elevation !== 'N/A') ? Math.round(Utils.convertHeight(elevation, heightUnit)) : 'N/A';

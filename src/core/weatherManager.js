@@ -317,3 +317,24 @@ export function interpolateWeatherData(weatherData, sliderIndex, interpStep, bas
     return interpolatedData;
 }
 
+export const debouncedGetElevationAndQFE = Utils.debounce(async (lat, lng) => {
+    try {
+        const data = await Utils.getElevationAndQFE(lat, lng, AppState.apiKey);
+        if (data) {
+            const elevationInput = document.getElementById('elevation');
+            const qfeInput = document.getElementById('qfe');
+
+            if (elevationInput) {
+                elevationInput.value = data.elevation.toFixed(1);
+            }
+            if (qfeInput) {
+                qfeInput.value = data.qfe.toFixed(2);
+            }
+
+            AppState.currentElevation = data.elevation;
+            Settings.state.userSettings.qfe = data.qfe;
+        }
+    } catch (error) {
+        console.error('Error fetching elevation and QFE:', error);
+    }
+}, 500);

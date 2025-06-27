@@ -8,7 +8,6 @@ import { TileCache } from '../core/tileCache.js';
 import { updateOfflineIndicator, isMobileDevice } from './ui.js';
 //import './public/vendor/Leaflet.PolylineMeasure.js'; // Pfad ggf. anpassen
 import { UI_DEFAULTS, ICON_URLS, ENSEMBLE_VISUALIZATION}  from '../core/constants.js'; // Importiere UI-Defaults
-import { debouncedGetElevationAndQFE } from './main-mobile.js';
 
 let lastTapTime = 0; // Add this line
 
@@ -545,35 +544,49 @@ function _setupCoreMapEventHandlers() {
     console.log('All core map event handlers have been set up.');
 }
 function _setupCrosshairCoordinateHandler(map) {
-    const updateWithDebouncedData = ({ elevation, qfe }, requestLatLng) => {
-        const currentCenter = map.getCenter();
-        if (Math.abs(currentCenter.lat - requestLatLng.lat) > 0.0001 || Math.abs(currentCenter.lng - requestLatLng.lng) > 0.0001) {
-            return;
-        }
-        const currentHTML = AppState.coordsControl._container.innerHTML;
-        const coordPart = currentHTML.split('<br>')[0];
-        const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
-        let displayElevation = 'N/A';
-        if (elevation !== 'N/A') {
-            const convertedElevation = Utils.convertHeight(elevation, heightUnit);
-            displayElevation = Math.round(convertedElevation);
-        }
-        const altString = displayElevation === 'N/A' ? 'N/A' : `${displayElevation}${heightUnit}`;
-        const qfeString = (qfe !== 'N/A') ? `${qfe.toFixed(0)}hPa` : 'N/A';
-        const displayText = `${coordPart}<br>Elevation: ${altString}<br>QFE: ${qfeString}`;
-        AppState.coordsControl.update(displayText);
-    };
-
     const handleMapMove = () => {
         const center = map.getCenter();
         const coordFormat = Settings.getValue('coordFormat', 'radio', 'Decimal');
         const coords = Utils.convertCoords(center.lat, center.lng, coordFormat);
         const coordString = (coordFormat === 'MGRS') ? `MGRS: ${coords.lat}` : `${center.lat.toFixed(5)}, ${center.lng.toFixed(5)}`;
+
+        // UI sofort mit "Fetching..." aktualisieren
         AppState.coordsControl.update(`${coordString}<br>Elevation: ...<br>QFE: ...`);
-        debouncedGetElevationAndQFE(center.lat, center.lng, center, updateWithDebouncedData);
+
+        // Die neue Funktion aus utils.js aufrufen
+        Utils.debouncedGetElevationAndQFE(center.lat, center.lng, ({ elevation }) => {
+            // Dieser Callback wird ausgeführt, sobald die Höhe verfügbar ist.
+            const currentCenter = map.getCenter();
+            if (Math.abs(currentCenter.lat - center.lat) > 0.0001 || Math.abs(currentCenter.lng - center.lng) > 0.0001) {
+                return; // Verhindert Update, wenn sich die Karte inzwischen weiterbewegt hat
+            }
+
+            const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
+            let displayElevation = 'N/A';
+            if (elevation !== 'N/A') {
+                const convertedElevation = Utils.convertHeight(elevation, heightUnit);
+                displayElevation = Math.round(convertedElevation);
+            }
+            const altString = displayElevation === 'N/A' ? 'N/A' : `${displayElevation}${heightUnit}`;
+
+            // QFE-Berechnung findet jetzt hier statt
+            let qfeString = 'N/A';
+            if (elevation !== 'N/A' && AppState.weatherData && AppState.weatherData.surface_pressure) {
+                const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
+                const surfacePressure = AppState.weatherData.surface_pressure[sliderIndex];
+                const temperature = AppState.weatherData.temperature_2m?.[sliderIndex] || 15;
+                const referenceElevation = AppState.lastAltitude !== 'N/A' ? AppState.lastAltitude : 0;
+                const qfe = Utils.calculateQFE(surfacePressure, elevation, referenceElevation, temperature);
+                qfeString = qfe !== 'N/A' ? `${qfe.toFixed(0)}hPa` : 'N/A';
+            }
+
+            const displayText = `${coordString}<br>Elevation: ${altString}<br>QFE: ${qfeString}`;
+            AppState.coordsControl.update(displayText);
+        });
     };
 
     map.on('move', handleMapMove);
+    // Ersten Aufruf auslösen, um die initiale Anzeige zu füllen
     setTimeout(() => map.fire('move'), 200);
     console.log('Crosshair coordinate handler initialized.');
 }

@@ -1,14 +1,13 @@
 // mapManager.js
 "use strict";
 
-import { AppState } from '../core/state.js'; 
+import { AppState } from '../core/state.js';
 import { Settings } from '../core/settings.js';
 import { Utils } from '../core/utils.js';
 import { TileCache } from '../core/tileCache.js';
 import { updateOfflineIndicator, isMobileDevice } from './ui.js';
 //import './public/vendor/Leaflet.PolylineMeasure.js'; // Pfad ggf. anpassen
-import { UI_DEFAULTS, ICON_URLS, ENSEMBLE_VISUALIZATION}  from '../core/constants.js'; // Importiere UI-Defaults
-import { debouncedGetElevationAndQFE } from '../ui-mobile/main-mobile.js';
+import { UI_DEFAULTS, ICON_URLS, ENSEMBLE_VISUALIZATION } from '../core/constants.js'; // Importiere UI-Defaults
 
 let lastTapTime = 0; // Add this line
 
@@ -50,7 +49,7 @@ async function initMap() {
     AppState.jumpRunTrackLayerGroup = L.layerGroup().addTo(AppState.map);
     AppState.favoritesLayerGroup = L.layerGroup().addTo(AppState.map); // <-- NEUE ZEILE HINZUFÜGEN
     console.log('Favorite marker layer added!');
-    
+
     _setupBaseLayersAndHandling();
     _addStandardMapControls();
     _setupCustomPanes();
@@ -361,16 +360,51 @@ export function updateCoordsDisplay(text) {
 // Die einzelnen komplexen Event-Handler
 function _handleMapMouseMove(e) {
     const { lat, lng } = e.latlng;
+    AppState.lastMouseLatLng = { lat, lng }; // Position für den Callback speichern
 
-    // Erstelle ein Event mit den rohen Koordinaten
-    const mouseMoveEvent = new CustomEvent('map:mousemove', {
-        detail: { lat, lng },
-        bubbles: true,
-        cancelable: true
+    const coordFormat = Settings.getValue('coordFormat', 'radio', 'Decimal');
+    let coordText;
+
+    // Koordinaten-Text korrekt formatieren
+    if (coordFormat === 'MGRS') {
+        const mgrsVal = Utils.decimalToMgrs(lat, lng);
+        coordText = `MGRS: ${mgrsVal || 'N/A'}`;
+    } else if (coordFormat === 'DMS') {
+        const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
+        coordText = `Lat: ${formatDMS(Utils.decimalToDms(lat, true))}, Lng: ${formatDMS(Utils.decimalToDms(lng, false))}`;
+    } else {
+        coordText = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
+    }
+
+    // Sofortiges Update mit "Fetching..."
+    if (AppState.coordsControl) {
+        AppState.coordsControl.update(`${coordText}<br>Elevation: Fetching...<br>QFE: Fetching...`);
+    }
+
+    // Debounced-Funktion aus Utils aufrufen
+    Utils.debouncedGetElevationAndQFE(lat, lng, ({ elevation }) => {
+        // Dieser Callback wird ausgeführt, nachdem die Höhe geholt wurde.
+        if (AppState.lastMouseLatLng && AppState.coordsControl &&
+            Math.abs(AppState.lastMouseLatLng.lat - lat) < 0.05 &&
+            Math.abs(AppState.lastMouseLatLng.lng - lng) < 0.05) {
+
+            const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
+            let displayElevation = elevation === 'N/A' ? 'N/A' : Math.round(Utils.convertHeight(elevation, heightUnit));
+            
+            // QFE-Berechnung findet jetzt hier statt
+            let qfeText = 'N/A';
+            if (elevation !== 'N/A' && AppState.weatherData && AppState.weatherData.surface_pressure) {
+                const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
+                const surfacePressure = AppState.weatherData.surface_pressure[sliderIndex];
+                const temperature = AppState.weatherData.temperature_2m?.[sliderIndex] || 15;
+                const referenceElevation = AppState.lastAltitude !== 'N/A' ? AppState.lastAltitude : 0;
+                const qfe = Utils.calculateQFE(surfacePressure, elevation, referenceElevation, temperature);
+                qfeText = qfe !== 'N/A' ? `${qfe} hPa` : 'N/A';
+            }
+
+            AppState.coordsControl.update(`${coordText}<br>Elevation: ${displayElevation} ${displayElevation === 'N/A' ? '' : heightUnit}<br>QFE: ${qfeText}`);
+        }
     });
-
-    // Sende das Event
-    AppState.map.getContainer().dispatchEvent(mouseMoveEvent);
 }
 function _setupCoreMapEventHandlers() {
     if (!AppState.map) {
@@ -379,7 +413,7 @@ function _setupCoreMapEventHandlers() {
     }
 
     // A. Das Control wird jetzt immer hier erstellt, egal für welchen Modus.
-     if (!AppState.coordsControl) {
+    if (!AppState.coordsControl) {
         // WICHTIG: Deaktivieren der Standard-Handler des Plugins.
         // Wir steuern die Updates jetzt zu 100% selbst.
         const coordOptions = {
@@ -538,7 +572,7 @@ function _setupCoreMapEventHandlers() {
         lastTapTime = currentTime; // Update the time of the last tap
     }, { passive: false }); // passive: false is required to allow preventDefault
     // --- END: Add Double-Tap/Touch Functionality ---
-    
+
     console.log('All core map event handlers have been set up.');
 }
 function _setupCrosshairCoordinateHandler(map) {
@@ -567,7 +601,26 @@ function _setupCrosshairCoordinateHandler(map) {
         const coords = Utils.convertCoords(center.lat, center.lng, coordFormat);
         const coordString = (coordFormat === 'MGRS') ? `MGRS: ${coords.lat}` : `${center.lat.toFixed(5)}, ${center.lng.toFixed(5)}`;
         AppState.coordsControl.update(`${coordString}<br>Elevation: ...<br>QFE: ...`);
-        debouncedGetElevationAndQFE(center.lat, center.lng, center, updateWithDebouncedData);
+        Utils.debouncedGetElevationAndQFE(lat, lng, ({ elevation }) => {
+            if (elevation !== 'N/A') {
+                const elevationValue = parseFloat(elevation);
+                // UI-Elemente aktualisieren (IDs könnten in Mobile anders sein, ggf. anpassen)
+                const elevationDisplay = document.getElementById('crosshair-elevation');
+                const qfeDisplay = document.getElementById('crosshair-qfe');
+
+                if (elevationDisplay) {
+                    elevationDisplay.textContent = `${elevationValue.toFixed(0)} m`;
+                }
+
+                // QFE berechnen und anzeigen
+                const surfacePressure = AppState.currentQNH || 1013; // Nehmen Sie den aktuellen QNH aus dem AppState
+                const qfe = Utils.calculateQFE(surfacePressure, elevationValue, 0);
+
+                if (qfeDisplay) {
+                    qfeDisplay.textContent = `${qfe} hPa`;
+                }
+            }
+        });
     };
 
     map.on('move', handleMapMove);
@@ -1021,8 +1074,8 @@ export async function createOrUpdateMarker(lat, lng) {
 export function createCustomMarker(lat, lng) {
     const customIcon = L.icon({
         iconUrl: ICON_URLS.DEFAULT_MARKER,
-        iconSize: [32, 32], 
-        iconAnchor: [16, 20], 
+        iconSize: [32, 32],
+        iconAnchor: [16, 20],
         popupAnchor: [0, -32],
         //shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
         //shadowSize: [41, 41], shadowAnchor: [13, 32]
@@ -1273,7 +1326,7 @@ export function updateFavoriteMarkers(favorites) {
             })
             .on('click', () => {
                 // Wenn auf einen Favoriten-Marker geklickt wird, die Position auswählen
-                 const selectEvent = new CustomEvent('location:selected', {
+                const selectEvent = new CustomEvent('location:selected', {
                     detail: { lat: fav.lat, lng: fav.lng, source: 'favorite_marker' },
                     bubbles: true,
                     cancelable: true
