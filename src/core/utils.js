@@ -778,7 +778,8 @@ export class Utils {
     }
 
     static async getDisplayTime(utcTimeStr, lat, lng, timeZone = 'Z') {
-        // Die Funktion fragt nicht mehr selbst nach der Einstellung.
+        // KORREKTUR: Die Funktion greift nicht mehr selbst auf das Dokument zu.
+        // Sie verlässt sich auf den übergebenen 'timeZone'-Parameter.
         if (timeZone.toLowerCase() === 'loc' && lat && lng) {
             return await Utils.formatLocalTime(utcTimeStr, lat, lng);
         } else {

@@ -165,33 +165,29 @@ export function downloadTableAsAscii(format) {
     const time = Utils.formatTime(AppState.weatherData.time[index]).replace(' ', '_');
     const filename = `${time}_${model}_${format}.txt`;
 
-    // 1. Anforderungen für das gewählte Format holen
     const formatRequirements = {
         'ATAK': { interpStep: 1000, heightUnit: 'ft', refLevel: 'AGL', windUnit: 'kt' },
         'Windwatch': { interpStep: 100, heightUnit: 'ft', refLevel: 'AGL', windUnit: 'km/h' },
         'HEIDIS': { interpStep: 100, heightUnit: 'm', refLevel: 'AGL', temperatureUnit: 'C', windUnit: 'm/s' },
-        'Customized': {} // Keine festen Anforderungen
+        'Customized': {}
     };
 
     const requirements = formatRequirements[format] || {};
-
-    // 2. Export-Einstellungen definieren: Entweder aus den Requirements oder aus der UI
+    
     const exportSettings = {
         interpStep: requirements.interpStep || getInterpolationStep(),
-        heightUnit: requirements.heightUnit || getHeightUnit(),
-        refLevel: requirements.refLevel || Settings.getValue('refLevel', 'AGL'),
-        windUnit: requirements.windUnit || getWindSpeedUnit(),
-        temperatureUnit: requirements.temperatureUnit || getTemperatureUnit()
+        heightUnit: requirements.heightUnit || Settings.getValue('heightUnit', 'radio', 'm'),
+        refLevel: requirements.refLevel || document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL',
+        windUnit: requirements.windUnit || Settings.getValue('windUnit', 'radio', 'kt'),
+        temperatureUnit: requirements.temperatureUnit || Settings.getValue('temperatureUnit', 'radio', 'C')
     };
-    console.log(`Generating export for '${format}' with settings:`, exportSettings);
-
-    // 3. Wetterdaten mit den korrekten Export-Einstellungen interpolieren
+    
     const interpolatedData = weatherManager.interpolateWeatherData(
         AppState.weatherData,
         index,
         exportSettings.interpStep,
         Math.round(AppState.lastAltitude),
-        exportSettings.heightUnit // WICHTIG: Die korrekte Einheit wird hier übergeben
+        exportSettings.heightUnit
     );
 
     if (!interpolatedData || interpolatedData.length === 0) {
@@ -199,7 +195,6 @@ export function downloadTableAsAscii(format) {
         return;
     }
 
-    // 4. Header und Datenzeilen basierend auf den Export-Einstellungen erstellen
     let content = '';
     let header = '';
 
@@ -219,17 +214,15 @@ export function downloadTableAsAscii(format) {
     }
     content += header;
 
-    // Datenzeilen generieren
     interpolatedData.forEach(data => {
         const displayHeight = Math.round(data.displayHeight);
         const displayDir = Math.round(data.dir);
-        // Werte explizit in die Ziel-Einheit des Exports umrechnen
         const displaySpd = Utils.convertWind(data.spd, exportSettings.windUnit, 'km/h');
         const formattedSpd = Number.isFinite(displaySpd) ? (exportSettings.windUnit === 'bft' ? Math.round(displaySpd) : displaySpd.toFixed(1)) : 'N/A';
 
         if (format === 'ATAK' || format === 'Windwatch') {
             content += `${displayHeight} ${displayDir} ${Math.round(displaySpd)}\n`;
-        } else { // HEIDIS & Customized
+        } else {
             const displayPressure = data.pressure === 'N/A' ? 'N/A' : data.pressure.toFixed(1);
             const displayTemp = Utils.convertTemperature(data.temp, exportSettings.temperatureUnit);
             const formattedTemp = displayTemp === 'N/A' ? 'N/A' : displayTemp.toFixed(1);
@@ -240,7 +233,6 @@ export function downloadTableAsAscii(format) {
         }
     });
 
-    // 5. Download auslösen (bleibt unverändert)
     const blob = new Blob([content], { type: 'text/plain' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');

@@ -118,7 +118,8 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
     const windSpeedUnit = getWindSpeedUnit();
     const temperatureUnit = getTemperatureUnit();
     // Pass lat and lng to getDisplayTime
-    const time = await Utils.getDisplayTime(AppState.weatherData.time[index], AppState.lastLat, AppState.lastLng);
+    const timeZone = Settings.getValue('timeZone', 'Z');
+    const time = await Utils.getDisplayTime(AppState.weatherData.time[index], AppState.lastLat, AppState.lastLng, timeZone);
     const interpStep = getInterpolationStep(); // Wert in der UI-Schicht holen
     const interpolatedData = weatherManager.interpolateWeatherData(
         AppState.weatherData, // Das Haupt-Wetterdatenobjekt
