@@ -777,12 +777,12 @@ export class Utils {
         return lastFullHour; // Return Date object instead of string
     }
 
-    static async getDisplayTime(utcTimeStr, lat, lng) {
-        const timeZone = document.querySelector('input[name="timeZone"]:checked')?.value || 'Z';
-        if (timeZone === 'Z' || !lat || !lng) {
-            return Utils.formatTime(utcTimeStr); // Synchronous
+    static async getDisplayTime(utcTimeStr, lat, lng, timeZone = 'Z') {
+        // Die Funktion fragt nicht mehr selbst nach der Einstellung.
+        if (timeZone.toLowerCase() === 'loc' && lat && lng) {
+            return await Utils.formatLocalTime(utcTimeStr, lat, lng);
         } else {
-            return await Utils.formatLocalTime(utcTimeStr, lat, lng); // Async
+            return Utils.formatTime(utcTimeStr); // Standardmäßig UTC ('Z')
         }
     }
 

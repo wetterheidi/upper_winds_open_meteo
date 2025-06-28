@@ -546,7 +546,7 @@ function _setupCoreMapEventHandlers() {
 function _setupCrosshairCoordinateHandler(map) {
     const handleMapMove = () => {
         const center = map.getCenter();
-        const coordFormat = Settings.getValue('coordFormat', 'radio', 'Decimal');
+        const coordFormat = Settings.getValue('coordFormat',  'Decimal');
         const coords = Utils.convertCoords(center.lat, center.lng, coordFormat);
         const coordString = (coordFormat === 'MGRS') ? `MGRS: ${coords.lat}` : `${center.lat.toFixed(5)}, ${center.lng.toFixed(5)}`;
 
@@ -561,7 +561,7 @@ function _setupCrosshairCoordinateHandler(map) {
                 return; // Verhindert Update, wenn sich die Karte inzwischen weiterbewegt hat
             }
 
-            const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
+            const heightUnit = Settings.getValue('heightUnit',  'm');
             let displayElevation = 'N/A';
             if (elevation !== 'N/A') {
                 const convertedElevation = Utils.convertHeight(elevation, heightUnit);
@@ -838,7 +838,7 @@ export function attachCutAwayMarkerDragend(marker) {
     });
 }
 export function updateCutAwayMarkerPopup(marker, lat, lng, open = false) {
-    const coordFormat = Settings.getValue('coordFormat', 'radio', 'Decimal');
+    const coordFormat = Settings.getValue('coordFormat',  'Decimal');
     const coords = Utils.convertCoords(lat, lng, coordFormat);
     let popupContent = `<b>Cut-Away Start</b><br>`;
 

@@ -173,7 +173,7 @@ export function interpolateWeatherData(weatherData, sliderIndex, interpStep, bas
     }
 
     baseHeight = Math.round(AppState.lastAltitude);
-    heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
+    heightUnit = Settings.getValue('heightUnit',  'm');
 
     // Define all possible pressure levels
     const allPressureLevels = STANDARD_PRESSURE_LEVELS;

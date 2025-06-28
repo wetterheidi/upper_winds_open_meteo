@@ -205,7 +205,7 @@ function drawEnsembleCircle(exitResult, color, label) {
         dashArray: '5, 10'
     }).addTo(AppState.ensembleLayerGroup);
 
-    const userWindUnit = Settings.getValue('windUnit', 'radio', 'kt');
+    const userWindUnit = Settings.getValue('windUnit',  'kt');
 
     // Prüfen, ob meanWindSpeedMps eine gültige Zahl ist
     let formattedMeanWindSpeed = 'N/A';
@@ -224,7 +224,7 @@ function drawEnsembleCircle(exitResult, color, label) {
     const lowerLimitDisplay = parseInt(document.getElementById('legHeightDownwind')?.value) || Settings.state.userSettings.legHeightDownwind || 0;
     const upperLimitDisplay = openingAltitudeAGL - 200;
 
-    const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
+    const heightUnit = Settings.getValue('heightUnit',  'm');
     const lowerLimitFormatted = Math.round(Utils.convertHeight(lowerLimitDisplay, heightUnit));
     const upperLimitFormatted = Math.round(Utils.convertHeight(upperLimitDisplay, heightUnit));
 
@@ -490,7 +490,7 @@ function calculateExitCircleForEnsemble(profileIdentifier, sliderIndex, specific
     }
 
     const interpStep = getInterpolationStep();
-    const heightUnit = Settings.getValue('heightUnit', 'radio', 'm'); // Höheinheit aus den Einstellungen
+    const heightUnit = Settings.getValue('heightUnit',  'm'); // Höheinheit aus den Einstellungen
     const originalGlobalWeatherData = AppState.weatherData;
     AppState.weatherData = weatherDataForProfile.hourly;
 

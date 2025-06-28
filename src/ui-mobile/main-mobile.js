@@ -16,16 +16,15 @@ import { DateTime } from 'luxon';
 import * as displayManager from './displayManager.js';
 import * as liveTrackingManager from '../core/liveTrackingManager.js'; // <-- DIESE ZEILE HINZUFÜGEN
 
-export const getTemperatureUnit = () => Settings.getValue('temperatureUnit', 'radio', 'C');
-export const getHeightUnit = () => Settings.getValue('heightUnit', 'radio', 'm');
-export const getWindSpeedUnit = () => Settings.getValue('windUnit', 'radio', 'kt');
-export const getCoordinateFormat = () => Settings.getValue('coordFormat', 'radio', 'Decimal');
-
+export const getTemperatureUnit = () => Settings.getValue('temperatureUnit', 'C');
+export const getHeightUnit = () => Settings.getValue('heightUnit', 'm');
+export const getWindSpeedUnit = () => Settings.getValue('windUnit', 'kt');
+export const getCoordinateFormat = () => Settings.getValue('coordFormat', 'Decimal');
 
 "use strict";
 
 export const debouncedCalculateJump = Utils.debounce(calculateJump, 300);
-export const getDownloadFormat = () => Settings.getValue('downloadFormat', 'radio', 'csv');
+export const getDownloadFormat = () => Settings.getValue('downloadFormat', 'csv');
 
 // == Tile caching ==
 Utils.setErrorHandler(displayError);
@@ -64,9 +63,9 @@ export function calculateMeanWind() {
     console.log('Calculating mean wind with model:', document.getElementById('modelSelect').value, 'weatherData:', AppState.weatherData);
 
     // KORREKTUR: Deklarationen an den Anfang der Funktion verschoben
-    const refLevel = document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL';
-    const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
-    const windSpeedUnit = Settings.getValue('windUnit', 'radio', 'kt');
+    const refLevel = Settings.getValue('refLevel', 'AGL');
+    const heightUnit = getHeightUnit();
+    const windSpeedUnit = getWindSpeedUnit();
 
     const index = document.getElementById('timeSlider').value || 0;
     const interpolatedData = weatherManager.interpolateWeatherData(
@@ -179,10 +178,10 @@ export function downloadTableAsAscii(format) {
     // 2. Export-Einstellungen definieren: Entweder aus den Requirements oder aus der UI
     const exportSettings = {
         interpStep: requirements.interpStep || getInterpolationStep(),
-        heightUnit: requirements.heightUnit || Settings.getValue('heightUnit', 'radio', 'm'),
-        refLevel: requirements.refLevel || document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL',
-        windUnit: requirements.windUnit || Settings.getValue('windUnit', 'radio', 'kt'),
-        temperatureUnit: requirements.temperatureUnit || Settings.getValue('temperatureUnit', 'radio', 'C')
+        heightUnit: requirements.heightUnit || getHeightUnit(),
+        refLevel: requirements.refLevel || Settings.getValue('refLevel', 'AGL'),
+        windUnit: requirements.windUnit || getWindSpeedUnit(),
+        temperatureUnit: requirements.temperatureUnit || getTemperatureUnit()
     };
     console.log(`Generating export for '${format}' with settings:`, exportSettings);
 
@@ -545,10 +544,10 @@ export function updateJumpMasterLineAndPanel(positionData = null) {
     // Die updateLivePositionControl-Funktion im mapManager ist schlau genug, die JML-Infos
     // nur anzuzeigen, wenn jumpMasterLineData nicht null ist.
     const settingsForPanel = {
-        heightUnit: Settings.getValue('heightUnit', 'radio', 'm'),
-        effectiveWindUnit: Settings.getValue('windUnit', 'radio', 'kt') === 'bft' ? 'kt' : Settings.getValue('windUnit', 'radio', 'kt'),
-        coordFormat: Settings.getValue('coordFormat', 'radio', 'Decimal'),
-        refLevel: Settings.getValue('refLevel', 'radio', 'AGL')
+        heightUnit: getHeightUnit(),
+        effectiveWindUnit: getWindSpeedUnit() === 'bft' ? 'kt' : getWindSpeedUnit(),
+        coordFormat: getCoordinateFormat(),
+        refLevel: Settings.getValue('refLevel', 'AGL')
     };
 
     mapManager.updateLivePositionControl({
@@ -1254,6 +1253,43 @@ function setupAppEventListeners() {
         // Hier wird die Funktion aufgerufen, die vorher im eventManager stand
         applySettingToInput(id, defaultValue);
     });
+
+document.addEventListener('setting:changed', async (e) => {
+        const { key } = e.detail;
+        console.log(`[main-mobile] Setting '${key}' changed. Triggering UI updates.`);
+
+        // Alle Einheiten-Änderungen erfordern jetzt eine breite Aktualisierung
+        const settingsThatTriggerFullUpdate = [
+            'refLevel', 'heightUnit', 'windUnit', 'temperatureUnit', 'timeZone', 'coordFormat'
+        ];
+
+        if (settingsThatTriggerFullUpdate.includes(key)) {
+            // Führe alle notwendigen UI-Updates aus
+            await displayManager.updateWeatherDisplay(getSliderValue(), 'weather-table-container', 'selectedTime');
+            
+            // NEU: Ruft die Funktion auf, die die Labels aktualisiert
+            if (key === 'heightUnit' || key === 'refLevel') {
+                Settings.updateUnitLabels(); 
+            }
+
+            if (AppState.lastAltitude !== 'N/A') {
+                calculateMeanWind();
+            }
+            if (Settings.getValue('calculateJump', false)) {
+                calculateJump();
+            }
+            
+            displayManager.updateLandingPatternDisplay();
+            updateJumpMasterLineAndPanel();
+            await displayManager.refreshMarkerPopup();
+            
+            // Wichtig: explizites Update des Fadenkreuz-Displays
+            if (AppState.map) {
+                AppState.map.fire('move');
+            }
+        }
+    });
+
 }
 
 document.addEventListener('DOMContentLoaded', async () => {

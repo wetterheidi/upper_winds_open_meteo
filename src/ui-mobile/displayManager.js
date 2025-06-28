@@ -6,6 +6,7 @@ import * as mapManager from './mapManager.js';
 import * as weatherManager from '../core/weatherManager.js';
 import { UI_DEFAULTS } from '../core/constants.js'; // UI_DEFAULTS für LANDING_PATTERN_MIN_ZOOM
 import * as JumpPlanner from '../core/jumpPlanner.js';
+import { getCoordinateFormat, getHeightUnit, getTemperatureUnit, getWindSpeedUnit } from './main-mobile.js';
 
 
 /**
@@ -24,7 +25,8 @@ export async function refreshMarkerPopup() {
     const altitude = AppState.lastAltitude;
 
     // NEU: Die aktuell ausgewählte Höheneinheit abfragen
-    const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
+    const heightUnit = getHeightUnit();
+    const coordFormat = getCoordinateFormat();
 
     // NEU: Höhe und Einheit für die Anzeige vorbereiten
     let displayAltitude = 'N/A';
@@ -40,7 +42,6 @@ export async function refreshMarkerPopup() {
         }
     }
 
-    const coordFormat = Settings.getValue('coordFormat', 'radio', 'Decimal');
     const sliderIndex = getSliderValue();
 
     const coords = Utils.convertCoords(lat, lng, coordFormat);
@@ -112,10 +113,10 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
         customLandingDirectionRRInput.value = Math.round(AppState.landingWindDir);
     }
 
-    const refLevel = document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL';
-    const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
-    const windSpeedUnit = Settings.getValue('windUnit', 'radio', 'kt');
-    const temperatureUnit = Settings.getValue('temperatureUnit', 'radio', 'C');
+    const refLevel = Settings.getValue('refLevel', 'AGL');
+    const heightUnit = getHeightUnit();
+    const windSpeedUnit = getWindSpeedUnit();
+    const temperatureUnit = getTemperatureUnit();
     // Pass lat and lng to getDisplayTime
     const time = await Utils.getDisplayTime(AppState.weatherData.time[index], AppState.lastLat, AppState.lastLng);
     const interpStep = getInterpolationStep(); // Wert in der UI-Schicht holen
@@ -270,7 +271,7 @@ export function updateLandingPatternDisplay() {
     const lng = markerLatLng.lng;
     const baseHeight = Math.round(AppState.lastAltitude);
     const interpStep = getInterpolationStep(); // Wert in der UI-Schicht holen
-    const heightUnit = Settings.getValue('heightUnit', 'radio', 'm'); // Höheinheit aus den Einstellungen
+    const heightUnit = getHeightUnit();
     const interpolatedData = weatherManager.interpolateWeatherData(
         AppState.weatherData, // Das Haupt-Wetterdatenobjekt
         sliderIndex,
@@ -308,7 +309,7 @@ export function updateLandingPatternDisplay() {
 
     // Helper function to convert wind speed to user-selected unit
     function formatWindSpeed(speedKt) {
-        const unit = Settings.getValue('windUnit', 'radio', 'kt');
+        const unit = getWindSpeedUnit();
         const convertedSpeed = Utils.convertWind(speedKt, unit, 'kt');
         if (unit === 'bft') {
             return Math.round(convertedSpeed); // Beaufort scale is integer
@@ -488,19 +489,19 @@ export function updateLandingPatternDisplay() {
                 position: finalMidPoint,
                 bearing: (finalWindDir - 90 + 180) % 360,
                 color: finalArrowColor,
-                tooltipText: `${Math.round(finalWindDir)}° ${formatWindSpeed(finalWindSpeedKt)}${Settings.getValue('windUnit', 'radio', 'kt')}` // Ihr alter Tooltip-Text
+                tooltipText: `${Math.round(finalWindDir)}° ${formatWindSpeed(finalWindSpeedKt)}${Settings.getValue('windUnit', 'kt')}` // Ihr alter Tooltip-Text
             },
             {
                 position: baseMidPoint,
                 bearing: (baseMeanWind[0] - 90 + 180) % 360,
                 color: baseArrowColor,
-                tooltipText: `${Math.round(baseWindDir)}° ${formatWindSpeed(baseWindSpeedKt)}${Settings.getValue('windUnit', 'radio', 'kt')}`
+                tooltipText: `${Math.round(baseWindDir)}° ${formatWindSpeed(baseWindSpeedKt)}${Settings.getValue('windUnit', 'kt')}`
             },
             {
                 position: downwindMidPoint,
                 bearing: (downwindMeanWind[0] - 90 + 180) % 360,
                 color: downwindArrowColor,
-                tooltipText: `${Math.round(downwindWindDir)}° ${formatWindSpeed(downwindWindSpeedKt)}${Settings.getValue('windUnit', 'radio', 'kt')}`
+                tooltipText: `${Math.round(downwindWindDir)}° ${formatWindSpeed(downwindWindSpeedKt)}${Settings.getValue('windUnit', 'kt')}`
             }
         ]
     };
@@ -543,7 +544,7 @@ export function updateJumpRunTrackDisplay() {
     // Neuer Code:
     const sliderIndex = getSliderValue();
     const interpStep = getInterpolationStep(); // Wert in der UI-Schicht holen
-    const heightUnit = Settings.getValue('heightUnit', 'radio', 'm'); // Höheinheit aus den Einstellungen
+    const heightUnit = getHeightUnit(); // Höheinheit aus den Einstellungen
     const interpolatedData = weatherManager.interpolateWeatherData(
         AppState.weatherData, // Das Haupt-Wetterdatenobjekt
         sliderIndex,
@@ -604,7 +605,7 @@ export function updateModelInfoPopup() {
     const modelRun = AppState.lastModelRun || "N/A"; // Holt den Model-Run aus dem AppState
 
     const titleContent = `Model: ${model.replace(/_/g, ' ').toUpperCase()}\nRun: ${modelRun}`;
-    
+
     // Ersetzt Zeilenumbrüche durch <br> für die HTML-Anzeige
     modelInfoPopup.innerHTML = titleContent.replace(/\n/g, '<br>');
 }

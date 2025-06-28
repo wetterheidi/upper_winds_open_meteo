@@ -388,7 +388,7 @@ function setupCheckboxEvents() {
 
     setupRadioGroup('jumpMasterLineTarget', () => {
         // Holt den neuen Wert und speichert ihn
-        const newValue = Settings.getValue('jumpMasterLineTarget', 'radio', 'DIP');
+        const newValue = Settings.getValue('jumpMasterLineTarget',  'DIP');
         Settings.state.userSettings.jumpMasterLineTarget = newValue;
         Settings.save();
         console.log('jumpMasterLineTarget changed:', newValue);
@@ -1025,14 +1025,13 @@ function setupSettingsPanels() {
         });
     };
 
-    // Jetzt rufen wir die Hilfsfunktion für jedes Setting auf
     // Units Panel
-    setupSelectControl('refLevel', 'units.refLevel');
-    setupSelectControl('heightUnit', 'units.heightUnit');
-    setupSelectControl('temperatureUnit', 'units.temperatureUnit');
-    setupSelectControl('windUnit', 'units.windUnit');
-    setupSelectControl('timeZone', 'timeZone'); // Dies ist kein verschachteltes Setting
-    setupSelectControl('coordFormat', 'coordFormat'); // Ebenfalls nicht verschachtelt
+    setupSelectControl('refLevel', 'refLevel');
+    setupSelectControl('heightUnit', 'heightUnit');
+    setupSelectControl('temperatureUnit', 'temperatureUnit');
+    setupSelectControl('windUnit', 'windUnit');
+    setupSelectControl('timeZone', 'timeZone');
+    setupSelectControl('coordFormat', 'coordFormat');
 
     // Download Panel
     setupSelectControl('downloadFormat', 'downloadFormat');

@@ -263,42 +263,50 @@ export const Settings = {
 
     /**
      * Retrieves the value of a setting.
-     * NEU: Liest den Wert zuerst aus dem Settings-State. Nur wenn der nicht existiert,
-     * wird als Fallback das DOM durchsucht.
-     * @param {string} name - The name of the setting (key in userSettings).
-     * @param {string} type - The UI element type ('radio', 'select', 'checkbox', 'number', 'text').
-     * @param {*} defaultValue - The default value if not found anywhere.
+     * FINAL & ROBUST: This version is backward-compatible.
+     * It handles calls with 2 arguments (name, defaultValue) from the refactored mobile app
+     * and calls with 3 arguments (name, type, defaultValue) from the legacy web app.
+     *
+     * @param {string} name - The name of the setting.
+     * @param {string|any} [type] - Optional. The type of the element ('radio', 'select', etc.) OR the default value if the third argument is omitted.
+     * @param {any} [defaultValue] - Optional. The default value.
      * @returns {*} The setting value.
      */
     getValue(name, type, defaultValue) {
-        // 1. Priorität: Versuche, den Wert aus dem geladenen State zu lesen.
+        // Handle flexible arguments: If called as getValue(name, defaultValue)
+        if (defaultValue === undefined && typeof type !== 'string') {
+            defaultValue = type;
+            type = null; // Indicates that the type was not explicitly provided
+        }
+
+        // 1. Priority: Always try to read from the loaded state first. This is the most reliable source.
         if (this.state.userSettings && typeof this.state.userSettings[name] !== 'undefined') {
             return this.state.userSettings[name];
         }
 
-        // 2. Priorität (Fallback): Wenn im State nichts gefunden wurde, durchsuche das DOM.
-        // Das ist nur noch für Elemente nötig, die nicht explizit in den Settings gespeichert werden.
-        const selector = type === 'radio' ? `input[name="${name}"]:checked` : `#${name}`;
-        const element = document.querySelector(selector);
+        // 2. Fallback: Query the DOM. This is crucial for the web app's initial load
+        //    and for cases where a setting is not explicitly saved in userSettings.
 
-        if (!element) {
-            // Diese Warnung erscheint jetzt nur noch, wenn ein Element WIRKLICH fehlt.
-            console.warn(`Setting element not found in DOM for fallback: ${selector}`);
-            return defaultValue;
+        // Try radio buttons first (for ui-web)
+        const radioElement = document.querySelector(`input[name="${name}"]:checked`);
+        if (radioElement) {
+            return radioElement.value;
         }
 
-        let value;
-        switch (type) {
-            case 'checkbox':
-                value = element.checked;
-                break;
-            case 'number':
-                value = parseFloat(element.value);
-                break;
-            default:
-                value = element.value;
+        // Try select elements next (for ui-mobile)
+        const selectElement = document.getElementById(name);
+        if (selectElement && selectElement.tagName === 'SELECT') {
+            return selectElement.value;
         }
-        return value;
+
+        // Try a checkbox by its ID
+        const checkboxElement = document.getElementById(name);
+        if (checkboxElement && checkboxElement.type === 'checkbox') {
+            return checkboxElement.checked;
+        }
+
+        // If nothing is found in state or DOM, return the provided default value.
+        return defaultValue;
     },
 
     /**

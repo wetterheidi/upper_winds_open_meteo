@@ -12,9 +12,9 @@ function getTooltipContent(point, index, points, groundAltitude) { // Entferne w
         return 'Map not initialized';
     }
 
-    const currentCoordFormat = Settings.getValue('coordFormat', 'radio', 'Decimal'); // Direkter Zugriff
-    const windUnit = Settings.getValue('windUnit', 'radio', 'kt'); // Direkter Zugriff
-    const heightUnit = Settings.getValue('heightUnit', 'radio', 'm'); // Direkter Zugriff
+    const currentCoordFormat = Settings.getValue('coordFormat',  'Decimal'); // Direkter Zugriff
+    const windUnit = Settings.getValue('windUnit',  'kt'); // Direkter Zugriff
+    const heightUnit = Settings.getValue('heightUnit',  'm'); // Direkter Zugriff
 
     const coords = Utils.convertCoords(point.lat, point.lng, currentCoordFormat);
     let tooltipContent = currentCoordFormat === 'MGRS' ? `MGRS: ${coords.lat}` : `Lat: ${coords.lat}<br>Lng: ${coords.lng}`;
