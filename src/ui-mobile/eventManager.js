@@ -1047,22 +1047,41 @@ function setupSettingsPanels() {
 }
 
 function setupInfoIcons() {
-    // Findet alle Elemente mit der Klasse .info-icon
     const infoIcons = document.querySelectorAll('.info-icon');
 
     infoIcons.forEach(icon => {
-        icon.addEventListener('click', (event) => {
-            // Verhindert, dass durch den Klick auch das Label/Input aktiviert wird
-            event.preventDefault();
-            event.stopPropagation();
+        // Findet das *direkt folgende* Popup-Element.
+        const popup = icon.nextElementSibling; 
 
-            const infoText = icon.dataset.info; // Holt den Text aus dem data-info Attribut
+        if (popup && popup.classList.contains('info-popup')) {
+            const infoText = icon.dataset.info;
             if (infoText) {
-                // Zeigt eine einfache System-Benachrichtigung an.
-                // Für eine schönere Darstellung könnte man hier ein eigenes Modal-Fenster öffnen.
-                alert(infoText);
+                popup.textContent = infoText; // Füllt das Popup mit dem Text
             }
-        });
+
+            icon.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                
+                // Schließe alle anderen offenen Popups
+                document.querySelectorAll('.info-popup').forEach(p => {
+                    if (p !== popup) p.style.display = 'none';
+                });
+
+                // Zeige oder verstecke das aktuelle Popup
+                const isVisible = popup.style.display === 'block';
+                popup.style.display = isVisible ? 'none' : 'block';
+            });
+        }
+    });
+
+    // Globaler Klick-Listener, um alle Popups zu schließen
+    document.addEventListener('click', (event) => {
+        if (!event.target.closest('.info-icon')) {
+            document.querySelectorAll('.info-popup').forEach(p => {
+                p.style.display = 'none';
+            });
+        }
     });
 }
 

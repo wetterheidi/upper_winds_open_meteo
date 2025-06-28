@@ -210,7 +210,7 @@ body {
     backdrop-filter: blur(5px);
     -webkit-backdrop-filter: blur(5px);
     border-bottom: 1px solid #ddd;
-    z-index: 1000 !important; /* Override z-index: 200 from styles-shared.css */
+    z-index: 2000 !important; /* Override z-index: 200 from styles-shared.css */
     padding: 5px;
     padding-top: calc(5px + env(safe-area-inset-top));
     padding-left: env(safe-area-inset-left);
@@ -250,98 +250,6 @@ body {
 .slider-content-wrapper #timeSlider {
     width: 100%;
     margin: 5px 0;
-}
-
-/* In src/ui-mobile/stylesNEW.css einfügen */
-
-/* Container für Modell-Auswahl und Info-Button anpassen */
-#model-row {
-    position: relative; /* Wichtig für die Positionierung des Popups */
-    display: flex;
-    align-items: center;
-    gap: 5px; /* Abstand zwischen Label, Select und Button */
-    width: 100%;
-    justify-content: center;
-}
-
-/* Styling für den neuen Info-Button */
-#modelInfoButton {
-    background: transparent;
-    border: 1px solid #888;
-    color: #555;
-    width: 24px;
-    height: 24px;
-    padding: 0;
-    border-radius: 50%; /* Macht den Button rund */
-    font-size: 14px;
-    font-weight: bold;
-    font-family: 'Times New Roman', Times, serif; /* Klassisches "i" Aussehen */
-    line-height: 22px;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    flex-shrink: 0; /* Verhindert, dass der Button schrumpft */
-}
-
-#modelInfoButton:hover {
-    background: #e0e0e0;
-    border-color: #333;
-}
-
-/* Styling für das Popup-Fenster */
-#modelInfoPopup {
-    display: none; /* Standardmäßig versteckt */
-    position: absolute;
-    top: calc(100% + 5px); /* Positioniert es 5px unter dem Button */
-    right: 0;
-    width: 220px;
-    background: white;
-    border: 1px solid #ccc;
-    padding: 10px;
-    border-radius: 5px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-    z-index: 1500; /* Stellt sicher, dass es über anderen Elementen liegt */
-    font-size: 13px;
-    line-height: 1.4;
-    text-align: left;
-}
-
-/* 1. NEU: Eine gemeinsame Klasse für alle Info-Buttons */
-.info-button-shared {
-    background: transparent;
-    border: 1px solid #888;
-    color: #555;
-    width: 20px;   /* Etwas kleiner für ein dezenteres Aussehen */
-    height: 20px;  /* Etwas kleiner */
-    padding: 0;
-    border-radius: 50%; /* Rund */
-    font-size: 13px;   /* Kleinere Schrift */
-    font-weight: bold;
-    font-family: 'Times New Roman', Times, serif; /* Klassisches "i" */
-    line-height: 18px; /* Vertikal zentrieren */
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    flex-shrink: 0; /* Verhindert, dass der Button schrumpft */
-    display: inline-flex; /* Wichtig für die Zentrierung */
-    justify-content: center;
-    align-items: center;
-}
-
-.info-button-shared:hover {
-    background: #e0e0e0;
-    border-color: #333;
-}
-
-/* 2. Bestehende #modelInfoButton Regel anpassen, um die neue Klasse zu nutzen */
-#modelInfoButton {
-    /* Erbt jetzt alle Stile von .info-button-shared */
-}
-
-/* 3. Bestehende .info-icon Regel anpassen (oder ersetzen), um die neue Klasse zu nutzen */
-.info-icon {
-    /* Erbt jetzt alle Stile von .info-button-shared */
-    margin-left: 8px; /* Behält den spezifischen Abstand bei */
 }
 
 /* Der Zeit-Slider selbst */
@@ -748,6 +656,109 @@ body {
 #weather-table-container tr.wind-very-high {
     border: 2px solid #ffcccc !important;
 }
+/* === ANFANG: Finaler, korrekter Block für BEIDE Info-Buttons & Popups === */
+
+/* 1. Stile für den Model-Info-Button (ein <button>-Element) */
+#modelInfoButton {
+    /* Zuerst die störenden allgemeinen Button-Stile zurücksetzen */
+    padding: 0 !important;
+    min-width: 0 !important;
+    
+    /* Jetzt das gewünschte Aussehen definieren */
+    background: transparent;
+    border: 1px solid #555;
+    color: #333;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    font-size: 13px;
+    font-weight: bold;
+    font-family: 'Times New Roman', Times, serif;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    flex-shrink: 0;
+    
+    /* Wichtig für die Positionierung und das 'i' */
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    margin-left: 8px;
+}
+
+#modelInfoButton:hover {
+    background: #f0f0f0;
+}
+
+/* 2. Stile für den Track-Upload-Info-Button (ein <span>-Element) */
+.info-icon {
+    background: transparent;
+    border: 1px solid #555;
+    color: #333;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    font-size: 13px;
+    font-weight: bold;
+    font-family: 'Times New Roman', Times, serif;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    flex-shrink: 0;
+    
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    margin-left: 8px;
+    line-height: 18px; /* Sorgt für vertikale Zentrierung */
+}
+
+.info-icon:hover {
+    background: #f0f0f0;
+}
+
+/* 3. Stellt sicher, dass die Container als Positionierungs-Anker dienen */
+#model-row, 
+#track-upload > div:first-child {
+    position: relative;
+}
+
+/* 4. Ein einheitlicher Stil für BEIDE Popups */
+.info-popup {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 5px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 120px;
+    
+    /* === HIER IST DIE EINZIGE ÄNDERUNG === */
+    height: auto;  /* Erlaubt dem Popup, in der Höhe zu wachsen */
+    text-align: center;
+    padding: 10px;
+    background: white;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 2000;
+    font-size: 13px;
+    color: #333;
+    line-height: 1.4;
+    min-height: 40px;
+    max-height: 300px; /* Verhindert, dass das Popup zu hoch wird */
+}
+
+.info-popup::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 6px;
+    border-style: solid;
+    border-color: white transparent transparent transparent;
+}
+
+/* === ENDE: Finaler Block === */
+
 
 /* Media queries for responsiveness */
 @media (max-width: 768px) {

@@ -44,8 +44,8 @@
                     <option value="ecmwf">ECMWF</option>
                 </select>
 
-                <button id="modelInfoButton">i</button>
-                <div id="modelInfoPopup"></div>
+                <button id="modelInfoButton" class="info-button-shared">i</button>
+                <div id="modelInfoPopup" class="info-popup"></div>
             </div>
         </div>
     </div>
@@ -453,12 +453,14 @@
                 <button class="accordion-header">Track Upload</button>
                 <div class="accordion-content">
                     <div id="track-upload" class="settings-grid">
-                        <div>
-                            <label for="trackFileInput">
-                                Upload File:
-                                <span class="info-icon info-button-shared" data-info="GPX or FlySight-CSV">i</span>
-                            </label>
+
+                        <div style="position: relative; display: flex; align-items: center;">
+                            <label for="trackFileInput">Upload File:</label>
+
+                            <span class="info-icon info-button-shared" data-info="GPX or FlySight-CSV">i</span>
+                            <div id="trackInfoPopup" class="info-popup"></div>
                         </div>
+
                         <input type="file" id="trackFileInput" accept=".gpx,.csv" style="margin-top: 5px;">
                         <button id="clearTrack">Clear</button>
                     </div>

@@ -85,7 +85,7 @@ async function fetchWeather(lat, lon, currentTime = null) {
                 const metaResponse = await fetch(metaUrl);
                 const metaData = await metaResponse.json();
                 runDate = new Date(metaData.last_run_initialisation_time * 1000);
-                AppState.lastModelRun = runDate.toISOString().replace('T', ' ').substring(0, 17) + 'Z';
+                AppState.lastModelRun = runDate.toISOString().replace('T', ' ').substring(0, 16) + 'Z';
             } catch (e) {
                 runDate = DateTime.utc().toJSDate();
                 AppState.lastModelRun = "N/A";
