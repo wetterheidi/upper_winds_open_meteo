@@ -1,5 +1,11 @@
 @import '../ui-common/styles-shared.css';
 
+/* For testing purposes */
+#slider-container { border: 2px solid red; }
+#map-container { border: 2px solid green; }
+#tab-bar { border: 2px solid blue; }
+.leaflet-top { border: 2px solid orange; }
+.leaflet-bottom { border: 2px solid purple; }
 
 /* Stile für die neue Tab-Bar und Panels */
 
@@ -596,6 +602,76 @@ body {
     box-shadow: rgba(0, 0, 0, 0.2);
     max-width: 300px;
     pointer-events: none;
+}
+
+/* In src/ui-mobile/stylesNEW.css oder einer anderen CSS-Datei für die App einfügen */
+
+/* Allgemeine Tabellenformatierung für ein sauberes Aussehen */
+#weather-table-container table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 13px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    table-layout: fixed;
+}
+
+#weather-table-container th {
+    background: linear-gradient(to bottom, #f0f4f8, #d9e2ec);
+    color: #333;
+    font-weight: bold;
+    padding: 10px 8px;
+    border: 1px solid #333; /* Wichtig für die Ränder */
+    text-align: center;
+    vertical-align: middle;
+}
+
+#weather-table-container td {
+    padding: 8px;
+    border: 1px solid #333; /* Wichtig für die Ränder */
+    text-align: center;
+    vertical-align: middle;
+}
+
+/* Deaktiviert Standard-Hintergründe, da wir sie dynamisch setzen */
+#weather-table-container tr:nth-child(even),
+#weather-table-container tr:nth-child(odd),
+#weather-table-container tr:hover {
+    background: none !important;
+}
+
+/* Stile für Hintergrundfarben basierend auf Luftfeuchtigkeit */
+#weather-table-container tr.humidity-low {
+    background: #FFFFFF !important; /* Weiß für <65% */
+}
+
+#weather-table-container tr.humidity-moderate {
+    background: #F4F4F4 !important; /* Helles Grau für 65%-85% */
+}
+
+#weather-table-container tr.humidity-high {
+    background: #cdcdcd !important; /* Mittleres Grau für 85%-99% */
+}
+
+#weather-table-container tr.humidity-saturated {
+    background: #B9B9B9 !important; /* Dunkles Grau für 100% */
+    color: #FFFFFF !important;     /* Weiße Schrift für Lesbarkeit */
+}
+
+/* Stile für Randfarben basierend auf Windgeschwindigkeit */
+#weather-table-container tr.wind-low {
+    border: 2px solid lightblue !important;
+}
+
+#weather-table-container tr.wind-moderate {
+    border: 2px solid lightgreen !important;
+}
+
+#weather-table-container tr.wind-high {
+    border: 2px solid #f5f34f !important;
+}
+
+#weather-table-container tr.wind-very-high {
+    border: 2px solid #ffcccc !important;
 }
 
 /* Media queries for responsiveness */
