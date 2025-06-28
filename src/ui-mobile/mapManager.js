@@ -1093,7 +1093,7 @@ export function recenterMap(force = false, moveMarkerToCenter = false) {
             AppState.map.getContainer().dispatchEvent(mapSelectEvent);
         } else {
             // Apply offset to keep marker below center
-            const offsetY = 50; // Pixels below center
+            const offsetY = 0; // Pixels below center
             const mapHeight = AppState.map.getSize().y;
             const offsetLat = (offsetY / mapHeight) * (AppState.map.getBounds().getNorth() - AppState.map.getBounds().getSouth());
             AppState.map.panTo([AppState.currentMarker.getLatLng().lat - offsetLat, AppState.currentMarker.getLatLng().lng], { animate: force });

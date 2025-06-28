@@ -16,7 +16,7 @@ html {
     z-index: 0;
 }
 
-/* Leaflet popup customization */
+/* Incorporate necessary styles from styles-shared.css */
 .leaflet-popup-content {
     font-size: 13px;
     font-family: 'Roboto', sans-serif;
@@ -25,42 +25,36 @@ html {
 
 .leaflet-tooltip {
     z-index: 800 !important;
-    /* Ensure tooltip is above all map elements */
     background-color: white;
     padding: 2px;
     pointer-events: none;
-    /* Prevent tooltip from blocking mouse events */
 }
 
 .leaflet-popup-content-wrapper {
     padding: 0.5px;
     border-radius: 5px;
-}
-
-.leaflet-popup-content-wrapper {
     word-wrap: break-word;
 }
 
 .leaflet-bottom .leaflet-control-scale {
-    margin-bottom: 5px;
+    margin-bottom: 5px !important;
     margin-left: 5px;
-    z-index: 1000; /* Ensure scale is above attribution */
-    background-color: rgba(255, 255, 255, 0.8); /* Slightly more opaque for readability */
-    padding: 2px 5px; /* Add padding for better appearance */
-    border-radius: 4px; /* Rounded corners */
+    z-index: 1000 !important;
+    background-color: rgba(255, 255, 255, 0.8);
+    padding: 2px 5px;
+    border-radius: 4px;
 }
 
-/* Style the attribution control */
 .leaflet-bottom .leaflet-control-attribution {
-    margin-bottom: 5px;
+    margin-bottom: 5px !important;
     margin-right: 5px;
     background-color: rgba(255, 255, 255, 0.8);
     padding: 2px 5px;
     font-size: 11px;
-    z-index: 900; /* Below the scale control */
-    white-space: normal; /* Allow text to wrap */
-    max-width: 100%; /* Limit width to prevent stretching across the map */
-    text-align: right; /* Align text to the right */
+    z-index: 900 !important;
+    white-space: normal;
+    max-width: 60%;
+    text-align: right;
 }
 
 .leaflet-control-live-position {
