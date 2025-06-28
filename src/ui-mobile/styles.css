@@ -252,6 +252,98 @@ body {
     margin: 5px 0;
 }
 
+/* In src/ui-mobile/stylesNEW.css einfügen */
+
+/* Container für Modell-Auswahl und Info-Button anpassen */
+#model-row {
+    position: relative; /* Wichtig für die Positionierung des Popups */
+    display: flex;
+    align-items: center;
+    gap: 5px; /* Abstand zwischen Label, Select und Button */
+    width: 100%;
+    justify-content: center;
+}
+
+/* Styling für den neuen Info-Button */
+#modelInfoButton {
+    background: transparent;
+    border: 1px solid #888;
+    color: #555;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border-radius: 50%; /* Macht den Button rund */
+    font-size: 14px;
+    font-weight: bold;
+    font-family: 'Times New Roman', Times, serif; /* Klassisches "i" Aussehen */
+    line-height: 22px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0; /* Verhindert, dass der Button schrumpft */
+}
+
+#modelInfoButton:hover {
+    background: #e0e0e0;
+    border-color: #333;
+}
+
+/* Styling für das Popup-Fenster */
+#modelInfoPopup {
+    display: none; /* Standardmäßig versteckt */
+    position: absolute;
+    top: calc(100% + 5px); /* Positioniert es 5px unter dem Button */
+    right: 0;
+    width: 220px;
+    background: white;
+    border: 1px solid #ccc;
+    padding: 10px;
+    border-radius: 5px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    z-index: 1500; /* Stellt sicher, dass es über anderen Elementen liegt */
+    font-size: 13px;
+    line-height: 1.4;
+    text-align: left;
+}
+
+/* 1. NEU: Eine gemeinsame Klasse für alle Info-Buttons */
+.info-button-shared {
+    background: transparent;
+    border: 1px solid #888;
+    color: #555;
+    width: 20px;   /* Etwas kleiner für ein dezenteres Aussehen */
+    height: 20px;  /* Etwas kleiner */
+    padding: 0;
+    border-radius: 50%; /* Rund */
+    font-size: 13px;   /* Kleinere Schrift */
+    font-weight: bold;
+    font-family: 'Times New Roman', Times, serif; /* Klassisches "i" */
+    line-height: 18px; /* Vertikal zentrieren */
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0; /* Verhindert, dass der Button schrumpft */
+    display: inline-flex; /* Wichtig für die Zentrierung */
+    justify-content: center;
+    align-items: center;
+}
+
+.info-button-shared:hover {
+    background: #e0e0e0;
+    border-color: #333;
+}
+
+/* 2. Bestehende #modelInfoButton Regel anpassen, um die neue Klasse zu nutzen */
+#modelInfoButton {
+    /* Erbt jetzt alle Stile von .info-button-shared */
+}
+
+/* 3. Bestehende .info-icon Regel anpassen (oder ersetzen), um die neue Klasse zu nutzen */
+.info-icon {
+    /* Erbt jetzt alle Stile von .info-button-shared */
+    margin-left: 8px; /* Behält den spezifischen Abstand bei */
+}
+
 /* Der Zeit-Slider selbst */
 #timeSlider {
     width: 100%; /* Volle Breite des Containers nutzen */
@@ -450,23 +542,6 @@ body {
        also platzieren wir sie in der zweiten Spalte, aber mit normaler Breite */
     width: auto;
     justify-self: start; /* Richtet den Button links in seiner Spalte aus */
-}
-
-.info-icon {
-    display: inline-flex;
-    justify-content: center;
-    align-items: center;
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    background-color: #adb5bd; /* Unauffälliges Grau */
-    color: white;
-    font-style: italic;
-    font-weight: bold;
-    font-family: 'Times New Roman', serif;
-    margin-left: 8px;
-    cursor: pointer;
-    user-select: none; /* Verhindert das Markieren des "i" */
 }
 
 /* ================================== */

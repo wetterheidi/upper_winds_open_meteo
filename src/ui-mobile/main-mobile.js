@@ -690,6 +690,7 @@ export async function updateUIWithNewWeatherData(newWeatherData, preservedIndex 
     if (AppState.lastAltitude !== 'N/A') {
         calculateMeanWind();
     }
+    displayManager.updateModelInfoPopup(); 
     Settings.updateModelRunInfo(AppState.lastModelRun, AppState.lastLat, AppState.lastLng);
 }
 

@@ -43,8 +43,10 @@
                     <option value="gfs">GFS</option>
                     <option value="ecmwf">ECMWF</option>
                 </select>
+
+                <button id="modelInfoButton">i</button>
+                <div id="modelInfoPopup"></div>
             </div>
-            <div id="modelInfoPopup"></div>
         </div>
     </div>
     <div id="loading">
@@ -454,7 +456,7 @@
                         <div>
                             <label for="trackFileInput">
                                 Upload File:
-                                <span class="info-icon" data-info="GPX or FlySight-CSV">i</span>
+                                <span class="info-icon info-button-shared" data-info="GPX or FlySight-CSV">i</span>
                             </label>
                         </div>
                         <input type="file" id="trackFileInput" accept=".gpx,.csv" style="margin-top: 5px;">

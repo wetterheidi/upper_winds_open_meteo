@@ -84,6 +84,26 @@ function setupTabBarEvents() {
     });
 }
 
+function setupModelInfoButtonEvents() {
+    const modelInfoButton = document.getElementById('modelInfoButton');
+    const modelInfoPopup = document.getElementById('modelInfoPopup');
+
+    if (!modelInfoButton || !modelInfoPopup) return;
+
+    modelInfoButton.addEventListener('click', (event) => {
+        event.stopPropagation(); // Verhindert, dass der Klick das Document-Event auslöst
+        const isVisible = modelInfoPopup.style.display === 'block';
+        modelInfoPopup.style.display = isVisible ? 'none' : 'block';
+    });
+
+    // Schließt das Popup, wenn irgendwo anders hingeklickt wird
+    document.addEventListener('click', (event) => {
+        if (modelInfoPopup.style.display === 'block' && !modelInfoButton.contains(event.target)) {
+            modelInfoPopup.style.display = 'none';
+        }
+    });
+}
+
 function setupAccordionEvents() {
     const accordionHeaders = document.querySelectorAll('.accordion-header');
     const allAccordionItems = document.querySelectorAll('.accordion-item'); // Alle Elemente holen
@@ -1094,6 +1114,7 @@ export function initializeEventListeners() {
     setupCheckboxEvents();
     setupSliderEvents();
     setupModelSelectEvents();
+    setupModelInfoButtonEvents(); // <-- HIER DIE NEUE ZEILE EINFÜGEN
     setupRadioEvents();
     setupInputEvents();
     setupDownloadEvents();

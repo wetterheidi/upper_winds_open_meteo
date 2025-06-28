@@ -591,3 +591,20 @@ export function updateJumpRunTrackDisplay() {
         AppState.lastTrackData = null;
     }
 }
+
+/**
+ * Aktualisiert den Inhalt des Popups für die Modell-Informationen.
+ */
+export function updateModelInfoPopup() {
+    const modelInfoPopup = document.getElementById('modelInfoPopup');
+    const modelSelect = document.getElementById('modelSelect');
+    if (!modelInfoPopup || !modelSelect) return;
+
+    const model = modelSelect.value;
+    const modelRun = AppState.lastModelRun || "N/A"; // Holt den Model-Run aus dem AppState
+
+    const titleContent = `Model: ${model.replace(/_/g, ' ').toUpperCase()}\nRun: ${modelRun}`;
+    
+    // Ersetzt Zeilenumbrüche durch <br> für die HTML-Anzeige
+    modelInfoPopup.innerHTML = titleContent.replace(/\n/g, '<br>');
+}
