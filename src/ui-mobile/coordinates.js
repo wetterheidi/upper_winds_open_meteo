@@ -7,6 +7,7 @@ import { AppState } from '../core/state.js';
 let isAddingFavorite = false;
 let isInitialized = false;
 let searchCache = JSON.parse(localStorage.getItem('searchCache')) || {};
+let currentFavoriteData = null;
 
 /**
  * Initializes the location search module for the touchscreen app.
@@ -115,26 +116,17 @@ function initializeLocationSearch() {
         console.log('initializeLocationSearch: Added clear button event listener');
     }
 
-    // Handle save favorite button click
-    if (saveFavoriteBtn && favoriteModal && favoriteNameInput && submitFavoriteName && cancelFavoriteName) {
-        const saveFavoriteHandler = () => {
-            console.log('initializeLocationSearch: Save favorite button clicked');
-            if (AppState.lastLat === null || AppState.lastLng === null) {
-                Utils.handleError("Please select a location on the map first.");
-                console.log('initializeLocationSearch: No valid map coordinates');
+    // Handle favorite modal submission
+    if (favoriteModal && favoriteNameInput && submitFavoriteName && cancelFavoriteName) {
+        const submitFavoriteHandler = () => {
+            if (!currentFavoriteData) {
+                console.warn('initializeLocationSearch: No favorite data to save, closing modal');
+                favoriteModal.style.display = 'none';
+                favoriteNameInput.value = '';
                 return;
             }
-            favoriteNameInput.value = `DIP at ${AppState.lastLat.toFixed(4)}, ${AppState.lastLng.toFixed(4)}`;
-            favoriteModal.style.display = 'block';
-            console.log('initializeLocationSearch: Favorite modal shown');
-            favoriteNameInput.focus();
-        };
-        saveFavoriteBtn.removeEventListener('click', saveFavoriteHandler);
-        saveFavoriteBtn.addEventListener('click', saveFavoriteHandler);
-        console.log('initializeLocationSearch: Added save favorite button listener');
-
-        const submitFavoriteHandler = () => {
-            const name = favoriteNameInput.value.trim() || `DIP at ${AppState.lastLat.toFixed(4)}, ${AppState.lastLng.toFixed(4)}`;
+            const { lat, lng, defaultName } = currentFavoriteData;
+            const name = favoriteNameInput.value.trim() || defaultName;
             console.log('initializeLocationSearch: Saving favorite with name:', name);
             if (isAddingFavorite) {
                 console.log('initializeLocationSearch: Blocked, favorite addition in progress');
@@ -142,14 +134,16 @@ function initializeLocationSearch() {
             }
             isAddingFavorite = true;
             try {
-                addOrUpdateFavorite(AppState.lastLat, AppState.lastLng, name);
-                addCoordToHistory(AppState.lastLat, AppState.lastLng, name, true);
+                addOrUpdateFavorite(lat, lng, name);
+                addCoordToHistory(lat, lng, name, true);
                 Utils.handleMessage(`"${name}" saved as favorite.`);
             } finally {
                 isAddingFavorite = false;
                 console.log('initializeLocationSearch: Favorite save completed');
             }
             favoriteModal.style.display = 'none';
+            favoriteNameInput.value = '';
+            currentFavoriteData = null;
             renderResultsList();
             if (!searchPanel.classList.contains('hidden')) {
                 resultsList.style.display = 'block';
@@ -163,10 +157,39 @@ function initializeLocationSearch() {
             console.log('initializeLocationSearch: Cancel favorite modal');
             favoriteModal.style.display = 'none';
             favoriteNameInput.value = '';
+            currentFavoriteData = null;
         };
         cancelFavoriteName.removeEventListener('click', cancelFavoriteHandler);
         cancelFavoriteName.addEventListener('click', cancelFavoriteHandler);
         console.log('initializeLocationSearch: Added cancel favorite button listener');
+    }
+
+    // Handle save favorite button click
+    if (saveFavoriteBtn) {
+        const saveFavoriteHandler = () => {
+            console.log('initializeLocationSearch: Save favorite button clicked');
+            if (AppState.lastLat === null || AppState.lastLng === null) {
+                Utils.handleError("Please select a location on the map first.");
+                console.log('initializeLocationSearch: No valid map coordinates');
+                return;
+            }
+            if (!favoriteModal || !favoriteNameInput) {
+                console.warn('initializeLocationSearch: Favorite modal or input missing');
+                return;
+            }
+            currentFavoriteData = {
+                lat: AppState.lastLat,
+                lng: AppState.lastLng,
+                defaultName: `DIP at ${AppState.lastLat.toFixed(4)}, ${AppState.lastLng.toFixed(4)}`
+            };
+            favoriteNameInput.value = currentFavoriteData.defaultName;
+            favoriteModal.style.display = 'block';
+            console.log('initializeLocationSearch: Favorite modal shown for map coordinates');
+            favoriteNameInput.focus();
+        };
+        saveFavoriteBtn.removeEventListener('click', saveFavoriteHandler);
+        saveFavoriteBtn.addEventListener('click', saveFavoriteHandler);
+        console.log('initializeLocationSearch: Added save favorite button listener');
     }
 
     // Show results when Search Panel becomes visible
@@ -269,15 +292,29 @@ async function performSearch(query) {
         return;
     }
 
-    // Check cache for recent results
+    // Check cache or history for results
     if (searchCache[query]) {
         console.log('performSearch: Using cached results for:', query);
         searchResults = searchCache[query];
         renderResultsList(searchResults);
         return;
     }
+    // Fallback to history for partial matches
+    const history = getCoordHistory();
+    const historyMatch = history.find(item => item.label.toLowerCase().includes(query.toLowerCase()));
+    if (historyMatch) {
+        console.log('performSearch: Using history match for:', query);
+        searchResults = [{
+            display_name: historyMatch.label,
+            lat: historyMatch.lat,
+            lon: historyMatch.lng,
+            isFavorite: historyMatch.isFavorite
+        }];
+        renderResultsList(searchResults);
+        return;
+    }
 
-    console.log('performSearch: No coordinates, initiating Nominatim search');
+    console.log('performSearch: No coordinates or cache, initiating Nominatim search');
     const maxRetries = 3;
     const retryDelay = 2000;
 
@@ -334,12 +371,14 @@ function parseQueryAsCoordinates(query) {
     console.log('parseQueryAsCoordinates: Parsing query:', query);
     const trimmedQuery = query.trim();
     const cleanedForDecimal = trimmedQuery.replace(/[,;\t]+/, ' ').trim();
-    const decMatch = cleanedForDecimal.match(/^(-?\d{1,3}(?:\.\d+)?)\s+(-?\d{1,3}(?:\.\d+)?)$/);
+    // Match two floating-point numbers (with optional negative sign and decimal part)
+    const decMatch = cleanedForDecimal.match(/^(-?\d*\.?\d+)\s+(-?\d*\.?\d+)$/);
     if (decMatch) {
+        console.log('parseQueryAsCoordinates: Regex match:', decMatch);
         const lat = parseFloat(decMatch[1]);
-        const lng = parseFloat(decMatch[3]);
+        const lng = parseFloat(decMatch[2]);
         console.log('parseQueryAsCoordinates: Decimal degrees detected:', { lat, lng });
-        if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
             return { lat, lng };
         } else {
             console.warn('parseQueryAsCoordinates: Invalid coordinate ranges:', { lat, lng });
@@ -431,7 +470,23 @@ function renderResultsList(searchResults = []) {
         favToggle.addEventListener('click', (e) => {
             e.stopPropagation();
             console.log('createListItem: Favorite toggle clicked for:', { lat, lng });
-            toggleFavorite(lat, lng, item.display_name || item.label);
+            if (item.isFavorite) {
+                toggleFavorite(lat, lng, item.display_name || item.label);
+            } else {
+                if (!favoriteModal || !favoriteNameInput) {
+                    console.warn('createListItem: Favorite modal or input missing');
+                    return;
+                }
+                currentFavoriteData = {
+                    lat,
+                    lng,
+                    defaultName: item.display_name || item.label
+                };
+                favoriteNameInput.value = currentFavoriteData.defaultName;
+                favoriteModal.style.display = 'block';
+                console.log('createListItem: Favorite modal shown for toggle');
+                favoriteNameInput.focus();
+            }
         });
         const deleteBtn = document.createElement('button');
         deleteBtn.className = 'delete-location-btn';
@@ -583,70 +638,43 @@ function addOrUpdateFavorite(lat, lng, name, skipMessage = false) {
     }
 }
 
-function toggleFavorite(lat, lng, label) {
-    console.log('toggleFavorite: Processing:', { lat, lng, label });
+function toggleFavorite(lat, lng, defaultName) {
+    console.log('toggleFavorite: Processing:', { lat, lng, defaultName });
     if (isNaN(lat) || isNaN(lng)) {
         console.error('toggleFavorite: Invalid coordinates');
         return;
     }
-    if (isAddingFavorite) {
-        console.log('toggleFavorite: Blocked due to ongoing operation');
+    const favoriteModal = document.getElementById('favoriteModal');
+    const favoriteNameInput = document.getElementById('favoriteNameInput');
+    if (!favoriteModal || !favoriteNameInput) {
+        console.warn('toggleFavorite: Favorite modal or input missing, cannot prompt for name');
+        addOrUpdateFavorite(lat, lng, defaultName);
         return;
     }
-    let history = getCoordHistory();
-    const newLat = parseFloat(lat.toFixed(5));
-    const newLng = parseFloat(lng.toFixed(5));
+    const history = getCoordHistory();
     const entry = history.find(e => {
         const entryLat = parseFloat(e.lat);
         const entryLng = parseFloat(e.lng);
-        return Math.abs(entryLat - newLat) < 0.001 && Math.abs(entryLng - newLng) < 0.001;
+        return Math.abs(entryLat - lat) < 0.001 && Math.abs(entryLng - lng) < 0.001;
     });
-    if (entry) {
-        console.log('toggleFavorite: Found entry:', entry);
-        if (entry.isFavorite) {
-            entry.isFavorite = false;
-            Utils.handleMessage(`"${entry.label}" removed from favorites.`);
-            saveCoordHistory(history);
-            renderResultsList();
-            _dispatchFavoritesUpdate();
-        } else {
-            isAddingFavorite = true;
-            try {
-                const name = entry.label || label;
-                entry.isFavorite = true;
-                entry.label = name;
-                Utils.handleMessage(`"${name}" saved as favorite.`);
-                saveCoordHistory(history);
-                renderResultsList();
-                _dispatchFavoritesUpdate();
-            } finally {
-                isAddingFavorite = false;
-                console.log('toggleFavorite: Completed');
-            }
-        }
+    if (entry && entry.isFavorite) {
+        console.log('toggleFavorite: Removing favorite status for:', entry);
+        entry.isFavorite = false;
+        Utils.handleMessage(`"${entry.label}" removed from favorites.`);
+        saveCoordHistory(history);
+        renderResultsList();
+        _dispatchFavoritesUpdate();
     } else {
-        console.log('toggleFavorite: No entry found, adding new favorite');
-        const name = label;
-        addOrUpdateFavorite(newLat, newLng, name);
+        currentFavoriteData = {
+            lat,
+            lng,
+            defaultName: entry ? (entry.label || defaultName) : defaultName
+        };
+        favoriteNameInput.value = currentFavoriteData.defaultName;
+        favoriteModal.style.display = 'block';
+        console.log('toggleFavorite: Favorite modal shown');
+        favoriteNameInput.focus();
     }
-}
-
-function removeLocationFromHistory(lat, lng) {
-    console.log('removeLocationFromHistory: Removing:', { lat, lng });
-    if (isNaN(lat) || isNaN(lng)) {
-        console.error('removeLocationFromHistory: Invalid coordinates');
-        return;
-    }
-    let history = getCoordHistory();
-    const updatedHistory = history.filter(entry => {
-        const entryLat = parseFloat(entry.lat);
-        const entryLng = parseFloat(entry.lng || entry.lon);
-        return Math.abs(entryLat - lat) > 0.001 || Math.abs(entryLng - lng) > 0.001;
-    });
-    saveCoordHistory(updatedHistory);
-    Utils.handleMessage("Location deleted.");
-    renderResultsList();
-    _dispatchFavoritesUpdate();
 }
 
 /**
@@ -663,6 +691,29 @@ function _dispatchFavoritesUpdate() {
     });
     document.dispatchEvent(event);
     console.log('_dispatchFavoritesUpdate: Event dispatched');
+}
+
+/**
+ * Removes a location from history.
+ * @param {number} lat - Latitude of the location.
+ * @param {number} lng - Longitude of the location.
+ */
+function removeLocationFromHistory(lat, lng) {
+    console.log('removeLocationFromHistory: Removing:', { lat, lng });
+    if (isNaN(lat) || isNaN(lng)) {
+        console.error('removeLocationFromHistory: Invalid coordinates');
+        return;
+    }
+    let history = getCoordHistory();
+    const updatedHistory = history.filter(entry => {
+        const entryLat = parseFloat(entry.lat);
+        const entryLng = parseFloat(entry.lng || entry.lon);
+        return Math.abs(entryLat - lat) > 0.001 || Math.abs(entryLng - lng) > 0.001;
+    });
+    saveCoordHistory(updatedHistory);
+    Utils.handleMessage("Location deleted.");
+    renderResultsList();
+    _dispatchFavoritesUpdate();
 }
 
 // --- Exports ---
