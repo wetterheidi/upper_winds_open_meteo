@@ -22,6 +22,7 @@ function initializeLocationSearch() {
     const searchInput = document.getElementById('locationSearchInput');
     const resultsList = document.getElementById('locationResults');
     const searchPanel = document.getElementById('panel-search');
+    const clearButton = document.getElementById('clearSearchInput');
 
     if (!searchInput) {
         console.error('initializeLocationSearch: Search input (locationSearchInput) not found in DOM');
@@ -35,7 +36,21 @@ function initializeLocationSearch() {
         console.error('initializeLocationSearch: Search panel (panel-search) not found in DOM');
         return;
     }
-    console.log('initializeLocationSearch: UI elements found:', { searchInput, resultsList, searchPanel });
+    console.log('initializeLocationSearch: UI elements found:', { 
+        searchInput: !!searchInput, 
+        resultsList: !!resultsList, 
+        searchPanel: !!searchPanel, 
+        clearButton: !!clearButton 
+    });
+
+    if (clearButton) {
+        console.log('initializeLocationSearch: Clear button found, initial state:', {
+            display: clearButton.style.display,
+            textContent: clearButton.textContent
+        });
+    } else {
+        console.warn('initializeLocationSearch: Clear button (clearSearchInput) not found, clear functionality disabled');
+    }
 
     if (!Utils || !Utils.debounce) {
         console.error('initializeLocationSearch: Utils.debounce is not available');
@@ -49,10 +64,40 @@ function initializeLocationSearch() {
     const inputHandler = () => {
         console.log('initializeLocationSearch: Input event triggered, value:', searchInput.value);
         debouncedSearch(searchInput.value);
+        // Show/hide clear button
+        if (clearButton) {
+            const shouldShow = searchInput.value.trim() !== '';
+            clearButton.style.display = shouldShow ? 'block' : 'none';
+            console.log('initializeLocationSearch: Clear button display set to:', clearButton.style.display);
+        }
+        // Ensure results list stays visible
+        if (!searchPanel.classList.contains('hidden')) {
+            resultsList.style.display = 'block';
+            console.log('initializeLocationSearch: Results list ensured visible');
+        }
     };
     searchInput.removeEventListener('input', inputHandler);
     searchInput.addEventListener('input', inputHandler);
     console.log('initializeLocationSearch: Added input event listener');
+
+    // Handle clear button click
+    if (clearButton) {
+        const clearHandler = () => {
+            console.log('initializeLocationSearch: Clear button clicked');
+            searchInput.value = '';
+            clearButton.style.display = 'none';
+            console.log('initializeLocationSearch: Input cleared, clear button hidden');
+            renderResultsList();
+            if (!searchPanel.classList.contains('hidden')) {
+                resultsList.style.display = 'block';
+                console.log('initializeLocationSearch: Results list shown after clear');
+            }
+            searchInput.focus(); // Return focus to input for convenience
+        };
+        clearButton.removeEventListener('click', clearHandler);
+        clearButton.addEventListener('click', clearHandler);
+        console.log('initializeLocationSearch: Added clear button event listener');
+    }
 
     // Show results when Search Panel becomes visible
     const observer = new MutationObserver((mutations) => {
@@ -62,6 +107,10 @@ function initializeLocationSearch() {
                     console.log('initializeLocationSearch: Search panel visible, rendering results');
                     renderResultsList();
                     resultsList.style.display = 'block';
+                    if (clearButton) {
+                        clearButton.style.display = searchInput.value.trim() ? 'block' : 'none';
+                        console.log('initializeLocationSearch: Clear button display set to:', clearButton.style.display);
+                    }
                 } else {
                     console.log('initializeLocationSearch: Search panel hidden, hiding results');
                     resultsList.style.display = 'none';
@@ -77,6 +126,10 @@ function initializeLocationSearch() {
         console.log('initializeLocationSearch: Search panel is visible on init, rendering results');
         renderResultsList();
         resultsList.style.display = 'block';
+        if (clearButton && searchInput.value.trim()) {
+            clearButton.style.display = 'block';
+            console.log('initializeLocationSearch: Clear button shown on init due to input value');
+        }
     }
 
     // Hide results only when interacting outside the Search Panel
@@ -91,6 +144,22 @@ function initializeLocationSearch() {
     document.addEventListener('touchstart', hideResultsHandler);
     document.addEventListener('click', hideResultsHandler);
     console.log('initializeLocationSearch: Added touchstart and click event listeners');
+
+    // Re-show results on click within panel
+    const showResultsHandler = (e) => {
+        if (searchPanel.contains(e.target) && !searchInput.contains(e.target) && !resultsList.contains(e.target) && !searchPanel.classList.contains('hidden')) {
+            console.log('initializeLocationSearch: Click within search panel, showing results');
+            renderResultsList();
+            resultsList.style.display = 'block';
+            if (clearButton && searchInput.value.trim()) {
+                clearButton.style.display = 'block';
+                console.log('initializeLocationSearch: Clear button shown after panel click');
+            }
+        }
+    };
+    searchPanel.removeEventListener('click', showResultsHandler);
+    searchPanel.addEventListener('click', showResultsHandler);
+    console.log('initializeLocationSearch: Added click listener for search panel');
 
     console.log('initializeLocationSearch: Initialization complete');
 }

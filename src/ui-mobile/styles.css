@@ -421,7 +421,28 @@ body {
     background-color: white;
 }
 
-/* In src/ui-mobile/styles.css */
+/* Clear button styling */
+.clear-icon {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 18px;
+    color: #888;
+    cursor: pointer;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 50%;
+    transition: background-color 0.2s ease;
+}
+
+.clear-icon:hover {
+    background: #f0f0f0;
+}
+
 
 /* Eine neue, generische Klasse für alle Einstellungs-Container */
 .settings-grid {
