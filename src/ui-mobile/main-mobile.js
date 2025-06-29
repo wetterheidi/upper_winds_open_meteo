@@ -15,6 +15,7 @@ import * as AutoupdateManager from '../core/autoupdateManager.js';
 import { DateTime } from 'luxon';
 import * as displayManager from './displayManager.js';
 import * as liveTrackingManager from '../core/liveTrackingManager.js'; // <-- DIESE ZEILE HINZUFÜGEN
+import * as EnsembleManager from '../core/ensembleManager.js';
 
 export const getTemperatureUnit = () => Settings.getValue('temperatureUnit', 'C');
 export const getHeightUnit = () => Settings.getValue('heightUnit', 'm');
@@ -1431,6 +1432,14 @@ document.addEventListener('location:selected', async (event) => {
 
         if (Settings.state.userSettings.showJumpMasterLine) {
             updateJumpMasterLineAndPanel();
+        }
+
+        if (Settings.state.userSettings.selectedEnsembleModels.length > 0) {
+            console.log("DIP moved, triggering ensemble recalculation...");
+            const ensembleSuccess = await EnsembleManager.fetchEnsembleWeatherData();
+            if (ensembleSuccess) {
+                EnsembleManager.processAndVisualizeEnsemble(getSliderValue());
+            }
         }
     } catch (error) {
         console.error('Fehler beim Verarbeiten von "location:selected":', error);
