@@ -1,11 +1,11 @@
 @import '../ui-common/styles-shared.css';
 
-/* For testing purposes */
+/* For testing purposes 
 #slider-container { border: 2px solid red; }
 #map-container { border: 2px solid green; }
 #tab-bar { border: 2px solid blue; }
 .leaflet-top { border: 2px solid orange; }
-.leaflet-bottom { border: 2px solid purple; }
+.leaflet-bottom { border: 2px solid purple; } */
 
 /* Stile für die neue Tab-Bar und Panels */
 
@@ -49,9 +49,13 @@
     margin-top: 2px;
 }
 
+button:hover {
+    background: #4da8da;
+}
+
 /* Stil für den aktiven Button */
 .tab-button.active {
-    color: #4da8da; /* Ihre Hauptfarbe */
+    color: #333; /* Ihre Hauptfarbe */
 }
 
 /* Content panels */
@@ -698,7 +702,7 @@ body {
 .leaflet-control-live-position {
     position: absolute;
     right: 0;
-    bottom: calc(65px + env(safe-area-inset-bottom)) !important;
+    bottom: calc(50px + env(safe-area-inset-bottom)) !important;
     z-index: 1000 !important;
     font-size: 12px;
     line-height: 1.4;
@@ -1023,18 +1027,6 @@ body {
     #map-container {
         min-height: calc(100vh - 96px - 55px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
     }
-
-    .leaflet-control-container .leaflet-top {
-        top: calc(96px + env(safe-area-inset-top)) !important;
-    }
-
-    .leaflet-control-container .leaflet-bottom {
-        bottom: calc(65px + env(safe-area-inset-bottom)) !important;
-    }
-
-    .leaflet-control-live-position {
-        bottom: calc(65px + env(safe-area-inset-bottom)) !important;
-    }
 }
 
 @media (max-width: 480px) {
@@ -1047,17 +1039,5 @@ body {
 
     .slider-content-wrapper {
         max-width: 400px;
-    }
-
-    .leaflet-control-container .leaflet-top {
-        top: calc(96px + env(safe-area-inset-top)) !important;
-    }
-
-    .leaflet-control-container .leaflet-bottom {
-        bottom: calc(70px + env(safe-area-inset-bottom)) !important;
-    }
-
-    .leaflet-control-live-position {
-        bottom: calc(70px + env(safe-area-inset-bottom)) !important;
     }
 }
