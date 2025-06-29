@@ -174,7 +174,7 @@ export function downloadTableAsAscii(format) {
     };
 
     const requirements = formatRequirements[format] || {};
-    
+
     const exportSettings = {
         interpStep: requirements.interpStep || getInterpolationStep(),
         heightUnit: requirements.heightUnit || Settings.getValue('heightUnit', 'radio', 'm'),
@@ -182,7 +182,7 @@ export function downloadTableAsAscii(format) {
         windUnit: requirements.windUnit || Settings.getValue('windUnit', 'radio', 'kt'),
         temperatureUnit: requirements.temperatureUnit || Settings.getValue('temperatureUnit', 'radio', 'C')
     };
-    
+
     const interpolatedData = weatherManager.interpolateWeatherData(
         AppState.weatherData,
         index,
@@ -682,7 +682,7 @@ export async function updateUIWithNewWeatherData(newWeatherData, preservedIndex 
     if (AppState.lastAltitude !== 'N/A') {
         calculateMeanWind();
     }
-    displayManager.updateModelInfoPopup(); 
+    displayManager.updateModelInfoPopup();
     Settings.updateModelRunInfo(AppState.lastModelRun, AppState.lastLat, AppState.lastLng);
 }
 
@@ -1079,7 +1079,7 @@ function setupAppEventListeners() {
             case 'upperLimit':
             case 'interpStepSelect':
                 if (AppState.weatherData) {
-                    await displayManager.updateWeatherDisplay(getSliderValue());
+                    await displayManager.updateWeatherDisplay(getSliderValue(), 'weather-table-container', 'selectedTime');
                     calculateMeanWind();
                 }
                 break;
@@ -1247,7 +1247,7 @@ function setupAppEventListeners() {
         applySettingToInput(id, defaultValue);
     });
 
-document.addEventListener('setting:changed', async (e) => {
+    document.addEventListener('setting:changed', async (e) => {
         const { key } = e.detail;
         console.log(`[main-mobile] Setting '${key}' changed. Triggering UI updates.`);
 
@@ -1259,10 +1259,10 @@ document.addEventListener('setting:changed', async (e) => {
         if (settingsThatTriggerFullUpdate.includes(key)) {
             // Führe alle notwendigen UI-Updates aus
             await displayManager.updateWeatherDisplay(getSliderValue(), 'weather-table-container', 'selectedTime');
-            
+
             // NEU: Ruft die Funktion auf, die die Labels aktualisiert
             if (key === 'heightUnit' || key === 'refLevel') {
-                Settings.updateUnitLabels(); 
+                Settings.updateUnitLabels();
             }
 
             if (AppState.lastAltitude !== 'N/A') {
@@ -1271,11 +1271,11 @@ document.addEventListener('setting:changed', async (e) => {
             if (Settings.getValue('calculateJump', false)) {
                 calculateJump();
             }
-            
+
             displayManager.updateLandingPatternDisplay();
             updateJumpMasterLineAndPanel();
             await displayManager.refreshMarkerPopup();
-            
+
             // Wichtig: explizites Update des Fadenkreuz-Displays
             if (AppState.map) {
                 AppState.map.fire('move');
@@ -1363,91 +1363,91 @@ document.addEventListener('DOMContentLoaded', async () => {
         displayManager.updateJumpRunTrackDisplay();
     });
 
-document.addEventListener('location:selected', async (event) => {
-    const { lat, lng, source } = event.detail;
-    console.log(`App: Event 'location:selected' empfangen. Quelle: ${source}`);
+    document.addEventListener('location:selected', async (event) => {
+        const { lat, lng, source } = event.detail;
+        console.log(`App: Event 'location:selected' empfangen. Quelle: ${source}`);
 
-    const loadingElement = document.getElementById('loading');
-    if (loadingElement) loadingElement.style.display = 'block';
+        const loadingElement = document.getElementById('loading');
+        if (loadingElement) loadingElement.style.display = 'block';
 
-    try {
-        const sliderIndex = getSliderValue();
-        const currentTimeToPreserve = AppState.weatherData?.time?.[sliderIndex] || null;
+        try {
+            const sliderIndex = getSliderValue();
+            const currentTimeToPreserve = AppState.weatherData?.time?.[sliderIndex] || null;
 
-        const newWeatherData = await weatherManager.fetchWeatherForLocation(lat, lng, currentTimeToPreserve);
+            const newWeatherData = await weatherManager.fetchWeatherForLocation(lat, lng, currentTimeToPreserve);
 
-        if (newWeatherData) {
-            const isInitialLoad = (source === 'geolocation' || source === 'geolocation_fallback');
-            await updateUIWithNewWeatherData(newWeatherData, isInitialLoad ? null : sliderIndex);
-        } else {
-            AppState.weatherData = null;
-        }
-
-        await mapManager.createOrUpdateMarker(lat, lng);
-        await displayManager.refreshMarkerPopup();
-
-        // Only recenter for non-marker-click interactions
-        if (source !== 'marker_click') {
-            mapManager.recenterMap(true);
-        }
-        AppState.isManualPanning = false;
-
-        if (source === 'geolocation' || source === 'geolocation_fallback') {
-            console.log("Starte initiales Caching nach Geolocation...");
-            cacheTilesForDIP({
-                map: AppState.map,
-                lastLat: lat,
-                lastLng: lng,
-                baseMaps: AppState.baseMaps,
-                onProgress: displayProgress,
-                onComplete: (message) => {
-                    hideProgress();
-                    if (message) displayMessage(message);
-                },
-                onCancel: () => {
-                    hideProgress();
-                    displayMessage('Caching cancelled.');
-                }
-            });
-        }
-
-        if (source === 'marker_drag' || source === 'dblclick' || source === 'search' || source === 'favorite_marker') {
-            console.log(`Starte Caching für neue Position via ${source}...`);
-            cacheTilesForDIP({
-                map: AppState.map,
-                lastLat: lat,
-                lastLng: lng,
-                baseMaps: AppState.baseMaps,
-                onProgress: displayProgress,
-                onComplete: (message) => {
-                    hideProgress();
-                    if (message) displayMessage(message);
-                },
-                onCancel: () => {
-                    hideProgress();
-                    displayMessage('Caching cancelled.');
-                }
-            });
-        }
-
-        if (Settings.state.userSettings.showJumpMasterLine) {
-            updateJumpMasterLineAndPanel();
-        }
-
-        if (Settings.state.userSettings.selectedEnsembleModels.length > 0) {
-            console.log("DIP moved, triggering ensemble recalculation...");
-            const ensembleSuccess = await EnsembleManager.fetchEnsembleWeatherData();
-            if (ensembleSuccess) {
-                EnsembleManager.processAndVisualizeEnsemble(getSliderValue());
+            if (newWeatherData) {
+                const isInitialLoad = (source === 'geolocation' || source === 'geolocation_fallback');
+                await updateUIWithNewWeatherData(newWeatherData, isInitialLoad ? null : sliderIndex);
+            } else {
+                AppState.weatherData = null;
             }
+
+            await mapManager.createOrUpdateMarker(lat, lng);
+            await displayManager.refreshMarkerPopup();
+
+            // Only recenter for non-marker-click interactions
+            if (source !== 'marker_click') {
+                mapManager.recenterMap(true);
+            }
+            AppState.isManualPanning = false;
+
+            if (source === 'geolocation' || source === 'geolocation_fallback') {
+                console.log("Starte initiales Caching nach Geolocation...");
+                cacheTilesForDIP({
+                    map: AppState.map,
+                    lastLat: lat,
+                    lastLng: lng,
+                    baseMaps: AppState.baseMaps,
+                    onProgress: displayProgress,
+                    onComplete: (message) => {
+                        hideProgress();
+                        if (message) displayMessage(message);
+                    },
+                    onCancel: () => {
+                        hideProgress();
+                        displayMessage('Caching cancelled.');
+                    }
+                });
+            }
+
+            if (source === 'marker_drag' || source === 'dblclick' || source === 'search' || source === 'favorite_marker') {
+                console.log(`Starte Caching für neue Position via ${source}...`);
+                cacheTilesForDIP({
+                    map: AppState.map,
+                    lastLat: lat,
+                    lastLng: lng,
+                    baseMaps: AppState.baseMaps,
+                    onProgress: displayProgress,
+                    onComplete: (message) => {
+                        hideProgress();
+                        if (message) displayMessage(message);
+                    },
+                    onCancel: () => {
+                        hideProgress();
+                        displayMessage('Caching cancelled.');
+                    }
+                });
+            }
+
+            if (Settings.state.userSettings.showJumpMasterLine) {
+                updateJumpMasterLineAndPanel();
+            }
+
+            if (Settings.state.userSettings.selectedEnsembleModels.length > 0) {
+                console.log("DIP moved, triggering ensemble recalculation...");
+                const ensembleSuccess = await EnsembleManager.fetchEnsembleWeatherData();
+                if (ensembleSuccess) {
+                    EnsembleManager.processAndVisualizeEnsemble(getSliderValue());
+                }
+            }
+        } catch (error) {
+            console.error('Fehler beim Verarbeiten von "location:selected":', error);
+            displayError(error.message);
+        } finally {
+            if (loadingElement) loadingElement.style.display = 'none';
         }
-    } catch (error) {
-        console.error('Fehler beim Verarbeiten von "location:selected":', error);
-        displayError(error.message);
-    } finally {
-        if (loadingElement) loadingElement.style.display = 'none';
-    }
-});
+    });
 
     document.addEventListener('autoupdate:tick', async (event) => {
         // Nur reagieren, wenn Autoupdate in den Settings auch wirklich aktiv ist

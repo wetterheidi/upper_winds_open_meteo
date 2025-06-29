@@ -1515,7 +1515,7 @@ input[type="checkbox"][style*="opacity: 1"] {
     }
 
     #controls-row label {
-        font-size: 11px;
+        font-size: 13px;
     }
 
     #controls-row select {
@@ -1524,7 +1524,7 @@ input[type="checkbox"][style*="opacity: 1"] {
 
     #meanWindControls label,
     #controls-row label {
-        font-size: 11px;
+        font-size: 13px;
     }
 
     #controls-row button {
@@ -1591,7 +1591,7 @@ input[type="checkbox"][style*="opacity: 1"] {
 
     #meanWindControls label,
     #controls-row label {
-        font-size: 11px;
+        font-size: 13px;
     }
 
     #controls-row button {
