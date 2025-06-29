@@ -218,6 +218,7 @@ body {
     box-sizing: border-box;
     position: static !important; /* Override position: fixed from styles-shared.css */
     width: 100%;
+    max-width: 500px; /* Reduced from 600px to fit narrower screens */
     display: flex; /* Center content horizontally */
     justify-content: center;
     align-items: center;
@@ -1015,7 +1016,7 @@ body {
 @media (max-width: 768px) {
     #slider-container {
         width: 100%;
-        max-width: 400px;
+        max-width: 500px;
     }
 
     #map-container {
@@ -1038,7 +1039,7 @@ body {
 @media (max-width: 480px) {
     #slider-container {
         width: 100%;
-        max-width: 400px; /* Slightly smaller for narrow screens */
+        max-width: 500px; /* Slightly smaller for narrow screens */
         padding: 3px;
         padding-top: calc(3px + env(safe-area-inset-top));
     }
