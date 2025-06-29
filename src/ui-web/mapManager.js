@@ -575,22 +575,38 @@ function _setupCoreMapEventHandlers() {
 
     console.log('All core map event handlers have been set up.');
 }
+
 function _setupCrosshairCoordinateHandler(map) {
-    const updateWithDebouncedData = ({ elevation, qfe }, requestLatLng) => {
+    const updateWithDebouncedData = ({ elevation }, requestLatLng) => {
         const currentCenter = map.getCenter();
         if (Math.abs(currentCenter.lat - requestLatLng.lat) > 0.0001 || Math.abs(currentCenter.lng - requestLatLng.lng) > 0.0001) {
-            return;
+            return; // Verhindert Update, wenn sich die Karte inzwischen weiterbewegt hat
         }
+
         const currentHTML = AppState.coordsControl._container.innerHTML;
         const coordPart = currentHTML.split('<br>')[0];
         const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
+        
         let displayElevation = 'N/A';
         if (elevation !== 'N/A') {
             const convertedElevation = Utils.convertHeight(elevation, heightUnit);
             displayElevation = Math.round(convertedElevation);
         }
         const altString = displayElevation === 'N/A' ? 'N/A' : `${displayElevation}${heightUnit}`;
-        const qfeString = (qfe !== 'N/A') ? `${qfe.toFixed(0)}hPa` : 'N/A';
+
+        // NEUE LOGIK: QFE wird hier berechnet, NACHDEM die Höhe empfangen wurde.
+        let qfeString = 'N/A';
+        if (elevation !== 'N/A' && AppState.weatherData && AppState.weatherData.surface_pressure) {
+            const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
+            const surfacePressure = AppState.weatherData.surface_pressure[sliderIndex];
+            const temperature = AppState.weatherData.temperature_2m?.[sliderIndex] || 15;
+            const referenceElevation = AppState.lastAltitude !== 'N/A' ? AppState.lastAltitude : 0;
+            
+            // Aufruf der bestehenden QFE-Funktion in utils.js
+            const qfe = Utils.calculateQFE(surfacePressure, elevation, referenceElevation, temperature);
+            qfeString = qfe !== 'N/A' ? `${qfe} hPa` : 'N/A';
+        }
+
         const displayText = `${coordPart}<br>Elevation: ${altString}<br>QFE: ${qfeString}`;
         AppState.coordsControl.update(displayText);
     };
@@ -600,31 +616,19 @@ function _setupCrosshairCoordinateHandler(map) {
         const coordFormat = Settings.getValue('coordFormat', 'radio', 'Decimal');
         const coords = Utils.convertCoords(center.lat, center.lng, coordFormat);
         const coordString = (coordFormat === 'MGRS') ? `MGRS: ${coords.lat}` : `${center.lat.toFixed(5)}, ${center.lng.toFixed(5)}`;
+        
+        // Setzt den Text auf "Laden..."
         AppState.coordsControl.update(`${coordString}<br>Elevation: ...<br>QFE: ...`);
-        Utils.debouncedGetElevationAndQFE(lat, lng, ({ elevation }) => {
-            if (elevation !== 'N/A') {
-                const elevationValue = parseFloat(elevation);
-                // UI-Elemente aktualisieren (IDs könnten in Mobile anders sein, ggf. anpassen)
-                const elevationDisplay = document.getElementById('crosshair-elevation');
-                const qfeDisplay = document.getElementById('crosshair-qfe');
-
-                if (elevationDisplay) {
-                    elevationDisplay.textContent = `${elevationValue.toFixed(0)} m`;
-                }
-
-                // QFE berechnen und anzeigen
-                const surfacePressure = AppState.currentQNH || 1013; // Nehmen Sie den aktuellen QNH aus dem AppState
-                const qfe = Utils.calculateQFE(surfacePressure, elevationValue, 0);
-
-                if (qfeDisplay) {
-                    qfeDisplay.textContent = `${qfe} hPa`;
-                }
-            }
+        
+        // Ruft die UNVERÄNDERTE Funktion aus utils.js auf
+        Utils.debouncedGetElevationAndQFE(center.lat, center.lng, (data) => {
+             // Übergibt die empfangenen Daten und die ursprünglichen Koordinaten an die Hilfsfunktion
+             updateWithDebouncedData(data, center);
         });
     };
 
     map.on('move', handleMapMove);
-    setTimeout(() => map.fire('move'), 200);
+    setTimeout(() => map.fire('move'), 200); // Löst die Anzeige initial aus
     console.log('Crosshair coordinate handler initialized.');
 }
 function _setupMouseCoordinateHandler(map) {

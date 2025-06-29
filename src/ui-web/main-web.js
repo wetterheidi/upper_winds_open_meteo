@@ -788,51 +788,61 @@ function setupAppEventListeners() {
         });
     });
 
-    document.addEventListener('map:mousemove', (event) => {
-        const { lat, lng } = event.detail;
-        AppState.lastMouseLatLng = { lat, lng }; // Position für den Callback speichern
+document.addEventListener('map:mousemove', (event) => {
+    const { lat, lng } = event.detail;
+    AppState.lastMouseLatLng = { lat, lng }; // Position für den Callback speichern
 
-        const coordFormat = getCoordinateFormat();
-        let coordText;
+    const coordFormat = getCoordinateFormat();
+    let coordText;
 
-        // Koordinaten-Text korrekt formatieren
-        if (coordFormat === 'MGRS') {
-            const mgrsVal = Utils.decimalToMgrs(lat, lng);
-            coordText = `MGRS: ${mgrsVal || 'N/A'}`;
-        } else if (coordFormat === 'DMS') {
-            const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
-            coordText = `Lat: ${formatDMS(Utils.decimalToDms(lat, true))}, Lng: ${formatDMS(Utils.decimalToDms(lng, false))}`;
-        } else {
-            coordText = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
-        }
+    // Koordinaten-Text korrekt formatieren
+    if (coordFormat === 'MGRS') {
+        const mgrsVal = Utils.decimalToMgrs(lat, lng);
+        coordText = `MGRS: ${mgrsVal || 'N/A'}`;
+    } else if (coordFormat === 'DMS') {
+        const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
+        coordText = `Lat: ${formatDMS(Utils.decimalToDms(lat, true))}, Lng: ${formatDMS(Utils.decimalToDms(lng, false))}`;
+    } else {
+        coordText = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
+    }
 
-        // Sofortiges Update mit "Fetching..."
-        if (AppState.coordsControl) {
-            AppState.coordsControl.update(`${coordText}<br>Elevation: Fetching...<br>QFE: Fetching...`);
-        }
+    // Sofortiges Update mit "Fetching..."
+    if (AppState.coordsControl) {
+        AppState.coordsControl.update(`${coordText}<br>Elevation: Fetching...<br>QFE: Fetching...`);
+    }
 
-        // Debounced-Funktion aufrufen, um API-Anfragen zu begrenzen
-        Utils.debouncedGetElevationAndQFE(lat, lng, { lat, lng }, ({ elevation, qfe }, requestLatLng) => {
-            // Callback wird ausgeführt, wenn die Daten da sind
-            if (AppState.lastMouseLatLng && AppState.coordsControl) {
-                // Nur aktualisieren, wenn die Maus noch in der Nähe ist
-                const deltaLat = Math.abs(AppState.lastMouseLatLng.lat - requestLatLng.lat);
-                const deltaLng = Math.abs(AppState.lastMouseLatLng.lng - requestLatLng.lng);
-                const threshold = 0.05;
+    // Debounced-Funktion aufrufen - JETZT KORRIGIERT
+    Utils.debouncedGetElevationAndQFE(lat, lng, ({ elevation }) => {
+        // Callback wird ausgeführt, wenn die Daten da sind
+        if (AppState.lastMouseLatLng && AppState.coordsControl) {
+            // Nur aktualisieren, wenn die Maus noch in der Nähe ist
+            const deltaLat = Math.abs(AppState.lastMouseLatLng.lat - lat);
+            const deltaLng = Math.abs(AppState.lastMouseLatLng.lng - lng);
+            const threshold = 0.05;
 
-                if (deltaLat < threshold && deltaLng < threshold) {
-                    const heightUnit = getHeightUnit();
-                    let displayElevation = elevation === 'N/A' ? 'N/A' : elevation;
-                    if (displayElevation !== 'N/A') {
-                        displayElevation = Utils.convertHeight(displayElevation, heightUnit);
-                        displayElevation = Math.round(displayElevation);
-                    }
-                    const qfeText = qfe === 'N/A' ? 'N/A' : `${qfe} hPa`;
-                    AppState.coordsControl.update(`${coordText}<br>Elevation: ${displayElevation} ${displayElevation === 'N/A' ? '' : heightUnit}<br>QFE: ${qfeText}`);
+            if (deltaLat < threshold && deltaLng < threshold) {
+                const heightUnit = getHeightUnit();
+                let displayElevation = elevation === 'N/A' ? 'N/A' : elevation;
+                if (displayElevation !== 'N/A') {
+                    displayElevation = Utils.convertHeight(displayElevation, heightUnit);
+                    displayElevation = Math.round(displayElevation);
                 }
+                
+                let qfeText = 'N/A';
+                if (elevation !== 'N/A' && AppState.weatherData && AppState.weatherData.surface_pressure) {
+                    const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
+                    const surfacePressure = AppState.weatherData.surface_pressure[sliderIndex];
+                    const temperature = AppState.weatherData.temperature_2m?.[sliderIndex] || 15;
+                    const referenceElevation = AppState.lastAltitude !== 'N/A' ? AppState.lastAltitude : 0;
+                    const qfe = Utils.calculateQFE(surfacePressure, elevation, referenceElevation, temperature);
+                    qfeText = qfe !== 'N/A' ? `${qfe} hPa` : 'N/A';
+                }
+
+                AppState.coordsControl.update(`${coordText}<br>Elevation: ${displayElevation} ${displayElevation === 'N/A' ? '' : heightUnit}<br>QFE: ${qfeText}`);
             }
-        });
+        }
     });
+});
 
     document.addEventListener('map:location_selected', async (event) => {
         const { lat, lng, source } = event.detail;
