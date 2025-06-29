@@ -23,6 +23,11 @@ function initializeLocationSearch() {
     const resultsList = document.getElementById('locationResults');
     const searchPanel = document.getElementById('panel-search');
     const clearButton = document.getElementById('clearSearchInput');
+    const saveFavoriteBtn = document.getElementById('saveFavoriteBtn');
+    const favoriteModal = document.getElementById('favoriteModal');
+    const favoriteNameInput = document.getElementById('favoriteNameInput');
+    const submitFavoriteName = document.getElementById('submitFavoriteName');
+    const cancelFavoriteName = document.getElementById('cancelFavoriteName');
 
     if (!searchInput) {
         console.error('initializeLocationSearch: Search input (locationSearchInput) not found in DOM');
@@ -40,7 +45,12 @@ function initializeLocationSearch() {
         searchInput: !!searchInput, 
         resultsList: !!resultsList, 
         searchPanel: !!searchPanel, 
-        clearButton: !!clearButton 
+        clearButton: !!clearButton,
+        saveFavoriteBtn: !!saveFavoriteBtn,
+        favoriteModal: !!favoriteModal,
+        favoriteNameInput: !!favoriteNameInput,
+        submitFavoriteName: !!submitFavoriteName,
+        cancelFavoriteName: !!cancelFavoriteName
     });
 
     if (clearButton) {
@@ -50,6 +60,12 @@ function initializeLocationSearch() {
         });
     } else {
         console.warn('initializeLocationSearch: Clear button (clearSearchInput) not found, clear functionality disabled');
+    }
+
+    if (saveFavoriteBtn && favoriteModal && favoriteNameInput && submitFavoriteName && cancelFavoriteName) {
+        console.log('initializeLocationSearch: Favorite button and modal elements found');
+    } else {
+        console.warn('initializeLocationSearch: Save favorite button or modal elements missing, save functionality disabled');
     }
 
     if (!Utils || !Utils.debounce) {
@@ -92,11 +108,65 @@ function initializeLocationSearch() {
                 resultsList.style.display = 'block';
                 console.log('initializeLocationSearch: Results list shown after clear');
             }
-            searchInput.focus(); // Return focus to input for convenience
+            searchInput.focus();
         };
         clearButton.removeEventListener('click', clearHandler);
         clearButton.addEventListener('click', clearHandler);
         console.log('initializeLocationSearch: Added clear button event listener');
+    }
+
+    // Handle save favorite button click
+    if (saveFavoriteBtn && favoriteModal && favoriteNameInput && submitFavoriteName && cancelFavoriteName) {
+        const saveFavoriteHandler = () => {
+            console.log('initializeLocationSearch: Save favorite button clicked');
+            if (AppState.lastLat === null || AppState.lastLng === null) {
+                Utils.handleError("Please select a location on the map first.");
+                console.log('initializeLocationSearch: No valid map coordinates');
+                return;
+            }
+            favoriteNameInput.value = `DIP at ${AppState.lastLat.toFixed(4)}, ${AppState.lastLng.toFixed(4)}`;
+            favoriteModal.style.display = 'block';
+            console.log('initializeLocationSearch: Favorite modal shown');
+            favoriteNameInput.focus();
+        };
+        saveFavoriteBtn.removeEventListener('click', saveFavoriteHandler);
+        saveFavoriteBtn.addEventListener('click', saveFavoriteHandler);
+        console.log('initializeLocationSearch: Added save favorite button listener');
+
+        const submitFavoriteHandler = () => {
+            const name = favoriteNameInput.value.trim() || `DIP at ${AppState.lastLat.toFixed(4)}, ${AppState.lastLng.toFixed(4)}`;
+            console.log('initializeLocationSearch: Saving favorite with name:', name);
+            if (isAddingFavorite) {
+                console.log('initializeLocationSearch: Blocked, favorite addition in progress');
+                return;
+            }
+            isAddingFavorite = true;
+            try {
+                addOrUpdateFavorite(AppState.lastLat, AppState.lastLng, name);
+                addCoordToHistory(AppState.lastLat, AppState.lastLng, name, true);
+                Utils.handleMessage(`"${name}" saved as favorite.`);
+            } finally {
+                isAddingFavorite = false;
+                console.log('initializeLocationSearch: Favorite save completed');
+            }
+            favoriteModal.style.display = 'none';
+            renderResultsList();
+            if (!searchPanel.classList.contains('hidden')) {
+                resultsList.style.display = 'block';
+            }
+        };
+        submitFavoriteName.removeEventListener('click', submitFavoriteHandler);
+        submitFavoriteName.addEventListener('click', submitFavoriteHandler);
+        console.log('initializeLocationSearch: Added submit favorite button listener');
+
+        const cancelFavoriteHandler = () => {
+            console.log('initializeLocationSearch: Cancel favorite modal');
+            favoriteModal.style.display = 'none';
+            favoriteNameInput.value = '';
+        };
+        cancelFavoriteName.removeEventListener('click', cancelFavoriteHandler);
+        cancelFavoriteName.addEventListener('click', cancelFavoriteHandler);
+        console.log('initializeLocationSearch: Added cancel favorite button listener');
     }
 
     // Show results when Search Panel becomes visible
@@ -114,6 +184,10 @@ function initializeLocationSearch() {
                 } else {
                     console.log('initializeLocationSearch: Search panel hidden, hiding results');
                     resultsList.style.display = 'none';
+                    if (favoriteModal) {
+                        favoriteModal.style.display = 'none';
+                        console.log('initializeLocationSearch: Favorite modal hidden');
+                    }
                 }
             }
         });
@@ -134,9 +208,13 @@ function initializeLocationSearch() {
 
     // Hide results only when interacting outside the Search Panel
     const hideResultsHandler = (e) => {
-        if (!searchPanel.contains(e.target) && !searchPanel.classList.contains('hidden')) {
-            console.log('initializeLocationSearch: Touch/click outside search panel, hiding results');
+        if (!searchPanel.contains(e.target) && !searchPanel.classList.contains('hidden') && (!favoriteModal || !favoriteModal.contains(e.target))) {
+            console.log('initializeLocationSearch: Touch/click outside search panel and modal, hiding results');
             resultsList.style.display = 'none';
+            if (favoriteModal) {
+                favoriteModal.style.display = 'none';
+                console.log('initializeLocationSearch: Favorite modal hidden');
+            }
         }
     };
     document.removeEventListener('touchstart', hideResultsHandler);
@@ -147,7 +225,7 @@ function initializeLocationSearch() {
 
     // Re-show results on click within panel
     const showResultsHandler = (e) => {
-        if (searchPanel.contains(e.target) && !searchInput.contains(e.target) && !resultsList.contains(e.target) && !searchPanel.classList.contains('hidden')) {
+        if (searchPanel.contains(e.target) && !searchInput.contains(e.target) && !resultsList.contains(e.target) && (!favoriteModal || !favoriteModal.contains(e.target)) && !searchPanel.classList.contains('hidden')) {
             console.log('initializeLocationSearch: Click within search panel, showing results');
             renderResultsList();
             resultsList.style.display = 'block';

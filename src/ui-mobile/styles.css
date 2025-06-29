@@ -443,6 +443,92 @@ body {
     background: #f0f0f0;
 }
 
+/* Save favorite button */
+.save-favorite-btn {
+    width: 100%;
+    max-width: 400px;
+    padding: 10px;
+    margin: 10px 0;
+    background-color: #4da8da;
+    color: white;
+    font-size: 14px;
+    font-weight: bold;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.save-favorite-btn:hover {
+    background-color: #0056b3;
+}
+
+/* Favorite modal */
+.favorite-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 3000;
+}
+
+.favorite-modal-content {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    width: 80%;
+    max-width: 400px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.favorite-modal-content h3 {
+    margin: 0 0 10px;
+    font-size: 16px;
+    color: #333;
+}
+
+#favoriteNameInput {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+.favorite-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.modal-btn {
+    padding: 8px 16px;
+    font-size: 14px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.modal-btn:not(.cancel) {
+    background-color: #4da8da;
+    color: white;
+}
+
+.modal-btn.cancel {
+    background-color: #ccc;
+    color: #333;
+}
+
+.modal-btn:hover {
+    opacity: 0.9;
+}
 
 /* Eine neue, generische Klasse für alle Einstellungs-Container */
 .settings-grid {

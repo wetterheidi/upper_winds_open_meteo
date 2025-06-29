@@ -481,12 +481,23 @@
                 <span id="clearSearchInput" class="clear-icon" style="display: none;">×</span>
             </div>
 
+            <button id="saveFavoriteBtn" class="save-favorite-btn">Save current location as Favorite</button>
+            <div id="favoriteModal" class="favorite-modal" style="display: none;">
+                <div class="favorite-modal-content">
+                    <h3>Save Favorite</h3>
+                    <input id="favoriteNameInput" type="text" placeholder="Enter favorite name">
+                    <div class="favorite-modal-actions">
+                        <button id="submitFavoriteName" class="modal-btn">Save</button>
+                        <button id="cancelFavoriteName" class="modal-btn cancel">Cancel</button>
+                    </div>
+                </div>
+            </div>
+
             <div id="locationResults" class="location-results-container">
                 <div id="favorites-section" class="search-section">
                     <h5>Favorites</h5>
                     <ul id="favorites-list"></ul>
                 </div>
-
                 <div id="recents-section" class="search-section">
                     <h5>Recent Searches</h5>
                     <ul id="recents-list"></ul>
