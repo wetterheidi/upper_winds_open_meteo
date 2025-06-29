@@ -882,6 +882,134 @@ body {
 
 /* === ENDE: Finaler Block === */
 
+#snackbar {
+  visibility: hidden;
+  min-width: 250px;
+  background-color: #333;
+  color: #fff;
+  text-align: center;
+  border-radius: 8px;
+  padding: 16px;
+  position: absolute; /* Geändert von fixed zu absolute */
+  z-index: 2010;
+  top: 100px; /* Position am oberen Rand */
+  left: 0; /* Position am linken Rand */
+  font-size: 1rem;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+  transform: translateX(-200%); /* Startet außerhalb des Bildschirms links */
+  opacity: 0;
+  transition: visibility 0s, opacity 0.5s, transform 0.5s;
+}
+
+#snackbar.show {
+  visibility: visible;
+  transform: translateX(0); /* Bewegt sich in den Bildschirm */
+  opacity: 1;
+}
+
+/* Spezifische Farben für Erfolgs- und Fehlermeldungen */
+#snackbar.success {
+  background-color: #4CAF50; /* Grün für Erfolg */
+}
+
+#snackbar.error {
+  background-color: #f44336; /* Rot für Fehler */
+}
+
+/* In src/ui-mobile/styles.css hinzufügen */
+
+#progress-snackbar {
+  visibility: hidden;
+  position: absolute; /* Geändert von fixed zu absolute */
+  top: 155px;  /* Positioniert unter der ersten Snackbar */
+  left: 0; /* Position am linken Rand */
+  transform: translateX(-200%); /* Startet außerhalb des Bildschirms links */
+  background-color: #3f51b5;
+  color: white;
+  padding: 14px;
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+  z-index: 2011; /* Über der normalen Snackbar */
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 280px;
+  box-sizing: border-box;
+  opacity: 0;
+  transition: visibility 0s, opacity 0.4s ease-in-out, transform 0.4s ease-in-out;
+}
+
+#progress-snackbar.show {
+  visibility: visible;
+  opacity: 1;
+  transform: translateY(0); /* Bewegt sich in den Bildschirm */
+}
+
+.progress-snackbar-content {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.progress-snackbar-text {
+  font-size: 0.95rem;
+  text-align: center;
+}
+
+.progress-bar-container {
+  width: 100%;
+  height: 6px;
+  background-color: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  width: 0%;
+  height: 100%;
+  background-color: #ffffff;
+  border-radius: 3px;
+  transition: width 0.3s ease-in-out;
+}
+
+#progress-snackbar .cancel-button {
+  background: transparent;
+  border: 1px solid white;
+  color: white;
+  border-radius: 5px;
+  padding: 5px 10px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+#offline-indicator {
+  visibility: hidden; /* Standardmäßig unsichtbar */
+  opacity: 0;
+  transform: translateY(-100%); /* Startet außerhalb des sichtbaren Bereichs oben */
+  
+  position: absolute; /* Wichtig: Absolut zum map-container */
+  top: 100px;
+  left: 0;
+  right: 0;
+  
+  background-color: #fff3cd; /* Ein sanftes, warnendes Gelb */
+  color: #856404; /* Dunkler Text für guten Kontrast */
+  text-align: center;
+  padding: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  
+  z-index: 2010; /* Über den Kartenebenen, aber unter den Haupt-Controls */
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  transition: visibility 0s, opacity 0.3s ease-out, transform 0.3s ease-out;
+}
+
+#offline-indicator.show {
+  visibility: visible;
+  opacity: 1;
+  transform: translateY(0); /* Gleitet von oben herein */
+}
 
 /* Media queries for responsiveness */
 @media (max-width: 768px) {
