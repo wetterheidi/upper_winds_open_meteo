@@ -312,8 +312,17 @@ body {
 }
 
 /* Ensure locationResults is visible by default when Search Panel is active */
-#search-panel:not(.hidden) #locationResults {
-    display: block;
+#panel-search:not(.hidden) #locationResults {
+    display: block !important;
+}
+
+/* Ensure locationResults is visible and scrollable */
+#locationResults {
+    display: none; /* Default hidden, overridden by JS or #search-panel:not(.hidden) */
+    width: 100%;
+    max-height: calc(100% - 120px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 /* Styling für die einzelnen Sektionen (Favoriten, Verlauf) */

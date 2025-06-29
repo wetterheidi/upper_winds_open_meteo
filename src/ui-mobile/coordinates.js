@@ -6,6 +6,7 @@ import { AppState } from '../core/state.js';
 
 let isAddingFavorite = false;
 let isInitialized = false;
+let searchCache = JSON.parse(localStorage.getItem('searchCache')) || {};
 
 /**
  * Initializes the location search module for the touchscreen app.
@@ -31,7 +32,7 @@ function initializeLocationSearch() {
         return;
     }
     if (!searchPanel) {
-        console.error('initializeLocationSearch: Search panel (search-panel) not found in DOM');
+        console.error('initializeLocationSearch: Search panel (panel-search) not found in DOM');
         return;
     }
     console.log('initializeLocationSearch: UI elements found:', { searchInput, resultsList, searchPanel });
@@ -44,7 +45,7 @@ function initializeLocationSearch() {
     const debouncedSearch = Utils.debounce(performSearch, 750);
     console.log('initializeLocationSearch: Debounced search function created');
 
-    // Remove existing listeners to prevent duplicates
+    // Handle search input
     const inputHandler = () => {
         console.log('initializeLocationSearch: Input event triggered, value:', searchInput.value);
         debouncedSearch(searchInput.value);
@@ -52,16 +53,6 @@ function initializeLocationSearch() {
     searchInput.removeEventListener('input', inputHandler);
     searchInput.addEventListener('input', inputHandler);
     console.log('initializeLocationSearch: Added input event listener');
-
-    searchInput.addEventListener('focus', () => {
-        console.log('initializeLocationSearch: Focus event triggered');
-        if (!searchInput.value.trim()) {
-            console.log('initializeLocationSearch: Empty input on focus, rendering results');
-            renderResultsList();
-        }
-        resultsList.style.display = 'block';
-        console.log('initializeLocationSearch: Results list displayed');
-    });
 
     // Show results when Search Panel becomes visible
     const observer = new MutationObserver((mutations) => {
@@ -79,12 +70,19 @@ function initializeLocationSearch() {
         });
     });
     observer.observe(searchPanel, { attributes: true, attributeFilter: ['class'] });
-    console.log('initializeLocationSearch: Added MutationObserver for search-panel');
+    console.log('initializeLocationSearch: Added MutationObserver for panel-search');
 
-    // Hide results on touch/click outside
+    // Show results if Search Panel is already visible on init
+    if (!searchPanel.classList.contains('hidden')) {
+        console.log('initializeLocationSearch: Search panel is visible on init, rendering results');
+        renderResultsList();
+        resultsList.style.display = 'block';
+    }
+
+    // Hide results only when interacting outside the Search Panel
     const hideResultsHandler = (e) => {
-        if (!searchInput.contains(e.target) && !resultsList.contains(e.target) && !searchPanel.classList.contains('hidden')) {
-            console.log('initializeLocationSearch: Touch/click outside detected, hiding results');
+        if (!searchPanel.contains(e.target) && !searchPanel.classList.contains('hidden')) {
+            console.log('initializeLocationSearch: Touch/click outside search panel, hiding results');
             resultsList.style.display = 'none';
         }
     };
@@ -124,6 +122,14 @@ async function performSearch(query) {
         return;
     }
 
+    // Check cache for recent results
+    if (searchCache[query]) {
+        console.log('performSearch: Using cached results for:', query);
+        searchResults = searchCache[query];
+        renderResultsList(searchResults);
+        return;
+    }
+
     console.log('performSearch: No coordinates, initiating Nominatim search');
     const maxRetries = 3;
     const retryDelay = 2000;
@@ -149,6 +155,13 @@ async function performSearch(query) {
             const data = await response.json();
             console.log('performSearch: Nominatim results:', data);
             searchResults = data;
+            // Cache results
+            searchCache[query] = searchResults;
+            try {
+                localStorage.setItem('searchCache', JSON.stringify(searchCache));
+            } catch (e) {
+                console.warn('performSearch: Failed to save search cache:', e);
+            }
             renderResultsList(searchResults);
             return;
         } catch (error) {
