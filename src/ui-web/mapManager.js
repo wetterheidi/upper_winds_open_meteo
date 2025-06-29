@@ -390,7 +390,7 @@ function _handleMapMouseMove(e) {
 
             const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
             let displayElevation = elevation === 'N/A' ? 'N/A' : Math.round(Utils.convertHeight(elevation, heightUnit));
-            
+
             // QFE-Berechnung findet jetzt hier statt
             let qfeText = 'N/A';
             if (elevation !== 'N/A' && AppState.weatherData && AppState.weatherData.surface_pressure) {
@@ -586,7 +586,7 @@ function _setupCrosshairCoordinateHandler(map) {
         const currentHTML = AppState.coordsControl._container.innerHTML;
         const coordPart = currentHTML.split('<br>')[0];
         const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
-        
+
         let displayElevation = 'N/A';
         if (elevation !== 'N/A') {
             const convertedElevation = Utils.convertHeight(elevation, heightUnit);
@@ -601,7 +601,7 @@ function _setupCrosshairCoordinateHandler(map) {
             const surfacePressure = AppState.weatherData.surface_pressure[sliderIndex];
             const temperature = AppState.weatherData.temperature_2m?.[sliderIndex] || 15;
             const referenceElevation = AppState.lastAltitude !== 'N/A' ? AppState.lastAltitude : 0;
-            
+
             // Aufruf der bestehenden QFE-Funktion in utils.js
             const qfe = Utils.calculateQFE(surfacePressure, elevation, referenceElevation, temperature);
             qfeString = qfe !== 'N/A' ? `${qfe} hPa` : 'N/A';
@@ -616,14 +616,14 @@ function _setupCrosshairCoordinateHandler(map) {
         const coordFormat = Settings.getValue('coordFormat', 'radio', 'Decimal');
         const coords = Utils.convertCoords(center.lat, center.lng, coordFormat);
         const coordString = (coordFormat === 'MGRS') ? `MGRS: ${coords.lat}` : `${center.lat.toFixed(5)}, ${center.lng.toFixed(5)}`;
-        
+
         // Setzt den Text auf "Laden..."
         AppState.coordsControl.update(`${coordString}<br>Elevation: ...<br>QFE: ...`);
-        
+
         // Ruft die UNVERÄNDERTE Funktion aus utils.js auf
         Utils.debouncedGetElevationAndQFE(center.lat, center.lng, (data) => {
-             // Übergibt die empfangenen Daten und die ursprünglichen Koordinaten an die Hilfsfunktion
-             updateWithDebouncedData(data, center);
+            // Übergibt die empfangenen Daten und die ursprünglichen Koordinaten an die Hilfsfunktion
+            updateWithDebouncedData(data, center);
         });
     };
 
@@ -944,8 +944,13 @@ export function clearCutAwayMarker() {
 export function drawJumpRunTrack(trackData) {
     clearJumpRunTrack();
 
-    if (!trackData || !AppState.jumpRunTrackLayerGroup) {
-        console.warn('No valid trackData or AppState.jumpRunTrackLayerGroup');
+    if (!AppState.jumpRunTrackLayerGroup) {
+        console.error('drawJumpRunTrack called before jumpRunTrackLayerGroup was initialized.');
+        return;
+    }
+    if (!trackData) {
+        // Dies ist der normale Weg, um den Track zu löschen.
+        // clearJumpRunTrack() wurde bereits aufgerufen, also beenden wir die Funktion hier einfach.
         return;
     }
 

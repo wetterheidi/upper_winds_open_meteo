@@ -1,13 +1,13 @@
 // mapManager.js
 "use strict";
 
-import { AppState } from '../core/state.js'; 
+import { AppState } from '../core/state.js';
 import { Settings } from '../core/settings.js';
 import { Utils } from '../core/utils.js';
 import { TileCache } from '../core/tileCache.js';
 import { updateOfflineIndicator, isMobileDevice } from './ui.js';
 //import './public/vendor/Leaflet.PolylineMeasure.js'; // Pfad ggf. anpassen
-import { UI_DEFAULTS, ICON_URLS, ENSEMBLE_VISUALIZATION}  from '../core/constants.js'; // Importiere UI-Defaults
+import { UI_DEFAULTS, ICON_URLS, ENSEMBLE_VISUALIZATION } from '../core/constants.js'; // Importiere UI-Defaults
 
 let lastTapTime = 0; // Add this line
 
@@ -379,7 +379,7 @@ function _setupCoreMapEventHandlers() {
     }
 
     // A. Das Control wird jetzt immer hier erstellt, egal für welchen Modus.
-     if (!AppState.coordsControl) {
+    if (!AppState.coordsControl) {
         // WICHTIG: Deaktivieren der Standard-Handler des Plugins.
         // Wir steuern die Updates jetzt zu 100% selbst.
         const coordOptions = {
@@ -538,13 +538,13 @@ function _setupCoreMapEventHandlers() {
         lastTapTime = currentTime; // Update the time of the last tap
     }, { passive: false }); // passive: false is required to allow preventDefault
     // --- END: Add Double-Tap/Touch Functionality ---
-    
+
     console.log('All core map event handlers have been set up.');
 }
 function _setupCrosshairCoordinateHandler(map) {
     const handleMapMove = () => {
         const center = map.getCenter();
-        const coordFormat = Settings.getValue('coordFormat',  'Decimal');
+        const coordFormat = Settings.getValue('coordFormat', 'Decimal');
         const coords = Utils.convertCoords(center.lat, center.lng, coordFormat);
         const coordString = (coordFormat === 'MGRS') ? `MGRS: ${coords.lat}` : `${center.lat.toFixed(5)}, ${center.lng.toFixed(5)}`;
 
@@ -559,7 +559,7 @@ function _setupCrosshairCoordinateHandler(map) {
                 return; // Verhindert Update, wenn sich die Karte inzwischen weiterbewegt hat
             }
 
-            const heightUnit = Settings.getValue('heightUnit',  'm');
+            const heightUnit = Settings.getValue('heightUnit', 'm');
             let displayElevation = 'N/A';
             if (elevation !== 'N/A') {
                 const convertedElevation = Utils.convertHeight(elevation, heightUnit);
@@ -836,7 +836,7 @@ export function attachCutAwayMarkerDragend(marker) {
     });
 }
 export function updateCutAwayMarkerPopup(marker, lat, lng, open = false) {
-    const coordFormat = Settings.getValue('coordFormat',  'Decimal');
+    const coordFormat = Settings.getValue('coordFormat', 'Decimal');
     const coords = Utils.convertCoords(lat, lng, coordFormat);
     let popupContent = `<b>Cut-Away Start</b><br>`;
 
@@ -901,8 +901,13 @@ export function clearCutAwayMarker() {
 export function drawJumpRunTrack(trackData) {
     clearJumpRunTrack();
 
-    if (!trackData || !AppState.jumpRunTrackLayerGroup) {
-        console.warn('No valid trackData or AppState.jumpRunTrackLayerGroup');
+    if (!AppState.jumpRunTrackLayerGroup) {
+        console.error('drawJumpRunTrack called before jumpRunTrackLayerGroup was initialized.');
+        return;
+    }
+    if (!trackData) {
+        // Dies ist der normale Weg, um den Track zu löschen.
+        // clearJumpRunTrack() wurde bereits aufgerufen, also beenden wir die Funktion hier einfach.
         return;
     }
 
@@ -1044,8 +1049,8 @@ export async function createOrUpdateMarker(lat, lng) {
 export function createCustomMarker(lat, lng) {
     const customIcon = L.icon({
         iconUrl: ICON_URLS.DEFAULT_MARKER,
-        iconSize: [32, 32], 
-        iconAnchor: [16, 20], 
+        iconSize: [32, 32],
+        iconAnchor: [16, 20],
         popupAnchor: [0, -32],
         //shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
         //shadowSize: [41, 41], shadowAnchor: [13, 32]
@@ -1311,7 +1316,7 @@ export function updateFavoriteMarkers(favorites) {
             })
             .on('click', () => {
                 // Wenn auf einen Favoriten-Marker geklickt wird, die Position auswählen
-                 const selectEvent = new CustomEvent('location:selected', {
+                const selectEvent = new CustomEvent('location:selected', {
                     detail: { lat: fav.lat, lng: fav.lng, source: 'favorite_marker' },
                     bubbles: true,
                     cancelable: true
