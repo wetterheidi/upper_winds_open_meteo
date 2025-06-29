@@ -118,12 +118,10 @@ function _setupBaseLayersAndHandling() {
         "Esri Satellite + OSM": L.layerGroup([
             L.tileLayer.cached('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
                 maxZoom: 19,
-                attribution: '© Esri, USDA, USGS',
                 zIndex: 1
             }),
             L.tileLayer.cached('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 19,
-                attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
                 opacity: 0.5,
                 zIndex: 2,
                 updateWhenIdle: true,
