@@ -74,7 +74,7 @@
     background-color: rgba(249, 249, 249, 0.95);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
-    padding: 15px;
+    padding: 1px 15px 1px 15px; /* NEU: Oben 0, sonst 15px */
     overflow-y: auto;
     box-sizing: border-box;
     pointer-events: auto;
@@ -586,11 +586,11 @@ body {
 }
 
 .leaflet-control-container .leaflet-top {
-    top: calc(96px + env(safe-area-inset-top)) !important; /* Below slider-container */
+    top: 10px; /* Below slider-container */
 }
 
 .leaflet-control-container .leaflet-bottom {
-    bottom: calc(65px + env(safe-area-inset-bottom)) !important; /* Above tab-bar */
+    bottom: 10px; /* Above tab-bar */
 }
 
 .leaflet-control-coordinates {
@@ -811,6 +811,7 @@ body {
 
 #modelInfoButton:hover {
     background: #f0f0f0;
+    color: #333;
 }
 
 /* 2. Stile für den Track-Upload-Info-Button (ein <span>-Element) */
