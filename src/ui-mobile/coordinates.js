@@ -5,7 +5,7 @@ import * as mgrs from 'mgrs';
 import { AppState } from '../core/state.js';
 
 let isAddingFavorite = false;
-let isInitialized = false; // Guard to prevent multiple initializations
+let isInitialized = false;
 
 /**
  * Initializes the location search module for the touchscreen app.
@@ -20,6 +20,7 @@ function initializeLocationSearch() {
     
     const searchInput = document.getElementById('locationSearchInput');
     const resultsList = document.getElementById('locationResults');
+    const searchPanel = document.getElementById('panel-search');
 
     if (!searchInput) {
         console.error('initializeLocationSearch: Search input (locationSearchInput) not found in DOM');
@@ -29,14 +30,18 @@ function initializeLocationSearch() {
         console.error('initializeLocationSearch: Results list (locationResults) not found in DOM');
         return;
     }
-    console.log('initializeLocationSearch: UI elements found:', { searchInput, resultsList });
+    if (!searchPanel) {
+        console.error('initializeLocationSearch: Search panel (search-panel) not found in DOM');
+        return;
+    }
+    console.log('initializeLocationSearch: UI elements found:', { searchInput, resultsList, searchPanel });
 
     if (!Utils || !Utils.debounce) {
         console.error('initializeLocationSearch: Utils.debounce is not available');
         return;
     }
 
-    const debouncedSearch = Utils.debounce(performSearch, 750); // Increased to 750ms
+    const debouncedSearch = Utils.debounce(performSearch, 750);
     console.log('initializeLocationSearch: Debounced search function created');
 
     // Remove existing listeners to prevent duplicates
@@ -44,7 +49,7 @@ function initializeLocationSearch() {
         console.log('initializeLocationSearch: Input event triggered, value:', searchInput.value);
         debouncedSearch(searchInput.value);
     };
-    searchInput.removeEventListener('input', inputHandler); // Remove any existing
+    searchInput.removeEventListener('input', inputHandler);
     searchInput.addEventListener('input', inputHandler);
     console.log('initializeLocationSearch: Added input event listener');
 
@@ -58,9 +63,27 @@ function initializeLocationSearch() {
         console.log('initializeLocationSearch: Results list displayed');
     });
 
-    // Remove existing touch/click listeners to prevent duplicates
+    // Show results when Search Panel becomes visible
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+                if (!searchPanel.classList.contains('hidden')) {
+                    console.log('initializeLocationSearch: Search panel visible, rendering results');
+                    renderResultsList();
+                    resultsList.style.display = 'block';
+                } else {
+                    console.log('initializeLocationSearch: Search panel hidden, hiding results');
+                    resultsList.style.display = 'none';
+                }
+            }
+        });
+    });
+    observer.observe(searchPanel, { attributes: true, attributeFilter: ['class'] });
+    console.log('initializeLocationSearch: Added MutationObserver for search-panel');
+
+    // Hide results on touch/click outside
     const hideResultsHandler = (e) => {
-        if (!searchInput.contains(e.target) && !resultsList.contains(e.target)) {
+        if (!searchInput.contains(e.target) && !resultsList.contains(e.target) && !searchPanel.classList.contains('hidden')) {
             console.log('initializeLocationSearch: Touch/click outside detected, hiding results');
             resultsList.style.display = 'none';
         }
@@ -114,7 +137,7 @@ async function performSearch(query) {
                 headers: {
                     'User-Agent': 'Skydiving-Weather-App/1.0 (anonymous)',
                     'Accept': 'application/json',
-                    'Origin': window.location.origin // Mimic browser context
+                    'Origin': window.location.origin
                 },
                 mode: 'cors',
                 credentials: 'omit'
@@ -217,9 +240,13 @@ function renderResultsList(searchResults = []) {
         }
         li.dataset.lat = lat;
         li.dataset.lon = lng;
+        li.className = 'search-item';
         const nameSpan = document.createElement('span');
-        nameSpan.className = 'location-name';
-        nameSpan.textContent = item.display_name || item.label;
+        nameSpan.className = 'search-item-text';
+        const nameText = document.createElement('span');
+        nameText.className = 'name';
+        nameText.textContent = item.display_name || item.label;
+        nameSpan.appendChild(nameText);
         li.appendChild(nameSpan);
         nameSpan.addEventListener('click', (e) => {
             console.log('createListItem: Location clicked:', { lat, lng });
@@ -230,10 +257,11 @@ function renderResultsList(searchResults = []) {
             });
             li.dispatchEvent(selectEvent);
             addCoordToHistory(lat, lng, item.display_name || item.label, item.isFavorite || false);
-            resultsList.style.display = 'none';
+            const resultsList = document.getElementById('locationResults');
+            if (resultsList) resultsList.style.display = 'none';
         });
         const buttonsContainer = document.createElement('div');
-        buttonsContainer.className = 'location-item-buttons';
+        buttonsContainer.className = 'search-item-actions';
         const favToggle = document.createElement('button');
         favToggle.className = 'favorite-toggle';
         favToggle.innerHTML = item.isFavorite ? '★' : '☆';
@@ -314,8 +342,9 @@ function renderResultsList(searchResults = []) {
     console.log('renderResultsList: Rendering complete');
 }
 
-// --- Local Storage Management ---
-
+/**
+ * Local Storage Management
+ */
 function getCoordHistory() {
     console.log('getCoordHistory: Retrieving history');
     try {

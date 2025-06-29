@@ -306,8 +306,14 @@ body {
 
 /* Container für alle Ergebnislisten */
 .location-results-container {
-    max-height: calc(100% - 120px); /* Höhe anpassen */
+    max-height: calc(100% - 120px);
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+}
+
+/* Ensure locationResults is visible by default when Search Panel is active */
+#search-panel:not(.hidden) #locationResults {
+    display: block;
 }
 
 /* Styling für die einzelnen Sektionen (Favoriten, Verlauf) */
@@ -334,7 +340,7 @@ body {
     margin: 0;
 }
 
-/* Styling für jeden einzelnen Eintrag in der Liste */
+/* Ensure search-item styles align with touch-friendly design */
 .search-item {
     display: flex;
     align-items: center;
@@ -342,6 +348,7 @@ body {
     border-bottom: 1px solid #f0f0f0;
     cursor: pointer;
     transition: background-color 0.2s ease;
+    min-height: 48px; /* Larger tap target for touch */
 }
 
 .search-item:last-child {
