@@ -584,7 +584,7 @@ function generateAndDisplayHeatmap(sliderIndex, interpStep) {
             const modelHourlyData = AppState.ensembleModelsData[modelName];
 
             // WICHTIGE KORREKTUR: sliderIndex hier weitergeben
-            const exitResult = calculateExitCircleForEnsemble(modelName, sliderIndex, interpStep, { hourly: modelHourlyData });
+            const exitResult = calculateExitCircleForEnsemble(modelName, sliderIndex, { hourly: modelHourlyData });
 
             if (exitResult) {
                 modelCircles.push({
@@ -653,7 +653,7 @@ function generateAndDisplayHeatmap(sliderIndex, interpStep) {
                 } else if (i < maxOverlap) {
                     gradient[ratio] = 'yellow';
                 } else {
-                    gradient[ratio] = 'lime';
+                    gradient[ratio] = 'rgba(0, 255, 0, 0.9)';
                 }
             }
         }

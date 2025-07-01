@@ -938,6 +938,8 @@ function setupAppEventListeners() {
                 if (Settings.state.userSettings.showJumpRunTrack) {
                     displayManager.updateJumpRunTrackDisplay();
                 }
+
+                EnsembleManager.processAndVisualizeEnsemble(sliderIndex, getInterpolationStep());
             }
         } catch (error) {
             console.error('Error during slider update:', error);
