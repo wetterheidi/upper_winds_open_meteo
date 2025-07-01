@@ -13,5 +13,10 @@
       "splashFullScreen": true,
       "splashImmersive": true
     }
+  },
+  "server": {
+    "hostname": "app.local",
+    "androidScheme": "https",
+    "iosScheme": "https"
   }
 }
