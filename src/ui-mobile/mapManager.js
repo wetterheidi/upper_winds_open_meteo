@@ -8,6 +8,7 @@ import { TileCache } from '../core/tileCache.js';
 import { updateOfflineIndicator, isMobileDevice } from './ui.js';
 //import './public/vendor/Leaflet.PolylineMeasure.js'; // Pfad ggf. anpassen
 import { UI_DEFAULTS, ICON_URLS, ENSEMBLE_VISUALIZATION } from '../core/constants.js'; // Importiere UI-Defaults
+import { Geolocation } from '@capacitor/geolocation';
 
 let lastTapTime = 0; // Add this line
 
@@ -317,22 +318,18 @@ async function _geolocationErrorCallback(error, defaultCenter, defaultZoom) {
 }
 
 async function _handleGeolocation(defaultCenter, defaultZoom) {
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-            // Bei ERFOLG wird diese Funktion aufgerufen
-            (position) => _geolocationSuccessCallback(position, defaultZoom),
-            // Bei FEHLER wird diese Funktion aufgerufen
-            (geoError) => _geolocationErrorCallback(geoError, defaultCenter, defaultZoom),
-            {
-                enableHighAccuracy: true,
-                timeout: UI_DEFAULTS.GEOLOCATION_TIMEOUT_MS,
-                maximumAge: 0
-            }
-        );
-    } else {
-        // Fallback, wenn der Browser gar keine Ortung unterstützt
-        console.warn('Geolocation not supported.');
-        await _geolocationErrorCallback({ message: "Geolocation not supported by this browser." }, defaultCenter, defaultZoom);
+    try {
+        // Dies löst automatisch den Berechtigungsdialog beim ersten Aufruf aus.
+        const position = await Geolocation.getCurrentPosition({
+            enableHighAccuracy: true,
+            timeout: 10000
+        });
+        // Rufen Sie Ihre bestehende Erfolgs-Callback-Funktion mit den neuen Daten auf
+        _geolocationSuccessCallback(position, defaultZoom);
+    } catch (error) {
+        console.error('Fehler beim Abrufen des Standorts mit Capacitor:', error);
+        // Rufen Sie Ihre bestehende Fehler-Callback-Funktion auf
+        _geolocationErrorCallback(error, defaultCenter, defaultZoom);
     }
 }
 function _initializeCoordsControlAndHandlers() {

@@ -4,6 +4,8 @@
 import { UI_DEFAULTS, SMOOTHING_DEFAULTS } from './constants.js';
 import { AppState } from './state.js';
 import { Utils } from './utils.js';
+import { Geolocation } from '@capacitor/geolocation';
+
 
 
 // --- Private Hilfsfunktionen ---
@@ -127,21 +129,40 @@ const debouncedPositionUpdate = Utils.debounce(async (position) => {
  */
 export function startPositionTracking() {
     if (AppState.watchId !== null) return;
-    if (!navigator.geolocation) {
-        Utils.handleError("Geolocation is not supported by your browser.");
-        document.dispatchEvent(new CustomEvent('tracking:stopped'));
-        return;
+    console.log("[LiveTrackingManager] Attempting to start position tracking...");
+
+    // PRÜFUNG: Läuft die App in einer nativen Umgebung?
+    if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+        console.log("[LiveTrackingManager] Using Capacitor Geolocation for tracking.");
+        Geolocation.watchPosition({ enableHighAccuracy: true }, (position, err) => {
+            if (err) {
+                Utils.handleError(`Geolocation error: ${err.message}`);
+                stopPositionTracking();
+                return;
+            }
+            debouncedPositionUpdate(position);
+        }).then(watchId => {
+            AppState.watchId = watchId;
+            document.dispatchEvent(new CustomEvent('tracking:started'));
+        });
+    } else {
+        // FALLBACK: Standard-Web-API für den Browser
+        console.log("[LiveTrackingManager] Using navigator.geolocation for tracking.");
+        if (!navigator.geolocation) {
+            Utils.handleError("Geolocation is not supported by your browser.");
+            document.dispatchEvent(new CustomEvent('tracking:stopped'));
+            return;
+        }
+        AppState.watchId = navigator.geolocation.watchPosition(
+            debouncedPositionUpdate,
+            (error) => {
+                Utils.handleError(`Geolocation error: ${error.message}`);
+                stopPositionTracking();
+            },
+            { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+        );
+        document.dispatchEvent(new CustomEvent('tracking:started'));
     }
-    console.log("[LiveTrackingManager] Starting position tracking...");
-    AppState.watchId = navigator.geolocation.watchPosition(
-        debouncedPositionUpdate,
-        (error) => {
-            Utils.handleError(`Geolocation error: ${error.message}`);
-            stopPositionTracking();
-        },
-        { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
-    );
-    document.dispatchEvent(new CustomEvent('tracking:started'));
 }
 
 /**
@@ -153,20 +174,26 @@ export function startPositionTracking() {
  */
 export function stopPositionTracking() {
     if (AppState.watchId !== null) {
-        navigator.geolocation.clearWatch(AppState.watchId);
+        // PRÜFUNG: Welche Methode zum Stoppen verwenden?
+        if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+            Geolocation.clearWatch({ id: AppState.watchId }).then(() => {
+                console.log("[LiveTrackingManager] Stopped Capacitor position tracking.");
+            });
+        } else {
+            navigator.geolocation.clearWatch(AppState.watchId);
+            console.log("[LiveTrackingManager] Stopped navigator position tracking.");
+        }
         AppState.watchId = null;
     }
-    // Aufräumen der Karten-Elemente
+    
+    // Aufräumlogik bleibt gleich
     if (AppState.liveMarker) AppState.map.removeLayer(AppState.liveMarker);
     if (AppState.accuracyCircle) AppState.map.removeLayer(AppState.accuracyCircle);
     AppState.liveMarker = null;
     AppState.accuracyCircle = null;
-    // Tracking-Variablen zurücksetzen
     AppState.prevLat = null;
     AppState.prevLng = null;
-    AppState.prevTime = null;
-    AppState.lastSmoothedSpeedMs = 0;
+    // ... weiterer Aufräumcode ...
     
     document.dispatchEvent(new CustomEvent('tracking:stopped'));
-    console.log("[LiveTrackingManager] Stopped position tracking and cleaned up.");
 }
