@@ -275,8 +275,11 @@ export function calculateCanopyCircles(interpolatedData) {
  * @param {object[]} interpolatedData - Die interpolierten Wetterdaten.
  * @returns {{direction: number, trackLength: number, latlngs: number[][], approachLatLngs: number[][], approachLength: number, approachTime: number}|null} Ein Objekt mit den Daten des Anflugs oder null.
  */
-export function jumpRunTrack(interpolatedData) {
-    if (!AppState.weatherData || !AppState.lastLat || !AppState.lastLng || AppState.lastAltitude === 'N/A' || !interpolatedData || interpolatedData.length === 0) {
+export function jumpRunTrack(interpolatedData, harpAnchor = null) {
+    const anchorLat = harpAnchor ? harpAnchor.lat : AppState.lastLat;
+    const anchorLng = harpAnchor ? harpAnchor.lng : AppState.lastLng;
+
+    if (!AppState.weatherData || !anchorLat || !anchorLng || AppState.lastAltitude === 'N/A' || !interpolatedData || interpolatedData.length === 0) {
         return null;
     }
     
@@ -319,17 +322,23 @@ export function jumpRunTrack(interpolatedData) {
     const lateralOffset = Settings.state.userSettings.jumpRunTrackOffset || 0;
     const forwardOffset = Settings.state.userSettings.jumpRunTrackForwardOffset || 0;
     
-    // KORREKTUR: Verwende die saubere Vektormethode zur Berechnung des Mittelpunkts
-    const bearingToCenter = (Math.atan2(lateralOffset, forwardOffset) * 180 / Math.PI + 360) % 360;
-    const distanceFromCenter = Math.sqrt(lateralOffset**2 + forwardOffset**2);
-    const finalBearing = (jumpRunTrackDirection + bearingToCenter + 360) % 360;
-    const [centerLat, centerLng] = Utils.calculateNewCenter(AppState.lastLat, AppState.lastLng, distanceFromCenter, finalBearing);
+    // Schritt 1: Der HARP (oder DIP) wird als initialer Startpunkt der durchgezogenen Linie definiert.
+    const initialStartPoint = [anchorLat, anchorLng];
+
+    // Schritt 2: Der initiale Endpunkt (Flugzeug) wird von diesem Startpunkt aus berechnet.
+    const initialEndPoint = Utils.calculateNewCenter(initialStartPoint[0], initialStartPoint[1], trackLength, jumpRunTrackDirection);
+
+    // Schritt 3: Der Gesamt-Verschiebungsvektor aus den Offsets wird berechnet.
+    const shiftDistance = Math.sqrt(lateralOffset**2 + forwardOffset**2);
+    const shiftAngleFromTrack = Math.atan2(lateralOffset, forwardOffset) * 180 / Math.PI;
+    const absoluteShiftBearing = (jumpRunTrackDirection + shiftAngleFromTrack + 360) % 360;
+
+    // Schritt 4: Die finale Position des Start- und Endpunkts wird durch Anwenden des
+    // Verschiebungsvektors auf die initialen Punkte ermittelt.
+    const startPoint = Utils.calculateNewCenter(initialStartPoint[0], initialStartPoint[1], shiftDistance, absoluteShiftBearing);
+    const endPoint = Utils.calculateNewCenter(initialEndPoint[0], initialEndPoint[1], shiftDistance, absoluteShiftBearing);
     
-    const halfLength = trackLength / 2;
-    const startPoint = Utils.calculateNewCenter(centerLat, centerLng, halfLength, (jumpRunTrackDirection + 180) % 360);
-    const endPoint = Utils.calculateNewCenter(centerLat, centerLng, halfLength, jumpRunTrackDirection);
-    
-    if(groundSpeedMps){
+     if(groundSpeedMps){
         const approachStartPoint = Utils.calculateNewCenter(startPoint[0], startPoint[1], approachLength, (jumpRunTrackDirection + 180) % 360);
         approachLatLngs = [startPoint, approachStartPoint];
     }

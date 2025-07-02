@@ -552,7 +552,8 @@ export function updateJumpRunTrackDisplay() {
         Math.round(AppState.lastAltitude),
         heightUnit
     ); // Und an die Core-Funktion übergeben
-    const trackData = JumpPlanner.jumpRunTrack(interpolatedData);
+    const harpAnchor = AppState.harpMarker ? AppState.harpMarker.getLatLng() : null;
+    const trackData = JumpPlanner.jumpRunTrack(interpolatedData, harpAnchor);
     if (trackData && trackData.latlngs?.length === 2 && trackData.latlngs.every(ll => Number.isFinite(ll[0]) && Number.isFinite(ll[1]))) {
         console.log('Drawing jump run track with data:', trackData);
         const drawData = {

@@ -1376,42 +1376,51 @@ document.addEventListener('DOMContentLoaded', async () => {
             calculateJump();
         }
     });
-    // NEU: track:dragend-Listener hier platzieren
+
     document.addEventListener('track:dragend', (event) => {
-        console.log("App: Event 'track:dragend' empfangen. Neuberechnung der Offsets relativ zum DIP.");
+        console.log("App: Event 'track:dragend' empfangen. Neuberechnung der Offsets relativ zum Ankerpunkt (DIP oder HARP).");
 
         const { newPosition, originalTrackData } = event.detail;
 
-        // 1. Hole den DIP (Bezugspunkt) und die Track-Daten
-        const dipPosition = L.latLng(AppState.lastLat, AppState.lastLng);
+        // Schritt 1: Den korrekten Ankerpunkt bestimmen (HARP oder DIP)
+        let anchorPosition;
+        const harpAnchor = AppState.harpMarker ? AppState.harpMarker.getLatLng() : null;
+
+        // Wenn ein HARP-Marker existiert, ist er IMMER der Anker
+        if (harpAnchor) {
+            anchorPosition = harpAnchor;
+            console.log("JRT-Ankerpunkt ist HARP.");
+        } else {
+            anchorPosition = L.latLng(AppState.lastLat, AppState.lastLng);
+            console.log("JRT-Ankerpunkt ist DIP.");
+        }
+
         const trackLength = originalTrackData.trackLength;
         const trackDirection = originalTrackData.airplane.bearing;
+        const newEndPoint = newPosition; // Die neue Position des Flugzeugs
 
-        // 2. Die neue Position ist das vordere Ende des Tracks. Berechne daraus den neuen Mittelpunkt des Tracks.
-        const newEndPoint = newPosition;
-        const [newCenterLat, newCenterLng] = Utils.calculateNewCenter(
+        // Schritt 2: Den NEUEN STARTPUNKT des Tracks berechnen, indem wir vom neuen Endpunkt zurückgehen.
+        const [newStartLat, newStartLng] = Utils.calculateNewCenter(
             newEndPoint.lat,
             newEndPoint.lng,
-            trackLength / 2, // Distanz
-            (trackDirection + 180) % 360 // Peilung (rückwärts entlang des Tracks)
+            trackLength, // Die GESAMTE Länge des Tracks
+            (trackDirection + 180) % 360 // Entgegen der Flugrichtung
         );
-        const newCenterPoint = L.latLng(newCenterLat, newCenterLng);
+        const newStartPoint = L.latLng(newStartLat, newStartLng);
 
-        // 3. Berechne den totalen Verschiebungs-Vektor vom DIP zum neuen Mittelpunkt.
-        const totalDistance = AppState.map.distance(dipPosition, newCenterPoint);
-        const bearingFromDipToCenter = Utils.calculateBearing(dipPosition.lat, dipPosition.lng, newCenterPoint.lat, newCenterPoint.lng);
+        // Schritt 3: Den Verschiebungs-Vektor vom Ankerpunkt zum NEUEN STARTPUNKT berechnen.
+        const totalDistance = AppState.map.distance(anchorPosition, newStartPoint);
+        const bearingFromAnchorToStart = Utils.calculateBearing(anchorPosition.lat, anchorPosition.lng, newStartPoint.lat, newStartPoint.lng);
 
-        // 4. Berechne die Winkeldifferenz zwischen dem Verschiebungs-Vektor und der Track-Richtung.
-        let angleDifference = bearingFromDipToCenter - trackDirection;
-        // Normalisiere den Winkel auf einen Wert zwischen -180 und 180
-        angleDifference = (angleDifference + 180) % 360 - 180;
+        // Schritt 4: Den Vektor in Vorwärts- und Quer-Offsets zerlegen.
+        let angleDifference = bearingFromAnchorToStart - trackDirection;
+        angleDifference = (angleDifference + 180) % 360 - 180; // Winkel normalisieren
 
-        // 5. Zerlege die Gesamtverschiebung in Vorwärts- und Quer-Komponenten.
         const angleRad = angleDifference * (Math.PI / 180);
         const forwardOffset = Math.round(totalDistance * Math.cos(angleRad));
         const lateralOffset = Math.round(totalDistance * Math.sin(angleRad));
 
-        // 6. Aktualisiere die Settings und die UI-Eingabefelder.
+        // Schritt 5: Settings und UI aktualisieren.
         Settings.state.userSettings.jumpRunTrackOffset = lateralOffset;
         Settings.state.userSettings.jumpRunTrackForwardOffset = forwardOffset;
         Settings.save();
@@ -1419,7 +1428,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         setInputValueSilently('jumpRunTrackOffset', lateralOffset);
         setInputValueSilently('jumpRunTrackForwardOffset', forwardOffset);
 
-        // 7. Zeichne den Track neu, um die Änderungen zu übernehmen.
+        // Schritt 6: Den Track neu zeichnen lassen. Die `jumpPlanner` Funktion verwendet
+        // jetzt den Anker + die neuen Offsets und kommt zum korrekten Ergebnis.
+        displayManager.updateJumpRunTrackDisplay();
+    });
+
+    document.addEventListener('harp:updated', () => {
+        console.log('[App] HARP has been updated, triggering JRT recalculation.');
         displayManager.updateJumpRunTrackDisplay();
     });
 

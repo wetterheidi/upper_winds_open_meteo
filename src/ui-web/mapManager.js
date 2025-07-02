@@ -1234,6 +1234,8 @@ export function handleHarpPlacement(e) {
         harpRadio.disabled = false;
         console.log('Enabled HARP radio button');
     }
+     document.dispatchEvent(new CustomEvent('ui:recalculateJump'));
+    document.dispatchEvent(new CustomEvent('harp:updated')); 
 }
 
 export function createHarpMarker(latitude, longitude) {
@@ -1241,8 +1243,8 @@ export function createHarpMarker(latitude, longitude) {
         icon: L.divIcon({
             className: 'harp-marker',
             html: '<div style="width: 14px; height: 14px; background-color: green; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 6px rgba(0,0,0,0.6);"></div>',
-            iconSize: [10, 10],
-            iconAnchor: [5, 5]
+            iconSize: [20, 20],
+            iconAnchor: [10, 10]
         }),
         pane: 'markerPane' // Use standard marker pane
     });

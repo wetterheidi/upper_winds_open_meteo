@@ -765,7 +765,8 @@ function setupHarpCoordInputEvents() {
 
             // Trigger JML update if live tracking is active and HARP is selected
             document.dispatchEvent(new CustomEvent('ui:jumpMasterLineTargetChanged'));
-
+            document.dispatchEvent(new CustomEvent('ui:recalculateJump'));
+            document.dispatchEvent(new CustomEvent('harp:updated'));
         } else {
             Utils.handleError('Invalid coordinates. Please enter a valid MGRS or Decimal Degree format.');
         }

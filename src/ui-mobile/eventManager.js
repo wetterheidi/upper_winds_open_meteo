@@ -62,7 +62,7 @@ function setupTabBarEvents() {
                 if (AppState.map) {
                     setTimeout(() => AppState.map.invalidateSize(), 100);
                 }
-            }, () => {});
+            }, () => { });
             return;
         }
 
@@ -145,7 +145,7 @@ function setupCheckbox(id, setting, callback) {
         checkbox.addEventListener('click', (event) => {
             console.log(`Click event on ${id}, checked: ${checkbox.checked}, target:`, event.target);
         });
-        console.log(`Attached change and click listeners to ${id}`);        
+        console.log(`Attached change and click listeners to ${id}`);
     } else {
         console.warn(`Checkbox ${id} not found`);
     }
@@ -195,13 +195,13 @@ function setupRadioGroup(name, callback) {
     radios.forEach(radio => {
         radio.addEventListener('change', () => {
 
-           // KORREKTUR: Liest den Wert direkt vom ausgewählten Radio-Button
+            // KORREKTUR: Liest den Wert direkt vom ausgewählten Radio-Button
             const checkedRadio = document.querySelector(`input[name="${name}"]:checked`);
             if (!checkedRadio) return;
             const newValue = checkedRadio.value;
 
             // Speichert den korrekten neuen Wert
-             Settings.state.userSettings[name] = newValue;
+            Settings.state.userSettings[name] = newValue;
             Settings.save();
             console.log(`${name} changed to: ${newValue} and saved to localStorage`);
 
@@ -388,7 +388,7 @@ function setupCheckboxEvents() {
 
     setupRadioGroup('jumpMasterLineTarget', () => {
         // Holt den neuen Wert und speichert ihn
-        const newValue = Settings.getValue('jumpMasterLineTarget',  'DIP');
+        const newValue = Settings.getValue('jumpMasterLineTarget', 'DIP');
         Settings.state.userSettings.jumpMasterLineTarget = newValue;
         Settings.save();
         console.log('jumpMasterLineTarget changed:', newValue);
@@ -819,7 +819,8 @@ function setupHarpCoordInputEvents() {
 
             // Trigger JML update if live tracking is active and HARP is selected
             document.dispatchEvent(new CustomEvent('ui:jumpMasterLineTargetChanged'));
-
+            document.dispatchEvent(new CustomEvent('ui:recalculateJump'));
+            document.dispatchEvent(new CustomEvent('harp:updated'));
         } else {
             Utils.handleError('Invalid coordinates. Please enter a valid MGRS or Decimal Degree format.');
         }
@@ -1098,7 +1099,7 @@ function setupInfoIcons() {
 
     infoIcons.forEach(icon => {
         // Findet das *direkt folgende* Popup-Element.
-        const popup = icon.nextElementSibling; 
+        const popup = icon.nextElementSibling;
 
         if (popup && popup.classList.contains('info-popup')) {
             const infoText = icon.dataset.info;
@@ -1109,7 +1110,7 @@ function setupInfoIcons() {
             icon.addEventListener('click', (event) => {
                 event.preventDefault();
                 event.stopPropagation();
-                
+
                 // Schließe alle anderen offenen Popups
                 document.querySelectorAll('.info-popup').forEach(p => {
                     if (p !== popup) p.style.display = 'none';

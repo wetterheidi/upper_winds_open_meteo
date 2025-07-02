@@ -129,6 +129,11 @@ export const Settings = {
             this.state.userSettings.jumpMasterLineTarget = 'DIP';
         }
 
+        // FÜGEN SIE DIE FOLGENDEN ZWEI ZEILEN HIER HINZU:
+        this.state.userSettings.jumpRunTrackOffset = 0;
+        this.state.userSettings.jumpRunTrackForwardOffset = 0;
+        console.log('Reset JRT offsets to 0 at startup');
+        
         // Reset ensemble models
         this.state.userSettings.selectedEnsembleModels = [...this.defaultSettings.selectedEnsembleModels]; // Setzt auf leeres Array (gemäß defaultSettings)
         this.state.userSettings.currentEnsembleScenario = this.defaultSettings.currentEnsembleScenario; // z.B. 'all_models'
