@@ -1218,8 +1218,8 @@ export function createHarpMarker(latitude, longitude) {
     const marker = L.marker([latitude, longitude], {
         icon: L.divIcon({
             className: 'harp-marker',
-            html: '<div style="background-color: green; width: 10px; height: 10px; border-radius: 50%;"></div>',
-            iconSize: [10, 10],
+            html: '<div style="width: 14px; height: 14px; background-color: green; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 6px rgba(0,0,0,0.6);"></div>',
+            iconSize: [20, 20],
             iconAnchor: [5, 5]
         }),
         pane: 'markerPane' // Use standard marker pane
