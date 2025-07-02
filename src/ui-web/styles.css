@@ -377,7 +377,20 @@ html {
     font-family: 'Roboto', sans-serif;
 }
 
-.submenu input[type="number"]:focus {
+/* New style for text input in submenu */
+.submenu input[type="text"] {
+    width: 100%; /* Adjust as needed, 100% or a fixed px value */
+    padding: 6px;
+    margin-left: 5px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: 'Roboto', sans-serif;
+    box-sizing: border-box; /* Include padding/border in element's total width */
+}
+
+.submenu input[type="number"]:focus,
+.submenu input[type="text"]:focus { /* Add focus for text input */
     outline: 2px solid #4da8da;
     border-color: #4da8da;
     box-shadow: 0 0 3px rgba(0, 123, 255, 0.5);

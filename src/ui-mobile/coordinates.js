@@ -370,9 +370,9 @@ async function performSearch(query) {
 function parseQueryAsCoordinates(query) {
     console.log('parseQueryAsCoordinates: Parsing query:', query);
     const trimmedQuery = query.trim();
-    const cleanedForDecimal = trimmedQuery.replace(/[,;\t]+/, ' ').trim();
-    // Match two floating-point numbers (with optional negative sign and decimal part)
-    const decMatch = cleanedForDecimal.match(/^(-?\d*\.?\d+)\s+(-?\d*\.?\d+)$/);
+    const cleanedForDecimal = trimmedQuery.replace(/[,;\t]+/g, ' ').trim();
+    // Flexible regex for decimal degrees: e.g., "48.1234 11.5678" or "-48.1234,11.5678"
+    const decMatch = cleanedForDecimal.match(/^(-?\d{1,3}(?:\.\d+)?)\s+(-?\d{1,3}(?:\.\d+)?)$/);
     if (decMatch) {
         console.log('parseQueryAsCoordinates: Regex match:', decMatch);
         const lat = parseFloat(decMatch[1]);
@@ -720,5 +720,6 @@ function removeLocationFromHistory(lat, lng) {
 export {
     initializeLocationSearch,
     addCoordToHistory,
-    getCoordHistory
+    getCoordHistory,
+    parseQueryAsCoordinates
 };

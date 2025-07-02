@@ -723,6 +723,54 @@ function setupMapEventListeners() {
     AppState.map.on('moveend', debouncedCacheHandler); // Caching kann parallel laufen
 
 }
+function setupHarpCoordInputEvents() {
+    const harpCoordInput = document.getElementById('harpCoordInput');
+    const placeHarpCoordButton = document.getElementById('placeHarpCoordButton');
+    const harpRadio = document.querySelector('input[name="jumpMasterLineTarget"][value="HARP"]');
+
+    if (!harpCoordInput || !placeHarpCoordButton || !harpRadio) {
+        console.warn('HARP coordinate input elements not found. Skipping setup.');
+        return;
+    }
+
+    placeHarpCoordButton.addEventListener('click', async () => {
+        const inputValue = harpCoordInput.value.trim();
+        if (!inputValue) {
+            Utils.handleError('Please enter coordinates.');
+            return;
+        }
+
+        const parsedCoords = Coordinates.parseQueryAsCoordinates(inputValue);
+
+        if (parsedCoords) {
+            // Clear existing HARP marker if it exists
+            if (AppState.harpMarker) {
+                AppState.map.removeLayer(AppState.harpMarker);
+            }
+
+            // Create and add new HARP marker
+            AppState.harpMarker = mapManager.createHarpMarker(parsedCoords.lat, parsedCoords.lng).addTo(AppState.map);
+            console.log('Placed HARP marker at:', parsedCoords);
+
+            // Update settings
+            Settings.state.userSettings.harpLat = parsedCoords.lat;
+            Settings.state.userSettings.harpLng = parsedCoords.lng;
+            Settings.save();
+            Utils.handleMessage('HARP marker placed successfully.');
+
+            // Enable HARP radio button and set it to checked
+            harpRadio.disabled = false;
+            harpRadio.checked = true;
+            console.log('Enabled HARP radio button and set to checked');
+
+            // Trigger JML update if live tracking is active and HARP is selected
+            document.dispatchEvent(new CustomEvent('ui:jumpMasterLineTargetChanged'));
+
+        } else {
+            Utils.handleError('Invalid coordinates. Please enter a valid MGRS or Decimal Degree format.');
+        }
+    });
+}
 function setupMenuItemEvents() {
     console.log("setupMenuItemEvents wird aufgerufen für 'Calculate Jump'.");
     const calculateJumpMenuItem = Array.from(document.querySelectorAll('.menu-label'))
@@ -1022,6 +1070,7 @@ export function initializeEventListeners() {
     setupResetCutAwayMarkerButton();
     setupCacheManagement();
     setupCacheSettings();
+    setupHarpCoordInputEvents(); // Call the new setup function here
     listenersInitialized = true;
     console.log("Event listeners initialized successfully (first and only time).");
 

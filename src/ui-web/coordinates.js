@@ -126,12 +126,12 @@ function parseQueryAsCoordinates(query) {
     console.log('parseQueryAsCoordinates: Eingabe:', query);
     const trimmedQuery = query.trim();
     // Unterstütze Kommas, mehrere Leerzeichen oder Tabs
-    const cleanedForDecimal = trimmedQuery.replace(/[,;\t]+/, ' ').trim();
-    // Flexiblerer Regex für Dezimalgraden: z. B. "48.1234 11.5678" oder "-48.1234,11.5678"
+    const cleanedForDecimal = trimmedQuery.replace(/[,;\t]+/g, ' ').trim();
+    // Flexible regex for decimal degrees: e.g., "48.1234 11.5678" or "-48.1234,11.5678"
     const decMatch = cleanedForDecimal.match(/^(-?\d{1,3}(?:\.\d+)?)\s+(-?\d{1,3}(?:\.\d+)?)$/);
     if (decMatch) {
         const lat = parseFloat(decMatch[1]);
-        const lng = parseFloat(decMatch[3]);
+        const lng = parseFloat(decMatch[2]);
         console.log('parseQueryAsCoordinates: Dezimalgraden erkannt:', { lat, lng });
         if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
             return { lat, lng };
@@ -443,5 +443,6 @@ function _dispatchFavoritesUpdate() {
 export {
     initializeLocationSearch,
     addCoordToHistory,
-    getCoordHistory // <-- NEUER EXPORT
+    getCoordHistory,   // <-- NEUER EXPORT
+    parseQueryAsCoordinates
 };
