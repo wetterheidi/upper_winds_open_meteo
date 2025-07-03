@@ -186,11 +186,11 @@
                             <li>
                                 <label class="radio-label cache-setting-label">
                                     Zoom Levels:
-                                    <select id="cacheZoomLevelsSelect" class="cache-setting-select">
-                                        <option value="10-14">10–14</option>
-                                        <option value="11-14" selected>11–14</option>
-                                        <option value="12-15">12–15</option>
-                                    </select>
+                                    <div style="display: flex; align-items: center; gap: 5px;">
+                                        <input type="number" id="cacheZoomMin" min="6" max="15" style="width: 60px;">
+                                        <span>-</span>
+                                        <input type="number" id="cacheZoomMax" min="6" max="15" style="width: 60px;">
+                                    </div>
                                 </label>
                             </li>
                             <li>

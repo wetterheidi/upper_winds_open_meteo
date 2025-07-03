@@ -988,20 +988,47 @@ function setupCacheSettings() {
         console.warn('cacheRadiusSelect not found in DOM');
     }
 
-    const cacheZoomLevelsSelect = document.getElementById('cacheZoomLevelsSelect');
-    if (cacheZoomLevelsSelect) {
-        cacheZoomLevelsSelect.addEventListener('change', () => {
-            const [minZoom, maxZoom] = cacheZoomLevelsSelect.value.split('-').map(Number);
-            Settings.state.userSettings.cacheZoomLevels = Array.from(
-                { length: maxZoom - minZoom + 1 },
-                (_, i) => minZoom + i
-            );
+const zoomMinInput = document.getElementById('cacheZoomMin');
+    const zoomMaxInput = document.getElementById('cacheZoomMax');
+
+    if (zoomMinInput && zoomMaxInput) {
+        // Hilfsfunktion zum Speichern der Zoom-Level
+        const updateZoomLevels = () => {
+            let minZoom = parseInt(zoomMinInput.value, 10);
+            let maxZoom = parseInt(zoomMaxInput.value, 10);
+
+            // Validierung
+            if (isNaN(minZoom) || minZoom < 6) minZoom = 6;
+            if (isNaN(maxZoom) || maxZoom > 15) maxZoom = 15;
+            if (minZoom > maxZoom) {
+                // Wenn min > max, setze max auf den gleichen Wert wie min
+                maxZoom = minZoom;
+                zoomMaxInput.value = maxZoom;
+                Utils.handleMessage("Max zoom cannot be less than min zoom.");
+            }
+
+            // Stelle sicher, dass die UI die validierten Werte anzeigt
+            zoomMinInput.value = minZoom;
+            zoomMaxInput.value = maxZoom;
+
+            // Erstelle das Array und speichere es
+            const zoomLevels = Array.from({ length: maxZoom - minZoom + 1 }, (_, i) => minZoom + i);
+            Settings.state.userSettings.cacheZoomLevels = zoomLevels;
             Settings.save();
             console.log('Updated cacheZoomLevels:', Settings.state.userSettings.cacheZoomLevels);
-        });
-        console.log('cacheZoomLevelsSelect listener attached, initial value:', cacheZoomLevelsSelect.value);
+        };
+
+        // Setze die initialen Werte aus den gespeicherten Einstellungen
+        const savedLevels = Settings.state.userSettings.cacheZoomLevels || [11, 12, 13, 14];
+        zoomMinInput.value = Math.min(...savedLevels);
+        zoomMaxInput.value = Math.max(...savedLevels);
+
+        // Füge Event-Listener hinzu
+        zoomMinInput.addEventListener('change', updateZoomLevels);
+        zoomMaxInput.addEventListener('change', updateZoomLevels);
+
     } else {
-        console.warn('cacheZoomLevelsSelect not found in DOM');
+        console.warn('Zoom level input fields not found in DOM');
     }
 
     const recacheNowButton = document.getElementById('recacheNowButton');

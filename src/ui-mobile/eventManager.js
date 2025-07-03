@@ -974,7 +974,7 @@ function setupCacheSettings() {
                 console.error('Settings not properly initialized');
                 return;
             }
-            
+
             let value = parseInt(cacheRadiusInput.value, 10);
 
             // Validierungslogik
@@ -985,33 +985,67 @@ function setupCacheSettings() {
                 value = 50; // Auf Maximum setzen, wenn zu groß
                 Utils.handleMessage("Cache radius cannot exceed 50 km.");
             }
-            
+
             // Korrigierten Wert im UI und in den Settings speichern
             cacheRadiusInput.value = value;
             Settings.state.userSettings.cacheRadiusKm = value;
             Settings.save();
             console.log('Updated cacheRadiusKm:', Settings.state.userSettings.cacheRadiusKm);
         });
-        
+
         console.log('cacheRadiusSelect listener attached, initial value:', cacheRadiusInput.value);
     } else {
         console.warn('cacheRadiusSelect not found in DOM');
     }
 
-    const cacheZoomLevelsSelect = document.getElementById('cacheZoomLevelsSelect');
-    if (cacheZoomLevelsSelect) {
-        cacheZoomLevelsSelect.addEventListener('change', () => {
-            const [minZoom, maxZoom] = cacheZoomLevelsSelect.value.split('-').map(Number);
-            Settings.state.userSettings.cacheZoomLevels = Array.from(
-                { length: maxZoom - minZoom + 1 },
-                (_, i) => minZoom + i
-            );
+    const zoomMinInput = document.getElementById('cacheZoomMin');
+    const zoomMaxInput = document.getElementById('cacheZoomMax');
+
+    if (zoomMinInput && zoomMaxInput) {
+        const updateZoomLevels = () => {
+            // Speichere die ursprünglichen Werte vor der Validierung
+            const originalMinValue = zoomMinInput.value;
+            const originalMaxValue = zoomMaxInput.value;
+
+            let minZoom = parseInt(originalMinValue, 10);
+            let maxZoom = parseInt(originalMaxValue, 10);
+
+            // Validierungsschritt 1: Werte auf den Bereich 6-15 begrenzen
+            if (isNaN(minZoom) || minZoom < 6) minZoom = 6;
+            if (minZoom > 15) minZoom = 15;
+            if (isNaN(maxZoom) || maxZoom > 15) maxZoom = 15;
+            if (maxZoom < 6) maxZoom = 6;
+
+            // Validierungsschritt 2: Sicherstellen, dass min <= max
+            if (minZoom > maxZoom) {
+                maxZoom = minZoom;
+            }
+            
+            // Aktualisiere die Input-Felder mit den korrigierten Werten
+            zoomMinInput.value = minZoom;
+            zoomMaxInput.value = maxZoom;
+
+            // Prüfe, ob eine Änderung stattgefunden hat, und sende die Nachricht
+            if (String(minZoom) !== originalMinValue || String(maxZoom) !== originalMaxValue) {
+                Utils.handleMessage("Zoom levels automatically adjusted (Range: 6-15).");
+            }
+
+            // Erstelle das Array und speichere die Einstellung
+            const zoomLevels = Array.from({ length: maxZoom - minZoom + 1 }, (_, i) => minZoom + i);
+            Settings.state.userSettings.cacheZoomLevels = zoomLevels;
             Settings.save();
             console.log('Updated cacheZoomLevels:', Settings.state.userSettings.cacheZoomLevels);
-        });
-        console.log('cacheZoomLevelsSelect listener attached, initial value:', cacheZoomLevelsSelect.value);
+        };
+
+        const savedLevels = Settings.state.userSettings.cacheZoomLevels || [11, 12, 13, 14];
+        zoomMinInput.value = Math.min(...savedLevels);
+        zoomMaxInput.value = Math.max(...savedLevels);
+
+        zoomMinInput.addEventListener('change', updateZoomLevels);
+        zoomMaxInput.addEventListener('change', updateZoomLevels);
+
     } else {
-        console.warn('cacheZoomLevelsSelect not found in DOM');
+        console.warn('Zoom level input fields not found in DOM');
     }
 
     const recacheNowButton = document.getElementById('recacheNowButton');
@@ -1104,13 +1138,6 @@ function setupSettingsPanels() {
     setupSelectControl('downloadFormat', 'downloadFormat');
     // Event-Listener für Buttons können hier auch hinzugefügt werden
     // document.getElementById('downloadButton').addEventListener('click', () => { ... });
-
-    // Cache Panel
-    setupSelectControl('cacheRadiusSelect', 'cache.radius');
-    setupSelectControl('cacheZoomLevelsSelect', 'cache.zoomLevels');
-    // document.getElementById('recacheNowButton').addEventListener('click', () => { ... });
-
-    // Usw. für die anderen Panels...
 }
 
 function setupInfoIcons() {

@@ -428,12 +428,13 @@
                     <div id="cache-settings" class="settings-grid">
                         <label for="cacheRadiusSelect">Cache Radius (km):</label>
                         <input type="number" id="cacheRadiusSelect" min="1" max="50">
-                        <label for="cacheZoomLevelsSelect">Zoom Levels:</label>
-                        <select id="cacheZoomLevelsSelect" class="cache-setting-select">
-                            <option value="10-14">10–14</option>
-                            <option value="11-14" selected>11–14</option>
-                            <option value="12-15">12–15</option>
-                        </select>
+                        <label for="cacheZoomMin">Zoom Levels:</label>
+                        <div id="cache-zoom-inputs" class="settings-grid"
+                            style="grid-template-columns: 1fr auto 1fr; gap: 5px; width: 100%;">
+                            <input type="number" id="cacheZoomMin" min="6" max="15">
+                            <span>-</span>
+                            <input type="number" id="cacheZoomMax" min="6" max="15">
+                        </div>
                         </label>
                         <button id="recacheNowButton">Recache Now</button>
                     </div>
