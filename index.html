@@ -18,7 +18,7 @@
 
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="/upper_winds_open_meteo/icon-48.png">
-  <script type="module" crossorigin src="/upper_winds_open_meteo/assets/index-DO6HPeJk.js"></script>
+  <script type="module" crossorigin src="/upper_winds_open_meteo/assets/index-CEnXEijJ.js"></script>
   <link rel="stylesheet" crossorigin href="/upper_winds_open_meteo/assets/index-6gYy9ujb.css">
 </head>
 
@@ -180,21 +180,18 @@
                             <li>
                                 <label class="radio-label cache-setting-label">
                                     Cache Radius (km):
-                                    <select id="cacheRadiusSelect" class="cache-setting-select">
-                                        <option value="5" selected>5 km</option>
-                                        <option value="10">10 km</option>
-                                        <option value="15">15 km</option>
-                                    </select>
+                                    <input type="number" id="cacheRadiusSelect" min="1" max="50"
+                                        style="width: 80px; text-align: right;">
                                 </label>
                             </li>
                             <li>
                                 <label class="radio-label cache-setting-label">
                                     Zoom Levels:
-                                    <select id="cacheZoomLevelsSelect" class="cache-setting-select">
-                                        <option value="10-14">10–14</option>
-                                        <option value="11-14" selected>11–14</option>
-                                        <option value="12-15">12–15</option>
-                                    </select>
+                                    <div style="display: flex; align-items: center; gap: 5px;">
+                                        <input type="number" id="cacheZoomMin" min="6" max="15" style="width: 60px;">
+                                        <span>-</span>
+                                        <input type="number" id="cacheZoomMax" min="6" max="15" style="width: 60px;">
+                                    </div>
                                 </label>
                             </li>
                             <li>
