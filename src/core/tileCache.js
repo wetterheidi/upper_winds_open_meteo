@@ -350,19 +350,18 @@ async function cacheTileWithRetry(url, maxRetries = 3) {
     return { success: false, error: lastError };
 }
 
-async function cacheTilesForDIP({ map, lastLat, lastLng, baseMaps, onProgress, onComplete, onCancel }) {
+async function cacheTilesForDIP({ map, lastLat, lastLng, baseMaps, onProgress, onComplete, onCancel, radiusKm: forcedRadius = null, silent = false }) {
     if (!map) {
-        if (onComplete) onComplete('Map not initialized, cannot cache tiles.');
+        if (onComplete && !silent) onComplete('Map not initialized, cannot cache tiles.');
         return;
     }
 
     if (!lastLat || !lastLng) {
-        // KORREKTUR: onComplete verwenden statt displayMessage
-        if (onComplete) onComplete('Please select a location to cache map tiles.');
+        if (onComplete && !silent) onComplete('Please select a location to cache map tiles.');
         return;
     }
 
-    const radiusKm = Settings.state.userSettings.cacheRadiusKm || Settings.defaultSettings.cacheRadiusKm;
+    const radiusKm = forcedRadius !== null ? forcedRadius : (Settings.state.userSettings.cacheRadiusKm || Settings.defaultSettings.cacheRadiusKm);
     const zoomLevels = Settings.state.userSettings.cacheZoomLevels || Settings.defaultSettings.cacheZoomLevels;
     const tiles = getTilesInRadius(lastLat, lastLng, radiusKm, zoomLevels, map);
 
@@ -383,10 +382,10 @@ async function cacheTilesForDIP({ map, lastLat, lastLng, baseMaps, onProgress, o
             });
         }
     }
-    
+
     const totalTiles = tiles.length * tileLayers.length;
     if (totalTiles === 0) {
-        if(onComplete) onComplete('No tiles to cache for this basemap.');
+        if (onComplete && !silent) onComplete('No tiles to cache for this basemap.');
         return;
     }
 
@@ -395,9 +394,7 @@ async function cacheTilesForDIP({ map, lastLat, lastLng, baseMaps, onProgress, o
     const failedTiles = [];
     AppState.isCachingCancelled = false;
 
-    console.log('Calling displayProgress with initial values:', { cachedCount, failedCount, totalTiles });
-    if (onProgress) {
-        // KORREKTUR: Der Startwert für den Fortschritt ist immer 0
+    if (onProgress && !silent) {
         onProgress(0, totalTiles, () => {
             AppState.isCachingCancelled = true;
             if (onCancel) onCancel();
@@ -459,15 +456,13 @@ async function cacheTilesForDIP({ map, lastLat, lastLng, baseMaps, onProgress, o
                 }
 
                 const currentCount = cachedCount + failedCount;
-                if ((index + 1) % 10 === 0 || index === tiles.length - 1) {
-                    console.log('Updating progress:', { currentCount, totalTiles });
-                    // KORREKTUR: Die übergebene Callback-Funktion verwenden
-                    if (onProgress) {
-                        onProgress(currentCount, totalTiles, () => {
-                            AppState.isCachingCancelled = true;
-                        });
-                    }
+            if ((index + 1) % 10 === 0 || index === tiles.length - 1) {
+                if (onProgress && !silent) {
+                    onProgress(currentCount, totalTiles, () => {
+                        AppState.isCachingCancelled = true;
+                    });
                 }
+            }
             });
 
             console.log(`Processing batch of ${tiles.length} tiles for layer ${layer.name}`);
@@ -514,7 +509,7 @@ async function cacheTilesForDIP({ map, lastLat, lastLng, baseMaps, onProgress, o
     } else {
         completionMessage = `Cached ${cachedCount} tiles around DIP successfully.`;
     }
-    
+
     if (onComplete) {
         onComplete(completionMessage);
     }
@@ -575,7 +570,7 @@ async function cacheVisibleTiles({ map, baseMaps, onProgress, onComplete, onCanc
         return;
     }
     // ... (Rest der Logik zum Füllen von tileLayers) ...
-     if (Settings.state.userSettings.baseMaps === 'Esri Satellite + OSM') {
+    if (Settings.state.userSettings.baseMaps === 'Esri Satellite + OSM') {
         tileLayers.push(
             { name: 'Esri Satellite', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', normalizedUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' },
             { name: 'OSM Overlay', url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', subdomains: ['a', 'b', 'c'], normalizedUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png' }
@@ -595,7 +590,7 @@ async function cacheVisibleTiles({ map, baseMaps, onProgress, onComplete, onCanc
     const totalTiles = tiles.length * tileLayers.length;
     const failedTiles = [];
     AppState.isCachingCancelled = false;
-    
+
     // Wichtig: onProgress MUSS eine Funktion sein, bevor sie aufgerufen wird.
     if (onProgress) {
         onProgress(0, totalTiles, () => {
@@ -611,14 +606,14 @@ async function cacheVisibleTiles({ map, baseMaps, onProgress, onComplete, onCanc
             // ...
             if (onProgress) {
                 onProgress(cachedCount + failedCount, totalTiles, () => {
-                     AppState.isCachingCancelled = true;
-                     if(onCancel) onCancel();
+                    AppState.isCachingCancelled = true;
+                    if (onCancel) onCancel();
                 });
             }
         });
         await Promise.all(fetchPromises);
     }
-    
+
     if (onComplete) {
         onComplete('Visible tiles cached.');
     }

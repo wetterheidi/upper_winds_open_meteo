@@ -963,18 +963,37 @@ function setupCacheManagement() {
 }
 
 function setupCacheSettings() {
-    const cacheRadiusSelect = document.getElementById('cacheRadiusSelect');
-    if (cacheRadiusSelect) {
-        cacheRadiusSelect.addEventListener('change', () => {
+    const cacheRadiusInput = document.getElementById('cacheRadiusSelect');
+    if (cacheRadiusInput) {
+        // Setzt den Startwert aus den gespeicherten Einstellungen
+        cacheRadiusInput.value = Settings.state.userSettings.cacheRadiusKm || 10;
+
+        // Event-Listener für das Eingabefeld mit Validierung
+        cacheRadiusInput.addEventListener('change', () => { // 'change' wird nach Verlassen des Feldes ausgelöst
             if (!Settings.state || !Settings.state.userSettings) {
                 console.error('Settings not properly initialized');
                 return;
             }
-            Settings.state.userSettings.cacheRadiusKm = parseInt(cacheRadiusSelect.value, 10);
+            
+            let value = parseInt(cacheRadiusInput.value, 10);
+
+            // Validierungslogik
+            if (isNaN(value) || value < 1) {
+                value = 1; // Auf Minimum setzen, wenn zu klein oder ungültig
+                Utils.handleMessage("Cache radius must be at least 1 km.");
+            } else if (value > 50) {
+                value = 50; // Auf Maximum setzen, wenn zu groß
+                Utils.handleMessage("Cache radius cannot exceed 50 km.");
+            }
+            
+            // Korrigierten Wert im UI und in den Settings speichern
+            cacheRadiusInput.value = value;
+            Settings.state.userSettings.cacheRadiusKm = value;
             Settings.save();
             console.log('Updated cacheRadiusKm:', Settings.state.userSettings.cacheRadiusKm);
         });
-        console.log('cacheRadiusSelect listener attached, initial value:', cacheRadiusSelect.value);
+        
+        console.log('cacheRadiusSelect listener attached, initial value:', cacheRadiusInput.value);
     } else {
         console.warn('cacheRadiusSelect not found in DOM');
     }

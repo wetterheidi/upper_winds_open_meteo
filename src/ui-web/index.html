@@ -179,11 +179,8 @@
                             <li>
                                 <label class="radio-label cache-setting-label">
                                     Cache Radius (km):
-                                    <select id="cacheRadiusSelect" class="cache-setting-select">
-                                        <option value="5" selected>5 km</option>
-                                        <option value="10">10 km</option>
-                                        <option value="15">15 km</option>
-                                    </select>
+                                    <input type="number" id="cacheRadiusSelect" min="1" max="50"
+                                        style="width: 80px; text-align: right;">
                                 </label>
                             </li>
                             <li>

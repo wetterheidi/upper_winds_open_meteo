@@ -1417,14 +1417,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     lastLng: lng,
                     baseMaps: AppState.baseMaps,
                     onProgress: displayProgress,
-                    onComplete: (message) => {
-                        hideProgress();
-                        if (message) displayMessage(message);
-                    },
-                    onCancel: () => {
-                        hideProgress();
-                        displayMessage('Caching cancelled.');
-                    }
+                    onComplete: displayMessage,
+                    onCancel: () => displayMessage('Caching cancelled.'),
+                    radiusKm: 5,
+                    silent: true // <- DIESE ZEILE IST ENTSCHEIDEND
                 });
             }
 
@@ -1436,14 +1432,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     lastLng: lng,
                     baseMaps: AppState.baseMaps,
                     onProgress: displayProgress,
-                    onComplete: (message) => {
-                        hideProgress();
-                        if (message) displayMessage(message);
-                    },
-                    onCancel: () => {
-                        hideProgress();
-                        displayMessage('Caching cancelled.');
-                    }
+                    onComplete: displayMessage,
+                    onCancel: () => displayMessage('Caching cancelled.'),
+                    radiusKm: 5,
+                    silent: true // <- DIESE ZEILE IST ENTSCHEIDEND
                 });
             }
 

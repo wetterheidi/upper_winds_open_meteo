@@ -427,11 +427,7 @@
                 <div class="accordion-content">
                     <div id="cache-settings" class="settings-grid">
                         <label for="cacheRadiusSelect">Cache Radius (km):</label>
-                        <select id="cacheRadiusSelect">
-                            <option value="5" selected>5 km</option>
-                            <option value="10">10 km</option>
-                            <option value="15">15 km</option>
-                        </select>
+                        <input type="number" id="cacheRadiusSelect" min="1" max="50">
                         <label for="cacheZoomLevelsSelect">Zoom Levels:</label>
                         <select id="cacheZoomLevelsSelect" class="cache-setting-select">
                             <option value="10-14">10–14</option>

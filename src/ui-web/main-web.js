@@ -1498,20 +1498,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Die 'geolocation'-Fälle sind schon abgedeckt, jetzt fügen wir die anderen hinzu.
             if (source === 'marker_drag' || source === 'dblclick' || source === 'search') {
                 console.log(`Starte Caching für neue Position via ${source}...`);
-                cacheTilesForDIP({ // Wichtig: cacheTilesForDIP, nicht cacheVisibleTiles
+                cacheTilesForDIP({
                     map: AppState.map,
                     lastLat: lat,
                     lastLng: lng,
                     baseMaps: AppState.baseMaps,
                     onProgress: displayProgress,
-                    onComplete: (message) => {
-                        hideProgress();
-                        if (message) displayMessage(message);
-                    },
-                    onCancel: () => {
-                        hideProgress();
-                        displayMessage('Caching cancelled.');
-                    }
+                    onComplete: displayMessage,
+                    onCancel: () => displayMessage('Caching cancelled.'),
+                    radiusKm: 5,
+                    silent: true // <- DIESE ZEILE IST ENTSCHEIDEND
                 });
             }
 
