@@ -1081,7 +1081,7 @@ function setupAppEventListeners() {
                                         closestIndex = index;
                                     }
                                 });
-                                layer.setTooltipContent(getTooltipContent(closestPoint, closestIndex, AppState.gpxPoints, groundAltitude, windUnit, heightUnit)).openTooltip(latlng);
+                                layer.setTooltipContent(Utils.getTooltipContent(closestPoint, closestIndex, AppState.gpxPoints, groundAltitude, windUnit, heightUnit)).openTooltip(latlng);
                             });
                         }
                     });

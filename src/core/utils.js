@@ -2,7 +2,8 @@ import { DateTime } from 'luxon';
 import * as mgrs from 'mgrs';
 import { AppState } from './state.js';
 import { CONVERSIONS, ISA_CONSTANTS, DEWPOINT_COEFFICIENTS, EARTH_RADIUS_METERS, PHYSICAL_CONSTANTS, BEAUFORT, ENSEMBLE_VISUALIZATION } from './constants.js';
-
+import { Settings } from "./settings.js";
+ 
 let customErrorHandler = console.error; // Fallback auf console.error
 let customMessageHandler = console.log; // Fallback für Nachrichten
 
@@ -941,6 +942,49 @@ export class Utils {
             return 0;
         }
         return feet / 3.28084;
+    }
+
+        static getTooltipContent(point, index, points, groundAltitude) {
+        if (!AppState.map) {
+            console.warn('Map not initialized for getTooltipContent');
+            return 'Map not initialized';
+        }
+
+        const currentCoordFormat = Settings.getValue('coordFormat', 'Decimal');
+        const windUnit = Settings.getValue('windUnit', 'kt');
+        const heightUnit = Settings.getValue('heightUnit', 'm');
+
+        const coords = Utils.convertCoords(point.lat, point.lng, currentCoordFormat);
+        let tooltipContent = currentCoordFormat === 'MGRS' ? `MGRS: ${coords.lat}` : `Lat: ${coords.lat}<br>Lng: ${coords.lng}`;
+
+        const elevation = point.ele;
+        let aglHeight = (elevation !== null && groundAltitude !== null) ? (elevation - groundAltitude) : null;
+
+        if (aglHeight !== null) {
+            const effectiveHeightUnit = heightUnit || 'm';
+            aglHeight = Utils.convertHeight(aglHeight, effectiveHeightUnit);
+            aglHeight = Math.round(aglHeight);
+            tooltipContent += `<br>Altitude: ${aglHeight} ${effectiveHeightUnit} AGL`;
+        } else {
+            tooltipContent += `<br>Altitude: N/A`;
+        }
+
+        let speed = 'N/A';
+        let descentRate = 'N/A';
+        if (index > 0 && point.time && points[index - 1].time && point.ele !== null && points[index - 1].ele !== null) {
+            const timeDiff = (point.time.toMillis() - points[index - 1].time.toMillis()) / 1000;
+            if (timeDiff > 0) {
+                const distance = AppState.map.distance([points[index - 1].lat, points[index - 1].lng], [point.lat, point.lng]);
+                const speedMs = distance / timeDiff;
+                speed = Utils.convertWind(speedMs, windUnit, 'm/s');
+                speed = windUnit === 'bft' ? Math.round(speed) : speed.toFixed(1);
+                const eleDiff = point.ele - points[index - 1].ele;
+                descentRate = (eleDiff / timeDiff).toFixed(1);
+            }
+        }
+        tooltipContent += `<br>Speed: ${speed} ${windUnit}`;
+        tooltipContent += `<br>Descent Rate: ${descentRate} m/s`;
+        return tooltipContent;
     }
 }
 

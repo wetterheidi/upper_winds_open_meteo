@@ -11,6 +11,9 @@ import { UI_DEFAULTS, ICON_URLS, ENSEMBLE_VISUALIZATION } from '../core/constant
 import { Geolocation } from '@capacitor/geolocation';
 
 let lastTapTime = 0; // Add this line
+let isRotatingJRT = false;
+let initialJrtAngle = 0;
+let initialJrtDirection = 0;
 
 /**
  * Initialisiert die Leaflet-Karte und alle zugehörigen Komponenten.
@@ -505,7 +508,62 @@ function _setupCoreMapEventHandlers() {
             await _handleMapDblClick({ latlng: latlng, containerPoint: L.point(touchX, touchY), layerPoint: AppState.map.latLngToLayerPoint(latlng) });
         }
         lastTapTime = currentTime; // Aktualisiere die Zeit des letzten Taps
+
+        if (e.touches.length === 2 && Settings.state.userSettings.showJumpRunTrack) {
+            e.preventDefault(); // Verhindert das Standard-Zooming von Leaflet
+
+            isRotatingJRT = true;
+            const touch1 = e.touches[0];
+            const touch2 = e.touches[1];
+
+            // Berechne den initialen Winkel zwischen den Fingern
+            initialJrtAngle = Math.atan2(touch2.clientY - touch1.clientY, touch2.clientX - touch1.clientX) * 180 / Math.PI;
+
+            // Speichere die aktuelle JRT-Richtung
+            const directionInput = document.getElementById('jumpRunTrackDirection');
+            initialJrtDirection = parseFloat(directionInput.value) || JumpPlanner.jumpRunTrack(null)?.direction || 0;
+        }
     }, { passive: false }); // passive: false ist wichtig, um preventDefault zu erlauben
+
+    mapContainer.addEventListener('touchmove', (e) => {
+        if (!isRotatingJRT || e.touches.length !== 2) return;
+
+        e.preventDefault(); // Weiterhin das Zoomen verhindern
+
+        const touch1 = e.touches[0];
+        const touch2 = e.touches[1];
+
+        // Berechne den aktuellen Winkel und die Änderung
+        const currentAngle = Math.atan2(touch2.clientY - touch1.clientY, touch2.clientX - touch1.clientX) * 180 / Math.PI;
+        const angleChange = currentAngle - initialJrtAngle;
+        let newDirection = (initialJrtDirection + angleChange + 360) % 360;
+
+        // Um ein flüssiges Neuzeichnen zu gewährleisten, verwenden wir requestAnimationFrame
+        requestAnimationFrame(() => {
+            // Aktualisiere das UI-Inputfeld und die Settings
+            const directionInput = document.getElementById('jumpRunTrackDirection');
+            directionInput.value = Math.round(newDirection);
+            Settings.state.userSettings.customJumpRunDirection = Math.round(newDirection);
+
+            // Zeichne den JRT neu
+            updateJumpRunTrackDisplay();
+        });
+    }, { passive: false });
+
+    mapContainer.addEventListener('touchend', (e) => {
+        if (isRotatingJRT) {
+            // Sobald weniger als zwei Finger auf dem Bildschirm sind, beenden wir die Rotation
+            if (e.touches.length < 2) {
+                isRotatingJRT = false;
+
+                // Speichere den finalen Wert in den Settings
+                const directionInput = document.getElementById('jumpRunTrackDirection');
+                Settings.state.userSettings.customJumpRunTrackDirection = parseFloat(directionInput.value);
+                Settings.save();
+                console.log("JRT rotation finished, final direction saved.");
+            }
+        }
+    });
 
     // Optionale, einfache Click/Mousedown-Handler (falls benötigt)
     AppState.map.on('click', (e) => {
@@ -1213,7 +1271,7 @@ export function handleHarpPlacement(e) {
         console.log('Enabled HARP radio button');
     }
     document.dispatchEvent(new CustomEvent('ui:recalculateJump'));
-    document.dispatchEvent(new CustomEvent('harp:updated')); 
+    document.dispatchEvent(new CustomEvent('harp:updated'));
 }
 
 export function createHarpMarker(latitude, longitude) {

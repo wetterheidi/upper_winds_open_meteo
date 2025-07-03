@@ -5,50 +5,6 @@ import { DateTime } from 'luxon';
 
 "use strict";
 
-
-function getTooltipContent(point, index, points, groundAltitude) { // Entferne windUnit und heightUnit aus den Parametern
-    if (!AppState.map) {
-        console.warn('Map not initialized for getTooltipContent');
-        return 'Map not initialized';
-    }
-
-    const currentCoordFormat = Settings.getValue('coordFormat',  'Decimal'); // Direkter Zugriff
-    const windUnit = Settings.getValue('windUnit',  'kt'); // Direkter Zugriff
-    const heightUnit = Settings.getValue('heightUnit',  'm'); // Direkter Zugriff
-
-    const coords = Utils.convertCoords(point.lat, point.lng, currentCoordFormat);
-    let tooltipContent = currentCoordFormat === 'MGRS' ? `MGRS: ${coords.lat}` : `Lat: ${coords.lat}<br>Lng: ${coords.lng}`;
-
-    const elevation = point.ele;
-    let aglHeight = (elevation !== null && groundAltitude !== null) ? (elevation - groundAltitude) : null;
-
-    if (aglHeight !== null) {
-        const effectiveHeightUnit = heightUnit || (Settings.state.userSettings.heightUnit || 'm');
-        aglHeight = Utils.convertHeight(aglHeight, effectiveHeightUnit);
-        aglHeight = Math.round(aglHeight);
-        tooltipContent += `<br>Altitude: ${aglHeight} ${effectiveHeightUnit} AGL`;
-    } else {
-        tooltipContent += `<br>Altitude: N/A`;
-    }
-
-    let speed = 'N/A';
-    let descentRate = 'N/A';
-    if (index > 0 && point.time && points[index - 1].time && point.ele !== null && points[index - 1].ele !== null) {
-        const timeDiff = (point.time.toMillis() - points[index - 1].time.toMillis()) / 1000;
-        if (timeDiff > 0) {
-            const distance = AppState.map.distance([points[index - 1].lat, points[index - 1].lng], [point.lat, point.lng]);
-            const speedMs = distance / timeDiff;
-            speed = Utils.convertWind(speedMs, windUnit, 'm/s');
-            speed = windUnit === 'bft' ? Math.round(speed) : speed.toFixed(1);
-            const eleDiff = point.ele - points[index - 1].ele;
-            descentRate = (eleDiff / timeDiff).toFixed(1);
-        }
-    }
-    tooltipContent += `<br>Speed: ${speed} ${windUnit}`;
-    tooltipContent += `<br>Descent Rate: ${descentRate} m/s`;
-    return tooltipContent;
-}
-
 /**
  * Lädt und verarbeitet eine GPX-Datei. Liest die Datei, extrahiert die Trackpunkte
  * und ruft die renderTrack-Funktion auf, um sie auf der Karte darzustellen.
@@ -270,8 +226,8 @@ async function renderTrack(points, fileName) {
                 points.forEach((p, index) => {
                     const dist = Math.sqrt(Math.pow(p.lat - latlng.lat, 2) + Math.pow(p.lng - latlng.lng, 2));
                     if (dist < minDist) { minDist = dist; closestPoint = p; closestIndex = index; }
-                });
-                segment.setTooltipContent(getTooltipContent(closestPoint, closestIndex, points, groundAltitude)).openTooltip(latlng);
+                });         
+                segment.setTooltipContent(Utils.getTooltipContent(closestPoint, closestIndex, points, groundAltitude)).openTooltip(latlng);
             });
             AppState.gpxLayer.addLayer(segment);
         }
