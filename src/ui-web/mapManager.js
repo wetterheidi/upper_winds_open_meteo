@@ -497,32 +497,21 @@ function _setupCoreMapEventHandlers() {
     });
 
 
-    // Contextmenu (Rechtsklick für Cut-Away-Marker)
     AppState.map.on('contextmenu', (e) => {
-        if (!Settings.state.userSettings.showCutAwayFinder || !Settings.state.userSettings.calculateJump) return;
-
+        // Rechtsklick/Langes Drücken verschiebt jetzt den DIP
         const { lat, lng } = e.latlng;
+        console.log('MapManager: Rechtsklick/Langes Drücken erkannt. Sende "location:selected"-Event.');
 
-        // Marker erstellen oder bewegen
-        if (AppState.cutAwayMarker) {
-            AppState.cutAwayMarker.setLatLng([lat, lng]);
-        } else {
-            AppState.cutAwayMarker = createCutAwayMarker(lat, lng).addTo(AppState.map);
-            attachCutAwayMarkerDragend(AppState.cutAwayMarker);
-        }
-
-        // Position im AppState speichern
-        AppState.cutAwayLat = lat;
-        AppState.cutAwayLng = lng;
-
-        // Popup aktualisieren und Neuberechnung anstoßen
-        updateCutAwayMarkerPopup(AppState.cutAwayMarker, lat, lng);
-
-        // Sende ein Event an app.js, damit die Neuberechnung ausgelöst wird.
-        const cutawayEvent = new CustomEvent('cutaway:marker_placed', {
-            bubbles: true
+        const mapSelectEvent = new CustomEvent('location:selected', {
+            detail: {
+                lat: lat,
+                lng: lng,
+                source: 'contextmenu' // Wir ändern die Quelle zur besseren Nachverfolgung
+            },
+            bubbles: true,
+            cancelable: true
         });
-        AppState.map.getContainer().dispatchEvent(cutawayEvent);
+        AppState.map.getContainer().dispatchEvent(mapSelectEvent);
     });
 
     // Touchstart (Doppel-Tipp) auf dem Kartencontainer
@@ -643,25 +632,28 @@ function _setupMouseCoordinateHandler(map) {
 
 // Die einzelnen komplexen Event-Handler
 function _handleMapDblClick(e) {
+    // Diese Funktion platziert jetzt den Cut-Away-Marker
+    if (!Settings.state.userSettings.showCutAwayFinder || !Settings.state.userSettings.calculateJump) return;
+
     const { lat, lng } = e.latlng;
-    console.log('MapManager: Doppelklick erkannt. Sende "location:selected"-Event.');
 
-    // 1. Erstelle das Event, genau wie beim Dragging.
-    //    Wir geben ihm eine Quelle mit, damit app.js weiß, woher es kam.
-    const mapSelectEvent = new CustomEvent('location:selected', {
-        detail: {
-            lat: lat,
-            lng: lng,
-            source: 'dblclick'
-        },
-        bubbles: true,
-        cancelable: true
+    // Erstellt oder bewegt den Cut-Away-Marker
+    if (AppState.cutAwayMarker) {
+        AppState.cutAwayMarker.setLatLng([lat, lng]);
+    } else {
+        AppState.cutAwayMarker = createCutAwayMarker(lat, lng).addTo(AppState.map);
+        attachCutAwayMarkerDragend(AppState.cutAwayMarker);
+    }
+
+    // Speichert die Position und löst die Neuberechnung aus
+    AppState.cutAwayLat = lat;
+    AppState.cutAwayLng = lng;
+    updateCutAwayMarkerPopup(AppState.cutAwayMarker, lat, lng);
+
+    const cutawayEvent = new CustomEvent('cutaway:marker_placed', {
+        bubbles: true
     });
-
-    // 2. Sende das Event.
-    AppState.map.getContainer().dispatchEvent(mapSelectEvent);
-
-    // 3. Alle direkten Aufrufe von calculateJump() etc. sind hier GELÖSCHT!
+    AppState.map.getContainer().dispatchEvent(cutawayEvent);
 }
 
 /**
@@ -1234,8 +1226,8 @@ export function handleHarpPlacement(e) {
         harpRadio.disabled = false;
         console.log('Enabled HARP radio button');
     }
-     document.dispatchEvent(new CustomEvent('ui:recalculateJump'));
-    document.dispatchEvent(new CustomEvent('harp:updated')); 
+    document.dispatchEvent(new CustomEvent('ui:recalculateJump'));
+    document.dispatchEvent(new CustomEvent('harp:updated'));
 }
 
 export function createHarpMarker(latitude, longitude) {
