@@ -208,7 +208,7 @@ function _addStandardMapControls() {
         }
     });
     L.control.zoom({ position: 'topright' }).addTo(AppState.map);
-    L.control.polylineMeasure({
+    const polylineMeasureControl = L.control.polylineMeasure({
         position: 'topright',
         unit: 'kilometres',
         showBearings: true,
@@ -216,19 +216,27 @@ function _addStandardMapControls() {
         showClearControl: true,
         showUnitControl: true,
         tooltipTextFinish: 'Click to finish the line<br>',
-        tooltipTextDelete: 'Shift-click to delete point', tooltipTextMove: 'Drag to move point<br>',
-        tooltipTextResume: 'Click to resume line<br>', tooltipTextAdd: 'Click to add point<br>',
+        tooltipTextDelete: 'Shift-click to delete point',
+        tooltipTextMove: 'Drag to move point<br>',
+        tooltipTextResume: 'Click to resume line<br>',
+        tooltipTextAdd: 'Click to add point<br>',
         measureControlTitleOn: 'Start measuring distance and bearing',
         measureControlTitleOff: 'Stop measuring'
     }).addTo(AppState.map);
 
-if (isMobileDevice()) {
+    if (isMobileDevice()) {
         let isMeasuring = false;
         let lastPoint = null;
         let rubberBandLayer = null;
         let measureLabel = L.DomUtil.create('div', 'leaflet-measure-label', AppState.map.getContainer());
 
-        // Zentrale Aufräumfunktion
+        // Variablen für Tap-Erkennung
+        let touchStartTime = 0;
+        let touchStartPos = null;
+        let isPotentialTap = false;
+        const tapTimeThreshold = 300; // Max. Dauer für einen Tap (ms)
+        const tapMoveThreshold = 10; // Max. Bewegung für einen Tap (Pixel)
+
         const cleanupMeasurementUI = () => {
             isMeasuring = false;
             if (rubberBandLayer) {
@@ -240,35 +248,104 @@ if (isMobileDevice()) {
                 measureLabel.innerHTML = '';
             }
             lastPoint = null;
+            console.log('Measurement UI cleaned up');
         };
 
-        AppState.map.on('polylinemeasure:start', function(e) {
+        AppState.map.on('polylinemeasure:start', function (e) {
             isMeasuring = true;
-            lastPoint = e.latlng;
+            lastPoint = null; // Erster Punkt wird durch Tap gesetzt
             if (measureLabel) measureLabel.style.display = 'block';
+            console.log('Measurement started, lastPoint:', lastPoint);
         });
-        
-        AppState.map.on('polylinemeasure:finish', cleanupMeasurementUI); // Wichtig für den letzten Punkt
 
-        AppState.map.on('polylinemeasure:clear', cleanupMeasurementUI); // Wichtig für den "Löschen"-Button
+        AppState.map.on('polylinemeasure:finish', cleanupMeasurementUI);
+        AppState.map.on('polylinemeasure:clear', cleanupMeasurementUI);
 
-        AppState.map.on('polylinemeasure:add', function(e) {
+        AppState.map.on('polylinemeasure:add', function (e) {
+            // Aktualisiere lastPoint basierend auf dem neu hinzugefügten Punkt
             if (e.currentLine && typeof e.currentLine.getLatLngs === 'function') {
                 const points = e.currentLine.getLatLngs();
                 if (points && points.length > 0) {
                     lastPoint = points[points.length - 1];
+                    console.log('Point added, updated lastPoint:', lastPoint);
                 }
             } else {
                 lastPoint = e.latlng;
+                console.log('Point added (fallback), updated lastPoint:', lastPoint);
             }
 
+            // Entferne die gestrichelte Linie, da ein neuer Punkt gesetzt wurde
             if (rubberBandLayer) {
                 AppState.map.removeLayer(rubberBandLayer);
-                rubberBandLayer = null; // Zurücksetzen für die nächste 'move'-Aktualisierung
+                rubberBandLayer = null;
             }
+
+            // Trigger move-Event, um die gestrichelte Linie sofort anzuzeigen
+            setTimeout(() => AppState.map.fire('move'), 0);
         });
 
-        AppState.map.on('move', function() {
+        // Touch-Handler mit Tap-Erkennung
+        AppState.map.getContainer().addEventListener('touchstart', function (e) {
+            if (!isMeasuring || e.touches.length !== 1 || e.target.closest('.leaflet-marker-icon')) return;
+
+            // Kein preventDefault/stopPropagation, um Panning zu erlauben
+            touchStartTime = Date.now();
+            touchStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            isPotentialTap = true;
+
+            console.log('Touch started, potential tap at:', touchStartPos);
+        }, { passive: true }); // Passive, um Leaflet-Panning nicht zu blockieren
+
+        AppState.map.getContainer().addEventListener('touchmove', function (e) {
+            if (!isPotentialTap || !isMeasuring) return;
+
+            const currentPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            const distanceMoved = Math.sqrt(
+                Math.pow(currentPos.x - touchStartPos.x, 2) +
+                Math.pow(currentPos.y - touchStartPos.y, 2)
+            );
+
+            if (distanceMoved > tapMoveThreshold) {
+                isPotentialTap = false;
+                console.log('Touch moved too far, canceling tap');
+            }
+        }, { passive: true });
+
+        AppState.map.getContainer().addEventListener('touchend', function (e) {
+            if (!isMeasuring || !isPotentialTap) return;
+
+            const touchEndTime = Date.now();
+            const touchDuration = touchEndTime - touchStartTime;
+
+            if (touchDuration <= tapTimeThreshold) {
+                // Bestätigter Tap: Setze Punkt
+                const rect = AppState.map.getContainer().getBoundingClientRect();
+                const touchX = touchStartPos.x - rect.left;
+                const touchY = touchStartPos.y - rect.top;
+                const latlng = AppState.map.containerPointToLatLng([touchX, touchY]);
+
+                // Simuliere ein click-Event für das Plugin
+                const clickEvent = new MouseEvent('click', {
+                    bubbles: true,
+                    cancelable: true,
+                    clientX: touchStartPos.x,
+                    clientY: touchStartPos.y
+                });
+                AppState.map.getContainer().dispatchEvent(clickEvent);
+
+                // Feedback für den Nutzer
+                Utils.handleMessage('Punkt gesetzt');
+                console.log('Tap confirmed, simulated click at:', latlng);
+
+                // Visuelle Bestätigung
+                const tempCircle = L.circle(latlng, { radius: 5, color: 'blue' }).addTo(AppState.map);
+                setTimeout(() => AppState.map.removeLayer(tempCircle), 500);
+            }
+
+            isPotentialTap = false;
+        }, { passive: true });
+
+        AppState.map.on('move', function () {
             if (isMeasuring && lastPoint) {
                 const currentCenter = AppState.map.getCenter();
 
@@ -276,7 +353,7 @@ if (isMobileDevice()) {
                     AppState.map.removeLayer(rubberBandLayer);
                 }
                 rubberBandLayer = L.polyline([lastPoint, currentCenter], {
-                    color: 'red',
+                    color: 'blue',
                     dashArray: '5, 5',
                     weight: 2,
                     interactive: false
@@ -285,25 +362,28 @@ if (isMobileDevice()) {
                 const distance = lastPoint.distanceTo(currentCenter);
                 const bearing = Utils.calculateBearing(lastPoint.lat, lastPoint.lng, currentCenter.lat, currentCenter.lng);
                 const distanceText = distance < 1000 ? `${distance.toFixed(0)} m` : `${(distance / 1000).toFixed(2)} km`;
-                
+
                 if (measureLabel) {
-                    measureLabel.innerHTML = `${bearing.toFixed(0)}°` <br> `${distanceText}`;
-                    const mapSize = AppState.map.getSize();
+                    measureLabel.innerHTML = `In: ${bearing.toFixed(0)}°<br><span class="bold-distance">${distanceText}</span>`; const mapSize = AppState.map.getSize();
                     const labelPos = L.point(mapSize.x / 2 + 20, mapSize.y / 2 - 40);
                     L.DomUtil.setPosition(measureLabel, labelPos);
                 }
+
+                console.log('Move event triggered, drawing rubberBandLayer from:', lastPoint, 'to:', currentCenter);
+            } else {
+                console.log('Move event skipped: isMeasuring=', isMeasuring, 'lastPoint=', lastPoint);
             }
         });
     }
-
-    // --- ENDE DER FINALEN VERSION ---
-
 
     L.control.scale({
         position: 'bottomleft',
         metric: true,
         imperial: false,
-        maxWidth: 100
+        maxWidth: 100,
+        background: 'rgba(255, 255, 255, 0.8)',
+        padding: '5px',
+        borderRadius: '4px'
     }).addTo(AppState.map);
     console.log('Standard map controls and baselayerchange handler added.');
 }
