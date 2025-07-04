@@ -222,6 +222,83 @@ function _addStandardMapControls() {
         measureControlTitleOff: 'Stop measuring'
     }).addTo(AppState.map);
 
+if (isMobileDevice()) {
+        let isMeasuring = false;
+        let lastPoint = null;
+        let rubberBandLayer = null;
+        let measureLabel = L.DomUtil.create('div', 'leaflet-measure-label', AppState.map.getContainer());
+
+        // Zentrale Aufräumfunktion
+        const cleanupMeasurementUI = () => {
+            isMeasuring = false;
+            if (rubberBandLayer) {
+                AppState.map.removeLayer(rubberBandLayer);
+                rubberBandLayer = null;
+            }
+            if (measureLabel) {
+                measureLabel.style.display = 'none';
+                measureLabel.innerHTML = '';
+            }
+            lastPoint = null;
+        };
+
+        AppState.map.on('polylinemeasure:start', function(e) {
+            isMeasuring = true;
+            lastPoint = e.latlng;
+            if (measureLabel) measureLabel.style.display = 'block';
+        });
+        
+        AppState.map.on('polylinemeasure:finish', cleanupMeasurementUI); // Wichtig für den letzten Punkt
+
+        AppState.map.on('polylinemeasure:clear', cleanupMeasurementUI); // Wichtig für den "Löschen"-Button
+
+        AppState.map.on('polylinemeasure:add', function(e) {
+            if (e.currentLine && typeof e.currentLine.getLatLngs === 'function') {
+                const points = e.currentLine.getLatLngs();
+                if (points && points.length > 0) {
+                    lastPoint = points[points.length - 1];
+                }
+            } else {
+                lastPoint = e.latlng;
+            }
+
+            if (rubberBandLayer) {
+                AppState.map.removeLayer(rubberBandLayer);
+                rubberBandLayer = null; // Zurücksetzen für die nächste 'move'-Aktualisierung
+            }
+        });
+
+        AppState.map.on('move', function() {
+            if (isMeasuring && lastPoint) {
+                const currentCenter = AppState.map.getCenter();
+
+                if (rubberBandLayer) {
+                    AppState.map.removeLayer(rubberBandLayer);
+                }
+                rubberBandLayer = L.polyline([lastPoint, currentCenter], {
+                    color: 'red',
+                    dashArray: '5, 5',
+                    weight: 2,
+                    interactive: false
+                }).addTo(AppState.map);
+
+                const distance = lastPoint.distanceTo(currentCenter);
+                const bearing = Utils.calculateBearing(lastPoint.lat, lastPoint.lng, currentCenter.lat, currentCenter.lng);
+                const distanceText = distance < 1000 ? `${distance.toFixed(0)} m` : `${(distance / 1000).toFixed(2)} km`;
+                
+                if (measureLabel) {
+                    measureLabel.innerHTML = `${bearing.toFixed(0)}°` <br> `${distanceText}`;
+                    const mapSize = AppState.map.getSize();
+                    const labelPos = L.point(mapSize.x / 2 + 20, mapSize.y / 2 - 40);
+                    L.DomUtil.setPosition(measureLabel, labelPos);
+                }
+            }
+        });
+    }
+
+    // --- ENDE DER FINALEN VERSION ---
+
+
     L.control.scale({
         position: 'bottomleft',
         metric: true,
