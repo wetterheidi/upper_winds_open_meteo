@@ -1017,6 +1017,16 @@ body {
   transform: translateY(0); /* Gleitet von oben herein */
 }
 
+.wind-tooltip {
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    border: none;
+    border-radius: 3px;
+    padding: 5px;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
 /* Media queries for responsiveness */
 @media (max-width: 768px) {
     #slider-container {
