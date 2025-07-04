@@ -799,8 +799,9 @@ function _setupMouseCoordinateHandler(map) {
 // Die einzelnen komplexen Event-Handler
 function _handleMapDblClick(e) {
     // Diese Funktion platziert jetzt den Cut-Away-Marker
-    if (!Settings.state.userSettings.showCutAwayFinder || !Settings.state.userSettings.calculateJump) return;
-
+    if (!Settings.state.userSettings.showCutAwayFinder) {
+        return;
+    }
     const { lat, lng } = e.latlng;
 
     // Erstellt oder bewegt den Cut-Away-Marker
