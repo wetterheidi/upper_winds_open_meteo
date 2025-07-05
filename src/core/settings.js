@@ -139,6 +139,10 @@ export const Settings = {
         this.state.userSettings.selectedEnsembleModels = [...this.defaultSettings.selectedEnsembleModels]; // Setzt auf leeres Array (gemäß defaultSettings)
         this.state.userSettings.currentEnsembleScenario = this.defaultSettings.currentEnsembleScenario; // z.B. 'all_models'
 
+        // Setzt den "Cut Away Finder" bei jedem Start zuverlässig auf "false".
+        this.state.userSettings.showCutAwayFinder = false;
+        console.log('Forced "showCutAwayFinder" to false on startup.');
+
         // Update unlocked features
         this.state.unlockedFeatures = {
             landingPattern: storedUnlockedFeatures.landingPattern || false,
