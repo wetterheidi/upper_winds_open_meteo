@@ -6,7 +6,8 @@ import { AppState } from './state.js';
 import { Utils } from './utils.js';
 import { Geolocation } from '@capacitor/geolocation';
 
-
+// Zähler, um die ersten ungenauen Web-Geolocation-Events zu überspringen
+let webUpdateCounter = 0;
 
 // --- Private Hilfsfunktionen ---
 
@@ -36,18 +37,6 @@ function createLiveMarkerIcon(direction) {
     });
 }
 
-function createLiveMarker(lat, lng) {
-    return L.marker([lat, lng], {
-        icon: L.divIcon({
-            className: 'live-marker',
-            html: '<div style="background-color: blue; width: 10px; height: 10px; border-radius: 50%;"></div>',
-            iconSize: [10, 10],
-            iconAnchor: [5, 5]
-        }),
-        zIndexOffset: 1000
-    });
-}
-
 function updateAccuracyCircle(lat, lng, accuracy) {
     if (AppState.accuracyCircle) {
         AppState.map.removeLayer(AppState.accuracyCircle);
@@ -65,12 +54,18 @@ const debouncedPositionUpdate = Utils.debounce(async (position) => {
     }
 
     const { latitude, longitude, accuracy, altitude: deviceAltitude, altitudeAccuracy } = position.coords;
-    console.log("[LiveTrackingManager] Position details:", { latitude, longitude, accuracy, deviceAltitude, altitudeAccuracy });
 
-    if (accuracy > UI_DEFAULTS.GEOLOCATION_ACCURACY_THRESHOLD_M) {
-        console.log("[LiveTrackingManager] Skipping position update due to low accuracy:", accuracy);
+    // Für das allererste Update sind wir weniger streng mit der Genauigkeit,
+    // damit der Marker auf jeden Fall erscheint. Danach sind wir streng.
+    const isFirstUpdate = !AppState.liveMarker;
+    const accuracyThreshold = isFirstUpdate ? 1500 : UI_DEFAULTS.GEOLOCATION_ACCURACY_THRESHOLD_M; // Höherer Schwellenwert für das erste Update
+
+    if (accuracy > accuracyThreshold) {
+        console.log(`[LiveTrackingManager] Skipping position update. Accuracy (${accuracy}m) is lower than threshold (${accuracyThreshold}m).`);
         return;
     }
+
+    console.log("[LiveTrackingManager] Position details:", { latitude, longitude, accuracy, deviceAltitude, altitudeAccuracy });
 
     const currentTime = Date.now();
     let speedMs = 0;
@@ -88,15 +83,12 @@ const debouncedPositionUpdate = Utils.debounce(async (position) => {
     const alpha = speedMs < SMOOTHING_DEFAULTS.SPEED_SMOOTHING_TRESHOLD ? SMOOTHING_DEFAULTS.SPEED_SMOOTHING_LOW : SMOOTHING_DEFAULTS.SPEED_SMOOTHING_HIGH;
     AppState.lastSmoothedSpeedMs = alpha * speedMs + (1 - alpha) * AppState.lastSmoothedSpeedMs;
 
-    // Marker erstellen oder aktualisieren
     if (!AppState.liveMarker) {
-        // Erstellt den Marker beim ersten Mal mit der initialen Richtung
         AppState.liveMarker = L.marker([latitude, longitude], {
             icon: createLiveMarkerIcon(direction),
             zIndexOffset: 1000
         }).addTo(AppState.map);
     } else {
-        // Aktualisiert bei Folgeaufrufen die Position und das Icon (für die Rotation)
         AppState.liveMarker.setLatLng([latitude, longitude]);
         AppState.liveMarker.setIcon(createLiveMarkerIcon(direction));
     }
@@ -104,7 +96,7 @@ const debouncedPositionUpdate = Utils.debounce(async (position) => {
     if (accuracy) {
         updateAccuracyCircle(latitude, longitude, accuracy);
     }
-    
+
     AppState.prevLat = latitude;
     AppState.prevLng = longitude;
     AppState.prevTime = currentTime;
@@ -146,7 +138,6 @@ export function startPositionTracking() {
             document.dispatchEvent(new CustomEvent('tracking:started'));
         });
     } else {
-        // FALLBACK: Standard-Web-API für den Browser
         console.log("[LiveTrackingManager] Using navigator.geolocation for tracking.");
         if (!navigator.geolocation) {
             Utils.handleError("Geolocation is not supported by your browser.");
@@ -174,7 +165,6 @@ export function startPositionTracking() {
  */
 export function stopPositionTracking() {
     if (AppState.watchId !== null) {
-        // PRÜFUNG: Welche Methode zum Stoppen verwenden?
         if (window.Capacitor && window.Capacitor.isNativePlatform()) {
             Geolocation.clearWatch({ id: AppState.watchId }).then(() => {
                 console.log("[LiveTrackingManager] Stopped Capacitor position tracking.");
@@ -186,14 +176,12 @@ export function stopPositionTracking() {
         AppState.watchId = null;
     }
     
-    // Aufräumlogik bleibt gleich
     if (AppState.liveMarker) AppState.map.removeLayer(AppState.liveMarker);
     if (AppState.accuracyCircle) AppState.map.removeLayer(AppState.accuracyCircle);
     AppState.liveMarker = null;
     AppState.accuracyCircle = null;
     AppState.prevLat = null;
     AppState.prevLng = null;
-    // ... weiterer Aufräumcode ...
     
     document.dispatchEvent(new CustomEvent('tracking:stopped'));
 }
