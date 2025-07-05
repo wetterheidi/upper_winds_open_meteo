@@ -47,6 +47,7 @@ export const Settings = {
         showJumpRunTrack: false,
         showExitArea: false,
         showCanopyArea: false,
+        showCutAwayFinder: false, 
         jumpRunTrackOffset: 0,
         jumpRunTrackForwardOffset: 0,
         aircraftSpeedKt: 90,

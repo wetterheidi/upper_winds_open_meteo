@@ -592,6 +592,7 @@ function initializeUIElements() {
     applySettingToCheckbox('showJumpRunTrack', Settings.state.userSettings.showJumpRunTrack);
     applySettingToCheckbox('showCanopyAreaCheckbox', Settings.state.userSettings.showCanopyArea);
     applySettingToCheckbox('showExitAreaCheckbox', Settings.state.userSettings.showExitArea);
+    applySettingToCheckbox('showCutAwayFinder', Settings.state.userSettings.showCutAwayFinder);
     Settings.state.userSettings.isCustomJumpRunDirection = Settings.state.userSettings.isCustomJumpRunDirection || false;
 
     const customLL = document.getElementById('customLandingDirectionLL');

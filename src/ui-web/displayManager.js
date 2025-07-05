@@ -560,13 +560,13 @@ export function updateJumpRunTrackDisplay() {
             path: {
                 latlngs: trackData.latlngs,
                 options: { color: 'orange', weight: 5, opacity: 0.8 },
-                tooltipText: `Jump Run Track: ${trackData.direction}°, Length: ${trackData.trackLength} m`,
+                tooltipText: `Jump Run: ${trackData.direction}°, ${trackData.trackLength} m`,
                 originalLatLngs: AppState.lastTrackData?.latlngs?.length === 2 ? AppState.lastTrackData.latlngs : trackData.latlngs
             },
             approachPath: trackData.approachLatLngs?.length === 2 && trackData.approachLatLngs.every(ll => Number.isFinite(ll[0]) && Number.isFinite(ll[1])) ? {
                 latlngs: trackData.approachLatLngs,
                 options: { color: 'orange', weight: 5, opacity: 0.8, dashArray: '5, 10' },
-                tooltipText: `Approach Path: ${trackData.direction}°, Length: ${trackData.approachLength} m`,
+                tooltipText: `Approach: ${trackData.direction}°, ${trackData.approachLength} m`,
                 originalLatLngs: AppState.lastTrackData?.approachLatLngs?.length === 2 ? AppState.lastTrackData.approachLatLngs : trackData.approachLatLngs
             } : null,
             trackLength: trackData.trackLength, // Wichtig für Drag-and-Drop

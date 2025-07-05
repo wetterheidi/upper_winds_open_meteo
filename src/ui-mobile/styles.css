@@ -1018,8 +1018,8 @@ body {
 }
 
 .wind-tooltip {
-    background: rgba(0, 0, 0, 0.8);
-    color: white;
+    background: rgba(255, 255, 255, 0.8);
+    color: black;
     border: none;
     border-radius: 3px;
     padding: 5px;
