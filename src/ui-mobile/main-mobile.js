@@ -685,6 +685,15 @@ export async function updateUIWithNewWeatherData(newWeatherData, preservedIndex 
     }
     displayManager.updateModelInfoPopup();
     Settings.updateModelRunInfo(AppState.lastModelRun, AppState.lastLat, AppState.lastLng);
+
+     console.log("Model changed. Triggering recalculation of jump parameters.");
+    displayManager.updateLandingPatternDisplay();
+    if (Settings.state.userSettings.calculateJump) {
+        calculateJump();
+    }
+    if (Settings.state.userSettings.showJumpRunTrack) {
+        displayManager.updateJumpRunTrackDisplay();
+    }
 }
 
 // == Setup values ==
