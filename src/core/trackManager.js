@@ -2,6 +2,8 @@ import { AppState } from './state.js';
 import { Settings } from "./settings.js";
 import { Utils } from "./utils.js";
 import { DateTime } from 'luxon';
+import * as JumpPlanner from './jumpPlanner.js';
+import { interpolateWeatherData } from './weatherManager.js';
 
 "use strict";
 
@@ -152,9 +154,9 @@ async function renderTrack(points, fileName) {
         const trackMetaData = {
             finalPointData: null,
             timestampToUseForWeather: null,
-            historicalDateString: null, 
+            historicalDateString: null,
             summaryForInfoElement: '',
-            success: false 
+            success: false
         };
 
         if (points.length > 0) {
@@ -168,9 +170,9 @@ async function renderTrack(points, fileName) {
                 const initialTimestamp = points[0].time;
                 const today = DateTime.utc().startOf('day');
                 const trackDateLuxon = initialTimestamp.startOf('day');
-                
+
                 if (trackDateLuxon < today) {
-                     trackMetaData.historicalDateString = trackDateLuxon.toFormat('yyyy-MM-dd');
+                    trackMetaData.historicalDateString = trackDateLuxon.toFormat('yyyy-MM-dd');
                 }
 
                 let roundedTimestamp = initialTimestamp.startOf('hour');
@@ -200,7 +202,7 @@ async function renderTrack(points, fileName) {
                 bubbles: true,
                 cancelable: true
             });
-            
+
             AppState.map.getContainer().dispatchEvent(trackLoadedEvent);
         }
 
@@ -226,7 +228,7 @@ async function renderTrack(points, fileName) {
                 points.forEach((p, index) => {
                     const dist = Math.sqrt(Math.pow(p.lat - latlng.lat, 2) + Math.pow(p.lng - latlng.lng, 2));
                     if (dist < minDist) { minDist = dist; closestPoint = p; closestIndex = index; }
-                });         
+                });
                 segment.setTooltipContent(Utils.getTooltipContent(closestPoint, closestIndex, points, groundAltitude)).openTooltip(latlng);
             });
             AppState.gpxLayer.addLayer(segment);
@@ -239,7 +241,7 @@ async function renderTrack(points, fileName) {
             if (bounds.isValid()) AppState.map.fitBounds(bounds, { padding: [50, 50], maxZoom: AppState.map.getMaxZoom() || 18 });
             else Utils.handleError('Unable to display track: invalid coordinates.');
         }
-        
+
         trackMetaData.success = true;
         console.log('[trackManager] renderTrack finished successfully.');
         return trackMetaData;
@@ -256,3 +258,250 @@ async function renderTrack(points, fileName) {
         return { success: false, error: error.message };
     }
 }
+
+/**
+ * Erstellt eine GPX-Datei als <trk> (Track) und löst den Download aus.
+ * Diese Struktur wird von Google Maps und anderen GPS-Programmen bevorzugt.
+ * @param {number} sliderIndex Der aktuell im UI ausgewählte Index des Zeitschiebereglers.
+ * @param {number} interpStep Der Interpolationsschritt für die Wetterdaten.
+ * @param {string} heightUnit Die aktuell ausgewählte Höheneinheit ('m' oder 'ft').
+ */
+export function exportToGpx(sliderIndex, interpStep, heightUnit) {
+    console.log("--- GPX EXPORT DEBUG START ---");
+    console.log("Schritt 1: Initialisiere Export mit Parametern:", { sliderIndex, interpStep, heightUnit });
+
+    if (!Settings.getValue('showJumpRunTrack', false)) {
+        Utils.handleError("Bitte aktivieren Sie zuerst 'Show Jump Run Track' im Menü, um den Track zu exportieren.");
+        return;
+    }
+
+    if (!AppState.weatherData || !AppState.lastLat || !AppState.lastLng || AppState.lastAltitude === 'N/A') {
+        console.error("DEBUG ABBRUCH: Vorbedingungen (Wetterdaten, Position) nicht erfüllt.");
+        Utils.handleError("Wetterdaten oder DIP-Position nicht verfügbar. GPX-Export nicht möglich.");
+        return;
+    }
+    console.log("Schritt 2: Vorbedingungen erfüllt.");
+
+    const dipLat = AppState.lastLat;
+    const dipLng = AppState.lastLng;
+    const harpAnchor = AppState.harpMarker ? AppState.harpMarker.getLatLng() : null;
+
+    const interpolatedData = interpolateWeatherData(
+        AppState.weatherData,
+        sliderIndex,
+        interpStep,
+        Math.round(AppState.lastAltitude),
+        heightUnit
+    );
+
+    if (!interpolatedData || interpolatedData.length === 0) {
+        console.error("DEBUG ABBRUCH: Interpolierte Wetterdaten sind leer.");
+        Utils.handleError("Keine Wetterdaten für die GPX-Erstellung verfügbar.");
+        return;
+    }
+    console.log("Schritt 3: Wetterdaten erfolgreich interpoliert.", `Anzahl Punkte: ${interpolatedData.length}`);
+
+    const trackData = JumpPlanner.jumpRunTrack(interpolatedData, harpAnchor);
+
+    // SEHR WICHTIGE AUSGABE: Was ist im trackData-Objekt?
+    console.log("Schritt 4: Jump Run Track berechnet. Ergebnis:", trackData);
+
+    if (!trackData || !trackData.latlngs || !trackData.approachLatLngs) {
+        console.error("DEBUG ABBRUCH: trackData-Objekt ist unvollständig.", "trackData:", trackData);
+        Utils.handleError("Jump Run Track konnte nicht berechnet werden. Prüfen Sie die Konsolenausgabe für Details.");
+        return;
+    }
+    console.log("Schritt 5: trackData-Objekt ist vollständig und gültig.");
+
+    const [approachStartLat, approachStartLng] = trackData.approachLatLngs[1];
+    const [jumpRunStartLat, jumpRunStartLng] = trackData.latlngs[0];
+    const [jumpRunEndLat, jumpRunEndLng] = trackData.latlngs[1];
+
+    const exitAltitude = Settings.getValue('exitAltitude', 3000);
+    console.log("Exit Altitude: ", exitAltitude);
+    console.log("Schritt 6: Alle Koordinaten für den Track extrahiert.");
+
+    // GPX-Inhalt erstellen (unverändert)
+    let gpxContent = `<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<gpx version="1.1" creator="DZMaster" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
+  <metadata>
+    <name>Jump Run - ${new Date().toLocaleString()}</name>
+    <desc>Generated by DZMaster. Jump Run Direction: ${trackData.direction}°</desc>
+    <author>
+      <name>DZMaster</name>
+      <link href="https://github.com/wetterheidi/upper_winds_open_meteo"/>
+    </author>
+    <time>${new Date().toISOString()}</time>
+  </metadata>
+`;
+
+    // --- START DER ÄNDERUNG: Nutzerfreundliche Wegpunkte hinzufügen ---
+    // Wegpunkt für DIP
+    gpxContent += `  <wpt lat="${dipLat}" lon="${dipLng}">
+    <name>DIP</name>
+    <sym>Flag, Blue</sym>
+  </wpt>\n`;
+
+    // Wegpunkt für HARP (falls vorhanden)
+    if (harpAnchor) {
+        gpxContent += `  <wpt lat="${harpAnchor.lat}" lon="${harpAnchor.lng}">
+    <name>HARP</name>
+    <sym>Flag, Green</sym>
+  </wpt>\n`;
+    }
+
+    // Wegpunkt für den Beginn des Anflugs
+    gpxContent += `  <wpt lat="${approachStartLat}" lon="${approachStartLng}">
+    <name>x-2, ${trackData.direction}°</name>
+    <ele>${exitAltitude}</ele>
+    <sym>Airplane</sym>
+  </wpt>\n`;
+
+    // Wegpunkt für den ersten Springer
+    gpxContent += `  <wpt lat="${jumpRunStartLat}" lon="${jumpRunStartLng}">
+    <name>First Out</name>
+    <ele>${exitAltitude}</ele>
+    <sym>Airplane</sym>
+  </wpt>\n`;
+
+    // Wegpunkt für den letzten Springer
+    gpxContent += `  <wpt lat="${jumpRunEndLat}" lon="${jumpRunEndLng}">
+    <name>Last Out</name>
+    <ele>${exitAltitude}</ele>
+    <sym>Airplane</sym>
+  </wpt>\n`;
+    // --- ENDE DER ÄNDERUNG ---
+
+    // Der Track (<trk>) bleibt erhalten, um die Linie zu zeichnen
+    gpxContent += `  <trk>
+    <name>Jump Run and Approach</name>
+    <trkseg>
+      <trkpt lat="${approachStartLat}" lon="${approachStartLng}"><ele>${exitAltitude}</ele></trkpt>
+      <trkpt lat="${jumpRunStartLat}" lon="${jumpRunStartLng}"><ele>${exitAltitude}</ele></trkpt>
+      <trkpt lat="${jumpRunEndLat}" lon="${jumpRunEndLng}"><ele>${exitAltitude}</ele></trkpt>
+    </trkseg>
+  </trk>
+</gpx>`;
+
+    console.log("Schritt 7: GPX-XML-String erfolgreich erstellt.");
+
+    const blob = new Blob([gpxContent], { type: "application/gpx+xml;charset=utf-8" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const time = Utils.formatTime(AppState.weatherData.time[sliderIndex]).replace(/ /g, '_').replace(/:/g, '');
+    a.href = url;
+    a.download = `${time}_JumpRun_Track.gpx`;
+
+    console.log("Schritt 8: Download-Link vorbereitet. LÖSE JETZT DOWNLOAD AUS.", { filename: a.download });
+    console.log("--- GPX EXPORT DEBUG END ---");
+
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+}
+
+/**
+ * Erstellt eine GPX-Datei für das Landemuster und löst den Download aus.
+ * @param {number} sliderIndex Der aktuell im UI ausgewählte Index des Zeitschiebereglers.
+ * @param {number} interpStep Der Interpolationsschritt für die Wetterdaten.
+ * @param {string} heightUnit Die aktuell ausgewählte Höheneinheit ('m' oder 'ft').
+ */
+export function exportLandingPatternToGpx(sliderIndex, interpStep, heightUnit) {
+    // 1. Prüfen, ob die Funktion überhaupt aktiviert ist
+    if (!Settings.getValue('showLandingPattern', false)) {
+        Utils.handleError("Bitte aktivieren Sie zuerst 'Landing Pattern' im Menü, um es zu exportieren.");
+        return;
+    }
+
+    if (!AppState.weatherData || !AppState.lastLat || !AppState.lastLng || AppState.lastAltitude === 'N/A') {
+        Utils.handleError("Wetterdaten oder DIP-Position nicht verfügbar. GPX-Export nicht möglich.");
+        return;
+    }
+
+    // 2. Notwendige Daten für die Berechnung sammeln
+    const interpolatedData = interpolateWeatherData(
+        AppState.weatherData, sliderIndex, interpStep, Math.round(AppState.lastAltitude), heightUnit
+    );
+
+    if (!interpolatedData || interpolatedData.length === 0) {
+        Utils.handleError("Keine Wetterdaten für die GPX-Erstellung verfügbar.");
+        return;
+    }
+
+    // Holen Sie die Eckpunkte des Landemusters. Diese Logik ist bereits in `displayManager` vorhanden
+    // und wird hier wiederverwendet.
+    // HINWEIS: Diese Neuberechnung ist notwendig, um die exakten Punkte zu bekommen.
+    const patternDataForExport = JumpPlanner.calculateLandingPatternCoords(AppState.lastLat, AppState.lastLng, interpolatedData);
+    if (!patternDataForExport) {
+         Utils.handleError("Landemuster konnte nicht berechnet werden.");
+         return;
+    }
+
+    const { downwindStart, baseStart, finalStart, landingPoint } = patternDataForExport;
+    const legHeightDownwind = Settings.getValue('legHeightDownwind', 300);
+    const legHeightBase = Settings.getValue('legHeightBase', 200);
+    const legHeightFinal = Settings.getValue('legHeightFinal', 100);
+
+    // 3. GPX-String aufbauen
+    let gpxContent = `<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<gpx version="1.1" creator="DZMaster" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
+  <metadata>
+    <name>Landing Pattern - ${new Date().toLocaleString()}</name>
+    <desc>Generated by DZMaster Application.</desc>
+    <author>
+      <name>DZMaster</name>
+      <link href="https://github.com/wetterheidi/upper_winds_open_meteo"/>
+    </author>
+    <time>${new Date().toISOString()}</time>
+  </metadata>
+`;
+
+    // Wegpunkte hinzufügen
+    gpxContent += `  <wpt lat="${downwindStart[0]}" lon="${downwindStart[1]}">
+    <name>Downwind</name>
+    <ele>${legHeightDownwind}</ele>
+    <sym>scenic area</sym>
+  </wpt>\n`;
+
+    gpxContent += `  <wpt lat="${baseStart[0]}" lon="${baseStart[1]}">
+    <name>Base</name>
+    <ele>${legHeightBase}</ele>
+    <sym>scenic area</sym>
+  </wpt>\n`;
+
+    gpxContent += `  <wpt lat="${finalStart[0]}" lon="${finalStart[1]}">
+    <name>Final</name>
+    <ele>${legHeightFinal}</ele>
+    <sym>scenic area</sym>
+  </wpt>\n`;
+  
+    gpxContent += `  <wpt lat="${landingPoint[0]}" lon="${landingPoint[1]}">
+    <name>DIP</name>
+    <sym>Flag, Blue</sym>
+  </wpt>\n`;
+
+    // Track hinzufügen, der die Punkte verbindet
+    gpxContent += `  <trk>
+    <name>Landing Pattern</name>
+    <trkseg>
+      <trkpt lat="${downwindStart[0]}" lon="${downwindStart[1]}"><ele>${legHeightDownwind}</ele></trkpt>
+      <trkpt lat="${baseStart[0]}" lon="${baseStart[1]}"><ele>${legHeightBase}</ele></trkpt>
+      <trkpt lat="${finalStart[0]}" lon="${finalStart[1]}"><ele>${legHeightFinal}</ele></trkpt>
+      <trkpt lat="${landingPoint[0]}" lon="${landingPoint[1]}"><ele>0</ele></trkpt>
+    </trkseg>
+  </trk>
+</gpx>`;
+
+    // 4. Download auslösen
+    const blob = new Blob([gpxContent], { type: "application/gpx+xml;charset=utf-8" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const time = Utils.formatTime(AppState.weatherData.time[sliderIndex]).replace(/ /g, '_').replace(/:/g, '');
+    a.download = `${time}_Landing_Pattern.gpx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+}
+
