@@ -279,7 +279,7 @@ export function jumpRunTrack(interpolatedData, harpAnchor = null) {
     const anchorLat = harpAnchor ? harpAnchor.lat : AppState.lastLat;
     const anchorLng = harpAnchor ? harpAnchor.lng : AppState.lastLng;
 
-    if (!AppState.weatherData || !anchorLat || !anchorLng || AppState.lastAltitude === 'N/A' || !interpolatedData || interpolatedData.length === 0) {
+    if (!AppState.weatherData || !anchorLat || !anchorLng || AppState.lastAltitude === 'N/A' || !interpolatedData || !interpolatedData.length) {
         return null;
     }
     
@@ -300,10 +300,15 @@ export function jumpRunTrack(interpolatedData, harpAnchor = null) {
     
     const exitAltitude = parseInt(document.getElementById('exitAltitude')?.value) || 3000;
     const exitHeightM = elevation + exitAltitude;
-    const tasKt = Utils.calculateTAS(Settings.state.userSettings.aircraftSpeedKt || 90, exitHeightM / 0.3048);
-    let groundSpeedMps = null, trackLength = 2000, approachLength = 2000, approachLatLngs = null;
+    const aircraftSpeedKt = Settings.state.userSettings.aircraftSpeedKt || 90;
+    const tasKt = Utils.calculateTAS(aircraftSpeedKt, exitHeightM / 0.3048);
     
-    if(tasKt !== 'N/A' && Number.isFinite(tasKt)) {
+    // --- START DER KORREKTUR ---
+    // Wir initialisieren groundSpeedMps mit einem sinnvollen Fallback-Wert.
+    let groundSpeedMps = aircraftSpeedKt * CONVERSIONS.KNOTS_TO_MPS; 
+
+    if (tasKt !== 'N/A' && Number.isFinite(tasKt)) {
+        // Wenn TAS berechnet werden kann, wird groundSpeedMps mit dem exakten Wert überschrieben.
         const windDirAtExit = Utils.linearInterpolate(heights.map(h => h - elevation), interpolatedData.map(d => d.dir), exitAltitude);
         const windSpeedMpsAtExit = Utils.linearInterpolate(heights.map(h => h - elevation), interpolatedData.map(d => Utils.convertWind(d.spd, 'm/s', 'km/h')), exitAltitude);
         const tasMps = tasKt * CONVERSIONS.KNOTS_TO_MPS;
@@ -314,34 +319,28 @@ export function jumpRunTrack(interpolatedData, harpAnchor = null) {
         const tasU = tasMps * Math.sin(headingRad);
         const tasV = tasMps * Math.cos(headingRad);
         groundSpeedMps = Math.sqrt(Math.pow(tasU + windU, 2) + Math.pow(tasV + windV, 2));
-
-        trackLength = Math.max(JUMP_RUN_DEFAULTS.MIN_TRACK_LENGTH_M, Math.min(JUMP_RUN_DEFAULTS.MAX_TRACK_LENGTH_M, Math.round((Settings.state.userSettings.numberOfJumpers || 10) * (Settings.state.userSettings.jumperSeparation || 5) * groundSpeedMps)));
-        approachLength = Math.max(JUMP_RUN_DEFAULTS.MIN_APPROACH_LENGTH_M, Math.min(JUMP_RUN_DEFAULTS.MAX_APPROACH_LENGTH_M, Math.round(groundSpeedMps * JUMP_RUN_DEFAULTS.APPROACH_TIME_SECONDS)));
     }
+    // --- ENDE DER KORREKTUR ---
+    
+    const trackLength = Math.max(JUMP_RUN_DEFAULTS.MIN_TRACK_LENGTH_M, Math.min(JUMP_RUN_DEFAULTS.MAX_TRACK_LENGTH_M, Math.round((Settings.state.userSettings.numberOfJumpers || 10) * (Settings.state.userSettings.jumperSeparation || 5) * groundSpeedMps)));
+    const approachLength = Math.max(JUMP_RUN_DEFAULTS.MIN_APPROACH_LENGTH_M, Math.min(JUMP_RUN_DEFAULTS.MAX_APPROACH_LENGTH_M, Math.round(groundSpeedMps * JUMP_RUN_DEFAULTS.APPROACH_TIME_SECONDS)));
     
     const lateralOffset = Settings.state.userSettings.jumpRunTrackOffset || 0;
     const forwardOffset = Settings.state.userSettings.jumpRunTrackForwardOffset || 0;
     
-    // Schritt 1: Der HARP (oder DIP) wird als initialer Startpunkt der durchgezogenen Linie definiert.
     const initialStartPoint = [anchorLat, anchorLng];
-
-    // Schritt 2: Der initiale Endpunkt (Flugzeug) wird von diesem Startpunkt aus berechnet.
     const initialEndPoint = Utils.calculateNewCenter(initialStartPoint[0], initialStartPoint[1], trackLength, jumpRunTrackDirection);
 
-    // Schritt 3: Der Gesamt-Verschiebungsvektor aus den Offsets wird berechnet.
     const shiftDistance = Math.sqrt(lateralOffset**2 + forwardOffset**2);
     const shiftAngleFromTrack = Math.atan2(lateralOffset, forwardOffset) * 180 / Math.PI;
     const absoluteShiftBearing = (jumpRunTrackDirection + shiftAngleFromTrack + 360) % 360;
 
-    // Schritt 4: Die finale Position des Start- und Endpunkts wird durch Anwenden des
-    // Verschiebungsvektors auf die initialen Punkte ermittelt.
     const startPoint = Utils.calculateNewCenter(initialStartPoint[0], initialStartPoint[1], shiftDistance, absoluteShiftBearing);
     const endPoint = Utils.calculateNewCenter(initialEndPoint[0], initialEndPoint[1], shiftDistance, absoluteShiftBearing);
     
-     if(groundSpeedMps){
-        const approachStartPoint = Utils.calculateNewCenter(startPoint[0], startPoint[1], approachLength, (jumpRunTrackDirection + 180) % 360);
-        approachLatLngs = [startPoint, approachStartPoint];
-    }
+    // Dieser Block wird jetzt immer ausgeführt, da groundSpeedMps immer einen Wert hat.
+    const approachStartPoint = Utils.calculateNewCenter(startPoint[0], startPoint[1], approachLength, (jumpRunTrackDirection + 180) % 360);
+    const approachLatLngs = [startPoint, approachStartPoint];
 
     return {
         direction: jumpRunTrackDirection, trackLength, meanWindDirection: meanWind[0], meanWindSpeed: meanWind[1],

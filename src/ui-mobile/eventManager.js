@@ -2,14 +2,14 @@
 "use strict";
 
 import { AppState } from '../core/state.js';
-import { Settings } from '../core/settings.js';
+import { Settings, getInterpolationStep } from '../core/settings.js';
 import { Utils } from '../core/utils.js';
 import * as displayManager from './displayManager.js';
 import * as mapManager from './mapManager.js';
 import * as Coordinates from './coordinates.js';
 import * as JumpPlanner from '../core/jumpPlanner.js';
 import { TileCache, cacheTilesForDIP, cacheVisibleTiles } from '../core/tileCache.js';
-import { loadGpxTrack, loadCsvTrackUTC } from '../core/trackManager.js';
+import { loadGpxTrack, loadCsvTrackUTC, exportToGpx} from '../core/trackManager.js';
 import * as weatherManager from '../core/weatherManager.js';
 import * as liveTrackingManager from '../core/liveTrackingManager.js';
 import { fetchEnsembleWeatherData, processAndVisualizeEnsemble, clearEnsembleVisualizations } from '../core/ensembleManager.js';
@@ -911,7 +911,22 @@ function setupTrackEvents() {
         });
     }
 }
+function setupGpxExportEvent() {
+    const exportButton = document.getElementById('exportGpxButton');
+    if (exportButton) {
+        exportButton.addEventListener('click', () => {
+            // Alle UI-Werte hier sammeln
+            const sliderIndex = getSliderValue();
+            const interpStep = getInterpolationStep();
+            // Hier greifen wir auf die getValue-Methode von Settings zu, 
+            // was der saubere Weg ist, um den UI-Wert zu bekommen.
+            const heightUnit = Settings.getValue('heightUnit', 'm'); 
 
+            // Alle Werte an die Core-Funktion übergeben
+            exportToGpx(sliderIndex, interpStep, heightUnit);
+        });
+    }
+}
 
 function setupCacheManagement() {
     const targetContainer = document.getElementById('app-management-settings');
@@ -1244,6 +1259,7 @@ export function initializeEventListeners() {
     setupSettingsPanels();
     setupInfoIcons();
     setupHarpCoordInputEvents(); // Call the new setup function here
+    setupGpxExportEvent();
     listenersInitialized = true;
     console.log("Event listeners initialized successfully (first and only time).");
 
