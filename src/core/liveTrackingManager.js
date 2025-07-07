@@ -55,33 +55,39 @@ const debouncedPositionUpdate = Utils.debounce(async (position) => {
 
     const { latitude, longitude, accuracy, altitude: deviceAltitude, altitudeAccuracy } = position.coords;
 
-    // Für das allererste Update sind wir weniger streng mit der Genauigkeit,
-    // damit der Marker auf jeden Fall erscheint. Danach sind wir streng.
     const isFirstUpdate = !AppState.liveMarker;
-    const accuracyThreshold = isFirstUpdate ? 1500 : UI_DEFAULTS.GEOLOCATION_ACCURACY_THRESHOLD_M; // Höherer Schwellenwert für das erste Update
+    const accuracyThreshold = isFirstUpdate ? 1500 : UI_DEFAULTS.GEOLOCATION_ACCURACY_THRESHOLD_M;
 
     if (accuracy > accuracyThreshold) {
-        console.log(`[LiveTrackingManager] Skipping position update. Accuracy (${accuracy}m) is lower than threshold (${accuracyThreshold}m).`);
+        console.log(`[LiveTrackingManager] Skipping position update due to low accuracy (${accuracy}m).`);
         return;
     }
-
-    console.log("[LiveTrackingManager] Position details:", { latitude, longitude, accuracy, deviceAltitude, altitudeAccuracy });
 
     const currentTime = Date.now();
     let speedMs = 0;
     let direction = 'N/A';
+    let descentRateMps = 0; // NEU: Variable für die Sinkrate
 
-    if (AppState.prevLat !== null && AppState.prevLng !== null && AppState.prevTime !== null) {
-        const distance = AppState.map.distance([AppState.prevLat, AppState.prevLng], [latitude, longitude]);
+    if (AppState.prevLat !== null && AppState.prevLng !== null && AppState.prevTime !== null && AppState.prevAltitude !== null) {
         const timeDiff = (currentTime - AppState.prevTime) / 1000;
         if (timeDiff > SMOOTHING_DEFAULTS.MIN_TIME_DIFF_FOR_SPEED_CALC_S) {
+            // Horizontale Geschwindigkeit berechnen
+            const distance = AppState.map.distance([AppState.prevLat, AppState.prevLng], [latitude, longitude]);
             speedMs = distance / timeDiff;
             direction = Utils.calculateBearing(AppState.prevLat, AppState.prevLng, latitude, longitude);
+
+            // NEU: Vertikale Geschwindigkeit (Sinkrate) berechnen
+            const altitudeDiff = AppState.prevAltitude - deviceAltitude; // positiv bei Sinken
+            descentRateMps = altitudeDiff / timeDiff;
         }
     }
 
-    const alpha = speedMs < SMOOTHING_DEFAULTS.SPEED_SMOOTHING_TRESHOLD ? SMOOTHING_DEFAULTS.SPEED_SMOOTHING_LOW : SMOOTHING_DEFAULTS.SPEED_SMOOTHING_HIGH;
-    AppState.lastSmoothedSpeedMs = alpha * speedMs + (1 - alpha) * AppState.lastSmoothedSpeedMs;
+    // Glättung der Werte für eine stabilere Anzeige
+    const alphaSpeed = speedMs < SMOOTHING_DEFAULTS.SPEED_SMOOTHING_TRESHOLD ? SMOOTHING_DEFAULTS.SPEED_SMOOTHING_LOW : SMOOTHING_DEFAULTS.SPEED_SMOOTHING_HIGH;
+    AppState.lastSmoothedSpeedMs = alphaSpeed * speedMs + (1 - alphaSpeed) * AppState.lastSmoothedSpeedMs;
+    const alphaDescent = 0.5; // Fester Glättungsfaktor für die Sinkrate
+    AppState.lastSmoothedDescentRateMps = alphaDescent * descentRateMps + (1 - alphaDescent) * (AppState.lastSmoothedDescentRateMps || 0);
+
 
     if (!AppState.liveMarker) {
         AppState.liveMarker = L.marker([latitude, longitude], {
@@ -97,19 +103,22 @@ const debouncedPositionUpdate = Utils.debounce(async (position) => {
         updateAccuracyCircle(latitude, longitude, accuracy);
     }
 
+    // Vorherige Werte für die nächste Berechnung speichern
     AppState.prevLat = latitude;
     AppState.prevLng = longitude;
     AppState.prevTime = currentTime;
+    AppState.prevAltitude = deviceAltitude; // NEU: Höhe speichern
 
+    // Event mit den neuen Daten auslösen
     const event = new CustomEvent('tracking:positionUpdated', {
         detail: {
             latitude, longitude, deviceAltitude, altitudeAccuracy, accuracy,
             speedMs: AppState.lastSmoothedSpeedMs,
+            descentRateMps: AppState.lastSmoothedDescentRateMps,
             direction: typeof direction === 'number' ? direction.toFixed(0) : 'N/A'
         },
         bubbles: true, cancelable: true
     });
-    console.log("[LiveTrackingManager] Dispatching tracking:positionUpdated event:", event.detail);
     document.dispatchEvent(event);
 }, 300);
 
