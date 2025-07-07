@@ -914,16 +914,14 @@ function setupTrackEvents() {
 function setupGpxExportEvent() {
     const exportButton = document.getElementById('exportGpxButton');
     if (exportButton) {
-        exportButton.addEventListener('click', () => {
-            // Alle UI-Werte hier sammeln
+        // Hinzufügen von 'async', um 'await' verwenden zu können
+        exportButton.addEventListener('click', async () => {
             const sliderIndex = getSliderValue();
             const interpStep = getInterpolationStep();
-            // Hier greifen wir auf die getValue-Methode von Settings zu, 
-            // was der saubere Weg ist, um den UI-Wert zu bekommen.
-            const heightUnit = Settings.getValue('heightUnit', 'm'); 
+            const heightUnit = Settings.getValue('heightUnit', 'm');
 
-            // Alle Werte an die Core-Funktion übergeben
-            exportToGpx(sliderIndex, interpStep, heightUnit);
+            // 'await' stellt sicher, dass auf die Fertigstellung der Funktion gewartet wird
+            await exportToGpx(sliderIndex, interpStep, heightUnit);
         });
     }
 

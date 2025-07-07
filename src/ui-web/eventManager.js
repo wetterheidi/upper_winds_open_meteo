@@ -909,8 +909,14 @@ function setupGpxExportEvent() {
 
     const exportButton = document.getElementById('exportGpxButton');
     if (exportButton) {
-        exportButton.addEventListener('click', () => {
-           exportToGpx(sliderIndex, interpStep, heightUnit);
+        // Hinzufügen von 'async', um 'await' verwenden zu können
+        exportButton.addEventListener('click', async () => {
+            const sliderIndex = getSliderValue();
+            const interpStep = getInterpolationStep();
+            const heightUnit = Settings.getValue('heightUnit', 'm');
+
+            // 'await' stellt sicher, dass auf die Fertigstellung der Funktion gewartet wird
+            await exportToGpx(sliderIndex, interpStep, heightUnit);
         });
     }
 
