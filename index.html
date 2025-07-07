@@ -18,7 +18,7 @@
 
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="/upper_winds_open_meteo/icon-48.png">
-  <script type="module" crossorigin src="/upper_winds_open_meteo/assets/index-D9Y3LMgX.js"></script>
+  <script type="module" crossorigin src="/upper_winds_open_meteo/assets/index-CwnOKB9u.js"></script>
   <link rel="stylesheet" crossorigin href="/upper_winds_open_meteo/assets/index-Cz0npjp5.css">
 </head>
 
@@ -291,6 +291,9 @@
                         <input type="number" id="descentRate" min="1" max="10" step="0.1" value="3.5">
                     </label>
                 </li>
+                <li>
+                    <button id="exportLandingPatternGpxButton">Export Landing Pattern as GPX</button>
+                </li>
             </ul>
         </li>
         <li>
@@ -388,8 +391,7 @@
                     </ul>
                 </li>
                 <li>
-                    <button id="exportGpxButton" style="width: 100%; background-color: #28a745;">Export Jump Run
-                        as GPX</button>
+                    <button id="exportGpxButton">Export Jump Run as GPX</button>
                 </li>
             </ul>
         </li>
@@ -506,9 +508,9 @@
             <div id="meanWindResult"></div>
         </div>
         <div id="controls-row">
-            <label for="interpStepSelect"
+            <label for="interpStep"
                 title="Select the altitude interval for weather data interpolation">Step:</label>
-            <select id="interpStepSelect" aria-label="Interpolation step interval">
+            <select id="interpStep" aria-label="Interpolation step interval">
                 <option value="100">100</option>
                 <option value="200" selected>200</option>
                 <option value="500">500</option>
