@@ -219,7 +219,7 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
  * die Linien und Pfeile für das Muster zu zeichnen.
  * @returns {void}
  */
-export function updateLandingPatternDisplay() {
+export function updateLandingPatternDisplayOLD() {
 
     // 1. Prüft, ob der Marker existiert UND ob es ein valides Objekt mit der getLatLng-Methode ist.
     if (!AppState.currentMarker || typeof AppState.currentMarker.getLatLng !== 'function') {
@@ -508,6 +508,105 @@ export function updateLandingPatternDisplay() {
     };
 
     // --- TEIL D: DEN KELLNER MIT DER FERTIGEN BESTELLUNG LOSSCHICKEN ---
+    mapManager.drawLandingPattern(patternData);
+}
+export function updateLandingPatternDisplay() {
+    // Schritt 1: Alle Vorbedingungen prüfen (unverändert)
+    if (!AppState.currentMarker || typeof AppState.currentMarker.getLatLng !== 'function') return;
+
+    const markerLatLng = AppState.currentMarker.getLatLng();
+    if (!markerLatLng) return;
+
+    if (!Settings.state.isLandingPatternUnlocked || !Settings.state.userSettings.showLandingPattern || !AppState.weatherData || AppState.map.getZoom() < UI_DEFAULTS.LANDING_PATTERN_MIN_ZOOM) {
+        mapManager.drawLandingPattern(null);
+        return;
+    }
+
+    // Schritt 2: Daten für die Berechnung sammeln (unverändert)
+    const sliderIndex = parseInt(document.getElementById('timeSlider').value) || 0;
+    const interpStep = getInterpolationStep();
+    const heightUnit = Settings.getValue('heightUnit', 'm');
+    const windUnit = Settings.getValue('windUnit', 'kt');
+    const baseHeight = Math.round(AppState.lastAltitude);
+    
+    const interpolatedData = weatherManager.interpolateWeatherData(
+        AppState.weatherData, sliderIndex, interpStep, baseHeight, heightUnit
+    );
+
+    if (!interpolatedData || interpolatedData.length === 0) {
+        mapManager.drawLandingPattern(null);
+        return;
+    }
+
+    // Schritt 3: Zentrale Funktion für die Bein-Koordinaten aufrufen (unverändert)
+    const patternCoords = JumpPlanner.calculateLandingPatternCoords(markerLatLng.lat, markerLatLng.lng, interpolatedData);
+
+    if (!patternCoords) {
+        mapManager.drawLandingPattern(null);
+        return;
+    }
+    
+    const { downwindStart, baseStart, finalStart, landingPoint } = patternCoords;
+
+    // ================== NEU: Logik für Windpfeile wiederhergestellt ==================
+    const heights = interpolatedData.map(d => d.height);
+    const uComponents = interpolatedData.map(d => -Utils.convertWind(d.spd, 'kt', 'km/h') * Math.sin(d.dir * Math.PI / 180));
+    const vComponents = interpolatedData.map(d => -Utils.convertWind(d.spd, 'kt', 'km/h') * Math.cos(d.dir * Math.PI / 180));
+
+    const LEG_HEIGHT_FINAL = parseInt(document.getElementById('legHeightFinal').value) || 100;
+    const LEG_HEIGHT_BASE = parseInt(document.getElementById('legHeightBase').value) || 200;
+    const LEG_HEIGHT_DOWNWIND = parseInt(document.getElementById('legHeightDownwind').value) || 300;
+
+    // Mittelwind für jeden Leg berechnen
+    const finalMeanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, baseHeight, baseHeight + LEG_HEIGHT_FINAL);
+    const baseMeanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, baseHeight + LEG_HEIGHT_FINAL, baseHeight + LEG_HEIGHT_BASE);
+    const downwindMeanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, baseHeight + LEG_HEIGHT_BASE, baseHeight + LEG_HEIGHT_DOWNWIND);
+
+    // Helferfunktion zur Farbcodierung der Pfeile
+    const getArrowColor = (windSpeedKt) => {
+        if (windSpeedKt <= 3) return 'lightblue';
+        if (windSpeedKt <= 10) return 'lightgreen';
+        if (windSpeedKt <= 16) return '#f5f34f';
+        return '#ffcccc';
+    };
+
+    // Helferfunktion zur Formatierung des Tooltips
+    const formatWindSpeed = (speedKt) => {
+        const convertedSpeed = Utils.convertWind(speedKt, windUnit, 'kt');
+        return windUnit === 'bft' ? Math.round(convertedSpeed) : convertedSpeed.toFixed(1);
+    };
+
+    // Die "Bauanleitung" für den mapManager erstellen
+    const patternData = {
+        legs: [
+            { path: [landingPoint, finalStart] },
+            { path: [finalStart, baseStart] },
+            { path: [baseStart, downwindStart] }
+        ],
+        arrows: [
+            {
+                position: [(landingPoint[0] + finalStart[0]) / 2, (landingPoint[1] + finalStart[1]) / 2],
+                bearing: (finalMeanWind[0] - 90 + 180) % 360,
+                color: getArrowColor(finalMeanWind[1]),
+                tooltipText: `${Math.round(finalMeanWind[0])}° ${formatWindSpeed(finalMeanWind[1])} ${windUnit}`
+            },
+            {
+                position: [(finalStart[0] + baseStart[0]) / 2, (finalStart[1] + baseStart[1]) / 2],
+                bearing: (baseMeanWind[0] - 90 + 180) % 360,
+                color: getArrowColor(baseMeanWind[1]),
+                tooltipText: `${Math.round(baseMeanWind[0])}° ${formatWindSpeed(baseMeanWind[1])} ${windUnit}`
+            },
+            {
+                position: [(baseStart[0] + downwindStart[0]) / 2, (baseStart[1] + downwindStart[1]) / 2],
+                bearing: (downwindMeanWind[0] - 90 + 180) % 360,
+                color: getArrowColor(downwindMeanWind[1]),
+                tooltipText: `${Math.round(downwindMeanWind[0])}° ${formatWindSpeed(downwindMeanWind[1])} ${windUnit}`
+            }
+        ]
+    };
+    // ================== ENDE DER WIEDERHERGESTELLTEN LOGIK ==================
+
+    // Den mapManager anweisen, das Muster zu zeichnen
     mapManager.drawLandingPattern(patternData);
 }
 

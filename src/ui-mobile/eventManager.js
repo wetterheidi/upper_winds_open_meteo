@@ -9,7 +9,7 @@ import * as mapManager from './mapManager.js';
 import * as Coordinates from './coordinates.js';
 import * as JumpPlanner from '../core/jumpPlanner.js';
 import { TileCache, cacheTilesForDIP, cacheVisibleTiles } from '../core/tileCache.js';
-import { loadGpxTrack, loadCsvTrackUTC, exportToGpx} from '../core/trackManager.js';
+import { loadGpxTrack, loadCsvTrackUTC, exportToGpx, exportLandingPatternToGpx} from '../core/trackManager.js';
 import * as weatherManager from '../core/weatherManager.js';
 import * as liveTrackingManager from '../core/liveTrackingManager.js';
 import { fetchEnsembleWeatherData, processAndVisualizeEnsemble, clearEnsembleVisualizations } from '../core/ensembleManager.js';
@@ -924,6 +924,14 @@ function setupGpxExportEvent() {
 
             // Alle Werte an die Core-Funktion übergeben
             exportToGpx(sliderIndex, interpStep, heightUnit);
+        });
+    }
+
+    const exportLandingPatternButton = document.getElementById('exportLandingPatternGpxButton');
+    if (exportLandingPatternButton) {
+        exportLandingPatternButton.addEventListener('click', () => {
+            console.log("DEBUG: Klick auf 'exportLandingPatternGpxButton' registriert.");
+            exportLandingPatternToGpx();
         });
     }
 }

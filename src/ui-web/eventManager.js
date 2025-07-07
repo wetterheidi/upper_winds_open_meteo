@@ -9,7 +9,7 @@ import * as mapManager from './mapManager.js';
 import * as Coordinates from '../ui-web/coordinates.js';
 import * as JumpPlanner from '../core/jumpPlanner.js';
 import { TileCache, cacheTilesForDIP, cacheVisibleTiles } from '../core/tileCache.js';
-import { loadGpxTrack, loadCsvTrackUTC, exportToGpx } from '../core/trackManager.js';
+import { loadGpxTrack, loadCsvTrackUTC, exportToGpx, exportLandingPatternToGpx } from '../core/trackManager.js';
 import * as weatherManager from '../core/weatherManager.js';
 import * as liveTrackingManager from '../core/liveTrackingManager.js';
 import { fetchEnsembleWeatherData, processAndVisualizeEnsemble, clearEnsembleVisualizations } from '../core/ensembleManager.js';
@@ -99,13 +99,13 @@ function setupRadioGroup(name, callback) {
     const radios = document.querySelectorAll(`input[name="${name}"]`);
     radios.forEach(radio => {
         radio.addEventListener('change', () => {
-           // KORREKTUR: Liest den Wert direkt vom ausgewählten Radio-Button
+            // KORREKTUR: Liest den Wert direkt vom ausgewählten Radio-Button
             const checkedRadio = document.querySelector(`input[name="${name}"]:checked`);
             if (!checkedRadio) return;
             const newValue = checkedRadio.value;
 
             // Speichert den korrekten neuen Wert
-             Settings.state.userSettings[name] = newValue;
+            Settings.state.userSettings[name] = newValue;
             Settings.save();
             console.log(`${name} changed to: ${newValue} and saved to localStorage`);
 
@@ -902,18 +902,23 @@ function setupTrackEvents() {
     }
 }
 function setupGpxExportEvent() {
+
+    const sliderIndex = getSliderValue();
+    const interpStep = getInterpolationStep();
+    const heightUnit = Settings.getValue('heightUnit', 'm');
+
     const exportButton = document.getElementById('exportGpxButton');
     if (exportButton) {
         exportButton.addEventListener('click', () => {
-            // Alle UI-Werte hier sammeln
-            const sliderIndex = getSliderValue();
-            const interpStep = getInterpolationStep();
-            // Hier greifen wir auf die getValue-Methode von Settings zu, 
-            // was der saubere Weg ist, um den UI-Wert zu bekommen.
-            const heightUnit = Settings.getValue('heightUnit', 'm'); 
+           exportToGpx(sliderIndex, interpStep, heightUnit);
+        });
+    }
 
-            // Alle Werte an die Core-Funktion übergeben
-            exportToGpx(sliderIndex, interpStep, heightUnit);
+    const exportLandingPatternButton = document.getElementById('exportLandingPatternGpxButton');
+    if (exportLandingPatternButton) {
+        exportLandingPatternButton.addEventListener('click', () => {
+            console.log("DEBUG: Klick auf 'exportLandingPatternGpxButton' registriert.");
+            exportLandingPatternToGpx();
         });
     }
 }
@@ -979,7 +984,7 @@ function setupCacheSettings() {
                 console.error('Settings not properly initialized');
                 return;
             }
-            
+
             let value = parseInt(cacheRadiusInput.value, 10);
 
             // Validierungslogik
@@ -990,20 +995,20 @@ function setupCacheSettings() {
                 value = 50; // Auf Maximum setzen, wenn zu groß
                 Utils.handleMessage("Cache radius cannot exceed 50 km.");
             }
-            
+
             // Korrigierten Wert im UI und in den Settings speichern
             cacheRadiusInput.value = value;
             Settings.state.userSettings.cacheRadiusKm = value;
             Settings.save();
             console.log('Updated cacheRadiusKm:', Settings.state.userSettings.cacheRadiusKm);
         });
-        
+
         console.log('cacheRadiusSelect listener attached, initial value:', cacheRadiusInput.value);
     } else {
         console.warn('cacheRadiusSelect not found in DOM');
     }
 
-const zoomMinInput = document.getElementById('cacheZoomMin');
+    const zoomMinInput = document.getElementById('cacheZoomMin');
     const zoomMaxInput = document.getElementById('cacheZoomMax');
 
     if (zoomMinInput && zoomMaxInput) {
@@ -1137,5 +1142,5 @@ export function initializeEventListeners() {
     listenersInitialized = true;
     console.log("Event listeners initialized successfully (first and only time).");
 
-    
+
 }

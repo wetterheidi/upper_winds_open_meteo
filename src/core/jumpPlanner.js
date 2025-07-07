@@ -351,50 +351,118 @@ export function jumpRunTrack(interpolatedData, harpAnchor = null) {
 /**
  * Berechnet die geographischen Koordinaten der Eckpunkte des Landemusters.
  * Startet am Landepunkt (DIP) und rechnet von dort aus rückwärts (Final, Base, Downwind),
- * um den Startpunkt des Downwind-Legs zu ermitteln.
+ * um die Koordinaten für jeden Leg-Startpunkt zu ermitteln.
  * @param {number} lat - Die geographische Breite des Landepunkts (DIP).
  * @param {number} lng - Die geographische Länge des Landepunkts (DIP).
  * @param {object[]} interpolatedData - Die interpolierten Wetterdaten.
- * @returns {{downwindLat: number, downwindLng: number}} Die Koordinaten des Startpunkts des Downwind-Legs.
+ * @returns {{downwindLat: number, downwindLng: number, downwindStart: number[], baseStart: number[], finalStart: number[], landingPoint: number[]}|null} Ein Objekt mit den Koordinaten der Eckpunkte oder null bei Fehler.
  */
-export function calculateLandingPatternCoords(lat, lng, interpolatedData) {
-    if (!interpolatedData || interpolatedData.length === 0) return { downwindLat: lat, downwindLng: lng };
-    
+export function calculateLandingPatternCoordsOLD(lat, lng, interpolatedData) {
+    if (!interpolatedData || interpolatedData.length === 0 || !AppState.lastAltitude) return null;
+
     const CANOPY_SPEED_KT = parseInt(document.getElementById('canopySpeed').value) || 20;
     const DESCENT_RATE_MPS = parseFloat(document.getElementById('descentRate').value) || 3.5;
     const LEG_HEIGHT_FINAL = parseInt(document.getElementById('legHeightFinal').value) || 100;
     const LEG_HEIGHT_BASE = parseInt(document.getElementById('legHeightBase').value) || 200;
     const LEG_HEIGHT_DOWNWIND = parseInt(document.getElementById('legHeightDownwind').value) || 300;
     const baseHeight = Math.round(AppState.lastAltitude);
-    
+
     const heights = interpolatedData.map(d => d.height);
     const uComponents = interpolatedData.map(d => -Utils.convertWind(d.spd, 'kt', 'km/h') * Math.sin(d.dir * Math.PI / 180));
     const vComponents = interpolatedData.map(d => -Utils.convertWind(d.spd, 'kt', 'km/h') * Math.cos(d.dir * Math.PI / 180));
-    
-    const landingDirection = document.querySelector('input[name="landingDirection"]:checked')?.value || 'LL';
-    const customLandingDir = parseInt(document.getElementById(landingDirection === 'LL' ? 'customLandingDirectionLL' : 'customLandingDirectionRR')?.value, 10);
-    let effectiveLandingWindDir = Number.isFinite(customLandingDir) ? customLandingDir : (Number.isFinite(AppState.landingWindDir) ? AppState.landingWindDir : interpolatedData[0].dir);
-    
+
+    const landingDirectionSetting = document.querySelector('input[name="landingDirection"]:checked')?.value || 'LL';
+    const customLandingDirInput = document.getElementById(landingDirectionSetting === 'LL' ? 'customLandingDirectionLL' : 'customLandingDirectionRR');
+    const customLandingDir = customLandingDirInput ? parseInt(customLandingDirInput.value, 10) : NaN;
+    let effectiveLandingWindDir = Number.isFinite(customLandingDir) ? customLandingDir : (Number.isFinite(AppState.landingWindDir) ? AppState.landingWindDir : interpolatedData[0]?.dir);
+
+    if (!Number.isFinite(effectiveLandingWindDir)) return null;
+
     const calculateLegEndpoint = (startLat, startLng, bearing, groundSpeedKt, timeSec) => {
-        const speedMps = groundSpeedKt * CONVERSIONS.KNOTS_TO_MPS;
+        const speedMps = groundSpeedKt * (1.852 / 3.6); // Knots to m/s
         const lengthMeters = speedMps * timeSec;
-        const [endLat, endLng] = Utils.calculateNewCenter(startLat, startLng, lengthMeters, bearing);
-        return [endLat, endLng];
+        return Utils.calculateNewCenter(startLat, startLng, lengthMeters, (bearing + 180) % 360);
     };
-    
+
+    // Final Leg
     const finalMeanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, baseHeight, baseHeight + LEG_HEIGHT_FINAL);
-    const finalCourse = (effectiveLandingWindDir + 180) % 360;
-    const finalGroundSpeedKt = Utils.calculateGroundSpeed(CANOPY_SPEED_KT, Utils.calculateWindComponents(finalMeanWind[1], Utils.calculateWindAngle(finalCourse, finalMeanWind[0])).headwind);
-    const finalEnd = calculateLegEndpoint(lat, lng, finalCourse, finalGroundSpeedKt, LEG_HEIGHT_FINAL / DESCENT_RATE_MPS);
-    
+    const finalCourse = effectiveLandingWindDir;
+    const { groundSpeed: finalGroundSpeedKt } = Utils.calculateFlightParameters(finalCourse, finalMeanWind[0], finalMeanWind[1], CANOPY_SPEED_KT);
+    const finalStart = calculateLegEndpoint(lat, lng, finalCourse, finalGroundSpeedKt, LEG_HEIGHT_FINAL / DESCENT_RATE_MPS);
+
+    // Base Leg
     const baseMeanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, baseHeight + LEG_HEIGHT_FINAL, baseHeight + LEG_HEIGHT_BASE);
-    const baseHeading = (effectiveLandingWindDir + (landingDirection === 'LL' ? 90 : -90) + 360) % 360;
-    const baseCourseObj = Utils.calculateCourseFromHeading(baseHeading, baseMeanWind[0], baseMeanWind[1], CANOPY_SPEED_KT);
-    const baseEnd = calculateLegEndpoint(finalEnd[0], finalEnd[1], (baseCourseObj.trueCourse + 180) % 360, baseCourseObj.groundSpeed, (LEG_HEIGHT_BASE - LEG_HEIGHT_FINAL) / DESCENT_RATE_MPS);
-    
+    const baseHeading = (effectiveLandingWindDir + (landingDirectionSetting === 'LL' ? 90 : -90) + 360) % 360;
+    const { trueCourse: baseCourse, groundSpeed: baseGroundSpeedKt } = Utils.calculateCourseFromHeading(baseHeading, baseMeanWind[0], baseMeanWind[1], CANOPY_SPEED_KT);
+    const baseStart = calculateLegEndpoint(finalStart[0], finalStart[1], baseCourse, baseGroundSpeedKt, (LEG_HEIGHT_BASE - LEG_HEIGHT_FINAL) / DESCENT_RATE_MPS);
+
+    // Downwind Leg
     const downwindMeanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, baseHeight + LEG_HEIGHT_BASE, baseHeight + LEG_HEIGHT_DOWNWIND);
-    const downwindGroundSpeedKt = Utils.calculateGroundSpeed(CANOPY_SPEED_KT, Utils.calculateWindComponents(downwindMeanWind[1], Utils.calculateWindAngle(effectiveLandingWindDir, downwindMeanWind[0])).headwind);
-    const downwindEnd = calculateLegEndpoint(baseEnd[0], baseEnd[1], effectiveLandingWindDir, downwindGroundSpeedKt, (LEG_HEIGHT_DOWNWIND - LEG_HEIGHT_BASE) / DESCENT_RATE_MPS);
-    
-    return { downwindLat: downwindEnd[0], downwindLng: downwindEnd[1] };
+    const downwindCourse = effectiveLandingWindDir;
+    const { groundSpeed: downwindGroundSpeedKt } = Utils.calculateFlightParameters(downwindCourse, downwindMeanWind[0], downwindMeanWind[1], CANOPY_SPEED_KT);
+    const downwindStart = calculateLegEndpoint(baseStart[0], baseStart[1], downwindCourse, downwindGroundSpeedKt, (LEG_HEIGHT_DOWNWIND - LEG_HEIGHT_BASE) / DESCENT_RATE_MPS);
+
+    return {
+        downwindLat: downwindStart[0],
+        downwindLng: downwindStart[1],
+        downwindStart: downwindStart,
+        baseStart: baseStart,
+        finalStart: finalStart,
+        landingPoint: [lat, lng]
+    };
+}
+// in src/core/jumpPlanner.js
+
+export function calculateLandingPatternCoords(lat, lng, interpolatedData) {
+    // Diese Funktion enthält jetzt die korrekte, erprobte Logik.
+    if (!interpolatedData || interpolatedData.length === 0 || !AppState.lastAltitude) return null;
+
+    const CANOPY_SPEED_KT = parseInt(document.getElementById('canopySpeed').value) || 20;
+    const DESCENT_RATE_MPS = parseFloat(document.getElementById('descentRate').value) || 3.5;
+    const LEG_HEIGHT_FINAL = parseInt(document.getElementById('legHeightFinal').value) || 100;
+    const LEG_HEIGHT_BASE = parseInt(document.getElementById('legHeightBase').value) || 200;
+    const LEG_HEIGHT_DOWNWIND = parseInt(document.getElementById('legHeightDownwind').value) || 300;
+    const baseHeight = Math.round(AppState.lastAltitude);
+
+    const heights = interpolatedData.map(d => d.height);
+    const uComponents = interpolatedData.map(d => -Utils.convertWind(d.spd, 'kt', 'km/h') * Math.sin(d.dir * Math.PI / 180));
+    const vComponents = interpolatedData.map(d => -Utils.convertWind(d.spd, 'kt', 'km/h') * Math.cos(d.dir * Math.PI / 180));
+
+    const landingDirectionSetting = document.querySelector('input[name="landingDirection"]:checked')?.value || 'LL';
+    const customLandingDirInput = document.getElementById(landingDirectionSetting === 'LL' ? 'customLandingDirectionLL' : 'customLandingDirectionRR');
+    const customLandingDir = customLandingDirInput ? parseInt(customLandingDirInput.value, 10) : NaN;
+    let effectiveLandingWindDir = Number.isFinite(customLandingDir) ? customLandingDir : (Number.isFinite(AppState.landingWindDir) ? AppState.landingWindDir : interpolatedData[0]?.dir);
+
+    if (!Number.isFinite(effectiveLandingWindDir)) return null;
+
+    const calculateLegEndpoint = (startLat, startLng, bearing, groundSpeedKt, timeSec) => {
+        const speedMps = groundSpeedKt * (1.852 / 3.6); // Knots to m/s
+        const lengthMeters = speedMps * timeSec;
+        return Utils.calculateNewCenter(startLat, startLng, lengthMeters, bearing);
+    };
+
+    // Final Leg
+    const finalMeanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, baseHeight + LEG_HEIGHT_FINAL, baseHeight + LEG_HEIGHT_BASE);
+    const finalCourse = effectiveLandingWindDir;
+    const { groundSpeed: finalGroundSpeedKt } = Utils.calculateFlightParameters(finalCourse, finalMeanWind[0], finalMeanWind[1], CANOPY_SPEED_KT);
+    const finalStart = calculateLegEndpoint(lat, lng, (finalCourse + 180) % 360, finalGroundSpeedKt, LEG_HEIGHT_FINAL / DESCENT_RATE_MPS);
+
+    // Base Leg
+    const baseMeanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, baseHeight + LEG_HEIGHT_BASE, baseHeight + LEG_HEIGHT_DOWNWIND);
+    const baseHeading = (effectiveLandingWindDir + (landingDirectionSetting === 'LL' ? 90 : -90) + 360) % 360;
+    const { trueCourse: baseCourse, groundSpeed: baseGroundSpeedKt } = Utils.calculateCourseFromHeading(baseHeading, baseMeanWind[0], baseMeanWind[1], CANOPY_SPEED_KT);
+    const baseStart = calculateLegEndpoint(finalStart[0], finalStart[1], (baseCourse + 180) % 360, baseGroundSpeedKt, (LEG_HEIGHT_BASE - LEG_HEIGHT_FINAL) / DESCENT_RATE_MPS);
+
+    // Downwind Leg
+    const downwindMeanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, baseHeight + LEG_HEIGHT_DOWNWIND, baseHeight + LEG_HEIGHT_DOWNWIND + 100); // 100m layer for downwind
+    const downwindCourse = (effectiveLandingWindDir + 180) % 360;
+    const { groundSpeed: downwindGroundSpeedKt } = Utils.calculateFlightParameters(downwindCourse, downwindMeanWind[0], downwindMeanWind[1], CANOPY_SPEED_KT);
+    const downwindStart = calculateLegEndpoint(baseStart[0], baseStart[1], (downwindCourse + 180) % 360, downwindGroundSpeedKt, (LEG_HEIGHT_DOWNWIND - LEG_HEIGHT_BASE) / DESCENT_RATE_MPS);
+
+    return {
+        downwindStart: downwindStart,
+        baseStart: baseStart,
+        finalStart: finalStart,
+        landingPoint: [lat, lng]
+    };
 }
