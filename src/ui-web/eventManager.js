@@ -150,17 +150,16 @@ function setupInput(id, eventType, debounceTime, validationCallback) {
     input.addEventListener(eventType, Utils.debounce(() => {
         const value = input.type === 'number' ? parseFloat(input.value) : input.value;
 
-        // Führen Sie die Validierung aus, falls eine übergeben wurde.
-        // Die Validierung kann `false` zurückgeben, um das Senden des Events zu stoppen.
         if (validationCallback && validationCallback(value) === false) {
-            return; // Abbruch bei ungültiger Eingabe
+            return;
         }
 
-        Settings.state.userSettings[id] = value;
+        // Verwendet einfach die 'id' des Elements als Schlüssel.
+        // Da die ID jetzt 'interpStep' ist, funktioniert das perfekt.
+        Settings.state.userSettings[id] = value; 
         Settings.save();
         console.log(`${id} changed to: ${value} and saved to localStorage`);
 
-        // Event auslösen, anstatt Logik direkt auszuführen
         document.dispatchEvent(new CustomEvent('ui:inputChanged', {
             detail: { name: id, value: value }
         }));
@@ -566,7 +565,7 @@ function setupInputEvents() {
 
     setupInput('canopySpeed', 'change', 300);
     setupInput('descentRate', 'change', 300);
-    setupInput('interpStepSelect', 'change', 300);
+    setupInput('interpStep', 'change', 300, null, 'interpStep'); // <-- KORRIGIERTE ZEILE mit dem korrekten Einstellungsnamen
 
     setupInput('customLandingDirectionLL', 'input', 100);
     setupInput('customLandingDirectionRR', 'input', 100);

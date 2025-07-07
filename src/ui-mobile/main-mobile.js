@@ -584,7 +584,7 @@ function initializeUIElements() {
     applySettingToInput('upperLimit', Settings.state.userSettings.upperLimit);
     applySettingToInput('openingAltitude', Settings.state.userSettings.openingAltitude);
     applySettingToInput('exitAltitude', Settings.state.userSettings.exitAltitude);
-    applySettingToInput('interpStepSelect', Settings.state.userSettings.interpStep);
+    applySettingToSelect('interpStep', Settings.state.userSettings.interpStep);
     applySettingToInput('aircraftSpeedKt', Settings.state.userSettings.aircraftSpeedKt);
     applySettingToInput('jumpRunTrackOffset', Settings.state.userSettings.jumpRunTrackOffset);
     applySettingToInput('numberOfJumpers', Settings.state.userSettings.numberOfJumpers);
@@ -1089,7 +1089,7 @@ function setupAppEventListeners() {
 
             case 'lowerLimit':
             case 'upperLimit':
-            case 'interpStepSelect':
+            case 'interpStep':
                 if (AppState.weatherData) {
                     await displayManager.updateWeatherDisplay(getSliderValue(), 'weather-table-container', 'selectedTime');
                     calculateMeanWind();

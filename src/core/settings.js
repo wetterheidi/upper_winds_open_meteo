@@ -1,7 +1,15 @@
 // === Settings Module ===
 import { FEATURE_PASSWORD } from './constants.js';
 
-export const getInterpolationStep = () => Settings.getValue('interpStepSelect', 'select', 200); // Umbenannt von getInterpStepSelect für Konsistenz
+export const getInterpolationStep = () => {
+    const selectElement = document.getElementById('interpStep');
+    // Direkter Zugriff auf den aktuellen Wert des UI-Elements
+    if (selectElement) {
+        return selectElement.value;
+    }
+    // Fallback, falls das Element nicht gefunden wird
+    return '200';
+};
 
 // Kontextkonstante (muss von main-mobile.js oder main-web.js gesetzt werden)
 let IS_MOBILE_APP = false; // Standardmäßig false, wird in main-mobile.js überschrieben
@@ -328,7 +336,7 @@ export const Settings = {
         const refLevel = this.getValue('refLevel', 'radio', 'AGL');
 
         // Update step label
-        const stepLabel = document.querySelector('#controls-row label[for="interpStepSelect"]');
+        const stepLabel = document.querySelector('#controls-row label[for="interpStep"]');
         if (stepLabel) {
             stepLabel.textContent = `Step (${heightUnit}):`;
             console.log(`Updated step label to: Step (${heightUnit})`);

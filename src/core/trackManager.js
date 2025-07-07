@@ -362,7 +362,7 @@ export function exportLandingPatternToGpx() {
     console.log("--- GPX Landing Pattern Export gestartet ---");
 
     const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
-    const interpStep = Settings.getValue('interpStepSelect', 'select', 200);
+    const interpStep = Settings.getValue('interpStep', 'select', 200);
     const heightUnit = Settings.getValue('heightUnit', 'm');
 
     if (!Settings.getValue('showLandingPattern', false)) {
