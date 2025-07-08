@@ -10,6 +10,7 @@ import * as Coordinates from './coordinates.js';
 import * as JumpPlanner from '../core/jumpPlanner.js';
 import { TileCache, cacheTilesForDIP, cacheVisibleTiles } from '../core/tileCache.js';
 import { loadGpxTrack, loadCsvTrackUTC, exportToGpx, exportLandingPatternToGpx } from '../core/trackManager.js';
+import { SensorManager } from '../core/sensorManager.js';
 import * as weatherManager from '../core/weatherManager.js';
 import * as liveTrackingManager from '../core/liveTrackingManager.js';
 import { fetchEnsembleWeatherData, processAndVisualizeEnsemble, clearEnsembleVisualizations } from '../core/ensembleManager.js';
@@ -62,14 +63,14 @@ function setupTabBarEvents() {
                 // Sende das Event, als ob der Benutzer geklickt hätte
                 trackPositionCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
             }
-        } else {
+        /*} else {
             // Dashboard wird verlassen -> Stoppe Tracking, falls es lief
             if (trackPositionCheckbox && trackPositionCheckbox.checked) {
                 console.log("Dashboard closed, stopping live tracking.");
                 trackPositionCheckbox.checked = false;
                 // Sende das Event, als ob der Benutzer geklickt hätte
                 trackPositionCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
-            }
+            }*/
         }
 
         if (panelId === 'planner' && !Settings.isFeatureUnlocked('planner')) {
@@ -1286,6 +1287,18 @@ export function initializeEventListeners() {
     setupInfoIcons();
     setupHarpCoordInputEvents(); // Call the new setup function here
     setupGpxExportEvent();
+
+    const armButton = document.getElementById('arm-recording-button');
+    if (armButton) {
+        armButton.addEventListener('click', () => {
+            if (AppState.isArmed) {
+                SensorManager.disarm();
+            } else {
+                SensorManager.arm();
+            }
+        });
+    }
+
     listenersInitialized = true;
     console.log("Event listeners initialized successfully (first and only time).");
 

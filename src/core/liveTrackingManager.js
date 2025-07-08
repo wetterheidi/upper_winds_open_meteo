@@ -5,6 +5,8 @@ import { UI_DEFAULTS, SMOOTHING_DEFAULTS } from './constants.js';
 import { AppState } from './state.js';
 import { Utils } from './utils.js';
 import { Geolocation } from '@capacitor/geolocation';
+import { SensorManager } from './sensorManager.js';
+import { DateTime } from 'luxon'; // <--- DIESE ZEILE HINZUFÜGEN
 
 // Zähler, um die ersten ungenauen Web-Geolocation-Events zu überspringen
 let webUpdateCounter = 0;
@@ -56,13 +58,12 @@ const debouncedPositionUpdate = Utils.debounce(async (position) => {
     const { latitude, longitude, accuracy, altitude: deviceAltitude, altitudeAccuracy } = position.coords;
 
     const isFirstUpdate = !AppState.liveMarker;
-    const accuracyThreshold = isFirstUpdate ? 1500 : UI_DEFAULTS.GEOLOCATION_ACCURACY_THRESHOLD_M;
+   const accuracyThreshold = isFirstUpdate ? 500 : UI_DEFAULTS.GEOLOCATION_ACCURACY_THRESHOLD_M; 
 
     if (accuracy > accuracyThreshold) {
-        console.log(`[LiveTrackingManager] Skipping position update due to low accuracy (${accuracy}m).`);
+        console.log(`[LiveTrackingManager] Skipping position update. Accuracy (${accuracy}m) is lower than threshold (${accuracyThreshold}m).`);
         return;
     }
-
     const currentTime = Date.now();
     let speedMs = 0;
     let direction = 'N/A';
@@ -119,6 +120,19 @@ const debouncedPositionUpdate = Utils.debounce(async (position) => {
         },
         bubbles: true, cancelable: true
     });
+
+    if (AppState.isAutoRecording) {
+        AppState.recordedTrackPoints.push({
+            lat: latitude,
+            lng: longitude,
+            ele: deviceAltitude,
+            time: DateTime.utc()
+        });
+
+        // Landung prüfen
+        SensorManager.checkLanding(AppState.lastSmoothedDescentRateMps);
+    }
+
     document.dispatchEvent(event);
 }, 300);
 
@@ -184,13 +198,13 @@ export function stopPositionTracking() {
         }
         AppState.watchId = null;
     }
-    
+
     if (AppState.liveMarker) AppState.map.removeLayer(AppState.liveMarker);
     if (AppState.accuracyCircle) AppState.map.removeLayer(AppState.accuracyCircle);
     AppState.liveMarker = null;
     AppState.accuracyCircle = null;
     AppState.prevLat = null;
     AppState.prevLng = null;
-    
+
     document.dispatchEvent(new CustomEvent('tracking:stopped'));
 }

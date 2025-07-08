@@ -5,6 +5,8 @@ import { DateTime } from 'luxon';
 import * as JumpPlanner from './jumpPlanner.js';
 import * as weatherManager from './weatherManager.js';
 import { interpolateWeatherData } from './weatherManager.js';
+import { Filesystem, Directory } from '@capacitor/filesystem';
+
 
 "use strict";
 
@@ -451,4 +453,76 @@ export function exportLandingPatternToGpx() {
     window.URL.revokeObjectURL(url);
     console.log("--- GPX Landing Pattern Export beendet ---");
 }
+
+/**
+ * Speichert die aufgezeichneten Trackpunkte als GPX-Datei.
+ */
+export async function saveRecordedTrack() {
+    console.log(`--- Starte saveRecordedTrack mit ${AppState.recordedTrackPoints.length} Punkten ---`);
+
+    if (!AppState.recordedTrackPoints || AppState.recordedTrackPoints.length < 2) {
+        Utils.handleError("Keine Track-Daten zum Speichern vorhanden.");
+        return;
+    }
+
+    try {
+        const header = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="DZMaster" xmlns="http://www.topografix.com/GPX/1/1">
+<metadata><name>Skydive Track - ${new Date().toLocaleString()}</name></metadata>
+<trk><name>Recorded Skydive</name><trkseg>`;
+
+        const footer = `</trkseg></trk></gpx>`;
+        
+        const trackpointStrings = AppState.recordedTrackPoints.map((p, index) => {
+            if (p && typeof p.lat === 'number' && typeof p.lng === 'number' && p.time) {
+                const ele = (typeof p.ele === 'number') ? p.ele.toFixed(2) : '0';
+                const time = p.time.toISO();
+                const trkpt = `<trkpt lat="${p.lat}" lon="${p.lng}"><ele>${ele}</ele><time>${time}</time></trkpt>`;
+                console.log(`Punkt ${index + 1}: ${trkpt}`); // Log für jeden einzelnen Punkt
+                return trkpt;
+            }
+            console.warn(`Ungültiger oder unvollständiger Punkt bei Index ${index} übersprungen:`, p);
+            return ''; // Leeren String für ungültige Punkte
+        }).filter(Boolean); // Entfernt leere Einträge
+
+        if (trackpointStrings.length < 2) {
+            Utils.handleError("Nicht genügend gültige Punkte für einen Track zum Speichern.");
+            return;
+        }
+
+        const gpxContent = `${header}\n${trackpointStrings.join('\n')}\n${footer}`;
+
+        console.log("--- FINALER GPX-INHALT VOR DEM SPEICHERN ---");
+        console.log(gpxContent);
+        console.log("-----------------------------------------");
+        
+        const fileName = `Skydive_Track_${DateTime.utc().toFormat('yyyy-MM-dd_HHmm')}.gpx`;
+
+        if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+            await Filesystem.writeFile({
+                path: fileName,
+                data: gpxContent,
+                directory: Directory.Documents,
+                encoding: 'utf8'
+            });
+            Utils.handleMessage(`Track saved: ${fileName}`);
+        } else {
+            // Web-Fallback
+            const blob = new Blob([gpxContent], { type: "application/gpx+xml;charset=utf-8" });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+    } catch (error) {
+        console.error("Fehler während saveRecordedTrack:", error);
+        Utils.handleError("Konnte den Track nicht speichern.");
+    } finally {
+        AppState.recordedTrackPoints = [];
+    }
+}
+
 

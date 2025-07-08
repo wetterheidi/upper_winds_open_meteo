@@ -49,6 +49,10 @@ export const AppState = {
     ensembleScenarioCircles: {}, // Speichert die Leaflet-Layer für die Szenario-Kreise, z.B. { min_wind: circleLayer, mean_wind: circleLayer }
     heatmapLayer: null, // Für die Referenz auf den Heatmap-Layer
     favoritesLayerGroup: null,          // <-- NEUE ZEILE HINZUFÜGEN
+    isArmed: false,
+    isAutoRecording: false,
+    recordedTrackPoints: [],
+    autoRecordingStartTime: null, // <--- DIESE ZEILE HINZUFÜGEN
 
     // --- NEUE ZUSTANDS-VARIABLEN ---
     ismapInitialized: false,              // von mapManager.js
