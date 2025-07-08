@@ -51,6 +51,7 @@ export const AppState = {
     favoritesLayerGroup: null,          // <-- NEUE ZEILE HINZUFÜGEN
     isArmed: false,
     isAutoRecording: false,
+    isManualRecording: false, // <-- NEUE ZEILE
     recordedTrackPoints: [],
     autoRecordingStartTime: null, // <--- DIESE ZEILE HINZUFÜGEN
 

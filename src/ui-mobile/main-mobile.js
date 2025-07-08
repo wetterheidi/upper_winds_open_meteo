@@ -4,7 +4,7 @@ import { AppState } from '../core/state.js';
 import { Utils } from '../core/utils.js';
 import { Settings, getInterpolationStep, setAppContext } from '../core/settings.js';
 import { UI_DEFAULTS } from '../core/constants.js';
-import { SensorManager } from '../core/sensorManager.js';
+import { SensorManager } from './sensorManager.js';
 import * as EventManager from './eventManager.js';
 import * as Coordinates from './coordinates.js';
 import * as JumpPlanner from '../core/jumpPlanner.js';
@@ -1063,6 +1063,9 @@ function setupAppEventListeners() {
     document.addEventListener('tracking:positionUpdated', (event) => {
         updateJumpMasterLineAndPanel(event.detail);
         updateDashboardPanel(event.detail);
+        if (AppState.isAutoRecording) {
+            SensorManager.checkLanding(event.detail.descentRateMps);
+        }
     });
 
     document.addEventListener('jml:targetChanged', () => {
@@ -1442,27 +1445,30 @@ function setupAppEventListeners() {
 
     document.addEventListener('sensor:armed', () => {
         const armButton = document.getElementById('arm-recording-button');
+        const manualButton = document.getElementById('manual-recording-button');
         if (armButton) {
             armButton.textContent = "Armed";
             armButton.classList.add('armed');
             armButton.classList.remove('recording');
         }
+        if (manualButton) {
+            manualButton.disabled = true; // Manuellen Button sperren, wenn "scharf"
+        }
     });
 
     document.addEventListener('sensor:disarmed', () => {
         const armButton = document.getElementById('arm-recording-button');
+        const manualButton = document.getElementById('manual-recording-button');
         if (armButton) {
             armButton.textContent = "Arm Recording";
             armButton.classList.remove('armed', 'recording');
         }
+        if (manualButton) {
+            manualButton.disabled = false; // Manuellen Button wieder freigeben
+        }
     });
 
     document.addEventListener('sensor:freefall_detected', () => {
-        AppState.isAutoRecording = true;
-        AppState.recordedTrackPoints = [];
-        AppState.autoRecordingStartTime = Date.now(); // <--- DIESE ZEILE HINZUFÜGEN
-        liveTrackingManager.startPositionTracking();
-
         const armButton = document.getElementById('arm-recording-button');
         if (armButton) {
             armButton.textContent = "Recording...";
@@ -1471,14 +1477,16 @@ function setupAppEventListeners() {
     });
 
     document.addEventListener('sensor:landing_detected', () => {
-        liveTrackingManager.stopPositionTracking();
-        SensorManager.disarm();
-
-        Utils.handleMessage("Landing detected. Saving track...");
-
-        // WICHTIG: Rufen Sie die importierte Funktion auf
+        // ... (bestehende Logik)
         saveRecordedTrack();
         AppState.isAutoRecording = false;
+
+        // Button-Zustände zurücksetzen
+        const manualButton = document.getElementById('manual-recording-button');
+        if (manualButton) {
+            manualButton.textContent = "Start Recording";
+            manualButton.classList.remove('recording');
+        }
     });
 
 }

@@ -5,8 +5,8 @@ import { UI_DEFAULTS, SMOOTHING_DEFAULTS } from './constants.js';
 import { AppState } from './state.js';
 import { Utils } from './utils.js';
 import { Geolocation } from '@capacitor/geolocation';
-import { SensorManager } from './sensorManager.js';
 import { DateTime } from 'luxon'; // <--- DIESE ZEILE HINZUFÜGEN
+import { saveRecordedTrack } from './trackManager.js'; // <-- NEU: Importieren
 
 // Zähler, um die ersten ungenauen Web-Geolocation-Events zu überspringen
 let webUpdateCounter = 0;
@@ -58,7 +58,7 @@ const debouncedPositionUpdate = Utils.debounce(async (position) => {
     const { latitude, longitude, accuracy, altitude: deviceAltitude, altitudeAccuracy } = position.coords;
 
     const isFirstUpdate = !AppState.liveMarker;
-   const accuracyThreshold = isFirstUpdate ? 500 : UI_DEFAULTS.GEOLOCATION_ACCURACY_THRESHOLD_M; 
+    const accuracyThreshold = isFirstUpdate ? 500 : UI_DEFAULTS.GEOLOCATION_ACCURACY_THRESHOLD_M;
 
     if (accuracy > accuracyThreshold) {
         console.log(`[LiveTrackingManager] Skipping position update. Accuracy (${accuracy}m) is lower than threshold (${accuracyThreshold}m).`);
@@ -121,16 +121,13 @@ const debouncedPositionUpdate = Utils.debounce(async (position) => {
         bubbles: true, cancelable: true
     });
 
-    if (AppState.isAutoRecording) {
+    if (AppState.isAutoRecording || AppState.isManualRecording) {
         AppState.recordedTrackPoints.push({
             lat: latitude,
             lng: longitude,
             ele: deviceAltitude,
             time: DateTime.utc()
         });
-
-        // Landung prüfen
-        SensorManager.checkLanding(AppState.lastSmoothedDescentRateMps);
     }
 
     document.dispatchEvent(event);
@@ -207,4 +204,42 @@ export function stopPositionTracking() {
     AppState.prevLng = null;
 
     document.dispatchEvent(new CustomEvent('tracking:stopped'));
+}
+
+/**
+ * Startet oder stoppt die manuelle Aufzeichnung eines Tracks.
+ * Wird durch den neuen Button im Dashboard gesteuert.
+ */
+export function toggleManualRecording() {
+    if (AppState.isAutoRecording) {
+        Utils.handleMessage("Cannot start manual recording while auto-recording is active.");
+        return;
+    }
+
+    AppState.isManualRecording = !AppState.isManualRecording;
+
+    if (AppState.isManualRecording) {
+        // Manuelle Aufnahme starten
+        AppState.recordedTrackPoints = []; // Track zurücksetzen
+        startPositionTracking(); // Tracking starten, falls es nicht läuft
+        Utils.handleMessage("Manual recording started.");
+        document.dispatchEvent(new CustomEvent('sensor:freefall_detected')); // Simuliert den Start
+    } else {
+        // Manuelle Aufnahme stoppen
+        Utils.handleMessage("Manual recording stopped. Saving track...");
+        saveRecordedTrack(); // Track speichern
+        // Das Tracking wird hier NICHT gestoppt, da es unabhängig weiterlaufen kann.
+    }
+
+    // Button-Zustand in der UI aktualisieren
+    const manualButton = document.getElementById('manual-recording-button');
+    if (manualButton) {
+        if (AppState.isManualRecording) {
+            manualButton.textContent = "Stop Recording";
+            manualButton.classList.add('recording');
+        } else {
+            manualButton.textContent = "Start Recording";
+            manualButton.classList.remove('recording');
+        }
+    }
 }

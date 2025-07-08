@@ -14,6 +14,11 @@ export default defineConfig({
     // Ausgabeverzeichnis für die Mobile-App
     outDir: resolve(__dirname, 'dist/mobile'),
     emptyOutDir: true,
+    rollupOptions: {
+      external: [
+        '@capacitor/motion'
+      ]
+    }
   },
 
   plugins: [
