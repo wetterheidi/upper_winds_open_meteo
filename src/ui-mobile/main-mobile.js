@@ -1049,6 +1049,7 @@ function setupAppEventListeners() {
                 Settings.save();
                 if (AppState.weatherData) {
                     debouncedCalculateJump();
+                    EnsembleManager.processAndVisualizeEnsemble(getSliderValue());
                 }
                 displayManager.updateJumpRunTrackDisplay();
                 break;
@@ -1075,6 +1076,7 @@ function setupAppEventListeners() {
                 if (AppState.weatherData) {
                     calculateJump();
                     displayManager.updateLandingPatternDisplay();
+                    EnsembleManager.processAndVisualizeEnsemble(getSliderValue());
                 }
                 break;
 

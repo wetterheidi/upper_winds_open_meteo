@@ -115,26 +115,19 @@ export async function fetchEnsembleWeatherData() {
  * @returns {void}
  */
 export function clearEnsembleVisualizations() {
-    // 1. Zuerst prüfen, ob die Layer-Gruppe überhaupt existiert.
     if (AppState.ensembleLayerGroup) {
-        // 2. Anstatt auf hasLayer() zu vertrauen, versuchen wir einfach, sie zu entfernen.
-        //    Leaflet ist robust genug, um damit umzugehen, wenn der Layer nicht mehr da ist.
         AppState.map.removeLayer(AppState.ensembleLayerGroup);
     }
-
-    // 3. Dasselbe für den Heatmap-Layer.
+    // Die Heatmap und der einzelne Contour-Layer werden nicht mehr benötigt
     if (AppState.heatmapLayer) {
         AppState.map.removeLayer(AppState.heatmapLayer);
+        AppState.heatmapLayer = null;
     }
-
-    // 4. Referenzen sicher zurücksetzen.
-    AppState.heatmapLayer = null;
+    // Alte Logik für heatmapContourLayer entfernen, da wir jetzt eine Gruppe haben
+    
     AppState.ensembleScenarioCircles = {};
-
-    // 5. Eine brandneue, garantiert saubere Layer-Gruppe erstellen und zur Karte hinzufügen.
+    // Erstelle die Layer-Gruppe neu, was automatisch alle alten Layer (Polygone, Kreise) entfernt
     AppState.ensembleLayerGroup = L.layerGroup().addTo(AppState.map);
-
-    console.log("Ensemble visualizations cleared and a new, clean layer group was created.");
 }
 
 /**
@@ -555,37 +548,29 @@ function calculateExitCircleForEnsemble(profileIdentifier, sliderIndex, specific
 }
 
 /**
- * Erstellt und zeigt eine Heatmap der wahrscheinlichsten Landezonen an.
- * Berechnet für jedes Ensemble-Modell den Exit-Bereich, legt ein Raster über alle Bereiche
- * und berechnet für jede Rasterzelle die Anzahl der Überlappungen.
- * Das Ergebnis wird als Heatmap-Layer auf der Karte visualisiert.
- * @returns {void}
+ * Erstellt und zeigt eine mehrstufige Polygon-Visualisierung an, die die Übereinstimmung
+ * der Ensemble-Modelle darstellt.
+ * - Äußeres Polygon (geringste Übereinstimmung)
+ * - Mittleres Polygon (mindestens 50% Übereinstimmung)
+ * - Inneres Polygon (100% Übereinstimmung)
  * @private
  */
 function generateAndDisplayHeatmap(sliderIndex, interpStep) {
-
-    // 1. Clear previous visualizations
+    // 1. Vorherige Visualisierungen entfernen (wichtig: auch den neuen Layer)
     clearEnsembleVisualizations();
-    if (AppState.heatmapLayer) {
-        AppState.map.removeLayer(AppState.heatmapLayer);
-        AppState.heatmapLayer = null;
+
+    // 2. Prüfen, ob Daten vorhanden sind
+    if (!AppState.ensembleModelsData || Object.keys(AppState.ensembleModelsData).length === 0) {
+        return; // Nichts zu tun, wenn keine Modelle ausgewählt sind
     }
 
-    // 2. Check if there is data
-    if (!AppState.ensembleModelsData || Object.keys(AppState.ensembleModelsData).length < 2) {
-        Utils.handleMessage("Please select at least two ensemble models to generate a heatmap.");
-        return;
-    }
-
-    // 3. Calculate all individual model circles
+    // 3. Alle einzelnen Modell-Kreise berechnen (unverändert)
     const modelCircles = [];
     for (const modelName in AppState.ensembleModelsData) {
+        // ... (diese Schleife bleibt exakt gleich)
         if (Object.hasOwnProperty.call(AppState.ensembleModelsData, modelName)) {
             const modelHourlyData = AppState.ensembleModelsData[modelName];
-
-            // WICHTIGE KORREKTUR: sliderIndex hier weitergeben
             const exitResult = calculateExitCircleForEnsemble(modelName, sliderIndex, { hourly: modelHourlyData });
-
             if (exitResult) {
                 modelCircles.push({
                     centerLat: exitResult.centerLat,
@@ -600,80 +585,90 @@ function generateAndDisplayHeatmap(sliderIndex, interpStep) {
         console.warn("Could not calculate any circles for the heatmap.");
         return;
     }
-    console.log(`[Heatmap] Calculated ${modelCircles.length} model circles.`);
 
-    // 4. Bounding-Box und Raster-Berechnung (bleibt unverändert)
+    // 4. Raster-Punkte für die verschiedenen Übereinstimmungslevel sammeln
+    const numModels = modelCircles.length;
+    const halfModels = Math.ceil(numModels / 2);
+
     let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
-    const metersPerDegree = 111320;
     modelCircles.forEach(circle => {
-        const latRadius = circle.radius / metersPerDegree;
-        const lngRadius = circle.radius / (metersPerDegree * Math.cos(circle.centerLat * Math.PI / 180));
+        const latRadius = circle.radius / 111320;
+        const lngRadius = circle.radius / (111320 * Math.cos(circle.centerLat * Math.PI / 180));
         minLat = Math.min(minLat, circle.centerLat - latRadius);
         maxLat = Math.max(maxLat, circle.centerLat + latRadius);
         minLng = Math.min(minLng, circle.centerLng - lngRadius);
         maxLng = Math.max(maxLng, circle.centerLng + lngRadius);
     });
 
-    const gridResolution = 40;
-    const latStep = gridResolution / metersPerDegree;
-    const heatmapPoints = [];
+    const gridResolution = 25;
+    const latStep = gridResolution / 111320;
+    
+    // Arrays für die Punkte jedes Levels
+    const pointsAnyOverlap = [];
+    const pointsHalfOverlap = [];
+    const pointsMaxOverlap = [];
 
-    console.log("[Heatmap] Starting grid calculation...");
     for (let lat = minLat; lat <= maxLat; lat += latStep) {
-        const lngStep = gridResolution / (metersPerDegree * Math.cos(lat * Math.PI / 180));
+        const lngStep = gridResolution / (111320 * Math.cos(lat * Math.PI / 180));
         for (let lng = minLng; lng <= maxLng; lng += lngStep) {
             let overlapCount = 0;
             const gridCellLatLng = L.latLng(lat, lng);
-            modelCircles.forEach(circle => {
-                const circleCenterLatLng = L.latLng(circle.centerLat, circle.centerLng);
-                const distance = AppState.map.distance(gridCellLatLng, circleCenterLatLng);
-                if (distance <= circle.radius) {
+            for (const circle of modelCircles) {
+                if (AppState.map.distance(gridCellLatLng, L.latLng(circle.centerLat, circle.centerLng)) <= circle.radius) {
                     overlapCount++;
                 }
-            });
-            if (overlapCount > 0) {
-                heatmapPoints.push([lat, lng, overlapCount]);
+            }
+
+            // Punkte zu den jeweiligen Listen hinzufügen
+            if (overlapCount >= 1) {
+                pointsAnyOverlap.push([lat, lng]);
+            }
+            if (overlapCount >= halfModels) {
+                pointsHalfOverlap.push([lat, lng]);
+            }
+            if (overlapCount === numModels) {
+                pointsMaxOverlap.push([lat, lng]);
             }
         }
     }
-    console.log(`[Heatmap] Finished grid calculation. Generated ${heatmapPoints.length} heatmap points.`);
-
-    // 5. Heatmap-Layer erstellen und anzeigen (bleibt unverändert)
-    if (heatmapPoints.length > 0) {
-        const maxOverlap = modelCircles.length;
-        const gradient = {};
-
-        if (maxOverlap === 1) {
-            gradient[1.0] = 'lime';
-        } else {
-            for (let i = 1; i <= maxOverlap; i++) {
-                const ratio = i / maxOverlap;
-                if (i === 1) {
-                    gradient[ratio] = 'red';
-                } else if (i < maxOverlap) {
-                    gradient[ratio] = 'yellow';
-                } else {
-                    gradient[ratio] = 'rgba(0, 255, 0, 0.9)';
-                }
+    
+    // Helferfunktion für die konvexe Hülle (bleibt unverändert)
+    const getConvexHull = points => {
+        // ... (Implementierung von getConvexHull bleibt hier)
+         points.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+        const crossProduct = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+        const lower = [];
+        for (const p of points) {
+            while (lower.length >= 2 && crossProduct(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) {
+                lower.pop();
             }
+            lower.push(p);
         }
-
-        console.log("[Heatmap] Using gradient:", gradient);
-
-        if (AppState.heatmapLayer) {
-            AppState.map.removeLayer(AppState.heatmapLayer);
+        const upper = [];
+        for (let i = points.length - 1; i >= 0; i--) {
+            const p = points[i];
+            while (upper.length >= 2 && crossProduct(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) {
+                upper.pop();
+            }
+            upper.push(p);
         }
+        return lower.slice(0, -1).concat(upper.slice(0, -1));
+    };
 
-        const dynamicRadius = Utils.calculateDynamicRadius(ENSEMBLE_VISUALIZATION.HEATMAP_BASE_RADIUS, ENSEMBLE_VISUALIZATION.HEATMAP_REFERENCE_ZOOM);
-
-        AppState.heatmapLayer = L.heatLayer(heatmapPoints, {
-            radius: dynamicRadius,
-            blur: 10,
-            max: maxOverlap,
-            minOpacity: 0.01,
-            gradient: gradient
-        }).addTo(AppState.map);
-    } else {
-        Utils.handleMessage("No overlapping landing areas found for the selected models.");
-    }
+    // 5. Polygone zeichnen und zur Layer-Gruppe hinzufügen
+    AppState.heatmapContourLayers = []; // Array zum Speichern der Layer
+    
+    // Funktion zum Zeichnen eines Polygons
+    const drawContour = (points, style) => {
+        if (points.length > 2) {
+            const hull = getConvexHull(points);
+            const polygon = L.polygon(hull, style).addTo(AppState.ensembleLayerGroup);
+            AppState.heatmapContourLayers.push(polygon);
+        }
+    };
+    
+    // Zeichne die Polygone von außen nach innen, damit sie sich korrekt überlagern
+    drawContour(pointsAnyOverlap, { color: 'red', weight: 2, fillOpacity: 0.1, interactive: false });
+    drawContour(pointsHalfOverlap, { color: 'yellow', weight: 2, fillOpacity: 0.15, interactive: false });
+    drawContour(pointsMaxOverlap, { color: 'green', weight: 3, fillOpacity: 0.2, interactive: false });
 }
