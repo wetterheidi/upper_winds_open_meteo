@@ -9,7 +9,7 @@ import * as mapManager from './mapManager.js';
 import * as Coordinates from './coordinates.js';
 import * as JumpPlanner from '../core/jumpPlanner.js';
 import { TileCache, cacheTilesForDIP, cacheVisibleTiles } from '../core/tileCache.js';
-import { loadGpxTrack, loadCsvTrackUTC, exportToGpx, exportLandingPatternToGpx} from '../core/trackManager.js';
+import { loadGpxTrack, loadCsvTrackUTC, exportToGpx, exportLandingPatternToGpx } from '../core/trackManager.js';
 import * as weatherManager from '../core/weatherManager.js';
 import * as liveTrackingManager from '../core/liveTrackingManager.js';
 import { fetchEnsembleWeatherData, processAndVisualizeEnsemble, clearEnsembleVisualizations } from '../core/ensembleManager.js';
@@ -50,6 +50,27 @@ function setupTabBarEvents() {
         if (!button) return;
 
         const panelId = button.dataset.panel;
+
+        const trackPositionCheckbox = document.getElementById('trackPositionCheckbox');
+
+        // Prüfe, ob das Dashboard betreten oder verlassen wird
+        if (panelId === 'dashboard') {
+            // Dashboard wird betreten -> Starte Tracking
+            if (trackPositionCheckbox && !trackPositionCheckbox.checked) {
+                console.log("Dashboard opened, starting live tracking.");
+                trackPositionCheckbox.checked = true;
+                // Sende das Event, als ob der Benutzer geklickt hätte
+                trackPositionCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        } else {
+            // Dashboard wird verlassen -> Stoppe Tracking, falls es lief
+            if (trackPositionCheckbox && trackPositionCheckbox.checked) {
+                console.log("Dashboard closed, stopping live tracking.");
+                trackPositionCheckbox.checked = false;
+                // Sende das Event, als ob der Benutzer geklickt hätte
+                trackPositionCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        }
 
         if (panelId === 'planner' && !Settings.isFeatureUnlocked('planner')) {
             Settings.showPasswordModal('planner', () => {
@@ -246,17 +267,16 @@ function setupInput(id, eventType, debounceTime, validationCallback) {
     input.addEventListener(eventType, Utils.debounce(() => {
         const value = input.type === 'number' ? parseFloat(input.value) : input.value;
 
-        // Führen Sie die Validierung aus, falls eine übergeben wurde.
-        // Die Validierung kann `false` zurückgeben, um das Senden des Events zu stoppen.
         if (validationCallback && validationCallback(value) === false) {
-            return; // Abbruch bei ungültiger Eingabe
+            return;
         }
 
+        // Verwendet einfach die 'id' des Elements als Schlüssel.
+        // Da die ID jetzt 'interpStep' ist, funktioniert das perfekt.
         Settings.state.userSettings[id] = value;
         Settings.save();
         console.log(`${id} changed to: ${value} and saved to localStorage`);
 
-        // Event auslösen, anstatt Logik direkt auszuführen
         document.dispatchEvent(new CustomEvent('ui:inputChanged', {
             detail: { name: id, value: value }
         }));
@@ -620,7 +640,7 @@ function setupInputEvents() {
 
     setupInput('canopySpeed', 'change', 300);
     setupInput('descentRate', 'change', 300);
-    setupInput('interpStepSelect', 'change', 300);
+    setupInput('interpStep', 'change', 300, null, 'interpStep'); // <-- KORRIGIERTE ZEILE mit dem korrekten Einstellungsnamen
 
     setupInput('customLandingDirectionLL', 'input', 100);
     setupInput('customLandingDirectionRR', 'input', 100);
@@ -1041,7 +1061,7 @@ function setupCacheSettings() {
             if (minZoom > maxZoom) {
                 maxZoom = minZoom;
             }
-            
+
             // Aktualisiere die Input-Felder mit den korrigierten Werten
             zoomMinInput.value = minZoom;
             zoomMaxInput.value = maxZoom;
