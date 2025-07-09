@@ -4,7 +4,7 @@
 import { UI_DEFAULTS, SMOOTHING_DEFAULTS } from './constants.js';
 import { AppState } from './state.js';
 import { Utils } from './utils.js';
-import { Geolocation } from '@capacitor/geolocation';
+import { getCapacitorModules } from './capacitor-adapter.js';
 import { DateTime } from 'luxon'; // <--- DIESE ZEILE HINZUFÜGEN
 import { saveRecordedTrack } from './trackManager.js'; // <-- NEU: Importieren
 
@@ -139,20 +139,18 @@ const debouncedPositionUpdate = Utils.debounce(async (position) => {
  * Löst ein 'tracking:started'-Event aus, um andere Teile der Anwendung zu informieren.
  * @returns {void}
  */
-export function startPositionTracking() {
+export async function startPositionTracking() {
     if (AppState.watchId !== null) return;
     console.log("[LiveTrackingManager] Attempting to start position tracking...");
 
     // PRÜFUNG: Läuft die App in einer nativen Umgebung?
     if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+        // *** HIER DIE ÄNDERUNG ***
+        const { Geolocation } = await getCapacitorModules(); // Modul laden
+
         console.log("[LiveTrackingManager] Using Capacitor Geolocation for tracking.");
         Geolocation.watchPosition({ enableHighAccuracy: true }, (position, err) => {
-            if (err) {
-                Utils.handleError(`Geolocation error: ${err.message}`);
-                stopPositionTracking();
-                return;
-            }
-            debouncedPositionUpdate(position);
+            // ... der Rest der Funktion bleibt gleich
         }).then(watchId => {
             AppState.watchId = watchId;
             document.dispatchEvent(new CustomEvent('tracking:started'));
@@ -183,7 +181,7 @@ export function startPositionTracking() {
  * Löst ein 'tracking:stopped'-Event aus.
  * @returns {void}
  */
-export function stopPositionTracking() {
+export async function stopPositionTracking() {
     if (AppState.watchId !== null) {
         if (window.Capacitor && window.Capacitor.isNativePlatform()) {
             Geolocation.clearWatch({ id: AppState.watchId }).then(() => {

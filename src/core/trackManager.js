@@ -5,7 +5,7 @@ import { DateTime } from 'luxon';
 import * as JumpPlanner from './jumpPlanner.js';
 import * as weatherManager from './weatherManager.js';
 import { interpolateWeatherData } from './weatherManager.js';
-import { Filesystem, Directory } from '@capacitor/filesystem';
+import { getCapacitorModules } from './capacitor-adapter.js';
 
 
 "use strict";
@@ -18,22 +18,27 @@ import { Filesystem, Directory } from '@capacitor/filesystem';
  * @returns {Promise<string>} Ein Promise, das zum Textinhalt der Datei auflöst.
  */
 async function readFileContent(file) {
+    // NEU: Module über die asynchrone Funktion abrufen
+    const { Filesystem, Directory } = await getCapacitorModules();
+
     // Prüfen, ob die App nativ läuft UND ein `path` für die Capacitor-API vorhanden ist.
     if (window.Capacitor && window.Capacitor.isNativePlatform() && file.path) {
         console.log(`[trackManager] Lese Datei über Capacitor Filesystem API: ${file.path}`);
         try {
+            // Der Rest Ihrer Funktion bleibt exakt gleich!
             const result = await Filesystem.readFile({
                 path: file.path
+                // Hinweis: Möglicherweise müssen Sie hier das korrekte Directory angeben,
+                // je nachdem, wo der FilePicker die Dateien speichert, z.B.
+                // directory: Directory.Documents
             });
-            // Capacitor gibt die Daten als Base64-kodierten String zurück.
-            // Wir müssen ihn für die Weiterverarbeitung dekodieren.
             return atob(result.data);
         } catch (error) {
             console.error('[trackManager] Fehler beim Lesen der Datei mit Capacitor:', error);
             throw new Error('Could not read file using native API.');
         }
     } else {
-        // Fallback für den Web-Browser
+        // Der Web-Fallback bleibt ebenfalls unverändert.
         console.log(`[trackManager] Lese Datei über Web FileReader: ${file.name}`);
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -57,7 +62,7 @@ export async function loadGpxTrack(file) {
     try {
         // **ÄNDERUNG**: Nutze die neue Hilfsfunktion
         const gpxData = await readFileContent(file);
-        
+
         const parser = new DOMParser();
         const xml = parser.parseFromString(gpxData, 'text/xml');
         const trackpoints = xml.getElementsByTagName('trkpt');
@@ -97,7 +102,7 @@ export async function loadCsvTrackUTC(file) {
     try {
         // **ÄNDERUNG**: Nutze die neue Hilfsfunktion
         const csvData = await readFileContent(file);
-        
+
         return new Promise(async (resolve, reject) => {
             const points = [];
             Papa.parse(csvData, {
@@ -126,8 +131,8 @@ export async function loadCsvTrackUTC(file) {
                     const trackMetaData = await renderTrack(points, file.name);
                     resolve(trackMetaData);
                 },
-                error: function (error) { 
-                    reject(new Error('Error parsing CSV: ' + error.message)); 
+                error: function (error) {
+                    reject(new Error('Error parsing CSV: ' + error.message));
                 }
             });
         });
@@ -400,7 +405,7 @@ export function exportLandingPatternToGpx() {
     console.log("Schritt 2: Wetterdaten erfolgreich interpoliert.");
 
     const patternDataForExport = JumpPlanner.calculateLandingPatternCoords(AppState.lastLat, AppState.lastLng, interpolatedData);
-    
+
     // ================== DEBUGGING-BLOCK ==================
     console.log("Schritt 3: Ergebnis von calculateLandingPatternCoords:", patternDataForExport);
     if (!patternDataForExport) {
@@ -411,9 +416,9 @@ export function exportLandingPatternToGpx() {
     // =====================================================
 
     const { downwindStart, baseStart, finalStart, landingPoint } = patternDataForExport;
-    
+
     const baseHeight = Math.round(AppState.lastAltitude);
-    
+
     const legHeightDownwind = Settings.getValue('legHeightDownwind', 300);
     const legHeightBase = Settings.getValue('legHeightBase', 200);
     const legHeightFinal = Settings.getValue('legHeightFinal', 100);
@@ -445,7 +450,7 @@ export function exportLandingPatternToGpx() {
     </trkseg>
   </trk>
 </gpx>`;
-    
+
     console.log("Schritt 4: GPX-String wurde erfolgreich erstellt.");
     console.log(gpxContent); // Gibt den GPX-Inhalt in die Konsole aus
 
@@ -456,10 +461,10 @@ export function exportLandingPatternToGpx() {
     a.download = `${time}_Landing_Pattern.gpx`;
     a.href = url;
     document.body.appendChild(a);
-    
+
     console.log("Schritt 5: Download-Link erstellt. Der Download wird jetzt ausgelöst...");
     a.click();
-    
+
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
     console.log("--- GPX Landing Pattern Export beendet ---");
@@ -483,18 +488,16 @@ export async function saveRecordedTrack() {
 <trk><name>Recorded Skydive</name><trkseg>`;
 
         const footer = `</trkseg></trk></gpx>`;
-        
+
         const trackpointStrings = AppState.recordedTrackPoints.map((p, index) => {
             if (p && typeof p.lat === 'number' && typeof p.lng === 'number' && p.time) {
                 const ele = (typeof p.ele === 'number') ? p.ele.toFixed(2) : '0';
                 const time = p.time.toISO();
                 const trkpt = `<trkpt lat="${p.lat}" lon="${p.lng}"><ele>${ele}</ele><time>${time}</time></trkpt>`;
-                console.log(`Punkt ${index + 1}: ${trkpt}`); // Log für jeden einzelnen Punkt
                 return trkpt;
             }
-            console.warn(`Ungültiger oder unvollständiger Punkt bei Index ${index} übersprungen:`, p);
-            return ''; // Leeren String für ungültige Punkte
-        }).filter(Boolean); // Entfernt leere Einträge
+            return '';
+        }).filter(Boolean);
 
         if (trackpointStrings.length < 2) {
             Utils.handleError("Nicht genügend gültige Punkte für einen Track zum Speichern.");
@@ -502,14 +505,13 @@ export async function saveRecordedTrack() {
         }
 
         const gpxContent = `${header}\n${trackpointStrings.join('\n')}\n${footer}`;
-
-        console.log("--- FINALER GPX-INHALT VOR DEM SPEICHERN ---");
-        console.log(gpxContent);
-        console.log("-----------------------------------------");
-        
         const fileName = `Skydive_Track_${DateTime.utc().toFormat('yyyy-MM-dd_HHmm')}.gpx`;
 
         if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+            // *** HIER IST DIE ÄNDERUNG ***
+            // Hole die benötigten Module über den Adapter
+            const { Filesystem, Directory } = await getCapacitorModules();
+
             await Filesystem.writeFile({
                 path: fileName,
                 data: gpxContent,
@@ -518,7 +520,7 @@ export async function saveRecordedTrack() {
             });
             Utils.handleMessage(`Track saved: ${fileName}`);
         } else {
-            // Web-Fallback
+            // Der Web-Fallback bleibt unverändert
             const blob = new Blob([gpxContent], { type: "application/gpx+xml;charset=utf-8" });
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);

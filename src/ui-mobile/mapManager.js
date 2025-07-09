@@ -8,7 +8,7 @@ import { TileCache } from '../core/tileCache.js';
 import { updateOfflineIndicator, isMobileDevice } from './ui.js';
 //import './public/vendor/Leaflet.PolylineMeasure.js'; // Pfad ggf. anpassen
 import { UI_DEFAULTS, ICON_URLS, ENSEMBLE_VISUALIZATION } from '../core/constants.js'; // Importiere UI-Defaults
-import { Geolocation } from '@capacitor/geolocation';
+import { getCapacitorModules } from '../core/capacitor-adapter.js';
 
 let lastTapTime = 0; // Add this line
 let isRotatingJRT = false;
@@ -476,6 +476,8 @@ async function _geolocationErrorCallback(error, defaultCenter, defaultZoom) {
 
 async function _handleGeolocation(defaultCenter, defaultZoom) {
     try {
+        const { Geolocation } = await getCapacitorModules();
+
         // Dies löst automatisch den Berechtigungsdialog beim ersten Aufruf aus.
         const position = await Geolocation.getCurrentPosition({
             enableHighAccuracy: true,
