@@ -950,7 +950,7 @@ button {
     border-radius: 4px;
     cursor: pointer;
     transition: background 0.3s;
-    min-width: 70px;
+    min-width: 55px;
 }
 
 button:hover {

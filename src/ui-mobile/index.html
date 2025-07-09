@@ -368,6 +368,67 @@
             </div>
         </div>
 
+        <div id="panel-dashboard" class="content-panel hidden">
+            <div class="dashboard-grid">
+                <div class="dashboard-card">
+                    <div class="card-label">Speed</div>
+                    <div id="dashboard-speed" class="card-value">---</div>
+                    <div id="dashboard-speed-unit" class="card-unit">kt</div>
+                </div>
+                <div class="dashboard-card">
+                    <div class="card-label">Direction</div>
+                    <div id="dashboard-direction" class="card-value">---</div>
+                    <div class="card-unit">deg</div>
+                </div>
+                <div class="dashboard-row-split">
+                    <div class="dashboard-card">
+                        <div class="card-label">Altitude</div>
+                        <div id="dashboard-altitude" class="card-value">---</div>
+                        <div id="dashboard-altitude-unit" class="card-unit">m</div>
+                    </div>
+                    <div class="dashboard-card">
+                        <div class="card-label">Range</div>
+                        <div id="dashboard-range" class="card-value">---</div>
+                        <div id="dashboard-range-unit" class="card-unit">m</div>
+                    </div>
+                </div>
+                <div class="dashboard-row-split">
+                    <div class="dashboard-card">
+                        <div class="card-label">Glide to DIP</div>
+                        <div id="dashboard-glide-required" class="card-value">---</div>
+                        <div class="card-unit"></div>
+                    </div>
+                    <div class="dashboard-card">
+                        <div class="card-label">Glide Ratio</div>
+                        <div id="dashboard-glide-current" class="card-value">---</div>
+                        <div class="card-unit"></div>
+                    </div>
+                </div>
+                <div class="dashboard-row-split">
+                    <div class="dashboard-card">
+                        <div class="card-label">Bearing to DIP</div>
+                        <div id="dashboard-bearing" class="card-value">---</div>
+                        <div class="card-unit">deg</div>
+                    </div>
+                    <div class="dashboard-card">
+                        <div class="card-label">Distance to DIP</div>
+                        <div id="dashboard-distance" class="card-value">---</div>
+                        <div id="dashboard-distance-unit" class="card-unit">m</div>
+                    </div>
+                    <div class="dashboard-card" id="auto-record-card">
+                        <button id="arm-recording-button" class="arm-button">
+                            Arm Recording
+                        </button>
+                    </div>
+                    <div class="dashboard-card" id="manual-record-card">
+                        <button id="manual-recording-button" class="arm-button">
+                            Start Recording
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div id="panel-settings" class="content-panel hidden">
 
             <div class="accordion-item">
@@ -533,6 +594,10 @@
         <button class="tab-button" data-panel="planner" id="planner-tab-button">
             <span class="icon">🪂</span>
             <span class="label">Planner</span>
+        </button>
+        <button class="tab-button" data-panel="dashboard">
+            <span class="icon">🚀</span>
+            <span class="label">Dashboard</span>
         </button>
         <button class="tab-button" data-panel="settings">
             <span class="icon">⚙️</span>

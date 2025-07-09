@@ -1,2 +1,87 @@
-/build/*
-!/build/.npmkeep
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-error.log
+
+# Build-Artefakte
+build/
+dist/
+out/
+
+# Log-Dateien
+*.log
+
+# Geheime Konfigurationsdateien
+config.js
+.env
+*.env
+
+# IDE- und Editor-spezifische Dateien
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Temporäre Dateien
+*.tmp
+*.bak
+*.swp
+*~.nib
+
+# Android
+# =====================================
+*.apk
+*.aar
+*.ap_
+*.aab
+*.dex
+*.class
+/gen
+/out
+
+# Gradle
+.gradle/
+build/
+/app/build/
+local.properties
+/captures/
+.DS_Store
+/app/src/main/assets/public
+/app/src/main/assets/capacitor.config.json
+/app/src/main/assets/capacitor.plugins.json
+/app/src/main/res/xml/config.xml
+
+
+# Cordova
+/plugins/
+/platforms/
+/res/
+/merges/
+
+# Capacitor
+/android/app/src/main/assets/capacitor.config.json
+/android/app/src/main/assets/capacitor.plugins.json
+/android/app/src/main/res/xml/config.xml
+/android/capacitor-cordova-android-plugins/
+
+/ios/App/App/capacitor.config.json
+/ios/App/App/config.xml
+/ios/App/public/
+/ios/capacitor-cordova-ios-plugins/
+
+# iOS
+# =====================================
+build/
+DerivedData/
+*.hmap
+*.ipa
+*.xcscheme
+xcuserdata/

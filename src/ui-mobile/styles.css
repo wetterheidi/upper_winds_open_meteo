@@ -55,13 +55,15 @@ button:hover {
 
 /* Stil für den aktiven Button */
 .tab-button.active {
-    color: #333; /* Ihre Hauptfarbe */
+    color: #333;
+    /* Ihre Hauptfarbe */
 }
 
 /* Content panels */
 #content-panels {
     position: absolute;
-    top: calc(96px + env(safe-area-inset-top)); /* Match slider-container height */
+    top: calc(96px + env(safe-area-inset-top));
+    /* Match slider-container height */
     bottom: calc(55px + env(safe-area-inset-bottom));
     left: env(safe-area-inset-left);
     right: env(safe-area-inset-right);
@@ -78,7 +80,8 @@ button:hover {
     background-color: rgba(249, 249, 249, 0.95);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
-    padding: 1px 15px 1px 15px; /* NEU: Oben 0, sonst 15px */
+    padding: 1px 15px 1px 15px;
+    /* NEU: Oben 0, sonst 15px */
     overflow-y: auto;
     box-sizing: border-box;
     pointer-events: auto;
@@ -93,7 +96,7 @@ button:hover {
     background-color: #fff;
     margin-bottom: 10px;
     border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     overflow: hidden;
 }
 
@@ -115,25 +118,29 @@ button:hover {
 
 /* Icon für auf/zu Zustand hinzufügen */
 .accordion-header::after {
-    content: '▼'; /* Pfeil nach unten */
+    content: '▼';
+    /* Pfeil nach unten */
     font-size: 12px;
     color: #888;
     transition: transform 0.3s ease;
 }
 
 .accordion-header.active::after {
-    transform: rotate(180deg); /* Pfeil drehen, wenn aktiv */
+    transform: rotate(180deg);
+    /* Pfeil drehen, wenn aktiv */
 }
 
 /* Stellt sicher, dass der Inhaltsbereich des Akkordeons seine Kinder (die Reihen) untereinander anordnet. */
 .accordion-content {
-    display: none; /* Standardmäßig versteckt */
+    display: none;
+    /* Standardmäßig versteckt */
     padding: 15px;
     border-top: 1px solid #e0e0e0;
 }
 
 .accordion-item.active .accordion-content {
-    display: flex; /* Nur wenn aktiv, als flex-Container anzeigen */
+    display: flex;
+    /* Nur wenn aktiv, als flex-Container anzeigen */
 }
 
 .accordion-content ul {
@@ -146,6 +153,7 @@ button:hover {
     padding: 10px 0;
     border-bottom: 1px solid #f0f0f0;
 }
+
 .accordion-content li:last-child {
     border-bottom: none;
 }
@@ -153,26 +161,32 @@ button:hover {
 /* Neue Klasse für eine einzelne Einstellungs-Reihe */
 .setting-row {
     display: flex;
-    justify-content: space-between; /* Verteilt Label und Steuerelement an die Enden */
-    align-items: center; /* Zentriert die Elemente vertikal zueinander */
+    justify-content: space-between;
+    /* Verteilt Label und Steuerelement an die Enden */
+    align-items: center;
+    /* Zentriert die Elemente vertikal zueinander */
     width: 100%;
 }
 
 /* Stellt sicher, dass das Label nicht die gesamte Breite einnimmt */
 .setting-row label {
     flex-grow: 1;
-    margin-right: 15px; /* Abstand zum Steuerelement */
+    margin-right: 15px;
+    /* Abstand zum Steuerelement */
 }
 
 /* Reset default margins and ensure full height */
-html, body {
+html,
+body {
     height: 100%;
     width: 100%;
     margin: 0;
     padding: 0;
     overflow: hidden;
-    display: grid !important; /* Override flex from styles-shared.css */
-    grid-template-rows: auto 1fr auto; /* Slider, Map, Tab-bar */
+    display: grid !important;
+    /* Override flex from styles-shared.css */
+    grid-template-rows: auto 1fr auto;
+    /* Slider, Map, Tab-bar */
     grid-template-columns: 1fr;
     height: 100vh;
     box-sizing: border-box;
@@ -181,7 +195,8 @@ html, body {
 /* Main grid layout */
 body {
     display: grid;
-    grid-template-rows: auto 1fr auto; /* Slider, Map, Tab-bar */
+    grid-template-rows: auto 1fr auto;
+    /* Slider, Map, Tab-bar */
     grid-template-columns: 1fr;
     height: 100vh;
     box-sizing: border-box;
@@ -193,7 +208,8 @@ body {
     grid-column: 1;
     position: relative;
     overflow: hidden;
-    min-height: 0; /* Prevent overflow */
+    min-height: 0;
+    /* Prevent overflow */
 }
 
 #map {
@@ -202,7 +218,8 @@ body {
     left: 0 !important;
     width: 100% !important;
     height: 100% !important;
-    margin-top: 0 !important; /* Override margin-top: 90px from styles-shared.css */
+    margin-top: 0 !important;
+    /* Override margin-top: 90px from styles-shared.css */
     z-index: 0;
 }
 
@@ -214,27 +231,34 @@ body {
     backdrop-filter: blur(5px);
     -webkit-backdrop-filter: blur(5px);
     border-bottom: 1px solid #ddd;
-    z-index: 2000 !important; /* Override z-index: 200 from styles-shared.css */
+    z-index: 2000 !important;
+    /* Override z-index: 200 from styles-shared.css */
     padding: 5px;
     padding-top: calc(5px + env(safe-area-inset-top));
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
     box-sizing: border-box;
-    position: static !important; /* Override position: fixed from styles-shared.css */
+    position: static !important;
+    /* Override position: fixed from styles-shared.css */
     width: 100%;
-    max-width: 500px; /* Reduced from 600px to fit narrower screens */
-    display: flex; /* Center content horizontally */
+    max-width: 500px;
+    /* Reduced from 600px to fit narrower screens */
+    display: flex;
+    /* Center content horizontally */
     justify-content: center;
     align-items: center;
     margin-left: env(safe-area-inset-left);
     margin-right: env(safe-area-inset-right);
-    transform: none !important; /* Override any transform styles */
-    left: auto !important; /* Override any left styles */
+    transform: none !important;
+    /* Override any transform styles */
+    left: auto !important;
+    /* Override any left styles */
 }
 
 .slider-content-wrapper {
     width: 100%;
-    max-width: 400px; /* Reduced from 500px to fit narrower screens */
+    max-width: 400px;
+    /* Reduced from 500px to fit narrower screens */
     padding: 5px;
     box-sizing: border-box;
     display: flex;
@@ -259,8 +283,10 @@ body {
 
 /* Der Zeit-Slider selbst */
 #timeSlider {
-    width: 100%; /* Volle Breite des Containers nutzen */
-    max-width: 400px; /* Maximale Breite auf größeren Handys */
+    width: 100%;
+    /* Volle Breite des Containers nutzen */
+    max-width: 400px;
+    /* Maximale Breite auf größeren Handys */
     margin: 5px 0;
 }
 
@@ -291,12 +317,14 @@ body {
     transform: translateY(-50%);
     font-size: 18px;
     color: #888;
-    pointer-events: none; /* Klicks gehen durch das Icon durch */
+    pointer-events: none;
+    /* Klicks gehen durch das Icon durch */
 }
 
 #locationSearchInput {
     width: 100%;
-    padding: 12px 15px 12px 40px; /* Mehr Platz für das Icon */
+    padding: 12px 15px 12px 40px;
+    /* Mehr Platz für das Icon */
     border-radius: 8px;
     border: 1px solid #ccc;
     font-size: 14px;
@@ -313,7 +341,8 @@ body {
 .location-results-container {
     max-height: calc(100% - 120px);
     overflow-y: auto;
-    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+    -webkit-overflow-scrolling: touch;
+    /* Smooth scrolling on iOS */
 }
 
 /* Ensure locationResults is visible by default when Search Panel is active */
@@ -323,7 +352,8 @@ body {
 
 /* Ensure locationResults is visible and scrollable */
 #locationResults {
-    display: none; /* Default hidden, overridden by JS or #search-panel:not(.hidden) */
+    display: none;
+    /* Default hidden, overridden by JS or #search-panel:not(.hidden) */
     width: 100%;
     max-height: calc(100% - 120px);
     overflow-y: auto;
@@ -334,15 +364,17 @@ body {
 .search-section {
     background: white;
     border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
     margin-bottom: 15px;
-    overflow: hidden; /* Stellt sicher, dass die border-radius greift */
+    overflow: hidden;
+    /* Stellt sicher, dass die border-radius greift */
 }
 
 .search-section h5 {
     padding: 10px 15px;
     margin: 0;
-    color: #4da8da; /* Ihre Hauptfarbe */
+    color: #4da8da;
+    /* Ihre Hauptfarbe */
     background-color: #f7f7f7;
     border-bottom: 1px solid #f0f0f0;
     font-size: 14px;
@@ -362,7 +394,8 @@ body {
     border-bottom: 1px solid #f0f0f0;
     cursor: pointer;
     transition: background-color 0.2s ease;
-    min-height: 48px; /* Larger tap target for touch */
+    min-height: 48px;
+    /* Larger tap target for touch */
 }
 
 .search-item:last-child {
@@ -377,7 +410,8 @@ body {
     font-size: 20px;
     margin-right: 15px;
     color: #888;
-    width: 24px; /* Feste Breite für Ausrichtung */
+    width: 24px;
+    /* Feste Breite für Ausrichtung */
     text-align: center;
 }
 
@@ -411,11 +445,13 @@ body {
 }
 
 .search-item-actions button.is-favorite {
-    color: #f3d131; /* Gold für Favoriten */
+    color: #f3d131;
+    /* Gold für Favoriten */
 }
 
 .search-item-actions button.delete-btn:hover {
-    color: #e74c3c; /* Rot beim Hovern */
+    color: #e74c3c;
+    /* Rot beim Hovern */
 }
 
 /* Styling für das neue Dropdown-Menü */
@@ -542,7 +578,7 @@ body {
        1. Spalte (für Labels) passt sich der Breite des Inhalts an.
        2. Spalte (für Inputs/Selects) füllt den Rest des verfügbaren Platzes. */
     grid-template-columns: auto 1fr;
-    
+
     /* Abstand zwischen den Zeilen und Spalten */
     gap: 16px 10px;
 
@@ -553,7 +589,8 @@ body {
 /* Stellt sicher, dass die Labels rechtsbündig sind für eine saubere Kante */
 .settings-grid label {
     text-align: right;
-    font-weight: 500; /* Etwas dicker für bessere Lesbarkeit */
+    font-weight: 500;
+    /* Etwas dicker für bessere Lesbarkeit */
 }
 
 /* Stellt sicher, dass die Eingabefelder und Buttons die volle Spaltenbreite nutzen */
@@ -561,23 +598,26 @@ body {
 .settings-grid input,
 .settings-grid button {
     width: 100%;
-    box-sizing: border-box; /* Verhindert, dass Padding/Border die Breite sprengt */
+    box-sizing: border-box;
+    /* Verhindert, dass Padding/Border die Breite sprengt */
     padding: 8px;
     border-radius: 5px;
     border: 1px solid #ccc;
 }
 
 .settings-grid button {
-    background-color: #4da8da; /* Ihre Hauptfarbe */
+    background-color: #4da8da;
+    /* Ihre Hauptfarbe */
     color: white;
     font-weight: bold;
     border: none;
     cursor: pointer;
-    
+
     /* Buttons sollen oft nicht die ganze Breite einnehmen, 
        also platzieren wir sie in der zweiten Spalte, aber mit normaler Breite */
     width: auto;
-    justify-self: start; /* Richtet den Button links in seiner Spalte aus */
+    justify-self: start;
+    /* Richtet den Button links in seiner Spalte aus */
 }
 
 /* ================================== */
@@ -590,11 +630,13 @@ body {
 }
 
 .leaflet-control-container .leaflet-top {
-    top: 10px; /* Below slider-container */
+    top: 10px;
+    /* Below slider-container */
 }
 
 .leaflet-control-container .leaflet-bottom {
-    bottom: 10px; /* Above tab-bar */
+    bottom: 10px;
+    /* Above tab-bar */
 }
 
 .leaflet-control-coordinates {
@@ -654,7 +696,8 @@ body {
 .leaflet-control-attribution,
 .leaflet-control.coordinates {
     color: #333;
-    text-shadow: 0 0 5px white, 0 0 3px white; /* Weißer "Glow"-Effekt für Kontrast */
+    text-shadow: 0 0 5px white, 0 0 3px white;
+    /* Weißer "Glow"-Effekt für Kontrast */
     font-weight: bold;
 }
 
@@ -731,14 +774,16 @@ body {
     color: #333;
     font-weight: bold;
     padding: 10px 8px;
-    border: 1px solid #333; /* Wichtig für die Ränder */
+    border: 1px solid #333;
+    /* Wichtig für die Ränder */
     text-align: center;
     vertical-align: middle;
 }
 
 #weather-table-container td {
     padding: 8px;
-    border: 1px solid #333; /* Wichtig für die Ränder */
+    border: 1px solid #333;
+    /* Wichtig für die Ränder */
     text-align: center;
     vertical-align: middle;
 }
@@ -752,20 +797,25 @@ body {
 
 /* Stile für Hintergrundfarben basierend auf Luftfeuchtigkeit */
 #weather-table-container tr.humidity-low {
-    background: #FFFFFF !important; /* Weiß für <65% */
+    background: #FFFFFF !important;
+    /* Weiß für <65% */
 }
 
 #weather-table-container tr.humidity-moderate {
-    background: #F4F4F4 !important; /* Helles Grau für 65%-85% */
+    background: #F4F4F4 !important;
+    /* Helles Grau für 65%-85% */
 }
 
 #weather-table-container tr.humidity-high {
-    background: #cdcdcd !important; /* Mittleres Grau für 85%-99% */
+    background: #cdcdcd !important;
+    /* Mittleres Grau für 85%-99% */
 }
 
 #weather-table-container tr.humidity-saturated {
-    background: #B9B9B9 !important; /* Dunkles Grau für 100% */
-    color: #FFFFFF !important;     /* Weiße Schrift für Lesbarkeit */
+    background: #B9B9B9 !important;
+    /* Dunkles Grau für 100% */
+    color: #FFFFFF !important;
+    /* Weiße Schrift für Lesbarkeit */
 }
 
 /* Stile für Randfarben basierend auf Windgeschwindigkeit */
@@ -784,6 +834,7 @@ body {
 #weather-table-container tr.wind-very-high {
     border: 2px solid #ffcccc !important;
 }
+
 /* === ANFANG: Finaler, korrekter Block für BEIDE Info-Buttons & Popups === */
 
 /* 1. Stile für den Model-Info-Button (ein <button>-Element) */
@@ -791,7 +842,7 @@ body {
     /* Zuerst die störenden allgemeinen Button-Stile zurücksetzen */
     padding: 0 !important;
     min-width: 0 !important;
-    
+
     /* Jetzt das gewünschte Aussehen definieren */
     background: transparent;
     border: 1px solid #555;
@@ -805,7 +856,7 @@ body {
     cursor: pointer;
     transition: background-color 0.2s ease;
     flex-shrink: 0;
-    
+
     /* Wichtig für die Positionierung und das 'i' */
     display: inline-flex;
     justify-content: center;
@@ -832,12 +883,13 @@ body {
     cursor: pointer;
     transition: background-color 0.2s ease;
     flex-shrink: 0;
-    
+
     display: inline-flex;
     justify-content: center;
     align-items: center;
     margin-left: 8px;
-    line-height: 18px; /* Sorgt für vertikale Zentrierung */
+    line-height: 18px;
+    /* Sorgt für vertikale Zentrierung */
 }
 
 .info-icon:hover {
@@ -845,8 +897,8 @@ body {
 }
 
 /* 3. Stellt sicher, dass die Container als Positionierungs-Anker dienen */
-#model-row, 
-#track-upload > div:first-child {
+#model-row,
+#track-upload>div:first-child {
     position: relative;
 }
 
@@ -858,21 +910,23 @@ body {
     left: 50%;
     transform: translateX(-50%);
     width: 120px;
-    
+
     /* === HIER IST DIE EINZIGE ÄNDERUNG === */
-    height: auto;  /* Erlaubt dem Popup, in der Höhe zu wachsen */
+    height: auto;
+    /* Erlaubt dem Popup, in der Höhe zu wachsen */
     text-align: center;
     padding: 10px;
     background: white;
     border: 1px solid #ccc;
     border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     z-index: 2000;
     font-size: 13px;
     color: #333;
     line-height: 1.4;
     min-height: 40px;
-    max-height: 300px; /* Verhindert, dass das Popup zu hoch wird */
+    max-height: 300px;
+    /* Verhindert, dass das Popup zu hoch wird */
 }
 
 .info-popup::after {
@@ -889,132 +943,152 @@ body {
 /* === ENDE: Finaler Block === */
 
 #snackbar {
-  visibility: hidden;
-  min-width: 250px;
-  background-color: #333;
-  color: #fff;
-  text-align: center;
-  border-radius: 8px;
-  padding: 16px;
-  position: absolute; /* Geändert von fixed zu absolute */
-  z-index: 2010;
-  top: 100px; /* Position am oberen Rand */
-  left: 0; /* Position am linken Rand */
-  font-size: 1rem;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-  transform: translateX(-200%); /* Startet außerhalb des Bildschirms links */
-  opacity: 0;
-  transition: visibility 0s, opacity 0.5s, transform 0.5s;
+    visibility: hidden;
+    min-width: 250px;
+    background-color: #333;
+    color: #fff;
+    text-align: center;
+    border-radius: 8px;
+    padding: 16px;
+    position: absolute;
+    /* Geändert von fixed zu absolute */
+    z-index: 2010;
+    top: 100px;
+    /* Position am oberen Rand */
+    left: 0;
+    /* Position am linken Rand */
+    font-size: 1rem;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    transform: translateX(-200%);
+    /* Startet außerhalb des Bildschirms links */
+    opacity: 0;
+    transition: visibility 0s, opacity 0.5s, transform 0.5s;
 }
 
 #snackbar.show {
-  visibility: visible;
-  transform: translateX(0); /* Bewegt sich in den Bildschirm */
-  opacity: 1;
+    visibility: visible;
+    transform: translateX(0);
+    /* Bewegt sich in den Bildschirm */
+    opacity: 1;
 }
 
 /* Spezifische Farben für Erfolgs- und Fehlermeldungen */
 #snackbar.success {
-  background-color: #4CAF50; /* Grün für Erfolg */
+    background-color: #4CAF50;
+    /* Grün für Erfolg */
 }
 
 #snackbar.error {
-  background-color: #f44336; /* Rot für Fehler */
+    background-color: #f44336;
+    /* Rot für Fehler */
 }
 
 /* In src/ui-mobile/styles.css hinzufügen */
 
 #progress-snackbar {
-  visibility: hidden;
-  position: absolute; /* Geändert von fixed zu absolute */
-  top: 155px;  /* Positioniert unter der ersten Snackbar */
-  left: 0; /* Position am linken Rand */
-  transform: translateX(-200%); /* Startet außerhalb des Bildschirms links */
-  background-color: #3f51b5;
-  color: white;
-  padding: 14px;
-  border-radius: 8px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.25);
-  z-index: 2011; /* Über der normalen Snackbar */
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 280px;
-  box-sizing: border-box;
-  opacity: 0;
-  transition: visibility 0s, opacity 0.4s ease-in-out, transform 0.4s ease-in-out;
+    visibility: hidden;
+    position: absolute;
+    /* Geändert von fixed zu absolute */
+    top: 155px;
+    /* Positioniert unter der ersten Snackbar */
+    left: 0;
+    /* Position am linken Rand */
+    transform: translateX(-200%);
+    /* Startet außerhalb des Bildschirms links */
+    background-color: #3f51b5;
+    color: white;
+    padding: 14px;
+    border-radius: 8px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+    z-index: 2011;
+    /* Über der normalen Snackbar */
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 280px;
+    box-sizing: border-box;
+    opacity: 0;
+    transition: visibility 0s, opacity 0.4s ease-in-out, transform 0.4s ease-in-out;
 }
 
 #progress-snackbar.show {
-  visibility: visible;
-  opacity: 1;
-  transform: translateY(0); /* Bewegt sich in den Bildschirm */
+    visibility: visible;
+    opacity: 1;
+    transform: translateY(0);
+    /* Bewegt sich in den Bildschirm */
 }
 
 .progress-snackbar-content {
-  flex-grow: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
 }
 
 .progress-snackbar-text {
-  font-size: 0.95rem;
-  text-align: center;
+    font-size: 0.95rem;
+    text-align: center;
 }
 
 .progress-bar-container {
-  width: 100%;
-  height: 6px;
-  background-color: rgba(255, 255, 255, 0.3);
-  border-radius: 3px;
-  overflow: hidden;
+    width: 100%;
+    height: 6px;
+    background-color: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+    overflow: hidden;
 }
 
 .progress-bar {
-  width: 0%;
-  height: 100%;
-  background-color: #ffffff;
-  border-radius: 3px;
-  transition: width 0.3s ease-in-out;
+    width: 0%;
+    height: 100%;
+    background-color: #ffffff;
+    border-radius: 3px;
+    transition: width 0.3s ease-in-out;
 }
 
 #progress-snackbar .cancel-button {
-  background: transparent;
-  border: 1px solid white;
-  color: white;
-  border-radius: 5px;
-  padding: 5px 10px;
-  font-size: 0.9rem;
-  cursor: pointer;
+    background: transparent;
+    border: 1px solid white;
+    color: white;
+    border-radius: 5px;
+    padding: 5px 10px;
+    font-size: 0.9rem;
+    cursor: pointer;
 }
 
 #offline-indicator {
-  visibility: hidden; /* Standardmäßig unsichtbar */
-  opacity: 0;
-  transform: translateY(-100%); /* Startet außerhalb des sichtbaren Bereichs oben */
-  
-  position: absolute; /* Wichtig: Absolut zum map-container */
-  top: 100px;
-  left: 0;
-  right: 0;
-  
-  background-color: #fff3cd; /* Ein sanftes, warnendes Gelb */
-  color: #856404; /* Dunkler Text für guten Kontrast */
-  text-align: center;
-  padding: 8px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  
-  z-index: 2010; /* Über den Kartenebenen, aber unter den Haupt-Controls */
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  transition: visibility 0s, opacity 0.3s ease-out, transform 0.3s ease-out;
+    visibility: hidden;
+    /* Standardmäßig unsichtbar */
+    opacity: 0;
+    transform: translateY(-100%);
+    /* Startet außerhalb des sichtbaren Bereichs oben */
+
+    position: absolute;
+    /* Wichtig: Absolut zum map-container */
+    top: 100px;
+    left: 0;
+    right: 0;
+
+    background-color: #fff3cd;
+    /* Ein sanftes, warnendes Gelb */
+    color: #856404;
+    /* Dunkler Text für guten Kontrast */
+    text-align: center;
+    padding: 8px;
+    font-size: 0.9rem;
+    font-weight: 500;
+
+    z-index: 2010;
+    /* Über den Kartenebenen, aber unter den Haupt-Controls */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: visibility 0s, opacity 0.3s ease-out, transform 0.3s ease-out;
 }
 
 #offline-indicator.show {
-  visibility: visible;
-  opacity: 1;
-  transform: translateY(0); /* Gleitet von oben herein */
+    visibility: visible;
+    opacity: 1;
+    transform: translateY(0);
+    /* Gleitet von oben herein */
 }
 
 .wind-tooltip {
@@ -1029,23 +1103,218 @@ body {
 
 /* Label für die Touch-Messung */
 .leaflet-measure-label {
-  position: absolute;
-  font: 10px Arial, Helvetica, sans-serif;
-  background-color: rgba(255, 255, 170, 0.7);;
-  color: black;
-  padding: 2px;
-  border-radius: 3px;
-  box-shadow: 1px 1px 4px #888;
-  white-space: nowrap;
-  text-align: right;
-  pointer-events: none; /* Wichtig, damit das Label keine Klicks abfängt */
-  display: none; /* Standardmäßig unsichtbar */
-  z-index: 9000; /* Über dem Fadenkreuz */
+    position: absolute;
+    font: 10px Arial, Helvetica, sans-serif;
+    background-color: rgba(255, 255, 170, 0.7);
+    ;
+    color: black;
+    padding: 2px;
+    border-radius: 3px;
+    box-shadow: 1px 1px 4px #888;
+    white-space: nowrap;
+    text-align: right;
+    pointer-events: none;
+    /* Wichtig, damit das Label keine Klicks abfängt */
+    display: none;
+    /* Standardmäßig unsichtbar */
+    z-index: 9000;
+    /* Über dem Fadenkreuz */
 }
 
 .bold-distance {
     font-weight: bold !important;
 }
+
+/* in src/ui-mobile/styles.css */
+
+.dashboard-grid {
+    display: grid;
+    grid-template-rows: 1fr 1fr 1fr 0.8fr 0.8fr 0.6fr;
+    gap: 10px;
+    height: 100%;
+    padding: 10px 0;
+    box-sizing: border-box;
+}
+
+.dashboard-card {
+    background-color: #000000;
+    color: #00FF00;
+    /* Klassisches Grün auf Schwarz für besten Kontrast */
+    border-radius: 10px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    font-family: 'Courier New', Courier, monospace;
+    text-align: center;
+    border: 2px solid #00FF00;
+    box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+}
+
+.card-label {
+    font-size: 1.2rem;
+    text-transform: uppercase;
+    opacity: 0.8;
+    margin-bottom: 5px;
+}
+
+.card-value {
+    font-size: 4rem;
+    font-weight: bold;
+    line-height: 1;
+}
+
+.card-unit {
+    font-size: 1.2rem;
+    margin-top: 5px;
+    opacity: 0.8;
+}
+
+/* NEU: Styling für die geteilte Zeile */
+.dashboard-row-split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    /* Zwei gleich breite Spalten */
+    gap: 10px;
+}
+
+/* Anpassung für die kleineren Karten in der geteilten Zeile */
+.dashboard-row-split .dashboard-card {
+    padding: 5px;
+}
+
+.dashboard-row-split .card-label {
+    font-size: 1rem;
+}
+
+.dashboard-row-split .card-value {
+    font-size: 3rem;
+}
+
+.dashboard-row-split .card-unit {
+    font-size: 1rem;
+}
+
+.dashboard-row-split #auto-record-card,
+.dashboard-row-split #manual-record-card {
+    background-color: #333;
+    border: 2px solid #555;
+    box-shadow: none;
+    justify-content: center;
+}
+
+/* ============================================== */
+/* === NEU: Dashboard-Farben für Gleitverhältnis === */
+/* ============================================== */
+
+/* Grundstil für die Gleitverhältnis-Karte mit sanftem Übergang */
+#dashboard-glide-current {
+    transition: color 0.5s ease-in-out;
+}
+
+/* Stil für "besser als nötig" (grün) */
+.glide-good {
+    color: #28a745 !important;
+    /* Ein klares Grün */
+}
+
+/* Stil für "gerade ausreichend" (gelb) */
+.glide-ok {
+    color: #ffc107 !important;
+    /* Ein warnendes Gelb */
+}
+
+/* Stil für "schlechter als nötig" (rot) */
+.glide-bad {
+    color: #dc3545 !important;
+    /* Ein deutliches Rot */
+}
+
+/* NEU: Styling für den Arm-Button und Status */
+#auto-record-card {
+    background-color: #333;
+    /* Dunkler Hintergrund */
+    border: 2px solid #555;
+    box-shadow: none;
+    justify-content: center;
+}
+
+.arm-button {
+    width: 100%;
+    height: 100%;
+    font-size: 1.5rem;
+    font-weight: bold;
+    border: 2px solid #ffc107;
+    background-color: transparent;
+    color: #ffc107;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.arm-button:hover {
+    background-color: #ffc107;
+    color: #000;
+}
+
+.arm-button.armed {
+    border-color: #28a745;
+    background-color: #28a745;
+    color: white;
+    cursor: default;
+}
+
+.arm-button.recording {
+    border-color: #dc3545;
+    background-color: #dc3545;
+    color: white;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7);
+    }
+
+    70% {
+        box-shadow: 0 0 10px 15px rgba(220, 53, 69, 0);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(220, 53, 69, 0);
+    }
+}
+
+#manual-recording-button {
+    border-color: #007bff; /* Blau für manuelle Aktionen */
+    color: #007bff;
+}
+
+#manual-recording-button:hover {
+    background-color: #007bff;
+    color: white;
+}
+
+#manual-recording-button.recording {
+    border-color: #17a2b8; /* Cyan für laufende manuelle Aufnahme */
+    background-color: #17a2b8;
+    color: white;
+    animation: pulse-blue 1.5s infinite;
+}
+
+@keyframes pulse-blue {
+    0% {
+        box-shadow: 0 0 0 0 rgba(23, 162, 184, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 10px 15px rgba(23, 162, 184, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(23, 162, 184, 0);
+    }
+}
+
 
 /* Media queries for responsiveness */
 @media (max-width: 768px) {
@@ -1062,7 +1331,8 @@ body {
 @media (max-width: 480px) {
     #slider-container {
         width: 100%;
-        max-width: 500px; /* Slightly smaller for narrow screens */
+        max-width: 500px;
+        /* Slightly smaller for narrow screens */
         padding: 3px;
         padding-top: calc(3px + env(safe-area-inset-top));
     }

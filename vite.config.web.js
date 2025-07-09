@@ -16,6 +16,12 @@ export default defineConfig(({ command }) => {
     build: {
       outDir: resolve(__dirname, 'dist/web'),
       emptyOutDir: true,
+      rollupOptions: {
+        // Schließt alle @capacitor/* Pakete vom Web-Build aus.
+        external: [
+          /^@capacitor\//
+        ]
+      }
     },
     plugins: [
       commonjs(),

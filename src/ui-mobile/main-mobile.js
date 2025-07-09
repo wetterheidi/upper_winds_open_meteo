@@ -4,10 +4,12 @@ import { AppState } from '../core/state.js';
 import { Utils } from '../core/utils.js';
 import { Settings, getInterpolationStep, setAppContext } from '../core/settings.js';
 import { UI_DEFAULTS } from '../core/constants.js';
+import { SensorManager } from './sensorManager.js';
 import * as EventManager from './eventManager.js';
 import * as Coordinates from './coordinates.js';
 import * as JumpPlanner from '../core/jumpPlanner.js';
 import * as mapManager from './mapManager.js';
+import { loadGpxTrack, loadCsvTrackUTC, exportToGpx, saveRecordedTrack } from '../core/trackManager.js'; // ÄNDERN SIE DIESE ZEILE
 import * as weatherManager from '../core/weatherManager.js';
 import { cacheVisibleTiles, cacheTilesForDIP } from '../core/tileCache.js';
 import { getSliderValue, displayError, displayMessage, displayProgress, hideProgress, applyDeviceSpecificStyles } from './ui.js';
@@ -551,6 +553,148 @@ export function updateJumpMasterLineAndPanel(positionData = null) {
     });
 }
 
+/**
+ * Updates the dashboard panel with the latest live tracking data,
+ * including glide ratios.
+ * @param {object} data - The position data from the tracking event.
+ */
+function updateDashboardPanel(data) {
+    if (!data) return;
+
+    const { latitude, longitude, deviceAltitude, speedMs, descentRateMps, direction } = data;
+
+    // --- Altitude & Range ---
+    const altitudeEl = document.getElementById('dashboard-altitude');
+    const altitudeUnitEl = document.getElementById('dashboard-altitude-unit');
+    const rangeEl = document.getElementById('dashboard-range');
+    const rangeUnitEl = document.getElementById('dashboard-range-unit');
+    const heightUnit = getHeightUnit();
+
+    if (deviceAltitude !== null && altitudeEl && altitudeUnitEl) {
+        const altitudeAGL = deviceAltitude - (AppState.lastAltitude || 0);
+        const displayAltitude = Math.round(Utils.convertHeight(altitudeAGL, heightUnit));
+        altitudeEl.textContent = displayAltitude;
+        altitudeUnitEl.textContent = `${heightUnit} AGL`;
+
+        // Range-Berechnung
+        if (rangeEl && rangeUnitEl && descentRateMps > 0.1) {
+            const timeToGround = altitudeAGL / descentRateMps;
+            const rangeMeters = speedMs * timeToGround;
+
+            let displayRange;
+            let displayUnit;
+            if (rangeMeters > 1000) {
+                displayRange = (rangeMeters / 1000).toFixed(1);
+                displayUnit = 'km';
+            } else {
+                displayRange = Math.round(rangeMeters);
+                displayUnit = 'm';
+            }
+            rangeEl.textContent = displayRange;
+            rangeUnitEl.textContent = displayUnit;
+        } else if (rangeEl) {
+            rangeEl.textContent = "---";
+        }
+    }
+
+    // --- Speed, Direction, Bearing, Distance, Glide Ratios (unverändert) ---
+    // Der Rest der Funktion bleibt exakt so, wie er im vorherigen Schritt war.
+    // ... (Code für Speed, Direction, Bearing, Distance & Glide Ratios hier einfügen) ...
+    // Speed
+    const speedEl = document.getElementById('dashboard-speed');
+    const speedUnitEl = document.getElementById('dashboard-speed-unit');
+    const windUnit = getWindSpeedUnit();
+    if (speedMs !== null && speedEl && speedUnitEl) {
+        const displaySpeed = Utils.convertWind(speedMs, windUnit, 'm/s');
+        speedEl.textContent = windUnit === 'bft' ? Math.round(displaySpeed) : displaySpeed.toFixed(0);
+        speedUnitEl.textContent = windUnit;
+    }
+
+    // Direction
+    const directionEl = document.getElementById('dashboard-direction');
+    if (direction !== 'N/A' && directionEl) {
+        directionEl.textContent = Math.round(direction);
+    }
+
+    // Bearing und Distance to DIP
+    const dipMarker = AppState.currentMarker;
+    const bearingEl = document.getElementById('dashboard-bearing');
+    const distanceEl = document.getElementById('dashboard-distance');
+    const distanceUnitEl = document.getElementById('dashboard-distance-unit');
+    let distanceMeters = null;
+
+    if (dipMarker && bearingEl && distanceEl && distanceUnitEl) {
+        const livePos = L.latLng(latitude, longitude);
+        const dipPos = dipMarker.getLatLng();
+        distanceMeters = livePos.distanceTo(dipPos);
+
+        let displayDistance;
+        let displayDistUnit;
+        if (distanceMeters > 1000) {
+            displayDistance = (distanceMeters / 1000).toFixed(1);
+            displayDistUnit = 'km';
+        } else {
+            displayDistance = Math.round(distanceMeters);
+            displayDistUnit = 'm';
+        }
+
+        distanceEl.textContent = displayDistance;
+        distanceUnitEl.textContent = displayDistUnit;
+
+        const bearing = Math.round(Utils.calculateBearing(latitude, longitude, dipPos.lat, dipPos.lng));
+        bearingEl.textContent = bearing;
+    }
+
+    // Gleitverhältnisse
+    const glideRequiredEl = document.getElementById('dashboard-glide-required');
+    const glideCurrentEl = document.getElementById('dashboard-glide-current');
+    let requiredRatio = null;
+    let currentRatio = null;
+
+    // 1. Erforderliches Gleitverhältnis zum DIP berechnen
+    if (dipMarker && distanceMeters !== null && glideRequiredEl) {
+        const dipAltitude = AppState.lastAltitude || 0;
+        const altitudeDifference = deviceAltitude - dipAltitude;
+        if (altitudeDifference > 1) {
+            requiredRatio = distanceMeters / altitudeDifference;
+            glideRequiredEl.textContent = requiredRatio.toFixed(1);
+        } else {
+            glideRequiredEl.textContent = "---";
+        }
+    }
+
+    // 2. Aktuelles Gleitverhältnis berechnen
+    if (glideCurrentEl && speedMs > 0 && descentRateMps > 0.1) {
+        currentRatio = speedMs / descentRateMps;
+        glideCurrentEl.textContent = currentRatio.toFixed(1);
+    } else {
+        glideCurrentEl.textContent = "---";
+    }
+
+    // 3. Farbe basierend auf dem Vergleich der Gleitverhältnisse setzen
+    if (glideCurrentEl && requiredRatio !== null && currentRatio !== null) {
+        // Toleranzbereich definieren (z.B. 10% des erforderlichen Wertes)
+        const tolerance = 0.10 * requiredRatio;
+
+        // CSS-Klassen entfernen, bevor die neue gesetzt wird
+        glideCurrentEl.classList.remove('glide-good', 'glide-ok', 'glide-bad');
+
+        if (currentRatio > requiredRatio + tolerance) {
+            // Deutlich besser -> Grün
+            glideCurrentEl.classList.add('glide-good');
+        } else if (currentRatio < requiredRatio - tolerance) {
+            // Deutlich schlechter -> Rot
+            glideCurrentEl.classList.add('glide-bad');
+        } else {
+            // Innerhalb der Toleranz -> Gelb
+            glideCurrentEl.classList.add('glide-ok');
+        }
+    } else if (glideCurrentEl) {
+        // Falls keine Berechnung möglich ist, alle Farbklassen entfernen
+        glideCurrentEl.classList.remove('glide-good', 'glide-ok', 'glide-bad');
+    }
+}
+
 // == UI and Event Handling ==
 function initializeApp() {
     setAppContext(true);
@@ -686,7 +830,7 @@ export async function updateUIWithNewWeatherData(newWeatherData, preservedIndex 
     displayManager.updateModelInfoPopup();
     Settings.updateModelRunInfo(AppState.lastModelRun, AppState.lastLat, AppState.lastLng);
 
-     console.log("Model changed. Triggering recalculation of jump parameters.");
+    console.log("Model changed. Triggering recalculation of jump parameters.");
     displayManager.updateLandingPatternDisplay();
     if (Settings.state.userSettings.calculateJump) {
         calculateJump();
@@ -918,6 +1062,10 @@ function setupAppEventListeners() {
 
     document.addEventListener('tracking:positionUpdated', (event) => {
         updateJumpMasterLineAndPanel(event.detail);
+        updateDashboardPanel(event.detail);
+        if (AppState.isAutoRecording) {
+            SensorManager.checkLanding(event.detail.descentRateMps);
+        }
     });
 
     document.addEventListener('jml:targetChanged', () => {
@@ -1297,6 +1445,63 @@ function setupAppEventListeners() {
         }
     });
 
+    document.addEventListener('sensor:armed', () => {
+        const armButton = document.getElementById('arm-recording-button');
+        const manualButton = document.getElementById('manual-recording-button');
+        if (armButton) {
+            armButton.textContent = "Armed";
+            armButton.classList.add('armed');
+            armButton.classList.remove('recording');
+        }
+        if (manualButton) {
+            manualButton.disabled = true; // Manuellen Button sperren, wenn "scharf"
+        }
+    });
+
+    document.addEventListener('sensor:disarmed', () => {
+        const armButton = document.getElementById('arm-recording-button');
+        const manualButton = document.getElementById('manual-recording-button');
+        if (armButton) {
+            armButton.textContent = "Arm Recording";
+            armButton.classList.remove('armed', 'recording');
+        }
+        if (manualButton) {
+            manualButton.disabled = false; // Manuellen Button wieder freigeben
+        }
+    });
+
+    document.addEventListener('sensor:freefall_detected', () => {
+        // Nur starten, wenn das System "scharf" ist und nicht bereits aufzeichnet
+        if (AppState.isArmed && !AppState.isAutoRecording) {
+            console.log("Freefall detected, starting automatic recording...");
+            AppState.isAutoRecording = true;
+            AppState.recordedTrackPoints = []; // Startet eine saubere Aufzeichnung
+
+            liveTrackingManager.startPositionTracking(); // Stellt sicher, dass das GPS-Tracking läuft
+
+            // Aktualisiert den Button-Text und die Optik
+            const armButton = document.getElementById('arm-recording-button');
+            if (armButton) {
+                armButton.textContent = "Recording...";
+                armButton.classList.add('recording');
+            }
+            Utils.handleMessage("Freefall detected! Recording started.");
+        }
+    });
+
+    document.addEventListener('sensor:landing_detected', () => {
+        // ... (bestehende Logik)
+        saveRecordedTrack();
+        AppState.isAutoRecording = false;
+
+        // Button-Zustände zurücksetzen
+        const manualButton = document.getElementById('manual-recording-button');
+        if (manualButton) {
+            manualButton.textContent = "Start Recording";
+            manualButton.classList.remove('recording');
+        }
+    });
+
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -1497,3 +1702,5 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 100); // Eine kleine Verzögerung von 100ms ist sicher.
 });
+
+window.simulateFreefall = () => document.dispatchEvent(new CustomEvent('sensor:freefall_detected'));
