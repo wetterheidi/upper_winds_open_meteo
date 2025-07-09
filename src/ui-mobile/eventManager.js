@@ -30,7 +30,15 @@ function dispatchAppEvent(eventName, detail = {}) {
 
 function setupTabBarEvents() {
     const tabBar = document.getElementById('tab-bar');
-    if (!tabBar) return;
+    const sliderContainer = document.getElementById('slider-container');
+    // --- NEU: Referenzen auf die Hauptcontainer holen ---
+    const mapContainer = document.getElementById('map-container');
+    const contentPanelsContainer = document.getElementById('content-panels');
+
+    if (!tabBar || !sliderContainer || !mapContainer || !contentPanelsContainer) {
+        console.error("Layout container(s) not found!");
+        return;
+    }
 
     const setPlannerLockState = () => {
         const plannerTabButton = document.getElementById('planner-tab-button');
@@ -52,42 +60,27 @@ function setupTabBarEvents() {
 
         const panelId = button.dataset.panel;
 
-        const trackPositionCheckbox = document.getElementById('trackPositionCheckbox');
+        // --- HIER IST DIE GESAMTE NEUE LOGIK ---
 
-        // Prüfe, ob das Dashboard betreten oder verlassen wird
-        if (panelId === 'dashboard') {
-            // Dashboard wird betreten -> Starte Tracking
-            if (trackPositionCheckbox && !trackPositionCheckbox.checked) {
-                console.log("Dashboard opened, starting live tracking.");
-                trackPositionCheckbox.checked = true;
-                // Sende das Event, als ob der Benutzer geklickt hätte
-                trackPositionCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
-            }
-            /*} else {
-                // Dashboard wird verlassen -> Stoppe Tracking, falls es lief
-                if (trackPositionCheckbox && trackPositionCheckbox.checked) {
-                    console.log("Dashboard closed, stopping live tracking.");
-                    trackPositionCheckbox.checked = false;
-                    // Sende das Event, als ob der Benutzer geklickt hätte
-                    trackPositionCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
-                }*/
+        // 1. Slider-Sichtbarkeit steuern (wie zuvor)
+        if (panelId === 'map' || panelId === 'data') {
+            sliderContainer.style.display = 'flex';
+        } else {
+            sliderContainer.style.display = 'none';
         }
 
-        if (panelId === 'planner' && !Settings.isFeatureUnlocked('planner')) {
-            Settings.showPasswordModal('planner', () => {
-                Settings.saveUnlockStatus('planner', true);
-                setPlannerLockState();
-                document.querySelectorAll('.content-panel').forEach(p => p.classList.add('hidden'));
-                document.getElementById(`panel-${panelId}`).classList.remove('hidden');
-                document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
-                button.classList.add('active');
-                if (AppState.map) {
-                    setTimeout(() => AppState.map.invalidateSize(), 100);
-                }
-            }, () => { });
-            return;
+        // 2. Haupt-Container (Karte vs. Panels) umschalten
+        if (panelId === 'map') {
+            // Zeige die Karte, verstecke die Panels
+            mapContainer.style.display = 'block';
+            contentPanelsContainer.style.display = 'none';
+        } else {
+            // Zeige die Panels, verstecke die Karte
+            mapContainer.style.display = 'none';
+            contentPanelsContainer.style.display = 'block';
         }
 
+        // 3. Spezifisches Panel innerhalb des Containers anzeigen
         document.querySelectorAll('.content-panel').forEach(p => p.classList.add('hidden'));
         if (panelId !== 'map') {
             const panelToShow = document.getElementById(`panel-${panelId}`);
@@ -95,15 +88,44 @@ function setupTabBarEvents() {
                 panelToShow.classList.remove('hidden');
             }
         }
+        
+        // --- RESTLICHE LOGIK BLEIBT GLEICH ---
+        
+        // Dashboard-Logik
+        const trackPositionCheckbox = document.getElementById('trackPositionCheckbox');
+        if (panelId === 'dashboard') {
+            if (trackPositionCheckbox && !trackPositionCheckbox.checked) {
+                trackPositionCheckbox.checked = true;
+                trackPositionCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        }
 
+        // Planner-Lock-Logik
+        if (panelId === 'planner' && !Settings.isFeatureUnlocked('planner')) {
+            Settings.showPasswordModal('planner', () => {
+                Settings.saveUnlockStatus('planner', true);
+                setPlannerLockState();
+                button.click(); // Simuliert einen erneuten Klick, um das Panel zu öffnen
+            }, () => {});
+            return;
+        }
+
+        // Aktiven Button-Stil setzen
         document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
         button.classList.add('active');
 
-        // Only call invalidateSize when showing a panel
-        if (AppState.map && panelId !== 'map') {
-            setTimeout(() => AppState.map.invalidateSize(), 100);
+        // Kartengröße neu berechnen, falls sie sichtbar ist
+        if (AppState.map && panelId === 'map') {
+            setTimeout(() => {
+                AppState.map.invalidateSize();
+            }, 100);
         }
     });
+
+    // Initialer Zustand beim Laden der App sicherstellen
+    mapContainer.style.display = 'block';
+    contentPanelsContainer.style.display = 'none';
+    sliderContainer.style.display = 'flex';
 }
 
 function setupModelInfoButtonEvents() {

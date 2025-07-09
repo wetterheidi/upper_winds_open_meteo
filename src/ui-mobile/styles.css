@@ -61,14 +61,15 @@ button:hover {
 
 /* Content panels */
 #content-panels {
-    position: absolute;
-    top: calc(96px + env(safe-area-inset-top));
-    /* Match slider-container height */
-    bottom: calc(55px + env(safe-area-inset-bottom));
-    left: env(safe-area-inset-left);
-    right: env(safe-area-inset-right);
-    z-index: 1000;
-    pointer-events: none;
+    grid-row: 2; /* Ordnet den Container der gleichen Grid-Zeile wie die Karte zu */
+    grid-column: 1;
+    display: none; /* Standardmäßig versteckt, wird per JS gesteuert */
+    background-color: rgba(249, 249, 249, 0.95);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding: 15px;
+    overflow-y: auto;
+    box-sizing: border-box;
 }
 
 .content-panel {
