@@ -8,7 +8,7 @@ import { TileCache } from '../core/tileCache.js';
 import { updateOfflineIndicator, isMobileDevice } from './ui.js';
 //import './public/vendor/Leaflet.PolylineMeasure.js'; // Pfad ggf. anpassen
 import { UI_DEFAULTS, ICON_URLS, ENSEMBLE_VISUALIZATION } from '../core/constants.js'; // Importiere UI-Defaults
-import { getCapacitorModules } from '../core/capacitor-adapter.js';
+import { getCapacitor } from '../core/capacitor-adapter.js';
 
 let lastTapTime = 0; // Add this line
 let isRotatingJRT = false;
@@ -476,18 +476,21 @@ async function _geolocationErrorCallback(error, defaultCenter, defaultZoom) {
 
 async function _handleGeolocation(defaultCenter, defaultZoom) {
     try {
-        const { Geolocation } = await getCapacitorModules();
+        // Hole die Module über den Adapter
+        const { Geolocation, isNative } = await getCapacitor();
 
-        // Dies löst automatisch den Berechtigungsdialog beim ersten Aufruf aus.
-        const position = await Geolocation.getCurrentPosition({
-            enableHighAccuracy: true,
-            timeout: 10000
-        });
-        // Rufen Sie Ihre bestehende Erfolgs-Callback-Funktion mit den neuen Daten auf
-        _geolocationSuccessCallback(position, defaultZoom);
+        if (isNative && Geolocation) {
+            const position = await Geolocation.getCurrentPosition({
+                enableHighAccuracy: true,
+                timeout: 10000
+            });
+            _geolocationSuccessCallback(position, defaultZoom);
+        } else {
+            // Dies sollte in der mobilen App nie passieren, ist aber ein guter Fallback
+            _geolocationErrorCallback({ message: "Native Geolocation not available." }, defaultCenter, defaultZoom);
+        }
     } catch (error) {
         console.error('Fehler beim Abrufen des Standorts mit Capacitor:', error);
-        // Rufen Sie Ihre bestehende Fehler-Callback-Funktion auf
         _geolocationErrorCallback(error, defaultCenter, defaultZoom);
     }
 }

@@ -5,7 +5,7 @@ import { DateTime } from 'luxon';
 import * as JumpPlanner from './jumpPlanner.js';
 import * as weatherManager from './weatherManager.js';
 import { interpolateWeatherData } from './weatherManager.js';
-import { getCapacitorModules } from './capacitor-adapter.js';
+import { getCapacitor } from './capacitor-adapter.js';
 
 
 "use strict";
@@ -19,7 +19,7 @@ import { getCapacitorModules } from './capacitor-adapter.js';
  */
 async function readFileContent(file) {
     // NEU: Module über die asynchrone Funktion abrufen
-    const { Filesystem, Directory } = await getCapacitorModules();
+    const { Filesystem, isNative } = await getCapacitor();
 
     // Prüfen, ob die App nativ läuft UND ein `path` für die Capacitor-API vorhanden ist.
     if (window.Capacitor && window.Capacitor.isNativePlatform() && file.path) {
@@ -507,11 +507,9 @@ export async function saveRecordedTrack() {
         const gpxContent = `${header}\n${trackpointStrings.join('\n')}\n${footer}`;
         const fileName = `Skydive_Track_${DateTime.utc().toFormat('yyyy-MM-dd_HHmm')}.gpx`;
 
-        if (window.Capacitor && window.Capacitor.isNativePlatform()) {
-            // *** HIER IST DIE ÄNDERUNG ***
-            // Hole die benötigten Module über den Adapter
-            const { Filesystem, Directory } = await getCapacitorModules();
+        const { Filesystem, Directory, isNative } = await getCapacitor();
 
+        if (isNative && Filesystem) {
             await Filesystem.writeFile({
                 path: fileName,
                 data: gpxContent,
