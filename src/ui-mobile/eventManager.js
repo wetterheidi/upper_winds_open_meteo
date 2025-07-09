@@ -19,6 +19,7 @@ import * as AutoupdateManager from '../core/autoupdateManager.js';
 import { UI_DEFAULTS } from '../core/constants.js';
 import { updateModelSelectUI, cleanupSelectedEnsembleModels } from './ui.js';
 import 'leaflet-gpx';
+import { FilePicker } from '@capawesome/capacitor-file-picker';
 
 let listenersInitialized = false;
 
@@ -169,6 +170,64 @@ function setupAccordionEvents() {
             }
         });
     });
+}
+
+/**
+ * Öffnet den nativen Dateiauswahldialog für Mobilgeräte.
+ * @returns {Promise<File|null>} Ein Promise, das zur ausgewählten Datei auflöst oder null bei Abbruch.
+ */
+async function openNativeFilePicker() {
+    try {
+        const result = await FilePicker.pickFiles({
+            types: ['text/gpx', 'text/csv', 'application/gpx+xml'],
+            readData: false // Wir lesen die Daten später selbst mit dem Filesystem-Plugin
+        });
+
+        if (result.files && result.files.length > 0) {
+            const file = result.files[0];
+            console.log('[eventManager] Native file picked:', file);
+            // Das zurückgegebene Objekt enthält den wichtigen `path` für das Filesystem-Plugin.
+            return file;
+        }
+        return null; // Benutzer hat die Auswahl abgebrochen
+    } catch (error) {
+        // Möglicher Fehler: Plugin nicht korrekt implementiert oder Berechtigungen fehlen.
+        console.error('Error using native file picker:', error);
+        Utils.handleError("Could not open file picker. Ensure permissions are granted.");
+        return null;
+    }
+}
+
+/**
+ * Verarbeitet die ausgewählte Datei, egal ob vom Web-Input oder vom nativen Picker.
+ * @param {File} file - Das ausgewählte Datei-Objekt.
+ */
+async function processTrackFile(file) {
+    const loadingElement = document.getElementById('loading');
+    if (loadingElement) loadingElement.style.display = 'block';
+
+    if (!file) {
+        Utils.handleError('No file selected.');
+        if (loadingElement) loadingElement.style.display = 'none';
+        return;
+    }
+
+    const extension = file.name.split('.').pop().toLowerCase();
+
+    try {
+        if (extension === 'gpx') {
+            await loadGpxTrack(file);
+        } else if (extension === 'csv') {
+            await loadCsvTrackUTC(file);
+        } else {
+            Utils.handleError('Unsupported file type. Please upload a .gpx or .csv file.');
+        }
+    } catch (error) {
+        console.error('Error during track file processing:', error);
+        Utils.handleError('Failed to process track file.');
+    } finally {
+        if (loadingElement) loadingElement.style.display = 'none';
+    }
 }
 
 // HILFSFUNKTIONEN FÜR EVENT SETUP
@@ -896,60 +955,46 @@ function setupResetCutAwayMarkerButton() {
     }
 }
 function setupTrackEvents() {
-    console.log('[app.js] Setting up track events');
+    console.log('[eventManager] Setting up track events for mobile.');
     const trackFileInput = document.getElementById('trackFileInput');
-    const loadingElement = document.getElementById('loading'); // Deklarieren wir die Variable hier einmal zentral.
+    if (!trackFileInput) return;
 
-    if (trackFileInput) {
-        trackFileInput.addEventListener('change', async (e) => {
-            const file = e.target.files[0];
+    // Listener für Klicks auf das Label/den gesamten Bereich, um den Picker zu öffnen
+    const trackUploadContainer = document.querySelector('#track-upload'); 
+    if (trackUploadContainer) {
+        trackUploadContainer.addEventListener('click', async (e) => {
+            e.preventDefault(); // Verhindert, dass das Standard-Dateifeld geöffnet wird
 
-            // 1. Spinner hier anzeigen, wenn eine Datei ausgewählt wird.
-            if (loadingElement) {
-                loadingElement.style.display = 'block';
-            }
-
-            if (!file) {
-                Utils.handleError('No file selected.');
-                if (loadingElement) loadingElement.style.display = 'none'; // Bei Fehler sofort ausblenden
-                return;
-            }
-
-            const extension = file.name.split('.').pop().toLowerCase();
-            let trackMetaData = null;
-
-            try {
-                if (extension === 'gpx') {
-                    trackMetaData = await loadGpxTrack(file);
-                } else if (extension === 'csv') {
-                    trackMetaData = await loadCsvTrackUTC(file);
-                } else {
-                    Utils.handleError('Unsupported file type. Please upload a .gpx or .csv file.');
-                    if (loadingElement) loadingElement.style.display = 'none'; // Bei Fehler sofort ausblenden
+            // Prüfen, ob die App nativ läuft
+            if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+                const nativeFile = await openNativeFilePicker();
+                if (nativeFile) {
+                    await processTrackFile(nativeFile);
                 }
-            } catch (error) {
-                console.error('Error during track file processing:', error);
-                Utils.handleError('Failed to process track file.');
-                if (loadingElement) loadingElement.style.display = 'none'; // Bei Fehler sofort ausblenden
+            } else {
+                // Fallback für den Browser: Öffne das versteckte Input-Feld
+                trackFileInput.click();
             }
         });
     }
 
+    // Dieser Listener bleibt für den Web-Fallback bestehen
+    trackFileInput.addEventListener('change', async (e) => {
+        if (e.target.files && e.target.files.length > 0) {
+            const file = e.target.files[0];
+            await processTrackFile(file);
+        }
+    });
+
     const clearTrackButton = document.getElementById('clearTrack');
     if (clearTrackButton) {
-        clearTrackButton.addEventListener('click', () => {
+        clearTrackButton.addEventListener('click', (e) => {
+            e.stopPropagation(); // Verhindert, dass der Klick das Öffnen des Pickers auslöst
             if (!AppState.map) { Utils.handleError('Cannot clear track: map not initialized.'); return; }
             if (AppState.gpxLayer) {
                 try {
                     if (AppState.map.hasLayer(AppState.gpxLayer)) AppState.map.removeLayer(AppState.gpxLayer);
                     AppState.gpxLayer = null; AppState.gpxPoints = []; AppState.isTrackLoaded = false;
-                    const infoElement = document.getElementById('info');
-                    if (infoElement) {
-                        const modelDisplayRegex = /(<br><strong>Available Models:<\/strong><ul>.*?<\/ul>|<br><strong>Available Models:<\/strong> None)/s;
-                        const currentInfoHTML = infoElement.innerHTML;
-                        const modelInfoMatch = currentInfoHTML.match(modelDisplayRegex);
-                        infoElement.innerHTML = 'Click on the map to fetch weather data.' + (modelInfoMatch ? modelInfoMatch[0] : '');
-                    }
                     if (trackFileInput) trackFileInput.value = '';
                 } catch (error) { Utils.handleError('Failed to clear track: ' + error.message); }
             } else { Utils.handleMessage('No track to clear.'); }

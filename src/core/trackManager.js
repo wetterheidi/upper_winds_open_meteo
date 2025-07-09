@@ -11,6 +11,40 @@ import { Filesystem, Directory } from '@capacitor/filesystem';
 "use strict";
 
 /**
+ * **NEU: Interne Hilfsfunktion zum Lesen von Dateiinhalten**
+ * Diese Funktion entscheidet, ob die Web-API (FileReader) oder die native Capacitor-API
+ * zum Lesen einer Datei verwendet werden soll.
+ * @param {File} file - Das vom Benutzer ausgewählte Datei-Objekt.
+ * @returns {Promise<string>} Ein Promise, das zum Textinhalt der Datei auflöst.
+ */
+async function readFileContent(file) {
+    // Prüfen, ob die App nativ läuft UND ein `path` für die Capacitor-API vorhanden ist.
+    if (window.Capacitor && window.Capacitor.isNativePlatform() && file.path) {
+        console.log(`[trackManager] Lese Datei über Capacitor Filesystem API: ${file.path}`);
+        try {
+            const result = await Filesystem.readFile({
+                path: file.path
+            });
+            // Capacitor gibt die Daten als Base64-kodierten String zurück.
+            // Wir müssen ihn für die Weiterverarbeitung dekodieren.
+            return atob(result.data);
+        } catch (error) {
+            console.error('[trackManager] Fehler beim Lesen der Datei mit Capacitor:', error);
+            throw new Error('Could not read file using native API.');
+        }
+    } else {
+        // Fallback für den Web-Browser
+        console.log(`[trackManager] Lese Datei über Web FileReader: ${file.name}`);
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.onerror = (e) => reject(new Error('Error reading file.'));
+            reader.readAsText(file);
+        });
+    }
+}
+
+/**
  * Lädt und verarbeitet eine GPX-Datei. Liest die Datei, extrahiert die Trackpunkte
  * und ruft die renderTrack-Funktion auf, um sie auf der Karte darzustellen.
  * @param {File} file - Das vom Benutzer ausgewählte GPX-Datei-Objekt.
@@ -19,48 +53,34 @@ import { Filesystem, Directory } from '@capacitor/filesystem';
 export async function loadGpxTrack(file) {
     if (!AppState.map) { /* istanbul ignore next */ Utils.handleError('Map not initialized.'); return null; }
     AppState.isLoadingGpx = true;
-    const reader = new FileReader();
 
-    return new Promise((resolve, reject) => {
-        reader.onload = async function (e) {
-            try {
-                const gpxData = e.target.result;
-                const parser = new DOMParser();
-                const xml = parser.parseFromString(gpxData, 'text/xml');
-                const trackpoints = xml.getElementsByTagName('trkpt');
-                const points = [];
-                for (let i = 0; i < trackpoints.length; i++) {
-                    const lat = parseFloat(trackpoints[i].getAttribute('lat'));
-                    const lng = parseFloat(trackpoints[i].getAttribute('lon'));
-                    if (isNaN(lat) || isNaN(lng)) continue;
-                    const ele = trackpoints[i].getElementsByTagName('ele')[0]?.textContent;
-                    const time = trackpoints[i].getElementsByTagName('time')[0]?.textContent;
-                    points.push({ lat, lng, ele: ele ? parseFloat(ele) : null, time: time ? DateTime.fromISO(time, { zone: 'utc' }) : null });
-                }
-                if (points.length < 2) throw new Error('GPX track has insufficient points.');
+    try {
+        // **ÄNDERUNG**: Nutze die neue Hilfsfunktion
+        const gpxData = await readFileContent(file);
+        
+        const parser = new DOMParser();
+        const xml = parser.parseFromString(gpxData, 'text/xml');
+        const trackpoints = xml.getElementsByTagName('trkpt');
+        const points = [];
+        for (let i = 0; i < trackpoints.length; i++) {
+            const lat = parseFloat(trackpoints[i].getAttribute('lat'));
+            const lng = parseFloat(trackpoints[i].getAttribute('lon'));
+            if (isNaN(lat) || isNaN(lng)) continue;
+            const ele = trackpoints[i].getElementsByTagName('ele')[0]?.textContent;
+            const time = trackpoints[i].getElementsByTagName('time')[0]?.textContent;
+            points.push({ lat, lng, ele: ele ? parseFloat(ele) : null, time: time ? DateTime.fromISO(time, { zone: 'utc' }) : null });
+        }
+        if (points.length < 2) throw new Error('GPX track has insufficient points.');
 
-                const trackMetaData = await renderTrack(points, file.name);
-                resolve(trackMetaData); // Gibt Metadaten zurück
-            } catch (error) {
-                /* istanbul ignore next */
-                console.error('[trackManager] Error in loadGpxTrack:', error);
-                /* istanbul ignore next */
-                Utils.handleError('Error parsing GPX file: ' + error.message);
-                /* istanbul ignore next */
-                resolve(null); // Gibt null bei Fehler zurück
-            }
-            finally { AppState.isLoadingGpx = false; }
-        };
-        reader.onerror = () => {
-            /* istanbul ignore next */
-            Utils.handleError('Error reading GPX file.');
-            /* istanbul ignore next */
-            AppState.isLoadingGpx = false;
-            /* istanbul ignore next */
-            reject(new Error('Error reading GPX file.')); // Promise ablehnen
-        };
-        reader.readAsText(file);
-    });
+        const trackMetaData = await renderTrack(points, file.name);
+        return trackMetaData;
+    } catch (error) {
+        console.error('[trackManager] Error in loadGpxTrack:', error);
+        Utils.handleError('Error parsing GPX file: ' + error.message);
+        return null;
+    } finally {
+        AppState.isLoadingGpx = false;
+    }
 }
 
 /**
@@ -73,60 +93,51 @@ export async function loadGpxTrack(file) {
 export async function loadCsvTrackUTC(file) {
     if (!AppState.map) { /* istanbul ignore next */ Utils.handleError('Map not initialized.'); return null; }
     AppState.isLoadingGpx = true;
-    const reader = new FileReader();
 
-    return new Promise((resolve, reject) => {
-        reader.onload = async function (e) {
-            try {
-                const csvData = e.target.result;
-                const points = [];
-                Papa.parse(csvData, {
-                    skipEmptyLines: true,
-                    step: function (row) {
-                        const data = row.data;
-                        // Beispielhafte Annahme für CSV-Struktur: $GNSS,Zeit,Lat,Lng,Höhe
-                        if (data[0] && data[0].toUpperCase() === '$GNSS' && data.length >= 5) {
-                            let timeStr = data[1];
-                            const lat = parseFloat(data[2]);
-                            const lng = parseFloat(data[3]);
-                            const ele = parseFloat(data[4]);
-                            if (isNaN(lat) || isNaN(lng) || isNaN(ele)) return;
-                            let time = null;
-                            try {
-                                // Standard-Zeitparsing (ggf. anpassen, falls UTC/Lokal unterschiedlich behandelt werden muss)
-                                time = DateTime.fromISO(timeStr, { setZone: true }).toUTC();
-                                if (!time.isValid) time = null;
-                            } catch (parseError) { /* istanbul ignore next */ time = null; }
-                            points.push({ lat, lng, ele, time });
-                        }
-                    },
-                    complete: async function () {
-                        if (points.length < 2) throw new Error('CSV track has insufficient points.');
-                        const trackMetaData = await renderTrack(points, file.name);
-                        resolve(trackMetaData); // Gibt Metadaten zurück
-                    },
-                    error: function (error) { /* istanbul ignore next */ throw new Error('Error parsing CSV: ' + error.message); }
-                });
-            } catch (error) {
-                /* istanbul ignore next */
-                console.error('[trackManager] Error in loadCsvTrackUTC:', error);
-                /* istanbul ignore next */
-                Utils.handleError('Error parsing CSV file: ' + error.message);
-                /* istanbul ignore next */
-                resolve(null); // Gibt null bei Fehler zurück
-            }
-            finally { AppState.isLoadingGpx = false; }
-        };
-        reader.onerror = () => {
-            /* istanbul ignore next */
-            Utils.handleError('Error reading CSV file.');
-            /* istanbul ignore next */
-            AppState.isLoadingGpx = false;
-            /* istanbul ignore next */
-            reject(new Error('Error reading CSV file.')); // Promise ablehnen
-        };
-        reader.readAsText(file);
-    });
+    try {
+        // **ÄNDERUNG**: Nutze die neue Hilfsfunktion
+        const csvData = await readFileContent(file);
+        
+        return new Promise(async (resolve, reject) => {
+            const points = [];
+            Papa.parse(csvData, {
+                skipEmptyLines: true,
+                step: function (row) {
+                    const data = row.data;
+                    if (data[0] && data[0].toUpperCase() === '$GNSS' && data.length >= 5) {
+                        let timeStr = data[1];
+                        const lat = parseFloat(data[2]);
+                        const lng = parseFloat(data[3]);
+                        const ele = parseFloat(data[4]);
+                        if (isNaN(lat) || isNaN(lng) || isNaN(ele)) return;
+                        let time = null;
+                        try {
+                            time = DateTime.fromISO(timeStr, { setZone: true }).toUTC();
+                            if (!time.isValid) time = null;
+                        } catch (parseError) { /* istanbul ignore next */ time = null; }
+                        points.push({ lat, lng, ele, time });
+                    }
+                },
+                complete: async function () {
+                    if (points.length < 2) {
+                        reject(new Error('CSV track has insufficient points.'));
+                        return;
+                    }
+                    const trackMetaData = await renderTrack(points, file.name);
+                    resolve(trackMetaData);
+                },
+                error: function (error) { 
+                    reject(new Error('Error parsing CSV: ' + error.message)); 
+                }
+            });
+        });
+    } catch (error) {
+        console.error('[trackManager] Error in loadCsvTrackUTC:', error);
+        Utils.handleError('Error reading or parsing CSV file: ' + error.message);
+        return null;
+    } finally {
+        AppState.isLoadingGpx = false;
+    }
 }
 
 /**
