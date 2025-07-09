@@ -1469,10 +1469,21 @@ function setupAppEventListeners() {
     });
 
     document.addEventListener('sensor:freefall_detected', () => {
-        const armButton = document.getElementById('arm-recording-button');
-        if (armButton) {
-            armButton.textContent = "Recording...";
-            armButton.classList.add('recording');
+        // Nur starten, wenn das System "scharf" ist und nicht bereits aufzeichnet
+        if (AppState.isArmed && !AppState.isAutoRecording) {
+            console.log("Freefall detected, starting automatic recording...");
+            AppState.isAutoRecording = true;
+            AppState.recordedTrackPoints = []; // Startet eine saubere Aufzeichnung
+
+            liveTrackingManager.startPositionTracking(); // Stellt sicher, dass das GPS-Tracking läuft
+
+            // Aktualisiert den Button-Text und die Optik
+            const armButton = document.getElementById('arm-recording-button');
+            if (armButton) {
+                armButton.textContent = "Recording...";
+                armButton.classList.add('recording');
+            }
+            Utils.handleMessage("Freefall detected! Recording started.");
         }
     });
 

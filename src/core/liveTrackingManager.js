@@ -229,6 +229,7 @@ export function toggleManualRecording() {
         Utils.handleMessage("Manual recording stopped. Saving track...");
         saveRecordedTrack(); // Track speichern
         // Das Tracking wird hier NICHT gestoppt, da es unabhängig weiterlaufen kann.
+        document.dispatchEvent(new CustomEvent('sensor:disarmed')); 
     }
 
     // Button-Zustand in der UI aktualisieren
