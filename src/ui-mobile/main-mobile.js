@@ -574,7 +574,7 @@ function updateDashboardPanel(data) {
         const altitudeAGL = deviceAltitude - (AppState.lastAltitude || 0);
         const displayAltitude = Math.round(Utils.convertHeight(altitudeAGL, heightUnit));
         altitudeEl.textContent = displayAltitude;
-        altitudeUnitEl.textContent = `${heightUnit} AGL`;
+        altitudeUnitEl.textContent = `${heightUnit} abv DIP`;
 
         // Range-Berechnung
         if (rangeEl && rangeUnitEl && descentRateMps > 0.1) {

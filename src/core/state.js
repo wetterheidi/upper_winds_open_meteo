@@ -54,6 +54,7 @@ export const AppState = {
     isManualRecording: false, // <-- NEUE ZEILE
     recordedTrackPoints: [],
     autoRecordingStartTime: null, // <--- DIESE ZEILE HINZUFÜGEN
+    altitudeCorrectionOffset: 0, 
 
     // --- NEUE ZUSTANDS-VARIABLEN ---
     ismapInitialized: false,              // von mapManager.js

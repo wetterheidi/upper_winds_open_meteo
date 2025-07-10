@@ -57,6 +57,18 @@ const debouncedPositionUpdate = Utils.debounce(async (position) => {
 
     const { latitude, longitude, accuracy, altitude: deviceAltitude, altitudeAccuracy } = position.coords;
 
+     // Wenn der Offset noch nicht berechnet wurde (beim ersten validen Punkt), berechne ihn jetzt.
+    if (AppState.altitudeCorrectionOffset === 0 && deviceAltitude !== null && AppState.lastAltitude !== 'N/A') {
+        AppState.altitudeCorrectionOffset = deviceAltitude - AppState.lastAltitude;
+        console.log(`Altitude correction offset calculated: ${AppState.altitudeCorrectionOffset.toFixed(2)}m (Device: ${deviceAltitude}m, Ground: ${AppState.lastAltitude}m)`);
+    }
+
+    // Wende die Korrektur an, falls sie existiert.
+    const correctedAltitude = (deviceAltitude !== null && AppState.altitudeCorrectionOffset !== 0)
+        ? deviceAltitude - AppState.altitudeCorrectionOffset
+        : deviceAltitude;
+
+
     const isFirstUpdate = !AppState.liveMarker;
     const accuracyThreshold = isFirstUpdate ? 500 : UI_DEFAULTS.GEOLOCATION_ACCURACY_THRESHOLD_M;
 
@@ -113,7 +125,9 @@ const debouncedPositionUpdate = Utils.debounce(async (position) => {
     // Event mit den neuen Daten auslösen
     const event = new CustomEvent('tracking:positionUpdated', {
         detail: {
-            latitude, longitude, deviceAltitude, altitudeAccuracy, accuracy,
+            latitude, longitude, 
+            deviceAltitude: correctedAltitude, 
+            altitudeAccuracy, accuracy,
             speedMs: AppState.lastSmoothedSpeedMs,
             descentRateMps: AppState.lastSmoothedDescentRateMps,
             direction: typeof direction === 'number' ? direction.toFixed(0) : 'N/A'
@@ -127,7 +141,7 @@ const debouncedPositionUpdate = Utils.debounce(async (position) => {
         AppState.recordedTrackPoints.push({
             lat: latitude,
             lng: longitude,
-            ele: deviceAltitude,
+            ele: correctedAltitude,
             time: DateTime.utc()
         });
     }
@@ -239,6 +253,7 @@ export async function stopPositionTracking() {
     AppState.prevLat = null;
     AppState.prevLng = null;
 
+    AppState.altitudeCorrectionOffset = 0; // Wichtig: Offset zurücksetzen
     document.dispatchEvent(new CustomEvent('tracking:stopped'));
 }
 
@@ -257,6 +272,7 @@ export function toggleManualRecording() {
     if (AppState.isManualRecording) {
         // Manuelle Aufnahme starten
         AppState.recordedTrackPoints = []; // Track zurücksetzen
+        AppState.altitudeCorrectionOffset = 0; // WICHTIG: Offset zurücksetzen
         startPositionTracking(); // Tracking starten, falls es nicht läuft
         Utils.handleMessage("Manual recording started.");
         document.dispatchEvent(new CustomEvent('sensor:freefall_detected')); // Simuliert den Start
