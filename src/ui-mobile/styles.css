@@ -952,22 +952,20 @@ body {
     position: absolute;
     /* Geändert von fixed zu absolute */
     z-index: 2010;
-    top: 100px;
-    /* Position am oberen Rand */
-    left: 0;
-    /* Position am linken Rand */
+
+    bottom: calc(55px + env(safe-area-inset-bottom) + 10px); /* 55px Tab-Bar + 10px Abstand */
+    left: 50%;
+    transform: translateX(-50%) translateY(200%); /* Startet außerhalb unten */
+    opacity: 0;
+
     font-size: 1rem;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-    transform: translateX(-200%);
-    /* Startet außerhalb des Bildschirms links */
-    opacity: 0;
-    transition: visibility 0s, opacity 0.5s, transform 0.5s;
+    transition: visibility 0s, opacity 0.5s, transform 0.5s ease-in-out;
 }
 
 #snackbar.show {
     visibility: visible;
-    transform: translateX(0);
-    /* Bewegt sich in den Bildschirm */
+    transform: translateX(-50%) translateY(0); /* Bewegt sich nach oben ins Bild */
     opacity: 1;
 }
 
@@ -988,12 +986,9 @@ body {
     visibility: hidden;
     position: absolute;
     /* Geändert von fixed zu absolute */
-    top: 155px;
-    /* Positioniert unter der ersten Snackbar */
-    left: 0;
-    /* Position am linken Rand */
-    transform: translateX(-200%);
-    /* Startet außerhalb des Bildschirms links */
+    bottom: calc(55px + env(safe-area-inset-bottom) + 80px); /* Höher positioniert */
+    left: 50%;
+    transform: translateX(-50%) translateY(200%); /* Startet außerhalb unten */
     background-color: #3f51b5;
     color: white;
     padding: 14px;
@@ -1013,8 +1008,7 @@ body {
 #progress-snackbar.show {
     visibility: visible;
     opacity: 1;
-    transform: translateY(0);
-    /* Bewegt sich in den Bildschirm */
+    transform: translateX(-50%) translateY(0);
 }
 
 .progress-snackbar-content {
