@@ -1,4 +1,3 @@
-// eventManager.js
 "use strict";
 
 import { AppState } from '../core/state.js';
@@ -19,15 +18,21 @@ import { UI_DEFAULTS } from '../core/constants.js';
 import { updateModelSelectUI, cleanupSelectedEnsembleModels } from './ui.js';
 import 'leaflet-gpx';
 
+// =================================================================
+// 1. Globale Variablen & Zustand
+// =================================================================
+
 let listenersInitialized = false;
+
+// =================================================================
+// 2. Allgemeine Hilfsfunktionen
+// =================================================================
 
 function dispatchAppEvent(eventName, detail = {}) {
     console.log(`[EventManager] Dispatching event: ${eventName}`, detail);
     const event = new CustomEvent(eventName, { detail, bubbles: true, cancelable: true });
     document.dispatchEvent(event);
 }
-
-// HILFSFUNKTIONEN FÜR EVENT SETUP
 function setupCheckbox(id, setting, callback) {
     console.log(`setupCheckbox called for id: ${id}`);
     const checkbox = document.getElementById(id);
@@ -55,7 +60,73 @@ function setupCheckbox(id, setting, callback) {
         console.warn(`Checkbox ${id} not found`);
     }
 }
+function setupRadioGroup(name, callback) {
+    const radios = document.querySelectorAll(`input[name="${name}"]`);
+    radios.forEach(radio => {
+        radio.addEventListener('change', () => {
+            // Liest den Wert direkt vom ausgewählten Radio-Button
+            const checkedRadio = document.querySelector(`input[name="${name}"]:checked`);
+            if (!checkedRadio) return;
+            const newValue = checkedRadio.value;
 
+            // Speichert den korrekten neuen Wert
+            Settings.state.userSettings[name] = newValue;
+            Settings.save();
+            console.log(`${name} changed to: ${newValue} and saved to localStorage`);
+
+            // Spezifische Logik für landingDirection kann hier bleiben, da sie die UI steuert
+            if (name === 'landingDirection') {
+                const customLL = document.getElementById('customLandingDirectionLL');
+                const customRR = document.getElementById('customLandingDirectionRR');
+
+                if (customLL) customLL.disabled = newValue !== 'LL'; 
+                if (customRR) customRR.disabled = newValue !== 'RR'; 
+
+                if (newValue === 'LL' && customLL && !customLL.value && Settings.state.userSettings.customLandingDirectionLL === '') {  
+                    customLL.value = Math.round(AppState.landingWindDir || 0);
+                    Settings.state.userSettings.customLandingDirectionLL = parseInt(customLL.value);
+                    Settings.save();
+                    console.log(`Set customLandingDirectionLL to ${customLL.value}`);
+                }
+                if (newValue === 'RR' && customRR && !customRR.value && Settings.state.userSettings.customLandingDirectionRR === '') { 
+                    customRR.value = Math.round(AppState.landingWindDir || 0);
+                    Settings.state.userSettings.customLandingDirectionRR = parseInt(customRR.value);
+                    Settings.save();
+                    console.log(`Set customLandingDirectionRR to ${customRR.value}`);
+                }
+            }
+            // Event auslösen, um die Anwendung über die Änderung zu informieren
+            document.dispatchEvent(new CustomEvent('ui:radioGroupChanged', {
+                detail: { name: name, value: newValue }
+            }));
+
+            // Optionaler Callback für rein lokale UI-Updates (wie updateUnitLabels)
+            if (callback) {
+                callback();
+            }
+        });
+    });
+}
+function setupInput(id, eventType, debounceTime, validationCallback) {
+    const input = document.getElementById(id);
+    if (!input) { /*...*/ return; }
+    input.addEventListener(eventType, Utils.debounce(() => {
+        const value = input.type === 'number' ? parseFloat(input.value) : input.value;
+
+        if (validationCallback && validationCallback(value) === false) {
+            return;
+        }
+
+        // Verwendet einfach die 'id' des Elements als Schlüssel.
+        Settings.state.userSettings[id] = value; 
+        Settings.save();
+        console.log(`${id} changed to: ${value} and saved to localStorage`);
+
+        document.dispatchEvent(new CustomEvent('ui:inputChanged', {
+            detail: { name: id, value: value }
+        }));
+    }, debounceTime));
+}
 function toggleSubmenu(element, submenu, isVisible) {
     console.log(`toggleSubmenu called for ${element.textContent || element.id}: ${isVisible ? 'show' : 'hide'}`);
     if (submenu) {
@@ -95,78 +166,11 @@ function toggleSubmenu(element, submenu, isVisible) {
     }
 }
 
-function setupRadioGroup(name, callback) {
-    const radios = document.querySelectorAll(`input[name="${name}"]`);
-    radios.forEach(radio => {
-        radio.addEventListener('change', () => {
-            // KORREKTUR: Liest den Wert direkt vom ausgewählten Radio-Button
-            const checkedRadio = document.querySelector(`input[name="${name}"]:checked`);
-            if (!checkedRadio) return;
-            const newValue = checkedRadio.value;
+// =================================================================
+// 3. UI-Komponenten-spezifische Setup-Funktionen
+// =================================================================
 
-            // Speichert den korrekten neuen Wert
-            Settings.state.userSettings[name] = newValue;
-            Settings.save();
-            console.log(`${name} changed to: ${newValue} and saved to localStorage`);
-
-            // Spezifische Logik für landingDirection kann hier bleiben, da sie die UI steuert
-            if (name === 'landingDirection') {
-                const customLL = document.getElementById('customLandingDirectionLL');
-                const customRR = document.getElementById('customLandingDirectionRR');
-                // Die Zeile "const landingDirection = ..." ist nicht mehr nötig, wir haben `newValue`
-
-                if (customLL) customLL.disabled = newValue !== 'LL'; // KORREKTUR
-                if (customRR) customRR.disabled = newValue !== 'RR'; // KORREKTUR
-
-                if (newValue === 'LL' && customLL && !customLL.value && Settings.state.userSettings.customLandingDirectionLL === '') { // KORREKTUR
-                    customLL.value = Math.round(AppState.landingWindDir || 0);
-                    Settings.state.userSettings.customLandingDirectionLL = parseInt(customLL.value);
-                    Settings.save();
-                    console.log(`Set customLandingDirectionLL to ${customLL.value}`);
-                }
-                if (newValue === 'RR' && customRR && !customRR.value && Settings.state.userSettings.customLandingDirectionRR === '') { // KORREKTUR
-                    customRR.value = Math.round(AppState.landingWindDir || 0);
-                    Settings.state.userSettings.customLandingDirectionRR = parseInt(customRR.value);
-                    Settings.save();
-                    console.log(`Set customLandingDirectionRR to ${customRR.value}`);
-                }
-            }
-            // NEU: Event auslösen, um die Anwendung über die Änderung zu informieren
-            document.dispatchEvent(new CustomEvent('ui:radioGroupChanged', {
-                detail: { name: name, value: newValue }
-            }));
-
-            // Optionaler Callback für rein lokale UI-Updates (wie updateUnitLabels)
-            if (callback) {
-                callback();
-            }
-        });
-    });
-}
-
-function setupInput(id, eventType, debounceTime, validationCallback) {
-    const input = document.getElementById(id);
-    if (!input) { /*...*/ return; }
-    input.addEventListener(eventType, Utils.debounce(() => {
-        const value = input.type === 'number' ? parseFloat(input.value) : input.value;
-
-        if (validationCallback && validationCallback(value) === false) {
-            return;
-        }
-
-        // Verwendet einfach die 'id' des Elements als Schlüssel.
-        // Da die ID jetzt 'interpStep' ist, funktioniert das perfekt.
-        Settings.state.userSettings[id] = value; 
-        Settings.save();
-        console.log(`${id} changed to: ${value} and saved to localStorage`);
-
-        document.dispatchEvent(new CustomEvent('ui:inputChanged', {
-            detail: { name: id, value: value }
-        }));
-    }, debounceTime));
-}
-
-// SETUP-FUNKTIONEN FÜR DIE EINZELNEN BEREICHE
+// --- Haupt-Layout & Navigation ---
 function setupMenuEvents() {
     console.log("setupMenuEvents wird aufgerufen für allgemeine Menü-Logik.");
     const hamburgerBtn = document.getElementById('hamburgerBtn');
@@ -184,7 +188,7 @@ function setupMenuEvents() {
         }
     });
 
-    // --- KORRIGIERTE LOGIK ZUM ÖFFNEN DER UNTERMENÜS ---
+    // Logik zum Öffnen des Untermenüs
     menu.addEventListener('click', (event) => {
         // Wir interessieren uns nur für das Element, das direkt geklickt wurde.
         const target = event.target;
@@ -206,6 +210,339 @@ function setupMenuEvents() {
     });
 }
 
+// --- Globale Steuerelemente (Slider, Modellauswahl) ---
+function setupSliderEvents() {
+    const slider = document.getElementById('timeSlider');
+    if (!slider) { /*...*/ return; }
+
+    slider.addEventListener('input', () => {
+        // Der EventManager weiß nicht, was passieren soll.
+        // Er meldet nur: "Der Slider wurde bewegt!"
+        document.dispatchEvent(new CustomEvent('ui:sliderChanged', {
+            detail: { sliderValue: slider.value }, // Wir geben den neuen Wert mit
+            bubbles: true,
+            cancelable: true
+        }));
+    });
+
+    // Der 'change' Event-Listener wird für die finale Textanzeige beibehalten,
+    // aber auch er löst nur ein Event aus.
+    slider.addEventListener('change', async () => {
+        document.dispatchEvent(new CustomEvent('ui:sliderChangeFinished', {
+            detail: { sliderValue: slider.value },
+            bubbles: true,
+            cancelable: true
+        }));
+    });
+}
+function setupModelSelectEvents() {
+    const modelSelect = document.getElementById('modelSelect');
+    if (!modelSelect) { /*...*/ return; }
+
+    modelSelect.addEventListener('change', () => {
+        const newModel = modelSelect.value;
+        console.log('Model select changed to:', newModel);
+
+        Settings.state.userSettings.model = newModel;
+        Settings.save();
+
+        // Event auslösen, anstatt die Logik hier auszuführen
+        document.dispatchEvent(new CustomEvent('ui:modelChanged', {
+            detail: { model: newModel }
+        }));
+    });
+
+    // Der Listener für 'models:available' ist in Ordnung, da er nur die UI aktualisiert
+    document.addEventListener('models:available', (event) => {
+        const { availableModels } = event.detail;
+        updateModelSelectUI(availableModels);
+        updateEnsembleModelUI(availableModels);
+        cleanupSelectedEnsembleModels(availableModels);
+    });
+}
+function setupCoordinateEvents() {
+    Coordinates.initializeLocationSearch();
+    console.log("Coordinate events setup complete.");
+}
+function setupMapEventListeners() {
+    console.log("App: Richte Event-Listener für Karten-Events ein.");
+
+    if (!AppState.map) {
+        console.error("Karte nicht initialisiert, Event-Listener können nicht gesetzt werden.");
+        return;
+    }
+
+    // Der Handler wird "dumm" - er löst nur noch ein Event aus.
+    const mapMoveHandler = () => {
+        document.dispatchEvent(new CustomEvent('map:moved'));
+    };
+
+    // Die Logik für das Caching kann hier bleiben, da sie eng mit der Karteninteraktion verbunden ist.
+    const debouncedCacheHandler = Utils.debounce(() => {
+        cacheVisibleTiles({
+            map: AppState.map,
+            baseMaps: AppState.baseMaps,
+            onProgress: displayProgress,
+            onComplete: (message) => {
+                hideProgress();
+                if (message) Utils.handleMessage(message);
+            },
+            onCancel: () => {
+                hideProgress();
+                Utils.handleMessage('Caching cancelled.');
+            }
+        });
+    }, 1000);
+
+    const debouncedMapMoveHandler = Utils.debounce(mapMoveHandler, 500); 
+
+    // Wir registrieren den einen, zentralen Handler für beide Events
+    AppState.map.on('zoomend', mapMoveHandler);
+    AppState.map.on('moveend', mapMoveHandler);
+    AppState.map.on('moveend', debouncedCacheHandler); // Caching kann parallel laufen
+
+}
+
+// --- Planner- & Berechnungs-spezifische Events ---
+function setupJumpRunTrackEvents() {
+    console.log("App: Richte Event-Listener für Track-Einstellungen ein.");
+
+    const setupInput = (inputId, settingName) => {
+        const element = document.getElementById(inputId);
+        if (element) {
+            // Setze den Initialwert basierend auf Settings
+            element.value = Settings.state.userSettings[settingName] || 0;
+            console.log(`Set ${inputId} to initial value:`, element.value);
+            element.addEventListener('input', () => {
+                const value = parseFloat(element.value);
+                if (isNaN(value)) return;
+                Settings.state.userSettings[settingName] = value;
+                Settings.save();
+                displayManager.updateJumpRunTrackDisplay();
+            });
+        }
+    };
+
+    setupInput('numberOfJumpers', 'numberOfJumpers');
+    setupInput('jumperSeparation', 'jumperSeparation');
+    setupInput('jumpRunTrackOffset', 'jumpRunTrackOffset');
+    setupInput('jumpRunTrackForwardOffset', 'jumpRunTrackForwardOffset');
+
+    const directionInput = document.getElementById('jumpRunTrackDirection');
+    if (directionInput) {
+        directionInput.value = Settings.state.userSettings.customJumpRunDirection || '';
+        directionInput.addEventListener('change', () => {
+            const value = parseFloat(directionInput.value);
+            if (Number.isFinite(value) && value >= 0 && value <= 359) {
+                Settings.state.userSettings.customJumpRunDirection = value;
+                console.log(`Setting 'customJumpRunDirection' on change to:`, value);
+            } else {
+                Settings.state.userSettings.customJumpRunDirection = null;
+                directionInput.value = '';
+                console.log('Invalid direction, resetting to calculated.');
+            }
+            Settings.save();
+            displayManager.updateJumpRunTrackDisplay();
+        });
+    }
+
+    const showTrackCheckbox = document.getElementById('showJumpRunTrack');
+    if (showTrackCheckbox) {
+        showTrackCheckbox.addEventListener('change', (e) => {
+            Settings.state.userSettings.showJumpRunTrack = e.target.checked;
+            Settings.save();
+            displayManager.updateJumpRunTrackDisplay();
+        });
+    }
+}
+function setupCutawayRadioButtons() {
+    const cutAwayRadios = document.querySelectorAll('input[name="cutAwayState"]');
+    if (cutAwayRadios.length === 0) return;
+
+    // Set the initial state from saved settings
+    const currentSetting = Settings.state.userSettings.cutAwayState || 'Partially';
+    const activeRadio = document.querySelector(`input[name="cutAwayState"][value="${currentSetting}"]`);
+    if (activeRadio) {
+        activeRadio.checked = true;
+    }
+
+    // Add event listeners
+    cutAwayRadios.forEach(radio => {
+        radio.addEventListener('change', () => {
+            if (radio.checked) {
+                console.log(`Cut Away State changed to: ${radio.value}`);
+
+                // 1. Save the new setting
+                Settings.state.userSettings.cutAwayState = radio.value;
+                Settings.save();
+
+                // 2. Trigger the recalculation and redraw
+                document.dispatchEvent(new CustomEvent('ui:recalculateJump'));
+
+            }
+        });
+    });
+}
+function setupResetCutAwayMarkerButton() {
+    const resetButton = document.getElementById('resetCutAwayMarker');
+    if (resetButton) {
+        resetButton.addEventListener('click', () => {
+            if (!AppState.map) {
+                console.warn('Map not initialized, cannot reset cut-away marker');
+                return;
+            }
+            if (AppState.cutAwayMarker) {
+                AppState.map.removeLayer(AppState.cutAwayMarker);
+                AppState.cutAwayMarker = null;
+                AppState.cutAwayLat = null;
+                AppState.cutAwayLng = null;
+                console.log('Cut-away marker reset');
+                if (AppState.cutAwayCircle) {
+                    AppState.map.removeLayer(AppState.cutAwayCircle);
+                    AppState.cutAwayCircle = null;
+                    console.log('Cleared cut-away circle');
+                }
+                document.getElementById('info').innerHTML = 'Right-click map to place cut-away marker';
+            }
+        });
+    }
+}
+
+// --- Track & Datei-Management ---
+function setupTrackEvents() {
+    console.log('[app.js] Setting up track events');
+    const trackFileInput = document.getElementById('trackFileInput');
+    const loadingElement = document.getElementById('loading'); // Deklarieren wir die Variable hier einmal zentral.
+
+    if (trackFileInput) {
+        trackFileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+
+            // 1. Spinner hier anzeigen, wenn eine Datei ausgewählt wird.
+            if (loadingElement) {
+                loadingElement.style.display = 'block';
+            }
+
+            if (!file) {
+                Utils.handleError('No file selected.');
+                if (loadingElement) loadingElement.style.display = 'none'; // Bei Fehler sofort ausblenden
+                return;
+            }
+
+            const extension = file.name.split('.').pop().toLowerCase();
+            let trackMetaData = null;
+
+            try {
+                if (extension === 'gpx') {
+                    trackMetaData = await loadGpxTrack(file);
+                } else if (extension === 'csv') {
+                    trackMetaData = await loadCsvTrackUTC(file);
+                } else {
+                    Utils.handleError('Unsupported file type. Please upload a .gpx or .csv file.');
+                    if (loadingElement) loadingElement.style.display = 'none'; // Bei Fehler sofort ausblenden
+                }
+            } catch (error) {
+                console.error('Error during track file processing:', error);
+                Utils.handleError('Failed to process track file.');
+                if (loadingElement) loadingElement.style.display = 'none'; // Bei Fehler sofort ausblenden
+            }
+        });
+    }
+
+    const clearTrackButton = document.getElementById('clearTrack');
+    if (clearTrackButton) {
+        clearTrackButton.addEventListener('click', () => {
+            if (!AppState.map) { Utils.handleError('Cannot clear track: map not initialized.'); return; }
+            if (AppState.gpxLayer) {
+                try {
+                    if (AppState.map.hasLayer(AppState.gpxLayer)) AppState.map.removeLayer(AppState.gpxLayer);
+                    AppState.gpxLayer = null; AppState.gpxPoints = []; AppState.isTrackLoaded = false;
+                    const infoElement = document.getElementById('info');
+                    if (infoElement) {
+                        const modelDisplayRegex = /(<br><strong>Available Models:<\/strong><ul>.*?<\/ul>|<br><strong>Available Models:<\/strong> None)/s;
+                        const currentInfoHTML = infoElement.innerHTML;
+                        const modelInfoMatch = currentInfoHTML.match(modelDisplayRegex);
+                        infoElement.innerHTML = 'Click on the map to fetch weather data.' + (modelInfoMatch ? modelInfoMatch[0] : '');
+                    }
+                    if (trackFileInput) trackFileInput.value = '';
+                } catch (error) { Utils.handleError('Failed to clear track: ' + error.message); }
+            } else { Utils.handleMessage('No track to clear.'); }
+        });
+    }
+}
+function setupGpxExportEvent() {
+
+    const sliderIndex = getSliderValue();
+    const interpStep = getInterpolationStep();
+    const heightUnit = Settings.getValue('heightUnit', 'm');
+
+    const exportButton = document.getElementById('exportGpxButton');
+    if (exportButton) {
+        // Hinzufügen von 'async', um 'await' verwenden zu können
+        exportButton.addEventListener('click', async () => {
+            const sliderIndex = getSliderValue();
+            const interpStep = getInterpolationStep();
+            const heightUnit = Settings.getValue('heightUnit', 'm');
+
+            // 'await' stellt sicher, dass auf die Fertigstellung der Funktion gewartet wird
+            await exportToGpx(sliderIndex, interpStep, heightUnit);
+        });
+    }
+
+    const exportLandingPatternButton = document.getElementById('exportLandingPatternGpxButton');
+    if (exportLandingPatternButton) {
+        exportLandingPatternButton.addEventListener('click', () => {
+            console.log("DEBUG: Klick auf 'exportLandingPatternGpxButton' registriert.");
+            exportLandingPatternToGpx();
+        });
+    }
+}
+
+// --- Einstellungs-Panel ---
+function setupMenuItemEvents() {
+    console.log("setupMenuItemEvents wird aufgerufen für 'Calculate Jump'.");
+    const calculateJumpMenuItem = Array.from(document.querySelectorAll('.menu-label'))
+        .find(item => item.textContent.trim() === 'Calculate Jump');
+
+    if (!calculateJumpMenuItem) {
+        console.error('Calculate Jump menu item not found');
+        return;
+    }
+
+    const submenu = calculateJumpMenuItem.closest('li').querySelector('ul.submenu');
+
+    const setVisualLockState = () => {
+        if (Settings.isFeatureUnlocked('calculateJump')) {
+            calculateJumpMenuItem.style.opacity = '1';
+            calculateJumpMenuItem.title = 'Click to open/close jump calculation settings';
+        } else {
+            calculateJumpMenuItem.style.opacity = '0.5';
+            calculateJumpMenuItem.title = 'Feature locked. Click to enter password.';
+            if (submenu) submenu.classList.add('hidden');
+        }
+    };
+
+    setVisualLockState(); // Setzt den initialen Zustand
+
+    calculateJumpMenuItem.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (Settings.isFeatureUnlocked('calculateJump')) {
+            if (submenu) submenu.classList.toggle('hidden');
+        } else {
+            Settings.showPasswordModal('calculateJump',
+                () => { // onSuccess
+                    setVisualLockState();
+                    if (submenu) submenu.classList.remove('hidden');
+                },
+                () => { // onCancel
+                    setVisualLockState();
+                }
+            );
+        }
+    });
+}
 function setupCheckboxEvents() {
     if (!AppState.map) {
         console.warn('Map not initialized, skipping setupCheckboxEvents');
@@ -319,7 +656,6 @@ function setupCheckboxEvents() {
             Settings.save();
             dispatchAppEvent('ui:showJumpMasterLineChanged', { isChecked });
 
-            // --- START DER ERWEITERUNG ---
             // Finde das zugehörige Submenü
             const submenu = showJumpMasterLineCheckbox.closest('li')?.querySelector('ul.submenu');
 
@@ -327,7 +663,6 @@ function setupCheckboxEvents() {
             if (submenu) {
                 toggleSubmenu(showJumpMasterLineCheckbox, submenu, isChecked);
             }
-            // --- ENDE DER ERWEITERUNG ---
         });
     }
 
@@ -364,58 +699,6 @@ function setupCheckboxEvents() {
         });
     }
 }
-
-function setupSliderEvents() {
-    const slider = document.getElementById('timeSlider');
-    if (!slider) { /*...*/ return; }
-
-    slider.addEventListener('input', () => {
-        // Der EventManager weiß nicht, was passieren soll.
-        // Er meldet nur: "Der Slider wurde bewegt!"
-        document.dispatchEvent(new CustomEvent('ui:sliderChanged', {
-            detail: { sliderValue: slider.value }, // Wir geben den neuen Wert mit
-            bubbles: true,
-            cancelable: true
-        }));
-    });
-
-    // Der 'change' Event-Listener wird für die finale Textanzeige beibehalten,
-    // aber auch er löst nur ein Event aus.
-    slider.addEventListener('change', async () => {
-        document.dispatchEvent(new CustomEvent('ui:sliderChangeFinished', {
-            detail: { sliderValue: slider.value },
-            bubbles: true,
-            cancelable: true
-        }));
-    });
-}
-
-function setupModelSelectEvents() {
-    const modelSelect = document.getElementById('modelSelect');
-    if (!modelSelect) { /*...*/ return; }
-
-    modelSelect.addEventListener('change', () => {
-        const newModel = modelSelect.value;
-        console.log('Model select changed to:', newModel);
-
-        Settings.state.userSettings.model = newModel;
-        Settings.save();
-
-        // Event auslösen, anstatt die Logik hier auszuführen
-        document.dispatchEvent(new CustomEvent('ui:modelChanged', {
-            detail: { model: newModel }
-        }));
-    });
-
-    // Der Listener für 'models:available' ist in Ordnung, da er nur die UI aktualisiert
-    document.addEventListener('models:available', (event) => {
-        const { availableModels } = event.detail;
-        updateModelSelectUI(availableModels);
-        updateEnsembleModelUI(availableModels);
-        cleanupSelectedEnsembleModels(availableModels);
-    });
-}
-
 function setupRadioEvents() {
     setupRadioGroup('refLevel', () => Settings.updateUnitLabels());
 
@@ -485,7 +768,6 @@ function setupRadioEvents() {
         AppState.ensembleLayerGroup = L.layerGroup().addTo(AppState.map);
     }
 }
-
 function setupInputEvents() {
     // Jeder Aufruf speichert jetzt nur noch den Wert und löst das 'ui:inputChanged' Event aus.
     // Die Validierungslogik bleibt als Callback erhalten.
@@ -541,7 +823,7 @@ function setupInputEvents() {
         if (isNaN(value) || value < 500 || value > 15000) {
             Utils.handleError('Opening altitude must be between 500 and 15000 meters.');
 
-            // NEU: Event auslösen, um die UI zurückzusetzen
+            // Event auslösen, um die UI zurückzusetzen
             document.dispatchEvent(new CustomEvent('ui:invalidInput', {
                 detail: { id: 'openingAltitude', defaultValue: 1200 }
             }));
@@ -565,7 +847,7 @@ function setupInputEvents() {
 
     setupInput('canopySpeed', 'change', 300);
     setupInput('descentRate', 'change', 300);
-    setupInput('interpStep', 'change', 300, null, 'interpStep'); // <-- KORRIGIERTE ZEILE mit dem korrekten Einstellungsnamen
+    setupInput('interpStep', 'change', 300, null, 'interpStep'); 
 
     setupInput('customLandingDirectionLL', 'input', 100);
     setupInput('customLandingDirectionRR', 'input', 100);
@@ -581,7 +863,6 @@ function setupInputEvents() {
     setupInput('cutAwayAltitude', 'change', 300);
     setupInput('historicalDatePicker', 'change', 300);
 }
-
 function setupDownloadEvents() {
     const downloadButton = document.getElementById('downloadButton');
     if (downloadButton) {
@@ -591,7 +872,6 @@ function setupDownloadEvents() {
         });
     }
 }
-
 function setupClearHistoricalDate() {
     const clearButton = document.getElementById('clearHistoricalDate');
     if (clearButton) {
@@ -601,333 +881,8 @@ function setupClearHistoricalDate() {
         });
     }
 }
-function setupCoordinateEvents() {
-    Coordinates.initializeLocationSearch();
-    console.log("Coordinate events setup complete.");
-}
-function setupCutawayRadioButtons() {
-    const cutAwayRadios = document.querySelectorAll('input[name="cutAwayState"]');
-    if (cutAwayRadios.length === 0) return;
 
-    // Set the initial state from saved settings
-    const currentSetting = Settings.state.userSettings.cutAwayState || 'Partially';
-    const activeRadio = document.querySelector(`input[name="cutAwayState"][value="${currentSetting}"]`);
-    if (activeRadio) {
-        activeRadio.checked = true;
-    }
-
-    // Add event listeners
-    cutAwayRadios.forEach(radio => {
-        radio.addEventListener('change', () => {
-            if (radio.checked) {
-                console.log(`Cut Away State changed to: ${radio.value}`);
-
-                // 1. Save the new setting
-                Settings.state.userSettings.cutAwayState = radio.value;
-                Settings.save();
-
-                // 2. Trigger the recalculation and redraw
-                document.dispatchEvent(new CustomEvent('ui:recalculateJump'));
-
-            }
-        });
-    });
-}
-function setupJumpRunTrackEvents() {
-    console.log("App: Richte Event-Listener für Track-Einstellungen ein.");
-
-    const setupInput = (inputId, settingName) => {
-        const element = document.getElementById(inputId);
-        if (element) {
-            // Setze den Initialwert basierend auf Settings
-            element.value = Settings.state.userSettings[settingName] || 0;
-            console.log(`Set ${inputId} to initial value:`, element.value);
-            element.addEventListener('input', () => {
-                const value = parseFloat(element.value);
-                if (isNaN(value)) return;
-                Settings.state.userSettings[settingName] = value;
-                Settings.save();
-                displayManager.updateJumpRunTrackDisplay();
-            });
-        }
-    };
-
-    setupInput('numberOfJumpers', 'numberOfJumpers');
-    setupInput('jumperSeparation', 'jumperSeparation');
-    setupInput('jumpRunTrackOffset', 'jumpRunTrackOffset');
-    setupInput('jumpRunTrackForwardOffset', 'jumpRunTrackForwardOffset');
-
-    const directionInput = document.getElementById('jumpRunTrackDirection');
-    if (directionInput) {
-        directionInput.value = Settings.state.userSettings.customJumpRunDirection || '';
-        directionInput.addEventListener('change', () => {
-            const value = parseFloat(directionInput.value);
-            if (Number.isFinite(value) && value >= 0 && value <= 359) {
-                Settings.state.userSettings.customJumpRunDirection = value;
-                console.log(`Setting 'customJumpRunDirection' on change to:`, value);
-            } else {
-                Settings.state.userSettings.customJumpRunDirection = null;
-                directionInput.value = '';
-                console.log('Invalid direction, resetting to calculated.');
-            }
-            Settings.save();
-            displayManager.updateJumpRunTrackDisplay();
-        });
-    }
-
-    const showTrackCheckbox = document.getElementById('showJumpRunTrack');
-    if (showTrackCheckbox) {
-        showTrackCheckbox.addEventListener('change', (e) => {
-            Settings.state.userSettings.showJumpRunTrack = e.target.checked;
-            Settings.save();
-            displayManager.updateJumpRunTrackDisplay();
-        });
-    }
-}
-function setupMapEventListeners() {
-    console.log("App: Richte Event-Listener für Karten-Events ein.");
-
-    if (!AppState.map) {
-        console.error("Karte nicht initialisiert, Event-Listener können nicht gesetzt werden.");
-        return;
-    }
-
-    // Der Handler wird "dumm" - er löst nur noch ein Event aus.
-    const mapMoveHandler = () => {
-        document.dispatchEvent(new CustomEvent('map:moved'));
-    };
-
-    // Die Logik für das Caching kann hier bleiben, da sie eng mit der Karteninteraktion verbunden ist.
-    const debouncedCacheHandler = Utils.debounce(() => {
-        cacheVisibleTiles({
-            map: AppState.map,
-            baseMaps: AppState.baseMaps,
-            onProgress: displayProgress,
-            onComplete: (message) => {
-                hideProgress();
-                if (message) Utils.handleMessage(message);
-            },
-            onCancel: () => {
-                hideProgress();
-                Utils.handleMessage('Caching cancelled.');
-            }
-        });
-    }, 1000);
-
-    const debouncedMapMoveHandler = Utils.debounce(mapMoveHandler, 500); // 500ms Verzögerung
-
-    // Wir registrieren den einen, zentralen Handler für beide Events
-    AppState.map.on('zoomend', mapMoveHandler);
-    AppState.map.on('moveend', mapMoveHandler);
-    AppState.map.on('moveend', debouncedCacheHandler); // Caching kann parallel laufen
-
-}
-function setupHarpCoordInputEvents() {
-    const harpCoordInput = document.getElementById('harpCoordInput');
-    const placeHarpCoordButton = document.getElementById('placeHarpCoordButton');
-    const harpRadio = document.querySelector('input[name="jumpMasterLineTarget"][value="HARP"]');
-
-    if (!harpCoordInput || !placeHarpCoordButton || !harpRadio) {
-        console.warn('HARP coordinate input elements not found. Skipping setup.');
-        return;
-    }
-
-    placeHarpCoordButton.addEventListener('click', async () => {
-        const inputValue = harpCoordInput.value.trim();
-        if (!inputValue) {
-            Utils.handleError('Please enter coordinates.');
-            return;
-        }
-
-        const parsedCoords = Coordinates.parseQueryAsCoordinates(inputValue);
-
-        if (parsedCoords) {
-            // Clear existing HARP marker if it exists
-            if (AppState.harpMarker) {
-                AppState.map.removeLayer(AppState.harpMarker);
-            }
-
-            // Create and add new HARP marker
-            AppState.harpMarker = mapManager.createHarpMarker(parsedCoords.lat, parsedCoords.lng).addTo(AppState.map);
-            console.log('Placed HARP marker at:', parsedCoords);
-
-            // Update settings
-            Settings.state.userSettings.harpLat = parsedCoords.lat;
-            Settings.state.userSettings.harpLng = parsedCoords.lng;
-            Settings.save();
-            Utils.handleMessage('HARP marker placed successfully.');
-
-            // Enable HARP radio button and set it to checked
-            harpRadio.disabled = false;
-            harpRadio.checked = true;
-            console.log('Enabled HARP radio button and set to checked');
-
-            // Trigger JML update if live tracking is active and HARP is selected
-            document.dispatchEvent(new CustomEvent('ui:jumpMasterLineTargetChanged'));
-            document.dispatchEvent(new CustomEvent('ui:recalculateJump'));
-            document.dispatchEvent(new CustomEvent('harp:updated'));
-        } else {
-            Utils.handleError('Invalid coordinates. Please enter a valid MGRS or Decimal Degree format.');
-        }
-    });
-}
-function setupMenuItemEvents() {
-    console.log("setupMenuItemEvents wird aufgerufen für 'Calculate Jump'.");
-    const calculateJumpMenuItem = Array.from(document.querySelectorAll('.menu-label'))
-        .find(item => item.textContent.trim() === 'Calculate Jump');
-
-    if (!calculateJumpMenuItem) {
-        console.error('Calculate Jump menu item not found');
-        return;
-    }
-
-    const submenu = calculateJumpMenuItem.closest('li').querySelector('ul.submenu');
-
-    const setVisualLockState = () => {
-        if (Settings.isFeatureUnlocked('calculateJump')) {
-            calculateJumpMenuItem.style.opacity = '1';
-            calculateJumpMenuItem.title = 'Click to open/close jump calculation settings';
-        } else {
-            calculateJumpMenuItem.style.opacity = '0.5';
-            calculateJumpMenuItem.title = 'Feature locked. Click to enter password.';
-            if (submenu) submenu.classList.add('hidden');
-        }
-    };
-
-    setVisualLockState(); // Setzt den initialen Zustand
-
-    calculateJumpMenuItem.addEventListener('click', (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-
-        if (Settings.isFeatureUnlocked('calculateJump')) {
-            if (submenu) submenu.classList.toggle('hidden');
-        } else {
-            Settings.showPasswordModal('calculateJump',
-                () => { // onSuccess
-                    setVisualLockState();
-                    if (submenu) submenu.classList.remove('hidden');
-                },
-                () => { // onCancel
-                    setVisualLockState();
-                }
-            );
-        }
-    });
-}
-function setupResetCutAwayMarkerButton() {
-    const resetButton = document.getElementById('resetCutAwayMarker');
-    if (resetButton) {
-        resetButton.addEventListener('click', () => {
-            if (!AppState.map) {
-                console.warn('Map not initialized, cannot reset cut-away marker');
-                return;
-            }
-            if (AppState.cutAwayMarker) {
-                AppState.map.removeLayer(AppState.cutAwayMarker);
-                AppState.cutAwayMarker = null;
-                AppState.cutAwayLat = null;
-                AppState.cutAwayLng = null;
-                console.log('Cut-away marker reset');
-                if (AppState.cutAwayCircle) {
-                    AppState.map.removeLayer(AppState.cutAwayCircle);
-                    AppState.cutAwayCircle = null;
-                    console.log('Cleared cut-away circle');
-                }
-                document.getElementById('info').innerHTML = 'Right-click map to place cut-away marker';
-            }
-        });
-    }
-}
-function setupTrackEvents() {
-    console.log('[app.js] Setting up track events');
-    const trackFileInput = document.getElementById('trackFileInput');
-    const loadingElement = document.getElementById('loading'); // Deklarieren wir die Variable hier einmal zentral.
-
-    if (trackFileInput) {
-        trackFileInput.addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-
-            // 1. Spinner hier anzeigen, wenn eine Datei ausgewählt wird.
-            if (loadingElement) {
-                loadingElement.style.display = 'block';
-            }
-
-            if (!file) {
-                Utils.handleError('No file selected.');
-                if (loadingElement) loadingElement.style.display = 'none'; // Bei Fehler sofort ausblenden
-                return;
-            }
-
-            const extension = file.name.split('.').pop().toLowerCase();
-            let trackMetaData = null;
-
-            try {
-                if (extension === 'gpx') {
-                    trackMetaData = await loadGpxTrack(file);
-                } else if (extension === 'csv') {
-                    trackMetaData = await loadCsvTrackUTC(file);
-                } else {
-                    Utils.handleError('Unsupported file type. Please upload a .gpx or .csv file.');
-                    if (loadingElement) loadingElement.style.display = 'none'; // Bei Fehler sofort ausblenden
-                }
-            } catch (error) {
-                console.error('Error during track file processing:', error);
-                Utils.handleError('Failed to process track file.');
-                if (loadingElement) loadingElement.style.display = 'none'; // Bei Fehler sofort ausblenden
-            }
-        });
-    }
-
-    const clearTrackButton = document.getElementById('clearTrack');
-    if (clearTrackButton) {
-        clearTrackButton.addEventListener('click', () => {
-            if (!AppState.map) { Utils.handleError('Cannot clear track: map not initialized.'); return; }
-            if (AppState.gpxLayer) {
-                try {
-                    if (AppState.map.hasLayer(AppState.gpxLayer)) AppState.map.removeLayer(AppState.gpxLayer);
-                    AppState.gpxLayer = null; AppState.gpxPoints = []; AppState.isTrackLoaded = false;
-                    const infoElement = document.getElementById('info');
-                    if (infoElement) {
-                        const modelDisplayRegex = /(<br><strong>Available Models:<\/strong><ul>.*?<\/ul>|<br><strong>Available Models:<\/strong> None)/s;
-                        const currentInfoHTML = infoElement.innerHTML;
-                        const modelInfoMatch = currentInfoHTML.match(modelDisplayRegex);
-                        infoElement.innerHTML = 'Click on the map to fetch weather data.' + (modelInfoMatch ? modelInfoMatch[0] : '');
-                    }
-                    if (trackFileInput) trackFileInput.value = '';
-                } catch (error) { Utils.handleError('Failed to clear track: ' + error.message); }
-            } else { Utils.handleMessage('No track to clear.'); }
-        });
-    }
-}
-function setupGpxExportEvent() {
-
-    const sliderIndex = getSliderValue();
-    const interpStep = getInterpolationStep();
-    const heightUnit = Settings.getValue('heightUnit', 'm');
-
-    const exportButton = document.getElementById('exportGpxButton');
-    if (exportButton) {
-        // Hinzufügen von 'async', um 'await' verwenden zu können
-        exportButton.addEventListener('click', async () => {
-            const sliderIndex = getSliderValue();
-            const interpStep = getInterpolationStep();
-            const heightUnit = Settings.getValue('heightUnit', 'm');
-
-            // 'await' stellt sicher, dass auf die Fertigstellung der Funktion gewartet wird
-            await exportToGpx(sliderIndex, interpStep, heightUnit);
-        });
-    }
-
-    const exportLandingPatternButton = document.getElementById('exportLandingPatternGpxButton');
-    if (exportLandingPatternButton) {
-        exportLandingPatternButton.addEventListener('click', () => {
-            console.log("DEBUG: Klick auf 'exportLandingPatternGpxButton' registriert.");
-            exportLandingPatternToGpx();
-        });
-    }
-}
-
+// --- Cache Management ---
 function setupCacheManagement() {
     const bottomContainer = document.getElementById('bottom-container');
     if (!bottomContainer) {
@@ -976,7 +931,6 @@ function setupCacheManagement() {
     // 4. Füge den fertigen Wrapper zum DOM hinzu
     bottomContainer.appendChild(buttonWrapper);
 }
-
 function setupCacheSettings() {
     const cacheRadiusInput = document.getElementById('cacheRadiusSelect');
     if (cacheRadiusInput) {
@@ -1082,6 +1036,58 @@ function setupCacheSettings() {
     }
 }
 
+// --- Live Tracking ---
+function setupHarpCoordInputEvents() {
+    const harpCoordInput = document.getElementById('harpCoordInput');
+    const placeHarpCoordButton = document.getElementById('placeHarpCoordButton');
+    const harpRadio = document.querySelector('input[name="jumpMasterLineTarget"][value="HARP"]');
+
+    if (!harpCoordInput || !placeHarpCoordButton || !harpRadio) {
+        console.warn('HARP coordinate input elements not found. Skipping setup.');
+        return;
+    }
+
+    placeHarpCoordButton.addEventListener('click', async () => {
+        const inputValue = harpCoordInput.value.trim();
+        if (!inputValue) {
+            Utils.handleError('Please enter coordinates.');
+            return;
+        }
+
+        const parsedCoords = Coordinates.parseQueryAsCoordinates(inputValue);
+
+        if (parsedCoords) {
+            // Clear existing HARP marker if it exists
+            if (AppState.harpMarker) {
+                AppState.map.removeLayer(AppState.harpMarker);
+            }
+
+            // Create and add new HARP marker
+            AppState.harpMarker = mapManager.createHarpMarker(parsedCoords.lat, parsedCoords.lng).addTo(AppState.map);
+            console.log('Placed HARP marker at:', parsedCoords);
+
+            // Update settings
+            Settings.state.userSettings.harpLat = parsedCoords.lat;
+            Settings.state.userSettings.harpLng = parsedCoords.lng;
+            Settings.save();
+            Utils.handleMessage('HARP marker placed successfully.');
+
+            // Enable HARP radio button and set it to checked
+            harpRadio.disabled = false;
+            harpRadio.checked = true;
+            console.log('Enabled HARP radio button and set to checked');
+
+            // Trigger JML update if live tracking is active and HARP is selected
+            document.dispatchEvent(new CustomEvent('ui:jumpMasterLineTargetChanged'));
+            document.dispatchEvent(new CustomEvent('ui:recalculateJump'));
+            document.dispatchEvent(new CustomEvent('harp:updated'));
+        } else {
+            Utils.handleError('Invalid coordinates. Please enter a valid MGRS or Decimal Degree format.');
+        }
+    });
+}
+
+// --- Ensemble-spezifische UI-Updates ---
 export function updateEnsembleModelUI(availableModels) {
     const submenu = document.getElementById('ensembleModelsSubmenu');
     if (!submenu) return;
@@ -1102,7 +1108,6 @@ export function updateEnsembleModelUI(availableModels) {
             Settings.state.userSettings.selectedEnsembleModels = selected;
             Settings.save();
 
-            // KORREKTUR: Die Logik aufteilen
             // 1. Daten abrufen und auf Erfolg warten
             const success = await fetchEnsembleWeatherData();
 
@@ -1119,33 +1124,52 @@ export function updateEnsembleModelUI(availableModels) {
     });
 }
 
-// HAUPT-INITIALISIERUNGSFUNKTION
+// =================================================================
+// 4. Haupt-Initialisierungsfunktion
+// =================================================================
+
 export function initializeEventListeners() {
     if (listenersInitialized) {
         return; // Bricht die Funktion sofort ab, wenn sie schon einmal lief
     }
     console.log("Initializing all UI event listeners...");
+
+// Logische Reihenfolge der Aufrufe
+    // 1. Grund-Layout
     setupMenuEvents();
-    setupCheckboxEvents();
+
+    // 2. Globale Controls
     setupSliderEvents();
     setupModelSelectEvents();
+    setupCoordinateEvents();
+
+    // 3. Einstellungen & Features
+    setupMenuItemEvents();
+    setupCheckboxEvents();
     setupRadioEvents();
     setupInputEvents();
     setupDownloadEvents();
-    setupTrackEvents();
     setupClearHistoricalDate();
-    setupCoordinateEvents();
-    setupCutawayRadioButtons();
+    
+    // 4. Spezifische Planner-Funktionen
     setupJumpRunTrackEvents();
-    setupMapEventListeners();
-    setupMenuItemEvents();
+    setupCutawayRadioButtons();
     setupResetCutAwayMarkerButton();
+
+    // 5. Datei- & Track-Management
+    setupTrackEvents();
+    setupGpxExportEvent();
+    
+    // 6. App-Management & Cache
     setupCacheManagement();
     setupCacheSettings();
-    setupHarpCoordInputEvents(); // Call the new setup function here
-    setupGpxExportEvent();
+
+    // 7. Live-Funktionen
+    setupHarpCoordInputEvents();
+
+    // 8. Event Listener für Karten-Interaktionen
+    setupMapEventListeners();
+
     listenersInitialized = true;
     console.log("Event listeners initialized successfully (first and only time).");
-
-
 }
