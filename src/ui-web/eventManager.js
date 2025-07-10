@@ -79,16 +79,16 @@ function setupRadioGroup(name, callback) {
                 const customLL = document.getElementById('customLandingDirectionLL');
                 const customRR = document.getElementById('customLandingDirectionRR');
 
-                if (customLL) customLL.disabled = newValue !== 'LL'; 
-                if (customRR) customRR.disabled = newValue !== 'RR'; 
+                if (customLL) customLL.disabled = newValue !== 'LL';
+                if (customRR) customRR.disabled = newValue !== 'RR';
 
-                if (newValue === 'LL' && customLL && !customLL.value && Settings.state.userSettings.customLandingDirectionLL === '') {  
+                if (newValue === 'LL' && customLL && !customLL.value && Settings.state.userSettings.customLandingDirectionLL === '') {
                     customLL.value = Math.round(AppState.landingWindDir || 0);
                     Settings.state.userSettings.customLandingDirectionLL = parseInt(customLL.value);
                     Settings.save();
                     console.log(`Set customLandingDirectionLL to ${customLL.value}`);
                 }
-                if (newValue === 'RR' && customRR && !customRR.value && Settings.state.userSettings.customLandingDirectionRR === '') { 
+                if (newValue === 'RR' && customRR && !customRR.value && Settings.state.userSettings.customLandingDirectionRR === '') {
                     customRR.value = Math.round(AppState.landingWindDir || 0);
                     Settings.state.userSettings.customLandingDirectionRR = parseInt(customRR.value);
                     Settings.save();
@@ -118,7 +118,7 @@ function setupInput(id, eventType, debounceTime, validationCallback) {
         }
 
         // Verwendet einfach die 'id' des Elements als Schlüssel.
-        Settings.state.userSettings[id] = value; 
+        Settings.state.userSettings[id] = value;
         Settings.save();
         console.log(`${id} changed to: ${value} and saved to localStorage`);
 
@@ -171,42 +171,60 @@ function toggleSubmenu(element, submenu, isVisible) {
 // =================================================================
 
 // --- Haupt-Layout & Navigation ---
-function setupMenuEvents() {
-    console.log("setupMenuEvents wird aufgerufen für allgemeine Menü-Logik.");
-    const hamburgerBtn = document.getElementById('hamburgerBtn');
-    const menu = document.getElementById('menu');
-    if (!hamburgerBtn || !menu) return;
+function setupSidebarEvents() {
+    const sidebar = document.getElementById('sidebar');
+    const mapContent = document.getElementById('map-content');
+    const panelContainer = document.getElementById('panel-container');
+    const icons = document.querySelectorAll('.sidebar-icon');
+    const panels = document.querySelectorAll('.panel');
+    let activePanelId = null;
 
-    // Hamburger-Button und Klick-außerhalb-Logik
-    hamburgerBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        menu.classList.toggle('hidden');
-    });
-    document.addEventListener('click', (e) => {
-        if (!menu.contains(e.target) && !hamburgerBtn.contains(e.target)) {
-            menu.classList.add('hidden');
-        }
-    });
+    icons.forEach(icon => {
+        icon.addEventListener('click', () => {
+            const panelId = icon.dataset.panelId;
 
-    // Logik zum Öffnen des Untermenüs
-    menu.addEventListener('click', (event) => {
-        // Wir interessieren uns nur für das Element, das direkt geklickt wurde.
-        const target = event.target;
-
-        // Prüfe, ob das geklickte Element (oder sein direktes Elternelement)
-        // eine Menü-Überschrift ist. Das schließt tiefere Elemente wie Buttons aus.
-        const isToggleLabel = target.matches('li > span') || target.matches('li > label');
-
-        if (isToggleLabel) {
-            // Verhindere, dass der Klick sich weiter ausbreitet
-            event.preventDefault();
-            event.stopPropagation();
-
-            const submenu = target.closest('li').querySelector('ul.submenu');
-            if (submenu) {
-                submenu.classList.toggle('hidden');
+            // Zustand 1: Das angeklickte Panel ist bereits offen -> Alles schließen.
+            if (panelContainer.classList.contains('expanded') && activePanelId === panelId) {
+                panelContainer.classList.remove('expanded');
+                mapContent.classList.remove('shifted');
+                icon.classList.remove('active');
+                activePanelId = null;
             }
-        }
+            // Zustand 2: Ein anderes Panel ist offen oder keines -> Das geklickte Panel öffnen.
+            else {
+                panelContainer.classList.add('expanded');
+                mapContent.classList.add('shifted');
+
+                // Alle Icons deaktivieren, dann das richtige aktivieren
+                icons.forEach(i => i.classList.remove('active'));
+                icon.classList.add('active');
+
+                // Das richtige Panel anzeigen und alle anderen verstecken
+                panels.forEach(p => {
+                    p.classList.toggle('hidden', p.id !== panelId);
+                });
+                activePanelId = panelId;
+            }
+
+            // Wichtig: Leaflet nach der Animation mitteilen, dass sich die Kartengröße geändert hat.
+            setTimeout(() => {
+                if (AppState.map) {
+                    AppState.map.invalidateSize({ animate: true });
+                }
+            }, 300); // Muss der Dauer der CSS-Transition entsprechen (0.3s)
+        });
+    });
+}
+function setupAccordionEvents() {
+    const accordionHeaders = document.querySelectorAll('.accordion-header');
+
+    accordionHeaders.forEach(header => {
+        header.addEventListener('click', () => {
+            const accordionItem = header.parentElement;
+
+            // Schaltet die .active-Klasse für das geklickte Element um
+            accordionItem.classList.toggle('active');
+        });
     });
 }
 
@@ -294,7 +312,7 @@ function setupMapEventListeners() {
         });
     }, 1000);
 
-    const debouncedMapMoveHandler = Utils.debounce(mapMoveHandler, 500); 
+    const debouncedMapMoveHandler = Utils.debounce(mapMoveHandler, 500);
 
     // Wir registrieren den einen, zentralen Handler für beide Events
     AppState.map.on('zoomend', mapMoveHandler);
@@ -847,7 +865,7 @@ function setupInputEvents() {
 
     setupInput('canopySpeed', 'change', 300);
     setupInput('descentRate', 'change', 300);
-    setupInput('interpStep', 'change', 300, null, 'interpStep'); 
+    setupInput('interpStep', 'change', 300, null, 'interpStep');
 
     setupInput('customLandingDirectionLL', 'input', 100);
     setupInput('customLandingDirectionRR', 'input', 100);
@@ -1134,9 +1152,10 @@ export function initializeEventListeners() {
     }
     console.log("Initializing all UI event listeners...");
 
-// Logische Reihenfolge der Aufrufe
+    // Logische Reihenfolge der Aufrufe
     // 1. Grund-Layout
-    setupMenuEvents();
+    setupSidebarEvents();
+    setupAccordionEvents();
 
     // 2. Globale Controls
     setupSliderEvents();
@@ -1150,7 +1169,7 @@ export function initializeEventListeners() {
     setupInputEvents();
     setupDownloadEvents();
     setupClearHistoricalDate();
-    
+
     // 4. Spezifische Planner-Funktionen
     setupJumpRunTrackEvents();
     setupCutawayRadioButtons();
@@ -1159,7 +1178,7 @@ export function initializeEventListeners() {
     // 5. Datei- & Track-Management
     setupTrackEvents();
     setupGpxExportEvent();
-    
+
     // 6. App-Management & Cache
     setupCacheManagement();
     setupCacheSettings();
