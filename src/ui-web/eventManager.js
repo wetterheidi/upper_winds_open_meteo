@@ -718,28 +718,18 @@ function setupCheckboxEvents() {
     }
 }
 function setupRadioEvents() {
-    setupRadioGroup('refLevel', () => Settings.updateUnitLabels());
+    // --- NEU: Diese Aufrufe werden entfernt, da sie jetzt von setupSelectEvents gehandhabt werden ---
+    // setupRadioGroup('refLevel', () => Settings.updateUnitLabels());
+    // setupRadioGroup('heightUnit', () => { ... });
+    // setupRadioGroup('temperatureUnit', () => { });
+    // setupRadioGroup('windUnit', () => { ... });
+    // setupRadioGroup('timeZone', () => { });
+    // setupRadioGroup('coordFormat', () => { });
+    // setupRadioGroup('downloadFormat', () => { });
 
-    setupRadioGroup('heightUnit', () => {
-        Settings.updateUnitLabels(); // Passt die Labels der UI an
-        // Der Rest wird durch das Event im main-Modul erledigt
-    });
-
-    setupRadioGroup('temperatureUnit', () => { }); // Löst nur das Event aus
-
-    setupRadioGroup('windUnit', () => {
-        Settings.updateUnitLabels(); // Lokale UI-Aktion, kann bleiben
-        // Der Rest wird vom Event-Listener im main-Modul erledigt
-    });
-    setupRadioGroup('timeZone', () => { }); // Löst nur das Event aus
-
-    setupRadioGroup('coordFormat', () => { });
-
-    setupRadioGroup('downloadFormat', () => { }); // Löst nur das Event aus
-
+    // Diese Aufrufe bleiben, da sie für echte Radio-Buttons sind
     setupRadioGroup('landingDirection', () => { });
     setupRadioGroup('jumpMasterLineTarget', () => {
-        // dispatchAppEvent('jml:targetChanged') wird zu:
         document.dispatchEvent(new CustomEvent('ui:jumpMasterLineTargetChanged'));
     });
 
@@ -785,6 +775,28 @@ function setupRadioEvents() {
     if (AppState.map && !AppState.ensembleLayerGroup) {
         AppState.ensembleLayerGroup = L.layerGroup().addTo(AppState.map);
     }
+}
+function setupSelectEvents() {
+    const selectIds = ['refLevel', 'heightUnit', 'temperatureUnit', 'windUnit', 'timeZone', 'coordFormat', 'downloadFormat'];
+
+    selectIds.forEach(id => {
+        const selectElement = document.getElementById(id);
+        if (selectElement) {
+            selectElement.addEventListener('change', () => {
+                const newValue = selectElement.value;
+
+                Settings.state.userSettings[id] = newValue;
+                Settings.save();
+                console.log(`Setting '${id}' changed to: ${newValue} and saved.`);
+
+                document.dispatchEvent(new CustomEvent('ui:settingChanged', {
+                    detail: { name: id, value: newValue }
+                }));
+            });
+        } else {
+            console.warn(`Select element with id '${id}' not found.`);
+        }
+    });
 }
 function setupInputEvents() {
     // Jeder Aufruf speichert jetzt nur noch den Wert und löst das 'ui:inputChanged' Event aus.
@@ -1166,6 +1178,7 @@ export function initializeEventListeners() {
     setupMenuItemEvents();
     setupCheckboxEvents();
     setupRadioEvents();
+    setupSelectEvents();
     setupInputEvents();
     setupDownloadEvents();
     setupClearHistoricalDate();

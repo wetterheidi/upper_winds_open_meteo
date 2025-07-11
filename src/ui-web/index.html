@@ -25,10 +25,22 @@
     <div class="main-layout">
 
         <aside id="sidebar">
-            <div class="sidebar-icon" data-panel-id="panel-data" title="Data">📊</div>
-            <div class="sidebar-icon" data-panel-id="panel-planner" title="Planner">🪂</div>
-            <div class="sidebar-icon" data-panel-id="panel-search" title="Search">🔍</div>
-            <div class="sidebar-icon" data-panel-id="panel-settings" title="Settings">⚙️</div>
+            <div class="sidebar-icon" data-panel-id="panel-data" title="Data">
+                <span class="icon">📊</span>
+                <span class="label">Data</span>
+            </div>
+            <div class="sidebar-icon" data-panel-id="panel-planner" title="Planner">
+                <span class="icon">🪂</span>
+                <span class="label">Planner</span>
+            </div>
+            <div class="sidebar-icon" data-panel-id="panel-search" title="Search">
+                <span class="icon">🔍</span>
+                <span class="label">Search</span>
+            </div>
+            <div class="sidebar-icon" data-panel-id="panel-settings" title="Settings">
+                <span class="icon">⚙️</span>
+                <span class="label">Settings</span>
+            </div>
         </aside>
 
         <div id="panel-container">
@@ -491,13 +503,43 @@
         <div id="map-content">
             <div id="map"></div>
             <div id="slider-container">
-            </div>
-            <div id="bottom-container">
+                <div class="slider-content-wrapper">
+                    <div class="time-row">
+                        <span id="selectedTime">Selected Time: </span>
+                        <div id="autoupdateToggle">
+                            <label for="autoupdateCheckbox" title="Autoupdate">⟳</label>
+                            <input type="checkbox" id="autoupdateCheckbox">
+                        </div>
+                    </div>
+                    <input type="range" id="timeSlider" min="0" max="167" value="0" disabled>
+                    <div id="model-row">
+                        <label id="modelLabel" for="modelSelect" title="Model Run">Forecast Model:</label>
+                        <select id="modelSelect">
+                            <option value="icon_global" selected>ICON GLOBAL</option>
+                            <option value="gfs">GFS</option>
+                            <option value="ecmwf">ECMWF</option>
+                        </select>
+
+                        <button id="modelInfoButton" class="info-button-shared">i</button>
+                        <div id="modelInfoPopup" class="info-popup"></div>
+                    </div>
+                </div>
             </div>
         </div>
 
     </div>
+
     <div id="passwordModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3 id="modalHeader">Restricted Feature</h3>
+            <p id="modalMessage">Please enter the password to enable this feature:</p>
+            <input type="password" id="passwordInput" placeholder="Password">
+            <div class="modal-buttons">
+                <button id="passwordSubmit">Submit</button>
+                <button id="passwordCancel">Cancel</button>
+            </div>
+            <p id="passwordError" style="color: red; display: none;">Incorrect password!</p>
+        </div>
     </div>
 
     <script type="module" src="/main-web.js" defer></script>

@@ -69,6 +69,7 @@ export function calculateMeanWind() {
     const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
     const windSpeedUnit = Settings.getValue('windUnit', 'radio', 'kt');
 
+
     const index = document.getElementById('timeSlider').value || 0;
     const interpolatedData = weatherManager.interpolateWeatherData(
         AppState.weatherData,
@@ -167,17 +168,15 @@ export function downloadTableAsAscii(format) {
     const time = Utils.formatTime(AppState.weatherData.time[index]).replace(' ', '_');
     const filename = `${time}_${model}_${format}.txt`;
 
-    // 1. Anforderungen für das gewählte Format holen
     const formatRequirements = {
         'ATAK': { interpStep: 1000, heightUnit: 'ft', refLevel: 'AGL', windUnit: 'kt' },
         'Windwatch': { interpStep: 100, heightUnit: 'ft', refLevel: 'AGL', windUnit: 'km/h' },
         'HEIDIS': { interpStep: 100, heightUnit: 'm', refLevel: 'AGL', temperatureUnit: 'C', windUnit: 'm/s' },
-        'Customized': {} // Keine festen Anforderungen
+        'Customized': {}
     };
 
     const requirements = formatRequirements[format] || {};
 
-    // 2. Export-Einstellungen definieren: Entweder aus den Requirements oder aus der UI
     const exportSettings = {
         interpStep: requirements.interpStep || getInterpolationStep(),
         heightUnit: requirements.heightUnit || Settings.getValue('heightUnit', 'radio', 'm'),
@@ -185,15 +184,13 @@ export function downloadTableAsAscii(format) {
         windUnit: requirements.windUnit || Settings.getValue('windUnit', 'radio', 'kt'),
         temperatureUnit: requirements.temperatureUnit || Settings.getValue('temperatureUnit', 'radio', 'C')
     };
-    console.log(`Generating export for '${format}' with settings:`, exportSettings);
 
-    // 3. Wetterdaten mit den korrekten Export-Einstellungen interpolieren
     const interpolatedData = weatherManager.interpolateWeatherData(
         AppState.weatherData,
         index,
         exportSettings.interpStep,
         Math.round(AppState.lastAltitude),
-        exportSettings.heightUnit // WICHTIG: Die korrekte Einheit wird hier übergeben
+        exportSettings.heightUnit
     );
 
     if (!interpolatedData || interpolatedData.length === 0) {
@@ -201,7 +198,6 @@ export function downloadTableAsAscii(format) {
         return;
     }
 
-    // 4. Header und Datenzeilen basierend auf den Export-Einstellungen erstellen
     let content = '';
     let header = '';
 
@@ -221,17 +217,15 @@ export function downloadTableAsAscii(format) {
     }
     content += header;
 
-    // Datenzeilen generieren
     interpolatedData.forEach(data => {
         const displayHeight = Math.round(data.displayHeight);
         const displayDir = Math.round(data.dir);
-        // Werte explizit in die Ziel-Einheit des Exports umrechnen
         const displaySpd = Utils.convertWind(data.spd, exportSettings.windUnit, 'km/h');
         const formattedSpd = Number.isFinite(displaySpd) ? (exportSettings.windUnit === 'bft' ? Math.round(displaySpd) : displaySpd.toFixed(1)) : 'N/A';
 
         if (format === 'ATAK' || format === 'Windwatch') {
             content += `${displayHeight} ${displayDir} ${Math.round(displaySpd)}\n`;
-        } else { // HEIDIS & Customized
+        } else {
             const displayPressure = data.pressure === 'N/A' ? 'N/A' : data.pressure.toFixed(1);
             const displayTemp = Utils.convertTemperature(data.temp, exportSettings.temperatureUnit);
             const formattedTemp = displayTemp === 'N/A' ? 'N/A' : displayTemp.toFixed(1);
@@ -242,7 +236,6 @@ export function downloadTableAsAscii(format) {
         }
     });
 
-    // 5. Download auslösen (bleibt unverändert)
     const blob = new Blob([content], { type: 'text/plain' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -580,13 +573,13 @@ function initializeApp() {
 }
 function initializeUIElements() {
     applySettingToSelect('modelSelect', Settings.state.userSettings.model);
-    applySettingToRadio('refLevel', Settings.state.userSettings.refLevel);
-    applySettingToRadio('heightUnit', Settings.state.userSettings.heightUnit);
-    applySettingToRadio('temperatureUnit', Settings.state.userSettings.temperatureUnit);
-    applySettingToRadio('windUnit', Settings.state.userSettings.windUnit);
-    applySettingToRadio('timeZone', Settings.state.userSettings.timeZone);
-    applySettingToRadio('coordFormat', Settings.state.userSettings.coordFormat);
-    applySettingToRadio('downloadFormat', Settings.state.userSettings.downloadFormat);
+    applySettingToSelect('refLevel', Settings.state.userSettings.refLevel);
+    applySettingToSelect('heightUnit', Settings.state.userSettings.heightUnit);
+    applySettingToSelect('temperatureUnit', Settings.state.userSettings.temperatureUnit);
+    applySettingToSelect('windUnit', Settings.state.userSettings.windUnit);
+    applySettingToSelect('timeZone', Settings.state.userSettings.timeZone);
+    applySettingToSelect('coordFormat', Settings.state.userSettings.coordFormat);
+    applySettingToSelect('downloadFormat', Settings.state.userSettings.downloadFormat);
     applySettingToRadio('landingDirection', Settings.state.userSettings.landingDirection);
     applySettingToInput('canopySpeed', Settings.state.userSettings.canopySpeed);
     applySettingToInput('descentRate', Settings.state.userSettings.descentRate);
@@ -664,7 +657,6 @@ export function updateUIState() {
     if (showExitAreaCheckbox) showExitAreaCheckbox.disabled = !Settings.state.userSettings.calculateJump; // Disable unless calculateJump is on
     Settings.updateUnitLabels();
 }
-// in app.js
 
 /**
  * Aktualisiert den AppState und die UI-Komponenten (insb. den Slider)
@@ -1040,6 +1032,46 @@ function setupAppEventListeners() {
         } catch (error) {
             console.error('Error during slider update:', error);
             displayError(error.message);
+        }
+    });
+
+    document.addEventListener('ui:settingChanged', async (e) => {
+        const { name, value } = e.detail;
+        console.log(`[main-web] Setting '${name}' changed to '${value}'. Performing updates.`);
+
+        // Update der Wetteranzeige für alle Einheiten-Änderungen
+        if (['refLevel', 'heightUnit', 'temperatureUnit', 'windUnit', 'timeZone'].includes(name)) {
+            await displayManager.updateWeatherDisplay(getSliderValue(), 'info', 'selectedTime');
+        }
+
+        // Neuberechnungen basierend auf der geänderten Einstellung anstoßen
+        switch (name) {
+            case 'heightUnit':
+            case 'windUnit':
+            case 'refLevel':
+                calculateMeanWind();
+                if (Settings.getValue('calculateJump', 'checkbox', false)) {
+                    calculateJump();
+                }
+                displayManager.updateLandingPatternDisplay();
+                updateJumpMasterLineAndPanel();
+                await displayManager.refreshMarkerPopup();
+                break;
+
+            case 'coordFormat':
+                await displayManager.refreshMarkerPopup();
+                updateJumpMasterLineAndPanel();
+                // Aktualisiert auch die Koordinatenanzeige unten links
+                if (AppState.map && AppState.lastMouseLatLng) {
+                    const mouseMoveEvent = new MouseEvent('mousemove', {
+                        bubbles: true,
+                        cancelable: true,
+                        clientX: AppState.lastMouseLatLng.x,
+                        clientY: AppState.lastMouseLatLng.y
+                    });
+                    AppState.map.getContainer().dispatchEvent(mouseMoveEvent);
+                }
+                break;
         }
     });
 
