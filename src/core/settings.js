@@ -153,8 +153,8 @@ export const Settings = {
 
         // Update unlocked features
         this.state.unlockedFeatures = {
-            landingPattern: storedUnlockedFeatures.landingPattern || false,
-            calculateJump: storedUnlockedFeatures.calculateJump || false,
+            landingPattern: storedUnlockedFeatures.landingPattern || true,
+            calculateJump: storedUnlockedFeatures.calculateJump || true,
             planner: storedUnlockedFeatures.planner || false // Hinzufügen
         };
 
@@ -477,7 +477,7 @@ export const Settings = {
      */
     isFeatureUnlocked(feature) {
         // In der mobilen App sind landingPattern und calculateJump immer freigeschaltet
-        if (IS_MOBILE_APP && (feature === 'landingPattern' || feature === 'calculateJump')) {
+        if (feature === 'landingPattern' || feature === 'calculateJump') {
             return true;
         }
         return !!this.state.unlockedFeatures[feature] || false;

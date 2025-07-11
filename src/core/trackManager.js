@@ -288,7 +288,7 @@ async function renderTrack(points, fileName) {
 export async function exportToGpx(sliderIndex, interpStep, heightUnit) {
     console.log("--- GPX EXPORT DEBUG START ---");
     if (!Settings.getValue('showJumpRunTrack', false)) {
-        Utils.handleError("Bitte aktivieren Sie zuerst 'Show Jump Run Track' im Menü, um den Track zu exportieren.");
+        Utils.handleError("Activate 'Show Jump Run Track' to export the track.");
         return;
     }
 
@@ -384,7 +384,7 @@ export function exportLandingPatternToGpx() {
     const heightUnit = Settings.getValue('heightUnit', 'm');
 
     if (!Settings.getValue('showLandingPattern', false)) {
-        Utils.handleError("Bitte 'Landing Pattern' aktivieren, um zu exportieren.");
+        Utils.handleError("Activate 'Landing Pattern' before export.");
         return;
     }
 

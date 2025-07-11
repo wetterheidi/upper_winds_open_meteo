@@ -103,7 +103,7 @@ async function fetchWeather(lat, lon, currentTime = null) {
         if (!response.ok) {
             // NEU: Spezifische Fehlermeldung für Rate-Limiting
             if (response.status === 429) {
-                throw new Error("API-Limit erreicht. Bitte warten Sie einen Moment und versuchen Sie es erneut.");
+                throw new Error("API-Limit reached. Please wait a moment and retry again.");
             }
             throw new Error(`HTTP error! Status: ${response.status}`);
         }

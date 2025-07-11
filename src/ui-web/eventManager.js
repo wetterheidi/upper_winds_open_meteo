@@ -172,52 +172,70 @@ function toggleSubmenu(element, submenu, isVisible) {
 
 // --- Haupt-Layout & Navigation ---
 function setupSidebarEvents() {
-    const mainLayout = document.querySelector('.main-layout'); // Korrekte Referenz zum Haupt-Layout
+    const mainLayout = document.querySelector('.main-layout');
     const icons = document.querySelectorAll('.sidebar-icon');
     const panels = document.querySelectorAll('.panel');
+    const plannerIcon = document.querySelector('.sidebar-icon[data-panel-id="panel-planner"]');
     let activePanelId = null;
 
-    if (!mainLayout || icons.length === 0 || panels.length === 0) {
-        console.error("Einige Layout-Elemente für die Sidebar-Logik wurden nicht gefunden.");
+    if (!mainLayout || !plannerIcon) {
+        console.error("Layout-Elemente für Sidebar-Logik nicht gefunden.");
         return;
     }
+
+    // Hilfsfunktion, um den visuellen Sperr-Zustand des Planner-Icons zu setzen
+    const setPlannerLockState = () => {
+        if (Settings.isFeatureUnlocked('planner')) {
+            plannerIcon.style.opacity = '1';
+            plannerIcon.title = 'Planner';
+        } else {
+            plannerIcon.style.opacity = '0.5';
+            plannerIcon.title = 'Feature locked. Click to enter password.';
+        }
+    };
+
+    // Initialen Zustand beim Laden der Seite setzen
+    setPlannerLockState();
 
     icons.forEach(icon => {
         icon.addEventListener('click', () => {
             const panelId = icon.dataset.panelId;
+
+            // --- NEUE PASSWORT-PRÜFUNG ---
+            if (panelId === 'panel-planner' && !Settings.isFeatureUnlocked('planner')) {
+                Settings.showPasswordModal('planner',
+                    () => { // onSuccess
+                        setPlannerLockState(); // Visuellen Zustand aktualisieren
+                        icon.click(); // Erneuten Klick simulieren, um das Panel zu öffnen
+                    },
+                    () => { // onCancel
+                        setPlannerLockState();
+                    }
+                );
+                return; // Funktion hier beenden, um das Panel nicht zu öffnen
+            }
+            // --- ENDE PASSWORT-PRÜFUNG ---
+
             const isAlreadyActive = mainLayout.classList.contains('sidebar-expanded') && activePanelId === panelId;
 
-            // Zuerst immer alle steuernden Klassen entfernen
             mainLayout.classList.remove('sidebar-expanded', 'data-panel-visible');
             icons.forEach(i => i.classList.remove('active'));
-            
-            // Zustand 1: Das angeklickte Panel war bereits offen -> Alles bleibt geschlossen.
+
             if (isAlreadyActive) {
                 activePanelId = null;
-            } 
-            // Zustand 2: Ein anderes Panel war offen oder keines -> Das geklickte Panel öffnen.
-            else {
+            } else {
                 mainLayout.classList.add('sidebar-expanded');
                 icon.classList.add('active');
                 activePanelId = panelId;
-
-                // Das korrekte Panel anzeigen
-                panels.forEach(p => {
-                    p.classList.toggle('hidden', p.id !== panelId);
-                });
-
-                // Wenn es das Daten-Panel ist, die Klasse für die breitere Ansicht hinzufügen
+                panels.forEach(p => p.classList.toggle('hidden', p.id !== panelId));
                 if (panelId === 'panel-data') {
                     mainLayout.classList.add('data-panel-visible');
                 }
             }
 
-            // Leaflet nach der Animation über die neue Kartengröße informieren
             setTimeout(() => {
-                if (AppState.map) {
-                    AppState.map.invalidateSize({ animate: true });
-                }
-            }, 300); // Entspricht der Dauer der CSS-Transition
+                if (AppState.map) AppState.map.invalidateSize({ animate: true });
+            }, 300);
         });
     });
 }
@@ -580,66 +598,11 @@ function setupGpxExportEvent() {
 }
 
 // --- Einstellungs-Panel ---
-function setupMenuItemEvents() {
-    console.log("setupMenuItemEvents wird aufgerufen für 'Calculate Jump'.");
-    const calculateJumpMenuItem = Array.from(document.querySelectorAll('.menu-label'))
-        .find(item => item.textContent.trim() === 'Calculate Jump');
-
-    if (!calculateJumpMenuItem) {
-        console.error('Calculate Jump menu item not found');
-        return;
-    }
-
-    const submenu = calculateJumpMenuItem.closest('li').querySelector('ul.submenu');
-
-    const setVisualLockState = () => {
-        if (Settings.isFeatureUnlocked('calculateJump')) {
-            calculateJumpMenuItem.style.opacity = '1';
-            calculateJumpMenuItem.title = 'Click to open/close jump calculation settings';
-        } else {
-            calculateJumpMenuItem.style.opacity = '0.5';
-            calculateJumpMenuItem.title = 'Feature locked. Click to enter password.';
-            if (submenu) submenu.classList.add('hidden');
-        }
-    };
-
-    setVisualLockState(); // Setzt den initialen Zustand
-
-    calculateJumpMenuItem.addEventListener('click', (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-
-        if (Settings.isFeatureUnlocked('calculateJump')) {
-            if (submenu) submenu.classList.toggle('hidden');
-        } else {
-            Settings.showPasswordModal('calculateJump',
-                () => { // onSuccess
-                    setVisualLockState();
-                    if (submenu) submenu.classList.remove('hidden');
-                },
-                () => { // onCancel
-                    setVisualLockState();
-                }
-            );
-        }
-    });
-}
 function setupCheckboxEvents() {
     if (!AppState.map) {
         console.warn('Map not initialized, skipping setupCheckboxEvents');
         return;
     }
-
-    setupCheckbox('showTableCheckbox', 'showTable', (checkbox) => {
-        // 1. Setting speichern (ist okay hier)
-        Settings.state.userSettings.showTable = checkbox.checked;
-        Settings.save();
-
-        // 2. Event auslösen und den neuen Zustand mitteilen
-        document.dispatchEvent(new CustomEvent('ui:showTableChanged', {
-            detail: { checked: checkbox.checked }
-        }));
-    });
 
     setupCheckbox('showExitAreaCheckbox', 'showExitArea', (checkbox) => {
         Settings.state.userSettings.showExitArea = checkbox.checked;
@@ -674,38 +637,21 @@ function setupCheckboxEvents() {
     });
 
     setupCheckbox('showLandingPattern', 'showLandingPattern', (checkbox) => {
-        const feature = 'landingPattern';
+        // Die Einstellung direkt basierend auf dem Status der Checkbox speichern
+        Settings.state.userSettings.showLandingPattern = checkbox.checked;
+        Settings.save();
 
-        // Die Logik, die entscheidet, ob das Feature freigeschaltet ist und das Modal anzeigt,
-        // kann hier bleiben, da sie eine reine UI-Aktion ist.
+        // Das zugehörige Untermenü ein- oder ausblenden
+        const submenu = checkbox.closest('li')?.querySelector('ul.submenu');
+        if (submenu) {
+            submenu.classList.toggle('hidden', !checkbox.checked);
+        }
 
-        const enableFeature = () => {
-            Settings.state.userSettings.showLandingPattern = true;
-            Settings.save();
-            const submenu = checkbox.closest('li')?.querySelector('ul');
-            toggleSubmenu(checkbox, submenu, true); // Lokale UI-Aktion
-            // Statt direkter Aufrufe, Event senden:
-            document.dispatchEvent(new CustomEvent('ui:landingPatternEnabled'));
-        };
-
-        const disableFeature = () => {
-            Settings.state.userSettings.showLandingPattern = false;
-            Settings.save();
-            checkbox.checked = false;
-            const submenu = checkbox.closest('li')?.querySelector('ul');
-            toggleSubmenu(checkbox, submenu, false); // Lokale UI-Aktion
-            // Statt direkter Aufrufe, Event senden:
-            document.dispatchEvent(new CustomEvent('ui:landingPatternDisabled'));
-        };
-
+        // Ein Event auslösen, damit der Rest der Anwendung reagieren kann
         if (checkbox.checked) {
-            if (Settings.isFeatureUnlocked(feature)) {
-                enableFeature();
-            } else {
-                Settings.showPasswordModal(feature, enableFeature, disableFeature);
-            }
+            document.dispatchEvent(new CustomEvent('ui:landingPatternEnabled'));
         } else {
-            disableFeature();
+            document.dispatchEvent(new CustomEvent('ui:landingPatternDisabled'));
         }
     });
 
@@ -979,7 +925,7 @@ function setupClearHistoricalDate() {
 function setupCacheManagement() {
     // ALT: const bottomContainer = document.getElementById('bottom-container');
     // NEU: Wir zielen auf den Container im Settings-Panel
-    const targetContainer = document.getElementById('app-management-settings'); 
+    const targetContainer = document.getElementById('app-management-settings');
 
     if (!targetContainer) {
         console.error('Ziel-Container für App-Management-Buttons nicht gefunden.');
@@ -990,7 +936,7 @@ function setupCacheManagement() {
     const buttonWrapper = document.createElement('div');
     buttonWrapper.id = 'settings-cache-buttons';
     // Wir verwenden das settings-grid, damit es zum Rest des Panels passt
-    buttonWrapper.className = 'settings-grid'; 
+    buttonWrapper.className = 'settings-grid';
 
     // 2. Erstelle den "Reset Settings" Button
     const resetButton = document.createElement('button');
@@ -1005,7 +951,7 @@ function setupCacheManagement() {
         }
     });
     // Füge ein leeres Label hinzu, damit der Button in der zweiten Spalte des Grids landet
-    buttonWrapper.appendChild(document.createElement('label')); 
+    buttonWrapper.appendChild(document.createElement('label'));
     buttonWrapper.appendChild(resetButton);
 
     // 3. Erstelle den "Clear Tile Cache" Button
@@ -1242,11 +1188,10 @@ export function initializeEventListeners() {
     setupSliderEvents();
     setupModelSelectEvents();
     setupCoordinateEvents();
-    setupModelInfoButtonEvents(); 
-    setupInfoIcons(); 
+    setupModelInfoButtonEvents();
+    setupInfoIcons();
 
     // 3. Einstellungen & Features
-    setupMenuItemEvents();
     setupCheckboxEvents();
     setupRadioEvents();
     setupSelectEvents();

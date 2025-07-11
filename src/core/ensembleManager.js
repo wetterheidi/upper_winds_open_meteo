@@ -72,7 +72,7 @@ export async function fetchEnsembleWeatherData() {
         if (!response.ok) {
             // NEU: Spezifische Fehlermeldung für Rate-Limiting
             if (response.status === 429) {
-                throw new Error("API-Limit für Ensemble-Daten erreicht. Bitte warten Sie einen Moment.");
+                throw new Error("API-Limit for ensemble data reached. Please wait a moment and retry again.");
             }
             throw new Error(`API request failed: ${response.status}`);
         }
