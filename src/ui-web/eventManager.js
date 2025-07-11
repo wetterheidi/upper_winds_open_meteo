@@ -172,46 +172,52 @@ function toggleSubmenu(element, submenu, isVisible) {
 
 // --- Haupt-Layout & Navigation ---
 function setupSidebarEvents() {
-    const sidebar = document.getElementById('sidebar');
-    const mapContent = document.getElementById('map-content');
-    const panelContainer = document.getElementById('panel-container');
+    const mainLayout = document.querySelector('.main-layout'); // Korrekte Referenz zum Haupt-Layout
     const icons = document.querySelectorAll('.sidebar-icon');
     const panels = document.querySelectorAll('.panel');
     let activePanelId = null;
 
+    if (!mainLayout || icons.length === 0 || panels.length === 0) {
+        console.error("Einige Layout-Elemente für die Sidebar-Logik wurden nicht gefunden.");
+        return;
+    }
+
     icons.forEach(icon => {
         icon.addEventListener('click', () => {
             const panelId = icon.dataset.panelId;
+            const isAlreadyActive = mainLayout.classList.contains('sidebar-expanded') && activePanelId === panelId;
 
-            // Zustand 1: Das angeklickte Panel ist bereits offen -> Alles schließen.
-            if (panelContainer.classList.contains('expanded') && activePanelId === panelId) {
-                panelContainer.classList.remove('expanded');
-                mapContent.classList.remove('shifted');
-                icon.classList.remove('active');
+            // Zuerst immer alle steuernden Klassen entfernen
+            mainLayout.classList.remove('sidebar-expanded', 'data-panel-visible');
+            icons.forEach(i => i.classList.remove('active'));
+            
+            // Zustand 1: Das angeklickte Panel war bereits offen -> Alles bleibt geschlossen.
+            if (isAlreadyActive) {
                 activePanelId = null;
-            }
-            // Zustand 2: Ein anderes Panel ist offen oder keines -> Das geklickte Panel öffnen.
+            } 
+            // Zustand 2: Ein anderes Panel war offen oder keines -> Das geklickte Panel öffnen.
             else {
-                panelContainer.classList.add('expanded');
-                mapContent.classList.add('shifted');
-
-                // Alle Icons deaktivieren, dann das richtige aktivieren
-                icons.forEach(i => i.classList.remove('active'));
+                mainLayout.classList.add('sidebar-expanded');
                 icon.classList.add('active');
+                activePanelId = panelId;
 
-                // Das richtige Panel anzeigen und alle anderen verstecken
+                // Das korrekte Panel anzeigen
                 panels.forEach(p => {
                     p.classList.toggle('hidden', p.id !== panelId);
                 });
-                activePanelId = panelId;
+
+                // Wenn es das Daten-Panel ist, die Klasse für die breitere Ansicht hinzufügen
+                if (panelId === 'panel-data') {
+                    mainLayout.classList.add('data-panel-visible');
+                }
             }
 
-            // Wichtig: Leaflet nach der Animation mitteilen, dass sich die Kartengröße geändert hat.
+            // Leaflet nach der Animation über die neue Kartengröße informieren
             setTimeout(() => {
                 if (AppState.map) {
                     AppState.map.invalidateSize({ animate: true });
                 }
-            }, 300); // Muss der Dauer der CSS-Transition entsprechen (0.3s)
+            }, 300); // Entspricht der Dauer der CSS-Transition
         });
     });
 }

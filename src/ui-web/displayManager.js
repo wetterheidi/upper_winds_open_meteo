@@ -129,12 +129,6 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
     ); // Und an die Core-Funktion übergeben
     const surfaceHeight = refLevel === 'AMSL' && AppState.lastAltitude !== 'N/A' ? Math.round(AppState.lastAltitude) : 0;
 
-    if (!Settings.state.userSettings.showTable) {
-        tableContainer.innerHTML = ''; // Leert den Tabellen-Container
-        timeContainer.innerHTML = `Selected Time: ${time}`; // Setzt die Zeit
-        return;
-    }
-
     // NEU: Zuerst alle Zeilen als HTML-Strings generieren
     const tableRowsHtml = interpolatedData.map(data => {
         // ... (Die gesamte Logik zur Berechnung von windClass, humidityClass, displayHeight, etc. bleibt hier drin) ...

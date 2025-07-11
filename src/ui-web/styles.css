@@ -11,14 +11,11 @@ body {
 
 .main-layout {
     display: grid;
-    /* Erstellt ein Grid-Layout für die Hauptbereiche */
+    /* Spalte 1: Sidebar, Spalte 2: Panel (anfangs 0px breit), Spalte 3: Karte */
     grid-template-columns: 60px 0 1fr;
-    /* - Spalte 1: 60px für die Icon-Leiste (Sidebar)
-       - Spalte 2: 0px für das Panel (standardmäßig eingeklappt)
-       - Spalte 3: "1fr" füllt den Rest mit dem Karteninhalt */
     width: 100vw;
     height: 100vh;
-    transition: grid-template-columns 0.3s ease-in-out; /* Animiert die Breitenänderung */
+    transition: grid-template-columns 0.3s ease-in-out;
 }
 
 .main-layout.sidebar-expanded {
@@ -26,9 +23,16 @@ body {
     /* Wenn die Sidebar offen ist, bekommt das Panel 350px Breite */
 }
 
+/* Spezifische Breite für das Data-Panel */
+.main-layout.sidebar-expanded.data-panel-visible {
+    /* Überschreibt die Standardbreite und macht das Panel 550px breit */
+    grid-template-columns: 60px 550px 1fr;
+}
+
 /* 2. Icon-Leiste (Seitenleiste) */
 #sidebar {
-    grid-column: 1 / 2;
+    grid-column: 1 / 2; /* Bleibt immer in der ersten Spalte */
+    /* ... restliche Sidebar-Stile bleiben unverändert ... */
     background-color: #f0f2f5;
     border-right: 1px solid #d9d9d9;
     display: flex;
@@ -38,7 +42,6 @@ body {
     gap: 10px;
     z-index: 2000;
 }
-
 
 .sidebar-icon {
     display: flex;
@@ -79,27 +82,13 @@ body {
 /* 3. Panel-Container (der aufklappende Teil) */
 #panel-container {
     grid-column: 2 / 3;
-    /* Positioniert sich in der zweiten Spalte */
-    width: 350px;
-    /* Feste Breite für die aufklappenden Inhalte */
     background-color: #ffffff;
     border-right: 1px solid #d9d9d9;
     box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
     padding: 20px;
     overflow-y: auto;
-    /* Scrollbar, wenn der Inhalt zu lang ist */
     z-index: 1500;
-    transform: translateX(-100%);
-    /* Standardmäßig nach links aus dem Bild geschoben */
-    visibility: hidden;
-    /* Standardmäßig unsichtbar */
-    transition: transform 0.3s ease-in-out, visibility 0.3s;
-}
-
-#panel-container.expanded {
-    transform: translateX(0);
-    /* Schiebt das Panel ins Bild */
-    visibility: visible;
+    /* transition und transform werden nicht mehr benötigt */
 }
 
 .panel.hidden {
@@ -173,14 +162,12 @@ body {
 
 /* 4. Hauptinhaltsbereich (Karte & Co.) */
 #map-content {
-    grid-column: 2 / 4;
-    /* Standardmäßig überlappt dieser Bereich das Panel */
+    grid-column: 3 / 4; /* Beginnt IMMER in der dritten Spalte */
     grid-row: 1 / 2;
     display: flex;
     flex-direction: column;
     position: relative;
-    /* Wichtig für Leaflet Controls */
-    transition: grid-column 0.3s ease-in-out;
+    /* Die .shifted-Klasse wird nicht mehr benötigt */
 }
 
 #map {
@@ -607,7 +594,7 @@ body {
     background: linear-gradient(to bottom, #f0f4f8, #d9e2ec);
     color: #333;
     font-weight: bold;
-    padding: 10px 8px;
+    padding: 6px 8px; /* <-- Neuer, kleinerer Wert */
     border: 1px solid #333;
     text-align: center;
     vertical-align: middle;
@@ -615,7 +602,7 @@ body {
 
 /* Tabellenzellen */
 #weather-table-container td {
-    padding: 8px;
+    padding: 4px 8px; /* <-- Neuer, kleinerer Wert */
     border: 1px solid #333;
     text-align: center;
     vertical-align: middle;
@@ -664,6 +651,34 @@ body {
 }
 
 /* Gilt für #meanWindControls und #controls-row */
+#meanWindResult {
+    font-size: 16px !important;
+    font-family: 'Roboto', sans-serif;
+    font-weight: bold;
+    color: #4da8da;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Spezifisches Layout für den Mittelwind-Container */
+#meanWindControls {
+    /* Definiert zwei Zeilen: eine für die Eingabefelder, eine für das Ergebnis */
+    grid-template-rows: auto auto; 
+    /* Fügt einen größeren Abstand zwischen den Zeilen hinzu */
+    row-gap: 15px; 
+    /* Definiert, wie viele Spalten das Grid hat */
+    grid-template-columns: var(--label-width) var(--input-width) var(--label-width) var(--input-width);
+}
+
+#meanWindControls #meanWindResult {
+    /* Weist das Ergebnis an, sich über alle 4 Spalten zu erstrecken */
+    grid-column: 1 / 5; 
+    /* Platziert das Ergebnis explizit in der zweiten Zeile */
+    grid-row: 2;         
+}
+
 #meanWindControls,
 #controls-row {
     display: grid;

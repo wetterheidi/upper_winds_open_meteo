@@ -290,7 +290,7 @@ export async function updateToCurrentHour() {
         await weatherManager.fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, null, false);
         console.log('Weather data fetched for current hour');
 
-        await displayManager.updateWeatherDisplay(currentHour, 'info', 'selectedTime');
+        await displayManager.updateWeatherDisplay(currentHour, 'weather-table-container', 'selectedTime'); // NEU
         if (AppState.lastAltitude !== 'N/A') {
             calculateMeanWind();
         }
@@ -702,7 +702,7 @@ export async function updateUIWithNewWeatherData(newWeatherData, preservedIndex 
     }
 
     // ... (restliche Funktion bleibt unverändert)
-    await displayManager.updateWeatherDisplay(slider.value, 'info', 'selectedTime');
+    await displayManager.updateWeatherDisplay(slider.value, 'weather-table-container', 'selectedTime');
     await displayManager.refreshMarkerPopup();
     if (AppState.lastAltitude !== 'N/A') {
         calculateMeanWind();
@@ -965,7 +965,7 @@ function setupAppEventListeners() {
                 }
             }
             console.log("Performing specific updates after track load...");
-            await displayManager.updateWeatherDisplay(getSliderValue(), 'info', 'selectedTime');
+            await displayManager.updateWeatherDisplay(getSliderValue(), 'weather-table-container', 'selectedTime'); // NEU
             await displayManager.refreshMarkerPopup();
             calculateMeanWind();
             calculateJump(); // Diese Funktion beinhaltet bereits die nötigen Checks und ruft auch calculateCutAway auf
@@ -1009,7 +1009,7 @@ function setupAppEventListeners() {
             const sliderIndex = getSliderValue();
             if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
                 // 1. Die Haupt-Wettertabelle anzeigen lassen
-                await displayManager.updateWeatherDisplay(sliderIndex, 'info', 'selectedTime');
+                await displayManager.updateWeatherDisplay(sliderIndex, 'weather-table-container', 'selectedTime'); // NEU
                 // 2. Das Popup des Markers aktualisieren lassen
                 await displayManager.refreshMarkerPopup();
                 // 3. Die Mittelwind-Berechnung UND Anzeige durchführen
@@ -1041,7 +1041,7 @@ function setupAppEventListeners() {
 
         // Update der Wetteranzeige für alle Einheiten-Änderungen
         if (['refLevel', 'heightUnit', 'temperatureUnit', 'windUnit', 'timeZone'].includes(name)) {
-            await displayManager.updateWeatherDisplay(getSliderValue(), 'info', 'selectedTime');
+            await displayManager.updateWeatherDisplay(getSliderValue(), 'weather-table-container', 'selectedTime');
         }
 
         // Neuberechnungen basierend auf der geänderten Einstellung anstoßen
@@ -1083,7 +1083,7 @@ function setupAppEventListeners() {
         // oder die die Grundlage für weitere Berechnungen bilden.
         // Prüfen, ob ein Update der Wetteranzeige notwendig ist
         if (['refLevel', 'heightUnit', 'temperatureUnit', 'windUnit', 'timeZone'].includes(name)) {
-            await displayManager.updateWeatherDisplay(getSliderValue(), 'info', 'selectedTime');
+            await displayManager.updateWeatherDisplay(getSliderValue(), 'weather-table-container', 'selectedTime');
         }
 
         // Jetzt steuern wir spezifische Aktionen basierend auf der geänderten Einstellung
@@ -1213,7 +1213,7 @@ function setupAppEventListeners() {
             case 'upperLimit':
             case 'interpStep':
                 if (AppState.weatherData) {
-                    await displayManager.updateWeatherDisplay(getSliderValue(), 'info', 'selectedTime');
+                    await displayManager.updateWeatherDisplay(getSliderValue(), 'weather-table-container', 'selectedTime');
                     calculateMeanWind();
                 }
                 break;
@@ -1335,7 +1335,7 @@ function setupAppEventListeners() {
 
         // Wenn die Tabelle eingeschaltet wird, muss sie mit den aktuellen Daten gefüllt werden.
         if (isChecked && AppState.weatherData && AppState.lastLat && AppState.lastLng) {
-            displayManager.updateWeatherDisplay(getSliderValue(), 'info', 'selectedTime');
+            displayManager.updateWeatherDisplay(getSliderValue(), 'weather-table-container', 'selectedTime');
         }
 
         mapManager.recenterMap();
