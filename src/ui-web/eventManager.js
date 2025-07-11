@@ -664,34 +664,26 @@ function setupCheckboxEvents() {
         }));
     });
 
-    const showJumpMasterLineCheckbox = document.getElementById('showJumpMasterLine');
-    if (showJumpMasterLineCheckbox) {
-        // Initialen Zustand setzen (wird von app.js gesteuert, aber wir sichern es hier ab)
-        showJumpMasterLineCheckbox.disabled = !Settings.state.userSettings.trackPosition;
-        showJumpMasterLineCheckbox.style.opacity = showJumpMasterLineCheckbox.disabled ? '0.5' : '1';
+    setupCheckbox('showJumpMasterLine', 'showJumpMasterLine', (checkbox) => {
+        // Prüfung, ob Live-Tracking aktiv ist
+        if (checkbox.checked && !Settings.state.userSettings.trackPosition) {
+            checkbox.checked = false;
+            Utils.handleError('Please start Live Tracking first.');
+            return;
+        }
 
-        showJumpMasterLineCheckbox.addEventListener('change', () => {
-            const isChecked = showJumpMasterLineCheckbox.checked;
+        Settings.state.userSettings.showJumpMasterLine = checkbox.checked;
+        Settings.save();
 
-            if (isChecked && showJumpMasterLineCheckbox.disabled) {
-                showJumpMasterLineCheckbox.checked = false;
-                Utils.handleError('Please start Live Tracking first.');
-                return;
-            }
+        // Event auslösen, damit main-web.js reagieren kann
+        document.dispatchEvent(new CustomEvent('ui:showJumpMasterLineChanged'));
 
-            Settings.state.userSettings.showJumpMasterLine = isChecked;
-            Settings.save();
-            dispatchAppEvent('ui:showJumpMasterLineChanged', { isChecked });
-
-            // Finde das zugehörige Submenü
-            const submenu = showJumpMasterLineCheckbox.closest('li')?.querySelector('ul.submenu');
-
-            // Rufe die Hilfsfunktion auf, um das Menü basierend auf dem Status der Checkbox ein- oder auszublenden
-            if (submenu) {
-                toggleSubmenu(showJumpMasterLineCheckbox, submenu, isChecked);
-            }
-        });
-    }
+        // Untermenü ein-/ausblenden
+        const submenu = checkbox.closest('li')?.querySelector('ul.submenu');
+        if (submenu) {
+            submenu.classList.toggle('hidden', !checkbox.checked);
+        }
+    });
 
     setupRadioGroup('jumpMasterLineTarget', () => {
         // Holt den neuen Wert und speichert ihn

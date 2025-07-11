@@ -675,6 +675,7 @@ body {
     font-size: 16px !important;
     font-family: 'Roboto', sans-serif;
     font-weight: bold;
+    padding: 10px 0px;
     color: #4da8da;
     text-align: left;
     white-space: nowrap;

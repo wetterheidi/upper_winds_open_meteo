@@ -486,7 +486,6 @@ export function validateLegHeights(final, base, downwind) {
 // == Live Tracking ==
 export function updateJumpMasterLineAndPanel(positionData = null) {
     // 1. Grundvoraussetzung: Ist Live-Tracking überhaupt aktiv?
-    // Wenn kein Live-Marker da ist, ist Tracking aus -> alles aufräumen und beenden.
     if (!AppState.liveMarker) {
         mapManager.clearJumpMasterLine();
         mapManager.hideLivePositionControl();
@@ -495,7 +494,7 @@ export function updateJumpMasterLineAndPanel(positionData = null) {
 
     // 2. Basis-Positionsdaten zusammenstellen
     const livePos = AppState.liveMarker.getLatLng();
-    if (!livePos) return; // Sicherheitsabfrage
+    if (!livePos) return;
 
     const data = positionData || { // Fallback, falls keine neuen Daten übergeben wurden
         latitude: livePos.lat,
@@ -509,7 +508,7 @@ export function updateJumpMasterLineAndPanel(positionData = null) {
 
     // 3. Jump-Master-Line-Daten NUR berechnen, wenn die Checkbox aktiv ist
     const showJML = Settings.state.userSettings.showJumpMasterLine;
-    let jumpMasterLineData = null; // Standardmäßig leer
+    let jumpMasterLineData = null;
 
     if (showJML) {
         let targetPos = null;
@@ -537,19 +536,17 @@ export function updateJumpMasterLineAndPanel(positionData = null) {
     }
 
     // 4. Das Panel IMMER aktualisieren, solange das Tracking läuft
-    // Die updateLivePositionControl-Funktion im mapManager ist schlau genug, die JML-Infos
-    // nur anzuzeigen, wenn jumpMasterLineData nicht null ist.
     const settingsForPanel = {
-        heightUnit: Settings.getValue('heightUnit', 'radio', 'm'),
-        effectiveWindUnit: Settings.getValue('windUnit', 'radio', 'kt') === 'bft' ? 'kt' : Settings.getValue('windUnit', 'radio', 'kt'),
-        coordFormat: Settings.getValue('coordFormat', 'radio', 'Decimal'),
+        heightUnit: getHeightUnit(),
+        effectiveWindUnit: getWindSpeedUnit() === 'bft' ? 'kt' : getWindSpeedUnit(),
+        coordFormat: getCoordinateFormat(),
         refLevel: Settings.getValue('refLevel', 'radio', 'AGL')
     };
 
     mapManager.updateLivePositionControl({
         ...data,
         showJumpMasterLine: showJML,
-        jumpMasterLineData, // ist entweder ein Objekt mit Daten oder null
+        jumpMasterLineData,
         ...settingsForPanel
     });
 }

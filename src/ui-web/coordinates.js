@@ -183,20 +183,44 @@ function renderResultsList(searchResults = []) {
 
 // --- Funktionen zur Verwaltung von localStorage & Favoriten (unverändert aus mobile) ---
 
+/**
+ * Versucht, eine Benutzereingabe als Koordinate zu parsen.
+ * @param {string} query - Die Eingabe des Benutzers.
+ * @returns {object|null} Ein Objekt mit {lat, lng} oder null.
+ */
 export function parseQueryAsCoordinates(query) {
-    const trimmedQuery = query.trim().replace(/,/g, ' ');
-    const decMatch = trimmedQuery.match(/^(-?\d{1,3}(?:\.\d+)?)\s+(-?\d{1,3}(?:\.\d+)?)$/);
+    const trimmedQuery = query.trim();
+    
+    // Versuch 1: Dezimalgrad (z.B. "48.123 -11.456" oder "48.123, -11.456")
+    const cleanedForDecimal = trimmedQuery.replace(/[,;\t]+/g, ' ').trim();
+    const decMatch = cleanedForDecimal.match(/^(-?\d{1,3}(?:\.\d+)?)\s+(-?\d{1,3}(?:\.\d+)?)$/);
     if (decMatch) {
         const lat = parseFloat(decMatch[1]);
         const lng = parseFloat(decMatch[2]);
-        if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) return { lat, lng };
-    }
-    try {
-        if (mgrs.parse(query)) {
-            const [lng, lat] = mgrs.toPoint(query);
+        if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
             return { lat, lng };
         }
-    } catch (e) { /* ignore */ }
+    }
+
+    // Versuch 2: MGRS
+    const cleanedForMgrs = trimmedQuery.replace(/\s/g, '').toUpperCase();
+    // Die Regex prüft auf das grundlegende MGRS-Format
+    const mgrsRegex = /^[0-9]{1,2}[C-HJ-NP-X][A-HJ-NP-Z]{2}(\d{2}|\d{4}|\d{6}|\d{8}|\d{10})$/;
+    if (mgrsRegex.test(cleanedForMgrs)) {
+        try {
+            // Die mgrs-Bibliothek selbst validiert die Koordinate final
+            const [lng, lat] = mgrs.toPoint(cleanedForMgrs);
+            if (!isNaN(lat) && !isNaN(lng)) {
+                return { lat, lng };
+            }
+        } catch (e) {
+            // Fehler wird ignoriert, da es sich um eine ungültige MGRS-Koordinate handeln könnte
+            console.warn('MGRS parsing failed:', e.message);
+            return null;
+        }
+    }
+
+    // Wenn keine der Prüfungen erfolgreich war
     return null;
 }
 
@@ -269,3 +293,4 @@ function _dispatchFavoritesUpdate() {
     const favorites = getCoordHistory().filter(item => item.isFavorite);
     document.dispatchEvent(new CustomEvent('favorites:updated', { detail: { favorites }, bubbles: true }));
 }
+
