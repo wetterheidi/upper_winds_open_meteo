@@ -920,18 +920,22 @@ function setupClearHistoricalDate() {
 
 // --- Cache Management ---
 function setupCacheManagement() {
-    const bottomContainer = document.getElementById('bottom-container');
-    if (!bottomContainer) {
-        console.error('Bottom container not found; cannot create settings/cache buttons.');
+    // ALT: const bottomContainer = document.getElementById('bottom-container');
+    // NEU: Wir zielen auf den Container im Settings-Panel
+    const targetContainer = document.getElementById('app-management-settings'); 
+
+    if (!targetContainer) {
+        console.error('Ziel-Container für App-Management-Buttons nicht gefunden.');
         return;
     }
 
     // 1. Erstelle den gemeinsamen Container für die Buttons
     const buttonWrapper = document.createElement('div');
     buttonWrapper.id = 'settings-cache-buttons';
-    buttonWrapper.className = 'button-wrapper';
+    // Wir verwenden das settings-grid, damit es zum Rest des Panels passt
+    buttonWrapper.className = 'settings-grid'; 
 
-    // 2. Erstelle den "Reset Settings" Button (Logik von eventManager hierher verschoben)
+    // 2. Erstelle den "Reset Settings" Button
     const resetButton = document.createElement('button');
     resetButton.id = 'resetButton';
     resetButton.textContent = 'Reset Settings';
@@ -940,12 +944,12 @@ function setupCacheManagement() {
         if (confirm("Are you sure you want to reset all settings and lock all features?")) {
             localStorage.removeItem('unlockedFeatures');
             localStorage.removeItem('upperWindsSettings');
-
-            // Führe einen Reload der Seite durch, um alles sauber neu zu initialisieren
             window.location.reload();
         }
     });
-    buttonWrapper.appendChild(resetButton); // Füge den Reset-Button zum Wrapper hinzu
+    // Füge ein leeres Label hinzu, damit der Button in der zweiten Spalte des Grids landet
+    buttonWrapper.appendChild(document.createElement('label')); 
+    buttonWrapper.appendChild(resetButton);
 
     // 3. Erstelle den "Clear Tile Cache" Button
     const clearCacheButton = document.createElement('button');
@@ -962,10 +966,12 @@ function setupCacheManagement() {
             Utils.handleError('Failed to clear tile cache: ' + error.message);
         }
     });
-    buttonWrapper.appendChild(clearCacheButton); // Füge den Clear-Cache-Button zum Wrapper hinzu
+    // Füge auch hier ein leeres Label für das Grid-Layout hinzu
+    buttonWrapper.appendChild(document.createElement('label'));
+    buttonWrapper.appendChild(clearCacheButton);
 
     // 4. Füge den fertigen Wrapper zum DOM hinzu
-    bottomContainer.appendChild(buttonWrapper);
+    targetContainer.appendChild(buttonWrapper);
 }
 function setupCacheSettings() {
     const cacheRadiusInput = document.getElementById('cacheRadiusSelect');

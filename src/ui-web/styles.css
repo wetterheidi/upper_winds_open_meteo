@@ -6,16 +6,20 @@
 
 /* 1. Haupt-Container (teilt den Bildschirm in Spalten) */
 body {
-    overflow: hidden; /* Verhindert Scrollbalken am Hauptfenster */
+    display: flex; /* Macht den Body zu einem Flex-Container */
+    flex-direction: column; /* Ordnet die Kinder (Layout und Slider) vertikal an */
+    height: 100vh;
+    margin: 0;
+    overflow: hidden; /* Verhindert unnötiges Scrollen */
 }
 
 .main-layout {
+    flex-grow: 1; 
     display: grid;
-    /* Spalte 1: Sidebar, Spalte 2: Panel (anfangs 0px breit), Spalte 3: Karte */
     grid-template-columns: 60px 0 1fr;
-    width: 100vw;
-    height: 100vh;
+    height: 100%; 
     transition: grid-template-columns 0.3s ease-in-out;
+    min-height: 0; /* <-- DIESE ZEILE HINZUFÜGEN */
 }
 
 .main-layout.sidebar-expanded {
@@ -85,7 +89,7 @@ body {
     background-color: #ffffff;
     border-right: 1px solid #d9d9d9;
     box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
-    padding: 20px;
+    padding: 0px;
     overflow-y: auto;
     z-index: 1500;
     /* transition und transform werden nicht mehr benötigt */
@@ -184,14 +188,16 @@ body {
 
 /* Anpassung für bestehende Elemente */
 #slider-container {
-    position: absolute;
-    top: 10px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: auto;
-    min-width: 300px; /* Gibt dem Slider eine Mindestbreite */
-    max-width: 500px;
-    z-index: 1001; /* Stellt sicher, dass er über der Karte liegt */
+    /* Entferne 'position', 'top', 'left', 'transform' */
+    flex-shrink: 0; /* Verhindert, dass der Slider schrumpft */
+    width: 100%;
+    max-width: 1200px;
+    margin: 10px auto; /* Zentriert den Slider horizontal und fügt Abstand hinzu */
+    padding: 10px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    z-index: 1001; /* Hält ihn über potenziell überlappenden Elementen */
 }
 
 /* =================================================================
@@ -896,7 +902,7 @@ body {
     box-sizing: border-box;
     position: static !important; /* Überschreibt 'fixed' aus anderen Stylesheets */
     width: 100%;
-    max-width: 500px;
+    max-width: 1200px;
     display: flex;
     justify-content: center;
     align-items: center;

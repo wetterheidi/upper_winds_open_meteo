@@ -22,7 +22,36 @@
 </head>
 
 <body>
+
+    <div id="slider-container">
+        <div class="slider-content-wrapper">
+            <div class="time-row">
+                <span id="selectedTime">Selected Time: </span>
+                <div id="autoupdateToggle">
+                    <label for="autoupdateCheckbox" title="Autoupdate">⟳</label>
+                    <input type="checkbox" id="autoupdateCheckbox">
+                </div>
+            </div>
+            <input type="range" id="timeSlider" min="0" max="167" value="0" disabled>
+            <div id="model-row">
+                <label id="modelLabel" for="modelSelect" title="Model Run">Forecast Model:</label>
+                <select id="modelSelect">
+                    <option value="icon_global" selected>ICON GLOBAL</option>
+                    <option value="gfs">GFS</option>
+                    <option value="ecmwf">ECMWF</option>
+                </select>
+
+                <button id="modelInfoButton" class="info-button-shared">i</button>
+                <div id="modelInfoPopup" class="info-popup"></div>
+            </div>
+        </div>
+    </div>
+
     <div class="main-layout">
+
+        <div id="map-content">
+            <div id="map"></div>
+            </div>
 
         <aside id="sidebar">
             <div class="sidebar-icon" data-panel-id="panel-data" title="Data">
@@ -495,33 +524,6 @@
                 <div class="accordion-item">
                     <button class="accordion-header">App Management</button>
                     <div class="accordion-content" id="app-management-settings">
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div id="map-content">
-            <div id="map"></div>
-            <div id="slider-container">
-                <div class="slider-content-wrapper">
-                    <div class="time-row">
-                        <span id="selectedTime">Selected Time: </span>
-                        <div id="autoupdateToggle">
-                            <label for="autoupdateCheckbox" title="Autoupdate">⟳</label>
-                            <input type="checkbox" id="autoupdateCheckbox">
-                        </div>
-                    </div>
-                    <input type="range" id="timeSlider" min="0" max="167" value="0" disabled>
-                    <div id="model-row">
-                        <label id="modelLabel" for="modelSelect" title="Model Run">Forecast Model:</label>
-                        <select id="modelSelect">
-                            <option value="icon_global" selected>ICON GLOBAL</option>
-                            <option value="gfs">GFS</option>
-                            <option value="ecmwf">ECMWF</option>
-                        </select>
-
-                        <button id="modelInfoButton" class="info-button-shared">i</button>
-                        <div id="modelInfoPopup" class="info-popup"></div>
                     </div>
                 </div>
             </div>
