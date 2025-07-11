@@ -930,7 +930,7 @@ body {
 /* Wrapper für den Inhalt des Sliders, um die Breite zu steuern */
 .slider-content-wrapper {
     width: 100%;
-    max-width: 400px;
+    max-width: 900px;
     padding: 5px;
     box-sizing: border-box;
     display: flex;
@@ -941,11 +941,16 @@ body {
 /* Zeilen für Zeit und Modell-Auswahl */
 .slider-content-wrapper .time-row,
 .slider-content-wrapper .model-row {
-    display: flex;
-    justify-content: space-between;
+display: flex;
+    justify-content: center; /* <-- Dies ist die entscheidende Änderung */
     align-items: center;
     width: 100%;
     margin-bottom: 8px;
+    gap: 15px; 
+}
+
+#model-row {
+    padding: 5px 0;
 }
 
 /* Der Zeit-Slider selbst */
