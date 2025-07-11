@@ -1474,7 +1474,7 @@ export function updateFavoriteMarkers(favorites) {
     // Ein Icon für die Favoriten-Marker erstellen (z.B. ein Stern)
     const starIcon = L.divIcon({
         html: '★',
-        className: 'favorite-marker-icon',
+        className: 'favorite-marker-icon', // Diese Klasse in styles.css definieren
         iconSize: [24, 24],
         iconAnchor: [12, 12]
     });
@@ -1487,15 +1487,12 @@ export function updateFavoriteMarkers(favorites) {
             })
             .on('click', () => {
                 // Wenn auf einen Favoriten-Marker geklickt wird, die Position auswählen
-                const selectEvent = new CustomEvent('location:selected', {
+                document.dispatchEvent(new CustomEvent('location:selected', {
                     detail: { lat: fav.lat, lng: fav.lng, source: 'favorite_marker' },
-                    bubbles: true,
-                    cancelable: true
-                });
-                AppState.map.getContainer().dispatchEvent(selectEvent);
+                    bubbles: true
+                }));
             });
 
         AppState.favoritesLayerGroup.addLayer(marker);
-        console.log('FAVORITE marker added');
     });
 }

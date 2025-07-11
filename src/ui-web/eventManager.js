@@ -326,6 +326,63 @@ function setupMapEventListeners() {
     AppState.map.on('moveend', debouncedCacheHandler); // Caching kann parallel laufen
 
 }
+function setupModelInfoButtonEvents() {
+    const modelInfoButton = document.getElementById('modelInfoButton');
+    const modelInfoPopup = document.getElementById('modelInfoPopup');
+
+    if (!modelInfoButton || !modelInfoPopup) return;
+
+    modelInfoButton.addEventListener('click', (event) => {
+        event.stopPropagation(); // Verhindert, dass der Klick das Document-Event auslöst
+        const isVisible = modelInfoPopup.style.display === 'block';
+        modelInfoPopup.style.display = isVisible ? 'none' : 'block';
+    });
+
+    // Schließt das Popup, wenn irgendwo anders hingeklickt wird
+    document.addEventListener('click', (event) => {
+        if (modelInfoPopup.style.display === 'block' && !modelInfoButton.contains(event.target)) {
+            modelInfoPopup.style.display = 'none';
+        }
+    });
+}
+function setupInfoIcons() {
+    const infoIcons = document.querySelectorAll('.info-icon');
+
+    infoIcons.forEach(icon => {
+        // Findet das *direkt folgende* Popup-Element.
+        const popup = icon.nextElementSibling;
+
+        if (popup && popup.classList.contains('info-popup')) {
+            const infoText = icon.dataset.info;
+            if (infoText) {
+                popup.textContent = infoText; // Füllt das Popup mit dem Text
+            }
+
+            icon.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+
+                // Schließe alle anderen offenen Popups
+                document.querySelectorAll('.info-popup').forEach(p => {
+                    if (p !== popup) p.style.display = 'none';
+                });
+
+                // Zeige oder verstecke das aktuelle Popup
+                const isVisible = popup.style.display === 'block';
+                popup.style.display = isVisible ? 'none' : 'block';
+            });
+        }
+    });
+
+    // Globaler Klick-Listener, um alle Popups zu schließen
+    document.addEventListener('click', (event) => {
+        if (!event.target.closest('.info-icon')) {
+            document.querySelectorAll('.info-popup').forEach(p => {
+                p.style.display = 'none';
+            });
+        }
+    });
+}
 
 // --- Planner- & Berechnungs-spezifische Events ---
 function setupJumpRunTrackEvents() {
@@ -1185,6 +1242,8 @@ export function initializeEventListeners() {
     setupSliderEvents();
     setupModelSelectEvents();
     setupCoordinateEvents();
+    setupModelInfoButtonEvents(); 
+    setupInfoIcons(); 
 
     // 3. Einstellungen & Features
     setupMenuItemEvents();

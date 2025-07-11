@@ -708,6 +708,7 @@ export async function updateUIWithNewWeatherData(newWeatherData, preservedIndex 
         calculateMeanWind();
     }
     Settings.updateModelRunInfo(AppState.lastModelRun, AppState.lastLat, AppState.lastLng);
+    displayManager.updateModelInfoPopup();
     console.log("Model changed. Triggering recalculation of jump parameters.");
     displayManager.updateLandingPatternDisplay();
     if (Settings.state.userSettings.calculateJump) {
@@ -1404,14 +1405,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     EventManager.initializeEventListeners();
 
     Coordinates.initializeLocationSearch();
-    // --- NEUER BLOCK ---
     // Initiales Zeichnen der Favoriten-Marker beim Start
     const initialFavorites = Coordinates.getCoordHistory().filter(item => item.isFavorite);
     if (initialFavorites.length > 0) {
         console.log(`[App] Found ${initialFavorites.length} favorite(s) on startup, plotting on map.`);
         mapManager.updateFavoriteMarkers(initialFavorites);
     }
-    // --- ENDE NEUER BLOCK ---
 
     document.addEventListener('cutaway:marker_placed', () => {
         console.log("App: Event 'cutaway:marker_placed' empfangen. Neuberechnung wird ausgelöst.");

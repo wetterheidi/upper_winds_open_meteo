@@ -114,54 +114,68 @@ body {
     margin-bottom: 10px;
     border-radius: 8px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    overflow: hidden;
+    overflow: hidden; /* Behält die abgerundeten Ecken bei */
 }
 
 #panel-container .accordion-header {
     width: 100%;
     padding: 15px;
-    background-color: #4da8da;
+    background-color: #4da8da; /* Deine Akzentfarbe */
+    color: white;
     border: none;
     border-bottom: 1px solid #e0e0e0;
     cursor: pointer;
     font-size: 16px;
     font-weight: bold;
     text-align: left;
-    color: white;
+    display: flex; /* Wichtig für die Ausrichtung von Text und Pfeil */
+    justify-content: space-between; /* Verteilt Text und Pfeil */
+    align-items: center;
 }
 
 #panel-container .accordion-header:hover {
-    background-color: #0056b3;
+    background-color: #0056b3; /* Dunklere Farbe beim Hovern */
 }
 
-/* Stellt sicher, dass der Inhalt standardmäßig NICHT angezeigt wird. */
-#panel-container .accordion-content {
-    display: none; /* Ändern von "padding: 15px;" zu "display: none;" */
-    padding: 15px;
-    border-top: 1px solid #e0e0e0;
-    background-color: #fdfdfd;
-}
-
-#panel-container .accordion-item.active .accordion-content {
-    display: block; /* oder 'flex', falls Sie Flexbox im Inneren verwenden */
-}
-
-/* Optional, aber empfohlen: Ein visueller Indikator für den aktiven Zustand */
+/* Visueller Indikator (Pfeil) für den auf/zu Zustand */
 #panel-container .accordion-header::after {
-    content: '▶'; /* Pfeil nach rechts für "geschlossen" */
-    float: right;
+    content: '▼'; /* Pfeil nach unten */
+    font-size: 12px;
+    color: white;
     transition: transform 0.3s ease;
-    font-size: 14px;
 }
 
 #panel-container .accordion-item.active .accordion-header::after {
-    transform: rotate(90deg); /* Dreht den Pfeil nach unten, wenn offen */
+    transform: rotate(180deg); /* Dreht den Pfeil nach oben, wenn geöffnet */
 }
 
-#panel-container ul {
+/* Stellt sicher, dass der Inhalt standardmäßig versteckt ist */
+#panel-container .accordion-content {
+    display: none;
+    padding: 15px;
+    border-top: 1px solid #e0e0e0;
+    background-color: #fdfdfd; /* Leicht anderer Hintergrund für den Inhalt */
+}
+
+/* Zeigt den Inhalt nur an, wenn das Element die 'active'-Klasse hat */
+#panel-container .accordion-item.active .accordion-content {
+    display: block;
+}
+
+/* Styling für Listen innerhalb des Akkordeons */
+#panel-container .accordion-content ul {
     list-style: none;
     padding: 0;
     margin: 0;
+}
+
+#panel-container .accordion-content li {
+    padding: 10px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+#panel-container .accordion-content li:last-child {
+    border-bottom: none;
 }
 
 /* 4. Hauptinhaltsbereich (Karte & Co.) */
@@ -191,9 +205,9 @@ body {
     /* Entferne 'position', 'top', 'left', 'transform' */
     flex-shrink: 0; /* Verhindert, dass der Slider schrumpft */
     width: 100%;
-    max-width: 1200px;
+    max-width: 4000px;
     margin: 10px auto; /* Zentriert den Slider horizontal und fügt Abstand hinzu */
-    padding: 10px;
+    padding: 0px;
     background: #fff;
     border-radius: 8px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
@@ -895,14 +909,14 @@ body {
     -webkit-backdrop-filter: blur(5px);
     border-bottom: 1px solid #ddd;
     z-index: 2000 !important; /* Wichtig, um über anderen Elementen zu liegen */
-    padding: 5px;
-    padding-top: calc(5px + env(safe-area-inset-top)); /* Berücksichtigt die Notch bei iPhones */
+    padding: 0px;
+    padding-top: calc(env(safe-area-inset-top)); /* Berücksichtigt die Notch bei iPhones */
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
     box-sizing: border-box;
     position: static !important; /* Überschreibt 'fixed' aus anderen Stylesheets */
     width: 100%;
-    max-width: 1200px;
+    max-width: 4000px;
     display: flex;
     justify-content: center;
     align-items: center;
