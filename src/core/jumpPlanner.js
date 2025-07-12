@@ -294,7 +294,7 @@ export function jumpRunTrack(interpolatedData, harpAnchor = null) {
     
     let jumpRunTrackDirection = Math.round(meanWind[0]);
     const customDirection = parseFloat(Settings.state.userSettings.customJumpRunDirection);
-    if (Number.isFinite(customDirection) && customDirection >= 0 && customDirection <= 359) {
+    if (Number.isFinite(customDirection) && customDirection >= 0 && customDirection <= 360) {
         jumpRunTrackDirection = customDirection;
     }
     

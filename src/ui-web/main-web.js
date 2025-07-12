@@ -912,86 +912,84 @@ function setupAppEventListeners() {
         updateJumpMasterLineAndPanel();
     });
 
-    document.addEventListener('track:loaded', async (event) => {
-        const loadingElement = document.getElementById('loading');
-        try {
-            const { lat, lng, timestamp, historicalDate, summary } = event.detail;
-            console.log('[main-web] Event "track:loaded" empfangen, starte Aktionen.');
+document.addEventListener('track:loaded', async (event) => {
+    const loadingElement = document.getElementById('loading');
+    try {
+        const { lat, lng, timestamp, historicalDate, summary } = event.detail;
+        console.log('[main-web] Event "track:loaded" empfangen, starte korrigierte Aktionen.');
 
-            // =======================================================
-            // HIER DIE NEUE LOGIK EINFÜGEN
-            // =======================================================
-            if (historicalDate) {
-                console.log("Historischer Track geladen, deaktiviere Autoupdate.");
-                const autoupdateCheckbox = document.getElementById('autoupdateCheckbox');
-                if (autoupdateCheckbox) {
-                    autoupdateCheckbox.checked = false;
-                }
-                // Stoppe den laufenden Autoupdate-Prozess
-                AutoupdateManager.stopAutoupdate();
-                // Speichere die neue Einstellung
-                Settings.state.userSettings.autoupdate = false;
-                Settings.save();
-                Utils.handleMessage("Autoupdate disabled for historical track viewing.");
+        // Deaktiviere Autoupdate, wenn ein historischer Track geladen wird.
+        if (historicalDate) {
+            const autoupdateCheckbox = document.getElementById('autoupdateCheckbox');
+            if (autoupdateCheckbox) {
+                autoupdateCheckbox.checked = false;
             }
-            // =======================================================
-            // ENDE DER NEUEN LOGIK
-            // =======================================================
+            AutoupdateManager.stopAutoupdate();
+            Settings.state.userSettings.autoupdate = false;
+            Settings.save();
+            Utils.handleMessage("Autoupdate disabled for historical track viewing.");
+        }
 
-            await mapManager.createOrUpdateMarker(lat, lng);
-            const newWeatherData = await weatherManager.fetchWeatherForLocation(lat, lng, timestamp);
-            if (newWeatherData) {
-                AppState.weatherData = newWeatherData; // Daten im AppState speichern
+        // Schritt 1: Marker auf der Karte erstellen oder aktualisieren.
+        await mapManager.createOrUpdateMarker(lat, lng);
 
-                // 2. Den Slider auf den richtigen Zeitpunkt setzen
-                const slider = document.getElementById('timeSlider');
-                if (slider && AppState.weatherData.time) {
-                    slider.max = AppState.weatherData.time.length - 1;
-                    slider.disabled = slider.max <= 0;
+        // Schritt 2: Wetterdaten für den spezifischen Zeitstempel des Tracks abrufen.
+        const newWeatherData = await weatherManager.fetchWeatherForLocation(lat, lng, timestamp);
+        
+        if (newWeatherData) {
+            AppState.weatherData = newWeatherData; // Daten im globalen Zustand speichern.
 
-                    // Finde den Index, der am besten zum Track-Zeitstempel passt
-                    const targetTimestamp = new Date(timestamp).getTime();
-                    let bestIndex = 0;
-                    let minDiff = Infinity;
-                    AppState.weatherData.time.forEach((time, idx) => {
-                        const diff = Math.abs(new Date(time).getTime() - targetTimestamp);
-                        if (diff < minDiff) {
-                            minDiff = diff;
-                            bestIndex = idx;
-                        }
-                    });
-                    slider.value = bestIndex; // Slider positionieren!
-                }
-            }
-            console.log("Performing specific updates after track load...");
-            await displayManager.updateWeatherDisplay(getSliderValue(), 'weather-table-container', 'selectedTime'); // NEU
-            await displayManager.refreshMarkerPopup();
-            calculateMeanWind();
-            calculateJump(); // Diese Funktion beinhaltet bereits die nötigen Checks und ruft auch calculateCutAway auf
-            displayManager.updateLandingPatternDisplay();
-            updateJumpMasterLineAndPanel();
+            // Schritt 3: Den korrekten Index für den Slider finden.
+            const slider = document.getElementById('timeSlider');
+            if (slider && AppState.weatherData.time) {
+                slider.max = AppState.weatherData.time.length - 1;
+                slider.disabled = slider.max <= 0;
 
-            const infoEl = document.getElementById('info');
-            if (infoEl && summary) {
-                const modelDisplayRegex = /(<br><strong>Available Models:<\/strong><ul>.*?<\/ul>|<br><strong>Available Models:<\/strong> None)/s;
-                const modelInfoMatch = infoEl.innerHTML.match(modelDisplayRegex);
-                infoEl.innerHTML = summary + (modelInfoMatch ? modelInfoMatch[0] : '');
-            }
-
-            if (historicalDate) {
-                const historicalDatePicker = document.getElementById('historicalDatePicker');
-                if (historicalDatePicker) historicalDatePicker.value = historicalDate;
-            }
-
-        } catch (error) {
-            console.error('Fehler bei der Verarbeitung von track:loaded:', error);
-            Utils.handleError('Konnte Track-Daten nicht vollständig verarbeiten.');
-        } finally {
-            if (loadingElement) {
-                loadingElement.style.display = 'none';
+                // Finde den Index im neuen Wetterdaten-Array, der am besten zum Track-Zeitstempel passt.
+                const targetTimestamp = new Date(timestamp).getTime();
+                let bestIndex = 0;
+                let minDiff = Infinity;
+                AppState.weatherData.time.forEach((time, idx) => {
+                    const diff = Math.abs(new Date(time).getTime() - targetTimestamp);
+                    if (diff < minDiff) {
+                        minDiff = diff;
+                        bestIndex = idx;
+                    }
+                });
+                // Setze den Slider genau auf diesen Zeitpunkt!
+                slider.value = bestIndex; 
             }
         }
-    });
+        
+        // Schritt 4: Alle UI-Elemente mit den neuen, zeitlich korrekten Daten aktualisieren.
+        await displayManager.updateWeatherDisplay(getSliderValue(), 'weather-table-container', 'selectedTime');
+        await displayManager.refreshMarkerPopup();
+        calculateMeanWind();
+        calculateJump();
+        displayManager.updateLandingPatternDisplay();
+
+        // Zeige die Track-Zusammenfassung an
+        const infoEl = document.getElementById('info');
+        if (infoEl && summary) {
+            const modelDisplayRegex = /(<br><strong>Available Models:<\/strong><ul>.*?<\/ul>|<br><strong>Available Models:<\/strong> None)/s;
+            const modelInfoMatch = infoEl.innerHTML.match(modelDisplayRegex);
+            infoEl.innerHTML = summary + (modelInfoMatch ? modelInfoMatch[0] : '');
+        }
+
+        if (historicalDate) {
+            const historicalDatePicker = document.getElementById('historicalDatePicker');
+            if (historicalDatePicker) historicalDatePicker.value = historicalDate;
+        }
+
+    } catch (error) {
+        console.error('Fehler bei der Verarbeitung von track:loaded:', error);
+        Utils.handleError('Konnte Track-Daten nicht vollständig verarbeiten.');
+    } finally {
+        if (loadingElement) {
+            loadingElement.style.display = 'none';
+        }
+    }
+});
 
     document.addEventListener('tracking:positionUpdated', (event) => {
         updateJumpMasterLineAndPanel(event.detail);

@@ -3,7 +3,7 @@ import * as mgrs from 'mgrs';
 import { AppState } from './state.js';
 import { CONVERSIONS, ISA_CONSTANTS, DEWPOINT_COEFFICIENTS, EARTH_RADIUS_METERS, PHYSICAL_CONSTANTS, BEAUFORT, ENSEMBLE_VISUALIZATION } from './constants.js';
 import { Settings } from "./settings.js";
- 
+
 let customErrorHandler = console.error; // Fallback auf console.error
 let customMessageHandler = console.log; // Fallback für Nachrichten
 
@@ -25,7 +25,18 @@ export class Utils {
      * @returns {number} Der auf die nächste Zehnerstelle gerundete Wert.
      */
     static roundToTens(value) {
-        return Math.round(value / 10) * 10;
+        const rounded = Math.round(value / 10) * 10;
+
+        // Wenn das Ergebnis 0 ist (z.B. für Richtungen von 355° bis 4°),
+        // gib stattdessen 360 zurück.
+        if (rounded === 0 || rounded === 360) {
+            // Prüfen, ob der ursprüngliche Wert näher an 360 als an 0 war,
+            // um zu vermeiden, dass z.B. 4° auch zu 360° wird.
+            if (value >= 355 || value <= 4) {
+                return 360;
+            }
+        }
+        return rounded;
     }
 
     /**
@@ -944,7 +955,7 @@ export class Utils {
         return feet / 3.28084;
     }
 
-        static getTooltipContent(point, index, points, groundAltitude) {
+    static getTooltipContent(point, index, points, groundAltitude) {
         if (!AppState.map) {
             console.warn('Map not initialized for getTooltipContent');
             return 'Map not initialized';

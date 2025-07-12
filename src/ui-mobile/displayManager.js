@@ -295,9 +295,9 @@ export function updateLandingPatternDisplayOLD() {
 
     // Determine effective landing direction based on selected pattern and input
     let effectiveLandingWindDir;
-    if (landingDirection === 'LL' && Number.isFinite(customLandingDirLL) && customLandingDirLL >= 0 && customLandingDirLL <= 359) {
+    if (landingDirection === 'LL' && Number.isFinite(customLandingDirLL) && customLandingDirLL >= 0 && customLandingDirLL <= 360) {
         effectiveLandingWindDir = customLandingDirLL;
-    } else if (landingDirection === 'RR' && Number.isFinite(customLandingDirRR) && customLandingDirRR >= 0 && customLandingDirRR <= 359) {
+    } else if (landingDirection === 'RR' && Number.isFinite(customLandingDirRR) && customLandingDirRR >= 0 && customLandingDirRR <= 360) {
         effectiveLandingWindDir = customLandingDirRR;
     } else {
         effectiveLandingWindDir = Number.isFinite(AppState.landingWindDir) ? AppState.landingWindDir : dirs[0];

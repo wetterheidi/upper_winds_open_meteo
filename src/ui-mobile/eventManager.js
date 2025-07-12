@@ -509,7 +509,7 @@ function setupJumpRunTrackEvents() {
         directionInput.value = Settings.state.userSettings.customJumpRunDirection || '';
         directionInput.addEventListener('change', () => {
             const value = parseFloat(directionInput.value);
-            if (Number.isFinite(value) && value >= 0 && value <= 359) {
+            if (Number.isFinite(value) && value >= 0 && value <= 360) {
                 Settings.state.userSettings.customJumpRunDirection = value;
                 console.log(`Setting 'customJumpRunDirection' on change to:`, value);
             } else {
