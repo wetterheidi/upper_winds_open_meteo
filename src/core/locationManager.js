@@ -239,9 +239,9 @@ export function updateFavoriteStatus(lat, lng, name, isFavorite) {
         history.unshift({ lat: newLat, lng: newLng, label: name, isFavorite: true, timestamp: Date.now() });
     }
     
-    saveCoordHistory(history); // saveCoordHistory() ist bereits hier
-    _dispatchFavoritesUpdate(); // _dispatch...() ist bereits hier
-
+    saveCoordHistory(history); 
+    _dispatchFavoritesUpdate(); 
+    
     // Gib eine Erfolgsmeldung zurück
     if (isFavorite) {
         Utils.handleMessage(`"${name}" saved as favorite.`);
