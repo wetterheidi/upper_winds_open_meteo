@@ -446,15 +446,19 @@ export function calculateJump() {
 }
 
 export function resetJumpRunDirection(triggerUpdate = true) {
-    AppState.customJumpRunDirection = null;
+    // 1. Gespeicherten Wert in den Settings löschen
+    Settings.state.userSettings.customJumpRunDirection = null;
+    Settings.save();
+    console.log('Persisted custom JRT direction has been reset.');
+
+    // 2. Eingabefeld in der UI leeren
     const directionInput = document.getElementById('jumpRunTrackDirection');
     if (directionInput) {
         directionInput.value = '';
-        console.log('Cleared jumpRunTrackDirection input');
     }
-    console.log('Reset JRT direction to calculated');
-    if (triggerUpdate && Settings.state.userSettings.showJumpRunTrack && AppState.weatherData && AppState.lastLat && AppState.lastLng) {
-        console.log('Triggering JRT update after reset');
+
+    // 3. Optional die Anzeige aktualisieren (nur wenn der Track noch sichtbar ist)
+    if (triggerUpdate && Settings.state.userSettings.showJumpRunTrack && AppState.weatherData) {
         displayManager.updateJumpRunTrackDisplay();
     }
 }
@@ -912,84 +916,84 @@ function setupAppEventListeners() {
         updateJumpMasterLineAndPanel();
     });
 
-document.addEventListener('track:loaded', async (event) => {
-    const loadingElement = document.getElementById('loading');
-    try {
-        const { lat, lng, timestamp, historicalDate, summary } = event.detail;
-        console.log('[main-web] Event "track:loaded" empfangen, starte korrigierte Aktionen.');
+    document.addEventListener('track:loaded', async (event) => {
+        const loadingElement = document.getElementById('loading');
+        try {
+            const { lat, lng, timestamp, historicalDate, summary } = event.detail;
+            console.log('[main-web] Event "track:loaded" empfangen, starte korrigierte Aktionen.');
 
-        // Deaktiviere Autoupdate, wenn ein historischer Track geladen wird.
-        if (historicalDate) {
-            const autoupdateCheckbox = document.getElementById('autoupdateCheckbox');
-            if (autoupdateCheckbox) {
-                autoupdateCheckbox.checked = false;
+            // Deaktiviere Autoupdate, wenn ein historischer Track geladen wird.
+            if (historicalDate) {
+                const autoupdateCheckbox = document.getElementById('autoupdateCheckbox');
+                if (autoupdateCheckbox) {
+                    autoupdateCheckbox.checked = false;
+                }
+                AutoupdateManager.stopAutoupdate();
+                Settings.state.userSettings.autoupdate = false;
+                Settings.save();
+                Utils.handleMessage("Autoupdate disabled for historical track viewing.");
             }
-            AutoupdateManager.stopAutoupdate();
-            Settings.state.userSettings.autoupdate = false;
-            Settings.save();
-            Utils.handleMessage("Autoupdate disabled for historical track viewing.");
-        }
 
-        // Schritt 1: Marker auf der Karte erstellen oder aktualisieren.
-        await mapManager.createOrUpdateMarker(lat, lng);
+            // Schritt 1: Marker auf der Karte erstellen oder aktualisieren.
+            await mapManager.createOrUpdateMarker(lat, lng);
 
-        // Schritt 2: Wetterdaten für den spezifischen Zeitstempel des Tracks abrufen.
-        const newWeatherData = await weatherManager.fetchWeatherForLocation(lat, lng, timestamp);
-        
-        if (newWeatherData) {
-            AppState.weatherData = newWeatherData; // Daten im globalen Zustand speichern.
+            // Schritt 2: Wetterdaten für den spezifischen Zeitstempel des Tracks abrufen.
+            const newWeatherData = await weatherManager.fetchWeatherForLocation(lat, lng, timestamp);
 
-            // Schritt 3: Den korrekten Index für den Slider finden.
-            const slider = document.getElementById('timeSlider');
-            if (slider && AppState.weatherData.time) {
-                slider.max = AppState.weatherData.time.length - 1;
-                slider.disabled = slider.max <= 0;
+            if (newWeatherData) {
+                AppState.weatherData = newWeatherData; // Daten im globalen Zustand speichern.
 
-                // Finde den Index im neuen Wetterdaten-Array, der am besten zum Track-Zeitstempel passt.
-                const targetTimestamp = new Date(timestamp).getTime();
-                let bestIndex = 0;
-                let minDiff = Infinity;
-                AppState.weatherData.time.forEach((time, idx) => {
-                    const diff = Math.abs(new Date(time).getTime() - targetTimestamp);
-                    if (diff < minDiff) {
-                        minDiff = diff;
-                        bestIndex = idx;
-                    }
-                });
-                // Setze den Slider genau auf diesen Zeitpunkt!
-                slider.value = bestIndex; 
+                // Schritt 3: Den korrekten Index für den Slider finden.
+                const slider = document.getElementById('timeSlider');
+                if (slider && AppState.weatherData.time) {
+                    slider.max = AppState.weatherData.time.length - 1;
+                    slider.disabled = slider.max <= 0;
+
+                    // Finde den Index im neuen Wetterdaten-Array, der am besten zum Track-Zeitstempel passt.
+                    const targetTimestamp = new Date(timestamp).getTime();
+                    let bestIndex = 0;
+                    let minDiff = Infinity;
+                    AppState.weatherData.time.forEach((time, idx) => {
+                        const diff = Math.abs(new Date(time).getTime() - targetTimestamp);
+                        if (diff < minDiff) {
+                            minDiff = diff;
+                            bestIndex = idx;
+                        }
+                    });
+                    // Setze den Slider genau auf diesen Zeitpunkt!
+                    slider.value = bestIndex;
+                }
+            }
+
+            // Schritt 4: Alle UI-Elemente mit den neuen, zeitlich korrekten Daten aktualisieren.
+            await displayManager.updateWeatherDisplay(getSliderValue(), 'weather-table-container', 'selectedTime');
+            await displayManager.refreshMarkerPopup();
+            calculateMeanWind();
+            calculateJump();
+            displayManager.updateLandingPatternDisplay();
+
+            // Zeige die Track-Zusammenfassung an
+            const infoEl = document.getElementById('info');
+            if (infoEl && summary) {
+                const modelDisplayRegex = /(<br><strong>Available Models:<\/strong><ul>.*?<\/ul>|<br><strong>Available Models:<\/strong> None)/s;
+                const modelInfoMatch = infoEl.innerHTML.match(modelDisplayRegex);
+                infoEl.innerHTML = summary + (modelInfoMatch ? modelInfoMatch[0] : '');
+            }
+
+            if (historicalDate) {
+                const historicalDatePicker = document.getElementById('historicalDatePicker');
+                if (historicalDatePicker) historicalDatePicker.value = historicalDate;
+            }
+
+        } catch (error) {
+            console.error('Fehler bei der Verarbeitung von track:loaded:', error);
+            Utils.handleError('Konnte Track-Daten nicht vollständig verarbeiten.');
+        } finally {
+            if (loadingElement) {
+                loadingElement.style.display = 'none';
             }
         }
-        
-        // Schritt 4: Alle UI-Elemente mit den neuen, zeitlich korrekten Daten aktualisieren.
-        await displayManager.updateWeatherDisplay(getSliderValue(), 'weather-table-container', 'selectedTime');
-        await displayManager.refreshMarkerPopup();
-        calculateMeanWind();
-        calculateJump();
-        displayManager.updateLandingPatternDisplay();
-
-        // Zeige die Track-Zusammenfassung an
-        const infoEl = document.getElementById('info');
-        if (infoEl && summary) {
-            const modelDisplayRegex = /(<br><strong>Available Models:<\/strong><ul>.*?<\/ul>|<br><strong>Available Models:<\/strong> None)/s;
-            const modelInfoMatch = infoEl.innerHTML.match(modelDisplayRegex);
-            infoEl.innerHTML = summary + (modelInfoMatch ? modelInfoMatch[0] : '');
-        }
-
-        if (historicalDate) {
-            const historicalDatePicker = document.getElementById('historicalDatePicker');
-            if (historicalDatePicker) historicalDatePicker.value = historicalDate;
-        }
-
-    } catch (error) {
-        console.error('Fehler bei der Verarbeitung von track:loaded:', error);
-        Utils.handleError('Konnte Track-Daten nicht vollständig verarbeiten.');
-    } finally {
-        if (loadingElement) {
-            loadingElement.style.display = 'none';
-        }
-    }
-});
+    });
 
     document.addEventListener('tracking:positionUpdated', (event) => {
         updateJumpMasterLineAndPanel(event.detail);
@@ -1263,19 +1267,21 @@ document.addEventListener('track:loaded', async (event) => {
 
     document.addEventListener('ui:showJumpRunTrackChanged', (e) => {
         const isChecked = e.detail.checked;
-        console.log(`[main-web] Jump Run Track toggled: ${isChecked}`);
 
-        // Die komplette if/else-Logik wird hierher verschoben:
-        if (isChecked && AppState.weatherData && AppState.lastLat && AppState.lastLng && Settings.state.isCalculateJumpUnlocked && Settings.state.userSettings.calculateJump) {
-            calculateJumpRunTrack();
+        if (isChecked) {
+            // Wenn die Box aktiviert wird, zeichne den Track.
+            // Die Logik hier verwendet jetzt entweder den berechneten Wert 
+            // oder einen neu eingegebenen benutzerdefinierten Wert.
+            displayManager.updateJumpRunTrackDisplay();
         } else {
-            // Die komplette Aufräumlogik
-            mapManager.drawJumpRunTrack(null); // Eine saubere Funktion im mapManager ist hier ideal
-            const directionInput = document.getElementById('jumpRunTrackDirection');
-            if (directionInput) {
-                const trackData = JumpPlanner.jumpRunTrack();
-                directionInput.value = trackData ? trackData.direction : '';
-            }
+            // Wenn die Box DEAKTIVIERT wird:
+
+            // 1. Die Visualisierung von der Karte entfernen.
+            mapManager.drawJumpRunTrack(null);
+
+            // 2. Die benutzerdefinierte Richtung und das Eingabefeld zurücksetzen.
+            // Das 'false' als Parameter verhindert ein unnötiges Neuzeichnen.
+            resetJumpRunDirection(false);
         }
     });
 

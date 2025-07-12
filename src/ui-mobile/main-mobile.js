@@ -445,15 +445,19 @@ export function calculateJump() {
     mapManager.drawCutAwayVisualization(cutawayDrawData);
 }
 export function resetJumpRunDirection(triggerUpdate = true) {
-    AppState.customJumpRunDirection = null;
+    // 1. Gespeicherten Wert in den Settings löschen
+    Settings.state.userSettings.customJumpRunDirection = null;
+    Settings.save();
+    console.log('Persisted custom JRT direction has been reset.');
+
+    // 2. Eingabefeld in der UI leeren
     const directionInput = document.getElementById('jumpRunTrackDirection');
     if (directionInput) {
         directionInput.value = '';
-        console.log('Cleared jumpRunTrackDirection input');
     }
-    console.log('Reset JRT direction to calculated');
-    if (triggerUpdate && Settings.state.userSettings.showJumpRunTrack && AppState.weatherData && AppState.lastLat && AppState.lastLng) {
-        console.log('Triggering JRT update after reset');
+
+    // 3. Optional die Anzeige aktualisieren (nur wenn der Track noch sichtbar ist)
+    if (triggerUpdate && Settings.state.userSettings.showJumpRunTrack && AppState.weatherData) {
         displayManager.updateJumpRunTrackDisplay();
     }
 }
@@ -1295,19 +1299,21 @@ function setupAppEventListeners() {
 
     document.addEventListener('ui:showJumpRunTrackChanged', (e) => {
         const isChecked = e.detail.checked;
-        console.log(`[main-mobile] Jump Run Track toggled: ${isChecked}`);
 
-        // Die komplette if/else-Logik wird hierher verschoben:
-        if (isChecked && AppState.weatherData && AppState.lastLat && AppState.lastLng && Settings.state.isCalculateJumpUnlocked && Settings.state.userSettings.calculateJump) {
-            calculateJumpRunTrack();
+        if (isChecked) {
+            // Wenn die Box aktiviert wird, zeichne den Track.
+            // Die Logik hier verwendet jetzt entweder den berechneten Wert 
+            // oder einen neu eingegebenen benutzerdefinierten Wert.
+            displayManager.updateJumpRunTrackDisplay();
         } else {
-            // Die komplette Aufräumlogik
-            mapManager.drawJumpRunTrack(null); // Eine saubere Funktion im mapManager ist hier ideal
-            const directionInput = document.getElementById('jumpRunTrackDirection');
-            if (directionInput) {
-                const trackData = JumpPlanner.jumpRunTrack();
-                directionInput.value = trackData ? trackData.direction : '';
-            }
+            // Wenn die Box DEAKTIVIERT wird:
+
+            // 1. Die Visualisierung von der Karte entfernen.
+            mapManager.drawJumpRunTrack(null);
+
+            // 2. Die benutzerdefinierte Richtung und das Eingabefeld zurücksetzen.
+            // Das 'false' als Parameter verhindert ein unnötiges Neuzeichnen.
+            resetJumpRunDirection(false);
         }
     });
 
