@@ -19,6 +19,7 @@ import { UI_DEFAULTS } from '../core/constants.js';
 import { updateModelSelectUI, cleanupSelectedEnsembleModels } from './ui.js';
 import 'leaflet-gpx';
 import { FilePicker } from '@capawesome/capacitor-file-picker';
+import * as LocationManager from '../core/locationManager.js';
 
 // =================================================================
 // 1. Globale Variablen & Zustand
@@ -1276,7 +1277,7 @@ function setupHarpCoordInputEvents() {
             return;
         }
 
-        const parsedCoords = Coordinates.parseQueryAsCoordinates(inputValue);
+        const parsedCoords = LocationManager.parseQueryAsCoordinates(inputValue);
 
         if (parsedCoords) {
             // Clear existing HARP marker if it exists

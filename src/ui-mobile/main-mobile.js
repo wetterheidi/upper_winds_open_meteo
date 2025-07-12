@@ -18,6 +18,7 @@ import { DateTime } from 'luxon';
 import * as displayManager from './displayManager.js';
 import * as liveTrackingManager from '../core/liveTrackingManager.js'; // <-- DIESE ZEILE HINZUFÜGEN
 import * as EnsembleManager from '../core/ensembleManager.js';
+import * as LocationManager from '../core/locationManager.js';
 
 export const getTemperatureUnit = () => Settings.getValue('temperatureUnit', 'C');
 export const getHeightUnit = () => Settings.getValue('heightUnit', 'm');
@@ -923,7 +924,7 @@ function setupAppEventListeners() {
         AppState.lastAltitude = await Utils.getAltitude(lat, lng);
 
         // Informiere das Coordinates-Modul über die neue Position
-        Coordinates.addCoordToHistory(lat, lng);
+        LocationManager.addCoordToHistory(lat, lng);
 
         // Bewege den Marker (falls die Aktion nicht schon vom Marker selbst kam)
         if (source !== 'marker_drag') {
@@ -1522,7 +1523,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     Coordinates.initializeLocationSearch();
     // --- NEUER BLOCK ---
     // Initiales Zeichnen der Favoriten-Marker beim Start
-    const initialFavorites = Coordinates.getCoordHistory().filter(item => item.isFavorite);
+    const initialFavorites = LocationManager.getCoordHistory().filter(item => item.isFavorite);
     if (initialFavorites.length > 0) {
         console.log(`[App] Found ${initialFavorites.length} favorite(s) on startup, plotting on map.`);
         mapManager.updateFavoriteMarkers(initialFavorites);

@@ -446,7 +446,7 @@ async function _geolocationSuccessCallback(position, defaultZoom) {
     });
     AppState.map.getContainer().dispatchEvent(mapSelectEvent);
 
-    // 3. ALLE Anwendungslogik-Aufrufe wie calculateJump() und Coordinates.addCoordToHistory() werden hier GELÖSCHT.
+    // 3. ALLE Anwendungslogik-Aufrufe wie calculateJump() und LocationManager.addCoordToHistory() werden hier GELÖSCHT.
 }
 async function _geolocationErrorCallback(error, defaultCenter, defaultZoom) {
     console.warn(`Geolocation error: ${error.message}`);
