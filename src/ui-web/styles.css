@@ -1003,3 +1003,82 @@ display: flex;
     border-radius: 4px;
     border: 1px solid #ccc;
 }
+
+/* Entfernt die Aufzählungspunkte im neuen Jump-Master-Panel */
+#panel-jumpmaster ul {
+    list-style: none; /* Entfernt die Punkte */
+    padding: 0;       /* Entfernt den linken Einzug der Liste */
+    margin: 0;        /* Entfernt den Standard-Abstand */
+}
+
+/* Optional: Stellt sicher, dass die Listenelemente den gleichen Abstand haben wie im Akkordeon */
+#panel-jumpmaster li {
+    padding: 10px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+#panel-jumpmaster li:last-child {
+    border-bottom: none;
+}
+
+#jumpmaster-dashboard {
+    padding: 0 15px 15px 15px;
+    border-top: 1px solid #eee;
+    margin-top: 10px;
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* Zwei Spalten */
+    gap: 15px; /* Abstand zwischen den Elementen */
+}
+
+.dashboard-item {
+    background-color: #f7f7f7;
+    padding: 10px;
+    border-radius: 6px;
+    text-align: center;
+}
+
+/* Lässt ein Element über beide Spalten gehen */
+.dashboard-item.span-2 {
+    grid-column: 1 / -1;
+}
+
+.dashboard-label {
+    font-size: 12px;
+    color: #666;
+    text-transform: uppercase;
+    margin-bottom: 5px;
+}
+
+.dashboard-value {
+    font-size: 18px;
+    font-weight: bold;
+    color: #333;
+}
+
+/* Kleinere Schrift für die Genauigkeit */
+.accuracy-item .dashboard-value {
+    font-size: 14px;
+    font-weight: normal;
+}
+
+/* Trennlinie für die JML-Details */
+#jumpmaster-line-details hr {
+    border: none;
+    border-top: 1px solid #eee;
+    margin: 15px 0;
+}
+
+/* Versteckt Elemente sicher */
+.hidden {
+    display: none !important;
+}
+
+/* Spezifische Anpassung für das Koordinaten-Feld im Jump Master Dashboard */
+#dashboard-jm-coords {
+    font-size: 16px;      /* Verringert die Schriftgröße, damit mehr Text passt */
+    line-height: 1.4;     /* Sorgt für guten Abstand, falls die Zeile umbricht */
+    word-wrap: break-word;/* Erlaubt den Umbruch von langen Zeichenketten (wichtig für MGRS) */
+}

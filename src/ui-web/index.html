@@ -26,7 +26,8 @@
     <header id="app-header">
         <div id="header-logo-container">
             <img id="header-logo" src="/icon4.png" alt="DZMaster Logo">
-            <label id="headerLabel" style="text-align: center; padding: 0; font-size: 16px; font-weight: bold;">DZ Master</label>
+            <label id="headerLabel" style="text-align: center; padding: 0; font-size: 16px; font-weight: bold;">DZ
+                Master</label>
         </div>
         <div id="slider-container">
             <div class="slider-content-wrapper">
@@ -66,6 +67,10 @@
             <div class="sidebar-icon" data-panel-id="panel-planner" title="Planner">
                 <span class="icon">🪂</span>
                 <span class="label">Planner</span>
+            </div>
+            <div class="sidebar-icon" data-panel-id="panel-jumpmaster" title="Jump Master">
+                <span class="icon">✈️</span>
+                <span class="label">Jumpmaster</span>
             </div>
             <div class="sidebar-icon" data-panel-id="panel-search" title="Search">
                 <span class="icon">🔍</span>
@@ -295,43 +300,19 @@
                 </div>
 
                 <div class="accordion-item">
-                    <button class="accordion-header">Jump Master</button>
+                    <button class="accordion-header">HARP Manager</button>
                     <div class="accordion-content">
                         <ul>
                             <li>
-                                <button id="placeHarpButton">Place HARP</button>
+                                <button id="placeHarpButton">Place HARP on Map</button>
+                            </li>
+                            <li>
+                                <label for="harpCoordInput" class="radio-label">Or enter coordinates:</label>
+                                <input type="text" id="harpCoordInput" placeholder="e.g., 48.123, 11.456 or MGRS">
+                                <button id="placeHarpCoordButton">Place by Coords</button>
+                            </li>
+                            <li>
                                 <button id="clearHarpButton">Clear HARP</button>
-                            </li>
-                            <li>
-                                <label class="radio-label">
-                                    <input type="text" id="harpCoordInput" placeholder="Enter HARP Coords (MGRS/Dec)" />
-                                </label>
-                                <button id="placeHarpCoordButton">Place Coords</button>
-                            </li>
-                            <li>
-                                <label class="radio-label">
-                                    <input type="checkbox" id="trackPositionCheckbox" name="trackPosition"> Start Live
-                                    Tracking
-                                </label>
-                            </li>
-                            <li>
-                                <label class="radio-label">
-                                    <input type="checkbox" id="showJumpMasterLine" name="showJumpMasterLine"> Show Jump
-                                    Master Line
-                                    To
-                                </label>
-                                <ul class="submenu hidden">
-                                    <li>
-                                        <label class="radio-label">
-                                            <input type="radio" name="jumpMasterLineTarget" value="DIP" checked> DIP
-                                        </label>
-                                    </li>
-                                    <li>
-                                        <label class="radio-label">
-                                            <input type="radio" name="jumpMasterLineTarget" value="HARP"> HARP
-                                        </label>
-                                    </li>
-                                </ul>
                             </li>
                         </ul>
                     </div>
@@ -381,6 +362,83 @@
                                 </ul>
                             </li>
                         </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div id="panel-jumpmaster" class="panel hidden">
+                <ul style="padding: 15px;">
+                    <li>
+                        <label class="radio-label">
+                            <input type="checkbox" id="trackPositionCheckbox" name="trackPosition"> Start Live Tracking
+                        </label>
+                    </li>
+                    <li>
+                        <label class="radio-label">
+                            <input type="checkbox" id="showJumpMasterLine" name="showJumpMasterLine"> Show Jump Master
+                            Line To
+                        </label>
+                        <ul class="submenu hidden">
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="jumpMasterLineTarget" value="DIP" checked> DIP
+                                </label>
+                            </li>
+                            <li>
+                                <label class="radio-label">
+                                    <input type="radio" name="jumpMasterLineTarget" value="HARP" disabled> HARP
+                                </label>
+                            </li>
+                        </ul>
+                    </li>
+                </ul>
+                <div id="jumpmaster-dashboard" class="hidden">
+                    <div class="dashboard-grid">
+                        <div class="dashboard-item span-2">
+                            <div class="dashboard-label">Position</div>
+                            <div class="dashboard-value" id="dashboard-jm-coords">--</div>
+                        </div>
+
+                        <div class="dashboard-item span-2">
+                            <div class="dashboard-label">Altitude</div>
+                            <div class="dashboard-value" id="dashboard-jm-altitude">--</div>
+                        </div>
+
+                        <div class="dashboard-item">
+                            <div class="dashboard-label">Direction</div>
+                            <div class="dashboard-value" id="dashboard-jm-direction">--</div>
+                        </div>
+
+                        <div class="dashboard-item">
+                            <div class="dashboard-label">Speed</div>
+                            <div class="dashboard-value" id="dashboard-jm-speed">--</div>
+                        </div>
+
+                        <div class="dashboard-item span-2 accuracy-item">
+                            <div class="dashboard-label">Accuracy</div>
+                            <div class="dashboard-value" id="dashboard-jm-accuracy">--</div>
+                        </div>
+                    </div>
+
+                    <div id="jumpmaster-line-details" class="hidden">
+                        <hr>
+                        <div class="dashboard-grid">
+                            <div class="dashboard-item span-2">
+                                <div class="dashboard-label" id="dashboard-jm-target-label">JML to --</div>
+                            </div>
+                            <div class="dashboard-item">
+                                <div class="dashboard-label">Bearing</div>
+                                <div class="dashboard-value" id="dashboard-jm-bearing">--</div>
+                            </div>
+                            <div class="dashboard-item">
+                                <div class="dashboard-label">Distance</div>
+                                <div class="dashboard-value" id="dashboard-jm-distance">--</div>
+                            </div>
+                            <div class="dashboard-item span-2">
+                                <div class="dashboard-label">Time to Target</div>
+                                <div class="dashboard-value" id="dashboard-jm-tot">--</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

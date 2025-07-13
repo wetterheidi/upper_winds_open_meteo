@@ -386,6 +386,19 @@ html {
     box-shadow: 0 0 3px rgba(0, 123, 255, 0.5);
 }
 
+/* NEU: Styling für deaktivierte Radio-Buttons */
+.submenu input[type="radio"]:disabled {
+    background-color: #f0f0f0; /* Heller grauer Hintergrund */
+    border-color: #cccccc;     /* Hellgrauer Rand */
+    cursor: not-allowed;       /* Zeigt das "Nicht erlaubt"-Cursor-Symbol */
+}
+
+/* Optional: Stellt sicher, dass auch der Text des Labels ausgegraut wird */
+.submenu label:has(input[type="radio"]:disabled) {
+    color: #999999;
+    cursor: not-allowed;
+}
+
 .submenu select {
     width: 100%;
     padding: 6px;

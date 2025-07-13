@@ -490,32 +490,29 @@ export function validateLegHeights(final, base, downwind) {
 
 // == Live Tracking ==
 export function updateJumpMasterLineAndPanel(positionData = null) {
-    // 1. Grundvoraussetzung: Ist Live-Tracking überhaupt aktiv?
-    if (!AppState.liveMarker) {
-        mapManager.clearJumpMasterLine();
-        mapManager.hideLivePositionControl();
-        return;
+    const showJML = Settings.state.userSettings.showJumpMasterLine;
+    let dataForDashboard = null;
+    let livePos = null;
+
+    // Zuerst prüfen, ob Live-Tracking überhaupt aktiv ist.
+    if (AppState.watchId !== null) {
+        // Wenn Tracking aktiv ist, haben wir immer Daten für das Haupt-Dashboard.
+        livePos = AppState.liveMarker ? AppState.liveMarker.getLatLng() : null;
+        
+        dataForDashboard = positionData || { // Nimm neue Daten oder die zuletzt bekannten
+            latitude: livePos ? livePos.lat : AppState.lastLatitude,
+            longitude: livePos ? livePos.lng : AppState.lastLongitude,
+            speedMs: AppState.lastSmoothedSpeedMs,
+            direction: AppState.lastDirection,
+            deviceAltitude: AppState.lastDeviceAltitude,
+            altitudeAccuracy: AppState.lastAltitudeAccuracy,
+            accuracy: AppState.lastAccuracy
+        };
+        dataForDashboard.showJumpMasterLine = showJML; // Füge den Checkbox-Status hinzu
     }
 
-    // 2. Basis-Positionsdaten zusammenstellen
-    const livePos = AppState.liveMarker.getLatLng();
-    if (!livePos) return;
-
-    const data = positionData || { // Fallback, falls keine neuen Daten übergeben wurden
-        latitude: livePos.lat,
-        longitude: livePos.lng,
-        speedMs: AppState.lastSmoothedSpeedMs,
-        direction: AppState.lastDirection,
-        deviceAltitude: AppState.lastDeviceAltitude,
-        altitudeAccuracy: AppState.lastAltitudeAccuracy,
-        accuracy: AppState.lastAccuracy
-    };
-
-    // 3. Jump-Master-Line-Daten NUR berechnen, wenn die Checkbox aktiv ist
-    const showJML = Settings.state.userSettings.showJumpMasterLine;
-    let jumpMasterLineData = null;
-
-    if (showJML) {
+    // Wenn die JML-Linie angezeigt werden soll UND wir eine Position haben:
+    if (showJML && livePos) {
         let targetPos = null;
         let targetName = '';
 
@@ -528,32 +525,112 @@ export function updateJumpMasterLineAndPanel(positionData = null) {
         }
 
         if (targetPos) {
+            // Berechne die Daten und zeichne die Linie
             const distance = AppState.map.distance(livePos, targetPos);
             const bearing = Math.round(Utils.calculateBearing(livePos.lat, livePos.lng, targetPos.lat, targetPos.lng));
-            const speedMs = data.speedMs > 1 ? data.speedMs : 1;
+            const speedMs = dataForDashboard.speedMs > 1 ? dataForDashboard.speedMs : 1;
             const tot = Math.round(distance / speedMs);
-            jumpMasterLineData = { distance, bearing, tot, target: targetName };
+            
+            dataForDashboard.jumpMasterLineData = { distance, bearing, tot, target: targetName };
             mapManager.drawJumpMasterLine(livePos, targetPos);
         }
     } else {
-        // Wenn die Checkbox nicht aktiv ist, sicherstellen, dass die Linie entfernt wird
+        // Wenn die Linie nicht angezeigt werden soll, räume sie auf.
         mapManager.clearJumpMasterLine();
     }
+    
+    // Aktualisiere das Dashboard IMMER am Ende.
+    // Die Funktion ist schlau genug zu wissen, was sie mit den Daten (oder null) tun soll.
+    updateJumpMasterDashboard(dataForDashboard);
+}
+function updateJumpMasterDashboard(data) {
+    const dashboard = document.getElementById('jumpmaster-dashboard');
+    if (!dashboard) return;
 
-    // 4. Das Panel IMMER aktualisieren, solange das Tracking läuft
-    const settingsForPanel = {
+    // Dashboard sichtbar machen, wenn Daten vorhanden sind, sonst verstecken.
+    if (!data) {
+        dashboard.classList.add('hidden');
+        return;
+    }
+    dashboard.classList.remove('hidden');
+
+    // UI-Elemente referenzieren
+    const coordsEl = document.getElementById('dashboard-jm-coords');
+    const altitudeEl = document.getElementById('dashboard-jm-altitude');
+    const directionEl = document.getElementById('dashboard-jm-direction');
+    const speedEl = document.getElementById('dashboard-jm-speed');
+    const accuracyEl = document.getElementById('dashboard-jm-accuracy');
+
+    // Werte formatieren und anzeigen
+    const settings = {
         heightUnit: getHeightUnit(),
         effectiveWindUnit: getWindSpeedUnit() === 'bft' ? 'kt' : getWindSpeedUnit(),
         coordFormat: getCoordinateFormat(),
         refLevel: Settings.getValue('refLevel', 'radio', 'AGL')
     };
 
-    mapManager.updateLivePositionControl({
-        ...data,
-        showJumpMasterLine: showJML,
-        jumpMasterLineData,
-        ...settingsForPanel
-    });
+    const coords = Utils.convertCoords(data.latitude, data.longitude, settings.coordFormat);
+    let coordText;
+
+    if (settings.coordFormat === 'MGRS') {
+        // MGRS ist ein einzelner String
+        coordText = coords;
+    } else if (settings.coordFormat === 'DMS') {
+        // Format für Grad, Minuten, Sekunden
+        const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
+        coordText = `${formatDMS(coords.lat)}, ${formatDMS(coords.lng)}`;
+    } else {
+        // Standard-Dezimalformat
+        coordText = `${coords.lat}, ${coords.lng}`;
+    }
+
+    coordsEl.textContent = coordText; // Die korrigierte Zeile
+
+    let altText = "N/A";
+    if (data.deviceAltitude !== null) {
+        let displayAltitude = (settings.refLevel === 'AGL' && AppState.lastAltitude) ? data.deviceAltitude - parseFloat(AppState.lastAltitude) : data.deviceAltitude;
+        altText = `${Math.round(Utils.convertHeight(displayAltitude, settings.heightUnit))} ${settings.heightUnit}`;
+    }
+    altitudeEl.textContent = altText;
+
+    directionEl.textContent = `${data.direction}°`;
+    speedEl.textContent = `${Utils.convertWind(data.speedMs, settings.effectiveWindUnit, 'm/s').toFixed(1)} ${settings.effectiveWindUnit}`;
+    accuracyEl.textContent = `± ${Math.round(Utils.convertHeight(data.accuracy, settings.heightUnit))} ${settings.heightUnit}`;
+    // =======================================================
+    // START DER KORREKTUR FÜR DIE JUMP MASTER LINE DETAILS
+    // =======================================================
+    const jmlDetails = document.getElementById('jumpmaster-line-details');
+    const showJML = data.showJumpMasterLine;
+
+    // Schritt 1: Blende den Detail-Container basierend auf der Checkbox ein oder aus.
+    jmlDetails.classList.toggle('hidden', !showJML);
+
+    // Schritt 2: Wenn der Container sichtbar ist, fülle ihn.
+    if (showJML) {
+        const targetLabel = document.getElementById('dashboard-jm-target-label');
+        const bearingEl = document.getElementById('dashboard-jm-bearing');
+        const distanceEl = document.getElementById('dashboard-jm-distance');
+        const totEl = document.getElementById('dashboard-jm-tot');
+
+        // Entweder mit echten Daten füllen...
+        if (data.jumpMasterLineData) {
+            const settings = { heightUnit: getHeightUnit() }; // Holen der Einheit für die Distanz
+            targetLabel.textContent = `JML to ${data.jumpMasterLineData.target}`;
+            bearingEl.textContent = `${data.jumpMasterLineData.bearing}°`;
+            distanceEl.textContent = `${Math.round(Utils.convertHeight(data.jumpMasterLineData.distance, settings.heightUnit))} ${settings.heightUnit}`;
+            totEl.textContent = data.jumpMasterLineData.tot < 1200 ? `X - ${data.jumpMasterLineData.tot} s` : 'N/A';
+        }
+        // ...oder mit Platzhaltern, falls noch keine Daten da sind.
+        else {
+            targetLabel.textContent = 'JML to --';
+            bearingEl.textContent = '--';
+            distanceEl.textContent = '--';
+            totEl.textContent = '--';
+        }
+    }
+    // =======================================================
+    // ENDE DER KORREKTUR
+    // =======================================================
 }
 
 // == UI and Event Handling ==
@@ -1342,6 +1419,11 @@ function setupAppEventListeners() {
         }
 
         mapManager.recenterMap();
+    });
+
+    document.addEventListener('ui:showJumpMasterLineChanged', () => {
+        console.log('[main-web] Jump Master Line checkbox changed, forcing dashboard update.');
+        updateJumpMasterLineAndPanel();
     });
 
     document.addEventListener('ui:jumpMasterLineTargetChanged', () => {

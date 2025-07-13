@@ -53,7 +53,6 @@ async function initMap() {
     _setupBaseLayersAndHandling();
     _addStandardMapControls();
     _setupCustomPanes();
-    _initializeLivePositionControl();
     _initializeDefaultMarker(defaultCenter, initialAltitude);
 
     _setupCoreMapEventHandlers();
@@ -393,11 +392,6 @@ function _setupCustomPanes() {
     AppState.map.getPane('tooltipPane').style.zIndex = 700;
     AppState.map.getPane('popupPane').style.zIndex = 700;
     console.log('Custom map panes created.');
-}
-function _initializeLivePositionControl() {
-    // Erstelle das Control mit der neuen Definition
-    AppState.livePositionControl = new LivePositionControl({ position: 'bottomright' }).addTo(AppState.map);
-    console.log('Initialized livePositionControl and hid by default');
 }
 async function _initializeDefaultMarker(defaultCenter, initialAltitude) {
     console.log("MapManager: Initialisiere den Standard-Marker...");
@@ -1274,64 +1268,6 @@ export function recenterMap(force = false) {
 }
 
 //Live Position Funktionen
-const LivePositionControl = L.Control.extend({
-    options: {
-        position: 'bottomright'
-    },
-    onAdd: function (map) {
-        const container = L.DomUtil.create('div', 'leaflet-control-live-position');
-        container.style.display = 'none';
-        container.style.background = 'rgba(255, 255, 255, 0.8)';
-        container.style.padding = '5px';
-        container.style.borderRadius = '4px';
-        this._container = container;
-        return container;
-    },
-    update: function (data) {
-        // Wenn keine Daten oder keine Koordinaten da sind -> ausblenden.
-        if (!data || data.latitude === null || data.latitude === undefined) {
-            this._container.style.display = 'none';
-            return;
-        }
-
-        const {
-            latitude, longitude, deviceAltitude, altitudeAccuracy, accuracy,
-            speedMs, direction, showJumpMasterLine, jumpMasterLineData,
-            heightUnit, effectiveWindUnit, coordFormat, refLevel
-        } = data;
-
-        const coords = Utils.convertCoords(latitude, longitude, coordFormat);
-        const coordText = (coordFormat === 'MGRS') ? `MGRS: ${coords.lat}<br>` : `Lat: ${latitude.toFixed(5)}<br>Lng: ${longitude.toFixed(5)}<br>`;
-
-        let altitudeText = "Altitude: N/A<br>";
-        if (deviceAltitude !== null) {
-            let displayAltitude = (refLevel === 'AGL' && AppState.lastAltitude) ? deviceAltitude - parseFloat(AppState.lastAltitude) : deviceAltitude;
-            let displayRefLevel = (refLevel === 'AGL' && AppState.lastAltitude) ? 'abv DIP' : refLevel;
-            const convertedAlt = Math.round(Utils.convertHeight(displayAltitude, heightUnit));
-            const convertedAcc = Math.round(Utils.convertHeight(altitudeAccuracy, heightUnit));
-            altitudeText = `Altitude: ${convertedAlt} ${heightUnit} ${displayRefLevel} (±${convertedAcc || 'N/A'} ${heightUnit})<br>`;
-        }
-
-        const accuracyText = `Accuracy: ${Math.round(Utils.convertHeight(accuracy, heightUnit))} ${heightUnit}<br>`;
-        const speedText = `Speed: ${Utils.convertWind(speedMs, effectiveWindUnit, 'm/s').toFixed(1)} ${effectiveWindUnit}<br>`;
-        const directionText = `Direction: ${direction}°`;
-
-        let content = `<span style="font-weight: bold;">Live Position</span><br>${coordText}${altitudeText}${accuracyText}${speedText}${directionText}`;
-
-        if (showJumpMasterLine && jumpMasterLineData) {
-            const distText = Math.round(Utils.convertHeight(jumpMasterLineData.distance, heightUnit));
-            const totText = jumpMasterLineData.tot !== 'N/A' && jumpMasterLineData.tot < 1200 ? `TOT: X - ${jumpMasterLineData.tot} s` : 'TOT: N/A';
-
-            content += `<br><br><span style="font-weight: bold;">Jump Master Line to ${jumpMasterLineData.target}</span><br>`;
-            content += `Bearing: ${jumpMasterLineData.bearing}°<br>`;
-            content += `Distance: ${distText} ${heightUnit}<br>`;
-            content += totText;
-        }
-
-        this._container.innerHTML = content;
-        this._container.style.display = 'block';
-    }
-});
 
 export function drawJumpMasterLine(start, end) {
     const line = [[start.lat, start.lng], [end.lat, end.lng]];
@@ -1346,19 +1282,6 @@ export function clearJumpMasterLine() {
     if (AppState.jumpMasterLine) {
         AppState.map.removeLayer(AppState.jumpMasterLine);
         AppState.jumpMasterLine = null;
-    }
-}
-
-export function hideLivePositionControl() {
-    if (AppState.livePositionControl) {
-        // Rufe update mit null auf, um es auszublenden
-        AppState.livePositionControl.update(null);
-    }
-}
-
-export function updateLivePositionControl(data) {
-    if (AppState.livePositionControl) {
-        AppState.livePositionControl.update(data);
     }
 }
 
