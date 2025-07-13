@@ -574,7 +574,7 @@ function updateJumpMasterDashboard(data) {
 
     if (settings.coordFormat === 'MGRS') {
         // MGRS ist ein einzelner String
-        coordText = coords;
+        coordText = coords.lat;
     } else if (settings.coordFormat === 'DMS') {
         // Format für Grad, Minuten, Sekunden
         const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;

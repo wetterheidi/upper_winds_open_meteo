@@ -5,12 +5,21 @@
    ================================================================= */
 
 /* 1. Haupt-Container (teilt den Bildschirm in Spalten) */
-body {
-    display: flex; /* Macht den Body zu einem Flex-Container */
-    flex-direction: column; /* Ordnet die Kinder (Layout und Slider) vertikal an */
-    height: 100vh;
-    margin: 0;
-    overflow: hidden; /* Verhindert unnötiges Scrollen */
+#webapp-container {
+    display: grid;
+    /* Wir definieren die zwei Hauptzeilen: Header und das Hauptlayout darunter */
+    grid-template-rows: auto 1fr; 
+    height: 100vh; /* Füllt die gesamte Bildschirmhöhe */
+    overflow: hidden; /* Verhindert Scrollbalken auf der Hauptebene */
+}
+
+/* Die Regel für das .main-layout bleibt fast gleich,
+   wir stellen nur sicher, dass sie sich korrekt verhält. */
+.main-layout {
+    display: grid;
+    grid-template-columns: 60px 0 1fr;
+    transition: grid-template-columns 0.3s ease-in-out;
+    min-height: 0; /* Verhindert ein Überlaufen des Grids */
 }
 
 /* Der neue Header-Container */
@@ -33,15 +42,6 @@ body {
     width: 80px;
     height: 80px;
     display: block; /* Verhindert unerwünschten Leerraum unter dem Bild */
-}
-
-.main-layout {
-    flex-grow: 1; 
-    display: grid;
-    grid-template-columns: 60px 0 1fr;
-    height: 100%; 
-    transition: grid-template-columns 0.3s ease-in-out;
-    min-height: 0; /* <-- DIESE ZEILE HINZUFÜGEN */
 }
 
 .main-layout.sidebar-expanded {
