@@ -733,6 +733,7 @@ function initializeUIElements() {
     applySettingToInput('upperLimit', Settings.state.userSettings.upperLimit);
     applySettingToInput('openingAltitude', Settings.state.userSettings.openingAltitude);
     applySettingToInput('exitAltitude', Settings.state.userSettings.exitAltitude);
+    applySettingToInput('safetyHeight', Settings.state.userSettings.safetyHeight);
     applySettingToSelect('interpStep', Settings.state.userSettings.interpStep);
     applySettingToInput('aircraftSpeedKt', Settings.state.userSettings.aircraftSpeedKt);
     applySettingToInput('jumpRunTrackOffset', Settings.state.userSettings.jumpRunTrackOffset);
@@ -1219,6 +1220,7 @@ function setupAppEventListeners() {
             // --- Fälle, die den kompletten Sprungablauf und das Landemuster beeinflussen ---
             case 'openingAltitude':
             case 'exitAltitude':
+            case 'safetyHeight':
             case 'numberOfJumpers':
             case 'jumperSeparation':
             case 'canopySpeed':

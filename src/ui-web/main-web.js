@@ -498,7 +498,7 @@ export function updateJumpMasterLineAndPanel(positionData = null) {
     if (AppState.watchId !== null) {
         // Wenn Tracking aktiv ist, haben wir immer Daten für das Haupt-Dashboard.
         livePos = AppState.liveMarker ? AppState.liveMarker.getLatLng() : null;
-        
+
         dataForDashboard = positionData || { // Nimm neue Daten oder die zuletzt bekannten
             latitude: livePos ? livePos.lat : AppState.lastLatitude,
             longitude: livePos ? livePos.lng : AppState.lastLongitude,
@@ -530,7 +530,7 @@ export function updateJumpMasterLineAndPanel(positionData = null) {
             const bearing = Math.round(Utils.calculateBearing(livePos.lat, livePos.lng, targetPos.lat, targetPos.lng));
             const speedMs = dataForDashboard.speedMs > 1 ? dataForDashboard.speedMs : 1;
             const tot = Math.round(distance / speedMs);
-            
+
             dataForDashboard.jumpMasterLineData = { distance, bearing, tot, target: targetName };
             mapManager.drawJumpMasterLine(livePos, targetPos);
         }
@@ -538,7 +538,7 @@ export function updateJumpMasterLineAndPanel(positionData = null) {
         // Wenn die Linie nicht angezeigt werden soll, räume sie auf.
         mapManager.clearJumpMasterLine();
     }
-    
+
     // Aktualisiere das Dashboard IMMER am Ende.
     // Die Funktion ist schlau genug zu wissen, was sie mit den Daten (oder null) tun soll.
     updateJumpMasterDashboard(dataForDashboard);
@@ -671,6 +671,7 @@ function initializeUIElements() {
     applySettingToInput('upperLimit', Settings.state.userSettings.upperLimit);
     applySettingToInput('openingAltitude', Settings.state.userSettings.openingAltitude);
     applySettingToInput('exitAltitude', Settings.state.userSettings.exitAltitude);
+    applySettingToInput('safetyHeight', Settings.state.userSettings.safetyHeight);
     applySettingToSelect('interpStep', Settings.state.userSettings.interpStep);
     applySettingToInput('aircraftSpeedKt', Settings.state.userSettings.aircraftSpeedKt);
     applySettingToInput('jumpRunTrackOffset', Settings.state.userSettings.jumpRunTrackOffset);
@@ -1264,6 +1265,7 @@ function setupAppEventListeners() {
             // --- Fälle, die den kompletten Sprungablauf und das Landemuster beeinflussen ---
             case 'openingAltitude':
             case 'exitAltitude':
+            case 'safetyHeight':
             case 'numberOfJumpers':
             case 'jumperSeparation':
             case 'canopySpeed':

@@ -191,6 +191,13 @@
                             </label>
                         </li>
                         <li>
+                            <label class="radio-label"
+                                title="Reduces the calculated radius to account for a safety buffer.">
+                                Safety Height (m):
+                                <input type="number" id="safetyHeight" min="0" max="1000" step="10" value="0">
+                            </label>
+                        </li>
+                        <li>
                             <label class="radio-label">
                                 Aircraft Speed (ktIAS):
                                 <input type="number" id="aircraftSpeedKt" min="10" max="150" step="5" value="90">
@@ -330,7 +337,8 @@
                             <span>Models</span>
                             <ul class="submenu" id="ensembleModelsSubmenu">
                             </ul>
-                            <button id="deselectAllEnsembleButton" style="width: 100%; margin-top: 5px;">Deselect All</button>
+                            <button id="deselectAllEnsembleButton" style="width: 100%; margin-top: 5px;">Deselect
+                                All</button>
                         </li>
                         <li>
                             <span>Scenarios</span>

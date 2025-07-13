@@ -135,6 +135,9 @@ export function calculateExitCircle(interpolatedData) {
     const legHeightDownwind = parseInt(document.getElementById('legHeightDownwind')?.value) || 300;
     const descentRate = parseFloat(document.getElementById('descentRate')?.value) || 3.5;
     const canopySpeedMps = (parseFloat(document.getElementById('canopySpeed')?.value) || 20) * CONVERSIONS.KNOTS_TO_MPS;
+    const safetyHeight = Settings.state.userSettings.safetyHeight || 0; // NEU
+
+    const reductionDistance = (safetyHeight / descentRate) * canopySpeedMps;
 
     const heights = interpolatedData.map(d => d.height);
     const uComponents = interpolatedData.map(d => -Utils.convertWind(d.spd, 'm/s', 'km/h') * Math.sin(d.dir * Math.PI / 180));
@@ -146,8 +149,8 @@ export function calculateExitCircle(interpolatedData) {
     const flyTimeFull = (openingAltitude - CANOPY_OPENING_BUFFER_METERS) / descentRate;
     const horizontalCanopyDistanceFull = flyTimeFull * canopySpeedMps;
 
-    const meanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, elevation + legHeightDownwind, elevation + openingAltitude - CANOPY_OPENING_BUFFER_METERS);
-    const meanWindFull = Utils.calculateMeanWind(heights, uComponents, vComponents, elevation, elevation + openingAltitude - CANOPY_OPENING_BUFFER_METERS);
+    const meanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, elevation + safetyHeight + legHeightDownwind, elevation + openingAltitude - CANOPY_OPENING_BUFFER_METERS);
+    const meanWindFull = Utils.calculateMeanWind(heights, uComponents, vComponents, elevation + safetyHeight, elevation + openingAltitude - CANOPY_OPENING_BUFFER_METERS);
 
     const landingPatternCoords = calculateLandingPatternCoords(AppState.lastLat, AppState.lastLng, interpolatedData);
     let { downwindLat: blueLat, downwindLng: blueLng } = landingPatternCoords;
@@ -164,9 +167,14 @@ export function calculateExitCircle(interpolatedData) {
     const darkGreenCenter = Utils.calculateNewCenter(newCenterBlue[0], newCenterBlue[1], freeFallResult.distance, greenShiftDirection);
 
     return {
-        greenLat: greenCenter[0], greenLng: greenCenter[1], darkGreenLat: darkGreenCenter[0], darkGreenLng: darkGreenCenter[1],
-        greenRadius: horizontalCanopyDistanceFull, darkGreenRadius: horizontalCanopyDistance,
-        freeFallDirection: freeFallResult.directionDeg, freeFallDistance: freeFallResult.distance, freeFallTime: freeFallResult.time
+        greenLat: greenCenter[0], greenLng: greenCenter[1], 
+        darkGreenLat: darkGreenCenter[0], darkGreenLng: darkGreenCenter[1],
+        // NEU: Reduziere die Radien, aber stelle sicher, dass sie nicht negativ werden
+        greenRadius: Math.max(0, horizontalCanopyDistanceFull - reductionDistance), 
+        darkGreenRadius: Math.max(0, horizontalCanopyDistance - reductionDistance),
+        freeFallDirection: freeFallResult.directionDeg, 
+        freeFallDistance: freeFallResult.distance, 
+        freeFallTime: freeFallResult.time
     };
 }
 
@@ -219,6 +227,9 @@ export function calculateCanopyCircles(interpolatedData) {
     const legHeightDownwind = parseInt(document.getElementById('legHeightDownwind')?.value) || 300;
     const descentRate = parseFloat(document.getElementById('descentRate')?.value) || 3.5;
     const canopySpeedMps = (parseFloat(document.getElementById('canopySpeed')?.value) || 20) * CONVERSIONS.KNOTS_TO_MPS;
+    const safetyHeight = Settings.state.userSettings.safetyHeight || 0; // NEU
+
+    const reductionDistance = (safetyHeight / descentRate) * canopySpeedMps;
 
     const heights = interpolatedData.map(d => d.height);
     const uComponents = interpolatedData.map(d => -Utils.convertWind(d.spd, 'm/s', 'km/h') * Math.sin(d.dir * Math.PI / 180));
@@ -230,8 +241,8 @@ export function calculateCanopyCircles(interpolatedData) {
     const flyTimeFull = (openingAltitude - CANOPY_OPENING_BUFFER_METERS) / descentRate;
     const horizontalCanopyDistanceFull = flyTimeFull * canopySpeedMps;
 
-    const meanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, elevation + legHeightDownwind, elevation + openingAltitude - CANOPY_OPENING_BUFFER_METERS);
-    const meanWindFull = Utils.calculateMeanWind(heights, uComponents, vComponents, elevation, elevation + openingAltitude - CANOPY_OPENING_BUFFER_METERS);
+    const meanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, elevation + legHeightDownwind, elevation + safetyHeight + openingAltitude - CANOPY_OPENING_BUFFER_METERS);
+    const meanWindFull = Utils.calculateMeanWind(heights, uComponents, vComponents, elevation + safetyHeight, elevation + openingAltitude - CANOPY_OPENING_BUFFER_METERS);
     
     const freeFallResult = calculateFreeFall(AppState.weatherData, exitAltitude, openingAltitude, interpolatedData, AppState.lastLat, AppState.lastLng, elevation);
     if (!freeFallResult) return null;
@@ -249,7 +260,7 @@ export function calculateCanopyCircles(interpolatedData) {
         const currentRadius = currentFlyTime * canopySpeedMps;
         if (currentRadius > 0) {
             const currentMeanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, lowerLimit, currentUpper);
-            additionalBlueRadii.push(currentRadius);
+            additionalBlueRadii.push(Math.max(0, currentRadius - reductionDistance));
             additionalBlueDisplacements.push(currentMeanWind[1] * currentFlyTime);
             additionalBlueDirections.push(currentMeanWind[0]);
             additionalBlueUpperLimits.push(currentUpper - elevation);
@@ -258,7 +269,8 @@ export function calculateCanopyCircles(interpolatedData) {
 
     return {
         blueLat, blueLng, redLat: AppState.lastLat, redLng: AppState.lastLng,
-        radius: horizontalCanopyDistance, radiusFull: horizontalCanopyDistanceFull,
+        radius: Math.max(0, horizontalCanopyDistance - reductionDistance), 
+        radiusFull: Math.max(0, horizontalCanopyDistanceFull - reductionDistance),
         additionalBlueRadii, additionalBlueDisplacements, additionalBlueDirections, additionalBlueUpperLimits,
         displacement: meanWind[1] * flyTime, direction: meanWind[0],
         displacementFull: meanWindFull[1] * flyTimeFull, directionFull: meanWindFull[0],

@@ -1064,6 +1064,8 @@ function setupInputEvents() {
         return true;
     });
 
+    setupInput('safetyHeight', 'change', 300);
+
     setupInput('canopySpeed', 'change', 300);
     setupInput('descentRate', 'change', 300);
     setupInput('interpStep', 'change', 300, null, 'interpStep'); 
