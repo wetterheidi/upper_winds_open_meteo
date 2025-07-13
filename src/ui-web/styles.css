@@ -13,6 +13,28 @@ body {
     overflow: hidden; /* Verhindert unnötiges Scrollen */
 }
 
+/* Der neue Header-Container */
+#app-header {
+    display: flex; /* Richtet Logo und Slider nebeneinander aus */
+    align-items: center; /* Zentriert beide Elemente vertikal */
+    padding: 10px;
+    background-color: #ffffff;
+    border-bottom: 1px solid #d9d9d9;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Container für das Logo */
+#header-logo-container {
+    padding-right: 20px; /* Abstand zum Slider */
+}
+
+#header-logo {
+    width: 80px;
+    height: 80px;
+    display: block; /* Verhindert unerwünschten Leerraum unter dem Bild */
+}
+
 .main-layout {
     flex-grow: 1; 
     display: grid;
@@ -209,9 +231,17 @@ body {
     margin: 10px auto; /* Zentriert den Slider horizontal und fügt Abstand hinzu */
     padding: 0px;
     background: #fff;
-    border-radius: 8px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     z-index: 1001; /* Hält ihn über potenziell überlappenden Elementen */
+}
+#slider-container {
+    flex-grow: 1; /* Sorgt dafür, dass der Slider den restlichen Platz einnimmt */
+    position: static; /* Hebt alte Positionierungsregeln auf */
+    transform: none;  /* Hebt alte Positionierungsregeln auf */
+    width: auto;      /* Passt sich dem flexiblen Container an */
+    max-width: none;  /* Hebt alte Breitenbeschränkungen auf */
+    box-shadow: none; /* Der Schatten ist jetzt am #app-header */
+    padding: 0;       /* Das Padding wird vom #app-header übernommen */
 }
 
 /* =================================================================

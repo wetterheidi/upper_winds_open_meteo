@@ -23,35 +23,40 @@
 
 <body>
 
-    <div id="slider-container">
-        <div class="slider-content-wrapper">
-            <div class="time-row">
-                <span id="selectedTime">Selected Time: </span>
-                <div id="autoupdateToggle">
-                    <label for="autoupdateCheckbox" title="Autoupdate">⟳</label>
-                    <input type="checkbox" id="autoupdateCheckbox">
+    <header id="app-header">
+        <div id="header-logo-container">
+            <img id="header-logo" src="/icon4.png" alt="DZMaster Logo">
+            <label id="headerLabel" style="text-align: center; padding: 0; font-size: 16px; font-weight: bold;">DZ Master</label>
+        </div>
+        <div id="slider-container">
+            <div class="slider-content-wrapper">
+                <div class="time-row">
+                    <span id="selectedTime">Selected Time: </span>
+                    <div id="autoupdateToggle">
+                        <label for="autoupdateCheckbox" title="Autoupdate">⟳</label>
+                        <input type="checkbox" id="autoupdateCheckbox">
+                    </div>
+                </div>
+                <input type="range" id="timeSlider" min="0" max="167" value="0" disabled>
+                <div id="model-row">
+                    <label id="modelLabel" for="modelSelect" title="Model Run">Forecast Model:</label>
+                    <select id="modelSelect">
+                        <option value="icon_global" selected>ICON GLOBAL</option>
+                        <option value="gfs">GFS</option>
+                        <option value="ecmwf">ECMWF</option>
+                    </select>
+
+                    <button id="modelInfoButton" class="info-button-shared">i</button>
+                    <div id="modelInfoPopup" class="info-popup"></div>
                 </div>
             </div>
-            <input type="range" id="timeSlider" min="0" max="167" value="0" disabled>
-            <div id="model-row">
-                <label id="modelLabel" for="modelSelect" title="Model Run">Forecast Model:</label>
-                <select id="modelSelect">
-                    <option value="icon_global" selected>ICON GLOBAL</option>
-                    <option value="gfs">GFS</option>
-                    <option value="ecmwf">ECMWF</option>
-                </select>
-
-                <button id="modelInfoButton" class="info-button-shared">i</button>
-                <div id="modelInfoPopup" class="info-popup"></div>
-            </div>
         </div>
-    </div>
-
+    </header>
     <div class="main-layout">
 
         <div id="map-content">
             <div id="map"></div>
-            </div>
+        </div>
 
         <aside id="sidebar">
             <div class="sidebar-icon" data-panel-id="panel-data" title="Data">
@@ -340,6 +345,8 @@
                                 <span>Models</span>
                                 <ul class="submenu" id="ensembleModelsSubmenu">
                                 </ul>
+                                <button id="deselectAllEnsembleButton" style="width: 100%; margin-top: 5px;">Deselect
+                                    All</button>
                             </li>
                             <li>
                                 <span>Scenarios</span>

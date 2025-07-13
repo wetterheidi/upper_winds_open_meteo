@@ -507,6 +507,30 @@ function setupResetCutAwayMarkerButton() {
         });
     }
 }
+function setupDeselectAllEnsembleButton() {
+    const deselectButton = document.getElementById('deselectAllEnsembleButton');
+    if (!deselectButton) return;
+
+    deselectButton.addEventListener('click', () => {
+        // 1. Finde alle Checkboxen der Ensemble-Modelle
+        const ensembleCheckboxes = document.querySelectorAll('#ensembleModelsSubmenu input[type="checkbox"]');
+        
+        // 2. Entferne bei allen den Haken
+        ensembleCheckboxes.forEach(checkbox => {
+            checkbox.checked = false;
+        });
+
+        // 3. Leere die Auswahl in den Einstellungen und speichere
+        Settings.state.userSettings.selectedEnsembleModels = [];
+        Settings.save();
+
+        // 4. Lösche die geladenen Ensemble-Daten und die Visualisierungen
+        AppState.ensembleModelsData = null;
+        clearEnsembleVisualizations(); // Diese Funktion aus ensembleManager.js wird hier wiederverwendet
+
+        Utils.handleMessage('All ensemble models deselected.');
+    });
+}
 
 // --- Track & Datei-Management ---
 function setupTrackEvents() {
@@ -1196,6 +1220,7 @@ export function initializeEventListeners() {
     setupJumpRunTrackEvents();
     setupCutawayRadioButtons();
     setupResetCutAwayMarkerButton();
+    setupDeselectAllEnsembleButton();
 
     // 5. Datei- & Track-Management
     setupTrackEvents();
