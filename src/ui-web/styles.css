@@ -4,26 +4,27 @@
    NEUES HAUPT-LAYOUT FÜR DIE WEB-ANWENDUNG
    ================================================================= */
 
-/* 1. Haupt-Container (teilt den Bildschirm in Spalten) */
+/* 1. Der Hauptcontainer wird zum Flex-Container, der die Richtung vorgibt */
 #webapp-container {
-    display: grid;
-    /* Wir definieren die zwei Hauptzeilen: Header und das Hauptlayout darunter */
-    grid-template-rows: auto 1fr; 
-    height: 100vh; /* Füllt die gesamte Bildschirmhöhe */
-    overflow: hidden; /* Verhindert Scrollbalken auf der Hauptebene */
+    display: flex;
+    flex-direction: column; /* Ordnet Header und Hauptlayout untereinander an */
+    height: 100vh;          /* Füllt die gesamte Bildschirmhöhe */
+    width: 100%;            /* Füllt die gesamte Bildschirmbreite */
+    overflow: hidden;       /* Verhindert das Scrollen der gesamten Seite */
 }
 
-/* Die Regel für das .main-layout bleibt fast gleich,
-   wir stellen nur sicher, dass sie sich korrekt verhält. */
+/* 2. Erlauben Sie das Scrollen NUR innerhalb des Hauptlayouts */
 .main-layout {
     display: grid;
     grid-template-columns: 60px 0 1fr;
-    transition: grid-template-columns 0.3s ease-in-out;
-    min-height: 0; /* Verhindert ein Überlaufen des Grids */
+    flex-grow: 1;      /* WICHTIG: Erlaubt diesem Bereich zu wachsen */
+    overflow: auto;    /* ERLAUBT das Scrollen für den gesamten Hauptbereich */
+    min-height: 0;     /* Ein wichtiger Trick, um Flexbox-Layout-Fehler zu vermeiden */
 }
 
 /* Der neue Header-Container */
 #app-header {
+    flex-shrink: 0; /* Verhindert, dass der Header schrumpft */
     display: flex; /* Richtet Logo und Slider nebeneinander aus */
     align-items: center; /* Zentriert beide Elemente vertikal */
     padding: 10px;
@@ -57,8 +58,7 @@
 
 /* 2. Icon-Leiste (Seitenleiste) */
 #sidebar {
-    grid-column: 1 / 2; /* Bleibt immer in der ersten Spalte */
-    /* ... restliche Sidebar-Stile bleiben unverändert ... */
+    grid-column: 1 / 2;
     background-color: #f0f2f5;
     border-right: 1px solid #d9d9d9;
     display: flex;
@@ -67,6 +67,7 @@
     padding-top: 10px;
     gap: 10px;
     z-index: 2000;
+    overflow-y: auto; /* NEU: Erlaubt das Scrollen innerhalb der Sidebar */
 }
 
 .sidebar-icon {
@@ -222,6 +223,12 @@
     /* Wenn das Panel offen ist, startet der Kartenbereich erst in der dritten Spalte */
 }
 
+#slider-container {
+    flex-grow: 1;
+    display: flex;
+    justify-content: center; /* Zentriert den Wrapper, falls Platz ist */
+    min-width: 0; /* Erlaubt dem Container, kleiner als sein Inhalt zu werden */
+}
 /* Anpassung für bestehende Elemente */
 #slider-container {
     /* Entferne 'position', 'top', 'left', 'transform' */
@@ -1081,4 +1088,24 @@ display: flex;
     font-size: 16px;      /* Verringert die Schriftgröße, damit mehr Text passt */
     line-height: 1.4;     /* Sorgt für guten Abstand, falls die Zeile umbricht */
     word-wrap: break-word;/* Erlaubt den Umbruch von langen Zeichenketten (wichtig für MGRS) */
+}
+
+/* Label für die Touch-Messung */
+.leaflet-measure-label {
+    position: absolute;
+    font: 10px Arial, Helvetica, sans-serif;
+    background-color: rgba(255, 255, 170, 0.7);
+    color: black;
+    padding: 2px;
+    border-radius: 3px;
+    box-shadow: 1px 1px 4px #888;
+    white-space: nowrap;
+    text-align: right;
+    pointer-events: none; /* Wichtig, damit das Label keine Klicks abfängt */
+    display: none;        /* Wird per JavaScript auf 'block' gesetzt */
+    z-index: 9000;        /* Über dem Fadenkreuz */
+}
+
+.bold-distance {
+    font-weight: bold !important;
 }
