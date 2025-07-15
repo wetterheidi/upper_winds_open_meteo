@@ -22,590 +22,607 @@
 </head>
 
 <body>
+    <div id="loading" style="display: none;">
+        <div class="spinner"></div>
+        <p>Fetching Weather...</p>
+    </div>
     <div id="webapp-container">
 
-    <header id="app-header">
-        <div id="header-logo-container">
-            <img id="header-logo" src="/icon4.png" alt="DZMaster Logo">
-            <label id="headerLabel" style="text-align: center; padding: 0; font-size: 16px; font-weight: bold;">DZ
-                Master</label>
-        </div>
-        <div id="slider-container">
-            <div class="slider-content-wrapper">
-                <div class="time-row">
-                    <span id="selectedTime">Selected Time: </span>
-                    <div id="autoupdateToggle">
-                        <label for="autoupdateCheckbox" title="Autoupdate">⟳</label>
-                        <input type="checkbox" id="autoupdateCheckbox">
+        <header id="app-header">
+            <div id="header-logo-container">
+                <img id="header-logo" src="/icon4.png" alt="DZMaster Logo">
+                <label id="headerLabel" style="text-align: center; padding: 0; font-size: 16px; font-weight: bold;">DZ
+                    Master</label>
+            </div>
+            <div id="slider-container">
+                <div class="slider-content-wrapper">
+                    <div class="time-row">
+                        <span id="selectedTime">Selected Time: </span>
+                        <div id="autoupdateToggle">
+                            <label for="autoupdateCheckbox" title="Autoupdate">⟳</label>
+                            <input type="checkbox" id="autoupdateCheckbox">
+                        </div>
                     </div>
-                </div>
-                <input type="range" id="timeSlider" min="0" max="167" value="0" disabled>
-                <div id="model-row">
-                    <label id="modelLabel" for="modelSelect" title="Model Run">Forecast Model:</label>
-                    <select id="modelSelect">
-                        <option value="icon_global" selected>ICON GLOBAL</option>
-                        <option value="gfs">GFS</option>
-                        <option value="ecmwf">ECMWF</option>
-                    </select>
-
-                    <button id="modelInfoButton" class="info-button-shared">i</button>
-                    <div id="modelInfoPopup" class="info-popup"></div>
-                </div>
-            </div>
-        </div>
-    </header>
-    <div class="main-layout">
-
-        <div id="map-content">
-            <div id="map"></div>
-            <div id="crosshair"></div>
-        </div>
-
-        <aside id="sidebar">
-            <div class="sidebar-icon" data-panel-id="panel-data" title="Data">
-                <span class="icon">📊</span>
-                <span class="label">Data</span>
-            </div>
-            <div class="sidebar-icon" data-panel-id="panel-planner" title="Planner">
-                <span class="icon">🪂</span>
-                <span class="label">Planner</span>
-            </div>
-            <div class="sidebar-icon" data-panel-id="panel-jumpmaster" title="Jump Master">
-                <span class="icon">✈️</span>
-                <span class="label">Jumpmaster</span>
-            </div>
-            <div class="sidebar-icon" data-panel-id="panel-search" title="Search">
-                <span class="icon">🔍</span>
-                <span class="label">Search</span>
-            </div>
-            <div class="sidebar-icon" data-panel-id="panel-settings" title="Settings">
-                <span class="icon">⚙️</span>
-                <span class="label">Settings</span>
-            </div>
-        </aside>
-
-        <div id="panel-container">
-            <div id="panel-data" class="panel hidden">
-                <div id="selectedTime" style="text-align: center; padding: 0; font-weight: bold;"></div>
-
-                <div id="bottom-container">
-                    <div id="meanWindControls">
-                        <label for="lowerLimit" title="Lower altitude for mean wind calculation">Lower Limit
-                            (m):</label>
-                        <input type="number" id="lowerLimit" min="0" step="100" value="0">
-                        <label for="upperLimit" title="Upper altitude for mean wind calculation">Upper Limit
-                            (m):</label>
-                        <input type="number" id="upperLimit" min="0" step="100" value="3000">
-                        <div id="meanWindResult"></div>
-                    </div>
-                    <div id="controls-row">
-                        <label for="interpStep"
-                            title="Select the altitude interval for weather data interpolation">Step:</label>
-                        <select id="interpStep" aria-label="Interpolation step interval">
-                            <option value="100">100</option>
-                            <option value="200" selected>200</option>
-                            <option value="500">500</option>
-                            <option value="1000">1000</option>
-                            <option value="2000">2000</option>
+                    <input type="range" id="timeSlider" min="0" max="167" value="0" disabled>
+                    <div id="model-row">
+                        <label id="modelLabel" for="modelSelect" title="Model Run">Forecast Model:</label>
+                        <select id="modelSelect">
+                            <option value="icon_global" selected>ICON GLOBAL</option>
+                            <option value="gfs">GFS</option>
+                            <option value="ecmwf">ECMWF</option>
                         </select>
-                    </div>
-                    <div id="weather-table-container">
-                        <table id="table">
-                            <thead>
-                                <tr>
-                                    <th>Altitude (m)</th>
-                                    <th>Altitude (ft)</th>
-                                    <th>Direction (°)</th>
-                                    <th>Speed (kt)</th>
-                                    <th>Speed (m/s)</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                            </tbody>
-                        </table>
+
+                        <button id="modelInfoButton" class="info-button-shared">i</button>
+                        <div id="modelInfoPopup" class="info-popup"></div>
                     </div>
                 </div>
             </div>
+        </header>
+        <div class="main-layout">
 
-            <div id="panel-planner" class="panel hidden">
-                <div class="accordion-item">
-                    <button class="accordion-header">Landing Pattern</button>
-                    <div class="accordion-content">
-                        <ul>
-                            <li>
-                                <label class="radio-label">
-                                    <input type="checkbox" id="showLandingPattern" name="showLandingPattern"> Show
-                                    Landing
-                                    Pattern
-                                </label>
-                            </li>
-                            <li>
-                                <label class="radio-label">
-                                    <input type="radio" name="landingDirection" value="LL" checked> LL
-                                    <input type="number" id="customLandingDirectionLL" min="0" max="360"
-                                        placeholder="0-360°">
-                                    <label>°</label>
-                                </label>
-                            </li>
-                            <li>
-                                <label class="radio-label">
-                                    <input type="radio" name="landingDirection" value="RR"> RR
-                                    <input type="number" id="customLandingDirectionRR" min="0" max="360"
-                                        placeholder="0-360°">
-                                    <label>°</label>
-                                </label>
-                            </li>
-                            <li>
-                                <label class="radio-label">
-                                    Start Downwind Leg at m AGL:
-                                    <input type="number" id="legHeightDownwind" min="50" max="1000" step="50"
-                                        value="300">
-                                </label>
-                            </li>
-                            <li>
-                                <label class="radio-label">
-                                    Start Base Leg at m AGL:
-                                    <input type="number" id="legHeightBase" min="50" max="1000" step="50" value="200">
-                                </label>
-                            </li>
-                            <li>
-                                <label class="radio-label">
-                                    Start Final Leg at m AGL:
-                                    <input type="number" id="legHeightFinal" min="50" max="1000" step="50" value="100">
-                                </label>
-                            </li>
-                            <li>
-                                <label class="radio-label" title="Expert: 28 kt, Advanced: 22 kt, Student: 18 kt">
-                                    Canopy Speed (kt):
-                                    <input type="number" id="canopySpeed" min="5" max="50" step="1" value="20">
-                                </label>
-                            </li>
-                            <li>
-                                <label class="radio-label" title="Expert: 8 m/s, Advanced: 5 m/s, Student: 4 m/s">
-                                    Descent Rate (m/s):
-                                    <input type="number" id="descentRate" min="1" max="10" step="0.1" value="3.5">
-                                </label>
-                            </li>
-                            <li>
-                                <button id="exportLandingPatternGpxButton">Export Landing Pattern as GPX</button>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-
-                <div class="accordion-item">
-                    <button class="accordion-header" data-planner-section="calculateJump">Calculate Jump</button>
-                    <div class="accordion-content">
-                        <ul>
-                            <li>
-                                <label class="radio-label">
-                                    Exit Altitude (m AGL):
-                                    <input type="number" id="exitAltitude" min="500" max="15000" step="100"
-                                        value="3000">
-                                </label>
-                            </li>
-                            <li>
-                                <label class="radio-label" title="Canopy open 200 m below opening altitude!">
-                                    Opening Altitude (m AGL):
-                                    <input type="number" id="openingAltitude" min="500" max="10000" step="100"
-                                        value="1200">
-                                </label>
-                            </li>
-                            <li>
-                                <label class="radio-label"
-                                    title="Reduces the calculated radius to account for a safety buffer.">
-                                    Safety Height (m):
-                                    <input type="number" id="safetyHeight" min="0" max="1000" step="10" value="0">
-                                </label>
-                            </li>
-                            <li>
-                                <label class="radio-label">
-                                    Aircraft Speed (ktIAS):
-                                    <input type="number" id="aircraftSpeedKt" min="10" max="150" step="5" value="90">
-                                </label>
-                            </li>
-                            <li>
-                                <label class="radio-label">
-                                    Number Of Jumpers:
-                                    <input type="number" id="numberOfJumpers" min="1" max="50" step="1" value="5">
-                                </label>
-                            </li>
-                            <li>
-                                <label class="radio-label">
-                                    Separation (s):
-                                    <input type="number" id="jumperSeparation" min="1" max="50" step="1" value="5">
-                                </label>
-                            </li>
-                            <li>
-                                <label class="radio-label">
-                                    <input type="checkbox" id="showJumpRunTrack" /> Show Jump Run Track:
-                                    <input type="number" id="jumpRunTrackDirection" min="0" max="360" step="1"
-                                        placeholder="Calculated">
-                                    <label>°</label>
-                                </label>
-                            </li>
-                            <li>
-                                <label class="radio-label">
-                                    Jump Run Offset (m):
-                                    <input type="number" id="jumpRunTrackOffset" min="-50000" max="50000" step="100"
-                                        value="0" style="width: 80px;">
-                                </label>
-                            </li>
-                            <li>
-                                <label class="radio-label">
-                                    Jump Run Forward Offset (m):
-                                    <input type="number" id="jumpRunTrackForwardOffset" min="-50000" max="50000"
-                                        step="100" value="0" style="width: 80px;">
-                                </label>
-                            </li>
-                            <li>
-                                <label class="radio-label">
-                                    <input type="checkbox" id="showExitAreaCheckbox"> Show Exit Area </label>
-                            </li>
-                            <li>
-                                <label class="radio-label">
-                                    <input type="checkbox" id="showCanopyAreaCheckbox"> Show Canopy Flight Area </label>
-                            </li>
-                            <li>
-                                <label class="radio-label">
-                                    <input type="checkbox" id="showCutAwayFinder" name="showCutAwayFinder"> Show Cut
-                                    Away
-                                    Finder
-                                </label>
-                                <ul class="submenu hidden">
-                                    <li>
-                                        <label class="radio-label">
-                                            Cut Away Altitude (m):
-                                            <input type="number" id="cutAwayAltitude" min="400" max="15000" step="100"
-                                                value="1000">
-                                        </label>
-                                    </li>
-                                    <li>
-                                        <label class="radio-label">
-                                            <input type="radio" name="cutAwayState" value="Collapsed"> Fully Collapsed
-                                        </label>
-                                    </li>
-                                    <li>
-                                        <label class="radio-label">
-                                            <input type="radio" name="cutAwayState" value="Partially" checked> Partially
-                                            Collapsed
-                                        </label>
-                                    </li>
-                                    <li>
-                                        <label class="radio-label">
-                                            <input type="radio" name="cutAwayState" value="Open"> Fully Open
-                                        </label>
-                                    </li>
-                                    <li>
-                                        <button id="resetCutAwayMarker">Reset Cut-Away Marker</button>
-                                    </li>
-                                </ul>
-                            </li>
-                            <li>
-                                <button id="exportGpxButton">Export Jump Run as GPX</button>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-
-                <div class="accordion-item">
-                    <button class="accordion-header">HARP Manager</button>
-                    <div class="accordion-content">
-                        <ul>
-                            <li>
-                                <button id="placeHarpButton">Place HARP on Map</button>
-                            </li>
-                            <li>
-                                <label for="harpCoordInput" class="radio-label">Or enter coordinates:</label>
-                                <input type="text" id="harpCoordInput" placeholder="e.g., 48.123, 11.456 or MGRS">
-                                <button id="placeHarpCoordButton">Place by Coords</button>
-                            </li>
-                            <li>
-                                <button id="clearHarpButton">Clear HARP</button>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-
-                <div class="accordion-item">
-                    <button class="accordion-header">Ensemble</button>
-                    <div class="accordion-content">
-                        <ul>
-                            <li>
-                                <span>Models</span>
-                                <ul class="submenu" id="ensembleModelsSubmenu">
-                                </ul>
-                                <button id="deselectAllEnsembleButton" style="width: 100%; margin-top: 5px;">Deselect
-                                    All</button>
-                            </li>
-                            <li>
-                                <span>Scenarios</span>
-                                <ul class="submenu" id="ensembleScenariosSubmenu">
-                                    <li>
-                                        <label class="radio-label">
-                                            <input type="radio" name="ensembleScenario" value="all_models" checked> All
-                                            Selected
-                                            Models
-                                        </label>
-                                    </li>
-                                    <li>
-                                        <label class="radio-label">
-                                            <input type="radio" name="ensembleScenario" value="heatmap"> Heatmap
-                                        </label>
-                                    </li>
-                                    <li>
-                                        <label class="radio-label">
-                                            <input type="radio" name="ensembleScenario" value="min_wind"> Minimum Wind
-                                        </label>
-                                    </li>
-                                    <li>
-                                        <label class="radio-label">
-                                            <input type="radio" name="ensembleScenario" value="mean_wind"> Mean Wind
-                                        </label>
-                                    </li>
-                                    <li>
-                                        <label class="radio-label">
-                                            <input type="radio" name="ensembleScenario" value="max_wind"> Maximum Wind
-                                        </label>
-                                    </li>
-                                </ul>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
+            <div id="map-content">
+                <div id="map"></div>
+                <div id="crosshair"></div>
             </div>
 
-            <div id="panel-jumpmaster" class="panel hidden">
-                <ul style="padding: 15px;">
-                    <li>
-                        <label class="radio-label">
-                            <input type="checkbox" id="trackPositionCheckbox" name="trackPosition"> Start Live Tracking
-                        </label>
-                    </li>
-                    <li>
-                        <label class="radio-label">
-                            <input type="checkbox" id="showJumpMasterLine" name="showJumpMasterLine"> Show Jump Master
-                            Line To
-                        </label>
-                        <ul class="submenu hidden">
-                            <li>
-                                <label class="radio-label">
-                                    <input type="radio" name="jumpMasterLineTarget" value="DIP" checked> DIP
-                                </label>
-                            </li>
-                            <li>
-                                <label class="radio-label">
-                                    <input type="radio" name="jumpMasterLineTarget" value="HARP" disabled> HARP
-                                </label>
-                            </li>
-                        </ul>
-                    </li>
-                </ul>
-                <div id="jumpmaster-dashboard" class="hidden">
-                    <div class="dashboard-grid">
-                        <div class="dashboard-item span-2">
-                            <div class="dashboard-label">Position</div>
-                            <div class="dashboard-value" id="dashboard-jm-coords">--</div>
-                        </div>
+            <aside id="sidebar">
+                <div class="sidebar-icon" data-panel-id="panel-data" title="Data">
+                    <span class="icon">📊</span>
+                    <span class="label">Data</span>
+                </div>
+                <div class="sidebar-icon" data-panel-id="panel-planner" title="Planner">
+                    <span class="icon">🪂</span>
+                    <span class="label">Planner</span>
+                </div>
+                <div class="sidebar-icon" data-panel-id="panel-jumpmaster" title="Jump Master">
+                    <span class="icon">✈️</span>
+                    <span class="label">Jumpmaster</span>
+                </div>
+                <div class="sidebar-icon" data-panel-id="panel-search" title="Search">
+                    <span class="icon">🔍</span>
+                    <span class="label">Search</span>
+                </div>
+                <div class="sidebar-icon" data-panel-id="panel-settings" title="Settings">
+                    <span class="icon">⚙️</span>
+                    <span class="label">Settings</span>
+                </div>
+            </aside>
 
-                        <div class="dashboard-item span-2">
-                            <div class="dashboard-label">Altitude</div>
-                            <div class="dashboard-value" id="dashboard-jm-altitude">--</div>
-                        </div>
+            <div id="panel-container">
+                <div id="panel-data" class="panel hidden">
+                    <div id="selectedTime" style="text-align: center; padding: 0; font-weight: bold;"></div>
 
-                        <div class="dashboard-item">
-                            <div class="dashboard-label">Direction</div>
-                            <div class="dashboard-value" id="dashboard-jm-direction">--</div>
+                    <div id="bottom-container">
+                        <div id="meanWindControls">
+                            <label for="lowerLimit" title="Lower altitude for mean wind calculation">Lower Limit
+                                (m):</label>
+                            <input type="number" id="lowerLimit" min="0" step="100" value="0">
+                            <label for="upperLimit" title="Upper altitude for mean wind calculation">Upper Limit
+                                (m):</label>
+                            <input type="number" id="upperLimit" min="0" step="100" value="3000">
+                            <div id="meanWindResult"></div>
                         </div>
-
-                        <div class="dashboard-item">
-                            <div class="dashboard-label">Speed</div>
-                            <div class="dashboard-value" id="dashboard-jm-speed">--</div>
+                        <div id="controls-row">
+                            <label for="interpStep"
+                                title="Select the altitude interval for weather data interpolation">Step:</label>
+                            <select id="interpStep" aria-label="Interpolation step interval">
+                                <option value="100">100</option>
+                                <option value="200" selected>200</option>
+                                <option value="500">500</option>
+                                <option value="1000">1000</option>
+                                <option value="2000">2000</option>
+                            </select>
                         </div>
+                        <div id="weather-table-container">
+                            <table id="table">
+                                <thead>
+                                    <tr>
+                                        <th>Altitude (m)</th>
+                                        <th>Altitude (ft)</th>
+                                        <th>Direction (°)</th>
+                                        <th>Speed (kt)</th>
+                                        <th>Speed (m/s)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
 
-                        <div class="dashboard-item span-2 accuracy-item">
-                            <div class="dashboard-label">Accuracy</div>
-                            <div class="dashboard-value" id="dashboard-jm-accuracy">--</div>
+                <div id="panel-planner" class="panel hidden">
+                    <div class="accordion-item">
+                        <button class="accordion-header">Landing Pattern</button>
+                        <div class="accordion-content">
+                            <ul>
+                                <li>
+                                    <label class="radio-label">
+                                        <input type="checkbox" id="showLandingPattern" name="showLandingPattern"> Show
+                                        Landing
+                                        Pattern
+                                    </label>
+                                </li>
+                                <li>
+                                    <label class="radio-label">
+                                        <input type="radio" name="landingDirection" value="LL" checked> LL
+                                        <input type="number" id="customLandingDirectionLL" min="0" max="360"
+                                            placeholder="0-360°">
+                                        <label>°</label>
+                                    </label>
+                                </li>
+                                <li>
+                                    <label class="radio-label">
+                                        <input type="radio" name="landingDirection" value="RR"> RR
+                                        <input type="number" id="customLandingDirectionRR" min="0" max="360"
+                                            placeholder="0-360°">
+                                        <label>°</label>
+                                    </label>
+                                </li>
+                                <li>
+                                    <label class="radio-label">
+                                        Start Downwind Leg at m AGL:
+                                        <input type="number" id="legHeightDownwind" min="50" max="1000" step="50"
+                                            value="300">
+                                    </label>
+                                </li>
+                                <li>
+                                    <label class="radio-label">
+                                        Start Base Leg at m AGL:
+                                        <input type="number" id="legHeightBase" min="50" max="1000" step="50"
+                                            value="200">
+                                    </label>
+                                </li>
+                                <li>
+                                    <label class="radio-label">
+                                        Start Final Leg at m AGL:
+                                        <input type="number" id="legHeightFinal" min="50" max="1000" step="50"
+                                            value="100">
+                                    </label>
+                                </li>
+                                <li>
+                                    <label class="radio-label" title="Expert: 28 kt, Advanced: 22 kt, Student: 18 kt">
+                                        Canopy Speed (kt):
+                                        <input type="number" id="canopySpeed" min="5" max="50" step="1" value="20">
+                                    </label>
+                                </li>
+                                <li>
+                                    <label class="radio-label" title="Expert: 8 m/s, Advanced: 5 m/s, Student: 4 m/s">
+                                        Descent Rate (m/s):
+                                        <input type="number" id="descentRate" min="1" max="10" step="0.1" value="3.5">
+                                    </label>
+                                </li>
+                                <li>
+                                    <button id="exportLandingPatternGpxButton">Export Landing Pattern as GPX</button>
+                                </li>
+                            </ul>
                         </div>
                     </div>
 
-                    <div id="jumpmaster-line-details" class="hidden">
-                        <hr>
+                    <div class="accordion-item">
+                        <button class="accordion-header" data-planner-section="calculateJump">Calculate Jump</button>
+                        <div class="accordion-content">
+                            <ul>
+                                <li>
+                                    <label class="radio-label">
+                                        Exit Altitude (m AGL):
+                                        <input type="number" id="exitAltitude" min="500" max="15000" step="100"
+                                            value="3000">
+                                    </label>
+                                </li>
+                                <li>
+                                    <label class="radio-label" title="Canopy open 200 m below opening altitude!">
+                                        Opening Altitude (m AGL):
+                                        <input type="number" id="openingAltitude" min="500" max="10000" step="100"
+                                            value="1200">
+                                    </label>
+                                </li>
+                                <li>
+                                    <label class="radio-label"
+                                        title="Reduces the calculated radius to account for a safety buffer.">
+                                        Safety Height (m):
+                                        <input type="number" id="safetyHeight" min="0" max="1000" step="10" value="0">
+                                    </label>
+                                </li>
+                                <li>
+                                    <label class="radio-label">
+                                        Aircraft Speed (ktIAS):
+                                        <input type="number" id="aircraftSpeedKt" min="10" max="150" step="5"
+                                            value="90">
+                                    </label>
+                                </li>
+                                <li>
+                                    <label class="radio-label">
+                                        Number Of Jumpers:
+                                        <input type="number" id="numberOfJumpers" min="1" max="50" step="1" value="5">
+                                    </label>
+                                </li>
+                                <li>
+                                    <label class="radio-label">
+                                        Separation (s):
+                                        <input type="number" id="jumperSeparation" min="1" max="50" step="1" value="5">
+                                    </label>
+                                </li>
+                                <li>
+                                    <label class="radio-label">
+                                        <input type="checkbox" id="showJumpRunTrack" /> Show Jump Run Track:
+                                        <input type="number" id="jumpRunTrackDirection" min="0" max="360" step="1"
+                                            placeholder="Calculated">
+                                        <label>°</label>
+                                    </label>
+                                </li>
+                                <li>
+                                    <label class="radio-label">
+                                        Jump Run Offset (m):
+                                        <input type="number" id="jumpRunTrackOffset" min="-50000" max="50000" step="100"
+                                            value="0" style="width: 80px;">
+                                    </label>
+                                </li>
+                                <li>
+                                    <label class="radio-label">
+                                        Jump Run Forward Offset (m):
+                                        <input type="number" id="jumpRunTrackForwardOffset" min="-50000" max="50000"
+                                            step="100" value="0" style="width: 80px;">
+                                    </label>
+                                </li>
+                                <li>
+                                    <label class="radio-label">
+                                        <input type="checkbox" id="showExitAreaCheckbox"> Show Exit Area </label>
+                                </li>
+                                <li>
+                                    <label class="radio-label">
+                                        <input type="checkbox" id="showCanopyAreaCheckbox"> Show Canopy Flight Area
+                                    </label>
+                                </li>
+                                <li>
+                                    <label class="radio-label">
+                                        <input type="checkbox" id="showCutAwayFinder" name="showCutAwayFinder"> Show Cut
+                                        Away
+                                        Finder
+                                    </label>
+                                    <ul class="submenu hidden">
+                                        <li>
+                                            <label class="radio-label">
+                                                Cut Away Altitude (m):
+                                                <input type="number" id="cutAwayAltitude" min="400" max="15000"
+                                                    step="100" value="1000">
+                                            </label>
+                                        </li>
+                                        <li>
+                                            <label class="radio-label">
+                                                <input type="radio" name="cutAwayState" value="Collapsed"> Fully
+                                                Collapsed
+                                            </label>
+                                        </li>
+                                        <li>
+                                            <label class="radio-label">
+                                                <input type="radio" name="cutAwayState" value="Partially" checked>
+                                                Partially
+                                                Collapsed
+                                            </label>
+                                        </li>
+                                        <li>
+                                            <label class="radio-label">
+                                                <input type="radio" name="cutAwayState" value="Open"> Fully Open
+                                            </label>
+                                        </li>
+                                        <li>
+                                            <button id="resetCutAwayMarker">Reset Cut-Away Marker</button>
+                                        </li>
+                                    </ul>
+                                </li>
+                                <li>
+                                    <button id="exportGpxButton">Export Jump Run as GPX</button>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item">
+                        <button class="accordion-header">HARP Manager</button>
+                        <div class="accordion-content">
+                            <ul>
+                                <li>
+                                    <button id="placeHarpButton">Place HARP on Map</button>
+                                </li>
+                                <li>
+                                    <label for="harpCoordInput" class="radio-label">Or enter coordinates:</label>
+                                    <input type="text" id="harpCoordInput" placeholder="e.g., 48.123, 11.456 or MGRS">
+                                    <button id="placeHarpCoordButton">Place by Coords</button>
+                                </li>
+                                <li>
+                                    <button id="clearHarpButton">Clear HARP</button>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item">
+                        <button class="accordion-header">Ensemble</button>
+                        <div class="accordion-content">
+                            <ul>
+                                <li>
+                                    <span>Models</span>
+                                    <ul class="submenu" id="ensembleModelsSubmenu">
+                                    </ul>
+                                    <button id="deselectAllEnsembleButton"
+                                        style="width: 100%; margin-top: 5px;">Deselect
+                                        All</button>
+                                </li>
+                                <li>
+                                    <span>Scenarios</span>
+                                    <ul class="submenu" id="ensembleScenariosSubmenu">
+                                        <li>
+                                            <label class="radio-label">
+                                                <input type="radio" name="ensembleScenario" value="all_models" checked>
+                                                All
+                                                Selected
+                                                Models
+                                            </label>
+                                        </li>
+                                        <li>
+                                            <label class="radio-label">
+                                                <input type="radio" name="ensembleScenario" value="heatmap"> Heatmap
+                                            </label>
+                                        </li>
+                                        <li>
+                                            <label class="radio-label">
+                                                <input type="radio" name="ensembleScenario" value="min_wind"> Minimum
+                                                Wind
+                                            </label>
+                                        </li>
+                                        <li>
+                                            <label class="radio-label">
+                                                <input type="radio" name="ensembleScenario" value="mean_wind"> Mean Wind
+                                            </label>
+                                        </li>
+                                        <li>
+                                            <label class="radio-label">
+                                                <input type="radio" name="ensembleScenario" value="max_wind"> Maximum
+                                                Wind
+                                            </label>
+                                        </li>
+                                    </ul>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="panel-jumpmaster" class="panel hidden">
+                    <ul style="padding: 15px;">
+                        <li>
+                            <label class="radio-label">
+                                <input type="checkbox" id="trackPositionCheckbox" name="trackPosition"> Start Live
+                                Tracking
+                            </label>
+                        </li>
+                        <li>
+                            <label class="radio-label">
+                                <input type="checkbox" id="showJumpMasterLine" name="showJumpMasterLine"> Show Jump
+                                Master
+                                Line To
+                            </label>
+                            <ul class="submenu hidden">
+                                <li>
+                                    <label class="radio-label">
+                                        <input type="radio" name="jumpMasterLineTarget" value="DIP" checked> DIP
+                                    </label>
+                                </li>
+                                <li>
+                                    <label class="radio-label">
+                                        <input type="radio" name="jumpMasterLineTarget" value="HARP" disabled> HARP
+                                    </label>
+                                </li>
+                            </ul>
+                        </li>
+                    </ul>
+                    <div id="jumpmaster-dashboard" class="hidden">
                         <div class="dashboard-grid">
                             <div class="dashboard-item span-2">
-                                <div class="dashboard-label" id="dashboard-jm-target-label">JML to --</div>
+                                <div class="dashboard-label">Position</div>
+                                <div class="dashboard-value" id="dashboard-jm-coords">--</div>
                             </div>
-                            <div class="dashboard-item">
-                                <div class="dashboard-label">Bearing</div>
-                                <div class="dashboard-value" id="dashboard-jm-bearing">--</div>
-                            </div>
-                            <div class="dashboard-item">
-                                <div class="dashboard-label">Distance</div>
-                                <div class="dashboard-value" id="dashboard-jm-distance">--</div>
-                            </div>
+
                             <div class="dashboard-item span-2">
-                                <div class="dashboard-label">Time to Target</div>
-                                <div class="dashboard-value" id="dashboard-jm-tot">--</div>
+                                <div class="dashboard-label">Altitude</div>
+                                <div class="dashboard-value" id="dashboard-jm-altitude">--</div>
                             </div>
+
+                            <div class="dashboard-item">
+                                <div class="dashboard-label">Direction</div>
+                                <div class="dashboard-value" id="dashboard-jm-direction">--</div>
+                            </div>
+
+                            <div class="dashboard-item">
+                                <div class="dashboard-label">Speed</div>
+                                <div class="dashboard-value" id="dashboard-jm-speed">--</div>
+                            </div>
+
+                            <div class="dashboard-item span-2 accuracy-item">
+                                <div class="dashboard-label">Accuracy</div>
+                                <div class="dashboard-value" id="dashboard-jm-accuracy">--</div>
+                            </div>
+                        </div>
+
+                        <div id="jumpmaster-line-details" class="hidden">
+                            <hr>
+                            <div class="dashboard-grid">
+                                <div class="dashboard-item span-2">
+                                    <div class="dashboard-label" id="dashboard-jm-target-label">JML to --</div>
+                                </div>
+                                <div class="dashboard-item">
+                                    <div class="dashboard-label">Bearing</div>
+                                    <div class="dashboard-value" id="dashboard-jm-bearing">--</div>
+                                </div>
+                                <div class="dashboard-item">
+                                    <div class="dashboard-label">Distance</div>
+                                    <div class="dashboard-value" id="dashboard-jm-distance">--</div>
+                                </div>
+                                <div class="dashboard-item span-2">
+                                    <div class="dashboard-label">Time to Target</div>
+                                    <div class="dashboard-value" id="dashboard-jm-tot">--</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="panel-search" class="panel hidden">
+                    <div class="search-bar-container">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" id="locationSearchInput" placeholder="Look up city or coordinates...">
+                        <span id="clearSearchInput" class="clear-icon" style="display: none;">×</span>
+                    </div>
+
+                    <button id="saveFavoriteBtn" class="save-favorite-btn">Save current location as Favorite</button>
+                    <div id="favoriteModal" class="favorite-modal" style="display: none;">
+                        <div class="favorite-modal-content">
+                            <h3>Save Favorite</h3>
+                            <input id="favoriteNameInput" type="text" placeholder="Enter favorite name">
+                            <div class="favorite-modal-actions">
+                                <button id="submitFavoriteName" class="modal-btn">Save</button>
+                                <button id="cancelFavoriteName" class="modal-btn cancel">Cancel</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="locationResults" class="location-results-container">
+                        <div id="favorites-section" class="search-section">
+                            <h5>Favorites</h5>
+                            <ul id="favorites-list"></ul>
+                        </div>
+                        <div id="recents-section" class="search-section">
+                            <h5>Recent Searches</h5>
+                            <ul id="recents-list"></ul>
+                        </div>
+
+                        <div id="search-results-section" class="search-section" style="display: none;">
+                            <h5>Results</h5>
+                            <ul id="search-results-list"></ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="panel-settings" class="panel hidden">
+                    <div class="accordion-item">
+                        <button class="accordion-header">Units</button>
+                        <div class="accordion-content">
+                            <div id="unit-selection" class="settings-grid">
+                                <label for='refLevel'> Reference Level</label>
+                                <select id="refLevel">
+                                    <option value="AGL">AGL</option>
+                                    <option value="AMSL">AMSL</option>
+                                </select>
+                                <label for="heightUnit">Height Unit:</label>
+                                <select id="heightUnit">
+                                    <option value="m">Meters</option>
+                                    <option value="ft">Feet</option>
+                                </select>
+                                <label for="temperatureUnit">Temperature Unit:</label>
+                                <select id="temperatureUnit">
+                                    <option value="C">Celsius</option>
+                                    <option value="F">Fahrenheit</option>
+                                </select>
+                                <label for="windUnit">Speed Unit:</label>
+                                <select id="windUnit">
+                                    <option value="kt">kt</option>
+                                    <option value="km/h">km/h</option>
+                                    <option value="m/s">m/s</option>
+                                    <option value="mph">mph</option>
+                                    <option value="bft">Bft</option>
+                                </select>
+                                <label for="timeZone">Time Zone:</label>
+                                <select id="timeZone">
+                                    <option value="Z">Z</option>
+                                    <option value="loc">Local</option>
+                                </select>
+                                <label for="coordFormat">Coordinate Format:</label>
+                                <select id="coordFormat">
+                                    <option value="Decimal">Decimal</option>
+                                    <option value="DMS">Deg Min Sec</option>
+                                    <option value="MGRS">MGRS</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item">
+                        <button class="accordion-header">Download Files</button>
+                        <div class="accordion-content">
+                            <div id="download-files" class="settings-grid">
+                                <label for="downloadFormat">Download Format:</label>
+                                <select id="downloadFormat">
+                                    <option value="HEIDIS">HEIDIS</option>
+                                    <option value="ATAK">ATAK</option>
+                                    <option value="Windwatch">Windwatch</option>
+                                    <option value="Customized">Customized</option>
+                                </select>
+                                <button id="downloadButton">Download Table</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item">
+                        <button class="accordion-header">Cache Settings</button>
+                        <div class="accordion-content">
+                            <div id="cache-settings" class="settings-grid">
+                                <label for="cacheRadiusSelect">Cache Radius (km):</label>
+                                <input type="number" id="cacheRadiusSelect" min="1" max="50">
+                                <label for="cacheZoomMin">Zoom Levels:</label>
+                                <div id="cache-zoom-inputs" class="settings-grid"
+                                    style="grid-template-columns: 1fr auto 1fr; gap: 5px; width: 100%;">
+                                    <input type="number" id="cacheZoomMin" min="6" max="15">
+                                    <span>-</span>
+                                    <input type="number" id="cacheZoomMax" min="6" max="15">
+                                </div>
+                                </label>
+                                <button id="recacheNowButton">Recache Now</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item">
+                        <button class="accordion-header">Historical Date</button>
+                        <div class="accordion-content">
+                            <div id="historical-date" class="settings-grid">
+                                <label for="historicalDatePicker">Select Date:</label>
+                                <input type="date" id="historicalDatePicker" min="2022-01-01">
+                                <button id="clearHistoricalDate">Clear</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item">
+                        <button class="accordion-header">Track Upload</button>
+                        <div class="accordion-content">
+                            <div id="track-upload" class="settings-grid">
+
+                                <div style="position: relative; display: flex; align-items: center;">
+                                    <label for="trackFileInput">Upload File:</label>
+
+                                    <span class="info-icon info-button-shared" data-info="GPX or FlySight-CSV">i</span>
+                                    <div id="trackInfoPopup" class="info-popup"></div>
+                                </div>
+
+                                <input type="file" id="trackFileInput" accept=".gpx,.csv" style="margin-top: 5px;">
+                                <button id="clearTrack">Clear</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item">
+                        <button class="accordion-header">App Management</button>
+                        <div class="accordion-content" id="app-management-settings">
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div id="panel-search" class="panel hidden">
-                <div class="search-bar-container">
-                    <span class="search-icon">🔍</span>
-                    <input type="text" id="locationSearchInput" placeholder="Look up city or coordinates...">
-                    <span id="clearSearchInput" class="clear-icon" style="display: none;">×</span>
-                </div>
-
-                <button id="saveFavoriteBtn" class="save-favorite-btn">Save current location as Favorite</button>
-                <div id="favoriteModal" class="favorite-modal" style="display: none;">
-                    <div class="favorite-modal-content">
-                        <h3>Save Favorite</h3>
-                        <input id="favoriteNameInput" type="text" placeholder="Enter favorite name">
-                        <div class="favorite-modal-actions">
-                            <button id="submitFavoriteName" class="modal-btn">Save</button>
-                            <button id="cancelFavoriteName" class="modal-btn cancel">Cancel</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="locationResults" class="location-results-container">
-                    <div id="favorites-section" class="search-section">
-                        <h5>Favorites</h5>
-                        <ul id="favorites-list"></ul>
-                    </div>
-                    <div id="recents-section" class="search-section">
-                        <h5>Recent Searches</h5>
-                        <ul id="recents-list"></ul>
-                    </div>
-
-                    <div id="search-results-section" class="search-section" style="display: none;">
-                        <h5>Results</h5>
-                        <ul id="search-results-list"></ul>
-                    </div>
-                </div>
-            </div>
-
-            <div id="panel-settings" class="panel hidden">
-                <div class="accordion-item">
-                    <button class="accordion-header">Units</button>
-                    <div class="accordion-content">
-                        <div id="unit-selection" class="settings-grid">
-                            <label for='refLevel'> Reference Level</label>
-                            <select id="refLevel">
-                                <option value="AGL">AGL</option>
-                                <option value="AMSL">AMSL</option>
-                            </select>
-                            <label for="heightUnit">Height Unit:</label>
-                            <select id="heightUnit">
-                                <option value="m">Meters</option>
-                                <option value="ft">Feet</option>
-                            </select>
-                            <label for="temperatureUnit">Temperature Unit:</label>
-                            <select id="temperatureUnit">
-                                <option value="C">Celsius</option>
-                                <option value="F">Fahrenheit</option>
-                            </select>
-                            <label for="windUnit">Speed Unit:</label>
-                            <select id="windUnit">
-                                <option value="kt">kt</option>
-                                <option value="km/h">km/h</option>
-                                <option value="m/s">m/s</option>
-                                <option value="mph">mph</option>
-                                <option value="bft">Bft</option>
-                            </select>
-                            <label for="timeZone">Time Zone:</label>
-                            <select id="timeZone">
-                                <option value="Z">Z</option>
-                                <option value="loc">Local</option>
-                            </select>
-                            <label for="coordFormat">Coordinate Format:</label>
-                            <select id="coordFormat">
-                                <option value="Decimal">Decimal</option>
-                                <option value="DMS">Deg Min Sec</option>
-                                <option value="MGRS">MGRS</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="accordion-item">
-                    <button class="accordion-header">Download Files</button>
-                    <div class="accordion-content">
-                        <div id="download-files" class="settings-grid">
-                            <label for="downloadFormat">Download Format:</label>
-                            <select id="downloadFormat">
-                                <option value="HEIDIS">HEIDIS</option>
-                                <option value="ATAK">ATAK</option>
-                                <option value="Windwatch">Windwatch</option>
-                                <option value="Customized">Customized</option>
-                            </select>
-                            <button id="downloadButton">Download Table</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="accordion-item">
-                    <button class="accordion-header">Cache Settings</button>
-                    <div class="accordion-content">
-                        <div id="cache-settings" class="settings-grid">
-                            <label for="cacheRadiusSelect">Cache Radius (km):</label>
-                            <input type="number" id="cacheRadiusSelect" min="1" max="50">
-                            <label for="cacheZoomMin">Zoom Levels:</label>
-                            <div id="cache-zoom-inputs" class="settings-grid"
-                                style="grid-template-columns: 1fr auto 1fr; gap: 5px; width: 100%;">
-                                <input type="number" id="cacheZoomMin" min="6" max="15">
-                                <span>-</span>
-                                <input type="number" id="cacheZoomMax" min="6" max="15">
-                            </div>
-                            </label>
-                            <button id="recacheNowButton">Recache Now</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="accordion-item">
-                    <button class="accordion-header">Historical Date</button>
-                    <div class="accordion-content">
-                        <div id="historical-date" class="settings-grid">
-                            <label for="historicalDatePicker">Select Date:</label>
-                            <input type="date" id="historicalDatePicker" min="2022-01-01">
-                            <button id="clearHistoricalDate">Clear</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="accordion-item">
-                    <button class="accordion-header">Track Upload</button>
-                    <div class="accordion-content">
-                        <div id="track-upload" class="settings-grid">
-
-                            <div style="position: relative; display: flex; align-items: center;">
-                                <label for="trackFileInput">Upload File:</label>
-
-                                <span class="info-icon info-button-shared" data-info="GPX or FlySight-CSV">i</span>
-                                <div id="trackInfoPopup" class="info-popup"></div>
-                            </div>
-
-                            <input type="file" id="trackFileInput" accept=".gpx,.csv" style="margin-top: 5px;">
-                            <button id="clearTrack">Clear</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="accordion-item">
-                    <button class="accordion-header">App Management</button>
-                    <div class="accordion-content" id="app-management-settings">
-                    </div>
-                </div>
-            </div>
         </div>
 
     </div>
-
-    </div><div id="passwordModal" class="modal" style="display: none;">
+    <div id="passwordModal" class="modal" style="display: none;">
         <div class="modal-content">
             <h3 id="modalHeader">Restricted Feature</h3>
             <p id="modalMessage">Please enter the password to enable this feature:</p>

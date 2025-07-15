@@ -288,6 +288,16 @@ body {
     margin: 5px 0;
 }
 
+/* Stellt die korrekte Größe und Farbe für das Autoupdate-Symbol wieder her */
+#autoupdateToggle label {
+    font-size: 24px;              /* Größer für bessere Sichtbarkeit und Klickbarkeit */
+    color: #4da8da;  /* Verwendet deine Hauptfarbe (--primary-color) */
+    font-weight: bold;            /* Macht das Symbol etwas kräftiger */
+    cursor: pointer;              /* Zeigt an, dass es klickbar ist */
+    line-height: 1;               /* Verhindert unerwünschten vertikalen Abstand */
+    padding-bottom: 4px;          /* Kleine Anpassung für die perfekte vertikale Zentrierung */
+}
+
 /* Kleinere Anpassungen für die Lesbarkeit */
 #selectedTime,
 #modelLabel {
