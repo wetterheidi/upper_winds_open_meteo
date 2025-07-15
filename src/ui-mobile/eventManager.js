@@ -675,7 +675,16 @@ function setupTrackEvents() {
     const trackUploadContainer = document.querySelector('#track-upload');
     if (trackUploadContainer) {
         trackUploadContainer.addEventListener('click', async (e) => {
-            e.preventDefault(); // Verhindert, dass das Standard-Dateifeld geöffnet wird
+            // *** HIER IST DIE KORREKTUR ***
+            // Wenn der Benutzer direkt auf das (jetzt sichtbare) Dateieingabefeld klickt,
+            // soll der Browser die Standardaktion ausführen (Datei-Menü öffnen).
+            // Wir beenden die Funktion hier sofort und verhindern NICHT die Standardaktion.
+            if (e.target === trackFileInput) {
+                return; 
+            }
+
+            // Der restliche Code wird nur ausgeführt, wenn *neben* den Button geklickt wird.
+            e.preventDefault(); 
 
             // Prüfen, ob die App nativ läuft
             if (window.Capacitor && window.Capacitor.isNativePlatform()) {
@@ -684,7 +693,7 @@ function setupTrackEvents() {
                     await processTrackFile(nativeFile);
                 }
             } else {
-                // Fallback für den Browser: Öffne das versteckte Input-Feld
+                // Fallback für den Browser: Öffne das versteckte Input-Feld programmatisch
                 trackFileInput.click();
             }
         });

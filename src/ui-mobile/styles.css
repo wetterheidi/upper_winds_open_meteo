@@ -1,3 +1,6 @@
+/* =================================================================== */
+/* 1. GLOBALE STILE & VARIABLEN
+/* =================================================================== */
 :root {
     --primary-color: #4da8da;
     --primary-hover-color: #0056b3;
@@ -6,9 +9,80 @@
     --background-medium: #f0f2f5;
     --border-color: #d9d9d9;
     --font-main: 'Roboto', sans-serif;
+    --label-width: 135px;
+    --input-width: 70px;
+    --grid-columns: var(--label-width) var(--input-width) var(--label-width) var(--input-width) minmax(0, 1fr);
 }
 
-/* Tab bar */
+html {
+    height: 100%;
+    overflow: hidden;
+    font-size: 13px;
+}
+
+body {
+    display: grid !important;
+    grid-template-rows: auto 1fr auto;
+    grid-template-columns: 1fr;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+* {
+    font-size: 13px;
+    font-family: var(--font-main);
+    font-weight: 400;
+}
+
+.hidden {
+    display: none !important;
+}
+
+
+/* =================================================================== */
+/* 2. HAUPT-LAYOUT-CONTAINER
+/* =================================================================== */
+
+#map-container {
+    grid-row: 2;
+    grid-column: 1;
+    position: relative;
+    overflow: hidden;
+    min-height: 0;
+}
+
+#map {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    margin-top: 0 !important;
+    z-index: 0;
+}
+
+#slider-container {
+    grid-row: 1;
+    grid-column: 1;
+    position: static !important;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    border-bottom: 1px solid var(--border-color);
+    z-index: 2000 !important;
+    padding-top: calc(2px + env(safe-area-inset-top));
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    box-sizing: border-box;
+}
+
 #tab-bar {
     grid-row: 3;
     grid-column: 1;
@@ -24,23 +98,52 @@
     z-index: 1001;
 }
 
-/* Die einzelnen Buttons in der Leiste */
+#content-panels {
+    grid-row: 2;
+    grid-column: 1;
+    display: none; /* Controlled by JS */
+    background-color: rgba(249, 249, 249, 0.95);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding: 15px;
+    padding-top: calc(15px + env(safe-area-inset-top));
+    overflow-y: auto;
+    box-sizing: border-box;
+}
+
+.content-panel {
+    padding: 0;
+    box-sizing: border-box;
+    background-color: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+
+/* =================================================================== */
+/* 3. WIEDERVERWENDBARE UI-KOMPONENTEN
+/* =================================================================== */
+
+/* --- Buttons --- */
 .tab-button {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    justify-content: center; /* Zentriert den Inhalt (Icon & Label) */
     background: none;
     border: none;
     color: #888888;
-    font-size: 10px;
-    padding: 2px 0;
     flex-grow: 1;
     transition: color 0.2s ease;
+    padding: 4px 0; /* Mehr vertikaler Abstand */
+    height: 100%;   /* Nutzt die volle Höhe der Tab-Bar */
+    box-sizing: border-box;
 }
 
 .tab-button .icon {
-    font-size: 24px;
+    font-size: 24px; /* Behält die korrekte Icon-Größe bei */
+    line-height: 1;  /* Verhindert zusätzlichen Zeilenabstand */
+    margin-bottom: 2px; /* Kleiner Abstand zum Label */
 }
 
 .tab-button .label {
@@ -48,50 +151,53 @@
     margin-top: 2px;
 }
 
-button:hover {
+.tab-button:hover {
     background: var(--primary-color);
 }
 
-/* Stil für den aktiven Button */
 .tab-button.active {
     color: var(--text-color);
-    /* Ihre Hauptfarbe */
 }
 
-#content-panels {
-    grid-row: 2;
-    grid-column: 1;
-    display: none;
-    /* Wird per JS gesteuert */
-    background-color: rgba(249, 249, 249, 0.95);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-
-    /* Wendet den korrekten Abstand an, inklusive der Safe Area oben */
-    padding: 15px;
-    padding-top: calc(15px + env(safe-area-inset-top));
-
-    /* Dieser Container ist für das Scrollen verantwortlich */
-    overflow-y: auto;
-    box-sizing: border-box;
+.btn {
+    width: 100%;
+    padding: 12px;
+    margin: 5px 0;
+    font-size: 14px;
+    font-weight: bold;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: center;
+    transition: background-color 0.2s ease, opacity 0.2s ease;
 }
 
-.content-panel {
-    /* Entfernt: position, top, bottom, left, right, overflow-y, etc. */
-    /* Die Panels sind jetzt einfache Block-Elemente. */
-    padding: 0;
-    box-sizing: border-box;
-    background-color: transparent;
-    /* Der Eltern-Container hat den Hintergrund */
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
+.btn-primary {
+    background-color: #4da8da;
 }
 
-.content-panel.hidden {
-    display: none;
+.btn-primary:hover {
+    background-color: #0056b3;
 }
 
-/* Styling für das Planner-Akkordeon */
+.btn-secondary {
+    background-color: #6c757d;
+}
+
+.btn-secondary:hover {
+    background-color: #5a6268;
+}
+
+.btn-danger {
+    background-color: #dc3545;
+}
+
+.btn-danger:hover {
+    background-color: #c82333;
+}
+
+/* --- Accordion --- */
 .accordion-item {
     background-color: var(--background-light);
     margin-bottom: 10px;
@@ -117,10 +223,8 @@ button:hover {
     background-color: var(--primary-hover-color);
 }
 
-/* Icon für auf/zu Zustand hinzufügen */
 .accordion-header::after {
     content: '▼';
-    /* Pfeil nach unten */
     font-size: 12px;
     color: #888;
     transition: transform 0.3s ease;
@@ -128,20 +232,16 @@ button:hover {
 
 .accordion-header.active::after {
     transform: rotate(180deg);
-    /* Pfeil drehen, wenn aktiv */
 }
 
-/* Stellt sicher, dass der Inhaltsbereich des Akkordeons seine Kinder (die Reihen) untereinander anordnet. */
 .accordion-content {
     display: none;
-    /* Standardmäßig versteckt */
     padding: 15px;
     border-top: 1px solid var(--border-color);
 }
 
 .accordion-item.active .accordion-content {
     display: flex;
-    /* Nur wenn aktiv, als flex-Container anzeigen */
 }
 
 .accordion-content ul {
@@ -159,113 +259,99 @@ button:hover {
     border-bottom: none;
 }
 
-/* Neue Klasse für eine einzelne Einstellungs-Reihe */
-.setting-row {
-    display: flex;
-    justify-content: space-between;
-    /* Verteilt Label und Steuerelement an die Enden */
-    align-items: center;
-    /* Zentriert die Elemente vertikal zueinander */
-    width: 100%;
-}
 
-/* Stellt sicher, dass das Label nicht die gesamte Breite einnimmt */
-.setting-row label {
-    flex-grow: 1;
-    margin-right: 15px;
-    /* Abstand zum Steuerelement */
-}
-
-/* Reset default margins and ensure full height */
-html {
-    height: 100%;
-    overflow: hidden;
-    /* Verhindert das Scrollen des gesamten Fensters */
-}
-
-body {
-    height: 100%;
-    /* Bezieht sich auf die 100% des html-Elements */
-    overflow: hidden;
-    /* Stellt sicher, dass auch der body nicht scrollt */
-    display: grid !important;
-    grid-template-rows: auto 1fr auto;
-    /* Deine korrekte Layout-Definition */
-    grid-template-columns: 1fr;
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
-/* Main grid layout */
-body {
+/* --- Settings Grid & Form Elements --- */
+.settings-grid {
     display: grid;
-    grid-template-rows: auto 1fr auto;
-    /* Slider, Map, Tab-bar */
-    grid-template-columns: 1fr;
-    height: 100vh;
-    box-sizing: border-box;
-}
-
-/* Map container */
-#map-container {
-    grid-row: 2;
-    grid-column: 1;
-    position: relative;
-    overflow: hidden;
-    min-height: 0;
-    /* Prevent overflow */
-}
-
-#map {
-    position: absolute !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: 100% !important;
-    height: 100% !important;
-    margin-top: 0 !important;
-    /* Override margin-top: 90px from styles-shared.css */
-    z-index: 0;
-}
-
-/* Slider container */
-#slider-container {
-    grid-row: 1;
-    grid-column: 1;
-    background: rgba(255, 255, 255, 0.9);
-    backdrop-filter: blur(5px);
-    -webkit-backdrop-filter: blur(5px);
-    border-bottom: 1px solid var(--border-color);
-    z-index: 2000 !important;
-    padding-top: calc(2px + env(safe-area-inset-top));
-    /* Berücksichtigt Notch */
-    padding-left: env(safe-area-inset-left);
-    padding-right: env(safe-area-inset-right);
-    box-sizing: border-box;
-    position: static !important;
-    width: 100%;
-    max-width: 500px;
-    display: flex;
-    justify-content: center;
+    grid-template-columns: auto 1fr;
+    gap: 16px 10px;
     align-items: center;
-    margin-left: env(safe-area-inset-left);
-    margin-right: env(safe-area-inset-right);
-    transform: none !important;
-    left: auto !important;
 }
 
+.settings-grid label {
+    text-align: right;
+    font-weight: 500;
+}
+
+.settings-grid select,
+.settings-grid input,
+.settings-grid button {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px;
+    border-radius: 5px;
+    border: 1px solid var(--border-color);
+}
+
+.settings-grid button {
+    background-color: var(--primary-color);
+    color: white;
+    font-weight: bold;
+    border: none;
+    cursor: pointer;
+    width: auto;
+    justify-self: start;
+}
+
+input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--primary-color);
+    border-radius: 4px;
+    background-color: var(--background-light);
+    cursor: pointer;
+    position: relative;
+    vertical-align: middle;
+    transition: background-color 0.2s ease, opacity 0.3s ease;
+}
+
+input[type="checkbox"]:not(:checked):hover {
+    background-color: #e6f0fa;
+}
+
+input[type="checkbox"]:checked::after {
+    content: '✔';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 14px;
+    font-weight: bold;
+    color: var(--primary-color);
+}
+
+input[type="checkbox"]:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(77, 168, 218, 0.2);
+}
+
+input[type="checkbox"][style*="opacity: 0.5"] {
+    cursor: not-allowed;
+}
+
+input[type="checkbox"][style*="opacity: 1"] {
+    cursor: pointer;
+}
+
+
+/* =================================================================== */
+/* 4. SPEZIFISCHE PANEL- & ELEMENT-STILE
+/* =================================================================== */
+
+/* --- Slider & Model Info --- */
 .slider-content-wrapper {
     width: 100%;
     max-width: 400px;
     padding: 0 5px;
-    /* Reduziertes vertikales Padding */
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
     align-items: center;
 }
 
-/* Die Regeln für die Inhalte können gleich bleiben, beziehen sich aber jetzt auf den Wrapper */
 .slider-content-wrapper .time-row,
 .slider-content-wrapper .model-row {
     display: flex;
@@ -275,7 +361,7 @@ body {
     margin-bottom: 5px;
 }
 
-.slider-content-wrapper #timeSlider {
+#timeSlider {
     -webkit-appearance: none;
     appearance: none;
     width: 100%;
@@ -286,23 +372,18 @@ body {
     margin: 5px 0;
 }
 
-/* Der runde "Anfasser" für Webkit-Browser (Chrome, Safari, Android) */
-.slider-content-wrapper #timeSlider::-webkit-slider-thumb {
+#timeSlider::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
     width: 16px;
-    /* Zurück auf 16px */
     height: 16px;
-    /* Zurück auf 16px */
     background: var(--primary-color);
     border-radius: 50%;
     cursor: pointer;
     box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
-    /* margin-top wurde entfernt, um das Sichtbarkeitsproblem zu beheben */
 }
 
-/* Der runde "Anfasser" für Firefox */
-.slider-content-wrapper #timeSlider::-moz-range-thumb {
+#timeSlider::-moz-range-thumb {
     width: 16px;
     height: 16px;
     background: var(--primary-color);
@@ -312,45 +393,22 @@ body {
     box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
 }
 
-/* Diese Regeln bleiben, um die durchgehend graue Leiste sicherzustellen */
-.slider-content-wrapper #timeSlider::-webkit-slider-runnable-track {
+#timeSlider::-webkit-slider-runnable-track,
+#timeSlider::-moz-range-track {
     background: #ddd;
     border-radius: 3px;
 }
 
-.slider-content-wrapper #timeSlider::-moz-range-track {
-    background: #ddd;
-    border-radius: 3px;
-}
-
-/* Der Zeit-Slider selbst */
-#timeSlider {
-    width: 100%;
-    /* Volle Breite des Containers nutzen */
-    max-width: 400px;
-    /* Maximale Breite auf größeren Handys */
-    margin: 5px 0;
-}
-
-/* Stellt die korrekte Größe und Farbe für das Autoupdate-Symbol wieder her */
 #autoupdateToggle label {
     font-size: 24px;
-    /* Größer für bessere Sichtbarkeit und Klickbarkeit */
     color: var(--primary-color);
-    /* Verwendet deine Hauptfarbe (--primary-color) */
     font-weight: bold;
-    /* Macht das Symbol etwas kräftiger */
     cursor: pointer;
-    /* Zeigt an, dass es klickbar ist */
     line-height: 1;
-    /* Verhindert unerwünschten vertikalen Abstand */
     padding-bottom: 4px;
-    /* Kleine Anpassung für die perfekte vertikale Zentrierung */
 }
 
-/* Kleinere Anpassungen für die Lesbarkeit */
-#selectedTime,
-#modelLabel {
+#selectedTime, #modelLabel {
     font-size: 14px;
     color: var(--text-color);
 }
@@ -362,15 +420,113 @@ body {
     border: 1px solid var(--border-color);
 }
 
-/* Styling für das neue Dropdown-Menü */
-.model-select {
-    padding: 8px;
-    border-radius: 5px;
-    border: 1px solid var(--border-color);
-    background-color: white;
+#modelInfoButton {
+    padding: 0 !important;
+    min-width: 0 !important;
+    background: transparent;
+    border: 1px solid #555;
+    color: var(--text-color);
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    font-size: 13px;
+    font-weight: bold;
+    font-family: 'Times New Roman', Times, serif;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    flex-shrink: 0;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    margin-left: 8px;
 }
 
-/* Container für die Suchleiste */
+#modelInfoButton:hover {
+    background: #f0f0f0;
+}
+
+#model-row {
+    position: relative;
+    margin: 5px 10px 5px 10px;
+}
+
+
+/* --- Data Panel & Weather Table --- */
+#meanWindControls, #controls-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px 15px;
+    align-items: center;
+    padding: 10px 0;
+    border-top: 1px solid #eee;
+}
+
+#meanWindControls label, #controls-row label {
+    font-weight: 500;
+    color: #4b5563;
+    text-align: left;
+    white-space: nowrap;
+}
+
+#meanWindControls input, #controls-row select, #controls-row input {
+    width: 90%;
+    padding: 8px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+}
+
+#meanWindResult {
+    grid-column: 1 / -1;
+    font-size: 16px !important;
+    font-weight: bold;
+    color: var(--primary-color);
+    text-align: center;
+    padding-top: 5px;
+}
+
+#weather-table-container table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 13px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    table-layout: fixed;
+}
+
+#weather-table-container th {
+    background: linear-gradient(to bottom, #f0f4f8, #d9e2ec);
+    color: var(--text-color);
+    font-weight: bold;
+    padding: 6px 8px;
+    border: 1px solid var(--text-color);
+    text-align: center;
+    vertical-align: middle;
+}
+
+#weather-table-container td {
+    padding: 2px;
+    border: 1px solid var(--text-color);
+    text-align: center;
+    vertical-align: middle;
+}
+
+#weather-table-container tr:nth-child(even),
+#weather-table-container tr:nth-child(odd),
+#weather-table-container tr:hover {
+    background: none !important;
+}
+
+#weather-table-container tr.humidity-low { background: var(--background-light) !important; }
+#weather-table-container tr.humidity-moderate { background: #F4F4F4 !important; }
+#weather-table-container tr.humidity-high { background: #cdcdcd !important; }
+#weather-table-container tr.humidity-saturated { background: #B9B9B9 !important; color: var(--background-light) !important; }
+
+#weather-table-container tr.wind-low { border: 2px solid lightblue !important; }
+#weather-table-container tr.wind-moderate { border: 2px solid lightgreen !important; }
+#weather-table-container tr.wind-high { border: 2px solid #f5f34f !important; }
+#weather-table-container tr.wind-very-high { border: 2px solid #ffcccc !important; }
+
+
+/* --- Search Panel --- */
 .search-bar-container {
     position: relative;
     margin-bottom: 15px;
@@ -383,12 +539,12 @@ body {
     transform: translateY(-50%);
     font-size: 18px;
     color: #888;
-    pointer-events: none; /* Klicks gehen durch das Icon durch */
+    pointer-events: none;
 }
 
 #locationSearchInput {
     width: 100%;
-    padding: 12px 15px 12px 40px; /* Mehr Platz für das Icon */
+    padding: 12px 15px 12px 40px;
     border-radius: 8px;
     border: 1px solid var(--border-color);
     font-size: 14px;
@@ -401,54 +557,41 @@ body {
     outline: none;
 }
 
-/* Container für alle Ergebnislisten */
 .location-results-container {
     max-height: calc(100% - 120px);
     overflow-y: auto;
-    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+    -webkit-overflow-scrolling: touch;
 }
 
-/* Ensure locationResults is visible by default when Search Panel is active */
 #panel-search:not(.hidden) #locationResults {
     display: block !important;
 }
 
-/* Ensure locationResults is visible and scrollable */
 #locationResults {
-    display: none; /* Default hidden, overridden by JS or #search-panel:not(.hidden) */
+    display: none;
     width: 100%;
     max-height: calc(100% - 120px);
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
 }
 
-.results-heading {
+.search-section {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    margin-bottom: 15px;
+    overflow: hidden;
+}
+
+.search-section h5, .results-heading {
     padding: 10px 15px;
     margin: 0;
     color: var(--primary-color);
     background-color: #f7f7f7;
     border-bottom: 1px solid #f0f0f0;
     font-size: 14px;
-    font-weight: bold; /* Macht die Schrift fett, wie bei einer h5 */
-    list-style-type: none; /* Entfernt eventuelle Listensymbole */
-}
-
-/* Styling für die einzelnen Sektionen (Favoriten, Verlauf) */
-.search-section {
-    background: white;
-    border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-    margin-bottom: 15px;
-    overflow: hidden; /* Stellt sicher, dass die border-radius greift */
-}
-
-.search-section h5 {
-    padding: 10px 15px;
-    margin: 0;
-    color: var(--primary-color); /* Deine Hauptfarbe */
-    background-color: #f7f7f7;
-    border-bottom: 1px solid #f0f0f0;
-    font-size: 14px;
+    font-weight: bold;
+    list-style-type: none;
 }
 
 .search-section ul {
@@ -457,7 +600,6 @@ body {
     margin: 0;
 }
 
-/* Ensure search-item styles align with touch-friendly design */
 .search-item {
     display: flex;
     align-items: center;
@@ -465,7 +607,7 @@ body {
     border-bottom: 1px solid var(--border-color);
     cursor: pointer;
     transition: background-color 0.2s ease;
-    min-height: 48px; /* Larger tap target for touch */
+    min-height: 48px;
 }
 
 .search-item:last-child {
@@ -480,7 +622,7 @@ body {
     font-size: 20px;
     margin-right: 15px;
     color: #888;
-    width: 24px; /* Feste Breite für Ausrichtung */
+    width: 24px;
     text-align: center;
 }
 
@@ -514,14 +656,13 @@ body {
 }
 
 .search-item-actions button.is-favorite {
-    color: #f3d131; /* Gold für Favoriten */
+    color: #f3d131;
 }
 
 .search-item-actions button.delete-btn:hover {
-    color: #e74c3c; /* Rot beim Hovern */
+    color: #e74c3c;
 }
 
-/* Clear button styling */
 .clear-icon {
     position: absolute;
     right: 12px;
@@ -543,652 +684,10 @@ body {
     background: #f0f0f0;
 }
 
-/* Save favorite button */
-.save-favorite-btn {
-    width: 100%;
-    max-width: 400px;
-    padding: 10px;
-    margin: 10px 0;
-    background-color: var(--primary-color);
-    color: white;
-    font-size: 14px;
-    font-weight: bold;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-}
-
-.save-favorite-btn:hover {
-    background-color: var(--primary-hover-color);
-}
-
-/* Favorite modal */
-.favorite-modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 3000;
-}
-
-.favorite-modal-content {
-    background: white;
-    padding: 20px;
-    border-radius: 8px;
-    width: 80%;
-    max-width: 400px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.favorite-modal-content h3 {
-    margin: 0 0 10px;
-    font-size: 16px;
-    color: var(--text-color);
-}
-
-#favoriteNameInput {
-    width: 100%;
-    padding: 10px;
-    margin-bottom: 10px;
-    border: 1px solid var(--border-color);
-    border-radius: 5px;
-    font-size: 14px;
-    box-sizing: border-box;
-}
-
-.favorite-modal-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-}
-
-.modal-btn {
-    padding: 8px 16px;
-    font-size: 14px;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-}
-
-.modal-btn:not(.cancel) {
-    background-color: var(--primary-color);
-    color: white;
-}
-
-.modal-btn.cancel {
-    background-color: #ccc;
-    color: var(--text-color);
-}
-
-.modal-btn:hover {
-    opacity: 0.9;
-}
-
-/* Eine neue, generische Klasse für alle Einstellungs-Container */
-.settings-grid {
-    display: grid;
-    /* Erzeugt zwei Spalten: 
-       1. Spalte (für Labels) passt sich der Breite des Inhalts an.
-       2. Spalte (für Inputs/Selects) füllt den Rest des verfügbaren Platzes. */
-    grid-template-columns: auto 1fr;
-
-    /* Abstand zwischen den Zeilen und Spalten */
-    gap: 16px 10px;
-
-    /* Zentriert die Elemente in jeder Zeile vertikal zueinander */
-    align-items: center;
-}
-
-/* Stellt sicher, dass die Labels rechtsbündig sind für eine saubere Kante */
-.settings-grid label {
-    text-align: right;
-    font-weight: 500;
-    /* Etwas dicker für bessere Lesbarkeit */
-}
-
-/* Stellt sicher, dass die Eingabefelder und Buttons die volle Spaltenbreite nutzen */
-.settings-grid select,
-.settings-grid input,
-.settings-grid button {
-    width: 100%;
-    box-sizing: border-box;
-    /* Verhindert, dass Padding/Border die Breite sprengt */
-    padding: 8px;
-    border-radius: 5px;
-    border: 1px solid var(--border-color);
-}
-
-.settings-grid button {
-    background-color: var(--primary-color);
-    /* Ihre Hauptfarbe */
-    color: white;
-    font-weight: bold;
-    border: none;
-    cursor: pointer;
-
-    /* Buttons sollen oft nicht die ganze Breite einnehmen, 
-       also platzieren wir sie in der zweiten Spalte, aber mit normaler Breite */
-    width: auto;
-    justify-self: start;
-    /* Richtet den Button links in seiner Spalte aus */
-}
-
-/* ================================== */
-/* Leaflet Control-Anpassungen        */
-/* ================================== */
-
-/* Leaflet controls */
-.leaflet-control-container {
-    z-index: 1010 !important;
-}
-
-.leaflet-control-container .leaflet-top {
-    top: 10px;
-    /* Below slider-container */
-}
-
-.leaflet-control-container .leaflet-bottom {
-    bottom: 10px;
-    /* Above tab-bar */
-}
-
-.leaflet-control-coordinates {
-    background: rgba(255, 255, 255, 0.8);
-    padding: 5px;
-    border-radius: 4px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-}
-
-/* Crosshair */
-#crosshair {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 16px;
-    height: 16px;
-    transform: translate(-50%, -50%);
-    pointer-events: none;
-    z-index: 999 !important;
-    display: none;
-}
-
-.touch-device #crosshair {
-    display: block;
-}
-
-#crosshair::before,
-#crosshair::after {
-    content: '';
-    position: absolute;
-    background-color: var(--text-color);
-    box-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
-}
-
-#crosshair::before {
-    left: 50%;
-    top: 0;
-    width: 2px;
-    height: 100%;
-    transform: translateX(-50%);
-}
-
-#crosshair::after {
-    top: 50%;
-    left: 0;
-    height: 2px;
-    width: 100%;
-    transform: translateY(-50%);
-}
-
-/*
- * Optional: Verbessert die Lesbarkeit der Texte auf dem gläsernen Hintergrund
- * der Panels, indem ein leichter Schlagschatten hinzugefügt wird.
- */
-.leaflet-control-scale-line,
-.leaflet-control-attribution a,
-.leaflet-control-attribution,
-.leaflet-control.coordinates {
-    color: var(--text-color);
-    text-shadow: 0 0 5px white, 0 0 3px white;
-    /* Weißer "Glow"-Effekt für Kontrast */
-    font-weight: bold;
-}
-
-/* Incorporate necessary styles from styles-shared.css */
-.leaflet-popup-content {
-    font-size: 13px;
-    font-family: var(--font-main);
-    line-height: 1.0;
-}
-
-.leaflet-tooltip {
-    z-index: 800 !important;
-    background-color: white;
-    padding: 2px;
-    pointer-events: none;
-}
-
-.leaflet-popup-content-wrapper {
-    padding: 0.5px;
-    border-radius: 5px;
-    word-wrap: break-word;
-}
-
-.leaflet-bottom .leaflet-control-scale {
-    margin-bottom: 5px;
-    margin-left: 5px;
-    z-index: 1000 !important;
-    background-color: rgba(255, 255, 255, 0.8);
-    padding: 2px 5px;
-    border-radius: 4px;
-}
-
-.leaflet-bottom .leaflet-control-attribution {
-    margin-bottom: 5px;
-    margin-right: 5px;
-    background-color: rgba(255, 255, 255, 0.8);
-    padding: 2px 5px;
-    font-size: 11px;
-    z-index: 900 !important;
-    white-space: normal;
-    max-width: 60%;
-    text-align: right;
-}
-
-.leaflet-control-live-position {
-    position: absolute;
-    right: 0;
-    bottom: calc(50px + env(safe-area-inset-bottom)) !important;
-    z-index: 1000 !important;
-    font-size: 12px;
-    line-height: 1.4;
-    background: rgba(255, 255, 255, 0.8) !important;
-    padding: 10px;
-    border: 1px solid rgba(0, 0, 0, 0.2);
-    border-radius: 4px;
-    box-shadow: rgba(0, 0, 0, 0.2);
-    max-width: 300px;
-    pointer-events: none;
-}
-
-/* In src/ui-mobile/stylesNEW.css oder einer anderen CSS-Datei für die App einfügen */
-
-/* Allgemeine Tabellenformatierung für ein sauberes Aussehen */
-#weather-table-container table {
-    border-collapse: collapse;
-    width: 100%;
-    font-size: 13px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    table-layout: fixed;
-}
-
-#weather-table-container th {
-    background: linear-gradient(to bottom, #f0f4f8, #d9e2ec);
-    color: var(--text-color);
-    font-weight: bold;
-    padding: 6px 8px;
-    border: 1px solid var(--text-color);
-    /* Wichtig für die Ränder */
-    text-align: center;
-    vertical-align: middle;
-}
-
-#weather-table-container td {
-    padding: 2px;
-    border: 1px solid var(--text-color);
-    /* Wichtig für die Ränder */
-    text-align: center;
-    vertical-align: middle;
-}
-
-/* Deaktiviert Standard-Hintergründe, da wir sie dynamisch setzen */
-#weather-table-container tr:nth-child(even),
-#weather-table-container tr:nth-child(odd),
-#weather-table-container tr:hover {
-    background: none !important;
-}
-
-/* Stile für Hintergrundfarben basierend auf Luftfeuchtigkeit */
-#weather-table-container tr.humidity-low {
-    background: var(--background-light) !important;
-    /* Weiß für <65% */
-}
-
-#weather-table-container tr.humidity-moderate {
-    background: #F4F4F4 !important;
-    /* Helles Grau für 65%-85% */
-}
-
-#weather-table-container tr.humidity-high {
-    background: #cdcdcd !important;
-    /* Mittleres Grau für 85%-99% */
-}
-
-#weather-table-container tr.humidity-saturated {
-    background: #B9B9B9 !important;
-    /* Dunkles Grau für 100% */
-    color: var(--background-light) !important;
-    /* Weiße Schrift für Lesbarkeit */
-}
-
-/* Stile für Randfarben basierend auf Windgeschwindigkeit */
-#weather-table-container tr.wind-low {
-    border: 2px solid lightblue !important;
-}
-
-#weather-table-container tr.wind-moderate {
-    border: 2px solid lightgreen !important;
-}
-
-#weather-table-container tr.wind-high {
-    border: 2px solid #f5f34f !important;
-}
-
-#weather-table-container tr.wind-very-high {
-    border: 2px solid #ffcccc !important;
-}
-
-/* === ANFANG: Finaler, korrekter Block für BEIDE Info-Buttons & Popups === */
-
-/* 1. Stile für den Model-Info-Button (ein <button>-Element) */
-#modelInfoButton {
-    /* Zuerst die störenden allgemeinen Button-Stile zurücksetzen */
-    padding: 0 !important;
-    min-width: 0 !important;
-
-    /* Jetzt das gewünschte Aussehen definieren */
-    background: transparent;
-    border: 1px solid #555;
-    color: var(--text-color);
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    font-size: 13px;
-    font-weight: bold;
-    font-family: 'Times New Roman', Times, serif;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-    flex-shrink: 0;
-
-    /* Wichtig für die Positionierung und das 'i' */
-    display: inline-flex;
-    justify-content: center;
-    align-items: center;
-    margin-left: 8px;
-}
-
-#modelInfoButton:hover {
-    background: #f0f0f0;
-    color: var(--text-color);
-}
-
-/* 2. Stile für den Track-Upload-Info-Button (ein <span>-Element) */
-.info-icon {
-    background: transparent;
-    border: 1px solid #555;
-    color: var(--text-color);
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    font-size: 13px;
-    font-weight: bold;
-    font-family: 'Times New Roman', Times, serif;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-    flex-shrink: 0;
-
-    display: inline-flex;
-    justify-content: center;
-    align-items: center;
-    margin-left: 8px;
-    line-height: 18px;
-    /* Sorgt für vertikale Zentrierung */
-}
-
-.info-icon:hover {
-    background: #f0f0f0;
-}
-
-/* 3. Stellt sicher, dass die Container als Positionierungs-Anker dienen */
-#model-row,
-#track-upload>div:first-child {
-    position: relative;
-    margin: ‚5px 10px 0 10px
-}
-
-/* 4. Ein einheitlicher Stil für BEIDE Popups */
-.info-popup {
-    display: none;
-    position: absolute;
-    bottom: calc(100% + 5px);
-    left: 50%;
-    transform: translateX(-50%);
-    width: 120px;
-
-    /* === HIER IST DIE EINZIGE ÄNDERUNG === */
-    height: auto;
-    /* Erlaubt dem Popup, in der Höhe zu wachsen */
-    text-align: center;
-    padding: 10px;
-    background: white;
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    z-index: 2000;
-    font-size: 13px;
-    color: var(--text-color);
-    line-height: 1.4;
-    min-height: 40px;
-    max-height: 300px;
-    /* Verhindert, dass das Popup zu hoch wird */
-}
-
-.info-popup::after {
-    content: '';
-    position: absolute;
-    top: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    border-width: 6px;
-    border-style: solid;
-    border-color: white transparent transparent transparent;
-}
-
-/* === ENDE: Finaler Block === */
-
-#snackbar {
-    visibility: hidden;
-    min-width: 250px;
-    background-color: var(--text-color);
-    color: var(--background-light);
-    text-align: center;
-    border-radius: 8px;
-    padding: 16px;
-    position: absolute;
-    /* Geändert von fixed zu absolute */
-    z-index: 2010;
-
-    bottom: calc(55px + env(safe-area-inset-bottom) + 10px);
-    /* 55px Tab-Bar + 10px Abstand */
-    left: 50%;
-    transform: translateX(-50%) translateY(200%);
-    /* Startet außerhalb unten */
-    opacity: 0;
-
-    font-size: 1rem;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-    transition: visibility 0s, opacity 0.5s, transform 0.5s ease-in-out;
-}
-
-#snackbar.show {
-    visibility: visible;
-    transform: translateX(-50%) translateY(0);
-    /* Bewegt sich nach oben ins Bild */
-    opacity: 1;
-}
-
-/* Spezifische Farben für Erfolgs- und Fehlermeldungen */
-#snackbar.success {
-    background-color: #4CAF50;
-    /* Grün für Erfolg */
-}
-
-#snackbar.error {
-    background-color: #f44336;
-    /* Rot für Fehler */
-}
-
-/* In src/ui-mobile/styles.css hinzufügen */
-
-#progress-snackbar {
-    visibility: hidden;
-    position: absolute;
-    /* Geändert von fixed zu absolute */
-    bottom: calc(55px + env(safe-area-inset-bottom) + 80px);
-    /* Höher positioniert */
-    left: 50%;
-    transform: translateX(-50%) translateY(200%);
-    /* Startet außerhalb unten */
-    background-color: #3f51b5;
-    color: white;
-    padding: 14px;
-    border-radius: 8px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
-    z-index: 2011;
-    /* Über der normalen Snackbar */
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    min-width: 280px;
-    box-sizing: border-box;
-    opacity: 0;
-    transition: visibility 0s, opacity 0.4s ease-in-out, transform 0.4s ease-in-out;
-}
-
-#progress-snackbar.show {
-    visibility: visible;
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-}
-
-.progress-snackbar-content {
-    flex-grow: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-}
-
-.progress-snackbar-text {
-    font-size: 0.95rem;
-    text-align: center;
-}
-
-.progress-bar-container {
-    width: 100%;
-    height: 6px;
-    background-color: rgba(255, 255, 255, 0.3);
-    border-radius: 3px;
-    overflow: hidden;
-}
-
-.progress-bar {
-    width: 0%;
-    height: 100%;
-    background-color: var(--background-light);
-    border-radius: 3px;
-    transition: width 0.3s ease-in-out;
-}
-
-#progress-snackbar .cancel-button {
-    background: transparent;
-    border: 1px solid white;
-    color: white;
-    border-radius: 5px;
-    padding: 5px 10px;
-    font-size: 0.9rem;
-    cursor: pointer;
-}
-
-#offline-indicator {
-    visibility: hidden;
-    /* Standardmäßig unsichtbar */
-    opacity: 0;
-    transform: translateY(-100%);
-    /* Startet außerhalb des sichtbaren Bereichs oben */
-
-    position: absolute;
-    /* Wichtig: Absolut zum map-container */
-    top: 100px;
-    left: 0;
-    right: 0;
-
-    background-color: #fff3cd;
-    /* Ein sanftes, warnendes Gelb */
-    color: #856404;
-    /* Dunkler Text für guten Kontrast */
-    text-align: center;
-    padding: 8px;
-    font-size: 0.9rem;
-    font-weight: 500;
-
-    z-index: 2010;
-    /* Über den Kartenebenen, aber unter den Haupt-Controls */
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    transition: visibility 0s, opacity 0.3s ease-out, transform 0.3s ease-out;
-}
-
-#offline-indicator.show {
-    visibility: visible;
-    opacity: 1;
-    transform: translateY(0);
-    /* Gleitet von oben herein */
-}
-
-.wind-tooltip {
-    background: rgba(255, 255, 255, 0.8);
-    color: black;
-    border: none;
-    border-radius: 3px;
-    padding: 5px;
-    font-size: 12px;
-    white-space: nowrap;
-}
-
-/* Label für die Touch-Messung */
-.leaflet-measure-label {
-    position: absolute;
-    font: 10px Arial, Helvetica, sans-serif;
-    background-color: rgba(255, 255, 170, 0.7);
-    ;
-    color: black;
-    padding: 2px;
-    border-radius: 3px;
-    box-shadow: 1px 1px 4px #888;
-    white-space: nowrap;
-    text-align: right;
-    pointer-events: none;
-    /* Wichtig, damit das Label keine Klicks abfängt */
-    display: none;
-    /* Standardmäßig unsichtbar */
-    z-index: 9000;
-    /* Über dem Fadenkreuz */
-}
-
-.bold-distance {
-    font-weight: bold !important;
-}
-
-/* in src/ui-mobile/styles.css */
-
+/* --- Dashboard --- */
 .dashboard-grid {
     display: grid;
-    grid-template-rows: 0, 75fr 0, 75fr 0, 75fr 0.6fr 0.6fr 0.4fr;
+    grid-template-rows: 0.75fr 0.75fr 0.6fr 0.6fr 0.4fr;
     gap: 10px;
     height: 100%;
     padding: 10px 0;
@@ -1198,7 +697,6 @@ body {
 .dashboard-card {
     background-color: #000000;
     color: #00FF00;
-    /* Klassisches Grün auf Schwarz für besten Kontrast */
     border-radius: 10px;
     padding: 10px;
     display: flex;
@@ -1230,70 +728,24 @@ body {
     opacity: 0.8;
 }
 
-/* NEU: Styling für die geteilte Zeile */
 .dashboard-row-split {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    /* Zwei gleich breite Spalten */
     gap: 10px;
 }
 
-/* Anpassung für die kleineren Karten in der geteilten Zeile */
-.dashboard-row-split .dashboard-card {
-    padding: 5px;
-}
+.dashboard-row-split .dashboard-card { padding: 5px; }
+.dashboard-row-split .card-label { font-size: 1rem; }
+.dashboard-row-split .card-value { font-size: 3rem; }
+.dashboard-row-split .card-unit { font-size: 1rem; }
 
-.dashboard-row-split .card-label {
-    font-size: 1rem;
-}
+#dashboard-glide-current { transition: color 0.5s ease-in-out; }
+.glide-good { color: #28a745 !important; }
+.glide-ok { color: #ffc107 !important; }
+.glide-bad { color: #dc3545 !important; }
 
-.dashboard-row-split .card-value {
-    font-size: 3rem;
-}
-
-.dashboard-row-split .card-unit {
-    font-size: 1rem;
-}
-
-.dashboard-row-split #auto-record-card,
-.dashboard-row-split #manual-record-card {
+#auto-record-card, #manual-record-card {
     background-color: var(--text-color);
-    border: 2px solid #555;
-    box-shadow: none;
-    justify-content: center;
-}
-
-/* ============================================== */
-/* === NEU: Dashboard-Farben für Gleitverhältnis === */
-/* ============================================== */
-
-/* Grundstil für die Gleitverhältnis-Karte mit sanftem Übergang */
-#dashboard-glide-current {
-    transition: color 0.5s ease-in-out;
-}
-
-/* Stil für "besser als nötig" (grün) */
-.glide-good {
-    color: #28a745 !important;
-    /* Ein klares Grün */
-}
-
-/* Stil für "gerade ausreichend" (gelb) */
-.glide-ok {
-    color: #ffc107 !important;
-    /* Ein warnendes Gelb */
-}
-
-/* Stil für "schlechter als nötig" (rot) */
-.glide-bad {
-    color: #dc3545 !important;
-    /* Ein deutliches Rot */
-}
-
-/* NEU: Styling für den Arm-Button und Status */
-#auto-record-card {
-    background-color: var(--text-color);
-    /* Dunkler Hintergrund */
     border: 2px solid #555;
     box-shadow: none;
     justify-content: center;
@@ -1312,843 +764,206 @@ body {
     transition: all 0.3s ease;
 }
 
-.arm-button:hover {
-    background-color: #ffc107;
-    color: #000;
+.arm-button:hover { background-color: #ffc107; color: #000; }
+.arm-button.armed { border-color: #28a745; background-color: #28a745; color: white; cursor: default; }
+.arm-button.recording { border-color: #dc3545; background-color: #dc3545; color: white; animation: pulse 1.5s infinite; }
+
+#manual-recording-button { border-color: #007bff; color: #007bff; }
+#manual-recording-button:hover { background-color: #007bff; color: white; }
+#manual-recording-button.recording { border-color: #17a2b8; background-color: #17a2b8; color: white; animation: pulse-blue 1.5s infinite; }
+
+
+/* --- Track Upload --- */
+#track-upload > div:first-child {
+    position: relative;
+    margin: 5px 10px 0 10px;
 }
 
-.arm-button.armed {
-    border-color: #28a745;
-    background-color: #28a745;
-    color: white;
-    cursor: default;
-}
-
-.arm-button.recording {
-    border-color: #dc3545;
-    background-color: #dc3545;
-    color: white;
-    animation: pulse 1.5s infinite;
-}
-
-@keyframes pulse {
-    0% {
-        box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7);
-    }
-
-    70% {
-        box-shadow: 0 0 10px 15px rgba(220, 53, 69, 0);
-    }
-
-    100% {
-        box-shadow: 0 0 0 0 rgba(220, 53, 69, 0);
-    }
-}
-
-#manual-recording-button {
-    border-color: #007bff;
-    /* Blau für manuelle Aktionen */
-    color: #007bff;
-}
-
-#manual-recording-button:hover {
-    background-color: #007bff;
-    color: white;
-}
-
-#manual-recording-button.recording {
-    border-color: #17a2b8;
-    /* Cyan für laufende manuelle Aufnahme */
-    background-color: #17a2b8;
-    color: white;
-    animation: pulse-blue 1.5s infinite;
-}
-
-@keyframes pulse-blue {
-    0% {
-        box-shadow: 0 0 0 0 rgba(23, 162, 184, 0.7);
-    }
-
-    70% {
-        box-shadow: 0 0 10px 15px rgba(23, 162, 184, 0);
-    }
-
-    100% {
-        box-shadow: 0 0 0 0 rgba(23, 162, 184, 0);
-    }
-}
-
-
-/* Media queries for responsiveness */
-@media (max-width: 768px) {
-    #slider-container {
-        width: 100%;
-        max-width: 500px;
-    }
-
-    #map-container {
-        min-height: calc(100vh - 96px - 55px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-    }
-}
-
-@media (max-width: 480px) {
-    #slider-container {
-        width: 100%;
-        max-width: 500px;
-        /* Slightly smaller for narrow screens */
-        padding: 3px;
-        padding-top: calc(3px + env(safe-area-inset-top));
-    }
-
-    .slider-content-wrapper {
-        max-width: 400px;
-    }
-}
-
-/* Existing root variables */
-:root {
-    --label-width: 135px;
-    --input-width: 70px;
-    --grid-columns: var(--label-width) var(--input-width) var(--label-width) var(--input-width) minmax(0, 1fr);
-}
-
-html {
-    font-size: 13px;
-}
-
-#map {
-    height: 70vh;
-    width: 100%;
-    margin-top: 90px;
-    z-index: 0;
-}
-
-/* Incorporate necessary styles from styles-shared.css */
-.leaflet-popup-content {
-    font-size: 13px;
-    font-family: var(--font-main);
-    line-height: 1.0;
-}
-
-.leaflet-tooltip {
-    z-index: 800 !important;
-    background-color: white;
-    padding: 2px;
-    pointer-events: none;
-}
-
-.leaflet-popup-content-wrapper {
-    padding: 0.5px;
-    border-radius: 5px;
-    word-wrap: break-word;
-}
-
-.leaflet-bottom .leaflet-control-scale {
-    margin-bottom: 5px !important;
-    margin-left: 5px;
-    z-index: 1000 !important;
-    background-color: rgba(255, 255, 255, 0.8);
-    padding: 2px 5px;
-    border-radius: 4px;
-}
-
-.leaflet-bottom .leaflet-control-attribution {
-    margin-bottom: 5px !important;
-    margin-right: 5px;
-    background-color: rgba(255, 255, 255, 0.8);
-    padding: 2px 5px;
-    font-size: 11px;
-    z-index: 900 !important;
-    white-space: normal;
-    max-width: 60%;
-    text-align: right;
-}
-
-.leaflet-control-live-position {
-    position: absolute;
-    right: 0px;
-    bottom: 10px;
-    z-index: 1000;
-    /* Above map tiles but below popups */
-    font-size: 12px;
-    line-height: 1.4;
-    opacity: 1 !important;
-    visibility: visible !important;
-    background: rgba(255, 255, 255, 0.8) !important;
-    padding: 10px;
-    border: 1px solid rgba(0, 0, 0, 0.2);
-    border-radius: 4px;
-    box-shadow: rgba(0, 0, 0, 0.2);
-    max-width: 300px;
-    pointer-events: none;
-}
-
-.leaflet-bottom .leaflet-control-live-position {
-    margin-bottom: 10px;
-    /* Keep vertical spacing */
-}
-
-/* ===== Live Marker Styles Start ===== */
-
-/* Container, um Standard-Leaflet-Stile zu deaktivieren */
-.live-marker-container {
+.info-icon {
     background: transparent;
-    border: none;
-}
-
-/* Wrapper für die Rotations-Transformation */
-.live-marker-wrapper {
-    width: 24px;
-    height: 24px;
-    display: flex;
+    border: 1px solid #555;
+    color: var(--text-color);
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    font-size: 13px;
+    font-weight: bold;
+    font-family: 'Times New Roman', Times, serif;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    flex-shrink: 0;
+    display: inline-flex;
     justify-content: center;
     align-items: center;
-    transition: transform 0.3s ease-out;
-    /* Optionale sanfte Rotation */
+    margin-left: 8px;
+    line-height: 18px;
 }
 
-/* Der blaue Punkt mit weißem Rand */
-.live-marker-dot {
-    width: 14px;
-    height: 14px;
-    background-color: #007bff;
-    /* Ein kräftiges Blau */
-    border-radius: 50%;
-    border: 2px solid white;
-    box-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
-    /* Ein Schatten für bessere Sichtbarkeit */
+.info-icon:hover {
+    background: #f0f0f0;
 }
 
-/* Der Pfeil, der über dem Punkt positioniert ist */
-.live-marker-arrow {
-    width: 0;
-    height: 0;
-    border-left: 6px solid transparent;
-    border-right: 6px solid transparent;
-    border-bottom: 10px solid #007bff;
-    position: absolute;
-    top: -1px;
-    /* Leicht nach oben verschoben */
-    left: 50%;
-    transform: translateX(-50%);
-    /*filter: drop-shadow(0px -1px 2px rgba(0,0,0,0.5)); /* Leichter Schatten für den Pfeil */
-}
 
-/* ===== Live Marker Styles End ===== */
-
-
-.leaflet-container {
-    z-index: 1;
-}
-
-.leaflet-overlay-pane {
-    z-index: 400;
-    /* Leaflet default */
-    pointer-events: none;
-    /* Overlays don’t need clicks */
-}
-
-.leaflet-marker-pane {
-    z-index: 600;
-    /* Leaflet default ~600 */
-    pointer-events: auto;
-    /* Allow marker clicks */
-}
-
-.leaflet-popup-pane {
-    z-index: 700;
-    /* Leaflet default ~700 */
-    pointer-events: auto;
-    /* Allow popup interactions */
-}
-
-.leaflet-overlay-pane>*,
-.leaflet-marker-pane>*,
-.leaflet-popup-pane>* {
-    pointer-events: auto;
-}
-
-.harp-marker {
-    background: transparent;
-}
-
-.ensemble-tooltip {
-    background-color: rgba(255, 255, 255, 0.9);
-    /* Heller Hintergrund */
-    color: var(--text-color);
-    /* Dunkler Text */
-    border: 1px solid var(--border-color);
-    border-radius: 3px;
-    padding: 5px 8px;
-    font-size: 12px;
-    white-space: nowrap;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-}
-
-/* Ensure the submenu items have consistent padding and font */
-.submenu li {
-    padding: 10px;
-    /* Increased padding for better spacing */
-    border-bottom: 1px solid #eee;
-    font-size: 13px;
-    font-family: var(--font-main);
-}
-
-/* Style the cache setting labels */
-.cache-setting-label {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    /* Align label and dropdown */
-    width: 100%;
-    font-family: var(--font-main);
-    font-size: 13px;
-    font-weight: 400;
-    color: #000;
-    padding-right: 10px;
-    /* Add space between label and dropdown */
-}
-
-/* Style the dropdowns */
-.cache-setting-select {
-    appearance: none;
-    /* Remove default browser styling */
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    background-color: var(--background-light);
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    padding: 6px 24px 6px 8px;
-    /* Space for custom arrow */
-    font-size: 13px;
-    font-family: var(--font-main);
-    color: #000;
-    cursor: pointer;
-    width: 120px;
-    /* Increased width for better alignment */
-    background-image: url('data:image/svg+xml;utf8,<svg fill="%234da8da" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>');
-    /* Custom dropdown arrow */
-    background-repeat: no-repeat;
-    background-position: right 8px center;
-    background-size: 12px;
-}
-
-/* Hover and focus states for dropdowns */
-.cache-setting-select:hover {
-    border-color: var(--primary-color);
-    background-color: #f0f8ff;
-    /* Light blue background on hover */
-}
-
-.cache-setting-select:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 3px rgba(0, 123, 255, 0.5);
-}
-
-/* Style the Recache Now button to match */
-#recacheNowButton {
-    background-color: var(--primary-color);
-    color: var(--background-light);
-    border: none;
-    border-radius: 4px;
-    padding: 6px 12px;
-    font-size: 13px;
-    font-family: var(--font-main);
-    cursor: pointer;
-    width: 120px;
-    /* Match dropdown width */
-    text-align: center;
-    display: block;
-    /* Ensure it takes full width of the li */
-    margin: 0 auto;
-    /* Center the button */
-}
-
-#recacheNowButton:hover {
-    background-color: var(--primary-hover-color);
-}
-
+/* --- Landing Pattern --- */
 #customLandingDirection {
     width: 60px;
     padding: 2px;
 }
 
-.hidden {
-    display: none !important;
-}
 
-* {
-    font-size: 13px;
-    font-family: var(--font-main);
-    font-weight: 400;
-}
+/* =================================================================== */
+/* 5. LEAFLET & KARTEN-STILE
+/* =================================================================== */
 
-#error-message {
-    position: absolute;
-    top: 5px;
-    right: 5px;
-    width: 30%;
-    background: #ffcccc;
-    color: #000000;
-    padding: 6px;
-    border-radius: 5px 5px 5px 5px;
-    text-align: center;
-    z-index: 9999;
-    display: none;
-}
+.leaflet-control-container { z-index: 1010 !important; }
+.leaflet-control-container .leaflet-top { top: 10px; }
+.leaflet-control-container .leaflet-bottom { bottom: 10px; }
 
-#offline-indicator {
-    position: fixed;
-    top: 35px;
-    right: 5px;
-    width: 30%;
-    background: #fff3cd;
-    color: #856404;
-    padding: 6px;
-    border-radius: 5px;
-    text-align: center;
-    z-index: 9997;
-}
-
-.modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.5);
-    z-index: 10000;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-.modal-content {
-    background: white;
-    padding: 20px;
-    border-radius: 5px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-    text-align: center;
-    width: 300px;
-}
-
-.modal-buttons {
-    margin-top: 15px;
-}
-
-.modal-buttons button {
-    margin: 0 10px;
-    padding: 5px 15px;
-}
-
-input[type="checkbox"] {
-    transition: opacity 0.3s ease;
-}
-
-input[type="checkbox"][style*="opacity: 0.5"] {
-    cursor: not-allowed;
-}
-
-input[type="checkbox"][style*="opacity: 1"] {
-    cursor: pointer;
-}
-
-.wind-tooltip {
-    background: rgba(0, 0, 0, 0.8);
-    color: white;
-    border: none;
-    border-radius: 3px;
-    padding: 5px;
-    font-size: 12px;
-    white-space: nowrap;
-}
-
-.isoline-label {
-    background: rgba(255, 255, 255, 0.7) !important;
-    color: blue !important;
-    font-weight: bold;
-    border: none;
-    border-radius: 3px;
-    padding: 0;
-    line-height: 1 !important;
-    /* Tighten line height */
-    text-align: center;
-    overflow: hidden !important;
-    /* Clip text if it overflows */
-    z-index: 2100 !important;
-    /* Above other tooltips */
-    pointer-events: none !important;
-    /* Prevent mouse interaction */
-}
-
-.isoline-label span {
-    margin: 0 !important;
-    padding: 0 !important;
-    display: inline-block;
-}
-
-.isoline-label-small {
-    width: 30px !important;
-    height: 12px !important;
-}
-
-.isoline-label-large {
-    width: 40px !important;
-    height: 14px !important;
-}
-
-#favoriteBtn {
-    margin-top: 3px;
-    padding: 5px 10px;
-    margin-left: 10px;
-    font-size: 12px;
-}
-
-.favorite-marker-icon {
-    color: #FFD700;
-    /* Gold-gelb */
-    font-size: 16px;
-    font-weight: bold;
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.6);
-    text-align: center;
-    line-height: 24px;
-    /* Vertikale Zentrierung */
-}
-
-#coordHistory {
-    padding: 5px;
-    font-size: 12px;
-}
-
-.cutaway-tooltip {
-    background-color: rgba(255, 255, 255, 0.8);
-    border: 1px solid red;
-    border-radius: 3px;
-    padding: 5px;
-    font-size: 12px;
-    white-space: nowrap;
-}
-
-/* Das Fadenkreuz-Element selbst ist nur ein unsichtbarer Ankerpunkt.
-   Es wird standardmäßig mit display: none versteckt. */
-#crosshair {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 16px;
-    /* Breite des Kreuzes */
-    height: 16px;
-    /* Höhe des Kreuzes */
-    transform: translate(-50%, -50%);
-    pointer-events: none;
-    z-index: 999;
-    display: none;
-    /* SEHR WICHTIG: Standardmäßig unsichtbar */
-}
-
-/* Die Sichtbarkeit wird NUR über diese Klasse gesteuert. */
-.touch-device #crosshair {
-    display: block;
-}
-
-/* Die zwei Linien (horizontal und vertikal) für das "+" 
-   werden mit sog. Pseudo-Elementen erstellt. */
-#crosshair::before,
-#crosshair::after {
-    content: '';
-    position: absolute;
-    background-color: var(--text-color);
-    /* Farbe des Kreuzes */
-    /* Ein leichter Schatten macht das Kreuz auf jedem Untergrund besser sichtbar */
-    box-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
-}
-
-/* Vertikale Linie des Kreuzes */
-#crosshair::before {
-    left: 50%;
-    top: 0;
-    width: 2px;
-    /* Dicke der Linie */
-    height: 100%;
-    transform: translateX(-50%);
-}
-
-/* Horizontale Linie des Kreuzes */
-#crosshair::after {
-    top: 50%;
-    left: 0;
-    height: 2px;
-    /* Dicke der Linie */
-    width: 100%;
-    transform: translateY(-50%);
-}
-
-#slider-container {
-    padding: 5px;
-}
-
-#timeLabel {
-    display: block;
-    margin-bottom: 5px;
-}
-
-#timeSlider {
-    width: 100%;
-    margin-bottom: 6px;
-}
-
-#modelSelect {
-    padding: 5px;
-    font-size: 13px;
-}
-
-#info table {
-    border-collapse: collapse;
-    width: 100%;
-    font-size: 13px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    table-layout: fixed;
-}
-
-#info th {
-    background: linear-gradient(to bottom, #f0f4f8, #d9e2ec);
+.leaflet-control-coordinates,
+.leaflet-control-scale-line,
+.leaflet-control-attribution a,
+.leaflet-control-attribution {
     color: var(--text-color);
+    text-shadow: 0 0 5px white, 0 0 3px white;
     font-weight: bold;
-    padding: 10px 8px;
-    border-bottom: 2px solid var(--text-color);
-    text-align: center;
-    vertical-align: middle;
-    width: 25%;
 }
 
-#info td {
-    padding: 8px;
-    border: 1px solid var(--text-color);
-    text-align: center;
-    vertical-align: middle;
-    width: 25%;
+.leaflet-popup-content-wrapper { padding: 0.5px; border-radius: 5px; word-wrap: break-word; }
+.leaflet-popup-content { font-size: 13px; font-family: var(--font-main); line-height: 1.0; }
+.leaflet-tooltip { z-index: 800 !important; background-color: white; padding: 2px; pointer-events: none; }
+
+.leaflet-bottom .leaflet-control-scale { margin-bottom: 5px !important; margin-left: 5px; z-index: 1000 !important; background-color: rgba(255, 255, 255, 0.8); padding: 2px 5px; border-radius: 4px; }
+.leaflet-bottom .leaflet-control-attribution { margin-bottom: 5px !important; margin-right: 5px; background-color: rgba(255, 255, 255, 0.8); padding: 2px 5px; font-size: 11px; z-index: 900 !important; white-space: normal; max-width: 60%; text-align: right; }
+
+.leaflet-control-live-position { position: absolute; right: 0px; bottom: calc(50px + env(safe-area-inset-bottom)) !important; z-index: 1000 !important; font-size: 12px; line-height: 1.4; background: rgba(255, 255, 255, 0.8) !important; padding: 10px; border: 1px solid rgba(0, 0, 0, 0.2); border-radius: 4px; box-shadow: rgba(0, 0, 0, 0.2); max-width: 300px; pointer-events: none; }
+
+/* --- Live Marker --- */
+.live-marker-container { background: transparent; border: none; }
+.live-marker-wrapper { width: 24px; height: 24px; display: flex; justify-content: center; align-items: center; transition: transform 0.3s ease-out; }
+.live-marker-dot { width: 14px; height: 14px; background-color: #007bff; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 6px rgba(0,0,0,0.6); }
+.live-marker-arrow { width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 10px solid #007bff; position: absolute; top: -1px; left: 50%; transform: translateX(-50%); }
+
+/* --- Leaflet Panes --- */
+.leaflet-container { z-index: 1; }
+.leaflet-overlay-pane { z-index: 400; pointer-events: none; }
+.leaflet-marker-pane { z-index: 600; pointer-events: auto; }
+.leaflet-popup-pane { z-index: 700; pointer-events: auto; }
+.leaflet-overlay-pane > *, .leaflet-marker-pane > *, .leaflet-popup-pane > * { pointer-events: auto; }
+
+/* --- HARP Marker --- */
+.harp-marker { background: transparent; }
+
+
+/* =================================================================== */
+/* 6. SPEZIFISCHE ELEMENT-STILE
+/* =================================================================== */
+
+/* --- Crosshair --- */
+#crosshair { position: absolute; top: 50%; left: 50%; width: 16px; height: 16px; transform: translate(-50%, -50%); pointer-events: none; z-index: 999 !important; display: none; }
+.touch-device #crosshair { display: block; }
+#crosshair::before, #crosshair::after { content: ''; position: absolute; background-color: var(--text-color); box-shadow: 0 0 2px rgba(255, 255, 255, 0.8); }
+#crosshair::before { left: 50%; top: 0; width: 2px; height: 100%; transform: translateX(-50%); }
+#crosshair::after { top: 50%; left: 0; height: 2px; width: 100%; transform: translateY(-50%); }
+
+/* --- Tooltips & Labels --- */
+.wind-tooltip { background: rgba(0, 0, 0, 0.8); color: white; border: none; border-radius: 3px; padding: 5px; font-size: 12px; white-space: nowrap; }
+.cutaway-tooltip { background-color: rgba(255, 255, 255, 0.8); border: 1px solid red; border-radius: 3px; padding: 5px; font-size: 12px; white-space: nowrap; }
+.ensemble-tooltip { background-color: rgba(255, 255, 255, 0.9); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 3px; padding: 5px 8px; font-size: 12px; white-space: nowrap; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+.isoline-label { background: rgba(255, 255, 255, 0.7) !important; color: blue !important; font-weight: bold; border: none; border-radius: 3px; padding: 0; line-height: 1 !important; text-align: center; overflow: hidden !important; z-index: 2100 !important; pointer-events: none !important; }
+.isoline-label span { margin: 0 !important; padding: 0 !important; display: inline-block; }
+.isoline-label-small { width: 30px !important; height: 12px !important; }
+.isoline-label-large { width: 40px !important; height: 14px !important; }
+.leaflet-measure-label { position: absolute; font: 10px Arial, Helvetica, sans-serif; background-color: rgba(255, 255, 170, 0.7); color: black; padding: 2px; border-radius: 3px; box-shadow: 1px 1px 4px #888; white-space: nowrap; text-align: right; pointer-events: none; display: none; z-index: 9000; }
+.bold-distance { font-weight: bold !important; }
+
+/* --- Favorite Marker --- */
+.favorite-marker-icon { color: #FFD700; font-size: 16px; font-weight: bold; text-shadow: 1px 1px 2px rgba(0,0,0,0.6); text-align: center; line-height: 24px; }
+
+/* Styling für einheitliche Sektions-Überschriften innerhalb von Listen */
+.list-header {
+    display: block; /* Stellt sicher, dass das Element die volle Breite einnimmt */
+    padding: 10px 15px;
+    margin: 0 -15px 10px -15px; /* Hebt den seitlichen Abstand des Eltern-Containers auf */
+    color: var(--primary-color);
+    background-color: #f7f7f7;
+    border-bottom: 1px solid #f0f0f0;
+    border-top: 1px solid #f0f0f0; /* Fügt eine obere Linie für bessere Abgrenzung hinzu */
+    font-size: 14px;
+    font-weight: bold;
 }
 
-/* Remove default alternating and hover backgrounds to avoid conflicts */
-#info tr:nth-child(even),
-#info tr:nth-child(odd),
-#info tr:hover {
-    background: none !important;
-}
+/* =================================================================== */
+/* 7. MODALE & POPUPS
+/* =================================================================== */
 
-/* New styles for humidity-based row backgrounds */
-#info table tr.humidity-low {
-    background: var(--background-light) !important;
-    /* White for <65% */
-}
+.modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 10000; display: flex; justify-content: center; align-items: center; }
+.modal-content { background: white; padding: 20px; border-radius: 5px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3); text-align: center; width: 300px; }
+.modal-buttons { margin-top: 15px; }
+.modal-buttons button { margin: 0 10px; padding: 5px 15px; }
 
-#info table tr.humidity-moderate {
-    background: #F4F4F4 !important;
-    /* Light grey for 65%-85% */
-}
+.save-favorite-btn { width: 100%; max-width: 400px; padding: 10px; margin: 10px 0; background-color: var(--primary-color); color: white; font-size: 14px; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; transition: background-color 0.2s ease; }
+.save-favorite-btn:hover { background-color: var(--primary-hover-color); }
 
-#info table tr.humidity-high {
-    background: #cdcdcd !important;
-    /* Medium grey for 85%-99% */
-}
+.favorite-modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 3000; }
+.favorite-modal-content { background: white; padding: 20px; border-radius: 8px; width: 80%; max-width: 400px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+.favorite-modal-content h3 { margin: 0 0 10px; font-size: 16px; color: var(--text-color); }
+#favoriteNameInput { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid var(--border-color); border-radius: 5px; font-size: 14px; box-sizing: border-box; }
+.favorite-modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
+.modal-btn { padding: 8px 16px; font-size: 14px; border: none; border-radius: 5px; cursor: pointer; }
+.modal-btn:not(.cancel) { background-color: var(--primary-color); color: white; }
+.modal-btn.cancel { background-color: #ccc; color: var(--text-color); }
+.modal-btn:hover { opacity: 0.9; }
 
-#info table tr.humidity-saturated {
-    background: #B9B9B9 !important;
-    /* Dark grey for 100% */
-    color: var(--background-light) !important;
-    /* White text for readability */
-}
+.info-popup { display: none; position: absolute; bottom: calc(100% + 5px); left: 50%; transform: translateX(-50%); width: 120px; height: auto; text-align: center; padding: 10px; background: white; border: 1px solid var(--border-color); border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 2000; font-size: 13px; color: var(--text-color); line-height: 1.4; min-height: 40px; max-height: 300px; }
+.info-popup::after { content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border-width: 6px; border-style: solid; border-color: white transparent transparent transparent; }
 
-/* Wind speed classes for border colors */
-#info table tr.wind-low {
-    border: 2px solid lightblue !important;
-}
+#snackbar { visibility: hidden; min-width: 250px; background-color: var(--text-color); color: var(--background-light); text-align: center; border-radius: 8px; padding: 16px; position: absolute; z-index: 2010; bottom: calc(55px + env(safe-area-inset-bottom) + 10px); left: 50%; transform: translateX(-50%) translateY(200%); opacity: 0; font-size: 1rem; box-shadow: 0 4px 8px rgba(0,0,0,0.2); transition: visibility 0s, opacity 0.5s, transform 0.5s ease-in-out; }
+#snackbar.show { visibility: visible; transform: translateX(-50%) translateY(0); opacity: 1; }
+#snackbar.success { background-color: #4CAF50; }
+#snackbar.error { background-color: #f44336; }
 
-#info table tr.wind-moderate {
-    border: 2px solid lightgreen !important;
-}
+#progress-snackbar { visibility: hidden; position: absolute; bottom: calc(55px + env(safe-area-inset-bottom) + 80px); left: 50%; transform: translateX(-50%) translateY(200%); background-color: #3f51b5; color: white; padding: 14px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.25); z-index: 2011; display: flex; align-items: center; gap: 12px; min-width: 280px; box-sizing: border-box; opacity: 0; transition: visibility 0s, opacity 0.4s ease-in-out, transform 0.4s ease-in-out; }
+#progress-snackbar.show { visibility: visible; opacity: 1; transform: translateX(-50%) translateY(0); }
+.progress-snackbar-content { flex-grow: 1; display: flex; flex-direction: column; gap: 5px; }
+.progress-snackbar-text { font-size: 0.95rem; text-align: center; }
+.progress-bar-container { width: 100%; height: 6px; background-color: rgba(255,255,255,0.3); border-radius: 3px; overflow: hidden; }
+.progress-bar { width: 0%; height: 100%; background-color: var(--background-light); border-radius: 3px; transition: width 0.3s ease-in-out; }
+#progress-snackbar .cancel-button { background: transparent; border: 1px solid white; color: white; border-radius: 5px; padding: 5px 10px; font-size: 0.9rem; cursor: pointer; }
 
-#info table tr.wind-high {
-    border: 2px solid #f5f34f !important;
-}
+#offline-indicator { visibility: hidden; opacity: 0; transform: translateY(-100%); position: absolute; top: 100px; left: 0; right: 0; background-color: #fff3cd; color: #856404; text-align: center; padding: 8px; font-size: 0.9rem; font-weight: 500; z-index: 2010; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: visibility 0s, opacity 0.3s ease-out, transform 0.3s ease-out; }
+#offline-indicator.show { visibility: visible; opacity: 1; transform: translateY(0); }
 
-#info table tr.wind-very-high {
-    border: 2px solid #ffcccc !important;
-}
+#loading { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); display: none; flex-direction: column; align-items: center; justify-content: center; background: rgba(255,255,255,0.9); padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); z-index: 1000; }
+#loading .spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite, pulse 1.5s ease-in-out infinite; }
+#loading p { margin-top: 10px; font-size: 13px; color: var(--text-color); font-family: Roboto, sans-serif; }
 
-#loading {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    display: none;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    background: rgba(255, 255, 255, 0.9);
-    padding: 20px;
-    border-radius: 10px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-    z-index: 1000;
-}
 
-#loading .spinner {
-    width: 40px;
-    height: 40px;
-    border: 4px solid #f3f3f3;
-    border-top: 4px solid #3498db;
-    border-radius: 50%;
-    animation: spin 1s linear infinite, pulse 1.5s ease-in-out infinite;
-}
+/* =================================================================== */
+/* 8. ANIMATIONEN
+/* =================================================================== */
 
-#loading p {
-    margin-top: 10px;
-    font-size: 13px;
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(220,53,69,0.7); } 70% { box-shadow: 0 0 10px 15px rgba(220,53,69,0); } 100% { box-shadow: 0 0 0 0 rgba(220,53,69,0); } }
+@keyframes pulse-blue { 0% { box-shadow: 0 0 0 0 rgba(23,162,184,0.7); } 70% { box-shadow: 0 0 10px 15px rgba(23,162,184,0); } 100% { box-shadow: 0 0 0 0 rgba(23,162,184,0); } }
+
+/* =================================================================== */
+/* 9. WIEDERHERGESTELLTE STILE FÜR TRACK-UPLOAD
+/* =================================================================== */
+
+#track-upload input[type="file"] {
+    display: block; /* Macht das Element sichtbar */
+    width: 100%;    /* Nimmt die volle Breite ein */
+    padding: 12px;
+    margin-top: 5px;
+    font-size: 14px;
     color: var(--text-color);
-    font-family: Roboto, sans-serif;
-}
-
-/* =================================================================
-   EINHEITLICHES CHECKBOX-STYLING (aus Web-Version übernommen)
-   ================================================================= */
-
-input[type="checkbox"] {
-    /* Zurücksetzen des Standard-Aussehens */
-    appearance: none;
-    -webkit-appearance: none;
-    -moz-appearance: none;
-
-    /* Dimensionen & Form */
-    width: 18px;
-    height: 18px;
-    border: 2px solid var(--primary-color);
-    /* Feste Farbe, da CSS-Variablen hier nicht definiert sind */
-    border-radius: 4px;
-
-    /* Positionierung & Verhalten */
-    background-color: var(--background-light);
-    cursor: pointer;
-    position: relative;
-    vertical-align: middle;
+    background-color: #f0f2f5; /* Leichter Hintergrund zur Abhebung */
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    cursor: pointer; /* Zeigt an, dass das Element klickbar ist */
     transition: background-color 0.2s ease;
 }
 
-/* Der Hover-Effekt ist auf Touch-Geräten nicht relevant, schadet aber nicht */
-input[type="checkbox"]:not(:checked):hover {
-    background-color: #e6f0fa;
-}
-
-/* Das Häkchen, das erscheint, wenn die Box ausgewählt ist */
-input[type="checkbox"]:checked::after {
-    content: '✔';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    font-size: 14px;
-    font-weight: bold;
-    color: var(--primary-color);
-}
-
-/* Fokus-Stil für bessere Barrierefreiheit */
-input[type="checkbox"]:focus {
-    outline: none;
-    box-shadow: 0 0 0 2px rgba(77, 168, 218, 0.2);
-}
-
-/* =================================================================
-   RESPONSIVES LAYOUT FÜR MITTELWIND-STEUERUNG
-   ================================================================= */
-
-/* Allgemeiner Container für die Steuerelemente */
-#meanWindControls,
-#controls-row {
-    display: grid;
-    /* Erzeugt ein flexibles Grid-Layout */
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    /* Magie: Erzeugt so viele Spalten wie möglich, die mind. 140px breit sind */
-    gap: 10px 15px;
-    /* Abstand zwischen den Zeilen und Spalten */
-    align-items: center;
-    padding: 10px 0;
-    border-top: 1px solid #eee;
-}
-
-/* Styling für die Labels (z.B. "Lower Limit:") */
-#meanWindControls label,
-#controls-row label {
-    font-weight: 500;
-    color: #4b5563;
-    text-align: left;
-    white-space: nowrap;
-}
-
-/* Styling für die Eingabefelder und Select-Boxen */
-#meanWindControls input,
-#controls-row select,
-#controls-row input {
-    width: 90%;
-    /* Füllt die verfügbare Breite seiner Grid-Spalte */
-    padding: 8px;
-    border: 1px solid #d1d5db;
-    border-radius: 6px;
-}
-
-/* Das Ergebnis-Feld soll immer die volle Breite einnehmen */
-#meanWindResult {
-    grid-column: 1 / -1;
-    /* Erstreckt sich über alle Spalten */
-    font-size: 16px !important;
-    font-weight: bold;
-    color: var(--primary-color);
-    text-align: center;
-    /* Zentriert für eine bessere Optik auf Mobilgeräten */
-    padding-top: 5px;
-}
-
-/* =================================================================
-   ZENTRALES & EINHEITLICHES BUTTON-STYLING
-   ================================================================= */
-
-/* 1. Basis-Stil für alle Buttons in der App */
-.btn {
-    width: 100%;
-    padding: 12px;
-    margin: 5px 0;
-    font-size: 14px;
-    font-weight: bold;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    text-align: center;
-    transition: background-color 0.2s ease, opacity 0.2s ease;
-}
-
-/* 2. Primäre Aktionsfarbe (Standard-Button) */
-.btn-primary {
-    background-color: #4da8da; /* Helles Blau */
-}
-
-.btn-primary:hover {
-    background-color: #0056b3; /* Dunkleres Blau */
-}
-
-/* 3. Sekundäre Aktionsfarbe (z.B. für Abbrechen) */
-.btn-secondary {
-    background-color: #6c757d; /* Grau */
-}
-
-.btn-secondary:hover {
-    background-color: #5a6268;
-}
-
-/* 4. Gefahr-Aktionsfarbe (z.B. für Reset) */
-.btn-danger {
-    background-color: #dc3545; /* Rot */
-}
-
-.btn-danger:hover {
-    background-color: #c82333;
+#track-upload input[type="file"]:hover {
+    background-color: #e6e8eb; /* Leichte Farbänderung beim Darüberfahren */
 }

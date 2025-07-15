@@ -48,7 +48,7 @@ export function stopAutoupdate() {
         clearInterval(AppState.autoupdateInterval);
         AppState.autoupdateInterval = null;
         console.log('[AutoupdateManager] Stopped autoupdate interval.');
-        displayMessage('Autoupdate disabled');
+        Utils.handleMessage('Autoupdate disabled');
     }
 }
 
