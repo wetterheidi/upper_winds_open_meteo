@@ -1,11 +1,12 @@
-/* For testing purposes 
-#slider-container { border: 2px solid red; }
-#map-container { border: 2px solid green; }
-#tab-bar { border: 2px solid blue; }
-.leaflet-top { border: 2px solid orange; }
-.leaflet-bottom { border: 2px solid purple; } */
-
-/* Stile für die neue Tab-Bar und Panels */
+:root {
+    --primary-color: #4da8da;
+    --primary-hover-color: #0056b3;
+    --text-color: #333;
+    --background-light: #ffffff;
+    --background-medium: #f0f2f5;
+    --border-color: #d9d9d9;
+    --font-main: 'Roboto', sans-serif;
+}
 
 /* Tab bar */
 #tab-bar {
@@ -17,8 +18,8 @@
     justify-content: space-around;
     align-items: flex-start;
     padding-top: 5px;
-    background-color: #fff;
-    border-top: 1px solid #ddd;
+    background-color: var(--background-light);
+    border-top: 1px solid var(--border-color);
     box-sizing: border-box;
     z-index: 1001;
 }
@@ -48,12 +49,12 @@
 }
 
 button:hover {
-    background: #4da8da;
+    background: var(--primary-color);
 }
 
 /* Stil für den aktiven Button */
 .tab-button.active {
-    color: #333;
+    color: var(--text-color);
     /* Ihre Hauptfarbe */
 }
 
@@ -92,7 +93,7 @@ button:hover {
 
 /* Styling für das Planner-Akkordeon */
 .accordion-item {
-    background-color: #fff;
+    background-color: var(--background-light);
     margin-bottom: 10px;
     border-radius: 8px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -102,10 +103,10 @@ button:hover {
 .accordion-header {
     width: 100%;
     padding: 15px;
-    background-color: #4da8da;
+    background-color: var(--primary-color);
     color: white;
     border: none;
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid var(--border-color);
     cursor: pointer;
     font-size: 16px;
     font-weight: bold;
@@ -113,7 +114,7 @@ button:hover {
 }
 
 .accordion-header:hover {
-    background-color: #0056b3;
+    background-color: var(--primary-hover-color);
 }
 
 /* Icon für auf/zu Zustand hinzufügen */
@@ -135,7 +136,7 @@ button:hover {
     display: none;
     /* Standardmäßig versteckt */
     padding: 15px;
-    border-top: 1px solid #e0e0e0;
+    border-top: 1px solid var(--border-color);
 }
 
 .accordion-item.active .accordion-content {
@@ -151,7 +152,7 @@ button:hover {
 
 .accordion-content li {
     padding: 10px 0;
-    border-bottom: 1px solid #f0f0f0;
+    border-bottom: 1px solid var(--border-color);
 }
 
 .accordion-content li:last-child {
@@ -234,7 +235,7 @@ body {
     background: rgba(255, 255, 255, 0.9);
     backdrop-filter: blur(5px);
     -webkit-backdrop-filter: blur(5px);
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid var(--border-color);
     z-index: 2000 !important;
     padding-top: calc(2px + env(safe-area-inset-top));
     /* Berücksichtigt Notch */
@@ -293,7 +294,7 @@ body {
     /* Zurück auf 16px */
     height: 16px;
     /* Zurück auf 16px */
-    background: #4da8da;
+    background: var(--primary-color);
     border-radius: 50%;
     cursor: pointer;
     box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
@@ -304,7 +305,7 @@ body {
 .slider-content-wrapper #timeSlider::-moz-range-thumb {
     width: 16px;
     height: 16px;
-    background: #4da8da;
+    background: var(--primary-color);
     border-radius: 50%;
     cursor: pointer;
     border: none;
@@ -335,7 +336,7 @@ body {
 #autoupdateToggle label {
     font-size: 24px;
     /* Größer für bessere Sichtbarkeit und Klickbarkeit */
-    color: #4da8da;
+    color: var(--primary-color);
     /* Verwendet deine Hauptfarbe (--primary-color) */
     font-weight: bold;
     /* Macht das Symbol etwas kräftiger */
@@ -351,14 +352,14 @@ body {
 #selectedTime,
 #modelLabel {
     font-size: 14px;
-    color: #333;
+    color: var(--text-color);
 }
 
 #modelSelect {
     font-size: 14px;
     padding: 4px;
     border-radius: 4px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--border-color);
 }
 
 /* Container für die Suchleiste */
@@ -383,13 +384,13 @@ body {
     padding: 12px 15px 12px 40px;
     /* Mehr Platz für das Icon */
     border-radius: 8px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--border-color);
     font-size: 14px;
     box-sizing: border-box;
 }
 
 #locationSearchInput:focus {
-    border-color: #4da8da;
+    border-color: var(--primary-color);
     box-shadow: 0 0 5px rgba(77, 168, 218, 0.5);
     outline: none;
 }
@@ -430,7 +431,7 @@ body {
 .search-section h5 {
     padding: 10px 15px;
     margin: 0;
-    color: #4da8da;
+    color: var(--primary-color);
     /* Ihre Hauptfarbe */
     background-color: #f7f7f7;
     border-bottom: 1px solid #f0f0f0;
@@ -448,7 +449,7 @@ body {
     display: flex;
     align-items: center;
     padding: 12px 15px;
-    border-bottom: 1px solid #f0f0f0;
+    border-bottom: 1px solid var(--border-color);
     cursor: pointer;
     transition: background-color 0.2s ease;
     min-height: 48px;
@@ -478,7 +479,7 @@ body {
 
 .search-item-text .name {
     font-weight: bold;
-    color: #333;
+    color: var(--text-color);
 }
 
 .search-item-text .details {
@@ -515,7 +516,7 @@ body {
 .model-select {
     padding: 8px;
     border-radius: 5px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--border-color);
     background-color: white;
 }
 
@@ -547,7 +548,7 @@ body {
     max-width: 400px;
     padding: 10px;
     margin: 10px 0;
-    background-color: #4da8da;
+    background-color: var(--primary-color);
     color: white;
     font-size: 14px;
     font-weight: bold;
@@ -558,7 +559,7 @@ body {
 }
 
 .save-favorite-btn:hover {
-    background-color: #0056b3;
+    background-color: var(--primary-hover-color);
 }
 
 /* Favorite modal */
@@ -587,14 +588,14 @@ body {
 .favorite-modal-content h3 {
     margin: 0 0 10px;
     font-size: 16px;
-    color: #333;
+    color: var(--text-color);
 }
 
 #favoriteNameInput {
     width: 100%;
     padding: 10px;
     margin-bottom: 10px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--border-color);
     border-radius: 5px;
     font-size: 14px;
     box-sizing: border-box;
@@ -615,13 +616,13 @@ body {
 }
 
 .modal-btn:not(.cancel) {
-    background-color: #4da8da;
+    background-color: var(--primary-color);
     color: white;
 }
 
 .modal-btn.cancel {
     background-color: #ccc;
-    color: #333;
+    color: var(--text-color);
 }
 
 .modal-btn:hover {
@@ -659,11 +660,11 @@ body {
     /* Verhindert, dass Padding/Border die Breite sprengt */
     padding: 8px;
     border-radius: 5px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--border-color);
 }
 
 .settings-grid button {
-    background-color: #4da8da;
+    background-color: var(--primary-color);
     /* Ihre Hauptfarbe */
     color: white;
     font-weight: bold;
@@ -724,7 +725,7 @@ body {
 #crosshair::after {
     content: '';
     position: absolute;
-    background-color: #333;
+    background-color: var(--text-color);
     box-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
 }
 
@@ -752,7 +753,7 @@ body {
 .leaflet-control-attribution a,
 .leaflet-control-attribution,
 .leaflet-control.coordinates {
-    color: #333;
+    color: var(--text-color);
     text-shadow: 0 0 5px white, 0 0 3px white;
     /* Weißer "Glow"-Effekt für Kontrast */
     font-weight: bold;
@@ -761,7 +762,7 @@ body {
 /* Incorporate necessary styles from styles-shared.css */
 .leaflet-popup-content {
     font-size: 13px;
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-main);
     line-height: 1.0;
 }
 
@@ -828,10 +829,10 @@ body {
 
 #weather-table-container th {
     background: linear-gradient(to bottom, #f0f4f8, #d9e2ec);
-    color: #333;
+    color: var(--text-color);
     font-weight: bold;
     padding: 6px 8px;
-    border: 1px solid #333;
+    border: 1px solid var(--text-color);
     /* Wichtig für die Ränder */
     text-align: center;
     vertical-align: middle;
@@ -839,7 +840,7 @@ body {
 
 #weather-table-container td {
     padding: 2px;
-    border: 1px solid #333;
+    border: 1px solid var(--text-color);
     /* Wichtig für die Ränder */
     text-align: center;
     vertical-align: middle;
@@ -854,7 +855,7 @@ body {
 
 /* Stile für Hintergrundfarben basierend auf Luftfeuchtigkeit */
 #weather-table-container tr.humidity-low {
-    background: #FFFFFF !important;
+    background: var(--background-light) !important;
     /* Weiß für <65% */
 }
 
@@ -871,7 +872,7 @@ body {
 #weather-table-container tr.humidity-saturated {
     background: #B9B9B9 !important;
     /* Dunkles Grau für 100% */
-    color: #FFFFFF !important;
+    color: var(--background-light) !important;
     /* Weiße Schrift für Lesbarkeit */
 }
 
@@ -903,7 +904,7 @@ body {
     /* Jetzt das gewünschte Aussehen definieren */
     background: transparent;
     border: 1px solid #555;
-    color: #333;
+    color: var(--text-color);
     width: 20px;
     height: 20px;
     border-radius: 50%;
@@ -923,14 +924,14 @@ body {
 
 #modelInfoButton:hover {
     background: #f0f0f0;
-    color: #333;
+    color: var(--text-color);
 }
 
 /* 2. Stile für den Track-Upload-Info-Button (ein <span>-Element) */
 .info-icon {
     background: transparent;
     border: 1px solid #555;
-    color: #333;
+    color: var(--text-color);
     width: 20px;
     height: 20px;
     border-radius: 50%;
@@ -975,12 +976,12 @@ body {
     text-align: center;
     padding: 10px;
     background: white;
-    border: 1px solid #ccc;
+    border: 1px solid var(--border-color);
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     z-index: 2000;
     font-size: 13px;
-    color: #333;
+    color: var(--text-color);
     line-height: 1.4;
     min-height: 40px;
     max-height: 300px;
@@ -1003,8 +1004,8 @@ body {
 #snackbar {
     visibility: hidden;
     min-width: 250px;
-    background-color: #333;
-    color: #fff;
+    background-color: var(--text-color);
+    color: var(--background-light);
     text-align: center;
     border-radius: 8px;
     padding: 16px;
@@ -1098,7 +1099,7 @@ body {
 .progress-bar {
     width: 0%;
     height: 100%;
-    background-color: #ffffff;
+    background-color: var(--background-light);
     border-radius: 3px;
     transition: width 0.3s ease-in-out;
 }
@@ -1255,7 +1256,7 @@ body {
 
 .dashboard-row-split #auto-record-card,
 .dashboard-row-split #manual-record-card {
-    background-color: #333;
+    background-color: var(--text-color);
     border: 2px solid #555;
     box-shadow: none;
     justify-content: center;
@@ -1290,7 +1291,7 @@ body {
 
 /* NEU: Styling für den Arm-Button und Status */
 #auto-record-card {
-    background-color: #333;
+    background-color: var(--text-color);
     /* Dunkler Hintergrund */
     border: 2px solid #555;
     box-shadow: none;
@@ -1424,7 +1425,7 @@ html {
 /* Incorporate necessary styles from styles-shared.css */
 .leaflet-popup-content {
     font-size: 13px;
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-main);
     line-height: 1.0;
 }
 
@@ -1573,9 +1574,9 @@ html {
 .ensemble-tooltip {
     background-color: rgba(255, 255, 255, 0.9);
     /* Heller Hintergrund */
-    color: #333;
+    color: var(--text-color);
     /* Dunkler Text */
-    border: 1px solid #ccc;
+    border: 1px solid var(--border-color);
     border-radius: 3px;
     padding: 5px 8px;
     font-size: 12px;
@@ -1589,7 +1590,7 @@ html {
     /* Increased padding for better spacing */
     border-bottom: 1px solid #eee;
     font-size: 13px;
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-main);
 }
 
 /* Style the cache setting labels */
@@ -1599,7 +1600,7 @@ html {
     justify-content: space-between;
     /* Align label and dropdown */
     width: 100%;
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-main);
     font-size: 13px;
     font-weight: 400;
     color: #000;
@@ -1613,13 +1614,13 @@ html {
     /* Remove default browser styling */
     -webkit-appearance: none;
     -moz-appearance: none;
-    background-color: #fff;
-    border: 1px solid #ccc;
+    background-color: var(--background-light);
+    border: 1px solid var(--border-color);
     border-radius: 4px;
     padding: 6px 24px 6px 8px;
     /* Space for custom arrow */
     font-size: 13px;
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-main);
     color: #000;
     cursor: pointer;
     width: 120px;
@@ -1633,26 +1634,26 @@ html {
 
 /* Hover and focus states for dropdowns */
 .cache-setting-select:hover {
-    border-color: #4da8da;
+    border-color: var(--primary-color);
     background-color: #f0f8ff;
     /* Light blue background on hover */
 }
 
 .cache-setting-select:focus {
     outline: none;
-    border-color: #4da8da;
+    border-color: var(--primary-color);
     box-shadow: 0 0 3px rgba(0, 123, 255, 0.5);
 }
 
 /* Style the Recache Now button to match */
 #recacheNowButton {
-    background-color: #4da8da;
-    color: #ffffff;
+    background-color: var(--primary-color);
+    color: var(--background-light);
     border: none;
     border-radius: 4px;
     padding: 6px 12px;
     font-size: 13px;
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-main);
     cursor: pointer;
     width: 120px;
     /* Match dropdown width */
@@ -1664,7 +1665,7 @@ html {
 }
 
 #recacheNowButton:hover {
-    background-color: #0056b3;
+    background-color: var(--primary-hover-color);
 }
 
 #customLandingDirection {
@@ -1678,7 +1679,7 @@ html {
 
 * {
     font-size: 13px;
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-main);
     font-weight: 400;
 }
 
@@ -1845,13 +1846,13 @@ input[type="checkbox"][style*="opacity: 1"] {
     flex-grow: 1;
     /* Das Eingabefeld nimmt den meisten Platz ein */
     padding: 8px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--border-color);
     border-radius: 4px;
     font-size: 14px;
 }
 
 #saveCurrentLocationBtn {
-    background-color: #4da8da;
+    background-color: var(--primary-color);
     color: white;
     border: none;
     border-radius: 3px;
@@ -1868,7 +1869,7 @@ input[type="checkbox"][style*="opacity: 1"] {
 }
 
 #saveCurrentLocationBtn:hover {
-    background-color: #0056b3;
+    background-color: var(--primary-hover-color);
 }
 
 .location-results-list {
@@ -1986,7 +1987,7 @@ input[type="checkbox"][style*="opacity: 1"] {
 #crosshair::after {
     content: '';
     position: absolute;
-    background-color: #333;
+    background-color: var(--text-color);
     /* Farbe des Kreuzes */
     /* Ein leichter Schatten macht das Kreuz auf jedem Untergrund besser sichtbar */
     box-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
@@ -2041,10 +2042,10 @@ input[type="checkbox"][style*="opacity: 1"] {
 
 #info th {
     background: linear-gradient(to bottom, #f0f4f8, #d9e2ec);
-    color: #333;
+    color: var(--text-color);
     font-weight: bold;
     padding: 10px 8px;
-    border-bottom: 2px solid #333;
+    border-bottom: 2px solid var(--text-color);
     text-align: center;
     vertical-align: middle;
     width: 25%;
@@ -2052,7 +2053,7 @@ input[type="checkbox"][style*="opacity: 1"] {
 
 #info td {
     padding: 8px;
-    border: 1px solid #333;
+    border: 1px solid var(--text-color);
     text-align: center;
     vertical-align: middle;
     width: 25%;
@@ -2067,7 +2068,7 @@ input[type="checkbox"][style*="opacity: 1"] {
 
 /* New styles for humidity-based row backgrounds */
 #info table tr.humidity-low {
-    background: #FFFFFF !important;
+    background: var(--background-light) !important;
     /* White for <65% */
 }
 
@@ -2084,7 +2085,7 @@ input[type="checkbox"][style*="opacity: 1"] {
 #info table tr.humidity-saturated {
     background: #B9B9B9 !important;
     /* Dark grey for 100% */
-    color: #FFFFFF !important;
+    color: var(--background-light) !important;
     /* White text for readability */
 }
 
@@ -2133,7 +2134,7 @@ input[type="checkbox"][style*="opacity: 1"] {
 #loading p {
     margin-top: 10px;
     font-size: 13px;
-    color: #333;
+    color: var(--text-color);
     font-family: Roboto, sans-serif;
 }
 
@@ -2150,12 +2151,12 @@ input[type="checkbox"] {
     /* Dimensionen & Form */
     width: 18px;
     height: 18px;
-    border: 2px solid #4da8da;
+    border: 2px solid var(--primary-color);
     /* Feste Farbe, da CSS-Variablen hier nicht definiert sind */
     border-radius: 4px;
 
     /* Positionierung & Verhalten */
-    background-color: #ffffff;
+    background-color: var(--background-light);
     cursor: pointer;
     position: relative;
     vertical-align: middle;
@@ -2176,7 +2177,7 @@ input[type="checkbox"]:checked::after {
     transform: translate(-50%, -50%);
     font-size: 14px;
     font-weight: bold;
-    color: #4da8da;
+    color: var(--primary-color);
 }
 
 /* Fokus-Stil für bessere Barrierefreiheit */
@@ -2195,7 +2196,7 @@ input[type="checkbox"]:focus {
     width: 100%;
     padding: 10px;
     margin: 5px 0;
-    background-color: #4da8da;
+    background-color: var(--primary-color);
     /* Deine Hauptfarbe */
     color: white;
     font-size: 14px;
@@ -2208,7 +2209,7 @@ input[type="checkbox"]:focus {
 
 #app-management-settings #resetButton:hover,
 #app-management-settings #clearCacheButton:hover {
-    background-color: #0056b3;
+    background-color: var(--primary-hover-color);
     /* Dunklere Farbe beim Hovern */
 }
 
@@ -2256,7 +2257,7 @@ input[type="checkbox"]:focus {
     /* Erstreckt sich über alle Spalten */
     font-size: 16px !important;
     font-weight: bold;
-    color: #4da8da;
+    color: var(--primary-color);
     text-align: center;
     /* Zentriert für eine bessere Optik auf Mobilgeräten */
     padding-top: 5px;
@@ -2276,7 +2277,7 @@ input[type="checkbox"]:focus {
     width: 100%;
     padding: 10px;
     margin: 5px 0;
-    background-color: #4da8da; /* Helles Blau */
+    background-color: var(--primary-color); /* Helles Blau */
     color: white;              /* Weiße Schrift */
     font-size: 14px;
     font-weight: bold;
@@ -2289,5 +2290,5 @@ input[type="checkbox"]:focus {
 
 /* Hover-Effekt für die Buttons */
 .accordion-content ul li button:hover {
-    background-color: #0056b3; /* Dunkleres Blau */
+    background-color: var(--primary-hover-color); /* Dunkleres Blau */
 }
