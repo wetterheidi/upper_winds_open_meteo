@@ -168,7 +168,7 @@
                             </label>
                         </li>
                         <li>
-                            <button id="exportLandingPatternGpxButton">Export Landing Pattern as GPX</button>
+                            <button id="exportLandingPatternGpxButton" class="btn btn-primary">Export Landing Pattern as GPX</button>
                         </li>
                     </ul>
                 </div>
@@ -275,12 +275,12 @@
                                     </label>
                                 </li>
                                 <li>
-                                    <button id="resetCutAwayMarker">Reset Cut-Away Marker</button>
+                                    <button id="resetCutAwayMarker" class="btn btn-secondary">Reset Cut-Away Marker</button>
                                 </li>
                             </ul>
                         </li>
                         <li>
-                            <button id="exportGpxButton">Export Jump Run as GPX</button>
+                            <button id="exportGpxButton" class="btn btn-primary">Export Jump Run as GPX</button>
                         </li>
                     </ul>
                 </div>
@@ -291,14 +291,14 @@
                 <div class="accordion-content">
                     <ul>
                         <li>
-                            <button id="placeHarpButton">Place HARP</button>
-                            <button id="clearHarpButton">Clear HARP</button>
+                            <button id="placeHarpButton" class="btn btn-primary">Place HARP</button>
+                            <button id="clearHarpButton" class="btn btn-primary">Clear HARP</button>
                         </li>
                         <li>
                             <label class="radio-label">
                                 <input type="text" id="harpCoordInput" placeholder="Enter HARP Coords (MGRS/Dec)" />
                             </label>
-                            <button id="placeHarpCoordButton">Place Coords</button>
+                            <button id="placeHarpCoordButton" class="btn btn-primary">Place Coords</button>
                         </li>
                         <li>
                             <label class="radio-label">
@@ -337,8 +337,7 @@
                             <span>Models</span>
                             <ul class="submenu" id="ensembleModelsSubmenu">
                             </ul>
-                            <button id="deselectAllEnsembleButton" style="width: 100%; margin-top: 5px;">Deselect
-                                All</button>
+                            <button id="deselectAllEnsembleButton" class="btn btn-secondary">Deselect All</button>
                         </li>
                         <li>
                             <span>Scenarios</span>
@@ -493,7 +492,7 @@
                             <option value="Windwatch">Windwatch</option>
                             <option value="Customized">Customized</option>
                         </select>
-                        <button id="downloadButton">Download Table</button>
+                        <button id="downloadButton" class="btn btn-primary">Download Table</button>
                     </div>
                 </div>
             </div>
@@ -512,7 +511,7 @@
                             <input type="number" id="cacheZoomMax" min="6" max="15">
                         </div>
                         </label>
-                        <button id="recacheNowButton">Recache Now</button>
+                        <button id="recacheNowButton" class="btn btn-primary">Recache Now</button>
                     </div>
                 </div>
             </div>
@@ -523,7 +522,7 @@
                     <div id="historical-date" class="settings-grid">
                         <label for="historicalDatePicker">Select Date:</label>
                         <input type="date" id="historicalDatePicker" min="2022-01-01">
-                        <button id="clearHistoricalDate">Clear</button>
+                        <button id="clearHistoricalDate" class="btn btn-secondary">Clear</button>
                     </div>
                 </div>
             </div>
@@ -560,7 +559,7 @@
                 <span id="clearSearchInput" class="clear-icon" style="display: none;">×</span>
             </div>
 
-            <button id="saveFavoriteBtn" class="save-favorite-btn">Save current location as Favorite</button>
+            <button id="saveFavoriteBtn" class="btn btn-primary">Save current location as Favorite</button>
             <div id="favoriteModal" class="favorite-modal" style="display: none;">
                 <div class="favorite-modal-content">
                     <h3>Save Favorite</h3>

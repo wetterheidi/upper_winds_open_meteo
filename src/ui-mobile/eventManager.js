@@ -1121,6 +1121,7 @@ function setupCacheManagement() {
     // 2. Erstelle den "Reset Settings" Button (Logik von eventManager hierher verschoben)
     const resetButton = document.createElement('button');
     resetButton.id = 'resetButton';
+    resetButton.className = 'btn btn-danger';
     resetButton.textContent = 'Reset Settings';
     resetButton.title = 'Resets all settings to their default values and locks all features';
     resetButton.addEventListener('click', () => {
@@ -1138,6 +1139,7 @@ function setupCacheManagement() {
     const clearCacheButton = document.createElement('button');
     clearCacheButton.id = 'clearCacheButton';
     clearCacheButton.textContent = 'Clear Tile Cache';
+    clearCacheButton.className = 'btn btn-danger';
     clearCacheButton.title = 'Clears cached map tiles. Pan/zoom to cache more tiles for offline use.';
     clearCacheButton.addEventListener('click', async () => {
         try {
