@@ -1,4 +1,3 @@
-
 /* For testing purposes 
 #slider-container { border: 2px solid red; }
 #map-container { border: 2px solid green; }
@@ -61,7 +60,8 @@ button:hover {
 #content-panels {
     grid-row: 2;
     grid-column: 1;
-    display: none; /* Wird per JS gesteuert */
+    display: none;
+    /* Wird per JS gesteuert */
     background-color: rgba(249, 249, 249, 0.95);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
@@ -80,7 +80,8 @@ button:hover {
     /* Die Panels sind jetzt einfache Block-Elemente. */
     padding: 0;
     box-sizing: border-box;
-    background-color: transparent; /* Der Eltern-Container hat den Hintergrund */
+    background-color: transparent;
+    /* Der Eltern-Container hat den Hintergrund */
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
 }
@@ -102,6 +103,7 @@ button:hover {
     width: 100%;
     padding: 15px;
     background-color: #4da8da;
+    color: white;
     border: none;
     border-bottom: 1px solid #e0e0e0;
     cursor: pointer;
@@ -174,19 +176,23 @@ button:hover {
 }
 
 /* Reset default margins and ensure full height */
-html,
+html {
+    height: 100%;
+    overflow: hidden;
+    /* Verhindert das Scrollen des gesamten Fensters */
+}
+
 body {
     height: 100%;
-    width: 100%;
+    /* Bezieht sich auf die 100% des html-Elements */
+    overflow: hidden;
+    /* Stellt sicher, dass auch der body nicht scrollt */
+    display: grid !important;
+    grid-template-rows: auto 1fr auto;
+    /* Deine korrekte Layout-Definition */
+    grid-template-columns: 1fr;
     margin: 0;
     padding: 0;
-    overflow: hidden;
-    display: grid !important;
-    /* Override flex from styles-shared.css */
-    grid-template-rows: auto 1fr auto;
-    /* Slider, Map, Tab-bar */
-    grid-template-columns: 1fr;
-    height: 100vh;
     box-sizing: border-box;
 }
 
@@ -230,34 +236,28 @@ body {
     -webkit-backdrop-filter: blur(5px);
     border-bottom: 1px solid #ddd;
     z-index: 2000 !important;
-    /* Override z-index: 200 from styles-shared.css */
-    padding: 5px;
-    padding-top: calc(5px + env(safe-area-inset-top));
+    padding-top: calc(2px + env(safe-area-inset-top));
+    /* Berücksichtigt Notch */
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
     box-sizing: border-box;
     position: static !important;
-    /* Override position: fixed from styles-shared.css */
     width: 100%;
     max-width: 500px;
-    /* Reduced from 600px to fit narrower screens */
     display: flex;
-    /* Center content horizontally */
     justify-content: center;
     align-items: center;
     margin-left: env(safe-area-inset-left);
     margin-right: env(safe-area-inset-right);
     transform: none !important;
-    /* Override any transform styles */
     left: auto !important;
-    /* Override any left styles */
 }
 
 .slider-content-wrapper {
     width: 100%;
     max-width: 400px;
-    /* Reduced from 500px to fit narrower screens */
-    padding: 5px;
+    padding: 0 5px;
+    /* Reduziertes vertikales Padding */
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
@@ -271,12 +271,55 @@ body {
     justify-content: space-between;
     align-items: center;
     width: 100%;
-    margin-bottom: 8px;
+    margin-bottom: 5px;
 }
 
 .slider-content-wrapper #timeSlider {
+    -webkit-appearance: none;
+    appearance: none;
     width: 100%;
+    height: 6px;
+    background: #ddd;
+    border-radius: 3px;
+    outline: none;
     margin: 5px 0;
+}
+
+/* Der runde "Anfasser" für Webkit-Browser (Chrome, Safari, Android) */
+.slider-content-wrapper #timeSlider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    /* Zurück auf 16px */
+    height: 16px;
+    /* Zurück auf 16px */
+    background: #4da8da;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
+    /* margin-top wurde entfernt, um das Sichtbarkeitsproblem zu beheben */
+}
+
+/* Der runde "Anfasser" für Firefox */
+.slider-content-wrapper #timeSlider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    background: #4da8da;
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Diese Regeln bleiben, um die durchgehend graue Leiste sicherzustellen */
+.slider-content-wrapper #timeSlider::-webkit-slider-runnable-track {
+    background: #ddd;
+    border-radius: 3px;
+}
+
+.slider-content-wrapper #timeSlider::-moz-range-track {
+    background: #ddd;
+    border-radius: 3px;
 }
 
 /* Der Zeit-Slider selbst */
@@ -290,12 +333,18 @@ body {
 
 /* Stellt die korrekte Größe und Farbe für das Autoupdate-Symbol wieder her */
 #autoupdateToggle label {
-    font-size: 24px;              /* Größer für bessere Sichtbarkeit und Klickbarkeit */
-    color: #4da8da;  /* Verwendet deine Hauptfarbe (--primary-color) */
-    font-weight: bold;            /* Macht das Symbol etwas kräftiger */
-    cursor: pointer;              /* Zeigt an, dass es klickbar ist */
-    line-height: 1;               /* Verhindert unerwünschten vertikalen Abstand */
-    padding-bottom: 4px;          /* Kleine Anpassung für die perfekte vertikale Zentrierung */
+    font-size: 24px;
+    /* Größer für bessere Sichtbarkeit und Klickbarkeit */
+    color: #4da8da;
+    /* Verwendet deine Hauptfarbe (--primary-color) */
+    font-weight: bold;
+    /* Macht das Symbol etwas kräftiger */
+    cursor: pointer;
+    /* Zeigt an, dass es klickbar ist */
+    line-height: 1;
+    /* Verhindert unerwünschten vertikalen Abstand */
+    padding-bottom: 4px;
+    /* Kleine Anpassung für die perfekte vertikale Zentrierung */
 }
 
 /* Kleinere Anpassungen für die Lesbarkeit */
@@ -781,7 +830,7 @@ body {
     background: linear-gradient(to bottom, #f0f4f8, #d9e2ec);
     color: #333;
     font-weight: bold;
-    padding: 10px 8px;
+    padding: 6px 8px;
     border: 1px solid #333;
     /* Wichtig für die Ränder */
     text-align: center;
@@ -789,7 +838,7 @@ body {
 }
 
 #weather-table-container td {
-    padding: 8px;
+    padding: 2px;
     border: 1px solid #333;
     /* Wichtig für die Ränder */
     text-align: center;
@@ -908,6 +957,7 @@ body {
 #model-row,
 #track-upload>div:first-child {
     position: relative;
+    margin: ‚5px 10px 0 10px
 }
 
 /* 4. Ein einheitlicher Stil für BEIDE Popups */
@@ -962,9 +1012,11 @@ body {
     /* Geändert von fixed zu absolute */
     z-index: 2010;
 
-    bottom: calc(55px + env(safe-area-inset-bottom) + 10px); /* 55px Tab-Bar + 10px Abstand */
+    bottom: calc(55px + env(safe-area-inset-bottom) + 10px);
+    /* 55px Tab-Bar + 10px Abstand */
     left: 50%;
-    transform: translateX(-50%) translateY(200%); /* Startet außerhalb unten */
+    transform: translateX(-50%) translateY(200%);
+    /* Startet außerhalb unten */
     opacity: 0;
 
     font-size: 1rem;
@@ -974,7 +1026,8 @@ body {
 
 #snackbar.show {
     visibility: visible;
-    transform: translateX(-50%) translateY(0); /* Bewegt sich nach oben ins Bild */
+    transform: translateX(-50%) translateY(0);
+    /* Bewegt sich nach oben ins Bild */
     opacity: 1;
 }
 
@@ -995,9 +1048,11 @@ body {
     visibility: hidden;
     position: absolute;
     /* Geändert von fixed zu absolute */
-    bottom: calc(55px + env(safe-area-inset-bottom) + 80px); /* Höher positioniert */
+    bottom: calc(55px + env(safe-area-inset-bottom) + 80px);
+    /* Höher positioniert */
     left: 50%;
-    transform: translateX(-50%) translateY(200%); /* Startet außerhalb unten */
+    transform: translateX(-50%) translateY(200%);
+    /* Startet außerhalb unten */
     background-color: #3f51b5;
     color: white;
     padding: 14px;
@@ -1131,7 +1186,7 @@ body {
 
 .dashboard-grid {
     display: grid;
-    grid-template-rows: 0,75fr 0,75fr 0,75fr 0.6fr 0.6fr 0.4fr;
+    grid-template-rows: 0, 75fr 0, 75fr 0, 75fr 0.6fr 0.6fr 0.4fr;
     gap: 10px;
     height: 100%;
     padding: 10px 0;
@@ -1289,7 +1344,8 @@ body {
 }
 
 #manual-recording-button {
-    border-color: #007bff; /* Blau für manuelle Aktionen */
+    border-color: #007bff;
+    /* Blau für manuelle Aktionen */
     color: #007bff;
 }
 
@@ -1299,7 +1355,8 @@ body {
 }
 
 #manual-recording-button.recording {
-    border-color: #17a2b8; /* Cyan für laufende manuelle Aufnahme */
+    border-color: #17a2b8;
+    /* Cyan für laufende manuelle Aufnahme */
     background-color: #17a2b8;
     color: white;
     animation: pulse-blue 1.5s infinite;
@@ -1309,9 +1366,11 @@ body {
     0% {
         box-shadow: 0 0 0 0 rgba(23, 162, 184, 0.7);
     }
+
     70% {
         box-shadow: 0 0 10px 15px rgba(23, 162, 184, 0);
     }
+
     100% {
         box-shadow: 0 0 0 0 rgba(23, 162, 184, 0);
     }
@@ -1431,43 +1490,48 @@ html {
 
 /* Container, um Standard-Leaflet-Stile zu deaktivieren */
 .live-marker-container {
-  background: transparent;
-  border: none;
+    background: transparent;
+    border: none;
 }
 
 /* Wrapper für die Rotations-Transformation */
 .live-marker-wrapper {
-  width: 24px;
-  height: 24px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  transition: transform 0.3s ease-out; /* Optionale sanfte Rotation */
+    width: 24px;
+    height: 24px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: transform 0.3s ease-out;
+    /* Optionale sanfte Rotation */
 }
 
 /* Der blaue Punkt mit weißem Rand */
 .live-marker-dot {
-  width: 14px;
-  height: 14px;
-  background-color: #007bff; /* Ein kräftiges Blau */
-  border-radius: 50%;
-  border: 2px solid white;
-  box-shadow: 0 0 6px rgba(0,0,0,0.6); /* Ein Schatten für bessere Sichtbarkeit */
+    width: 14px;
+    height: 14px;
+    background-color: #007bff;
+    /* Ein kräftiges Blau */
+    border-radius: 50%;
+    border: 2px solid white;
+    box-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
+    /* Ein Schatten für bessere Sichtbarkeit */
 }
 
 /* Der Pfeil, der über dem Punkt positioniert ist */
 .live-marker-arrow {
-  width: 0;
-  height: 0;
-  border-left: 6px solid transparent;
-  border-right: 6px solid transparent;
-  border-bottom: 10px solid #007bff; 
-  position: absolute;
-  top: -1px; /* Leicht nach oben verschoben */
-  left: 50%;
-  transform: translateX(-50%);
-  /*filter: drop-shadow(0px -1px 2px rgba(0,0,0,0.5)); /* Leichter Schatten für den Pfeil */
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-bottom: 10px solid #007bff;
+    position: absolute;
+    top: -1px;
+    /* Leicht nach oben verschoben */
+    left: 50%;
+    transform: translateX(-50%);
+    /*filter: drop-shadow(0px -1px 2px rgba(0,0,0,0.5)); /* Leichter Schatten für den Pfeil */
 }
+
 /* ===== Live Marker Styles End ===== */
 
 
@@ -1476,18 +1540,24 @@ html {
 }
 
 .leaflet-overlay-pane {
-    z-index: 400; /* Leaflet default */
-    pointer-events: none; /* Overlays don’t need clicks */
+    z-index: 400;
+    /* Leaflet default */
+    pointer-events: none;
+    /* Overlays don’t need clicks */
 }
 
 .leaflet-marker-pane {
-    z-index: 600; /* Leaflet default ~600 */
-    pointer-events: auto; /* Allow marker clicks */
+    z-index: 600;
+    /* Leaflet default ~600 */
+    pointer-events: auto;
+    /* Allow marker clicks */
 }
 
 .leaflet-popup-pane {
-    z-index: 700; /* Leaflet default ~700 */
-    pointer-events: auto; /* Allow popup interactions */
+    z-index: 700;
+    /* Leaflet default ~700 */
+    pointer-events: auto;
+    /* Allow popup interactions */
 }
 
 .leaflet-overlay-pane>*,
@@ -1501,19 +1571,22 @@ html {
 }
 
 .ensemble-tooltip {
-    background-color: rgba(255, 255, 255, 0.9); /* Heller Hintergrund */
-    color: #333; /* Dunkler Text */
+    background-color: rgba(255, 255, 255, 0.9);
+    /* Heller Hintergrund */
+    color: #333;
+    /* Dunkler Text */
     border: 1px solid #ccc;
     border-radius: 3px;
     padding: 5px 8px;
     font-size: 12px;
     white-space: nowrap;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 /* Ensure the submenu items have consistent padding and font */
 .submenu li {
-    padding: 10px; /* Increased padding for better spacing */
+    padding: 10px;
+    /* Increased padding for better spacing */
     border-bottom: 1px solid #eee;
     font-size: 13px;
     font-family: 'Roboto', sans-serif;
@@ -1523,30 +1596,36 @@ html {
 .cache-setting-label {
     display: flex;
     align-items: center;
-    justify-content: space-between; /* Align label and dropdown */
+    justify-content: space-between;
+    /* Align label and dropdown */
     width: 100%;
     font-family: 'Roboto', sans-serif;
     font-size: 13px;
     font-weight: 400;
     color: #000;
-    padding-right: 10px; /* Add space between label and dropdown */
+    padding-right: 10px;
+    /* Add space between label and dropdown */
 }
 
 /* Style the dropdowns */
 .cache-setting-select {
-    appearance: none; /* Remove default browser styling */
+    appearance: none;
+    /* Remove default browser styling */
     -webkit-appearance: none;
     -moz-appearance: none;
     background-color: #fff;
     border: 1px solid #ccc;
     border-radius: 4px;
-    padding: 6px 24px 6px 8px; /* Space for custom arrow */
+    padding: 6px 24px 6px 8px;
+    /* Space for custom arrow */
     font-size: 13px;
     font-family: 'Roboto', sans-serif;
     color: #000;
     cursor: pointer;
-    width: 120px; /* Increased width for better alignment */
-    background-image: url('data:image/svg+xml;utf8,<svg fill="%234da8da" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>'); /* Custom dropdown arrow */
+    width: 120px;
+    /* Increased width for better alignment */
+    background-image: url('data:image/svg+xml;utf8,<svg fill="%234da8da" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>');
+    /* Custom dropdown arrow */
     background-repeat: no-repeat;
     background-position: right 8px center;
     background-size: 12px;
@@ -1555,7 +1634,8 @@ html {
 /* Hover and focus states for dropdowns */
 .cache-setting-select:hover {
     border-color: #4da8da;
-    background-color: #f0f8ff; /* Light blue background on hover */
+    background-color: #f0f8ff;
+    /* Light blue background on hover */
 }
 
 .cache-setting-select:focus {
@@ -1574,10 +1654,13 @@ html {
     font-size: 13px;
     font-family: 'Roboto', sans-serif;
     cursor: pointer;
-    width: 120px; /* Match dropdown width */
+    width: 120px;
+    /* Match dropdown width */
     text-align: center;
-    display: block; /* Ensure it takes full width of the li */
-    margin: 0 auto; /* Center the button */
+    display: block;
+    /* Ensure it takes full width of the li */
+    margin: 0 auto;
+    /* Center the button */
 }
 
 #recacheNowButton:hover {
@@ -1721,12 +1804,14 @@ input[type="checkbox"][style*="opacity: 1"] {
 }
 
 .favorite-marker-icon {
-    color: #FFD700; /* Gold-gelb */
+    color: #FFD700;
+    /* Gold-gelb */
     font-size: 16px;
     font-weight: bold;
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.6);
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.6);
     text-align: center;
-    line-height: 24px; /* Vertikale Zentrierung */
+    line-height: 24px;
+    /* Vertikale Zentrierung */
 }
 
 #coordHistory {
@@ -1745,7 +1830,8 @@ input[type="checkbox"][style*="opacity: 1"] {
 
 /* Stile für das neue Orts-Management-Panel */
 #locationSearchSubmenu {
-    padding: 5px; /* Etwas weniger Innenabstand für ein kompakteres Design */
+    padding: 5px;
+    /* Etwas weniger Innenabstand für ein kompakteres Design */
 }
 
 .search-container {
@@ -1756,7 +1842,8 @@ input[type="checkbox"][style*="opacity: 1"] {
 }
 
 #locationSearchInput {
-    flex-grow: 1; /* Das Eingabefeld nimmt den meisten Platz ein */
+    flex-grow: 1;
+    /* Das Eingabefeld nimmt den meisten Platz ein */
     padding: 8px;
     border: 1px solid #ccc;
     border-radius: 4px;
@@ -1767,12 +1854,14 @@ input[type="checkbox"][style*="opacity: 1"] {
     background-color: #4da8da;
     color: white;
     border: none;
-    border-radius: 3px; /* Rund */
+    border-radius: 3px;
+    /* Rund */
     width: 30px;
     height: 30px;
     font-size: 16px;
     cursor: pointer;
-    flex-shrink: 0; /* Verhindert, dass der Button schrumpft */
+    flex-shrink: 0;
+    /* Verhindert, dass der Button schrumpft */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1786,8 +1875,10 @@ input[type="checkbox"][style*="opacity: 1"] {
     list-style: none;
     padding: 0;
     margin: 0;
-    max-height: 250px; /* Begrenzt die Höhe der Liste */
-    overflow-y: auto; /* Fügt einen Scrollbalken hinzu, wenn nötig */
+    max-height: 250px;
+    /* Begrenzt die Höhe der Liste */
+    overflow-y: auto;
+    /* Fügt einen Scrollbalken hinzu, wenn nötig */
     border-top: 1px solid #eee;
 }
 
@@ -1818,7 +1909,8 @@ input[type="checkbox"][style*="opacity: 1"] {
 }
 
 .location-results-list .favorite-toggle.is-favorite {
-    color: #f3d131; /* Gold für Favoriten */
+    color: #f3d131;
+    /* Gold für Favoriten */
 }
 
 .location-results-list .location-info {
@@ -1830,7 +1922,8 @@ input[type="checkbox"][style*="opacity: 1"] {
 .location-item-buttons {
     display: flex;
     align-items: center;
-    gap: 5px; /* Abstand zwischen den Buttons */
+    gap: 5px;
+    /* Abstand zwischen den Buttons */
 }
 
 .delete-location-btn {
@@ -1845,19 +1938,22 @@ input[type="checkbox"][style*="opacity: 1"] {
     min-height: 24px !important;
     padding: 0;
     cursor: pointer;
-    font-size: 20px; /* Leicht vergrößert für bessere Sichtbarkeit */
+    font-size: 20px;
+    /* Leicht vergrößert für bessere Sichtbarkeit */
     font-weight: bold;
-    
+
     /* Perfekte Zentrierung des '×' */
     display: flex;
     align-items: center;
     justify-content: center;
     line-height: 1;
-    box-sizing: border-box !important; /* Verhindert, dass Padding/Border die Größe beeinflusst */
+    box-sizing: border-box !important;
+    /* Verhindert, dass Padding/Border die Größe beeinflusst */
 }
 
 .delete-location-btn:hover {
-    background-color: #fee; /* Etwas dezenter als das vorherige Rot */
+    background-color: #fee;
+    /* Etwas dezenter als das vorherige Rot */
     color: #d63031;
     border-color: #d63031;
 }
@@ -1865,49 +1961,55 @@ input[type="checkbox"][style*="opacity: 1"] {
 /* Das Fadenkreuz-Element selbst ist nur ein unsichtbarer Ankerpunkt.
    Es wird standardmäßig mit display: none versteckt. */
 #crosshair {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 16px;  /* Breite des Kreuzes */
-  height: 16px; /* Höhe des Kreuzes */
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-  z-index: 999;
-  display: none; /* SEHR WICHTIG: Standardmäßig unsichtbar */
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 16px;
+    /* Breite des Kreuzes */
+    height: 16px;
+    /* Höhe des Kreuzes */
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 999;
+    display: none;
+    /* SEHR WICHTIG: Standardmäßig unsichtbar */
 }
 
 /* Die Sichtbarkeit wird NUR über diese Klasse gesteuert. */
 .touch-device #crosshair {
-  display: block;
+    display: block;
 }
 
 /* Die zwei Linien (horizontal und vertikal) für das "+" 
    werden mit sog. Pseudo-Elementen erstellt. */
 #crosshair::before,
 #crosshair::after {
-  content: '';
-  position: absolute;
-  background-color: #333; /* Farbe des Kreuzes */
-  /* Ein leichter Schatten macht das Kreuz auf jedem Untergrund besser sichtbar */
-  box-shadow: 0 0 2px rgba(255, 255, 255, 0.8); 
+    content: '';
+    position: absolute;
+    background-color: #333;
+    /* Farbe des Kreuzes */
+    /* Ein leichter Schatten macht das Kreuz auf jedem Untergrund besser sichtbar */
+    box-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
 }
 
 /* Vertikale Linie des Kreuzes */
 #crosshair::before {
-  left: 50%;
-  top: 0;
-  width: 2px; /* Dicke der Linie */
-  height: 100%;
-  transform: translateX(-50%);
+    left: 50%;
+    top: 0;
+    width: 2px;
+    /* Dicke der Linie */
+    height: 100%;
+    transform: translateX(-50%);
 }
 
 /* Horizontale Linie des Kreuzes */
 #crosshair::after {
-  top: 50%;
-  left: 0;
-  height: 2px; /* Dicke der Linie */
-  width: 100%;
-  transform: translateY(-50%);
+    top: 50%;
+    left: 0;
+    height: 2px;
+    /* Dicke der Linie */
+    width: 100%;
+    transform: translateY(-50%);
 }
 
 #slider-container {
@@ -2033,4 +2135,159 @@ input[type="checkbox"][style*="opacity: 1"] {
     font-size: 13px;
     color: #333;
     font-family: Roboto, sans-serif;
+}
+
+/* =================================================================
+   EINHEITLICHES CHECKBOX-STYLING (aus Web-Version übernommen)
+   ================================================================= */
+
+input[type="checkbox"] {
+    /* Zurücksetzen des Standard-Aussehens */
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+
+    /* Dimensionen & Form */
+    width: 18px;
+    height: 18px;
+    border: 2px solid #4da8da;
+    /* Feste Farbe, da CSS-Variablen hier nicht definiert sind */
+    border-radius: 4px;
+
+    /* Positionierung & Verhalten */
+    background-color: #ffffff;
+    cursor: pointer;
+    position: relative;
+    vertical-align: middle;
+    transition: background-color 0.2s ease;
+}
+
+/* Der Hover-Effekt ist auf Touch-Geräten nicht relevant, schadet aber nicht */
+input[type="checkbox"]:not(:checked):hover {
+    background-color: #e6f0fa;
+}
+
+/* Das Häkchen, das erscheint, wenn die Box ausgewählt ist */
+input[type="checkbox"]:checked::after {
+    content: '✔';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 14px;
+    font-weight: bold;
+    color: #4da8da;
+}
+
+/* Fokus-Stil für bessere Barrierefreiheit */
+input[type="checkbox"]:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(77, 168, 218, 0.2);
+}
+
+/* =================================================================
+   EINHEITLICHES BUTTON-STYLING FÜR APP-MANAGEMENT
+   ================================================================= */
+
+/* Wendet das Standard-Button-Design auf die Reset- und Cache-Buttons an */
+#app-management-settings #resetButton,
+#app-management-settings #clearCacheButton {
+    width: 100%;
+    padding: 10px;
+    margin: 5px 0;
+    background-color: #4da8da;
+    /* Deine Hauptfarbe */
+    color: white;
+    font-size: 14px;
+    font-weight: bold;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+#app-management-settings #resetButton:hover,
+#app-management-settings #clearCacheButton:hover {
+    background-color: #0056b3;
+    /* Dunklere Farbe beim Hovern */
+}
+
+/* =================================================================
+   RESPONSIVES LAYOUT FÜR MITTELWIND-STEUERUNG
+   ================================================================= */
+
+/* Allgemeiner Container für die Steuerelemente */
+#meanWindControls,
+#controls-row {
+    display: grid;
+    /* Erzeugt ein flexibles Grid-Layout */
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    /* Magie: Erzeugt so viele Spalten wie möglich, die mind. 140px breit sind */
+    gap: 10px 15px;
+    /* Abstand zwischen den Zeilen und Spalten */
+    align-items: center;
+    padding: 10px 0;
+    border-top: 1px solid #eee;
+}
+
+/* Styling für die Labels (z.B. "Lower Limit:") */
+#meanWindControls label,
+#controls-row label {
+    font-weight: 500;
+    color: #4b5563;
+    text-align: left;
+    white-space: nowrap;
+}
+
+/* Styling für die Eingabefelder und Select-Boxen */
+#meanWindControls input,
+#controls-row select,
+#controls-row input {
+    width: 90%;
+    /* Füllt die verfügbare Breite seiner Grid-Spalte */
+    padding: 8px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+}
+
+/* Das Ergebnis-Feld soll immer die volle Breite einnehmen */
+#meanWindResult {
+    grid-column: 1 / -1;
+    /* Erstreckt sich über alle Spalten */
+    font-size: 16px !important;
+    font-weight: bold;
+    color: #4da8da;
+    text-align: center;
+    /* Zentriert für eine bessere Optik auf Mobilgeräten */
+    padding-top: 5px;
+}
+
+/* =================================================================
+   EINHEITLICHES BUTTON-STYLING FÜR PLANNER-PANEL
+   ================================================================= */
+
+/* * Wendet das Standard-Button-Design auf alle Buttons an, 
+ * die sich innerhalb einer Liste im Akkordeon-Inhalt befinden.
+ * Das stellt sicher, dass z.B. die "Export"-Buttons und
+ * die "Place HARP"-Buttons korrekt gestylt werden, ohne
+ * die Akkordeon-Header selbst zu beeinflussen.
+*/
+.accordion-content ul li button {
+    width: 100%;
+    padding: 10px;
+    margin: 5px 0;
+    background-color: #4da8da; /* Helles Blau */
+    color: white;              /* Weiße Schrift */
+    font-size: 14px;
+    font-weight: bold;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: center;
+    transition: background-color 0.2s ease;
+}
+
+/* Hover-Effekt für die Buttons */
+.accordion-content ul li button:hover {
+    background-color: #0056b3; /* Dunkleres Blau */
 }
