@@ -1,4 +1,6 @@
-
+/* =================================================================== */
+/* 1. GLOBALE STILE & ROOT-VARIABLEN
+/* =================================================================== */
 :root {
     --primary-color: #4da8da;
     --primary-hover-color: #0056b3;
@@ -7,35 +9,50 @@
     --background-medium: #f0f2f5;
     --border-color: #d9d9d9;
     --font-main: 'Roboto', sans-serif;
+    --label-width: 135px;
+    --input-width: 70px;
+    --grid-columns: var(--label-width) var(--input-width) var(--label-width) var(--input-width) minmax(0, 1fr);
 }
 
-/* =================================================================
-   NEUES HAUPT-LAYOUT FÜR DIE WEB-ANWENDUNG
-   ================================================================= */
+html {
+    font-size: 13px;
+    overflow: hidden;
+    /* Verhindert, dass die ganze Seite scrollt */
+}
 
-/* 1. Der Hauptcontainer wird zum Flex-Container, der die Richtung vorgibt */
+body {
+    height: 100vh;
+    width: 100%;
+    margin: 0;
+    overflow: hidden;
+}
+
+* {
+    font-size: 13px;
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+}
+
+.hidden {
+    display: none !important;
+}
+
+
+/* =================================================================== */
+/* 2. HAUPT-LAYOUT (WEB-SPEZIFISCH)
+/* =================================================================== */
 #webapp-container {
     display: flex;
-    flex-direction: column; /* Ordnet Header und Hauptlayout untereinander an */
-    height: 100vh;          /* Füllt die gesamte Bildschirmhöhe */
-    width: 100%;            /* Füllt die gesamte Bildschirmbreite */
-    overflow: hidden;       /* Verhindert das Scrollen der gesamten Seite */
+    flex-direction: column;
+    height: 100vh;
+    width: 100%;
+    overflow: hidden;
 }
 
-/* 2. Erlauben Sie das Scrollen NUR innerhalb des Hauptlayouts */
-.main-layout {
-    display: grid;
-    grid-template-columns: 60px 0 1fr;
-    flex-grow: 1;      /* WICHTIG: Erlaubt diesem Bereich zu wachsen */
-    overflow: auto;    /* ERLAUBT das Scrollen für den gesamten Hauptbereich */
-    min-height: 0;     /* Ein wichtiger Trick, um Flexbox-Layout-Fehler zu vermeiden */
-}
-
-/* Der neue Header-Container */
 #app-header {
-    flex-shrink: 0; /* Verhindert, dass der Header schrumpft */
-    display: flex; /* Richtet Logo und Slider nebeneinander aus */
-    align-items: center; /* Zentriert beide Elemente vertikal */
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
     padding: 10px;
     background-color: var(--background-light);
     border-bottom: 1px solid var(--border-color);
@@ -43,29 +60,33 @@
     box-sizing: border-box;
 }
 
-/* Container für das Logo */
 #header-logo-container {
-    padding-right: 20px; /* Abstand zum Slider */
+    padding-right: 20px;
 }
 
 #header-logo {
     width: 80px;
     height: 80px;
-    display: block; /* Verhindert unerwünschten Leerraum unter dem Bild */
+    display: block;
+}
+
+.main-layout {
+    display: grid;
+    grid-template-columns: 60px 0 1fr;
+    /* Sidebar, Panel (geschlossen), Karte */
+    flex-grow: 1;
+    overflow: auto;
+    min-height: 0;
 }
 
 .main-layout.sidebar-expanded {
     grid-template-columns: 60px 350px 1fr;
-    /* Wenn die Sidebar offen ist, bekommt das Panel 350px Breite */
 }
 
-/* Spezifische Breite für das Data-Panel */
 .main-layout.sidebar-expanded.data-panel-visible {
-    /* Überschreibt die Standardbreite und macht das Panel 550px breit */
     grid-template-columns: 60px 550px 1fr;
 }
 
-/* 2. Icon-Leiste (Seitenleiste) */
 #sidebar {
     grid-column: 1 / 2;
     background-color: var(--background-medium);
@@ -76,19 +97,49 @@
     padding-top: 10px;
     gap: 10px;
     z-index: 2000;
-    overflow-y: auto; /* NEU: Erlaubt das Scrollen innerhalb der Sidebar */
+    overflow-y: auto;
 }
 
+#panel-container {
+    grid-column: 2 / 3;
+    background-color: var(--background-light);
+    border-right: 1px solid var(--border-color);
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
+    padding: 2px;
+    overflow-y: auto;
+    z-index: 1500;
+}
+
+#map-content {
+    grid-column: 3 / 4;
+    grid-row: 1 / 2;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+#map {
+    flex-grow: 1;
+    height: auto;
+    width: 100%;
+    margin-top: 0;
+}
+
+/* =================================================================== */
+/* 3. WIEDERVERWENDBARE KOMPONENTEN
+/* =================================================================== */
+
+/* --- Sidebar Icons --- */
 .sidebar-icon {
     display: flex;
-    flex-direction: column; /* Ordnet Icon und Label untereinander an */
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 8px 4px; /* Etwas mehr vertikaler Abstand */
+    padding: 8px 4px;
     cursor: pointer;
     border-radius: 8px;
-    width: 56px; /* Etwas breiter für das Label */
-    height: 56px; /* Etwas höher für das Label */
+    width: 56px;
+    height: 56px;
     transition: background-color 0.2s ease;
 }
 
@@ -98,40 +149,25 @@
 
 .sidebar-icon.active {
     background-color: #d1d5db;
-    /* Hebt das aktive Icon hervor */
 }
 
-/* Neue Regel für das Icon selbst */
 .sidebar-icon .icon {
-    font-size: 24px; /* Leicht verkleinertes Icon */
-    line-height: 1;  /* Verhindert zusätzlichen Zeilenabstand */
+    font-size: 24px;
+    line-height: 1;
 }
 
-/* Neue Regel für das Label */
 .sidebar-icon .label {
     font-size: 10px;
-    margin-top: 4px; /* Abstand zwischen Icon und Label */
+    margin-top: 4px;
     font-weight: 500;
     color: #555;
 }
 
-/* 3. Panel-Container (der aufklappende Teil) */
-#panel-container {
-    grid-column: 2 / 3;
-    background-color: var(--background-light);
-    border-right: 1px solid var(--border-color);
-    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
-    padding: 2px;
-    overflow-y: auto;
-    z-index: 1500;
-    /* transition und transform werden nicht mehr benötigt */
-}
-
+/* --- Panels & Accordion --- */
 .panel.hidden {
     display: none;
 }
 
-/* Titel innerhalb der Panels */
 #panel-container h2 {
     margin-top: 0;
     color: var(--text-color);
@@ -140,19 +176,18 @@
     margin-bottom: 20px;
 }
 
-/* Accordion-Styling (aus der mobilen App übernommen und angepasst) */
 #panel-container .accordion-item {
     background-color: #fff;
     margin-bottom: 10px;
     border-radius: 8px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    overflow: hidden; /* Behält die abgerundeten Ecken bei */
+    overflow: hidden;
 }
 
 #panel-container .accordion-header {
     width: 100%;
     padding: 15px;
-    background-color: var(--primary-color); /* Deine Akzentfarbe */
+    background-color: var(--primary-color);
     color: white;
     border: none;
     border-bottom: 1px solid #e0e0e0;
@@ -160,41 +195,37 @@
     font-size: 16px;
     font-weight: bold;
     text-align: left;
-    display: flex; /* Wichtig für die Ausrichtung von Text und Pfeil */
-    justify-content: space-between; /* Verteilt Text und Pfeil */
+    display: flex;
+    justify-content: space-between;
     align-items: center;
 }
 
 #panel-container .accordion-header:hover {
-    background-color: var(--primary-hover-color); /* Dunklere Farbe beim Hovern */
+    background-color: var(--primary-hover-color);
 }
 
-/* Visueller Indikator (Pfeil) für den auf/zu Zustand */
 #panel-container .accordion-header::after {
-    content: '▼'; /* Pfeil nach unten */
+    content: '▶';
     font-size: 12px;
     color: white;
     transition: transform 0.3s ease;
 }
 
 #panel-container .accordion-item.active .accordion-header::after {
-    transform: rotate(180deg); /* Dreht den Pfeil nach oben, wenn geöffnet */
+    transform: rotate(90deg);
 }
 
-/* Stellt sicher, dass der Inhalt standardmäßig versteckt ist */
 #panel-container .accordion-content {
     display: none;
-    padding: 15px;
-    border-top: 1px solid #e0e0e0;
-    background-color: #fdfdfd; /* Leicht anderer Hintergrund für den Inhalt */
+    padding: 20px 15px;
+    border-top: 1px solid #e5e7eb;
+    background-color: #fdfdfd;
 }
 
-/* Zeigt den Inhalt nur an, wenn das Element die 'active'-Klasse hat */
 #panel-container .accordion-item.active .accordion-content {
     display: block;
 }
 
-/* Styling für Listen innerhalb des Akkordeons */
 #panel-container .accordion-content ul {
     list-style: none;
     padding: 0;
@@ -210,95 +241,21 @@
     border-bottom: none;
 }
 
-/* 4. Hauptinhaltsbereich (Karte & Co.) */
-#map-content {
-    grid-column: 3 / 4; /* Beginnt IMMER in der dritten Spalte */
-    grid-row: 1 / 2;
-    display: flex;
-    flex-direction: column;
-    position: relative;
-    /* Die .shifted-Klasse wird nicht mehr benötigt */
-}
-
-#map {
-    flex-grow: 1;
-    height: auto;
-    width: 100%;
-    margin-top: 0; /* Alte Ränder zurücksetzen */
-}
-
-#map-content.shifted {
-    grid-column: 3 / 4;
-    /* Wenn das Panel offen ist, startet der Kartenbereich erst in der dritten Spalte */
-}
-
-#app-header #slider-container {
-    /* Layout & Dimensionierung im Header */
-    flex-grow: 1;          /* Erlaubt dem Container, den verfügbaren Platz einzunehmen */
-    display: flex;         /* Richtet den Inhalt (den Wrapper) darin aus */
-    justify-content: center; /* Zentriert den Inhalts-Wrapper horizontal */
-    align-items: center;   /* Zentriert den Inhalts-Wrapper vertikal */
-    min-width: 0;          /* Wichtiger Flexbox-Fix, um Schrumpfen zu erlauben */
-
-    /* Zurücksetzen alter/konfliktierender Stile */
-    position: static;      /* Stellt sicher, dass es ein normales Element im Fluss ist */
-    width: auto;           /* Breite wird durch Flexbox bestimmt */
-    max-width: none;       /* Keine maximale Breite */
-    transform: none;       /* Keine Transformationen */
-    box-shadow: none;      /* Der Header hat bereits den Schatten */
-    padding: 0;            /* Das Padding wird vom Header-Container gesteuert */
-    background: none;      /* Der Header hat bereits den Hintergrund */
-    border-bottom: none;   /* Der Header hat bereits die untere Linie */
-    z-index: auto;         /* Keine spezielle z-Ebene erforderlich */
-}
-
-/* =================================================================
-   EINHEITLICHES STYLING FÜR PANEL-INHALTE (AKKORDEON & CO.)
-   ================================================================= */
-
-/* --- 1. Grundstruktur für Akkordeon-Inhalte --- */
-#panel-container .accordion-content {
-    display: none; /* Standardmäßig geschlossen */
-    padding: 20px 15px; /* Etwas mehr Luft */
-    background-color: var(--background-light);
-    border-top: 1px solid #e5e7eb;
-}
-
-#panel-container .accordion-item.active .accordion-content {
-    display: block; /* Nur im aktiven Zustand anzeigen */
-}
-
-/* Visueller Indikator für den Akkordeon-Status (Pfeil) */
-#panel-container .accordion-header::after {
-    content: '▶';
-    float: right;
-    transition: transform 0.2s ease-in-out;
-    font-size: 12px;
-    color: #e5e7eb;
-}
-
-#panel-container .accordion-item.active .accordion-header::after {
-    transform: rotate(90deg);
-}
-
-/* --- 2. Das Settings-Grid für eine saubere Anordnung (wie in der App) --- */
+/* --- Formular-Elemente & Grids --- */
 .settings-grid {
     display: grid;
-    grid-template-columns: auto 1fr; /* Spalte 1: Label, Spalte 2: Steuerelement */
-    align-items: center; /* Zentriert Label und Steuerelement auf einer Höhe */
+    grid-template-columns: auto 1fr;
+    gap: 10px;
+    align-items: center;
 }
 
-/* --- 3. Einheitliches Styling für alle Formular-Elemente --- */
-
-/* Labels (Bezeichnungen) */
-.settings-grid label, 
+.settings-grid label,
 .settings-grid span {
     font-weight: 500;
-    text-align: right;
     color: #4b5563;
+    text-align: right;
 }
 
-/* Alle Eingabefelder und Auswahlboxen */
 .settings-grid input[type="text"],
 .settings-grid input[type="number"],
 .settings-grid select {
@@ -311,33 +268,32 @@
     transition: border-color 0.2s, box-shadow 0.2s;
 }
 
-/* --- Einheitliches Checkbox-Styling --- */
+.settings-grid input:focus,
+.settings-grid select:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(77, 168, 218, 0.2);
+    outline: none;
+}
+
 input[type="checkbox"] {
-    /* Zurücksetzen des Standard-Aussehens */
     appearance: none;
     -webkit-appearance: none;
     -moz-appearance: none;
-    
-    /* Dimensionen & Form */
     width: 18px;
     height: 18px;
     border: 2px solid var(--primary-color);
     border-radius: 4px;
-    
-    /* Positionierung & Verhalten */
     background-color: var(--background-light);
     cursor: pointer;
     position: relative;
-    vertical-align: middle; /* Sorgt für korrekte Ausrichtung neben Text */
-    transition: background-color 0.2s ease;
+    vertical-align: middle;
+    transition: background-color 0.2s ease, opacity 0.3s ease;
 }
 
-/* Stil für den Hover-Effekt (wenn die Box nicht ausgewählt ist) */
 input[type="checkbox"]:not(:checked):hover {
     background-color: #e6f0fa;
 }
 
-/* Das Häkchen, das erscheint, wenn die Box ausgewählt ist */
 input[type="checkbox"]:checked::after {
     content: '✔';
     position: absolute;
@@ -349,30 +305,17 @@ input[type="checkbox"]:checked::after {
     color: var(--primary-color);
 }
 
-/* Fokus-Stil für bessere Barrierefreiheit */
 input[type="checkbox"]:focus {
     outline: none;
     box-shadow: 0 0 0 2px rgba(77, 168, 218, 0.2);
 }
 
-.settings-grid input:focus, 
-.settings-grid select:focus {
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 2px rgba(77, 168, 218, 0.2);
-    outline: none;
+input[type="checkbox"][style*="opacity: 0.5"] {
+    cursor: not-allowed;
 }
 
-/* Spezielles Styling für Checkboxen für einheitliches Aussehen */
-.settings-grid input[type="checkbox"] {
-    justify-self: start; /* Richtet die Checkbox linksbündig in ihrer Spalte aus */
-    height: 1.25em;
-    width: 1.25em;
-    accent-color: var(--primary-color); /* Färbt die Checkbox in Ihrer Akzentfarbe */
-}
-
-/* Buttons */
 #panel-container .accordion-content button {
-    grid-column: 1 / -1; /* Nimmt die volle Breite des Grids ein */
+    grid-column: 1 / -1;
     padding: 10px;
     background-color: var(--primary-color);
     color: white;
@@ -381,303 +324,208 @@ input[type="checkbox"]:focus {
     font-size: 14px;
     font-weight: bold;
     cursor: pointer;
-    margin: 10px;
+    margin-top: 10px;
 }
 
 #panel-container .accordion-content button:hover {
     background-color: #3b82f6;
 }
-/* =================================================================
-   STYLING FÜR DAS SEARCH-PANEL (ADAPTIERT VON MOBILE)
-   ================================================================= */
 
-   /* Stellt sicher, dass die Suchergebnisse sichtbar sind, wenn das Panel aktiv ist */
-#panel-search:not(.hidden) #locationResults {
-    display: block !important;
-}
-
-/* Container für die Suchleiste */
-.search-bar-container {
+/* --- Info Buttons & Popups --- */
+#model-row,
+#track-upload>div:first-child {
     position: relative;
-    margin-bottom: 15px;
+    padding: 10px 0;
 }
 
-/* Such-Icon in der Leiste */
-.search-bar-container .search-icon {
-    position: absolute;
-    left: 12px;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 18px;
-    color: #888;
-    pointer-events: none;
-    /* Klicks gehen durch das Icon durch */
-}
-
-/* Stil für das fokussierte Such-Eingabefeld */
-#locationSearchInput:focus {
-    border-color: var(--primary-color);
-    box-shadow: 0 0 5px rgba(77, 168, 218, 0.5);
-    outline: none;
-}
-
-/* Container für alle Ergebnislisten */
-.location-results-container {
-    max-height: calc(100% - 120px);
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    /* Weiches Scrollen auf iOS */
-}
-
-/* Stellt sicher, dass die Ergebnisliste sichtbar und scrollbar ist */
-#locationResults {
-    display: none;
-    /* Standardmäßig versteckt, wird per JS oder #panel-search:not(.hidden) überschrieben */
-    width: 100%;
-    max-height: calc(100% - 120px);
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-}
-
-/* Styling für die einzelnen Sektionen (Favoriten, Verlauf) */
-.search-section {
-    background: white;
-    border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-    margin-bottom: 15px;
-    overflow: hidden;
-    /* Stellt sicher, dass die border-radius greift */
-}
-
-/* Überschriften der Sektionen */
-.search-section h5 {
-    padding: 10px 15px;
-    margin: 0;
-    color: var(--primary-color);
-    /* Hauptfarbe */
-    background-color: #f7f7f7;
-    border-bottom: 1px solid #f0f0f0;
-    font-size: 14px;
-}
-
-/* Listen innerhalb der Sektionen */
-.search-section ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-}
-
-/* Einzelne Einträge in der Ergebnisliste */
-.search-item {
-    display: flex;
-    align-items: center;
-    padding: 12px 15px;
-    border-bottom: 1px solid #f0f0f0;
+.info-button-shared {
+    background: transparent;
+    border: 1px solid #555;
+    color: var(--text-color);
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    font-size: 13px;
+    font-weight: bold;
+    font-family: 'Times New Roman', Times, serif;
     cursor: pointer;
     transition: background-color 0.2s ease;
-    min-height: 48px;
-    /* Größeres Tipp-Ziel für Touch */
-}
-
-.search-item:last-child {
-    border-bottom: none;
-}
-
-.search-item:hover {
-    background-color: #f9f9f9;
-}
-
-/* Icon eines Listeneintrags */
-.search-item-icon {
-    font-size: 20px;
-    margin-right: 15px;
-    color: #888;
-    width: 24px;
-    /* Feste Breite für Ausrichtung */
-    text-align: center;
-}
-
-/* Textbereich eines Listeneintrags */
-.search-item-text {
-    flex-grow: 1;
-}
-
-/* Name eines Listeneintrags */
-.search-item-text .name {
-    font-weight: bold;
-    color: var(--text-color);
-}
-
-/* Details eines Listeneintrags */
-.search-item-text .details {
-    font-size: 12px;
-    color: #777;
-}
-
-/* Container für die Aktions-Buttons (Favorit, Löschen) */
-.search-item-actions {
-    margin-left: auto;
-    display: flex;
-    align-items: center;
-}
-
-/* Allgemeine Aktions-Buttons */
-.search-item-actions button {
-    background: none;
-    border: none;
-    font-size: 24px;
-    color: #ccc;
-    cursor: pointer;
-    padding: 5px;
-}
-
-/* Button für einen aktiven Favoriten */
-.search-item-actions button.is-favorite {
-    color: #f3d131;
-    /* Gold für Favoriten */
-}
-
-/* Hover-Effekt für den Löschen-Button */
-.search-item-actions button.delete-btn:hover {
-    color: #e74c3c;
-    /* Rot beim Hovern */
-}
-
-/* Icon zum Leeren der Suchleiste */
-.clear-icon {
-    position: absolute;
-    right: 12px;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 18px;
-    color: #888;
-    cursor: pointer;
-    width: 24px;
-    height: 24px;
-    display: flex;
+    flex-shrink: 0;
+    display: inline-flex;
     justify-content: center;
     align-items: center;
-    border-radius: 50%;
-    transition: background-color 0.2s ease;
+    margin-left: 8px;
+    padding: 0 !important;
+    min-width: 0 !important;
 }
 
-.clear-icon:hover {
+.info-button-shared:hover {
     background: #f0f0f0;
 }
 
-/* Button zum Speichern eines Favoriten */
-.save-favorite-btn {
-    width: 100%;
-    max-width: 400px;
+.info-popup {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 5px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 120px;
     padding: 10px;
-    margin: 10px 0;
-    background-color: var(--primary-color);
-    color: white;
-    font-size: 14px;
-    font-weight: bold;
-    border: none;
+    background: white;
+    border: 1px solid #ccc;
     border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 2000;
+    font-size: 13px;
+    color: var(--text-color);
+    line-height: 1.4;
+    text-align: center;
+}
+
+.info-popup::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 6px;
+    border-style: solid;
+    border-color: white transparent transparent transparent;
+}
+
+
+/* =================================================================== */
+/* 4. HEADER & SLIDER-CONTAINER
+/* =================================================================== */
+#app-header #slider-container {
+    flex-grow: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-width: 0;
+}
+
+.slider-content-wrapper {
+    width: 100%;
+    max-width: 900px;
+    padding: 5px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.slider-content-wrapper .time-row,
+.slider-content-wrapper .model-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    margin-bottom: 8px;
+    gap: 15px;
+}
+
+#selectedTime,
+#modelLabel {
+    font-size: 14px;
+    color: var(--text-color);
+}
+
+#autoupdateToggle label {
+    font-size: 24px;
+    color: var(--primary-color);
+    font-weight: bold;
     cursor: pointer;
-    transition: background-color 0.2s ease;
+    line-height: 1;
+    padding-bottom: 4px;
 }
 
-.save-favorite-btn:hover {
-    background-color: var(--primary-hover-color);
+#timeSlider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    background: #ddd;
+    border-radius: 3px;
+    outline: none;
+    transition: opacity 0.2s ease;
 }
 
-/* Modal zum Benennen eines Favoriten */
-.favorite-modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
+#timeSlider:hover {
+    opacity: 1;
+}
+
+#timeSlider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    background: var(--primary-color);
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+#timeSlider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    background: var(--primary-color);
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+}
+
+#modelSelect {
+    font-size: 14px;
+    padding: 4px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+}
+
+
+/* =================================================================== */
+/* 5. PANEL-SPEZIFISCHE STILE
+/* =================================================================== */
+
+/* --- Data Panel --- */
+#panel-data #meanWindControls {
+    display: grid;
+    /* Definiert 4 Spalten: Label | Input | Label | Input */
+    grid-template-columns: auto auto auto auto;
+    gap: 5px 10px; /* 5px Zeilenabstand, 10px Spaltenabstand */
+    align-items: center;
+    margin: 10px;
+    justify-content: start; /* Richtet das Grid linksbündig aus */
+}
+
+#panel-data #controls-row {
     display: flex;
     align-items: center;
-    justify-content: center;
-    z-index: 3000;
-}
-
-.favorite-modal-content {
-    background: white;
-    padding: 20px;
-    border-radius: 8px;
-    width: 80%;
-    max-width: 400px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.favorite-modal-content h3 {
-    margin: 0 0 10px;
-    font-size: 16px;
-    color: var(--text-color);
-}
-
-#favoriteNameInput {
-    width: 100%;
-    padding: 10px;
-    margin-bottom: 10px;
-    border: 1px solid #ccc;
-    border-radius: 5px;
-    font-size: 14px;
-    box-sizing: border-box;
-}
-
-.favorite-modal-actions {
-    display: flex;
-    justify-content: flex-end;
     gap: 10px;
+    margin: 10px;
 }
 
-.modal-btn {
-    padding: 8px 16px;
-    font-size: 14px;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
+#meanWindControls label {
+    text-align: right; /* Stellt sicher, dass die Labels bündig sind */
 }
 
-.modal-btn:not(.cancel) {
-    background-color: var(--primary-color);
-    color: white;
+#meanWindControls input {
+    width: 80px; /* Gibt den Inputs eine feste, aber passende Breite */
 }
 
-.modal-btn.cancel {
-    background-color: #ccc;
-    color: var(--text-color);
-}
-
-.modal-btn:hover {
-    opacity: 0.9;
-}
-
-
-/* =================================================================
-   STYLING FÜR DAS Data-PANEL
-   ================================================================= */
-
-   /* Gilt für #panel-data, da es die Klasse .content-panel hat */
-.content-panel {
-    padding: 0;
-    box-sizing: border-box;
-    background-color: transparent;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-}
-
-/* Versteckt das Panel, wenn es nicht aktiv ist */
-.content-panel.hidden {
-    display: none;
+#meanWindResult {
+    grid-column: 1 / -1; /* Sorgt dafür, dass dieses Element die volle Breite einnimmt */
+    grid-row: 2; /* Platziert es explizit in der zweiten Zeile */
+    margin-top: 10px; /* Fügt Abstand nach oben hinzu */
+    font-weight: bold;
+    font-size: 16px;
+    color: var(--primary-color);
 }
 
 #weather-table-container {
-    padding: 10px;           /* Etwas Innenabstand, damit die Tabelle nicht am Rand klebt */
-    margin-top: 15px;        /* Etwas Abstand nach oben zu den anderen Steuerelementen */
-    overflow: hidden;        /* Stellt sicher, dass die abgerundeten Ecken die Tabelle sauber umschliessen */
+    margin-top: 15px;
+    overflow: hidden;
 }
 
-/* Allgemeine Tabellenformatierung */
 #weather-table-container table {
     border-collapse: collapse;
     width: 100%;
@@ -686,51 +534,38 @@ input[type="checkbox"]:focus {
     table-layout: fixed;
 }
 
-/* Tabellenkopf */
 #weather-table-container th {
     background: linear-gradient(to bottom, #f0f4f8, #d9e2ec);
     color: var(--text-color);
     font-weight: bold;
-    padding: 6px 8px; /* <-- Neuer, kleinerer Wert */
+    padding: 6px 8px;
     border: 1px solid var(--text-color);
     text-align: center;
-    vertical-align: middle;
 }
 
-/* Tabellenzellen */
 #weather-table-container td {
-    padding: 0px 8px; /* <-- Neuer, kleinerer Wert */
+    padding: 2px 8px;
     border: 1px solid var(--text-color);
     text-align: center;
-    vertical-align: middle;
 }
 
-/* Deaktiviert Standard-Hintergründe, da diese dynamisch gesetzt werden */
-#weather-table-container tr:nth-child(even),
-#weather-table-container tr:nth-child(odd),
-#weather-table-container tr:hover {
-    background: none !important;
-}
-
-/* Stile für Hintergrundfarben basierend auf Luftfeuchtigkeit */
 #weather-table-container tr.humidity-low {
-    background: var(--background-light) !important; /* Weiß für <65% */
+    background: var(--background-light) !important;
 }
 
 #weather-table-container tr.humidity-moderate {
-    background: #F4F4F4 !important; /* Helles Grau für 65%-85% */
+    background: #F4F4F4 !important;
 }
 
 #weather-table-container tr.humidity-high {
-    background: #cdcdcd !important; /* Mittleres Grau für 85%-99% */
+    background: #cdcdcd !important;
 }
 
 #weather-table-container tr.humidity-saturated {
-    background: #B9B9B9 !important; /* Dunkles Grau für 100% */
-    color: var(--background-light) !important;      /* Weiße Schrift für Lesbarkeit */
+    background: #B9B9B9 !important;
+    color: white !important;
 }
 
-/* Stile für Randfarben basierend auf Windgeschwindigkeit */
 #weather-table-container tr.wind-low {
     border: 2px solid lightblue !important;
 }
@@ -747,298 +582,14 @@ input[type="checkbox"]:focus {
     border: 2px solid #ffcccc !important;
 }
 
-/* Gilt für #meanWindControls und #controls-row */
-#meanWindResult {
-    font-size: 16px !important;
-    font-family: var(--font-main);
-    font-weight: bold;
-    padding: 10px 0px;
-    color: var(--primary-color);
-    text-align: left;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
 
-/* Spezifisches Layout für den Mittelwind-Container */
-#meanWindControls {
-    display: grid;
-    grid-template-rows: auto auto; 
-    grid-template-columns: var(--label-width) var(--input-width) var(--label-width) var(--input-width);
-    gap: 5px 15px;
-    align-items: center;
-}
-
-#meanWindControls #meanWindResult {
-    /* Weist das Ergebnis an, sich über alle 4 Spalten zu erstrecken */
-    grid-column: 1 / 5; 
-    /* Platziert das Ergebnis explizit in der zweiten Zeile */
-    grid-row: 2;         
-}
-
-#meanWindControls,
-#controls-row {
-    display: grid;
-    /* Nutzt das definierte Grid-Layout */
-    grid-template-columns: var(--grid-columns);
-    align-items: center;
-    justify-items: start;
-    gap: 5px;
-    margin: 10px;
-}
-
-/* Stil für die Eingabefelder in #meanWindControls */
-#meanWindControls input,
-#lowerLimit,
-#upperLimit {
-    width: var(--input-width);
-    box-sizing: border-box;
-}
-
-/* Stil für das Select-Menü in #controls-row */
-#controls-row select {
-    width: var(--input-width);
-    padding: 6px;
-    box-sizing: border-box;
-}
-
-/* Allgemeine Stile für Labels in beiden Containern */
-#meanWindControls label,
-#controls-row label {
-    width: var(--label-width);
-    text-align: left;
-    font-size: 13px;
-    font-family: var(--font-main);
-    font-weight: 400;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-/* Stil für das Ergebnisfeld des Mittelwinds */
-#meanWindResult {
-    font-size: 16px !important;
-    font-family: var(--font-main);
-    font-weight: bold;
-    color: var(--primary-color);
-    text-align: left;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-/* Allgemeine Stile für Eingabefelder, Select-Menüs und Buttons in #meanWindControls und #controls-row */
-#meanWindControls input,
-#controls-row select,
-#controls-row button {
-    font-size: 13px;
-    font-family: var(--font-main);
-    font-weight: 400;
-    margin: 0;
-    box-sizing: border-box;
-}
-
-#meanWindControls input {
-    width: 70px;
-}
-
-#controls-row select {
-    margin-right: 5px;
-}
-
-/* Spezifische Media Queries für kleinere Bildschirme */
-@media (max-width: 768px) {
-    #meanWindResult {
-        grid-column: 1 / 5;
-        grid-row: 2;
-        margin-top: 5px;
-    }
-
-    #controls-row select {
-        margin-right: 5px;
-    }
-}
-
-@media (max-width: 480px) {
-    #controls-row {
-        grid-template-columns: 100px 60px auto;
-        grid-template-rows: auto auto;
-    }
-
-    #controls-row label {
-        font-size: 13px;
-    }
-
-    #controls-row select {
-        width: 60px;
-    }
-}
-
-/* =================================================================
-   STYLING FÜR DIE INFO BUTTONS
-   ================================================================= */
-
-   /* Stile für den Model-Info-Button (ein <button>-Element) */
-#modelInfoButton {
-    /* Allgemeine Button-Stile zurücksetzen, um ein eigenes Design zu ermöglichen */
-    padding: 0 !important;
-    min-width: 0 !important;
-
-    /* Definition des gewünschten Aussehens */
-    background: transparent;
-    border: 1px solid #555;
-    color: var(--text-color);
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    font-size: 13px;
-    font-weight: bold;
-    font-family: 'Times New Roman', Times, serif;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-    flex-shrink: 0;
-
-    /* Wichtig für die korrekte Positionierung und das 'i' */
-    display: inline-flex;
-    justify-content: center;
-    align-items: center;
-    margin-left: 8px;
-}
-
-#modelInfoButton:hover {
-    background: #f0f0f0;
-    color: var(--text-color);
-}
-
-/* Stile für den Track-Upload-Info-Button (ein <span>-Element) */
-.info-icon {
-    background: transparent;
-    border: 1px solid #555;
-    color: var(--text-color);
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    font-size: 13px;
-    font-weight: bold;
-    font-family: 'Times New Roman', Times, serif;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-    flex-shrink: 0;
-    display: inline-flex;
-    justify-content: center;
-    align-items: center;
-    margin-left: 8px;
-    line-height: 18px; /* Sorgt für vertikale Zentrierung des Textes */
-}
-
-.info-icon:hover {
-    background: #f0f0f0;
-}
-
-/* Stellt sicher, dass die übergeordneten Container als Positionierungs-Anker dienen */
-#model-row,
-#track-upload>div:first-child {
-    position: relative;
-}
-
-/* Ein einheitlicher Stil für BEIDE Popups */
-.info-popup {
-    display: none; /* Standardmäßig versteckt */
-    position: absolute;
-    bottom: calc(100% + 5px); /* Positioniert das Popup über dem Button */
-    left: 50%;
-    transform: translateX(-50%);
-    width: 120px;
-    height: auto; /* Erlaubt dem Popup, in der Höhe zu wachsen */
-    text-align: center;
-    padding: 10px;
-    background: white;
-    border: 1px solid #ccc;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    z-index: 2000;
-    font-size: 13px;
-    color: var(--text-color);
-    line-height: 1.4;
-    min-height: 40px;
-    max-height: 300px; /* Verhindert, dass das Popup zu hoch wird */
-}
-
-/* Erzeugt den kleinen Pfeil, der nach unten auf den Button zeigt */
-.info-popup::after {
-    content: '';
-    position: absolute;
-    top: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    border-width: 6px;
-    border-style: solid;
-    border-color: white transparent transparent transparent;
-}
-
-/* =================================================================
-   STYLING FÜR DEN SLIDER (ZEIT- UND MODELL-AUSWAHL)
-   ================================================================= */
-
-/* Wrapper für den Inhalt des Sliders, um die Breite zu steuern */
-.slider-content-wrapper {
-    width: 100%;
-    max-width: 900px;
-    padding: 5px;
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-
-/* Zeilen für Zeit und Modell-Auswahl */
-.slider-content-wrapper .time-row,
-.slider-content-wrapper .model-row {
-display: flex;
-    justify-content: center; /* <-- Dies ist die entscheidende Änderung */
-    align-items: center;
-    width: 100%;
-    margin-bottom: 8px;
-    gap: 15px; 
-}
-
-#model-row {
-    padding: 10px 0;
-}
-
-/* Stellt die korrekte Größe und Farbe für das Autoupdate-Symbol wieder her */
-#autoupdateToggle label {
-    font-size: 24px;              /* Größer für bessere Sichtbarkeit und Klickbarkeit */
-    color: var(--primary-color);  /* Verwendet deine Hauptfarbe (--primary-color) */
-    font-weight: bold;            /* Macht das Symbol etwas kräftiger */
-    cursor: pointer;              /* Zeigt an, dass es klickbar ist */
-    line-height: 1;               /* Verhindert unerwünschten vertikalen Abstand */
-    padding-bottom: 4px;          /* Kleine Anpassung für die perfekte vertikale Zentrierung */
-}
-
-/* Kleinere Anpassungen für die Lesbarkeit der Labels */
-#selectedTime,
-#modelLabel {
-    font-size: 14px;
-    color: var(--text-color);
-}
-
-/* Das Dropdown-Menü für die Modellauswahl */
-#modelSelect {
-    font-size: 14px;
-    padding: 4px;
-    border-radius: 4px;
-    border: 1px solid #ccc;
-}
-
-/* Entfernt die Aufzählungspunkte im neuen Jump-Master-Panel */
+/* --- Jumpmaster Panel --- */
 #panel-jumpmaster ul {
-    list-style: none; /* Entfernt die Punkte */
-    padding: 0;       /* Entfernt den linken Einzug der Liste */
-    margin: 0;        /* Entfernt den Standard-Abstand */
+    list-style: none;
+    padding: 0 15px;
+    margin: 0;
 }
 
-/* Optional: Stellt sicher, dass die Listenelemente den gleichen Abstand haben wie im Akkordeon */
 #panel-jumpmaster li {
     padding: 10px 0;
     border-bottom: 1px solid #f0f0f0;
@@ -1049,15 +600,15 @@ display: flex;
 }
 
 #jumpmaster-dashboard {
-    padding: 0 15px 15px 15px;
+    padding: 0 15px 15px;
     border-top: 1px solid #eee;
     margin-top: 10px;
 }
 
 .dashboard-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr; /* Zwei Spalten */
-    gap: 15px; /* Abstand zwischen den Elementen */
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
 }
 
 .dashboard-item {
@@ -1067,7 +618,6 @@ display: flex;
     text-align: center;
 }
 
-/* Lässt ein Element über beide Spalten gehen */
 .dashboard-item.span-2 {
     grid-column: 1 / -1;
 }
@@ -1085,331 +635,257 @@ display: flex;
     color: var(--text-color);
 }
 
-/* Kleinere Schrift für die Genauigkeit */
 .accuracy-item .dashboard-value {
     font-size: 14px;
     font-weight: normal;
 }
 
-/* Trennlinie für die JML-Details */
+#dashboard-jm-coords {
+    font-size: 16px;
+    line-height: 1.4;
+    word-wrap: break-word;
+}
+
 #jumpmaster-line-details hr {
     border: none;
     border-top: 1px solid #eee;
     margin: 15px 0;
 }
 
-/* Versteckt Elemente sicher */
-.hidden {
-    display: none !important;
+/* --- Search Panel --- */
+#panel-search:not(.hidden) #locationResults {
+    display: block !important;
 }
 
-/* Spezifische Anpassung für das Koordinaten-Feld im Jump Master Dashboard */
-#dashboard-jm-coords {
-    font-size: 16px;      /* Verringert die Schriftgröße, damit mehr Text passt */
-    line-height: 1.4;     /* Sorgt für guten Abstand, falls die Zeile umbricht */
-    word-wrap: break-word;/* Erlaubt den Umbruch von langen Zeichenketten (wichtig für MGRS) */
+.search-bar-container {
+    position: relative;
+    margin-bottom: 15px;
 }
 
-/* Label für die Touch-Messung */
-.leaflet-measure-label {
+.search-bar-container .search-icon {
     position: absolute;
-    font: 10px Arial, Helvetica, sans-serif;
-    background-color: rgba(255, 255, 170, 0.7);
-    color: black;
-    padding: 2px;
-    border-radius: 3px;
-    box-shadow: 1px 1px 4px #888;
-    white-space: nowrap;
-    text-align: right;
-    pointer-events: none; /* Wichtig, damit das Label keine Klicks abfängt */
-    display: none;        /* Wird per JavaScript auf 'block' gesetzt */
-    z-index: 9000;        /* Über dem Fadenkreuz */
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 18px;
+    color: #888;
+    pointer-events: none;
 }
 
-.bold-distance {
-    font-weight: bold !important;
+#locationSearchInput {
+    padding-left: 40px;
 }
 
-/* Existing root variables */
-:root {
-    --label-width: 135px;
-    --input-width: 70px;
-    --grid-columns: var(--label-width) var(--input-width) var(--label-width) var(--input-width) minmax(0, 1fr);
+.location-results-container {
+    max-height: calc(100% - 120px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
-html {
-    font-size: 13px;
+.search-section h5,
+.results-heading {
+    padding: 10px 15px;
+    margin: 0;
+    font-size: 14px;
+    background-color: #f0f0f0;
+    font-weight: bold;
 }
 
-#map {
-    height: 70vh;
+.search-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 15px;
+    border-bottom: 1px solid #f0f0f0;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.search-item:hover {
+    background-color: #f9f9f9;
+}
+
+.search-item-text {
+    flex-grow: 1;
+}
+
+.search-item-text .name {
+    font-weight: bold;
+}
+
+.search-item-actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+}
+
+.search-item-actions button {
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: #ccc;
+    cursor: pointer;
+    padding: 5px;
+}
+
+.search-item-actions button.is-favorite {
+    color: #f3d131;
+}
+
+.search-item-actions button.delete-btn:hover {
+    color: #e74c3c;
+}
+
+.clear-icon {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 18px;
+    color: #888;
+    cursor: pointer;
+}
+
+/* =================================================================== */
+/* 6. KARTEN- & LEAFLET-STILE
+/* =================================================================== */
+#crosshair {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 16px;
+    height: 16px;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 999;
+    display: none;
+}
+
+.touch-device #crosshair {
+    display: block;
+}
+
+#crosshair::before,
+#crosshair::after {
+    content: '';
+    position: absolute;
+    background-color: #333;
+    box-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
+}
+
+#crosshair::before {
+    left: 50%;
+    top: 0;
+    width: 2px;
+    height: 100%;
+    transform: translateX(-50%);
+}
+
+#crosshair::after {
+    top: 50%;
+    left: 0;
+    height: 2px;
     width: 100%;
-    margin-top: 90px;
-    z-index: 0;
+    transform: translateY(-50%);
 }
 
-/* Incorporate necessary styles from styles-shared.css */
+.leaflet-popup-content-wrapper {
+    padding: 1px;
+    border-radius: 5px;
+}
+
 .leaflet-popup-content {
     font-size: 13px;
-    font-family: 'Roboto', sans-serif;
-    line-height: 1.0;
+    line-height: 1.2;
 }
 
 .leaflet-tooltip {
-    z-index: 800 !important;
     background-color: white;
     padding: 2px;
     pointer-events: none;
 }
 
-.leaflet-popup-content-wrapper {
-    padding: 0.5px;
-    border-radius: 5px;
-    word-wrap: break-word;
-}
-
-.leaflet-bottom .leaflet-control-scale {
-    margin-bottom: 5px !important;
-    margin-left: 5px;
-    z-index: 1000 !important;
-    background-color: rgba(255, 255, 255, 0.8);
-    padding: 2px 5px;
-    border-radius: 4px;
-}
-
-.leaflet-bottom .leaflet-control-attribution {
-    margin-bottom: 5px !important;
-    margin-right: 5px;
-    background-color: rgba(255, 255, 255, 0.8);
-    padding: 2px 5px;
-    font-size: 11px;
-    z-index: 900 !important;
-    white-space: normal;
-    max-width: 60%;
-    text-align: right;
-}
-
-.leaflet-control-live-position {
-    position: absolute;
-    right: 0px;
-    bottom: 10px;
-    z-index: 1000;
-    /* Above map tiles but below popups */
-    font-size: 12px;
-    line-height: 1.4;
-    opacity: 1 !important;
-    visibility: visible !important;
-    background: rgba(255, 255, 255, 0.8) !important;
-    padding: 10px;
-    border: 1px solid rgba(0, 0, 0, 0.2);
-    border-radius: 4px;
-    box-shadow: rgba(0, 0, 0, 0.2);
-    max-width: 300px;
-    pointer-events: none;
-}
-
-.leaflet-bottom .leaflet-control-live-position {
-    margin-bottom: 10px;
-    /* Keep vertical spacing */
-}
-
-/* ===== Live Marker Styles Start ===== */
-
-/* Container, um Standard-Leaflet-Stile zu deaktivieren */
-.live-marker-container {
-  background: transparent;
-  border: none;
-}
-
-/* Wrapper für die Rotations-Transformation */
-.live-marker-wrapper {
-  width: 24px;
-  height: 24px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  transition: transform 0.3s ease-out; /* Optionale sanfte Rotation */
-}
-
-/* Der blaue Punkt mit weißem Rand */
-.live-marker-dot {
-  width: 14px;
-  height: 14px;
-  background-color: #007bff; /* Ein kräftiges Blau */
-  border-radius: 50%;
-  border: 2px solid white;
-  box-shadow: 0 0 6px rgba(0,0,0,0.6); /* Ein Schatten für bessere Sichtbarkeit */
-}
-
-/* Der Pfeil, der über dem Punkt positioniert ist */
-.live-marker-arrow {
-  width: 0;
-  height: 0;
-  border-left: 6px solid transparent;
-  border-right: 6px solid transparent;
-  border-bottom: 10px solid #007bff; 
-  position: absolute;
-  top: -1px; /* Leicht nach oben verschoben */
-  left: 50%;
-  transform: translateX(-50%);
-  /*filter: drop-shadow(0px -1px 2px rgba(0,0,0,0.5)); /* Leichter Schatten für den Pfeil */
-}
-/* ===== Live Marker Styles End ===== */
-
-
-.leaflet-container {
-    z-index: 1;
-}
-
-.leaflet-overlay-pane {
-    z-index: 400; /* Leaflet default */
-    pointer-events: none; /* Overlays don’t need clicks */
-}
-
-.leaflet-marker-pane {
-    z-index: 600; /* Leaflet default ~600 */
-    pointer-events: auto; /* Allow marker clicks */
-}
-
-.leaflet-popup-pane {
-    z-index: 700; /* Leaflet default ~700 */
-    pointer-events: auto; /* Allow popup interactions */
-}
-
-.leaflet-overlay-pane>*,
-.leaflet-marker-pane>*,
-.leaflet-popup-pane>* {
-    pointer-events: auto;
-}
-
-.harp-marker {
-    background: transparent;
-}
-
+.wind-tooltip,
+.cutaway-tooltip,
 .ensemble-tooltip {
-    background-color: rgba(255, 255, 255, 0.9); /* Heller Hintergrund */
-    color: #333; /* Dunkler Text */
-    border: 1px solid #ccc;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    border: none;
     border-radius: 3px;
-    padding: 5px 8px;
+    padding: 5px;
     font-size: 12px;
     white-space: nowrap;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
 }
 
-/* Ensure the submenu items have consistent padding and font */
-.submenu li {
-    padding: 10px; /* Increased padding for better spacing */
-    border-bottom: 1px solid #eee;
-    font-size: 13px;
-    font-family: 'Roboto', sans-serif;
-}
-
-/* Style the cache setting labels */
-.cache-setting-label {
-    display: flex;
-    align-items: center;
-    justify-content: space-between; /* Align label and dropdown */
-    width: 100%;
-    font-family: 'Roboto', sans-serif;
-    font-size: 13px;
-    font-weight: 400;
-    color: #000;
-    padding-right: 10px; /* Add space between label and dropdown */
-}
-
-/* Style the dropdowns */
-.cache-setting-select {
-    appearance: none; /* Remove default browser styling */
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    background-color: #fff;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    padding: 6px 24px 6px 8px; /* Space for custom arrow */
-    font-size: 13px;
-    font-family: 'Roboto', sans-serif;
-    color: #000;
-    cursor: pointer;
-    width: 120px; /* Increased width for better alignment */
-    background-image: url('data:image/svg+xml;utf8,<svg fill="%234da8da" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>'); /* Custom dropdown arrow */
-    background-repeat: no-repeat;
-    background-position: right 8px center;
-    background-size: 12px;
-}
-
-/* Hover and focus states for dropdowns */
-.cache-setting-select:hover {
-    border-color: #4da8da;
-    background-color: #f0f8ff; /* Light blue background on hover */
-}
-
-.cache-setting-select:focus {
-    outline: none;
-    border-color: #4da8da;
-    box-shadow: 0 0 3px rgba(0, 123, 255, 0.5);
-}
-
-/* Style the Recache Now button to match */
-#recacheNowButton {
-    background-color: #4da8da;
-    color: #ffffff;
+.isoline-label {
+    background: rgba(255, 255, 255, 0.7) !important;
+    color: blue !important;
+    font-weight: bold;
     border: none;
-    border-radius: 4px;
-    padding: 6px 12px;
-    font-size: 13px;
-    font-family: 'Roboto', sans-serif;
-    cursor: pointer;
-    width: 120px; /* Match dropdown width */
+    border-radius: 3px;
     text-align: center;
-    display: block; /* Ensure it takes full width of the li */
-    margin: 0 auto; /* Center the button */
+    pointer-events: none !important;
 }
 
-#recacheNowButton:hover {
-    background-color: #0056b3;
+.favorite-marker-icon {
+    color: #FFD700;
+    font-size: 16px;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.6);
+    text-align: center;
+    line-height: 24px;
 }
 
-#customLandingDirection {
-    width: 60px;
-    padding: 2px;
+
+/* =================================================================== */
+/* 7. MODALE & NACHRICHTEN
+/* =================================================================== */
+#loading,
+#message,
+#error-message,
+#progress,
+#offline-indicator {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    padding: 20px;
+    border-radius: 10px;
+    z-index: 10001;
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-.hidden {
-    display: none !important;
+#loading {
+    display: none;
+    background: rgba(255, 255, 255, 0.9);
 }
 
-* {
-    font-size: 13px;
-    font-family: 'Roboto', sans-serif;
-    font-weight: 400;
+#loading .spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 10px;
+}
+
+#message,
+#error-message {
+    display: none;
+    top: 5px;
+    right: 5px;
+    left: auto;
+    transform: none;
+    width: 30%;
+}
+
+#message {
+    background-color: #ccffcc;
 }
 
 #error-message {
-    position: absolute;
-    top: 5px;
-    right: 5px;
-    width: 30%;
-    background: #ffcccc;
-    color: #000000;
-    padding: 6px;
-    border-radius: 5px 5px 5px 5px;
-    text-align: center;
-    z-index: 9999;
-    display: none;
-}
-
-#offline-indicator {
-    position: fixed;
-    top: 35px;
-    right: 5px;
-    width: 30%;
-    background: #fff3cd;
-    color: #856404;
-    padding: 6px;
-    border-radius: 5px;
-    text-align: center;
-    z-index: 9997;
+    background-color: #ffcccc;
 }
 
 .modal {
@@ -1429,8 +905,6 @@ html {
     background: white;
     padding: 20px;
     border-radius: 5px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-    text-align: center;
     width: 300px;
 }
 
@@ -1438,468 +912,88 @@ html {
     margin-top: 15px;
 }
 
-.modal-buttons button {
-    margin: 0 10px;
-    padding: 5px 15px;
-}
-
-input[type="checkbox"] {
-    transition: opacity 0.3s ease;
-}
-
-input[type="checkbox"][style*="opacity: 0.5"] {
-    cursor: not-allowed;
-}
-
-input[type="checkbox"][style*="opacity: 1"] {
-    cursor: pointer;
-}
-
-.wind-tooltip {
-    background: rgba(0, 0, 0, 0.8);
-    color: white;
-    border: none;
-    border-radius: 3px;
-    padding: 5px;
-    font-size: 12px;
-    white-space: nowrap;
-}
-
-.isoline-label {
-    background: rgba(255, 255, 255, 0.7) !important;
-    color: blue !important;
-    font-weight: bold;
-    border: none;
-    border-radius: 3px;
-    padding: 0;
-    line-height: 1 !important;
-    /* Tighten line height */
-    text-align: center;
-    overflow: hidden !important;
-    /* Clip text if it overflows */
-    z-index: 2100 !important;
-    /* Above other tooltips */
-    pointer-events: none !important;
-    /* Prevent mouse interaction */
-}
-
-.isoline-label span {
-    margin: 0 !important;
-    padding: 0 !important;
-    display: inline-block;
-}
-
-.isoline-label-small {
-    width: 30px !important;
-    height: 12px !important;
-}
-
-.isoline-label-large {
-    width: 40px !important;
-    height: 14px !important;
-}
-
-#favoriteBtn {
-    margin-top: 3px;
-    padding: 5px 10px;
-    margin-left: 10px;
-    font-size: 12px;
-}
-
-.favorite-marker-icon {
-    color: #FFD700; /* Gold-gelb */
-    font-size: 16px;
-    font-weight: bold;
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.6);
-    text-align: center;
-    line-height: 24px; /* Vertikale Zentrierung */
-}
-
-#coordHistory {
-    padding: 5px;
-    font-size: 12px;
-}
-
-.cutaway-tooltip {
-    background-color: rgba(255, 255, 255, 0.8);
-    border: 1px solid red;
-    border-radius: 3px;
-    padding: 5px;
-    font-size: 12px;
-    white-space: nowrap;
-}
-
-/* Stile für das neue Orts-Management-Panel */
-#locationSearchSubmenu {
-    padding: 5px; /* Etwas weniger Innenabstand für ein kompakteres Design */
-}
-
-.search-container {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    margin-bottom: 5px;
-}
-
-#locationSearchInput {
-    flex-grow: 1; /* Das Eingabefeld nimmt den meisten Platz ein */
-    padding: 8px 8px 8px 40px;    /* Mehr Platz für das Icon */
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    font-size: 14px;
-    width: 100%;
-    box-sizing: border-box;
-}
-
-#saveCurrentLocationBtn {
-    background-color: #4da8da;
-    color: white;
-    border: none;
-    border-radius: 3px; /* Rund */
-    width: 30px;
-    height: 30px;
-    font-size: 16px;
-    cursor: pointer;
-    flex-shrink: 0; /* Verhindert, dass der Button schrumpft */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-#saveCurrentLocationBtn:hover {
-    background-color: #0056b3;
-}
-
-.location-results-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    max-height: 250px; /* Begrenzt die Höhe der Liste */
-    overflow-y: auto; /* Fügt einen Scrollbalken hinzu, wenn nötig */
-    border-top: 1px solid #eee;
-}
-
-.location-results-list li {
-    padding: 8px 10px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    cursor: pointer;
-    border-bottom: 1px solid #eee;
-}
-
-.location-results-list li:hover {
-    background-color: #f0f8ff;
-}
-
-.location-results-list .location-name {
-    flex-grow: 1;
-}
-
-.location-results-list .favorite-toggle {
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-size: 18px;
-    padding: 0 5px;
-    color: #ccc;
-}
-
-.location-results-list .favorite-toggle.is-favorite {
-    color: #f3d131; /* Gold für Favoriten */
-}
-
-.location-results-list .location-info {
-    font-size: 11px;
-    color: #888;
-    display: block;
-}
-
-.location-item-buttons {
-    display: flex;
-    align-items: center;
-    gap: 5px; /* Abstand zwischen den Buttons */
-}
-
-.delete-location-btn {
-    background: none;
-    border: 1px solid #999;
-    color: #888;
-    border-radius: 50%;
-    /* Feste, gleiche Breite und Höhe erzwingen */
-    width: 24px !important;
-    height: 24px !important;
-    min-width: 24px !important;
-    min-height: 24px !important;
-    padding: 0;
-    cursor: pointer;
-    font-size: 20px; /* Leicht vergrößert für bessere Sichtbarkeit */
-    font-weight: bold;
-    
-    /* Perfekte Zentrierung des '×' */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    line-height: 1;
-    box-sizing: border-box !important; /* Verhindert, dass Padding/Border die Größe beeinflusst */
-}
-
-.delete-location-btn:hover {
-    background-color: #fee; /* Etwas dezenter als das vorherige Rot */
-    color: #d63031;
-    border-color: #d63031;
-}
-
-/* Das Fadenkreuz-Element selbst ist nur ein unsichtbarer Ankerpunkt.
-   Es wird standardmäßig mit display: none versteckt. */
-#crosshair {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 16px;  /* Breite des Kreuzes */
-  height: 16px; /* Höhe des Kreuzes */
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-  z-index: 999;
-  display: none; /* SEHR WICHTIG: Standardmäßig unsichtbar */
-}
-
-/* Die Sichtbarkeit wird NUR über diese Klasse gesteuert. */
-.touch-device #crosshair {
-  display: block;
-}
-
-/* Die zwei Linien (horizontal und vertikal) für das "+" 
-   werden mit sog. Pseudo-Elementen erstellt. */
-#crosshair::before,
-#crosshair::after {
-  content: '';
-  position: absolute;
-  background-color: #333; /* Farbe des Kreuzes */
-  /* Ein leichter Schatten macht das Kreuz auf jedem Untergrund besser sichtbar */
-  box-shadow: 0 0 2px rgba(255, 255, 255, 0.8); 
-}
-
-/* Vertikale Linie des Kreuzes */
-#crosshair::before {
-  left: 50%;
-  top: 0;
-  width: 2px; /* Dicke der Linie */
-  height: 100%;
-  transform: translateX(-50%);
-}
-
-/* Horizontale Linie des Kreuzes */
-#crosshair::after {
-  top: 50%;
-  left: 0;
-  height: 2px; /* Dicke der Linie */
-  width: 100%;
-  transform: translateY(-50%);
-}
-
-#slider-container {
-    padding: 5px;
-}
-
-#timeLabel {
-    display: block;
-    margin-bottom: 5px;
-}
-
-/* Stile für den Zeit-Slider */
-#timeSlider {
-    -webkit-appearance: none; /* Setzt das Browser-Styling zurück */
-    appearance: none;
-    width: 100%;
-    height: 6px;
-    background: #ddd; /* Die Farbe für die gesamte Leiste */
-    border-radius: 3px;
-    outline: none;
-    transition: opacity 0.2s ease;
-}
-
-#timeSlider:hover {
-    opacity: 1;
-}
-
-/* Der runde "Anfasser" für Webkit-Browser (Chrome, Safari) */
-#timeSlider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 18px;
-    height: 18px;
-    background: var(--primary-color);
-    border-radius: 50%;
-    cursor: pointer;
-}
-
-/* Der runde "Anfasser" für Firefox */
-#timeSlider::-moz-range-thumb {
-    width: 18px;
-    height: 18px;
-    background: var(--primary-color);
-    border-radius: 50%;
-    cursor: pointer;
-    border: none;
-}
-
-/* NEU: Stellt sicher, dass die Leiste selbst in Webkit-Browsern grau bleibt */
-#timeSlider::-webkit-slider-runnable-track {
-    background: #ddd;
-    border-radius: 3px;
-}
-
-/* NEU: Stellt sicher, dass die Leiste selbst in Firefox grau bleibt */
-#timeSlider::-moz-range-track {
-    background: #ddd;
-    border-radius: 3px;
-}
-
-#modelSelect {
-    padding: 5px;
-    font-size: 13px;
-}
-
-#info table {
-    border-collapse: collapse;
-    width: 100%;
-    font-size: 13px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    table-layout: fixed;
-}
-
-#info th {
-    background: linear-gradient(to bottom, #f0f4f8, #d9e2ec);
-    color: #333;
-    font-weight: bold;
-    padding: 10px 8px;
-    border-bottom: 2px solid #333;
-    text-align: center;
-    vertical-align: middle;
-    width: 25%;
-}
-
-#info td {
-    padding: 8px;
-    border: 1px solid #333;
-    text-align: center;
-    vertical-align: middle;
-    width: 25%;
-}
-
-/* Remove default alternating and hover backgrounds to avoid conflicts */
-#info tr:nth-child(even),
-#info tr:nth-child(odd),
-#info tr:hover {
-    background: none !important;
-}
-
-/* New styles for humidity-based row backgrounds */
-#info table tr.humidity-low {
-    background: #FFFFFF !important;
-    /* White for <65% */
-}
-
-#info table tr.humidity-moderate {
-    background: #F4F4F4 !important;
-    /* Light grey for 65%-85% */
-}
-
-#info table tr.humidity-high {
-    background: #cdcdcd !important;
-    /* Medium grey for 85%-99% */
-}
-
-#info table tr.humidity-saturated {
-    background: #B9B9B9 !important;
-    /* Dark grey for 100% */
-    color: #FFFFFF !important;
-    /* White text for readability */
-}
-
-/* Wind speed classes for border colors */
-#info table tr.wind-low {
-    border: 2px solid lightblue !important;
-}
-
-#info table tr.wind-moderate {
-    border: 2px solid lightgreen !important;
-}
-
-#info table tr.wind-high {
-    border: 2px solid #f5f34f !important;
-}
-
-#info table tr.wind-very-high {
-    border: 2px solid #ffcccc !important;
-}
-
-#loading {
+.favorite-modal {
+    /* Identisch zu .modal */
     position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    display: none;
-    flex-direction: column;
-    align-items: center;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 10000;
+    display: flex;
     justify-content: center;
-    background: rgba(255, 255, 255, 0.9);
-    padding: 20px;
-    border-radius: 10px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-    z-index: 1000;
-}
-
-#loading .spinner {
-    width: 40px;
-    height: 40px;
-    border: 4px solid #f3f3f3;
-    border-top: 4px solid #3498db;
-    border-radius: 50%;
-    animation: spin 1s linear infinite, pulse 1.5s ease-in-out infinite;
-}
-
-#loading p {
-    margin-top: 10px;
-    font-size: 13px;
-    color: #333;
-    font-family: Roboto, sans-serif;
-}
-
-/* --- Lade-Spinner & Nachrichten --- */
-#loading {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    display: none; /* Wird per JS gesteuert */
-    flex-direction: column;
     align-items: center;
-    justify-content: center;
-    background: rgba(255, 255, 255, 0.9);
+}
+
+.favorite-modal-content {
+    background: white;
     padding: 20px;
-    border-radius: 10px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-    z-index: 10001; /* Stellt sicher, dass er über allem liegt */
+    border-radius: 8px;
+    width: 80%;
+    max-width: 400px;
 }
 
-#loading .spinner {
-    width: 40px;
-    height: 40px;
-    border: 4px solid #f3f3f3;
-    border-top: 4px solid var(--primary-color);
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
+.favorite-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
 }
 
-#loading p {
-    margin-top: 10px;
-    font-size: 13px;
-    color: var(--text-color-dark);
+.modal-btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
 }
+
+.modal-btn:not(.cancel) {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.modal-btn.cancel {
+    background-color: #ccc;
+}
+
+/* =================================================================== */
+/* 8. ANIMATIONEN
+/* =================================================================== */
 
 @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7);
+    }
+
+    70% {
+        box-shadow: 0 0 10px 15px rgba(220, 53, 69, 0);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(220, 53, 69, 0);
+    }
+}
+
+@keyframes pulse-blue {
+    0% {
+        box-shadow: 0 0 0 0 rgba(23, 162, 184, 0.7);
+    }
+
+    70% {
+        box-shadow: 0 0 10px 15px rgba(23, 162, 184, 0);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(23, 162, 184, 0);
+    }
 }
