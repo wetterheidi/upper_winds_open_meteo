@@ -667,60 +667,74 @@ async function processTrackFile(file) {
     }
 }
 function setupTrackEvents() {
-    console.log('[eventManager] Setting up track events for mobile.');
+    const uploadButton = document.getElementById('uploadTrackButton');
     const trackFileInput = document.getElementById('trackFileInput');
-    if (!trackFileInput) return;
+    const fileNameDisplay = document.getElementById('fileNameDisplay');
+    const clearTrackButton = document.getElementById('clearTrack');
 
-    // Listener für Klicks auf das Label/den gesamten Bereich, um den Picker zu öffnen
-    const trackUploadContainer = document.querySelector('#track-upload');
-    if (trackUploadContainer) {
-        trackUploadContainer.addEventListener('click', async (e) => {
-            // *** HIER IST DIE KORREKTUR ***
-            // Wenn der Benutzer direkt auf das (jetzt sichtbare) Dateieingabefeld klickt,
-            // soll der Browser die Standardaktion ausführen (Datei-Menü öffnen).
-            // Wir beenden die Funktion hier sofort und verhindern NICHT die Standardaktion.
-            if (e.target === trackFileInput) {
-                return; 
-            }
-
-            // Der restliche Code wird nur ausgeführt, wenn *neben* den Button geklickt wird.
-            e.preventDefault(); 
-
-            // Prüfen, ob die App nativ läuft
-            if (window.Capacitor && window.Capacitor.isNativePlatform()) {
-                const nativeFile = await openNativeFilePicker();
-                if (nativeFile) {
-                    await processTrackFile(nativeFile);
-                }
-            } else {
-                // Fallback für den Browser: Öffne das versteckte Input-Feld programmatisch
-                trackFileInput.click();
-            }
-        });
+    if (!uploadButton || !trackFileInput || !fileNameDisplay || !clearTrackButton) {
+        console.error('One or more track upload elements are missing from the DOM.');
+        return;
     }
 
-    // Dieser Listener bleibt für den Web-Fallback bestehen
+    // Ein Klick auf unseren gestylten Button löst den Klick auf den versteckten Input aus.
+    uploadButton.addEventListener('click', () => {
+        trackFileInput.click();
+    });
+
+    // Dieser Listener wird aktiv, sobald der Benutzer eine Datei ausgewählt hat.
     trackFileInput.addEventListener('change', async (e) => {
+        const loadingElement = document.getElementById('loading');
         if (e.target.files && e.target.files.length > 0) {
             const file = e.target.files[0];
-            await processTrackFile(file);
+            
+            // UI aktualisieren
+            fileNameDisplay.textContent = file.name;
+            fileNameDisplay.style.fontStyle = 'normal';
+            if (loadingElement) loadingElement.style.display = 'block';
+
+            const extension = file.name.split('.').pop().toLowerCase();
+            try {
+                // *** HIER IST DIE KORREKTE VERARBEITUNGSLOGIK ***
+                if (extension === 'gpx') {
+                    await loadGpxTrack(file); // Ruft die importierte Funktion auf
+                } else if (extension === 'csv') {
+                    await loadCsvTrackUTC(file); // Ruft die importierte Funktion auf
+                } else {
+                    Utils.handleError('Unsupported file type. Please upload a .gpx or .csv file.');
+                }
+            } catch (error) {
+                console.error('Error during track file processing:', error);
+                Utils.handleError('Failed to process track file.');
+            } finally {
+                if (loadingElement) loadingElement.style.display = 'none';
+            }
         }
     });
 
-    const clearTrackButton = document.getElementById('clearTrack');
-    if (clearTrackButton) {
-        clearTrackButton.addEventListener('click', (e) => {
-            e.stopPropagation(); // Verhindert, dass der Klick das Öffnen des Pickers auslöst
-            if (!AppState.map) { Utils.handleError('Cannot clear track: map not initialized.'); return; }
-            if (AppState.gpxLayer) {
-                try {
-                    if (AppState.map.hasLayer(AppState.gpxLayer)) AppState.map.removeLayer(AppState.gpxLayer);
-                    AppState.gpxLayer = null; AppState.gpxPoints = []; AppState.isTrackLoaded = false;
-                    if (trackFileInput) trackFileInput.value = '';
-                } catch (error) { Utils.handleError('Failed to clear track: ' + error.message); }
-            } else { Utils.handleMessage('No track to clear.'); }
-        });
-    }
+    // Logik für den "Clear Track" Button
+    clearTrackButton.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!AppState.map) { Utils.handleError('Cannot clear track: map not initialized.'); return; }
+        
+        if (AppState.gpxLayer) {
+            try {
+                if (AppState.map.hasLayer(AppState.gpxLayer)) AppState.map.removeLayer(AppState.gpxLayer);
+                AppState.gpxLayer = null;
+                AppState.gpxPoints = [];
+                AppState.isTrackLoaded = false;
+                
+                trackFileInput.value = ''; // Input zurücksetzen
+                fileNameDisplay.textContent = 'No file chosen';
+                fileNameDisplay.style.fontStyle = 'italic';
+                
+            } catch (error) {
+                Utils.handleError('Failed to clear track: ' + error.message);
+            }
+        } else {
+            Utils.handleMessage('No track to clear.');
+        }
+    });
 }
 function setupGpxExportEvent() {
     const exportButton = document.getElementById('exportGpxButton');

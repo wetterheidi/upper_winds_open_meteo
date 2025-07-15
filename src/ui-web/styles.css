@@ -275,6 +275,26 @@ body {
     outline: none;
 }
 
+/* --- Custom File Upload Button --- */
+.file-upload-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.file-name-display {
+    display: block;
+    margin-top: 5px;
+    padding: 8px 12px;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    font-style: italic;
+    color: #6c757d;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 input[type="checkbox"] {
     appearance: none;
     -webkit-appearance: none;

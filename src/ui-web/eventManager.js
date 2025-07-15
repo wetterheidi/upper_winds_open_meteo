@@ -534,65 +534,74 @@ function setupDeselectAllEnsembleButton() {
 
 // --- Track & Datei-Management ---
 function setupTrackEvents() {
-    console.log('[app.js] Setting up track events');
+    const uploadButton = document.getElementById('uploadTrackButton');
     const trackFileInput = document.getElementById('trackFileInput');
-    const loadingElement = document.getElementById('loading'); // Deklarieren wir die Variable hier einmal zentral.
+    const fileNameDisplay = document.getElementById('fileNameDisplay');
+    const clearTrackButton = document.getElementById('clearTrack');
 
-    if (trackFileInput) {
-        trackFileInput.addEventListener('change', async (e) => {
+    if (!uploadButton || !trackFileInput || !fileNameDisplay || !clearTrackButton) {
+        console.error('One or more track upload elements are missing from the DOM.');
+        return;
+    }
+
+    // Ein Klick auf unseren gestylten Button löst den Klick auf den versteckten Input aus.
+    uploadButton.addEventListener('click', () => {
+        trackFileInput.click();
+    });
+
+    // Dieser Listener wird aktiv, sobald der Benutzer eine Datei ausgewählt hat.
+    trackFileInput.addEventListener('change', async (e) => {
+        const loadingElement = document.getElementById('loading');
+        if (e.target.files && e.target.files.length > 0) {
             const file = e.target.files[0];
-
-            // 1. Spinner hier anzeigen, wenn eine Datei ausgewählt wird.
-            if (loadingElement) {
-                loadingElement.style.display = 'block';
-            }
-
-            if (!file) {
-                Utils.handleError('No file selected.');
-                if (loadingElement) loadingElement.style.display = 'none'; // Bei Fehler sofort ausblenden
-                return;
-            }
+            
+            // UI aktualisieren
+            fileNameDisplay.textContent = file.name;
+            fileNameDisplay.style.fontStyle = 'normal';
+            if (loadingElement) loadingElement.style.display = 'block';
 
             const extension = file.name.split('.').pop().toLowerCase();
-            let trackMetaData = null;
-
             try {
+                // *** HIER IST DIE KORREKTE VERARBEITUNGSLOGIK ***
                 if (extension === 'gpx') {
-                    trackMetaData = await loadGpxTrack(file);
+                    await loadGpxTrack(file); // Ruft die importierte Funktion auf
                 } else if (extension === 'csv') {
-                    trackMetaData = await loadCsvTrackUTC(file);
+                    await loadCsvTrackUTC(file); // Ruft die importierte Funktion auf
                 } else {
                     Utils.handleError('Unsupported file type. Please upload a .gpx or .csv file.');
-                    if (loadingElement) loadingElement.style.display = 'none'; // Bei Fehler sofort ausblenden
                 }
             } catch (error) {
                 console.error('Error during track file processing:', error);
                 Utils.handleError('Failed to process track file.');
-                if (loadingElement) loadingElement.style.display = 'none'; // Bei Fehler sofort ausblenden
+            } finally {
+                if (loadingElement) loadingElement.style.display = 'none';
             }
-        });
-    }
+        }
+    });
 
-    const clearTrackButton = document.getElementById('clearTrack');
-    if (clearTrackButton) {
-        clearTrackButton.addEventListener('click', () => {
-            if (!AppState.map) { Utils.handleError('Cannot clear track: map not initialized.'); return; }
-            if (AppState.gpxLayer) {
-                try {
-                    if (AppState.map.hasLayer(AppState.gpxLayer)) AppState.map.removeLayer(AppState.gpxLayer);
-                    AppState.gpxLayer = null; AppState.gpxPoints = []; AppState.isTrackLoaded = false;
-                    const infoElement = document.getElementById('info');
-                    if (infoElement) {
-                        const modelDisplayRegex = /(<br><strong>Available Models:<\/strong><ul>.*?<\/ul>|<br><strong>Available Models:<\/strong> None)/s;
-                        const currentInfoHTML = infoElement.innerHTML;
-                        const modelInfoMatch = currentInfoHTML.match(modelDisplayRegex);
-                        infoElement.innerHTML = 'Click on the map to fetch weather data.' + (modelInfoMatch ? modelInfoMatch[0] : '');
-                    }
-                    if (trackFileInput) trackFileInput.value = '';
-                } catch (error) { Utils.handleError('Failed to clear track: ' + error.message); }
-            } else { Utils.handleMessage('No track to clear.'); }
-        });
-    }
+    // Logik für den "Clear Track" Button
+    clearTrackButton.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!AppState.map) { Utils.handleError('Cannot clear track: map not initialized.'); return; }
+        
+        if (AppState.gpxLayer) {
+            try {
+                if (AppState.map.hasLayer(AppState.gpxLayer)) AppState.map.removeLayer(AppState.gpxLayer);
+                AppState.gpxLayer = null;
+                AppState.gpxPoints = [];
+                AppState.isTrackLoaded = false;
+                
+                trackFileInput.value = ''; // Input zurücksetzen
+                fileNameDisplay.textContent = 'No file chosen';
+                fileNameDisplay.style.fontStyle = 'italic';
+                
+            } catch (error) {
+                Utils.handleError('Failed to clear track: ' + error.message);
+            }
+        } else {
+            Utils.handleMessage('No track to clear.');
+        }
+    });
 }
 function setupGpxExportEvent() {
 

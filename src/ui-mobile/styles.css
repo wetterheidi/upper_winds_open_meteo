@@ -293,6 +293,26 @@ body {
     justify-self: start;
 }
 
+/* --- Custom File Upload Button --- */
+.file-upload-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.file-name-display {
+    display: block;
+    margin-top: 5px;
+    padding: 8px 12px;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    font-style: italic;
+    color: #6c757d;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 input[type="checkbox"] {
     appearance: none;
     -webkit-appearance: none;
@@ -777,6 +797,11 @@ input[type="checkbox"][style*="opacity: 1"] {
 #track-upload > div:first-child {
     position: relative;
     margin: 5px 10px 0 10px;
+}
+
+#track-upload .btn {
+    width: auto;         /* Verhindert, dass die Buttons die volle Spaltenbreite einnehmen */
+    justify-self: start; /* Richtet die Buttons links in ihrer Grid-Spalte aus */
 }
 
 .info-icon {
