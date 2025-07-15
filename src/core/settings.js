@@ -1,5 +1,5 @@
 // === Settings Module ===
-import { FEATURE_PASSWORD } from './constants.js';
+import { FEATURE_PASSWORD } from './config.js'; 
 
 export const getInterpolationStep = () => {
     const selectElement = document.getElementById('interpStep');

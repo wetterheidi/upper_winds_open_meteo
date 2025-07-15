@@ -2,7 +2,7 @@ import defaultMarkerUrl from '/icon-48.png';
 import cutawayMarkerUrl from '/schere_purple.png';
 import airplaneMarkerUrl from '/airplane_orange.png';
 
-export const FEATURE_PASSWORD = "skydiver2025"; // Hardcoded password 
+//export const FEATURE_PASSWORD = "skydiver2025"; // Hardcoded password 
 
 export const JUMPER_SEPARATION_TABLE = {
     135: 5, 130: 5, 125: 5, 120: 5, 115: 5, 110: 5, 105: 5,

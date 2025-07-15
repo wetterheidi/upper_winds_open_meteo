@@ -1,5 +1,5 @@
 # Sensitive configuration files
-config.js
+/src/core/config.js
 
 # Environment variables
 .env
