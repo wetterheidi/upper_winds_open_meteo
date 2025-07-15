@@ -942,8 +942,6 @@ function setupClearHistoricalDate() {
 
 // --- Cache Management ---
 function setupCacheManagement() {
-    // ALT: const bottomContainer = document.getElementById('bottom-container');
-    // NEU: Wir zielen auf den Container im Settings-Panel
     const targetContainer = document.getElementById('app-management-settings');
 
     if (!targetContainer) {
@@ -951,17 +949,19 @@ function setupCacheManagement() {
         return;
     }
 
-    // 1. Erstelle den gemeinsamen Container für die Buttons
     const buttonWrapper = document.createElement('div');
     buttonWrapper.id = 'settings-cache-buttons';
-    // Wir verwenden das settings-grid, damit es zum Rest des Panels passt
     buttonWrapper.className = 'settings-grid';
 
-    // 2. Erstelle den "Reset Settings" Button
+    // --- Reset Settings Button ---
     const resetButton = document.createElement('button');
     resetButton.id = 'resetButton';
     resetButton.textContent = 'Reset Settings';
     resetButton.title = 'Resets all settings to their default values and locks all features';
+    
+    // *** HIER IST DIE ÄNDERUNG FÜR DEN RESET-BUTTON ***
+    resetButton.className = 'btn btn-danger'; // Weist die neuen CSS-Klassen zu
+
     resetButton.addEventListener('click', () => {
         if (confirm("Are you sure you want to reset all settings and lock all features?")) {
             localStorage.removeItem('unlockedFeatures');
@@ -969,32 +969,37 @@ function setupCacheManagement() {
             window.location.reload();
         }
     });
-    // Füge ein leeres Label hinzu, damit der Button in der zweiten Spalte des Grids landet
-    buttonWrapper.appendChild(document.createElement('label'));
+    
+    // Grid-Layout-Logik beibehalten
+    buttonWrapper.appendChild(document.createElement('label')); 
     buttonWrapper.appendChild(resetButton);
 
-    // 3. Erstelle den "Clear Tile Cache" Button
+    // --- Clear Tile Cache Button ---
     const clearCacheButton = document.createElement('button');
     clearCacheButton.id = 'clearCacheButton';
     clearCacheButton.textContent = 'Clear Tile Cache';
     clearCacheButton.title = 'Clears cached map tiles. Pan/zoom to cache more tiles for offline use.';
+    
+    // *** HIER IST DIE ÄNDERUNG FÜR DEN CACHE-BUTTON ***
+    clearCacheButton.className = 'btn btn-danger'; // Weist die neuen CSS-Klassen zu
+
     clearCacheButton.addEventListener('click', async () => {
         try {
             const size = await TileCache.getCacheSize();
             await TileCache.clearCache();
             Utils.handleMessage(`Tile cache cleared successfully (freed ${size.toFixed(2)} MB).`);
-            console.log('Tile cache cleared');
         } catch (error) {
             Utils.handleError('Failed to clear tile cache: ' + error.message);
         }
     });
-    // Füge auch hier ein leeres Label für das Grid-Layout hinzu
+
+    // Grid-Layout-Logik beibehalten
     buttonWrapper.appendChild(document.createElement('label'));
     buttonWrapper.appendChild(clearCacheButton);
 
-    // 4. Füge den fertigen Wrapper zum DOM hinzu
     targetContainer.appendChild(buttonWrapper);
 }
+
 function setupCacheSettings() {
     const cacheRadiusInput = document.getElementById('cacheRadiusSelect');
     if (cacheRadiusInput) {

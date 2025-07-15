@@ -314,23 +314,6 @@ input[type="checkbox"][style*="opacity: 0.5"] {
     cursor: not-allowed;
 }
 
-#panel-container .accordion-content button {
-    grid-column: 1 / -1;
-    padding: 10px;
-    background-color: var(--primary-color);
-    color: white;
-    border: none;
-    border-radius: 6px;
-    font-size: 14px;
-    font-weight: bold;
-    cursor: pointer;
-    margin-top: 10px;
-}
-
-#panel-container .accordion-content button:hover {
-    background-color: #3b82f6;
-}
-
 /* --- Info Buttons & Popups --- */
 #model-row,
 #track-upload>div:first-child {
@@ -393,6 +376,46 @@ input[type="checkbox"][style*="opacity: 0.5"] {
     border-color: white transparent transparent transparent;
 }
 
+/* --- Allgemeine Buttons --- */
+#panel-container button.btn {
+    grid-column: 1 / -1; 
+    padding: 10px;
+    margin: 10px 0; 
+    font-size: 14px;
+    font-weight: bold;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    text-align: center;
+    transition: background-color 0.2s ease, opacity 0.2s ease;
+    width: 100%; /* Stellt sicher, dass er die volle Breite einnimmt */
+    box-sizing: border-box;
+}
+
+.btn-primary {
+    background-color: var(--primary-color);
+}
+
+.btn-primary:hover {
+    background-color: var(--primary-hover-color);
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+}
+
+.btn-secondary:hover {
+    background-color: #5a6268;
+}
+
+.btn-danger {
+    background-color: #dc3545;
+}
+
+.btn-danger:hover {
+    background-color: #c82333;
+}
 
 /* =================================================================== */
 /* 4. HEADER & SLIDER-CONTAINER
