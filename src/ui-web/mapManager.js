@@ -425,54 +425,54 @@ function _setupGeomanMeasurementHandlers() {
         liveMeasureLabel.innerHTML = 'Klicke, um den ersten Punkt zu setzen.';
 
         // Listener für das Live-Label (Gummiband)
-        const handleMouseMove = (moveEvent) => {
-            const latlngs = workingLayer.getLatLngs();
-            if (latlngs.length > 0) {
-                const lastPoint = latlngs[latlngs.length - 1];
-                const distance = lastPoint.distanceTo(moveEvent.latlng);
-                const bearing = Utils.calculateBearing(lastPoint.lat, lastPoint.lng, moveEvent.latlng.lat, moveEvent.latlng.lng);
-                const distanceText = distance < 1000 ? `${distance.toFixed(0)} m` : `${(distance / 1000).toFixed(2)} km`;
+            const handleMouseMove = (moveEvent) => {
+                const latlngs = workingLayer.getLatLngs();
+                if (latlngs.length > 0) {
+                    const lastPoint = latlngs[latlngs.length - 1];
+                    const distance = lastPoint.distanceTo(moveEvent.latlng);
+                    const bearing = Utils.calculateBearing(lastPoint.lat, lastPoint.lng, moveEvent.latlng.lat, moveEvent.latlng.lng);
+                    const distanceText = distance < 1000 ? `${distance.toFixed(0)} m` : `${(distance / 1000).toFixed(2)} km`;
                 liveMeasureLabel.innerHTML = `In: ${bearing.toFixed(0)}°<br>Out: ---°<br>+: ${distanceText}</span>`;
-                L.DomUtil.setPosition(liveMeasureLabel, moveEvent.containerPoint.add([15, -15]));
-            }
-        };
+                    L.DomUtil.setPosition(liveMeasureLabel, moveEvent.containerPoint.add([15, -15]));
+                }
+            };
 
         // Listener für das Setzen permanenter Labels
-        const handleVertexAdd = () => {
-            updateAllPermanentLabels(workingLayer);
-        };
+            const handleVertexAdd = () => {
+                updateAllPermanentLabels(workingLayer);
+            };
 
         // Listener registrieren
-        map.on('mousemove', handleMouseMove);
-        workingLayer.on('pm:vertexadded', handleVertexAdd);
+            map.on('mousemove', handleMouseMove);
+            workingLayer.on('pm:vertexadded', handleVertexAdd);
 
         // Aufräum-Funktion
-        const cleanup = () => {
-            map.off('mousemove', handleMouseMove);
-            workingLayer.off('pm:vertexadded', handleVertexAdd);
-            liveMeasureLabel.style.display = 'none';
-        };
+            const cleanup = () => {
+                map.off('mousemove', handleMouseMove);
+                workingLayer.off('pm:vertexadded', handleVertexAdd);
+                liveMeasureLabel.style.display = 'none';
+            };
 
         // Listener für den ERFOLGREICHEN Abschluss
-        map.once('pm:create', (createEvent) => {
+            map.once('pm:create', (createEvent) => {
             cleanup(); // Live-Label ausblenden und Listener entfernen
             updateAllPermanentLabels(createEvent.layer); // Finale Labels auf die neue Ebene zeichnen
-        });
+            });
 
         // Listener für den Abbruch (z. B. ESC-Taste oder manuelles Beenden ohne Linie)
         map.once('pm:drawend', () => {
             // Nur aufräumen, wenn keine Linie erstellt wurde
             if (workingLayer.getLatLngs().length === 0) {
-                cleanup();
-                persistentLabelsGroup.clearLayers();
-            }
-        });
+                    cleanup();
+                    persistentLabelsGroup.clearLayers();
+                }
+            });
     });
 
     // Handler für das Bearbeiten und Löschen von Linien
     map.on('pm:edit', (e) => {
-        updateAllPermanentLabels(e.layer);
-        e.layer.on('pm:vertexdragend', () => updateAllPermanentLabels(e.layer));
+            updateAllPermanentLabels(e.layer);
+            e.layer.on('pm:vertexdragend', () => updateAllPermanentLabels(e.layer));
     });
 
     map.on('pm:remove', () => {
