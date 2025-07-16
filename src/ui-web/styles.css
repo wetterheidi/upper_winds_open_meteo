@@ -909,6 +909,8 @@ input[type="checkbox"][style*="opacity: 0.5"] {
     padding: 5px 8px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.2);
     min-width: 50px;
+    font-size: 9px;
+    line-height: 1;
 }
 
 /* NEU: Diese Regel steuert gezielt den Text im Label */

@@ -403,7 +403,7 @@ function _setupGeomanMeasurementHandlers() {
         const radius = layer.getRadius();
         const radiusText = radius < 1000 ? `${radius.toFixed(0)} m` : `${(radius / 1000).toFixed(2)} km`;
 
-        const labelContent = `<div class="geoman-permanent-label">Radius: ${radiusText}</div>`;
+        const labelContent = `<div class="geoman-permanent-label">Radius:<br> ${radiusText}</div>`;
 
         const label = L.marker(center, {
             icon: L.divIcon({ className: 'geoman-label-container', html: labelContent, iconAnchor: [0, 0] })
