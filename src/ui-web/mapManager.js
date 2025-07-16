@@ -365,7 +365,7 @@ function _setupGeomanMeasurementHandlers() {
 
     // --- Helferfunktionen für permanente Labels ---
 
-    // Helfer für Linien-Labels (unverändert)
+    // Helfer für Linien-Labels
     function createPermanentLineLabel(latlngs, index) {
         const currentPoint = latlngs[index];
         const prevPoint = index > 0 ? latlngs[index - 1] : null;
@@ -397,7 +397,7 @@ function _setupGeomanMeasurementHandlers() {
         }).addTo(persistentLabelsGroup);
     }
 
-    // NEU: Helfer für Kreis-Labels
+    // Helfer für Kreis-Labels
     function createPermanentCircleLabel(layer) {
         const center = layer.getLatLng();
         const radius = layer.getRadius();
@@ -415,10 +415,18 @@ function _setupGeomanMeasurementHandlers() {
 
     function updateAllPermanentLineLabels(layer) {
         persistentLabelsGroup.clearLayers();
-        const latlngs = layer.getLatLngs();
-        latlngs.forEach((_, index) => createPermanentLineLabel(latlngs, index));
+        const latlngs = layer.getLatLngs(); // Sicherstellen, dass die aktuellsten Koordinaten verwendet werden
+        console.log('updateAllPermanentLineLabels - LatLngs:', latlngs); // Debugging
+        if (Array.isArray(latlngs[0])) { // Für MultiLineStrings
+            latlngs.forEach((subLatlngs, subIndex) => {
+                console.log(`SubLine ${subIndex}:`, subLatlngs); // Debugging
+                subLatlngs.forEach((_, index) => createPermanentLineLabel(subLatlngs, index));
+            });
+        } else {
+            console.log('Single Line:', latlngs); // Debugging
+            latlngs.forEach((_, index) => createPermanentLineLabel(latlngs, index));
+        }
     }
-
 
     // --- Haupt-Event-Handler ---
 
@@ -481,24 +489,39 @@ function _setupGeomanMeasurementHandlers() {
             finalize();
             if (createEvent.shape === 'Line') {
                 updateAllPermanentLineLabels(createEvent.layer);
+                // Registriere pm:dragend direkt nach dem Erstellen der Linie
+                createEvent.layer.on('pm:dragend', () => {
+                    console.log('Line drag ended (pm:create), LatLngs:', createEvent.layer.getLatLngs());
+                    updateAllPermanentLineLabels(createEvent.layer);
+                });
             } else if (createEvent.shape === 'Circle') {
                 createPermanentCircleLabel(createEvent.layer);
             }
         });
 
         map.once('pm:drawend', () => {
-            if (workingLayer.getLatLngs().length === 0) {
+            if (!workingLayer.getLatLngs().length) {
                 finalize();
                 persistentLabelsGroup.clearLayers();
             }
         });
     });
 
-    // Handler für das Bearbeiten und Löschen
+    // Handler für das Bearbeiten, Löschen und Verschieben
     map.on('pm:edit', (e) => {
         if (e.shape === 'Line') {
+            // Initiale Aktualisierung der Labels bei Editieren
             updateAllPermanentLineLabels(e.layer);
-            e.layer.on('pm:vertexdragend', () => updateAllPermanentLineLabels(e.layer));
+            // Handler für Vertex-Drag (Punktverschiebung)
+            e.layer.on('pm:vertexdragend', () => {
+                console.log('Vertex drag ended, updating labels');
+                updateAllPermanentLineLabels(e.layer);
+            });
+            // Handler für das Verschieben der gesamten Linie
+            e.layer.on('pm:dragend', () => {
+                console.log('Line drag ended (pm:edit), LatLngs:', e.layer.getLatLngs());
+                updateAllPermanentLineLabels(e.layer);
+            });
         } else if (e.shape === 'Circle') {
             // Aktualisiere das permanente Label, während der Kreis bearbeitet wird
             const updateCircleLabel = () => {
@@ -509,6 +532,29 @@ function _setupGeomanMeasurementHandlers() {
             };
             e.layer.on('pm:markerdragend', updateCircleLabel);
             e.layer.on('pm:edit', updateCircleLabel); // Für Radius-Änderungen
+        }
+    });
+
+    // Zusätzlicher Handler für pm:dragend auf der Karte
+    map.on('pm:dragend', (e) => {
+        console.log('Map pm:dragend triggered, Layer:', e.layer, 'LatLngs:', e.layer ? e.layer.getLatLngs() : 'No layer');
+        if (e.shape === 'Line' && e.layer) {
+            updateAllPermanentLineLabels(e.layer);
+        }
+    });
+
+    // Teste alternative Events
+    map.on('dragend', (e) => {
+        console.log('Map dragend (no pm prefix) triggered, Target:', e.target);
+        if (e.target && e.target.getLatLngs) {
+            updateAllPermanentLineLabels(e.target);
+        }
+    });
+
+    map.on('pm:drag', (e) => {
+        console.log('Map pm:drag triggered, Layer:', e.layer, 'LatLngs:', e.layer ? e.layer.getLatLngs() : 'No layer');
+        if (e.shape === 'Line' && e.layer) {
+            updateAllPermanentLineLabels(e.layer);
         }
     });
 
