@@ -231,7 +231,7 @@ function _addStandardMapControls() {
         removalMode: true,
     });
 
-    AppState.map.pm.setLang('de');
+    AppState.map.pm.setLang('en');
 
     console.log('Standard map controls including Geoman have been added.');
 }

@@ -228,7 +228,7 @@ function _addStandardMapControls() {
         removalMode: true,
     });
 
-    AppState.map.pm.setLang('de');
+    AppState.map.pm.setLang('en');
 
     console.log('Standard map controls including Geoman have been added.');
 }
@@ -352,37 +352,31 @@ function _initializeCoordsControlAndHandlers() {
 /**
  * Richtet die Event-Handler für Leaflet-Geoman ein.
  * Finale Web-Version, die den Event-Konflikt behebt und alle Features implementiert.
+ * ERWEITERT: Unterstützt jetzt auch das Zeichnen von Kreisen mit Live-Radius und
+ * permanentem Label, ohne die Linien-Funktionalität zu beeinträchtigen.
  */
 function _setupGeomanMeasurementHandlers() {
     const map = AppState.map;
     if (!map) return;
 
+    // Gemeinsame UI-Elemente für beide Mess-Typen
     const liveMeasureLabel = L.DomUtil.create('div', 'leaflet-measure-label', map.getContainer());
     const persistentLabelsGroup = L.layerGroup().addTo(map);
 
-    // --- Helferfunktionen ---
-    function createPermanentLabel(latlngs, index) {
+    // --- Helferfunktionen für permanente Labels ---
+
+    // Helfer für Linien-Labels (unverändert)
+    function createPermanentLineLabel(latlngs, index) {
         const currentPoint = latlngs[index];
         const prevPoint = index > 0 ? latlngs[index - 1] : null;
+        if (!prevPoint) return;
+
         const nextPoint = index < latlngs.length - 1 ? latlngs[index + 1] : null;
-
-        if (!prevPoint) return; // Kein Label für den ersten Punkt
-
-        // In-Richtung (vom vorherigen zum aktuellen Punkt)
         const inBearing = Utils.calculateBearing(prevPoint.lat, prevPoint.lng, currentPoint.lat, currentPoint.lng);
-
-        // Out-Richtung (vom aktuellen zum nächsten Punkt)
-        let outBearingText = '---';
-        if (nextPoint) {
-            const outBearing = Utils.calculateBearing(currentPoint.lat, currentPoint.lng, nextPoint.lat, nextPoint.lng);
-            outBearingText = `${outBearing.toFixed(0)}°`;
-        }
-
-        // Distanz des letzten Segments (+)
+        const outBearingText = nextPoint ? `${Utils.calculateBearing(currentPoint.lat, currentPoint.lng, nextPoint.lat, nextPoint.lng).toFixed(0)}°` : '---';
         const segmentDistance = prevPoint.distanceTo(currentPoint);
         const segmentDistanceText = segmentDistance < 1000 ? `${segmentDistance.toFixed(0)} m` : `${(segmentDistance / 1000).toFixed(2)} km`;
 
-        // Gesamtdistanz (∑)
         let totalDistance = 0;
         for (let i = 1; i <= index; i++) {
             totalDistance += latlngs[i - 1].distanceTo(latlngs[i]);
@@ -399,83 +393,126 @@ function _setupGeomanMeasurementHandlers() {
         `;
 
         L.marker(currentPoint, {
-            icon: L.divIcon({
-                className: 'geoman-label-container',
-                html: labelContent,
-                iconAnchor: [-5, -5]
-            })
+            icon: L.divIcon({ className: 'geoman-label-container', html: labelContent, iconAnchor: [-5, -5] })
         }).addTo(persistentLabelsGroup);
     }
 
-    function updateAllPermanentLabels(layer) {
-        persistentLabelsGroup.clearLayers();
-        const latlngs = layer.getLatLngs();
-        latlngs.forEach((_, index) => {
-            createPermanentLabel(latlngs, index);
-        });
+    // NEU: Helfer für Kreis-Labels
+    function createPermanentCircleLabel(layer) {
+        const center = layer.getLatLng();
+        const radius = layer.getRadius();
+        const radiusText = radius < 1000 ? `${radius.toFixed(0)} m` : `${(radius / 1000).toFixed(2)} km`;
+
+        const labelContent = `<div class="geoman-permanent-label">Radius: ${radiusText}</div>`;
+
+        const label = L.marker(center, {
+            icon: L.divIcon({ className: 'geoman-label-container', html: labelContent, iconAnchor: [0, 0] })
+        }).addTo(persistentLabelsGroup);
+
+        // Speichere eine Referenz zum Label im Layer, um es später zu aktualisieren
+        layer.permanentLabel = label;
     }
 
-    // --- Haupt-Event-Handler ---
-    map.on('pm:drawstart', (e) => {
-        if (e.shape !== 'Line') return;
+    function updateAllPermanentLineLabels(layer) {
+        persistentLabelsGroup.clearLayers();
+        const latlngs = layer.getLatLngs();
+        latlngs.forEach((_, index) => createPermanentLineLabel(latlngs, index));
+    }
 
+
+    // --- Haupt-Event-Handler ---
+
+    map.on('pm:drawstart', (e) => {
         const workingLayer = e.workingLayer;
         persistentLabelsGroup.clearLayers();
         liveMeasureLabel.style.display = 'block';
-        liveMeasureLabel.innerHTML = 'Klicke, um den ersten Punkt zu setzen.';
 
-        // Listener für das Live-Label (Gummiband)
-            const handleMouseMove = (moveEvent) => {
+        let mouseMoveHandler, vertexAddHandler, cleanup;
+
+        if (e.shape === 'Line') {
+            liveMeasureLabel.innerHTML = 'Klicke, um den ersten Punkt zu setzen.';
+
+            mouseMoveHandler = (moveEvent) => {
                 const latlngs = workingLayer.getLatLngs();
                 if (latlngs.length > 0) {
                     const lastPoint = latlngs[latlngs.length - 1];
                     const distance = lastPoint.distanceTo(moveEvent.latlng);
                     const bearing = Utils.calculateBearing(lastPoint.lat, lastPoint.lng, moveEvent.latlng.lat, moveEvent.latlng.lng);
                     const distanceText = distance < 1000 ? `${distance.toFixed(0)} m` : `${(distance / 1000).toFixed(2)} km`;
-                liveMeasureLabel.innerHTML = `In: ${bearing.toFixed(0)}°<br>Out: ---°<br>+: ${distanceText}</span>`;
+                    liveMeasureLabel.innerHTML = `In: ${bearing.toFixed(0)}°<br>Out: ---°<br>+: ${distanceText}`;
                     L.DomUtil.setPosition(liveMeasureLabel, moveEvent.containerPoint.add([15, -15]));
                 }
             };
 
-        // Listener für das Setzen permanenter Labels
-            const handleVertexAdd = () => {
-                updateAllPermanentLabels(workingLayer);
+            vertexAddHandler = () => updateAllPermanentLineLabels(workingLayer);
+
+            map.on('mousemove', mouseMoveHandler);
+            workingLayer.on('pm:vertexadded', vertexAddHandler);
+
+            cleanup = () => {
+                map.off('mousemove', mouseMoveHandler);
+                workingLayer.off('pm:vertexadded', vertexAddHandler);
             };
 
-        // Listener registrieren
-            map.on('mousemove', handleMouseMove);
-            workingLayer.on('pm:vertexadded', handleVertexAdd);
+        } else if (e.shape === 'Circle') {
+            liveMeasureLabel.innerHTML = 'Klicke und ziehe, um einen Kreis zu zeichnen.';
 
-        // Aufräum-Funktion
-            const cleanup = () => {
-                map.off('mousemove', handleMouseMove);
-                workingLayer.off('pm:vertexadded', handleVertexAdd);
-                liveMeasureLabel.style.display = 'none';
-            };
-
-        // Listener für den ERFOLGREICHEN Abschluss
-            map.once('pm:create', (createEvent) => {
-            cleanup(); // Live-Label ausblenden und Listener entfernen
-            updateAllPermanentLabels(createEvent.layer); // Finale Labels auf die neue Ebene zeichnen
-            });
-
-        // Listener für den Abbruch (z. B. ESC-Taste oder manuelles Beenden ohne Linie)
-        map.once('pm:drawend', () => {
-            // Nur aufräumen, wenn keine Linie erstellt wurde
-            if (workingLayer.getLatLngs().length === 0) {
-                    cleanup();
-                    persistentLabelsGroup.clearLayers();
+            mouseMoveHandler = (moveEvent) => {
+                const center = workingLayer.getLatLng();
+                if (center) {
+                    const radius = center.distanceTo(moveEvent.latlng);
+                    const radiusText = radius < 1000 ? `${radius.toFixed(0)} m` : `${(radius / 1000).toFixed(2)} km`;
+                    liveMeasureLabel.innerHTML = `Radius: ${radiusText}`;
+                    L.DomUtil.setPosition(liveMeasureLabel, moveEvent.containerPoint.add([15, -15]));
                 }
-            });
+            };
+
+            map.on('mousemove', mouseMoveHandler);
+            cleanup = () => map.off('mousemove', mouseMoveHandler);
+        }
+
+        // Gemeinsame Aufräum-Logik
+        const finalize = () => {
+            if (cleanup) cleanup();
+            liveMeasureLabel.style.display = 'none';
+        };
+
+        map.once('pm:create', (createEvent) => {
+            finalize();
+            if (createEvent.shape === 'Line') {
+                updateAllPermanentLineLabels(createEvent.layer);
+            } else if (createEvent.shape === 'Circle') {
+                createPermanentCircleLabel(createEvent.layer);
+            }
+        });
+
+        map.once('pm:drawend', () => {
+            if (workingLayer.getLatLngs().length === 0) {
+                finalize();
+                persistentLabelsGroup.clearLayers();
+            }
+        });
     });
 
-    // Handler für das Bearbeiten und Löschen von Linien
+    // Handler für das Bearbeiten und Löschen
     map.on('pm:edit', (e) => {
-            updateAllPermanentLabels(e.layer);
-            e.layer.on('pm:vertexdragend', () => updateAllPermanentLabels(e.layer));
+        if (e.shape === 'Line') {
+            updateAllPermanentLineLabels(e.layer);
+            e.layer.on('pm:vertexdragend', () => updateAllPermanentLineLabels(e.layer));
+        } else if (e.shape === 'Circle') {
+            // Aktualisiere das permanente Label, während der Kreis bearbeitet wird
+            const updateCircleLabel = () => {
+                if (e.layer.permanentLabel) {
+                    persistentLabelsGroup.removeLayer(e.layer.permanentLabel);
+                }
+                createPermanentCircleLabel(e.layer);
+            };
+            e.layer.on('pm:markerdragend', updateCircleLabel);
+            e.layer.on('pm:edit', updateCircleLabel); // Für Radius-Änderungen
+        }
     });
 
-    map.on('pm:remove', () => {
+    map.on('pm:remove', (e) => {
         persistentLabelsGroup.clearLayers();
     });
 }
