@@ -895,10 +895,6 @@ input[type="checkbox"][style*="opacity: 0.5"] {
     z-index: 9000;        /* Stellt sicher, dass es über fast allem anderen liegt */
 }
 
-.leaflet-measure-label {
-    display: block !important; /* Temporär für Debugging */
-}
-
 /* Stil für die hervorgehobene Distanz-Anzeige */
 .bold-distance {
     font-weight: bold !important;

@@ -216,15 +216,15 @@ function _addStandardMapControls() {
     // Jetzt, wo die Ladereihenfolge stimmt, ist dies der saubere und richtige Weg:
     AppState.map.pm.addControls({
         position: 'topright',
-        drawMarker: false,
+        drawMarker: true,
         drawCircleMarker: false,
         drawPolyline: true,
-        drawPolygon: true,
+        drawPolygon: false,
         drawRectangle: false,
-        drawCircle: false,
+        drawCircle: true,
         cutPolygon: false,
         editMode: true,
-        dragMode: false,
+        dragMode: true,
         removalMode: true,
     });
 
@@ -360,13 +360,12 @@ function _setupGeomanMeasurementHandlers() {
     const liveMeasureLabel = L.DomUtil.create('div', 'leaflet-measure-label', map.getContainer());
     const persistentLabelsGroup = L.layerGroup().addTo(map);
 
-    // --- Helferfunktionen basierend auf deinem Code ---
-
+    // --- Helferfunktionen ---
     function createPermanentLabel(latlngs, index) {
         const currentPoint = latlngs[index];
         const prevPoint = index > 0 ? latlngs[index - 1] : null;
 
-        if (!prevPoint) return; // Kein Label für den ersten Punkt
+        if (!prevPoint) return;
 
         const distance = prevPoint.distanceTo(currentPoint);
         const bearing = Utils.calculateBearing(prevPoint.lat, prevPoint.lng, currentPoint.lat, currentPoint.lng);
@@ -392,62 +391,66 @@ function _setupGeomanMeasurementHandlers() {
     }
 
     // --- Haupt-Event-Handler ---
-
-    // 1. Wenn eine neue Messung STARTET
     map.on('pm:drawstart', (e) => {
-        if (e.shape === 'Line') {
-            persistentLabelsGroup.clearLayers();
-            liveMeasureLabel.innerHTML = 'Klicke, um den ersten Punkt zu setzen.';
-            liveMeasureLabel.style.display = 'block';
+        if (e.shape !== 'Line') return;
 
-            const workingLayer = e.workingLayer;
+        const workingLayer = e.workingLayer;
+        persistentLabelsGroup.clearLayers();
+        liveMeasureLabel.style.display = 'block';
+        liveMeasureLabel.innerHTML = 'Klicke, um den ersten Punkt zu setzen.';
 
-            // Dieser Listener ist NUR für das Live-Label zuständig
-            const updateLiveLabel = (moveEvent) => {
-                const latlngs = workingLayer.getLatLngs();
-                if (latlngs.length > 0) {
-                    const lastPoint = latlngs[latlngs.length - 1];
-                    const distance = lastPoint.distanceTo(moveEvent.latlng);
-                    const bearing = Utils.calculateBearing(lastPoint.lat, lastPoint.lng, moveEvent.latlng.lat, moveEvent.latlng.lng);
-                    const distanceText = distance < 1000 ? `${distance.toFixed(0)} m` : `${(distance / 1000).toFixed(2)} km`;
-                    
-                    liveMeasureLabel.innerHTML = `Richtung: ${bearing.toFixed(0)}°<br><span class="bold-distance">Distanz: ${distanceText}</span>`;
-                    L.DomUtil.setPosition(liveMeasureLabel, moveEvent.containerPoint.add([15, -15]));
-                }
-            };
-            
-            // WICHTIG: Den Listener hier registrieren
-            map.on('mousemove', updateLiveLabel);
-            
-            // Wenn die Linie fertig ist (oder abgebrochen wird), räumen wir auf
-            const cleanup = () => {
-                liveMeasureLabel.style.display = 'none';
-                map.off('mousemove', updateLiveLabel); // WICHTIG: Den Listener hier wieder entfernen!
-            };
-            
-            // map.once sorgt dafür, dass dieser Listener nur einmal ausgeführt wird
-            map.once('pm:create', (createEvent) => {
-                // Finale Labels für die fertige Linie erstellen
-                updateAllPermanentLabels(createEvent.layer);
+        // Listener für das Live-Label (Gummiband)
+        const handleMouseMove = (moveEvent) => {
+            const latlngs = workingLayer.getLatLngs();
+            if (latlngs.length > 0) {
+                const lastPoint = latlngs[latlngs.length - 1];
+                const distance = lastPoint.distanceTo(moveEvent.latlng);
+                const bearing = Utils.calculateBearing(lastPoint.lat, lastPoint.lng, moveEvent.latlng.lat, moveEvent.latlng.lng);
+                const distanceText = distance < 1000 ? `${distance.toFixed(0)} m` : `${(distance / 1000).toFixed(2)} km`;
+                liveMeasureLabel.innerHTML = `Richtung: ${bearing.toFixed(0)}°<br><span class="bold-distance">Distanz: ${distanceText}</span>`;
+                L.DomUtil.setPosition(liveMeasureLabel, moveEvent.containerPoint.add([15, -15]));
+            }
+        };
+
+        // Listener für das Setzen permanenter Labels
+        const handleVertexAdd = () => {
+            updateAllPermanentLabels(workingLayer);
+        };
+
+        // Listener registrieren
+        map.on('mousemove', handleMouseMove);
+        workingLayer.on('pm:vertexadded', handleVertexAdd);
+
+        // Aufräum-Funktion
+        const cleanup = () => {
+            map.off('mousemove', handleMouseMove);
+            workingLayer.off('pm:vertexadded', handleVertexAdd);
+            liveMeasureLabel.style.display = 'none';
+        };
+
+        // Listener für den ERFOLGREICHEN Abschluss
+        map.once('pm:create', (createEvent) => {
+            cleanup(); // Live-Label ausblenden und Listener entfernen
+            updateAllPermanentLabels(createEvent.layer); // Finale Labels auf die neue Ebene zeichnen
+        });
+
+        // Listener für den Abbruch (z. B. ESC-Taste oder manuelles Beenden ohne Linie)
+        map.once('pm:drawend', () => {
+            // Nur aufräumen, wenn keine Linie erstellt wurde
+            if (workingLayer.getLatLngs().length === 0) {
                 cleanup();
-            });
-
-            map.once('pm:drawend', cleanup);
-        }
+                persistentLabelsGroup.clearLayers();
+            }
+        });
     });
 
-    // 2. Wenn ein neuer PUNKT GESETZT wird
-    map.on('pm:vertexadded', (e) => {
+    // Handler für das Bearbeiten und Löschen von Linien
+    map.on('pm:edit', (e) => {
         updateAllPermanentLabels(e.layer);
-    });
-    
-    // 3. Wenn ein Punkt VERSCHOBEN wird
-    map.on('pm:vertexdragend', (e) => {
-        updateAllPermanentLabels(e.layer);
+        e.layer.on('pm:vertexdragend', () => updateAllPermanentLabels(e.layer));
     });
 
-    // 4. Wenn eine fertige Linie GELÖSCHT wird
-    map.on('pm:remove', (e) => {
+    map.on('pm:remove', () => {
         persistentLabelsGroup.clearLayers();
     });
 }
