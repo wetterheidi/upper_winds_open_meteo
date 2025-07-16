@@ -380,7 +380,7 @@ export class Utils {
                 elevation: data.elevation !== undefined ? data.elevation : 'N/A'
             };
             Utils.locationCache.set(cacheKey, locationData);
-            console.log(`Fetched location data for ${cacheKey}:`, locationData);
+            //console.log(`Fetched location data for ${cacheKey}:`, locationData);
             return locationData;
         } catch (error) {
             console.error('Error fetching location data:', error.message);
@@ -683,7 +683,7 @@ export class Utils {
         if (!surfacePressure || elevation === 'N/A' || referenceElevation === 'N/A' || isNaN(surfacePressure) || isNaN(elevation) || isNaN(referenceElevation)) {
             return 'N/A';
         }
-        console.log('QFE reference elevation: ', referenceElevation);
+        //console.log('QFE reference elevation: ', referenceElevation);
         // Constants for barometric formula
         const g = ISA_CONSTANTS.GRAVITY; // Gravitational acceleration (m/s²)
         const M = PHYSICAL_CONSTANTS.MOLAR_MASS_AIR; // Molar mass of air (kg/mol)
@@ -697,7 +697,7 @@ export class Utils {
         const exponent = (g * M) / (R * L);
         const qfePa = P0 * Math.pow(1 - (L * h) / T, exponent);
 
-        console.log(surfacePressure, elevation, referenceElevation);
+        //console.log(surfacePressure, elevation, referenceElevation);
         // Convert back to hPa and round to nearest integer
         const qfe = Math.round(qfePa / 100);
         return isNaN(qfe) ? 'N/A' : qfe;
@@ -774,7 +774,7 @@ export class Utils {
 
     static async getAltitude(lat, lng) {
         const { elevation } = await Utils.getLocationData(lat, lng);
-        console.log('Fetched elevation from Open-Meteo:', elevation);
+        //console.log('Fetched elevation from Open-Meteo:', elevation);
         return elevation !== 'N/A' ? elevation : 'N/A';
     }
 

@@ -191,200 +191,46 @@ function _addStandardMapControls() {
         console.error("Karte nicht initialisiert, bevor Controls hinzugefügt werden können.");
         return;
     }
+
     L.control.layers(AppState.baseMaps, null, { position: 'topright' }).addTo(AppState.map);
     AppState.map.on('baselayerchange', function (e) {
-        console.log(`Base map changed to: ${e.name}`);
         if (Settings && Settings.state && Settings.state.userSettings) {
             Settings.state.userSettings.baseMaps = e.name;
             Settings.save();
-            console.log(`Saved selected base map "${e.name}" to settings.`);
-        } else {
-            console.error("Settings object not properly available to save base map choice.");
         }
         AppState.hasTileErrorSwitched = false;
         if (AppState.lastLat && AppState.lastLng && typeof cacheTilesForDIP === 'function') {
             cacheTilesForDIP({ map: AppState.map, lastLat: AppState.lastLat, lastLng: AppState.lastLng, baseMaps: AppState.baseMaps });
         }
     });
+
     L.control.zoom({ position: 'topright' }).addTo(AppState.map);
-    const polylineMeasureControl = L.control.polylineMeasure({
-        position: 'topright',
-        unit: 'kilometres',
-        showBearings: true,
-        clearMeasurementsOnStop: false,
-        showClearControl: true,
-        showUnitControl: true,
-        tooltipTextFinish: 'Click to finish the line<br>',
-        tooltipTextDelete: 'Shift-click to delete point',
-        tooltipTextMove: 'Drag to move point<br>',
-        tooltipTextResume: 'Click to resume line<br>',
-        tooltipTextAdd: 'Click to add point<br>',
-        measureControlTitleOn: 'Start measuring distance and bearing',
-        measureControlTitleOff: 'Stop measuring'
-    }).addTo(AppState.map);
-
-    if (isMobileDevice()) {
-        let isMeasuring = false;
-        let lastPoint = null;
-        let rubberBandLayer = null;
-        let measureLabel = L.DomUtil.create('div', 'leaflet-measure-label', AppState.map.getContainer());
-
-        // Variablen für Tap-Erkennung
-        let touchStartTime = 0;
-        let touchStartPos = null;
-        let isPotentialTap = false;
-        const tapTimeThreshold = 300; // Max. Dauer für einen Tap (ms)
-        const tapMoveThreshold = 10; // Max. Bewegung für einen Tap (Pixel)
-
-        const cleanupMeasurementUI = () => {
-            isMeasuring = false;
-            if (rubberBandLayer) {
-                AppState.map.removeLayer(rubberBandLayer);
-                rubberBandLayer = null;
-            }
-            if (measureLabel) {
-                measureLabel.style.display = 'none';
-                measureLabel.innerHTML = '';
-            }
-            lastPoint = null;
-            console.log('Measurement UI cleaned up');
-        };
-
-        AppState.map.on('polylinemeasure:start', function (e) {
-            isMeasuring = true;
-            lastPoint = null; // Erster Punkt wird durch Tap gesetzt
-            if (measureLabel) measureLabel.style.display = 'block';
-            console.log('Measurement started, lastPoint:', lastPoint);
-        });
-
-        AppState.map.on('polylinemeasure:finish', cleanupMeasurementUI);
-        AppState.map.on('polylinemeasure:clear', cleanupMeasurementUI);
-
-        AppState.map.on('polylinemeasure:add', function (e) {
-            // Aktualisiere lastPoint basierend auf dem neu hinzugefügten Punkt
-            if (e.currentLine && typeof e.currentLine.getLatLngs === 'function') {
-                const points = e.currentLine.getLatLngs();
-                if (points && points.length > 0) {
-                    lastPoint = points[points.length - 1];
-                    console.log('Point added, updated lastPoint:', lastPoint);
-                }
-            } else {
-                lastPoint = e.latlng;
-                console.log('Point added (fallback), updated lastPoint:', lastPoint);
-            }
-
-            // Entferne die gestrichelte Linie, da ein neuer Punkt gesetzt wurde
-            if (rubberBandLayer) {
-                AppState.map.removeLayer(rubberBandLayer);
-                rubberBandLayer = null;
-            }
-
-            // Trigger move-Event, um die gestrichelte Linie sofort anzuzeigen
-            setTimeout(() => AppState.map.fire('move'), 0);
-        });
-
-        // Touch-Handler mit Tap-Erkennung
-        AppState.map.getContainer().addEventListener('touchstart', function (e) {
-            if (!isMeasuring || e.touches.length !== 1 || e.target.closest('.leaflet-marker-icon')) return;
-
-            // Kein preventDefault/stopPropagation, um Panning zu erlauben
-            touchStartTime = Date.now();
-            touchStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-            isPotentialTap = true;
-
-            console.log('Touch started, potential tap at:', touchStartPos);
-        }, { passive: true }); // Passive, um Leaflet-Panning nicht zu blockieren
-
-        AppState.map.getContainer().addEventListener('touchmove', function (e) {
-            if (!isPotentialTap || !isMeasuring) return;
-
-            const currentPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-            const distanceMoved = Math.sqrt(
-                Math.pow(currentPos.x - touchStartPos.x, 2) +
-                Math.pow(currentPos.y - touchStartPos.y, 2)
-            );
-
-            if (distanceMoved > tapMoveThreshold) {
-                isPotentialTap = false;
-                console.log('Touch moved too far, canceling tap');
-            }
-        }, { passive: true });
-
-        AppState.map.getContainer().addEventListener('touchend', function (e) {
-            if (!isMeasuring || !isPotentialTap) return;
-
-            const touchEndTime = Date.now();
-            const touchDuration = touchEndTime - touchStartTime;
-
-            if (touchDuration <= tapTimeThreshold) {
-                // Bestätigter Tap: Setze Punkt
-                const rect = AppState.map.getContainer().getBoundingClientRect();
-                const touchX = touchStartPos.x - rect.left;
-                const touchY = touchStartPos.y - rect.top;
-                const latlng = AppState.map.containerPointToLatLng([touchX, touchY]);
-
-                // Simuliere ein click-Event für das Plugin
-                const clickEvent = new MouseEvent('click', {
-                    bubbles: true,
-                    cancelable: true,
-                    clientX: touchStartPos.x,
-                    clientY: touchStartPos.y
-                });
-                AppState.map.getContainer().dispatchEvent(clickEvent);
-
-                // Feedback für den Nutzer
-                Utils.handleMessage('Punkt gesetzt');
-                console.log('Tap confirmed, simulated click at:', latlng);
-
-                // Visuelle Bestätigung
-                const tempCircle = L.circle(latlng, { radius: 5, color: 'blue' }).addTo(AppState.map);
-                setTimeout(() => AppState.map.removeLayer(tempCircle), 500);
-            }
-
-            isPotentialTap = false;
-        }, { passive: true });
-
-        AppState.map.on('move', function () {
-            if (isMeasuring && lastPoint) {
-                const currentCenter = AppState.map.getCenter();
-
-                if (rubberBandLayer) {
-                    AppState.map.removeLayer(rubberBandLayer);
-                }
-                rubberBandLayer = L.polyline([lastPoint, currentCenter], {
-                    color: 'blue',
-                    dashArray: '5, 5',
-                    weight: 2,
-                    interactive: false
-                }).addTo(AppState.map);
-
-                const distance = lastPoint.distanceTo(currentCenter);
-                const bearing = Utils.calculateBearing(lastPoint.lat, lastPoint.lng, currentCenter.lat, currentCenter.lng);
-                const distanceText = distance < 1000 ? `${distance.toFixed(0)} m` : `${(distance / 1000).toFixed(2)} km`;
-
-                if (measureLabel) {
-                    measureLabel.innerHTML = `In: ${bearing.toFixed(0)}°<br><span class="bold-distance">${distanceText}</span>`; const mapSize = AppState.map.getSize();
-                    const labelPos = L.point(mapSize.x / 2 + 20, mapSize.y / 2 - 40);
-                    L.DomUtil.setPosition(measureLabel, labelPos);
-                }
-
-                console.log('Move event triggered, drawing rubberBandLayer from:', lastPoint, 'to:', currentCenter);
-            } else {
-                console.log('Move event skipped: isMeasuring=', isMeasuring, 'lastPoint=', lastPoint);
-            }
-        });
-    }
 
     L.control.scale({
         position: 'bottomleft',
         metric: true,
         imperial: false,
-        maxWidth: 100,
-        background: 'rgba(255, 255, 255, 0.8)',
-        padding: '5px',
-        borderRadius: '4px'
+        maxWidth: 100
     }).addTo(AppState.map);
-    console.log('Standard map controls and baselayerchange handler added.');
+
+    // Jetzt, wo die Ladereihenfolge stimmt, ist dies der saubere und richtige Weg:
+    AppState.map.pm.addControls({
+        position: 'topright',
+        drawMarker: false,
+        drawCircleMarker: false,
+        drawPolyline: true,
+        drawPolygon: true,
+        drawRectangle: false,
+        drawCircle: false,
+        cutPolygon: false,
+        editMode: true,
+        dragMode: false,
+        removalMode: true,
+    });
+
+    AppState.map.pm.setLang('de');
+
+    console.log('Standard map controls including Geoman have been added.');
 }
 function _setupCustomPanes() {
     AppState.map.createPane('gpxTrackPane');
@@ -502,6 +348,110 @@ function _initializeCoordsControlAndHandlers() {
     });
     console.log('Mousemove and mouseout handlers set up.');
 }
+
+/**
+ * Richtet die Event-Handler für Leaflet-Geoman ein.
+ * Finale Web-Version, die den Event-Konflikt behebt und alle Features implementiert.
+ */
+function _setupGeomanMeasurementHandlers() {
+    const map = AppState.map;
+    if (!map) return;
+
+    const liveMeasureLabel = L.DomUtil.create('div', 'leaflet-measure-label', map.getContainer());
+    const persistentLabelsGroup = L.layerGroup().addTo(map);
+
+    // --- Helferfunktionen basierend auf deinem Code ---
+
+    function createPermanentLabel(latlngs, index) {
+        const currentPoint = latlngs[index];
+        const prevPoint = index > 0 ? latlngs[index - 1] : null;
+
+        if (!prevPoint) return; // Kein Label für den ersten Punkt
+
+        const distance = prevPoint.distanceTo(currentPoint);
+        const bearing = Utils.calculateBearing(prevPoint.lat, prevPoint.lng, currentPoint.lat, currentPoint.lng);
+        const distanceText = distance < 1000 ? `${distance.toFixed(0)} m` : `${(distance / 1000).toFixed(2)} km`;
+        
+        const labelContent = `<div class="geoman-permanent-label">${bearing.toFixed(0)}° / ${distanceText}</div>`;
+
+        L.marker(currentPoint, {
+            icon: L.divIcon({
+                className: 'geoman-label-container',
+                html: labelContent,
+                iconAnchor: [-10, -10]
+            })
+        }).addTo(persistentLabelsGroup);
+    }
+
+    function updateAllPermanentLabels(layer) {
+        persistentLabelsGroup.clearLayers();
+        const latlngs = layer.getLatLngs();
+        latlngs.forEach((_, index) => {
+            createPermanentLabel(latlngs, index);
+        });
+    }
+
+    // --- Haupt-Event-Handler ---
+
+    // 1. Wenn eine neue Messung STARTET
+    map.on('pm:drawstart', (e) => {
+        if (e.shape === 'Line') {
+            persistentLabelsGroup.clearLayers();
+            liveMeasureLabel.innerHTML = 'Klicke, um den ersten Punkt zu setzen.';
+            liveMeasureLabel.style.display = 'block';
+
+            const workingLayer = e.workingLayer;
+
+            // Dieser Listener ist NUR für das Live-Label zuständig
+            const updateLiveLabel = (moveEvent) => {
+                const latlngs = workingLayer.getLatLngs();
+                if (latlngs.length > 0) {
+                    const lastPoint = latlngs[latlngs.length - 1];
+                    const distance = lastPoint.distanceTo(moveEvent.latlng);
+                    const bearing = Utils.calculateBearing(lastPoint.lat, lastPoint.lng, moveEvent.latlng.lat, moveEvent.latlng.lng);
+                    const distanceText = distance < 1000 ? `${distance.toFixed(0)} m` : `${(distance / 1000).toFixed(2)} km`;
+                    
+                    liveMeasureLabel.innerHTML = `Richtung: ${bearing.toFixed(0)}°<br><span class="bold-distance">Distanz: ${distanceText}</span>`;
+                    L.DomUtil.setPosition(liveMeasureLabel, moveEvent.containerPoint.add([15, -15]));
+                }
+            };
+            
+            // WICHTIG: Den Listener hier registrieren
+            map.on('mousemove', updateLiveLabel);
+            
+            // Wenn die Linie fertig ist (oder abgebrochen wird), räumen wir auf
+            const cleanup = () => {
+                liveMeasureLabel.style.display = 'none';
+                map.off('mousemove', updateLiveLabel); // WICHTIG: Den Listener hier wieder entfernen!
+            };
+            
+            // map.once sorgt dafür, dass dieser Listener nur einmal ausgeführt wird
+            map.once('pm:create', (createEvent) => {
+                // Finale Labels für die fertige Linie erstellen
+                updateAllPermanentLabels(createEvent.layer);
+                cleanup();
+            });
+
+            map.once('pm:drawend', cleanup);
+        }
+    });
+
+    // 2. Wenn ein neuer PUNKT GESETZT wird
+    map.on('pm:vertexadded', (e) => {
+        updateAllPermanentLabels(e.layer);
+    });
+    
+    // 3. Wenn ein Punkt VERSCHOBEN wird
+    map.on('pm:vertexdragend', (e) => {
+        updateAllPermanentLabels(e.layer);
+    });
+
+    // 4. Wenn eine fertige Linie GELÖSCHT wird
+    map.on('pm:remove', (e) => {
+        persistentLabelsGroup.clearLayers();
+    });
+}
+
 export function updateCoordsDisplay(text) {
     // AppState.coordsControl wurde in _initializeCoordsControlAndHandlers erstellt.
     if (AppState.coordsControl) {
@@ -713,6 +663,7 @@ function _setupCoreMapEventHandlers() {
     }, { passive: false }); // passive: false is required to allow preventDefault
     // --- END: Add Double-Tap/Touch Functionality ---
 
+    _setupGeomanMeasurementHandlers();
     console.log('All core map event handlers have been set up.');
 }
 
