@@ -364,20 +364,45 @@ function _setupGeomanMeasurementHandlers() {
     function createPermanentLabel(latlngs, index) {
         const currentPoint = latlngs[index];
         const prevPoint = index > 0 ? latlngs[index - 1] : null;
+        const nextPoint = index < latlngs.length - 1 ? latlngs[index + 1] : null;
 
-        if (!prevPoint) return;
+        if (!prevPoint) return; // Kein Label für den ersten Punkt
 
-        const distance = prevPoint.distanceTo(currentPoint);
-        const bearing = Utils.calculateBearing(prevPoint.lat, prevPoint.lng, currentPoint.lat, currentPoint.lng);
-        const distanceText = distance < 1000 ? `${distance.toFixed(0)} m` : `${(distance / 1000).toFixed(2)} km`;
-        
-        const labelContent = `<div class="geoman-permanent-label">${bearing.toFixed(0)}° / ${distanceText}</div>`;
+        // In-Richtung (vom vorherigen zum aktuellen Punkt)
+        const inBearing = Utils.calculateBearing(prevPoint.lat, prevPoint.lng, currentPoint.lat, currentPoint.lng);
+
+        // Out-Richtung (vom aktuellen zum nächsten Punkt)
+        let outBearingText = '---';
+        if (nextPoint) {
+            const outBearing = Utils.calculateBearing(currentPoint.lat, currentPoint.lng, nextPoint.lat, nextPoint.lng);
+            outBearingText = `${outBearing.toFixed(0)}°`;
+        }
+
+        // Distanz des letzten Segments (+)
+        const segmentDistance = prevPoint.distanceTo(currentPoint);
+        const segmentDistanceText = segmentDistance < 1000 ? `${segmentDistance.toFixed(0)} m` : `${(segmentDistance / 1000).toFixed(2)} km`;
+
+        // Gesamtdistanz (∑)
+        let totalDistance = 0;
+        for (let i = 1; i <= index; i++) {
+            totalDistance += latlngs[i - 1].distanceTo(latlngs[i]);
+        }
+        const totalDistanceText = totalDistance < 1000 ? `${totalDistance.toFixed(0)} m` : `${(totalDistance / 1000).toFixed(2)} km`;
+
+        const labelContent = `
+            <div class="geoman-permanent-label">
+                <div>In: ${inBearing.toFixed(0)}°</div>
+                <div>Out: ${outBearingText}</div>
+                <div>+: ${segmentDistanceText}</div>
+                <div>∑: ${totalDistanceText}</div>
+            </div>
+        `;
 
         L.marker(currentPoint, {
             icon: L.divIcon({
                 className: 'geoman-label-container',
                 html: labelContent,
-                iconAnchor: [-10, -10]
+                iconAnchor: [-5, -5]
             })
         }).addTo(persistentLabelsGroup);
     }
@@ -407,7 +432,7 @@ function _setupGeomanMeasurementHandlers() {
                 const distance = lastPoint.distanceTo(moveEvent.latlng);
                 const bearing = Utils.calculateBearing(lastPoint.lat, lastPoint.lng, moveEvent.latlng.lat, moveEvent.latlng.lng);
                 const distanceText = distance < 1000 ? `${distance.toFixed(0)} m` : `${(distance / 1000).toFixed(2)} km`;
-                liveMeasureLabel.innerHTML = `Richtung: ${bearing.toFixed(0)}°<br><span class="bold-distance">Distanz: ${distanceText}</span>`;
+                liveMeasureLabel.innerHTML = `In: ${bearing.toFixed(0)}°<br>Out: ---°<br>+: ${distanceText}</span>`;
                 L.DomUtil.setPosition(liveMeasureLabel, moveEvent.containerPoint.add([15, -15]));
             }
         };
