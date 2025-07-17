@@ -357,8 +357,7 @@ function _setupGeomanMeasurementHandlers() {
     let lastKnownCircleState = null;
     let currentLayer = null;
 
-    // --- Helper functions for permanent labels (no changes here) ---
-
+    // Helper function for permanent line labels
     function createPermanentLineLabel(latlngs, index) {
         const currentPoint = latlngs[index];
         const prevPoint = index > 0 ? latlngs[index - 1] : null;
@@ -393,6 +392,7 @@ function _setupGeomanMeasurementHandlers() {
         marker.addTo(persistentLabelsGroup);
     }
 
+    // Helper function for permanent circle labels
     function createPermanentCircleLabel(layer) {
         const center = layer.getLatLng();
         const radius = layer.getRadius();
@@ -462,10 +462,10 @@ function _setupGeomanMeasurementHandlers() {
 
         if (e.shape === 'Line') {
             if (isMobileDevice()) {
-                liveMeasureLabel.innerHTML = 'Tap crosshair to set first point.';
+                liveMeasureLabel.innerHTML = 'Tap to set first point.';
                 let lastPoint = null;
                 let rubberBandLayer = null;
-                
+
                 mapMoveHandler = () => {
                     const latlngs = workingLayer.getLatLngs();
                     if (latlngs.length > 0) {
@@ -485,7 +485,7 @@ function _setupGeomanMeasurementHandlers() {
                         const distance = lastPoint.distanceTo(currentCenter);
                         const bearing = Utils.calculateBearing(lastPoint.lat, lastPoint.lng, currentCenter.lat, currentCenter.lng);
                         const distanceText = distance < 1000 ? `${distance.toFixed(0)} m` : `${(distance / 1000).toFixed(2)} km`;
-                        
+
                         liveMeasureLabel.innerHTML = `In: ${bearing.toFixed(0)}°<br>Out: ---°<br>+: ${distanceText}`;
                         const mapSize = map.getSize();
                         const labelPos = L.point(mapSize.x / 2 + 20, mapSize.y / 2 - 40);
@@ -494,19 +494,19 @@ function _setupGeomanMeasurementHandlers() {
                 };
 
                 vertexAddHandler = () => {
-                   if (rubberBandLayer) {
-                       map.removeLayer(rubberBandLayer);
-                       rubberBandLayer = null;
+                    if (rubberBandLayer) {
+                        map.removeLayer(rubberBandLayer);
+                        rubberBandLayer = null;
                     }
                     setTimeout(() => {
                         updateAllPermanentLineLabels(workingLayer);
                         map.fire('move');
-                    }, 50); 
+                    }, 50);
                 };
-                
+
                 map.on('move', mapMoveHandler);
                 workingLayer.on('pm:vertexadded', vertexAddHandler);
-                
+
                 cleanup = () => {
                     map.off('move', mapMoveHandler);
                     workingLayer.off('pm:vertexadded', vertexAddHandler);
@@ -515,7 +515,6 @@ function _setupGeomanMeasurementHandlers() {
                     }
                 };
             } else {
-                // Web version logic
                 liveMeasureLabel.innerHTML = 'Click to set the first point.';
                 mouseMoveHandler = (moveEvent) => {
                     const latlngs = workingLayer.getLatLngs();
@@ -539,41 +538,60 @@ function _setupGeomanMeasurementHandlers() {
                 };
             }
         } else if (e.shape === 'Circle') {
-            // Mobile-specific logic for circle drawing
             if (isMobileDevice()) {
-                 liveMeasureLabel.innerHTML = 'Tap crosshair to set circle center.';
+                liveMeasureLabel.innerHTML = '';
+                // Position label at map center initially
+                const mapSize = map.getSize();
+                const initialLabelPos = L.point(mapSize.x / 2, mapSize.y / 2 - 40);
+                L.DomUtil.setPosition(liveMeasureLabel, initialLabelPos);
+                let centerSet = false;
 
-                 mapMoveHandler = () => {
-                    const center = workingLayer.getLatLng();
-                    if (center) { // Only run if center is set
-                        const crosshairPos = map.getCenter();
-                        const radius = center.distanceTo(crosshairPos);
-                        
-                        workingLayer.setRadius(radius);
+                mapMoveHandler = () => {
+                    if (centerSet) {
+                        const center = workingLayer.getLatLng();
+                        if (center) {
+                            const crosshairPos = map.getCenter();
+                            const radius = center.distanceTo(crosshairPos);
+                            workingLayer.setRadius(radius);
 
-                        const radiusText = radius < 1000 ? `${radius.toFixed(0)} m` : `${(radius / 1000).toFixed(2)} km`;
-                        liveMeasureLabel.innerHTML = `Radius: ${radiusText}`;
-                        const mapSize = map.getSize();
-                        const labelPos = L.point(mapSize.x / 2 + 20, mapSize.y / 2 - 40);
-                        L.DomUtil.setPosition(liveMeasureLabel, labelPos);
+                            const radiusText = radius < 1000 ? `${radius.toFixed(0)} m` : `${(radius / 1000).toFixed(2)} km`;
+                            liveMeasureLabel.innerHTML = `Radius: ${radiusText}`;
+                            const mapSize = map.getSize();
+                            const labelPos = L.point(mapSize.x / 2, mapSize.y / 2 - 40);
+                            L.DomUtil.setPosition(liveMeasureLabel, labelPos);
+                        }
                     }
-                 };
+                };
 
-                 // This event fires once after the first tap
-                 vertexAddHandler = () => {
-                    liveMeasureLabel.innerHTML = 'Move map to adjust radius. Tap again to finish.';
-                    map.on('move', mapMoveHandler);
-                 };
+                vertexAddHandler = () => {
+                    if (!centerSet) {
+                        centerSet = true;
+                        liveMeasureLabel.innerHTML = 'Move map to adjust radius. Tap again to finish.';
+                        const mapSize = map.getSize();
+                        const labelPos = L.point(mapSize.x / 2, mapSize.y / 2 - 40);
+                        L.DomUtil.setPosition(liveMeasureLabel, labelPos);
+                        map.on('move', mapMoveHandler);
+                    } else {
+                        // Second tap: finalize radius
+                        finalize();
+                        updateCircleLabel(workingLayer);
+                        currentLayer = workingLayer;
+                        lastKnownCircleState = JSON.stringify({
+                            center: workingLayer.getLatLng(),
+                            radius: workingLayer.getRadius()
+                        });
+                    }
+                };
 
-                 workingLayer.on('pm:vertexadded', vertexAddHandler);
+                workingLayer.on('pm:vertexadded', vertexAddHandler);
 
-                 cleanup = () => {
+                cleanup = () => {
                     map.off('move', mapMoveHandler);
                     workingLayer.off('pm:vertexadded', vertexAddHandler);
-                 };
-
+                    centerSet = false;
+                    liveMeasureLabel.style.display = 'none';
+                };
             } else {
-                // Web version for circle
                 liveMeasureLabel.innerHTML = 'Click and drag to draw a circle.';
                 mouseMoveHandler = (moveEvent) => {
                     const center = workingLayer.getLatLng();
@@ -600,8 +618,13 @@ function _setupGeomanMeasurementHandlers() {
                 updateAllPermanentLineLabels(createEvent.layer);
             } else if (createEvent.shape === 'Circle' && createEvent.layer instanceof L.Circle) {
                 updateCircleLabel(createEvent.layer);
+                currentLayer = createEvent.layer;
+                lastKnownCircleState = JSON.stringify({
+                    center: createEvent.layer.getLatLng(),
+                    radius: createEvent.layer.getRadius()
+                });
             }
-             if (createEvent.layer.pm) {
+            if (createEvent.layer.pm) {
                 createEvent.layer.pm.enable();
             }
         });
@@ -618,7 +641,30 @@ function _setupGeomanMeasurementHandlers() {
         if (e.shape === 'Line' && e.layer instanceof L.Polyline) {
             setTimeout(() => updateAllPermanentLineLabels(e.layer), 300);
         } else if (e.shape === 'Circle' && e.layer instanceof L.Circle) {
-            setTimeout(() => updateCircleLabel(e.layer), 300);
+            // Update live label during dragging
+            if (isMobileDevice()) {
+                liveMeasureLabel.style.display = 'block';
+                const radius = e.layer.getRadius();
+                const radiusText = radius < 1000 ? `${radius.toFixed(0)} m` : `${(radius / 1000).toFixed(2)} km`;
+                liveMeasureLabel.innerHTML = `Radius: ${radiusText}`;
+                const mapSize = map.getSize();
+                const labelPos = L.point(mapSize.x / 2, mapSize.y / 2 - 40);
+                L.DomUtil.setPosition(liveMeasureLabel, labelPos);
+            }
+            setTimeout(() => {
+                updateCircleLabel(e.layer);
+                currentLayer = e.layer;
+                lastKnownCircleState = JSON.stringify({
+                    center: e.layer.getLatLng(),
+                    radius: e.layer.getRadius()
+                });
+            }, 300);
+        }
+    });
+
+    map.on('pm:editend', () => {
+        if (isMobileDevice()) {
+            liveMeasureLabel.style.display = 'none';
         }
     });
 
@@ -627,6 +673,7 @@ function _setupGeomanMeasurementHandlers() {
         lastKnownCircleState = null;
         lastKnownLatLngs = null;
         currentLayer = null;
+        liveMeasureLabel.style.display = 'none';
     });
 }
 function _initializeCoordsControlAndHandlers() {
