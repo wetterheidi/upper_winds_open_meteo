@@ -340,12 +340,7 @@ async function _handleGeolocation(defaultCenter, defaultZoom) {
         _geolocationErrorCallback(error, defaultCenter, defaultZoom);
     }
 }
-/**
- * Richtet die Event-Handler für Leaflet-Geoman ein.
- * Finale Web-Version, die den Event-Konflikt behebt und alle Features implementiert.
- * ERWEITERT: Unterstützt jetzt auch das Zeichnen von Kreisen mit Live-Radius und
- * permanentem Label, ohne die Linien-Funktionalität zu beeinträchtigen.
- */
+
 function _setupGeomanMeasurementHandlers() {
     const map = AppState.map;
     if (!map) {
@@ -491,7 +486,7 @@ function _setupGeomanMeasurementHandlers() {
                         const bearing = Utils.calculateBearing(lastPoint.lat, lastPoint.lng, currentCenter.lat, currentCenter.lng);
                         const distanceText = distance < 1000 ? `${distance.toFixed(0)} m` : `${(distance / 1000).toFixed(2)} km`;
                         
-                        liveMeasureLabel.innerHTML = `Bearing: ${bearing.toFixed(0)}°<br>Distance: ${distanceText}`;
+                        liveMeasureLabel.innerHTML = `In: ${bearing.toFixed(0)}°<br>Out: ---°<br>+: ${distanceText}`;
                         const mapSize = map.getSize();
                         const labelPos = L.point(mapSize.x / 2 + 20, mapSize.y / 2 - 40);
                         L.DomUtil.setPosition(liveMeasureLabel, labelPos);
@@ -529,7 +524,7 @@ function _setupGeomanMeasurementHandlers() {
                         const distance = lastPoint.distanceTo(moveEvent.latlng);
                         const bearing = Utils.calculateBearing(lastPoint.lat, lastPoint.lng, moveEvent.latlng.lat, moveEvent.latlng.lng);
                         const distanceText = distance < 1000 ? `${distance.toFixed(0)} m` : `${(distance / 1000).toFixed(2)} km`;
-                        liveMeasureLabel.innerHTML = `Bearing: ${bearing.toFixed(0)}°<br>Distance: ${distanceText}`;
+                        liveMeasureLabel.innerHTML = `In: ${bearing.toFixed(0)}°<br>Out: ---°<br>+: ${distanceText}`;
                         L.DomUtil.setPosition(liveMeasureLabel, moveEvent.containerPoint.add([15, -15]));
                     }
                 };
