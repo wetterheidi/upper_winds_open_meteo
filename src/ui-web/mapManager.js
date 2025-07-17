@@ -392,9 +392,13 @@ function _setupGeomanMeasurementHandlers() {
             </div>
         `;
 
-        L.marker(currentPoint, {
-            icon: L.divIcon({ className: 'geoman-label-container', html: labelContent, iconAnchor: [-5, -5] })
-        }).addTo(persistentLabelsGroup);
+        console.log('Creating label for point:', currentPoint); // Debugging
+        const marker = L.marker(currentPoint, {
+            icon: L.divIcon({ className: 'geoman-label-container', html: labelContent, iconAnchor: [-5, -5] }),
+            pmIgnore: true // Verhindert, dass Geoman den Marker für Rotation oder Bearbeitung verarbeitet
+        });
+        console.log('Adding marker to persistentLabelsGroup:', marker); // Debugging
+        marker.addTo(persistentLabelsGroup);
     }
 
     // Helfer für Kreis-Labels
@@ -406,14 +410,23 @@ function _setupGeomanMeasurementHandlers() {
         const labelContent = `<div class="geoman-permanent-label">Radius:<br> ${radiusText}</div>`;
 
         const label = L.marker(center, {
-            icon: L.divIcon({ className: 'geoman-label-container', html: labelContent, iconAnchor: [0, 0] })
-        }).addTo(persistentLabelsGroup);
+            icon: L.divIcon({ className: 'geoman-label-container', html: labelContent, iconAnchor: [0, 0] }),
+            pmIgnore: true // Verhindert, dass Geoman den Marker für Rotation oder Bearbeitung verarbeitet
+        });
+        console.log('Adding circle label to persistentLabelsGroup:', label); // Debugging
+        label.addTo(persistentLabelsGroup);
 
         // Speichere eine Referenz zum Label im Layer, um es später zu aktualisieren
         layer.permanentLabel = label;
     }
 
     function updateAllPermanentLineLabels(layer) {
+        // Prüfe, ob das Layer-Objekt eine Polyline ist
+        if (!layer || !(layer instanceof L.Polyline)) {
+            console.log('Invalid layer for updateAllPermanentLineLabels (not a Polyline):', layer);
+            return;
+        }
+
         persistentLabelsGroup.clearLayers();
         const latlngs = layer.getLatLngs(); // Sicherstellen, dass die aktuellsten Koordinaten verwendet werden
         console.log('updateAllPermanentLineLabels - LatLngs:', latlngs); // Debugging
@@ -487,11 +500,23 @@ function _setupGeomanMeasurementHandlers() {
 
         map.once('pm:create', (createEvent) => {
             finalize();
-            if (createEvent.shape === 'Line') {
+            if (createEvent.shape === 'Line' && createEvent.layer instanceof L.Polyline) {
                 updateAllPermanentLineLabels(createEvent.layer);
-                // Registriere pm:dragend direkt nach dem Erstellen der Linie
+                // Registriere pm:dragend, pm:rotateend, pm:vertexdragend und pm:vertexadded direkt nach dem Erstellen der Linie
                 createEvent.layer.on('pm:dragend', () => {
                     console.log('Line drag ended (pm:create), LatLngs:', createEvent.layer.getLatLngs());
+                    updateAllPermanentLineLabels(createEvent.layer);
+                });
+                createEvent.layer.on('pm:rotateend', () => {
+                    console.log('Line rotation ended (pm:create), LatLngs:', createEvent.layer.getLatLngs());
+                    updateAllPermanentLineLabels(createEvent.layer);
+                });
+                createEvent.layer.on('pm:vertexdragend', () => {
+                    console.log('Vertex drag ended (pm:create), LatLngs:', createEvent.layer.getLatLngs());
+                    updateAllPermanentLineLabels(createEvent.layer);
+                });
+                createEvent.layer.on('pm:vertexadded', () => {
+                    console.log('Vertex added (pm:create), LatLngs:', createEvent.layer.getLatLngs());
                     updateAllPermanentLineLabels(createEvent.layer);
                 });
             } else if (createEvent.shape === 'Circle') {
@@ -507,19 +532,30 @@ function _setupGeomanMeasurementHandlers() {
         });
     });
 
-    // Handler für das Bearbeiten, Löschen und Verschieben
+    // Handler für das Bearbeiten, Drehen, Verschieben und Löschen
     map.on('pm:edit', (e) => {
-        if (e.shape === 'Line') {
+        if (e.shape === 'Line' && e.layer instanceof L.Polyline) {
             // Initiale Aktualisierung der Labels bei Editieren
+            console.log('pm:edit triggered for Line, LatLngs:', e.layer.getLatLngs());
             updateAllPermanentLineLabels(e.layer);
             // Handler für Vertex-Drag (Punktverschiebung)
             e.layer.on('pm:vertexdragend', () => {
-                console.log('Vertex drag ended, updating labels');
+                console.log('Vertex drag ended (pm:edit), LatLngs:', e.layer.getLatLngs());
+                updateAllPermanentLineLabels(e.layer);
+            });
+            // Handler für Vertex-Hinzufügung
+            e.layer.on('pm:vertexadded', () => {
+                console.log('Vertex added (pm:edit), LatLngs:', e.layer.getLatLngs());
                 updateAllPermanentLineLabels(e.layer);
             });
             // Handler für das Verschieben der gesamten Linie
             e.layer.on('pm:dragend', () => {
                 console.log('Line drag ended (pm:edit), LatLngs:', e.layer.getLatLngs());
+                updateAllPermanentLineLabels(e.layer);
+            });
+            // Handler für das Drehen der gesamten Linie
+            e.layer.on('pm:rotateend', () => {
+                console.log('Line rotation ended (pm:edit), LatLngs:', e.layer.getLatLngs());
                 updateAllPermanentLineLabels(e.layer);
             });
         } else if (e.shape === 'Circle') {
@@ -535,25 +571,38 @@ function _setupGeomanMeasurementHandlers() {
         }
     });
 
-    // Zusätzlicher Handler für pm:dragend auf der Karte
+    // Zusätzliche Handler für pm:dragend, pm:rotateend und pm:change auf der Karte
     map.on('pm:dragend', (e) => {
-        console.log('Map pm:dragend triggered, Layer:', e.layer, 'LatLngs:', e.layer ? e.layer.getLatLngs() : 'No layer');
-        if (e.shape === 'Line' && e.layer) {
+        console.log('Map pm:dragend triggered, Layer:', e.layer, 'LatLngs:', e.layer && e.layer instanceof L.Polyline ? e.layer.getLatLngs() : 'No Polyline');
+        if (e.shape === 'Line' && e.layer && e.layer instanceof L.Polyline) {
             updateAllPermanentLineLabels(e.layer);
         }
     });
 
-    // Teste alternative Events
+    map.on('pm:rotateend', (e) => {
+        console.log('Map pm:rotateend triggered, Layer:', e.layer, 'LatLngs:', e.layer && e.layer instanceof L.Polyline ? e.layer.getLatLngs() : 'No Polyline');
+        if (e.shape === 'Line' && e.layer && e.layer instanceof L.Polyline) {
+            updateAllPermanentLineLabels(e.layer);
+        }
+    });
+
+    map.on('pm:change', (e) => {
+        console.log('Map pm:change triggered, Layer:', e.layer, 'LatLngs:', e.layer && e.layer instanceof L.Polyline ? e.layer.getLatLngs() : 'No Polyline');
+        if (e.shape === 'Line' && e.layer && e.layer instanceof L.Polyline) {
+            updateAllPermanentLineLabels(e.layer);
+        }
+    });
+
     map.on('dragend', (e) => {
         console.log('Map dragend (no pm prefix) triggered, Target:', e.target);
-        if (e.target && e.target.getLatLngs) {
+        if (e.target && e.target instanceof L.Polyline) {
             updateAllPermanentLineLabels(e.target);
         }
     });
 
     map.on('pm:drag', (e) => {
-        console.log('Map pm:drag triggered, Layer:', e.layer, 'LatLngs:', e.layer ? e.layer.getLatLngs() : 'No layer');
-        if (e.shape === 'Line' && e.layer) {
+        console.log('Map pm:drag triggered, Layer:', e.layer, 'LatLngs:', e.layer && e.layer instanceof L.Polyline ? e.layer.getLatLngs() : 'No Polyline');
+        if (e.shape === 'Line' && e.layer && e.layer instanceof L.Polyline) {
             updateAllPermanentLineLabels(e.layer);
         }
     });
