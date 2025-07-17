@@ -353,22 +353,17 @@ function _setupGeomanMeasurementHandlers() {
         return;
     }
 
-    // Debugging: Geoman-Version und globale Optionen
     console.log('Leaflet-Geoman Version:', L.PM.version);
-    console.log('Global PM Options:', map.pm.getGlobalOptions());
 
-    // Gemeinsame UI-Elemente für beide Mess-Typen
     const liveMeasureLabel = L.DomUtil.create('div', 'leaflet-measure-label', map.getContainer());
     const persistentLabelsGroup = L.layerGroup().addTo(map);
 
-    // Speichere die letzten bekannten Koordinaten und Radius für Polling
     let lastKnownLatLngs = null;
-    let lastKnownCircleState = null; // Für Kreise: { center: LatLng, radius: number }
+    let lastKnownCircleState = null;
     let currentLayer = null;
 
-    // --- Helferfunktionen für permanente Labels ---
+    // --- Helper functions for permanent labels (no changes here) ---
 
-    // Helfer für Linien-Labels
     function createPermanentLineLabel(latlngs, index) {
         const currentPoint = latlngs[index];
         const prevPoint = index > 0 ? latlngs[index - 1] : null;
@@ -387,8 +382,6 @@ function _setupGeomanMeasurementHandlers() {
 
         const outBearingText = nextPoint ? `${Utils.calculateBearing(currentPoint.lat, currentPoint.lng, nextPoint.lat, nextPoint.lng).toFixed(0)}°` : '---';
 
-        console.log('createPermanentLineLabel - Index:', index, 'PrevPoint:', prevPoint, 'CurrentPoint:', currentPoint, 'NextPoint:', nextPoint, 'InBearing:', inBearing, 'SegmentDistance:', segmentDistance, 'TotalDistance:', totalDistance);
-
         const labelContent = `
             <div class="geoman-permanent-label">
                 <div>In: ${inBearing.toFixed(0)}°</div>
@@ -398,81 +391,56 @@ function _setupGeomanMeasurementHandlers() {
             </div>
         `;
 
-        console.log('Creating label for point:', currentPoint);
         const marker = L.marker(currentPoint, {
             icon: L.divIcon({ className: 'geoman-label-container', html: labelContent, iconAnchor: [-5, -5] }),
             pmIgnore: true
         });
-        console.log('Adding marker to persistentLabelsGroup:', marker);
         marker.addTo(persistentLabelsGroup);
     }
 
-    // Helfer für Kreis-Labels
     function createPermanentCircleLabel(layer) {
         const center = layer.getLatLng();
         const radius = layer.getRadius();
         const radiusText = radius < 1000 ? `${radius.toFixed(0)} m` : `${(radius / 1000).toFixed(2)} km`;
-
         const labelContent = `<div class="geoman-permanent-label">Radius:<br> ${radiusText}</div>`;
-
         const label = L.marker(center, {
             icon: L.divIcon({ className: 'geoman-label-container', html: labelContent, iconAnchor: [0, 0] }),
             pmIgnore: true
         });
-        console.log('Adding circle label to persistentLabelsGroup:', label, 'Center:', center, 'Radius:', radius);
         label.addTo(persistentLabelsGroup);
-
-        // Speichere eine Referenz zum Label im Layer
         layer.permanentLabel = label;
     }
 
     function updateAllPermanentLineLabels(layer) {
-        if (!layer || !(layer instanceof L.Polyline)) {
-            console.log('Invalid layer for updateAllPermanentLineLabels (not a Polyline):', layer);
-            return;
-        }
-
-        console.log('Layer PM Enabled:', layer.pm && layer.pm.enabled ? layer.pm.enabled() : 'No PM or not enabled');
+        if (!layer || !(layer instanceof L.Polyline)) return;
         persistentLabelsGroup.clearLayers();
         const latlngs = layer.getLatLngs();
-        console.log('updateAllPermanentLineLabels - LatLngs:', latlngs);
         if (Array.isArray(latlngs[0])) {
-            latlngs.forEach((subLatlngs, subIndex) => {
-                console.log(`SubLine ${subIndex}:`, subLatlngs);
+            latlngs.forEach((subLatlngs) => {
                 subLatlngs.forEach((_, index) => createPermanentLineLabel(subLatlngs, index));
             });
         } else {
-            console.log('Single Line:', latlngs);
             latlngs.forEach((_, index) => createPermanentLineLabel(latlngs, index));
         }
-
         lastKnownLatLngs = JSON.stringify(latlngs);
         currentLayer = layer;
     }
 
-    // Helfer für Kreis-Updates
     function updateCircleLabel(layer) {
-        if (!layer || !(layer instanceof L.Circle)) {
-            console.log('Invalid layer for updateCircleLabel (not a Circle):', layer);
-            return;
-        }
+        if (!layer || !(layer instanceof L.Circle)) return;
         if (layer.permanentLabel) {
             persistentLabelsGroup.removeLayer(layer.permanentLabel);
         }
         createPermanentCircleLabel(layer);
-        console.log('Updated circle label, Center:', layer.getLatLng(), 'Radius:', layer.getRadius());
     }
 
-    // Polling-Mechanismus für Linien und Kreise
     function startPolling() {
         setInterval(() => {
             if (currentLayer) {
                 if (currentLayer instanceof L.Polyline) {
                     const currentLatLngs = JSON.stringify(currentLayer.getLatLngs());
                     if (currentLatLngs !== lastKnownLatLngs) {
-                        console.log('Polling: Line coordinates changed, LatLngs:', currentLayer.getLatLngs());
                         updateAllPermanentLineLabels(currentLayer);
-                        lastKnownLatLngs = currentLatLngs;
                     }
                 } else if (currentLayer instanceof L.Circle) {
                     const currentState = JSON.stringify({
@@ -480,7 +448,6 @@ function _setupGeomanMeasurementHandlers() {
                         radius: currentLayer.getRadius()
                     });
                     if (currentState !== lastKnownCircleState) {
-                        console.log('Polling: Circle state changed, Center:', currentLayer.getLatLng(), 'Radius:', currentLayer.getRadius());
                         updateCircleLabel(currentLayer);
                         lastKnownCircleState = currentState;
                     }
@@ -489,54 +456,142 @@ function _setupGeomanMeasurementHandlers() {
         }, 500);
     }
 
-    // Starte Polling nach der Initialisierung
     startPolling();
-
-    // --- Haupt-Event-Handler ---
 
     map.on('pm:drawstart', (e) => {
         const workingLayer = e.workingLayer;
         persistentLabelsGroup.clearLayers();
         liveMeasureLabel.style.display = 'block';
 
-        let mouseMoveHandler, vertexAddHandler, cleanup;
+        let mouseMoveHandler, vertexAddHandler, mapMoveHandler, cleanup;
 
         if (e.shape === 'Line') {
-            liveMeasureLabel.innerHTML = 'Klicke, um den ersten Punkt zu setzen.';
-            mouseMoveHandler = (moveEvent) => {
-                const latlngs = workingLayer.getLatLngs();
-                if (latlngs.length > 0) {
-                    const lastPoint = latlngs[latlngs.length - 1];
-                    const distance = lastPoint.distanceTo(moveEvent.latlng);
-                    const bearing = Utils.calculateBearing(lastPoint.lat, lastPoint.lng, moveEvent.latlng.lat, moveEvent.latlng.lng);
-                    const distanceText = distance < 1000 ? `${distance.toFixed(0)} m` : `${(distance / 1000).toFixed(2)} km`;
-                    liveMeasureLabel.innerHTML = `In: ${bearing.toFixed(0)}°<br>Out: ---°<br>+: ${distanceText}`;
-                    L.DomUtil.setPosition(liveMeasureLabel, moveEvent.containerPoint.add([15, -15]));
-                }
-            };
-            vertexAddHandler = () => {
-                console.log('Vertex added during draw:', workingLayer.getLatLngs());
-                setTimeout(() => updateAllPermanentLineLabels(workingLayer), 300);
-            };
-            map.on('mousemove', mouseMoveHandler);
-            workingLayer.on('pm:vertexadded', vertexAddHandler);
-            cleanup = () => {
-                map.off('mousemove', mouseMoveHandler);
-                workingLayer.off('pm:vertexadded', vertexAddHandler);
-            };
+            if (isMobileDevice()) {
+                liveMeasureLabel.innerHTML = 'Tap crosshair to set first point.';
+                let lastPoint = null;
+                let rubberBandLayer = null;
+                
+                mapMoveHandler = () => {
+                    const latlngs = workingLayer.getLatLngs();
+                    if (latlngs.length > 0) {
+                        lastPoint = latlngs[latlngs.length - 1];
+                        const currentCenter = map.getCenter();
+
+                        if (rubberBandLayer) {
+                            map.removeLayer(rubberBandLayer);
+                        }
+                        rubberBandLayer = L.polyline([lastPoint, currentCenter], {
+                            color: 'blue',
+                            dashArray: '5, 5',
+                            weight: 2,
+                            interactive: false
+                        }).addTo(map);
+
+                        const distance = lastPoint.distanceTo(currentCenter);
+                        const bearing = Utils.calculateBearing(lastPoint.lat, lastPoint.lng, currentCenter.lat, currentCenter.lng);
+                        const distanceText = distance < 1000 ? `${distance.toFixed(0)} m` : `${(distance / 1000).toFixed(2)} km`;
+                        
+                        liveMeasureLabel.innerHTML = `Bearing: ${bearing.toFixed(0)}°<br>Distance: ${distanceText}`;
+                        const mapSize = map.getSize();
+                        const labelPos = L.point(mapSize.x / 2 + 20, mapSize.y / 2 - 40);
+                        L.DomUtil.setPosition(liveMeasureLabel, labelPos);
+                    }
+                };
+
+                vertexAddHandler = () => {
+                   if (rubberBandLayer) {
+                       map.removeLayer(rubberBandLayer);
+                       rubberBandLayer = null;
+                    }
+                    setTimeout(() => {
+                        updateAllPermanentLineLabels(workingLayer);
+                        map.fire('move');
+                    }, 50); 
+                };
+                
+                map.on('move', mapMoveHandler);
+                workingLayer.on('pm:vertexadded', vertexAddHandler);
+                
+                cleanup = () => {
+                    map.off('move', mapMoveHandler);
+                    workingLayer.off('pm:vertexadded', vertexAddHandler);
+                    if (rubberBandLayer) {
+                        map.removeLayer(rubberBandLayer);
+                    }
+                };
+            } else {
+                // Web version logic
+                liveMeasureLabel.innerHTML = 'Click to set the first point.';
+                mouseMoveHandler = (moveEvent) => {
+                    const latlngs = workingLayer.getLatLngs();
+                    if (latlngs.length > 0) {
+                        const lastPoint = latlngs[latlngs.length - 1];
+                        const distance = lastPoint.distanceTo(moveEvent.latlng);
+                        const bearing = Utils.calculateBearing(lastPoint.lat, lastPoint.lng, moveEvent.latlng.lat, moveEvent.latlng.lng);
+                        const distanceText = distance < 1000 ? `${distance.toFixed(0)} m` : `${(distance / 1000).toFixed(2)} km`;
+                        liveMeasureLabel.innerHTML = `Bearing: ${bearing.toFixed(0)}°<br>Distance: ${distanceText}`;
+                        L.DomUtil.setPosition(liveMeasureLabel, moveEvent.containerPoint.add([15, -15]));
+                    }
+                };
+                vertexAddHandler = () => {
+                    setTimeout(() => updateAllPermanentLineLabels(workingLayer), 300);
+                };
+                map.on('mousemove', mouseMoveHandler);
+                workingLayer.on('pm:vertexadded', vertexAddHandler);
+                cleanup = () => {
+                    map.off('mousemove', mouseMoveHandler);
+                    workingLayer.off('pm:vertexadded', vertexAddHandler);
+                };
+            }
         } else if (e.shape === 'Circle') {
-            liveMeasureLabel.innerHTML = 'Klicke und ziehe, um einen Kreis zu zeichnen.';
-            mouseMoveHandler = (moveEvent) => {
-                const center = workingLayer.getLatLng();
-                if (center) {
-                    const radius = center.distanceTo(moveEvent.latlng);
-                    const radiusText = radius < 1000 ? `${radius.toFixed(0)} m` : `${(radius / 1000).toFixed(2)} km`;
-                    liveMeasureLabel.innerHTML = `Radius: ${radiusText}`;
-                    L.DomUtil.setPosition(liveMeasureLabel, moveEvent.containerPoint.add([15, -15]));
-                }
-            };
-            map.on('mousemove', mouseMoveHandler);
-            cleanup = () => map.off('mousemove', mouseMoveHandler);
+            // Mobile-specific logic for circle drawing
+            if (isMobileDevice()) {
+                 liveMeasureLabel.innerHTML = 'Tap crosshair to set circle center.';
+
+                 mapMoveHandler = () => {
+                    const center = workingLayer.getLatLng();
+                    if (center) { // Only run if center is set
+                        const crosshairPos = map.getCenter();
+                        const radius = center.distanceTo(crosshairPos);
+                        
+                        workingLayer.setRadius(radius);
+
+                        const radiusText = radius < 1000 ? `${radius.toFixed(0)} m` : `${(radius / 1000).toFixed(2)} km`;
+                        liveMeasureLabel.innerHTML = `Radius: ${radiusText}`;
+                        const mapSize = map.getSize();
+                        const labelPos = L.point(mapSize.x / 2 + 20, mapSize.y / 2 - 40);
+                        L.DomUtil.setPosition(liveMeasureLabel, labelPos);
+                    }
+                 };
+
+                 // This event fires once after the first tap
+                 vertexAddHandler = () => {
+                    liveMeasureLabel.innerHTML = 'Move map to adjust radius. Tap again to finish.';
+                    map.on('move', mapMoveHandler);
+                 };
+
+                 workingLayer.on('pm:vertexadded', vertexAddHandler);
+
+                 cleanup = () => {
+                    map.off('move', mapMoveHandler);
+                    workingLayer.off('pm:vertexadded', vertexAddHandler);
+                 };
+
+            } else {
+                // Web version for circle
+                liveMeasureLabel.innerHTML = 'Click and drag to draw a circle.';
+                mouseMoveHandler = (moveEvent) => {
+                    const center = workingLayer.getLatLng();
+                    if (center) {
+                        const radius = center.distanceTo(moveEvent.latlng);
+                        const radiusText = radius < 1000 ? `${radius.toFixed(0)} m` : `${(radius / 1000).toFixed(2)} km`;
+                        liveMeasureLabel.innerHTML = `Radius: ${radiusText}`;
+                        L.DomUtil.setPosition(liveMeasureLabel, moveEvent.containerPoint.add([15, -15]));
+                    }
+                };
+                map.on('mousemove', mouseMoveHandler);
+                cleanup = () => map.off('mousemove', mouseMoveHandler);
+            }
         }
 
         const finalize = () => {
@@ -548,72 +603,11 @@ function _setupGeomanMeasurementHandlers() {
             finalize();
             if (createEvent.shape === 'Line' && createEvent.layer instanceof L.Polyline) {
                 updateAllPermanentLineLabels(createEvent.layer);
-                if (createEvent.layer.pm) {
-                    createEvent.layer.pm.enable();
-                    console.log('Bearbeitungsmodus aktiviert nach pm:create');
-                }
-                console.log('Layer PM Enabled after create:', createEvent.layer.pm && createEvent.layer.pm.enabled ? createEvent.layer.pm.enabled() : 'No PM or not enabled');
-                createEvent.layer.on('pm:dragend', () => {
-                    console.log('Line drag ended (pm:create), LatLngs:', createEvent.layer.getLatLngs());
-                    updateAllPermanentLineLabels(createEvent.layer);
-                });
-                createEvent.layer.on('pm:rotateend', () => {
-                    console.log('Line rotation ended (pm:create), LatLngs:', createEvent.layer.getLatLngs());
-                    updateAllPermanentLineLabels(createEvent.layer);
-                });
-                createEvent.layer.on('pm:vertexdragend', () => {
-                    console.log('Vertex drag ended (pm:create), LatLngs:', createEvent.layer.getLatLngs());
-                    setTimeout(() => updateAllPermanentLineLabels(createEvent.layer), 300);
-                });
-                createEvent.layer.on('pm:vertexadded', () => {
-                    console.log('Vertex added (pm:create), LatLngs:', createEvent.layer.getLatLngs());
-                    setTimeout(() => updateAllPermanentLineLabels(createEvent.layer), 300);
-                });
-                createEvent.layer.on('pm:vertexupdated', () => {
-                    console.log('Vertex updated (pm:create), LatLngs:', createEvent.layer.getLatLngs());
-                    setTimeout(() => updateAllPermanentLineLabels(createEvent.layer), 300);
-                });
-                createEvent.layer.on('pm:vertexmodified', () => {
-                    console.log('Vertex modified (pm:create), LatLngs:', createEvent.layer.getLatLngs());
-                    setTimeout(() => updateAllPermanentLineLabels(createEvent.layer), 300);
-                });
-                createEvent.layer.on('pm:vertexdrag', () => {
-                    console.log('Vertex drag (pm:create), LatLngs:', createEvent.layer.getLatLngs());
-                    setTimeout(() => updateAllPermanentLineLabels(createEvent.layer), 300);
-                });
-                createEvent.layer.on('pm:markerdragend', () => {
-                    console.log('Marker drag ended (pm:create), LatLngs:', createEvent.layer.getLatLngs());
-                    setTimeout(() => updateAllPermanentLineLabels(createEvent.layer), 300);
-                });
             } else if (createEvent.shape === 'Circle' && createEvent.layer instanceof L.Circle) {
                 updateCircleLabel(createEvent.layer);
-                if (createEvent.layer.pm) {
-                    createEvent.layer.pm.enable();
-                    console.log('Bearbeitungsmodus aktiviert nach pm:create für Kreis');
-                }
-                console.log('Layer PM Enabled after create (Circle):', createEvent.layer.pm && createEvent.layer.pm.enabled ? createEvent.layer.pm.enabled() : 'No PM or not enabled');
-                createEvent.layer.on('pm:markerdragend', () => {
-                    console.log('Circle marker drag ended (pm:create), Center:', createEvent.layer.getLatLng(), 'Radius:', createEvent.layer.getRadius());
-                    setTimeout(() => updateCircleLabel(createEvent.layer), 300);
-                });
-                createEvent.layer.on('pm:edit', () => {
-                    console.log('Circle edited (pm:create), Center:', createEvent.layer.getLatLng(), 'Radius:', createEvent.layer.getRadius());
-                    setTimeout(() => updateCircleLabel(createEvent.layer), 300);
-                });
-                createEvent.layer.on('pm:dragend', () => {
-                    console.log('Circle drag ended (pm:create), Center:', createEvent.layer.getLatLng(), 'Radius:', createEvent.layer.getRadius());
-                    setTimeout(() => updateCircleLabel(createEvent.layer), 300);
-                });
-                createEvent.layer.on('pm:change', () => {
-                    console.log('Circle changed (pm:create), Center:', createEvent.layer.getLatLng(), 'Radius:', createEvent.layer.getRadius());
-                    setTimeout(() => updateCircleLabel(createEvent.layer), 300);
-                });
-                // Speichere den initialen Kreis-Status für Polling
-                lastKnownCircleState = JSON.stringify({
-                    center: createEvent.layer.getLatLng(),
-                    radius: createEvent.layer.getRadius()
-                });
-                currentLayer = createEvent.layer;
+            }
+             if (createEvent.layer.pm) {
+                createEvent.layer.pm.enable();
             }
         });
 
@@ -625,102 +619,7 @@ function _setupGeomanMeasurementHandlers() {
         });
     });
 
-    // Handler für das Bearbeiten, Drehen, Verschieben und Löschen
     map.on('pm:edit', (e) => {
-        if (e.shape === 'Line' && e.layer instanceof L.Polyline) {
-            console.log('pm:edit triggered for Line, LatLngs:', e.layer.getLatLngs());
-            console.log('Layer PM Enabled in pm:edit:', e.layer.pm && e.layer.pm.enabled ? e.layer.pm.enabled() : 'No PM or not enabled');
-            updateAllPermanentLineLabels(e.layer);
-            e.layer.on('pm:vertexdragend', () => {
-                console.log('Vertex drag ended (pm:edit), LatLngs:', e.layer.getLatLngs());
-                setTimeout(() => updateAllPermanentLineLabels(e.layer), 300);
-            });
-            e.layer.on('pm:vertexupdated', () => {
-                console.log('Vertex updated (pm:edit), LatLngs:', e.layer.getLatLngs());
-                setTimeout(() => updateAllPermanentLineLabels(e.layer), 300);
-            });
-            e.layer.on('pm:vertexmodified', () => {
-                console.log('Vertex modified (pm:edit), LatLngs:', e.layer.getLatLngs());
-                setTimeout(() => updateAllPermanentLineLabels(e.layer), 300);
-            });
-            e.layer.on('pm:vertexdrag', () => {
-                console.log('Vertex drag (pm:edit), LatLngs:', e.layer.getLatLngs());
-                setTimeout(() => updateAllPermanentLineLabels(e.layer), 300);
-            });
-            e.layer.on('pm:markerdragend', () => {
-                console.log('Marker drag ended (pm:edit), LatLngs:', e.layer.getLatLngs());
-                setTimeout(() => updateAllPermanentLineLabels(e.layer), 300);
-            });
-            e.layer.on('pm:vertexadded', () => {
-                console.log('Vertex added (pm:edit), LatLngs:', e.layer.getLatLngs());
-                setTimeout(() => updateAllPermanentLineLabels(e.layer), 300);
-            });
-            e.layer.on('pm:dragend', () => {
-                console.log('Line drag ended (pm:edit), LatLngs:', e.layer.getLatLngs());
-                updateAllPermanentLineLabels(e.layer);
-            });
-            e.layer.on('pm:rotateend', () => {
-                console.log('Line rotation ended (pm:edit), LatLngs:', e.layer.getLatLngs());
-                updateAllPermanentLineLabels(e.layer);
-            });
-        } else if (e.shape === 'Circle' && e.layer instanceof L.Circle) {
-            console.log('pm:edit triggered for Circle, Center:', e.layer.getLatLng(), 'Radius:', e.layer.getRadius());
-            updateCircleLabel(e.layer);
-            e.layer.on('pm:markerdragend', () => {
-                console.log('Circle marker drag ended (pm:edit), Center:', e.layer.getLatLng(), 'Radius:', e.layer.getRadius());
-                setTimeout(() => updateCircleLabel(e.layer), 300);
-            });
-            e.layer.on('pm:edit', () => {
-                console.log('Circle edited (pm:edit), Center:', e.layer.getLatLng(), 'Radius:', e.layer.getRadius());
-                setTimeout(() => updateCircleLabel(e.layer), 300);
-            });
-            e.layer.on('pm:dragend', () => {
-                console.log('Circle drag ended (pm:edit), Center:', e.layer.getLatLng(), 'Radius:', e.layer.getRadius());
-                setTimeout(() => updateCircleLabel(e.layer), 300);
-            });
-            e.layer.on('pm:change', () => {
-                console.log('Circle changed (pm:edit), Center:', e.layer.getLatLng(), 'Radius:', e.layer.getRadius());
-                setTimeout(() => updateCircleLabel(e.layer), 300);
-            });
-            // Aktualisiere den Kreis-Status für Polling
-            lastKnownCircleState = JSON.stringify({
-                center: e.layer.getLatLng(),
-                radius: e.layer.getRadius()
-            });
-            currentLayer = e.layer;
-        }
-    });
-
-    // Globale Handler für Kreise und Linien
-    map.on('pm:markerdragend', (e) => {
-        console.log('Map pm:markerdragend triggered, Layer:', e.layer, 'Shape:', e.shape, 'Center or LatLngs:', e.layer instanceof L.Circle ? e.layer.getLatLng() : (e.layer instanceof L.Polyline ? e.layer.getLatLngs() : 'No Circle or Polyline'), 'Radius:', e.layer instanceof L.Circle ? e.layer.getRadius() : 'N/A', 'Vertex:', e.vertex, 'Index:', e.index);
-        if (e.shape === 'Line' && e.layer instanceof L.Polyline) {
-            setTimeout(() => updateAllPermanentLineLabels(e.layer), 300);
-        } else if (e.shape === 'Circle' && e.layer instanceof L.Circle) {
-            setTimeout(() => updateCircleLabel(e.layer), 300);
-        }
-    });
-
-    map.on('pm:edit', (e) => {
-        console.log('Map pm:edit triggered, Layer:', e.layer, 'Shape:', e.shape, 'Center or LatLngs:', e.layer instanceof L.Circle ? e.layer.getLatLng() : (e.layer instanceof L.Polyline ? e.layer.getLatLngs() : 'No Circle or Polyline'), 'Radius:', e.layer instanceof L.Circle ? e.layer.getRadius() : 'N/A');
-        if (e.shape === 'Line' && e.layer instanceof L.Polyline) {
-            setTimeout(() => updateAllPermanentLineLabels(e.layer), 300);
-        } else if (e.shape === 'Circle' && e.layer instanceof L.Circle) {
-            setTimeout(() => updateCircleLabel(e.layer), 300);
-        }
-    });
-
-    map.on('pm:dragend', (e) => {
-        console.log('Map pm:dragend triggered, Layer:', e.layer, 'Shape:', e.shape, 'Center or LatLngs:', e.layer instanceof L.Circle ? e.layer.getLatLng() : (e.layer instanceof L.Polyline ? e.layer.getLatLngs() : 'No Circle or Polyline'), 'Radius:', e.layer instanceof L.Circle ? e.layer.getRadius() : 'N/A');
-        if (e.shape === 'Line' && e.layer instanceof L.Polyline) {
-            updateAllPermanentLineLabels(e.layer);
-        } else if (e.shape === 'Circle' && e.layer instanceof L.Circle) {
-            setTimeout(() => updateCircleLabel(e.layer), 300);
-        }
-    });
-
-    map.on('pm:change', (e) => {
-        console.log('Map pm:change triggered, Layer:', e.layer, 'Shape:', e.shape, 'Center or LatLngs:', e.layer instanceof L.Circle ? e.layer.getLatLng() : (e.layer instanceof L.Polyline ? e.layer.getLatLngs() : 'No Circle or Polyline'), 'Radius:', e.layer instanceof L.Circle ? e.layer.getRadius() : 'N/A');
         if (e.shape === 'Line' && e.layer instanceof L.Polyline) {
             setTimeout(() => updateAllPermanentLineLabels(e.layer), 300);
         } else if (e.shape === 'Circle' && e.layer instanceof L.Circle) {
@@ -729,16 +628,10 @@ function _setupGeomanMeasurementHandlers() {
     });
 
     map.on('pm:remove', (e) => {
-        console.log('pm:remove triggered, clearing labels for Shape:', e.shape);
         persistentLabelsGroup.clearLayers();
         lastKnownCircleState = null;
         lastKnownLatLngs = null;
         currentLayer = null;
-    });
-
-    // Debugging: Protokolliere alle Geoman-Events
-    map.on('pm:*', (e) => {
-        console.log('Geoman event triggered:', e.type, 'Layer:', e.layer, 'Shape:', e.shape, 'Center or LatLngs:', e.layer instanceof L.Circle ? e.layer.getLatLng() : (e.layer instanceof L.Polyline ? e.layer.getLatLngs() : 'No Circle or Polyline'), 'Radius:', e.layer instanceof L.Circle ? e.layer.getRadius() : 'N/A', 'Vertex:', e.vertex, 'Index:', e.index, 'Marker:', e.marker);
     });
 }
 function _initializeCoordsControlAndHandlers() {
