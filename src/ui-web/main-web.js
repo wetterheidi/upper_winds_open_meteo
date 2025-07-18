@@ -16,7 +16,7 @@ import { cacheVisibleTiles, cacheTilesForDIP } from '../core/tileCache.js';
 import { getSliderValue, displayError, displayMessage, displayProgress, hideProgress, applyDeviceSpecificStyles } from './ui.js';
 import * as AutoupdateManager from '../core/autoupdateManager.js';
 import * as displayManager from './displayManager.js';
-import * as liveTrackingManager from '../core/liveTrackingManager.js'; // <-- DIESE ZEILE HINZUFÜGEN
+import * as liveTrackingManager from '../core/liveTrackingManager.js'; 
 import * as EnsembleManager from '../core/ensembleManager.js';
 import * as LocationManager from '../core/locationManager.js';
 
@@ -339,7 +339,7 @@ export function validateLegHeights(final, base, downwind) {
 export function calculateMeanWind() {
     console.log('Calculating mean wind with model:', document.getElementById('modelSelect').value, 'weatherData:', AppState.weatherData);
 
-    const refLevel = document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL';
+    const refLevel = document.getElementById('refLevel')?.value || 'AGL'; // KORREKTUR: Liest das Dropdown-Menü aus
     const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
     const windSpeedUnit = Settings.getValue('windUnit', 'radio', 'kt');
 

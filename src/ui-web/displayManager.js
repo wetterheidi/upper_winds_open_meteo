@@ -112,7 +112,7 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
         customLandingDirectionRRInput.value = Math.round(AppState.landingWindDir);
     }
 
-    const refLevel = document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL';
+    const refLevel = document.getElementById('refLevel')?.value || 'AGL'; 
     const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
     const windSpeedUnit = Settings.getValue('windUnit', 'radio', 'kt');
     const temperatureUnit = Settings.getValue('temperatureUnit', 'radio', 'C');
@@ -230,7 +230,7 @@ export function updateLandingPatternDisplay() {
     const heightUnit = Settings.getValue('heightUnit', 'm');
     const windUnit = Settings.getValue('windUnit', 'kt');
     const baseHeight = Math.round(AppState.lastAltitude);
-    
+
     const interpolatedData = weatherManager.interpolateWeatherData(
         AppState.weatherData, sliderIndex, interpStep, baseHeight, heightUnit
     );
@@ -247,7 +247,7 @@ export function updateLandingPatternDisplay() {
         mapManager.drawLandingPattern(null);
         return;
     }
-    
+
     const { downwindStart, baseStart, finalStart, landingPoint } = patternCoords;
 
     // ================== NEU: Logik für Windpfeile wiederhergestellt ==================
