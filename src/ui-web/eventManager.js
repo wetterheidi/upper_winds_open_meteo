@@ -6,15 +6,10 @@ import { Utils } from '../core/utils.js';
 import * as displayManager from './displayManager.js';
 import * as mapManager from './mapManager.js';
 import * as Coordinates from '../ui-web/coordinates.js';
-import * as JumpPlanner from '../core/jumpPlanner.js';
 import { TileCache, cacheTilesForDIP, cacheVisibleTiles } from '../core/tileCache.js';
 import { loadGpxTrack, loadCsvTrackUTC, exportToGpx, exportLandingPatternToGpx } from '../core/trackManager.js';
-import * as weatherManager from '../core/weatherManager.js';
-import * as liveTrackingManager from '../core/liveTrackingManager.js';
 import { fetchEnsembleWeatherData, processAndVisualizeEnsemble, clearEnsembleVisualizations } from '../core/ensembleManager.js';
 import { getSliderValue, displayMessage, hideProgress, displayProgress } from './ui.js';
-import * as AutoupdateManager from '../core/autoupdateManager.js';
-import { UI_DEFAULTS } from '../core/constants.js';
 import { updateModelSelectUI, cleanupSelectedEnsembleModels } from './ui.js';
 import 'leaflet-gpx';
 import * as LocationManager from '../core/locationManager.js';
@@ -29,11 +24,6 @@ let listenersInitialized = false;
 // 2. Allgemeine Hilfsfunktionen
 // =================================================================
 
-function dispatchAppEvent(eventName, detail = {}) {
-    console.log(`[EventManager] Dispatching event: ${eventName}`, detail);
-    const event = new CustomEvent(eventName, { detail, bubbles: true, cancelable: true });
-    document.dispatchEvent(event);
-}
 function setupCheckbox(id, setting, callback) {
     console.log(`setupCheckbox called for id: ${id}`);
     const checkbox = document.getElementById(id);
@@ -128,44 +118,6 @@ function setupInput(id, eventType, debounceTime, validationCallback) {
         }));
     }, debounceTime));
 }
-function toggleSubmenu(element, submenu, isVisible) {
-    console.log(`toggleSubmenu called for ${element.textContent || element.id}: ${isVisible ? 'show' : 'hide'}`);
-    if (submenu) {
-        // Sicherstellen, dass die Klasse .submenu vorhanden ist
-        if (!submenu.classList.contains('submenu')) {
-            submenu.classList.add('submenu');
-        }
-
-        // Klasse umschalten und Aria-Attribut für Barrierefreiheit setzen
-        submenu.classList.toggle('hidden', !isVisible);
-        element.setAttribute('aria-expanded', isVisible);
-        console.log(`Submenu toggled for ${element.textContent || element.id}: ${isVisible ? 'shown' : 'hidden'}`);
-
-        // WICHTIG: Die "forceVisibility"-Logik beibehalten, um UI-Bugs zu verhindern
-        let attempts = 0;
-        const maxAttempts = 5;
-        const forceVisibility = () => {
-            const currentState = {
-                isHidden: submenu.classList.contains('hidden'),
-                displayStyle: window.getComputedStyle(submenu).display
-            };
-
-            // Wenn das Menü geöffnet sein SOLL, aber aus irgendeinem Grund versteckt ist...
-            if (isVisible && (currentState.isHidden || currentState.displayStyle === 'none')) {
-                console.warn(`Submenu for ${element.textContent || element.id} was hidden unexpectedly. Forcing it to be visible.`);
-                submenu.classList.remove('hidden');
-                submenu.style.display = 'block'; // Erzwingt die Sichtbarkeit
-                attempts++;
-                if (attempts < maxAttempts) {
-                    setTimeout(forceVisibility, 100); // Erneuter Check nach kurzer Zeit
-                }
-            }
-        };
-        setTimeout(forceVisibility, 100); // Initialer Check
-    } else {
-        console.warn(`Submenu for ${element.textContent || element.id} not found`);
-    }
-}
 
 // =================================================================
 // 3. UI-Komponenten-spezifische Setup-Funktionen
@@ -202,7 +154,6 @@ function setupSidebarEvents() {
         icon.addEventListener('click', () => {
             const panelId = icon.dataset.panelId;
 
-            // --- NEUE PASSWORT-PRÜFUNG ---
             if (panelId === 'panel-planner' && !Settings.isFeatureUnlocked('planner')) {
                 Settings.showPasswordModal('planner',
                     () => { // onSuccess
@@ -215,7 +166,6 @@ function setupSidebarEvents() {
                 );
                 return; // Funktion hier beenden, um das Panel nicht zu öffnen
             }
-            // --- ENDE PASSWORT-PRÜFUNG ---
 
             const isAlreadyActive = mainLayout.classList.contains('sidebar-expanded') && activePanelId === panelId;
 
@@ -337,13 +287,10 @@ function setupMapEventListeners() {
         });
     }, 1000);
 
-    const debouncedMapMoveHandler = Utils.debounce(mapMoveHandler, 500);
-
     // Wir registrieren den einen, zentralen Handler für beide Events
     AppState.map.on('zoomend', mapMoveHandler);
     AppState.map.on('moveend', mapMoveHandler);
     AppState.map.on('moveend', debouncedCacheHandler); // Caching kann parallel laufen
-
 }
 function setupModelInfoButtonEvents() {
     const modelInfoButton = document.getElementById('modelInfoButton');
@@ -562,7 +509,6 @@ function setupTrackEvents() {
 
             const extension = file.name.split('.').pop().toLowerCase();
             try {
-                // *** HIER IST DIE KORREKTE VERARBEITUNGSLOGIK ***
                 if (extension === 'gpx') {
                     await loadGpxTrack(file); // Ruft die importierte Funktion auf
                 } else if (extension === 'csv') {
@@ -611,13 +557,11 @@ function setupGpxExportEvent() {
 
     const exportButton = document.getElementById('exportGpxButton');
     if (exportButton) {
-        // Hinzufügen von 'async', um 'await' verwenden zu können
         exportButton.addEventListener('click', async () => {
             const sliderIndex = getSliderValue();
             const interpStep = getInterpolationStep();
             const heightUnit = Settings.getValue('heightUnit', 'm');
 
-            // 'await' stellt sicher, dass auf die Fertigstellung der Funktion gewartet wird
             await exportToGpx(sliderIndex, interpStep, heightUnit);
         });
     }
@@ -641,14 +585,12 @@ function setupCheckboxEvents() {
     setupCheckbox('showExitAreaCheckbox', 'showExitArea', (checkbox) => {
         Settings.state.userSettings.showExitArea = checkbox.checked;
         Settings.save();
-        // Event auslösen, anstatt Logik auszuführen
         document.dispatchEvent(new CustomEvent('ui:jumpFeatureChanged'));
     });
 
     setupCheckbox('showCanopyAreaCheckbox', 'showCanopyArea', (checkbox) => {
         Settings.state.userSettings.showCanopyArea = checkbox.checked;
         Settings.save();
-        // Dasselbe Event auslösen
         document.dispatchEvent(new CustomEvent('ui:jumpFeatureChanged'));
     });
 
@@ -681,7 +623,6 @@ function setupCheckboxEvents() {
             submenu.classList.toggle('hidden', !checkbox.checked);
         }
 
-        // Ein Event auslösen, damit der Rest der Anwendung reagieren kann
         if (checkbox.checked) {
             document.dispatchEvent(new CustomEvent('ui:landingPatternEnabled'));
         } else {
@@ -709,7 +650,6 @@ function setupCheckboxEvents() {
         Settings.state.userSettings.showJumpMasterLine = checkbox.checked;
         Settings.save();
 
-        // Event auslösen, damit main-web.js reagieren kann
         document.dispatchEvent(new CustomEvent('ui:showJumpMasterLineChanged'));
 
         // Untermenü ein-/ausblenden
@@ -753,22 +693,11 @@ function setupCheckboxEvents() {
     }
 }
 function setupRadioEvents() {
-    // --- NEU: Diese Aufrufe werden entfernt, da sie jetzt von setupSelectEvents gehandhabt werden ---
-    // setupRadioGroup('refLevel', () => Settings.updateUnitLabels());
-    // setupRadioGroup('heightUnit', () => { ... });
-    // setupRadioGroup('temperatureUnit', () => { });
-    // setupRadioGroup('windUnit', () => { ... });
-    // setupRadioGroup('timeZone', () => { });
-    // setupRadioGroup('coordFormat', () => { });
-    // setupRadioGroup('downloadFormat', () => { });
-
-    // Diese Aufrufe bleiben, da sie für echte Radio-Buttons sind
     setupRadioGroup('landingDirection', () => { });
     setupRadioGroup('jumpMasterLineTarget', () => {
         document.dispatchEvent(new CustomEvent('ui:jumpMasterLineTargetChanged'));
     });
 
-    //Ensemble stuff
     const scenarioRadios = document.querySelectorAll('input[name="ensembleScenario"]');
     scenarioRadios.forEach(radio => {
         radio.addEventListener('change', async () => { // Die Funktion zu 'async' machen
@@ -834,10 +763,7 @@ function setupSelectEvents() {
     });
 }
 function setupInputEvents() {
-    // Jeder Aufruf speichert jetzt nur noch den Wert und löst das 'ui:inputChanged' Event aus.
-    // Die Validierungslogik bleibt als Callback erhalten.
-
-    // Helfer-Funktion, die den Event-Listener für die Bein-Höhen erstellt
+    // Helfer-Funktion, die den Event-Listener für die legHeight erstellt
     const createLegHeightListener = (id, defaultValue) => {
         const input = document.getElementById(id);
         if (!input) return;
@@ -876,7 +802,7 @@ function setupInputEvents() {
         });
     };
 
-    // Die neuen Listener für die Bein-Höhen erstellen
+    // Die neuen Listener für die legHeight erstellen
     createLegHeightListener('legHeightFinal', 100);
     createLegHeightListener('legHeightBase', 200);
     createLegHeightListener('legHeightDownwind', 300);
@@ -901,7 +827,7 @@ function setupInputEvents() {
         if (isNaN(value) || value < 500 || value > 15000) {
             Utils.handleError('Exit altitude must be between 500 and 15000 meters.');
 
-            // NEU: Event auslösen, um die UI zurückzusetzen
+            //Event auslösen, um die UI zurückzusetzen
             document.dispatchEvent(new CustomEvent('ui:invalidInput', {
                 detail: { id: 'exitAltitude', defaultValue: 3000 }
             }));
@@ -934,7 +860,6 @@ function setupDownloadEvents() {
     const downloadButton = document.getElementById('downloadButton');
     if (downloadButton) {
         downloadButton.addEventListener('click', () => {
-            // Event auslösen
             document.dispatchEvent(new CustomEvent('ui:downloadClicked'));
         });
     }
@@ -943,7 +868,6 @@ function setupClearHistoricalDate() {
     const clearButton = document.getElementById('clearHistoricalDate');
     if (clearButton) {
         clearButton.addEventListener('click', () => {
-            // Event auslösen
             document.dispatchEvent(new CustomEvent('ui:clearDateClicked'));
         });
     }
@@ -968,7 +892,6 @@ function setupCacheManagement() {
     resetButton.textContent = 'Reset Settings';
     resetButton.title = 'Resets all settings to their default values and locks all features';
     
-    // *** HIER IST DIE ÄNDERUNG FÜR DEN RESET-BUTTON ***
     resetButton.className = 'btn btn-danger'; // Weist die neuen CSS-Klassen zu
 
     resetButton.addEventListener('click', () => {
@@ -989,7 +912,6 @@ function setupCacheManagement() {
     clearCacheButton.textContent = 'Clear Tile Cache';
     clearCacheButton.title = 'Clears cached map tiles. Pan/zoom to cache more tiles for offline use.';
     
-    // *** HIER IST DIE ÄNDERUNG FÜR DEN CACHE-BUTTON ***
     clearCacheButton.className = 'btn btn-danger'; // Weist die neuen CSS-Klassen zu
 
     clearCacheButton.addEventListener('click', async () => {
@@ -1096,7 +1018,6 @@ function setupCacheSettings() {
                 lastLat: AppState.lastLat,
                 lastLng: AppState.lastLng,
                 baseMaps: AppState.baseMaps,
-                // NEU: Die Callback-Funktionen übergeben
                 onProgress: displayProgress,
                 onComplete: (message) => {
                     hideProgress();

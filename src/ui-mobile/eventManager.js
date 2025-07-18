@@ -6,16 +6,12 @@ import { Utils } from '../core/utils.js';
 import * as displayManager from './displayManager.js';
 import * as mapManager from './mapManager.js';
 import * as Coordinates from './coordinates.js';
-import * as JumpPlanner from '../core/jumpPlanner.js';
 import { TileCache, cacheTilesForDIP, cacheVisibleTiles } from '../core/tileCache.js';
 import { loadGpxTrack, loadCsvTrackUTC, exportToGpx, exportLandingPatternToGpx } from '../core/trackManager.js';
 import { SensorManager } from './sensorManager.js';
-import * as weatherManager from '../core/weatherManager.js';
 import * as liveTrackingManager from '../core/liveTrackingManager.js';
 import { fetchEnsembleWeatherData, processAndVisualizeEnsemble, clearEnsembleVisualizations } from '../core/ensembleManager.js';
 import { getSliderValue, displayMessage, hideProgress, displayProgress } from './ui.js';
-import * as AutoupdateManager from '../core/autoupdateManager.js';
-import { UI_DEFAULTS } from '../core/constants.js';
 import { updateModelSelectUI, cleanupSelectedEnsembleModels } from './ui.js';
 import 'leaflet-gpx';
 import { FilePicker } from '@capawesome/capacitor-file-picker';
@@ -75,7 +71,6 @@ function setupRadioGroup(name, callback) {
             if (name === 'landingDirection') {
                 const customLL = document.getElementById('customLandingDirectionLL');
                 const customRR = document.getElementById('customLandingDirectionRR');
-                // Die Zeile "const landingDirection = ..." ist nicht mehr nötig, wir haben `newValue`
 
                 if (customLL) customLL.disabled = newValue !== 'LL'; 
                 if (customRR) customRR.disabled = newValue !== 'RR'; 
@@ -112,7 +107,6 @@ function setupInput(id, eventType, debounceTime, validationCallback) {
         const value = input.type === 'number' ? parseFloat(input.value) : input.value;
 
         if (validationCallback && validationCallback(value) === false) {
-            return;
             return;
         }
 
@@ -372,8 +366,6 @@ function setupSliderEvents() {
     if (!slider) { /*...*/ return; }
 
     slider.addEventListener('input', () => {
-        // Der EventManager weiß nicht, was passieren soll.
-        // Er meldet nur: "Der Slider wurde bewegt!"
         document.dispatchEvent(new CustomEvent('ui:sliderChanged', {
             detail: { sliderValue: slider.value }, // Wir geben den neuen Wert mit
             bubbles: true,
@@ -381,8 +373,6 @@ function setupSliderEvents() {
         }));
     });
 
-    // Der 'change' Event-Listener wird für die finale Textanzeige beibehalten,
-    // aber auch er löst nur ein Event aus.
     slider.addEventListener('change', async () => {
         document.dispatchEvent(new CustomEvent('ui:sliderChangeFinished', {
             detail: { sliderValue: slider.value },
@@ -447,12 +437,10 @@ function setupMapEventListeners() {
         return;
     }
 
-    // Der Handler wird "dumm" - er löst nur noch ein Event aus.
     const mapMoveHandler = () => {
         document.dispatchEvent(new CustomEvent('map:moved'));
     };
 
-    // Die Logik für das Caching kann hier bleiben, da sie eng mit der Karteninteraktion verbunden ist.
     const debouncedCacheHandler = Utils.debounce(() => {
         cacheVisibleTiles({
             map: AppState.map,
@@ -469,13 +457,9 @@ function setupMapEventListeners() {
         });
     }, 1000);
 
-    const debouncedMapMoveHandler = Utils.debounce(mapMoveHandler, 500);
-
-    // Wir registrieren den einen, zentralen Handler für beide Events
     AppState.map.on('zoomend', mapMoveHandler);
     AppState.map.on('moveend', mapMoveHandler);
     AppState.map.on('moveend', debouncedCacheHandler); // Caching kann parallel laufen
-
 }
 
 // --- Planner- & Berechnungs-spezifische Events ---
@@ -602,7 +586,7 @@ function setupDeselectAllEnsembleButton() {
 
         // 4. Lösche die geladenen Ensemble-Daten und die Visualisierungen
         AppState.ensembleModelsData = null;
-        clearEnsembleVisualizations(); // Diese Funktion aus ensembleManager.js wird hier wiederverwendet
+        clearEnsembleVisualizations(); 
 
         Utils.handleMessage('All ensemble models deselected.');
     });
@@ -610,62 +594,6 @@ function setupDeselectAllEnsembleButton() {
 
 // --- Track & Datei-Management ---
 
-/**
- * Öffnet den nativen Dateiauswahldialog für Mobilgeräte.
- * @returns {Promise<File|null>} Ein Promise, das zur ausgewählten Datei auflöst oder null bei Abbruch.
- */
-async function openNativeFilePicker() {
-    try {
-        const result = await FilePicker.pickFiles({
-            types: ['text/gpx', 'text/csv', 'application/gpx+xml'],
-            readData: false // Wir lesen die Daten später selbst mit dem Filesystem-Plugin
-        });
-
-        if (result.files && result.files.length > 0) {
-            const file = result.files[0];
-            console.log('[eventManager] Native file picked:', file);
-            // Das zurückgegebene Objekt enthält den wichtigen `path` für das Filesystem-Plugin.
-            return file;
-        }
-        return null; // Benutzer hat die Auswahl abgebrochen
-    } catch (error) {
-        // Möglicher Fehler: Plugin nicht korrekt implementiert oder Berechtigungen fehlen.
-        console.error('Error using native file picker:', error);
-        Utils.handleError("Could not open file picker. Ensure permissions are granted.");
-        return null;
-    }
-}
-/**
- * Verarbeitet die ausgewählte Datei, egal ob vom Web-Input oder vom nativen Picker.
- * @param {File} file - Das ausgewählte Datei-Objekt.
- */
-async function processTrackFile(file) {
-    const loadingElement = document.getElementById('loading');
-    if (loadingElement) loadingElement.style.display = 'block';
-
-    if (!file) {
-        Utils.handleError('No file selected.');
-        if (loadingElement) loadingElement.style.display = 'none';
-        return;
-    }
-
-    const extension = file.name.split('.').pop().toLowerCase();
-
-    try {
-        if (extension === 'gpx') {
-            await loadGpxTrack(file);
-        } else if (extension === 'csv') {
-            await loadCsvTrackUTC(file);
-        } else {
-            Utils.handleError('Unsupported file type. Please upload a .gpx or .csv file.');
-        }
-    } catch (error) {
-        console.error('Error during track file processing:', error);
-        Utils.handleError('Failed to process track file.');
-    } finally {
-        if (loadingElement) loadingElement.style.display = 'none';
-    }
-}
 function setupTrackEvents() {
     const uploadButton = document.getElementById('uploadTrackButton');
     const trackFileInput = document.getElementById('trackFileInput');
@@ -695,7 +623,6 @@ function setupTrackEvents() {
 
             const extension = file.name.split('.').pop().toLowerCase();
             try {
-                // *** HIER IST DIE KORREKTE VERARBEITUNGSLOGIK ***
                 if (extension === 'gpx') {
                     await loadGpxTrack(file); // Ruft die importierte Funktion auf
                 } else if (extension === 'csv') {
@@ -739,13 +666,11 @@ function setupTrackEvents() {
 function setupGpxExportEvent() {
     const exportButton = document.getElementById('exportGpxButton');
     if (exportButton) {
-        // Hinzufügen von 'async', um 'await' verwenden zu können
         exportButton.addEventListener('click', async () => {
             const sliderIndex = getSliderValue();
             const interpStep = getInterpolationStep();
             const heightUnit = Settings.getValue('heightUnit', 'm');
 
-            // 'await' stellt sicher, dass auf die Fertigstellung der Funktion gewartet wird
             await exportToGpx(sliderIndex, interpStep, heightUnit);
         });
     }
@@ -823,8 +748,6 @@ function setupSettingsPanels() {
 
     // Download Panel
     setupSelectControl('downloadFormat', 'downloadFormat');
-    // Event-Listener für Buttons können hier auch hinzugefügt werden
-    // document.getElementById('downloadButton').addEventListener('click', () => { ... });
 }
 function setupCheckboxEvents() {
     if (!AppState.map) {
@@ -835,14 +758,12 @@ function setupCheckboxEvents() {
     setupCheckbox('showExitAreaCheckbox', 'showExitArea', (checkbox) => {
         Settings.state.userSettings.showExitArea = checkbox.checked;
         Settings.save();
-        // Event auslösen, anstatt Logik auszuführen
         document.dispatchEvent(new CustomEvent('ui:jumpFeatureChanged'));
     });
 
     setupCheckbox('showCanopyAreaCheckbox', 'showCanopyArea', (checkbox) => {
         Settings.state.userSettings.showCanopyArea = checkbox.checked;
         Settings.save();
-        // Dasselbe Event auslösen
         document.dispatchEvent(new CustomEvent('ui:jumpFeatureChanged'));
     });
 
@@ -880,7 +801,6 @@ function setupCheckboxEvents() {
 
     const showJumpMasterLineCheckbox = document.getElementById('showJumpMasterLine');
     if (showJumpMasterLineCheckbox) {
-        // Initialen Zustand setzen (wird von app.js gesteuert, aber wir sichern es hier ab)
         showJumpMasterLineCheckbox.disabled = !Settings.state.userSettings.trackPosition;
         showJumpMasterLineCheckbox.style.opacity = showJumpMasterLineCheckbox.disabled ? '0.5' : '1';
 
@@ -897,7 +817,6 @@ function setupCheckboxEvents() {
             Settings.save();
             dispatchAppEvent('ui:showJumpMasterLineChanged', { isChecked });
 
-            // --- START DER ERWEITERUNG ---
             // Finde das zugehörige Submenü
             const submenu = showJumpMasterLineCheckbox.closest('li')?.querySelector('ul.submenu');
 
@@ -915,7 +834,6 @@ function setupCheckboxEvents() {
         Settings.save();
         console.log('jumpMasterLineTarget changed:', newValue);
 
-        // Event auslösen
         document.dispatchEvent(new CustomEvent('ui:jumpMasterLineTargetChanged'));
     });
 
@@ -946,14 +864,12 @@ function setupRadioEvents() {
 
     setupRadioGroup('heightUnit', () => {
         Settings.updateUnitLabels(); // Passt die Labels der UI an
-        // Der Rest wird durch das Event im main-Modul erledigt
     });
 
     setupRadioGroup('temperatureUnit', () => { }); // Löst nur das Event aus
 
     setupRadioGroup('windUnit', () => {
         Settings.updateUnitLabels(); // Lokale UI-Aktion, kann bleiben
-        // Der Rest wird vom Event-Listener im main-Modul erledigt
     });
     setupRadioGroup('timeZone', () => { }); // Löst nur das Event aus
 
@@ -963,7 +879,6 @@ function setupRadioEvents() {
 
     setupRadioGroup('landingDirection', () => { });
     setupRadioGroup('jumpMasterLineTarget', () => {
-        // dispatchAppEvent('jml:targetChanged') wird zu:
         document.dispatchEvent(new CustomEvent('ui:jumpMasterLineTargetChanged'));
     });
 
@@ -989,8 +904,6 @@ function setupRadioEvents() {
                         return; // Abbrechen bei Fehler
                     }
                 }
-
-                // JETZT, da die Daten sicher vorhanden sind, die Visualisierung mit dem Index aufrufen
                 const sliderIndex = getSliderValue(); // Den Index aus der UI holen
                 processAndVisualizeEnsemble(sliderIndex); // Den Index an die Core-Funktion übergeben
             }
@@ -1011,10 +924,7 @@ function setupRadioEvents() {
     }
 }
 function setupInputEvents() {
-    // Jeder Aufruf speichert jetzt nur noch den Wert und löst das 'ui:inputChanged' Event aus.
-    // Die Validierungslogik bleibt als Callback erhalten.
-
-    // Helfer-Funktion, die den Event-Listener für die Bein-Höhen erstellt
+    // Helfer-Funktion, die den Event-Listener für die legHeight erstellt
     const createLegHeightListener = (id, defaultValue) => {
         const input = document.getElementById(id);
         if (!input) return;
@@ -1053,7 +963,7 @@ function setupInputEvents() {
         });
     };
 
-    // Die neuen Listener für die Bein-Höhen erstellen
+    // Die neuen Listener für die legHeight erstellen
     createLegHeightListener('legHeightFinal', 100);
     createLegHeightListener('legHeightBase', 200);
     createLegHeightListener('legHeightDownwind', 300);
@@ -1112,7 +1022,6 @@ function setupDownloadEvents() {
     const downloadButton = document.getElementById('downloadButton');
     if (downloadButton) {
         downloadButton.addEventListener('click', () => {
-            // Event auslösen
             document.dispatchEvent(new CustomEvent('ui:downloadClicked'));
         });
     }
@@ -1121,7 +1030,6 @@ function setupClearHistoricalDate() {
     const clearButton = document.getElementById('clearHistoricalDate');
     if (clearButton) {
         clearButton.addEventListener('click', () => {
-            // Event auslösen
             document.dispatchEvent(new CustomEvent('ui:clearDateClicked'));
         });
     }
