@@ -461,7 +461,7 @@ function setupDeselectAllEnsembleButton() {
     deselectButton.addEventListener('click', () => {
         // 1. Finde alle Checkboxen der Ensemble-Modelle
         const ensembleCheckboxes = document.querySelectorAll('#ensembleModelsSubmenu input[type="checkbox"]');
-        
+
         // 2. Entferne bei allen den Haken
         ensembleCheckboxes.forEach(checkbox => {
             checkbox.checked = false;
@@ -501,7 +501,7 @@ function setupTrackEvents() {
         const loadingElement = document.getElementById('loading');
         if (e.target.files && e.target.files.length > 0) {
             const file = e.target.files[0];
-            
+
             // UI aktualisieren
             fileNameDisplay.textContent = file.name;
             fileNameDisplay.style.fontStyle = 'normal';
@@ -529,18 +529,18 @@ function setupTrackEvents() {
     clearTrackButton.addEventListener('click', (e) => {
         e.stopPropagation();
         if (!AppState.map) { Utils.handleError('Cannot clear track: map not initialized.'); return; }
-        
+
         if (AppState.gpxLayer) {
             try {
                 if (AppState.map.hasLayer(AppState.gpxLayer)) AppState.map.removeLayer(AppState.gpxLayer);
                 AppState.gpxLayer = null;
                 AppState.gpxPoints = [];
                 AppState.isTrackLoaded = false;
-                
+
                 trackFileInput.value = ''; // Input zurücksetzen
                 fileNameDisplay.textContent = 'No file chosen';
                 fileNameDisplay.style.fontStyle = 'italic';
-                
+
             } catch (error) {
                 Utils.handleError('Failed to clear track: ' + error.message);
             }
@@ -675,8 +675,19 @@ function setupCheckboxEvents() {
         placeHarpButton.addEventListener('click', () => {
             AppState.isPlacingHarp = true;
             console.log('HARP placement mode activated');
-            AppState.map.on('click', mapManager.handleHarpPlacement); // Use imported function
+            AppState.map.on('click', mapManager.handleHarpPlacement);
             Utils.handleMessage('Click the map to place the HARP marker');
+
+            // NEUE LOGIK: Sidebar schließen und Karte anpassen
+            const mainLayout = document.querySelector('.main-layout');
+            if (mainLayout) {
+                mainLayout.classList.remove('sidebar-expanded', 'data-panel-visible');
+            }
+            document.querySelectorAll('.sidebar-icon.active').forEach(icon => icon.classList.remove('active'));
+
+            setTimeout(() => {
+                if (AppState.map) AppState.map.invalidateSize({ animate: true });
+            }, 300); // Warten auf die CSS-Transition
         });
     }
 
@@ -891,7 +902,7 @@ function setupCacheManagement() {
     resetButton.id = 'resetButton';
     resetButton.textContent = 'Reset Settings';
     resetButton.title = 'Resets all settings to their default values and locks all features';
-    
+
     resetButton.className = 'btn btn-danger'; // Weist die neuen CSS-Klassen zu
 
     resetButton.addEventListener('click', () => {
@@ -901,9 +912,9 @@ function setupCacheManagement() {
             window.location.reload();
         }
     });
-    
+
     // Grid-Layout-Logik beibehalten
-    buttonWrapper.appendChild(document.createElement('label')); 
+    buttonWrapper.appendChild(document.createElement('label'));
     buttonWrapper.appendChild(resetButton);
 
     // --- Clear Tile Cache Button ---
@@ -911,7 +922,7 @@ function setupCacheManagement() {
     clearCacheButton.id = 'clearCacheButton';
     clearCacheButton.textContent = 'Clear Tile Cache';
     clearCacheButton.title = 'Clears cached map tiles. Pan/zoom to cache more tiles for offline use.';
-    
+
     clearCacheButton.className = 'btn btn-danger'; // Weist die neuen CSS-Klassen zu
 
     clearCacheButton.addEventListener('click', async () => {
@@ -1056,30 +1067,32 @@ function setupHarpCoordInputEvents() {
         const parsedCoords = LocationManager.parseQueryAsCoordinates(inputValue);
 
         if (parsedCoords) {
-            // Clear existing HARP marker if it exists
             if (AppState.harpMarker) {
                 AppState.map.removeLayer(AppState.harpMarker);
             }
-
-            // Create and add new HARP marker
             AppState.harpMarker = mapManager.createHarpMarker(parsedCoords.lat, parsedCoords.lng).addTo(AppState.map);
-            console.log('Placed HARP marker at:', parsedCoords);
-
-            // Update settings
+            AppState.map.panTo([parsedCoords.lat, parsedCoords.lng]);
             Settings.state.userSettings.harpLat = parsedCoords.lat;
             Settings.state.userSettings.harpLng = parsedCoords.lng;
             Settings.save();
             Utils.handleMessage('HARP marker placed successfully.');
-
-            // Enable HARP radio button and set it to checked
             harpRadio.disabled = false;
             harpRadio.checked = true;
-            console.log('Enabled HARP radio button and set to checked');
-
-            // Trigger JML update if live tracking is active and HARP is selected
             document.dispatchEvent(new CustomEvent('ui:jumpMasterLineTargetChanged'));
             document.dispatchEvent(new CustomEvent('ui:recalculateJump'));
             document.dispatchEvent(new CustomEvent('harp:updated'));
+
+            //Sidebar schließen und Karte anpassen
+            const mainLayout = document.querySelector('.main-layout');
+            if (mainLayout) {
+                mainLayout.classList.remove('sidebar-expanded', 'data-panel-visible');
+            }
+            document.querySelectorAll('.sidebar-icon.active').forEach(icon => icon.classList.remove('active'));
+
+            setTimeout(() => {
+                if (AppState.map) AppState.map.invalidateSize({ animate: true });
+            }, 300);
+
         } else {
             Utils.handleError('Invalid coordinates. Please enter a valid MGRS or Decimal Degree format.');
         }

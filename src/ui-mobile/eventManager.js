@@ -72,8 +72,8 @@ function setupRadioGroup(name, callback) {
                 const customLL = document.getElementById('customLandingDirectionLL');
                 const customRR = document.getElementById('customLandingDirectionRR');
 
-                if (customLL) customLL.disabled = newValue !== 'LL'; 
-                if (customRR) customRR.disabled = newValue !== 'RR'; 
+                if (customLL) customLL.disabled = newValue !== 'LL';
+                if (customRR) customRR.disabled = newValue !== 'RR';
 
                 if (newValue === 'LL' && customLL && !customLL.value && Settings.state.userSettings.customLandingDirectionLL === '') { // KORREKTUR
                     customLL.value = Math.round(AppState.landingWindDir || 0);
@@ -574,7 +574,7 @@ function setupDeselectAllEnsembleButton() {
     deselectButton.addEventListener('click', () => {
         // 1. Finde alle Checkboxen der Ensemble-Modelle
         const ensembleCheckboxes = document.querySelectorAll('#ensembleModelsSubmenu input[type="checkbox"]');
-        
+
         // 2. Entferne bei allen den Haken
         ensembleCheckboxes.forEach(checkbox => {
             checkbox.checked = false;
@@ -586,7 +586,7 @@ function setupDeselectAllEnsembleButton() {
 
         // 4. Lösche die geladenen Ensemble-Daten und die Visualisierungen
         AppState.ensembleModelsData = null;
-        clearEnsembleVisualizations(); 
+        clearEnsembleVisualizations();
 
         Utils.handleMessage('All ensemble models deselected.');
     });
@@ -615,7 +615,7 @@ function setupTrackEvents() {
         const loadingElement = document.getElementById('loading');
         if (e.target.files && e.target.files.length > 0) {
             const file = e.target.files[0];
-            
+
             // UI aktualisieren
             fileNameDisplay.textContent = file.name;
             fileNameDisplay.style.fontStyle = 'normal';
@@ -643,18 +643,18 @@ function setupTrackEvents() {
     clearTrackButton.addEventListener('click', (e) => {
         e.stopPropagation();
         if (!AppState.map) { Utils.handleError('Cannot clear track: map not initialized.'); return; }
-        
+
         if (AppState.gpxLayer) {
             try {
                 if (AppState.map.hasLayer(AppState.gpxLayer)) AppState.map.removeLayer(AppState.gpxLayer);
                 AppState.gpxLayer = null;
                 AppState.gpxPoints = [];
                 AppState.isTrackLoaded = false;
-                
+
                 trackFileInput.value = ''; // Input zurücksetzen
                 fileNameDisplay.textContent = 'No file chosen';
                 fileNameDisplay.style.fontStyle = 'italic';
-                
+
             } catch (error) {
                 Utils.handleError('Failed to clear track: ' + error.message);
             }
@@ -842,8 +842,11 @@ function setupCheckboxEvents() {
         placeHarpButton.addEventListener('click', () => {
             AppState.isPlacingHarp = true;
             console.log('HARP placement mode activated');
-            AppState.map.on('click', mapManager.handleHarpPlacement); // Use imported function
+            AppState.map.on('click', mapManager.handleHarpPlacement);
             Utils.handleMessage('Click the map to place the HARP marker');
+
+            //Zum Karten-Tab wechseln
+            document.querySelector('.tab-button[data-panel="map"]')?.click();
         });
     }
 
@@ -1001,7 +1004,7 @@ function setupInputEvents() {
 
     setupInput('canopySpeed', 'change', 300);
     setupInput('descentRate', 'change', 300);
-    setupInput('interpStep', 'change', 300, null, 'interpStep'); 
+    setupInput('interpStep', 'change', 300, null, 'interpStep');
     setupInput('interpStep', 'change', 300, null, 'interpStep');
 
     setupInput('customLandingDirectionLL', 'input', 100);
@@ -1235,34 +1238,27 @@ function setupHarpCoordInputEvents() {
             Utils.handleError('Please enter coordinates.');
             return;
         }
-
         const parsedCoords = LocationManager.parseQueryAsCoordinates(inputValue);
 
         if (parsedCoords) {
-            // Clear existing HARP marker if it exists
+            // ... (der Code zum Platzieren des Markers bleibt hier unverändert)
             if (AppState.harpMarker) {
                 AppState.map.removeLayer(AppState.harpMarker);
             }
-
-            // Create and add new HARP marker
             AppState.harpMarker = mapManager.createHarpMarker(parsedCoords.lat, parsedCoords.lng).addTo(AppState.map);
-            console.log('Placed HARP marker at:', parsedCoords);
-
-            // Update settings
+            AppState.map.panTo([parsedCoords.lat, parsedCoords.lng]);
             Settings.state.userSettings.harpLat = parsedCoords.lat;
             Settings.state.userSettings.harpLng = parsedCoords.lng;
             Settings.save();
             Utils.handleMessage('HARP marker placed successfully.');
-
-            // Enable HARP radio button and set it to checked
             harpRadio.disabled = false;
             harpRadio.checked = true;
-            console.log('Enabled HARP radio button and set to checked');
-
-            // Trigger JML update if live tracking is active and HARP is selected
             document.dispatchEvent(new CustomEvent('ui:jumpMasterLineTargetChanged'));
             document.dispatchEvent(new CustomEvent('ui:recalculateJump'));
             document.dispatchEvent(new CustomEvent('harp:updated'));
+
+            //Zum Karten-Tab wechseln
+            document.querySelector('.tab-button[data-panel="map"]')?.click();
         } else {
             Utils.handleError('Invalid coordinates. Please enter a valid MGRS or Decimal Degree format.');
         }
@@ -1337,7 +1333,7 @@ export function initializeEventListeners() {
     setupInputEvents();
     setupDownloadEvents();
     setupClearHistoricalDate();
-    
+
     // 4. Spezifische Planner-Funktionen
     setupJumpRunTrackEvents();
     setupCutawayRadioButtons();
@@ -1347,7 +1343,7 @@ export function initializeEventListeners() {
     // 5. Datei- & Track-Management
     setupTrackEvents();
     setupGpxExportEvent();
-    
+
     // 6. App-Management & Cache
     setupCacheManagement();
     setupCacheSettings();

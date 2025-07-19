@@ -760,19 +760,31 @@ function updateDashboardPanel(data) {
         altitudeEl.textContent = displayAltitude;
         altitudeUnitEl.textContent = `${heightUnit} abv DIP`;
 
-        // Range-Berechnung
         if (rangeEl && rangeUnitEl && descentRateMps > 0.1) {
             const timeToGround = altitudeAGL / descentRateMps;
             const rangeMeters = speedMs * timeToGround;
 
             let displayRange;
             let displayUnit;
-            if (rangeMeters > 1000) {
-                displayRange = (rangeMeters / 1000).toFixed(1);
-                displayUnit = 'km';
-            } else {
-                displayRange = Math.round(rangeMeters);
-                displayUnit = 'm';
+
+            // KORREKTUR: Berücksichtigt jetzt 'ft' und 'mi'
+            if (heightUnit === 'ft') {
+                const rangeFeet = Utils.convertHeight(rangeMeters, 'ft');
+                if (rangeFeet > 5280) { // Wenn über eine Meile
+                    displayRange = (rangeFeet / 5280).toFixed(1);
+                    displayUnit = 'mi';
+                } else {
+                    displayRange = Math.round(rangeFeet);
+                    displayUnit = 'ft';
+                }
+            } else { // Standard 'm'
+                if (rangeMeters > 1000) {
+                    displayRange = (rangeMeters / 1000).toFixed(1);
+                    displayUnit = 'km';
+                } else {
+                    displayRange = Math.round(rangeMeters);
+                    displayUnit = 'm';
+                }
             }
             rangeEl.textContent = displayRange;
             rangeUnitEl.textContent = displayUnit;
@@ -781,10 +793,7 @@ function updateDashboardPanel(data) {
         }
     }
 
-    // --- Speed, Direction, Bearing, Distance, Glide Ratios (unverändert) ---
-    // Der Rest der Funktion bleibt exakt so, wie er im vorherigen Schritt war.
-    // ... (Code für Speed, Direction, Bearing, Distance & Glide Ratios hier einfügen) ...
-    // Speed
+    // --- Speed, Direction, Bearing, Distance, Glide Ratios ---
     const speedEl = document.getElementById('dashboard-speed');
     const speedUnitEl = document.getElementById('dashboard-speed-unit');
     const windUnit = getWindSpeedUnit();
@@ -794,13 +803,11 @@ function updateDashboardPanel(data) {
         speedUnitEl.textContent = windUnit;
     }
 
-    // Direction
     const directionEl = document.getElementById('dashboard-direction');
     if (direction !== 'N/A' && directionEl) {
         directionEl.textContent = Math.round(direction);
     }
 
-    // Bearing und Distance to DIP
     const dipMarker = AppState.currentMarker;
     const bearingEl = document.getElementById('dashboard-bearing');
     const distanceEl = document.getElementById('dashboard-distance');
@@ -814,12 +821,25 @@ function updateDashboardPanel(data) {
 
         let displayDistance;
         let displayDistUnit;
-        if (distanceMeters > 1000) {
-            displayDistance = (distanceMeters / 1000).toFixed(1);
-            displayDistUnit = 'km';
-        } else {
-            displayDistance = Math.round(distanceMeters);
-            displayDistUnit = 'm';
+        
+        // KORREKTUR: Berücksichtigt jetzt 'ft' und 'mi' für die Distanz
+        if (heightUnit === 'ft') {
+            const distanceFeet = Utils.convertHeight(distanceMeters, 'ft');
+            if (distanceFeet > 5280) { // Wenn über eine Meile
+                displayDistance = (distanceFeet / 5280).toFixed(1);
+                displayDistUnit = 'mi';
+            } else {
+                displayDistance = Math.round(distanceFeet);
+                displayDistUnit = 'ft';
+            }
+        } else { // Standard 'm'
+            if (distanceMeters > 1000) {
+                displayDistance = (distanceMeters / 1000).toFixed(1);
+                displayDistUnit = 'km';
+            } else {
+                displayDistance = Math.round(distanceMeters);
+                displayDistUnit = 'm';
+            }
         }
 
         distanceEl.textContent = displayDistance;
@@ -828,14 +848,13 @@ function updateDashboardPanel(data) {
         const bearing = Math.round(Utils.calculateBearing(latitude, longitude, dipPos.lat, dipPos.lng));
         bearingEl.textContent = bearing;
     }
-
-    // Gleitverhältnisse
+    
+    // ... (Der restliche Teil der Funktion für Gleitverhältnisse bleibt unverändert)
     const glideRequiredEl = document.getElementById('dashboard-glide-required');
     const glideCurrentEl = document.getElementById('dashboard-glide-current');
     let requiredRatio = null;
     let currentRatio = null;
 
-    // 1. Erforderliches Gleitverhältnis zum DIP berechnen
     if (dipMarker && distanceMeters !== null && glideRequiredEl) {
         const dipAltitude = AppState.lastAltitude || 0;
         const altitudeDifference = deviceAltitude - dipAltitude;
@@ -847,7 +866,6 @@ function updateDashboardPanel(data) {
         }
     }
 
-    // 2. Aktuelles Gleitverhältnis berechnen
     if (glideCurrentEl && speedMs > 0 && descentRateMps > 0.1) {
         currentRatio = speedMs / descentRateMps;
         glideCurrentEl.textContent = currentRatio.toFixed(1);
@@ -855,26 +873,17 @@ function updateDashboardPanel(data) {
         glideCurrentEl.textContent = "---";
     }
 
-    // 3. Farbe basierend auf dem Vergleich der Gleitverhältnisse setzen
     if (glideCurrentEl && requiredRatio !== null && currentRatio !== null) {
-        // Toleranzbereich definieren (z.B. 10% des erforderlichen Wertes)
         const tolerance = 0.10 * requiredRatio;
-
-        // CSS-Klassen entfernen, bevor die neue gesetzt wird
         glideCurrentEl.classList.remove('glide-good', 'glide-ok', 'glide-bad');
-
         if (currentRatio > requiredRatio + tolerance) {
-            // Deutlich besser -> Grün
             glideCurrentEl.classList.add('glide-good');
         } else if (currentRatio < requiredRatio - tolerance) {
-            // Deutlich schlechter -> Rot
             glideCurrentEl.classList.add('glide-bad');
         } else {
-            // Innerhalb der Toleranz -> Gelb
             glideCurrentEl.classList.add('glide-ok');
         }
     } else if (glideCurrentEl) {
-        // Falls keine Berechnung möglich ist, alle Farbklassen entfernen
         glideCurrentEl.classList.remove('glide-good', 'glide-ok', 'glide-bad');
     }
 }

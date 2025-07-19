@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>Wetterheidi</string>
+	<string>DZMaster</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -22,6 +22,15 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>Privacy - Location Always and When In Use Usage Description: Needed to track skydiving</key>
+	<string></string>
+	<key>Privacy - Location When In Use Usage Description: Location must be shown on map</key>
+	<string></string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+		<string>processing</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

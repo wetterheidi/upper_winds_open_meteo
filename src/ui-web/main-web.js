@@ -16,7 +16,7 @@ import { cacheVisibleTiles, cacheTilesForDIP } from '../core/tileCache.js';
 import { getSliderValue, displayError, displayMessage, displayProgress, hideProgress, applyDeviceSpecificStyles } from './ui.js';
 import * as AutoupdateManager from '../core/autoupdateManager.js';
 import * as displayManager from './displayManager.js';
-import * as liveTrackingManager from '../core/liveTrackingManager.js'; 
+import * as liveTrackingManager from '../core/liveTrackingManager.js';
 import * as EnsembleManager from '../core/ensembleManager.js';
 import * as LocationManager from '../core/locationManager.js';
 
@@ -796,7 +796,9 @@ function updateJumpMasterDashboard(data) {
     altitudeEl.textContent = altText;
 
     directionEl.textContent = `${data.direction}°`;
-    speedEl.textContent = `${Utils.convertWind(data.speedMs, settings.effectiveWindUnit, 'm/s').toFixed(1)} ${settings.effectiveWindUnit}`;
+    const displaySpeed = Utils.convertWind(data.speedMs, settings.effectiveWindUnit, 'm/s');
+    const formattedSpeed = settings.effectiveWindUnit === 'bft' ? Math.round(displaySpeed) : displaySpeed.toFixed(1);
+    speedEl.textContent = `${formattedSpeed} ${settings.effectiveWindUnit}`;
     accuracyEl.textContent = `± ${Math.round(Utils.convertHeight(data.accuracy, settings.heightUnit))} ${settings.heightUnit}`;
 
     const jmlDetails = document.getElementById('jumpmaster-line-details');
@@ -959,19 +961,19 @@ function setupAppEventListeners() {
         }
 
         // 2. Kernlogik ausführen
-        resetJumpRunDirection(true); 
-        await weatherManager.fetchWeatherForLocation(lat, lng); 
+        resetJumpRunDirection(true);
+        await weatherManager.fetchWeatherForLocation(lat, lng);
 
         if (Settings.state.userSettings.calculateJump) {
-            calculateJump(); 
+            calculateJump();
             JumpPlanner.calculateCutAway();
         }
 
-        mapManager.recenterMap(true); 
+        mapManager.recenterMap(true);
         AppState.isManualPanning = false;
 
         // 3. UI-Updates anstoßen, die von den neuen Daten abhängen
-        displayManager.updateJumpRunTrackDisplay(); 
+        displayManager.updateJumpRunTrackDisplay();
         displayManager.updateLandingPatternDisplay();
     });
 
@@ -1475,7 +1477,7 @@ function setupAppEventListeners() {
 
 document.addEventListener('DOMContentLoaded', async () => {
     initializeApp();
-    initializeUIElements(); 
+    initializeUIElements();
     applyDeviceSpecificStyles();
     await mapManager.initializeMap();
     setupAppEventListeners();
