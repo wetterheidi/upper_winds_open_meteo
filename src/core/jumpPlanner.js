@@ -153,7 +153,7 @@ export function calculateExitCircle(interpolatedData) {
     const meanWindFull = Utils.calculateMeanWind(heights, uComponents, vComponents, elevation + safetyHeight, elevation + openingAltitude - CANOPY_OPENING_BUFFER_METERS);
 
     const landingPatternCoords = calculateLandingPatternCoords(AppState.lastLat, AppState.lastLng, interpolatedData);
-    const [blueLat, blueLng] = landingPatternCoords.downwindStart;
+    let [blueLat, blueLng] = landingPatternCoords.downwindStart;
     if (!Number.isFinite(blueLat)) { blueLat = AppState.lastLat; blueLng = AppState.lastLng; }
 
     const newCenterBlue = Utils.calculateNewCenter(blueLat, blueLng, meanWind[1] * flyTime, meanWind[0]);
@@ -248,7 +248,7 @@ export function calculateCanopyCircles(interpolatedData) {
     if (!freeFallResult) return null;
 
     const landingPatternCoords = calculateLandingPatternCoords(AppState.lastLat, AppState.lastLng, interpolatedData);
-    const [blueLat, blueLng] = landingPatternCoords.downwindStart;
+    let [blueLat, blueLng] = landingPatternCoords.downwindStart;
     if (!Number.isFinite(blueLat)) { blueLat = AppState.lastLat; blueLng = AppState.lastLng; }
 
     const upperLimit = elevation + openingAltitude - CANOPY_OPENING_BUFFER_METERS;

@@ -4,51 +4,40 @@
  * Platzhalter bereit, um Build- und Laufzeitfehler zu vermeiden.
  */
 
-// Eine Variable, um das geladene Modul-Objekt zu speichern (Singleton-Muster).
-let capacitorModules = null;
+let capacitorModulesPromise = null;
 
 async function loadModules() {
-    // Nur in einer echten Capacitor-Umgebung versuchen, die Module zu laden.
     if (window.Capacitor && window.Capacitor.isNativePlatform()) {
         try {
             console.log("Capacitor-Plattform erkannt. Lade native Module...");
-            // Lade die Module explizit.
-            const geolocationModule = await import('@capacitor/geolocation');
-            const filesystemModule = await import('@capacitor/filesystem');
-            
+            // Importiere die separate Datei, die alle nativen Module enthält
+            const { nativeModules } = await import('./native-imports.js');
             console.log("Native Module erfolgreich geladen.");
-            // Gib ein Objekt zurück, das die echten, funktionalen Module enthält.
-            return {
-                Geolocation: geolocationModule.Geolocation,
-                Filesystem: filesystemModule.Filesystem,
-                Directory: filesystemModule.Directory,
-                isNative: true
-            };
+            return nativeModules;
         } catch (error) {
-            console.error("Kritischer Fehler: Capacitor-Module konnten auf nativer Plattform nicht geladen werden.", error);
-            // Fallback, um einen App-Absturz zu verhindern.
-            return { Geolocation: null, Filesystem: null, Directory: null, isNative: true };
+            console.error("Kritischer Fehler: Native Module konnten nicht geladen werden.", error);
+            // Fallback
+            return { Geolocation: null, Filesystem: null, Directory: null, BackgroundGeolocation: null, isNative: true };
         }
     } else {
-        // Dies ist eine Web-Umgebung.
+        // Dies ist eine Web-Umgebung. Es wird nichts importiert.
         console.log("Web-Umgebung erkannt. Native Module werden nicht geladen.");
-        return {
-            Geolocation: null, // Explizit null, damit der Code darauf prüfen kann.
+        return Promise.resolve({
+            Geolocation: null,
             Filesystem: null,
             Directory: null,
+            BackgroundGeolocation: null,
             isNative: false
-        };
+        });
     }
 }
 
 /**
- * Holt die benötigten Capacitor-Module. Die Funktion lädt die Module
- * nur beim ersten Aufruf und gibt danach den zwischengespeicherten Wert zurück.
- * @returns {Promise<{Geolocation: object|null, Filesystem: object|null, Directory: object|null, isNative: boolean}>}
+ * Holt die benötigten Capacitor-Module.
  */
 export function getCapacitor() {
-    if (!capacitorModules) {
-        capacitorModules = loadModules();
+    if (!capacitorModulesPromise) {
+        capacitorModulesPromise = loadModules();
     }
-    return capacitorModules;
+    return capacitorModulesPromise;
 }

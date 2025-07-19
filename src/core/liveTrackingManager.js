@@ -35,7 +35,8 @@ function createLiveMarkerIcon(direction) {
         className: 'live-marker-container', // Container-Klasse ohne Standard-Leaflet-Stile
         html: iconHtml,
         iconSize: [24, 24], // Größe des Icons
-        iconAnchor: [12, 12] // Zentriert das Icon auf der Koordinate
+        iconAnchor: [12, 12],
+        pmIgnore: true
     });
 }
 
@@ -199,39 +200,49 @@ export async function startPositionTracking() {
     if (AppState.watchId !== null) return;
     console.log("[LiveTrackingManager] Attempting to start position tracking...");
 
-    // Hole die Module über den Adapter
-    const { Geolocation, isNative } = await getCapacitor();
+    const { BackgroundGeolocation, isNative } = await getCapacitor();
 
-    if (isNative && Geolocation) { // Prüfe, ob wir in der nativen App sind UND das Modul geladen wurde
+    if (isNative && BackgroundGeolocation) {
         try {
-            await Geolocation.requestPermissions(); // Berechtigung anfordern
-            const watchId = await Geolocation.watchPosition({ enableHighAccuracy: true }, (position, err) => {
-                if (err || !position) {
-                    Utils.handleError(`Geolocation error: ${err?.message || 'No position'}`);
-                    stopPositionTracking();
-                    return;
+            await BackgroundGeolocation.addWatcher({
+                    id: "primary-watcher",
+                    backgroundMessage: "Tracking your position for DZMaster.",
+                    backgroundTitle: "DZMaster is tracking",
+                    requestPermissions: true,
+                    stale: false,
+                    distanceFilter: 5 // In Metern
+                },
+                (position, error) => {
+                    if (error) {
+                        Utils.handleError(`Background Geolocation error: ${error.message}`);
+                        stopPositionTracking();
+                        return;
+                    }
+                    if (position) {
+                        debouncedPositionUpdate(position);
+                    }
                 }
-                debouncedPositionUpdate(position);
-            });
-            AppState.watchId = watchId;
+            );
+            AppState.watchId = "primary-watcher"; // Speichern der Watcher-ID
             document.dispatchEvent(new CustomEvent('tracking:started'));
+            console.log("[LiveTrackingManager] Background Geolocation watcher added.");
+
         } catch (error) {
-            Utils.handleError(`Failed to start tracking: ${error.message}`);
+            Utils.handleError(`Failed to start background tracking: ${error.message}`);
         }
     } else {
-        console.log("[LiveTrackingManager] Using navigator.geolocation for tracking.");
+        console.log("[LiveTrackingManager] Using navigator.geolocation for tracking (Web).");
         if (!navigator.geolocation) {
             Utils.handleError("Geolocation is not supported by your browser.");
             document.dispatchEvent(new CustomEvent('tracking:stopped'));
             return;
         }
         AppState.watchId = navigator.geolocation.watchPosition(
-            debouncedPositionUpdate,
+            (position) => debouncedPositionUpdate(position), // Standard-Positionsobjekt
             (error) => {
                 Utils.handleError(`Geolocation error: ${error.message}`);
                 stopPositionTracking();
-            },
-            { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+            }, { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
         );
         document.dispatchEvent(new CustomEvent('tracking:started'));
     }
@@ -246,14 +257,14 @@ export async function startPositionTracking() {
  */
 export async function stopPositionTracking() {
     if (AppState.watchId !== null) {
-        // Hole die Module erneut, um sicherzugehen
-        const { Geolocation, isNative } = await getCapacitor();
+        const { BackgroundGeolocation, isNative } = await getCapacitor();
 
-        if (isNative && Geolocation) {
-            await Geolocation.clearWatch({ id: AppState.watchId });
-            console.log("[LiveTrackingManager] Stopped Capacitor position tracking.");
+        if (isNative && BackgroundGeolocation) {
+            await BackgroundGeolocation.removeWatcher({ id: AppState.watchId });
+            console.log("[LiveTrackingManager] Stopped Capacitor Background Geolocation watcher.");
         } else {
             navigator.geolocation.clearWatch(AppState.watchId);
+            console.log("[LiveTrackingManager] Stopped navigator.geolocation watcher.");
         }
         AppState.watchId = null;
     }
@@ -264,8 +275,7 @@ export async function stopPositionTracking() {
     AppState.accuracyCircle = null;
     AppState.prevLat = null;
     AppState.prevLng = null;
-
-    AppState.altitudeCorrectionOffset = 0; // Wichtig: Offset zurücksetzen
+    AppState.altitudeCorrectionOffset = 0;
     document.dispatchEvent(new CustomEvent('tracking:stopped'));
 }
 

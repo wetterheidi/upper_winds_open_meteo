@@ -2,27 +2,38 @@ import { defineConfig } from 'vite'
 import { resolve } from 'path'
 import commonjs from '@rollup/plugin-commonjs'
 
-// Diese Konfiguration ist NUR für die Web-App
 export default defineConfig(({ command }) => {
   return {
-    // Der "root" der Web-App ist 'src/ui-web'
-    root: 'src/ui-web',
-    publicDir: resolve(__dirname, 'public'),
+    // Der 'root' bleibt immer das Projekt-Hauptverzeichnis.
+    
+    publicDir: 'public',
 
-    // WICHTIG: Die Base URL ist für den Dev-Server immer '/', 
-    // nur für den 'build' Befehl wird sie auf den Repository-Namen gesetzt.
+    // 'base' ist der einzige Wert, der sich ändern muss.
     base: command === 'serve' ? '/' : '/upper_winds_open_meteo/',
 
-    build: {
-      outDir: resolve(__dirname, 'dist/web'),
-      emptyOutDir: true,
-      rollupOptions: {
-        // Schließt alle @capacitor/* Pakete vom Web-Build aus.
-        external: [
-          /^@capacitor\//
-        ]
-      }
+    server: {
+      // Sag dem Dev-Server, welche Seite er beim Start öffnen soll.
+      // Der Pfad ist absolut vom Projekt-Root.
+      open: '/src/ui-web/index.html',
     },
+
+    build: {
+      outDir: 'dist',
+      rollupOptions: {
+        input: {
+          web: resolve(__dirname, 'src/ui-web/index.html'),
+          mobile: resolve(__dirname, 'src/ui-mobile/index.html'),
+        },
+        // ================== NEUER ABSCHNITT START ===================
+        // Weist den Builder an, Capacitor-Module nicht zu bündeln.
+        external: [
+            /^@capacitor\//,
+            '@capacitor-community/background-geolocation'
+        ]
+        // ================== NEUER ABSCHNITT ENDE ====================
+      },
+    },
+
     plugins: [
       commonjs(),
     ],
