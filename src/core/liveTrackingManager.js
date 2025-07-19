@@ -44,7 +44,7 @@ function updateAccuracyCircle(lat, lng, accuracy) {
         AppState.map.removeLayer(AppState.accuracyCircle);
     }
     AppState.accuracyCircle = L.circle([lat, lng], {
-        radius: accuracy, color: 'blue', fillOpacity: 0.1, weight: 1, dashArray: '5, 5'
+        radius: accuracy, color: 'blue', fillOpacity: 0.1, weight: 1, dashArray: '5, 5', pmIgnore: true
     }).addTo(AppState.map);
 }
 
@@ -116,7 +116,8 @@ const debouncedPositionUpdate = Utils.debounce(async (position) => {
     if (!AppState.liveMarker) {
         AppState.liveMarker = L.marker([latitude, longitude], {
             icon: createLiveMarkerIcon(direction),
-            zIndexOffset: 1000
+            zIndexOffset: 1000,
+            pmIgnore: true
         }).addTo(AppState.map);
     } else {
         AppState.liveMarker.setLatLng([latitude, longitude]);

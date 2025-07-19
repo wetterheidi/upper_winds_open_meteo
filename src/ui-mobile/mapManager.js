@@ -1041,7 +1041,8 @@ export function drawJumpVisualization(jumpData) {
                 color: circleInfo.color,
                 fillColor: circleInfo.fillColor,
                 fillOpacity: circleInfo.fillOpacity,
-                weight: circleInfo.weight || 2
+                weight: circleInfo.weight || 2,
+                pmIgnore: true
             }).addTo(AppState.jumpVisualizationLayerGroup);
 
             // NEU: Wenn eine Tooltip-Information vorhanden ist, binde sie.
@@ -1058,7 +1059,11 @@ export function drawJumpVisualization(jumpData) {
     // Zeichne Canopy-Kreise
     if (jumpData.canopyCircles) {
         jumpData.canopyCircles.forEach(circleInfo => {
-            L.circle(circleInfo.center, circleInfo).addTo(AppState.jumpVisualizationLayerGroup);
+            // Fügen Sie die Option dem zweiten Argument von L.circle hinzu
+            L.circle(circleInfo.center, {
+                ...circleInfo, // Übernimmt alle bestehenden Optionen
+                pmIgnore: true
+            }).addTo(AppState.jumpVisualizationLayerGroup);
         });
     }
 
@@ -1085,7 +1090,8 @@ export function drawJumpVisualization(jumpData) {
                     className: `isoline-label ${isSmall ? 'isoline-label-small' : 'isoline-label-large'}`,
                     html: `<span style="font-size: ${isSmall ? '8px' : '10px'}">${labelInfo.text}</span>`,
                     iconSize: isSmall ? [50, 12] : [60, 14],
-                    iconAnchor: calculateLabelAnchor(labelInfo.center, labelInfo.radius)
+                    iconAnchor: calculateLabelAnchor(labelInfo.center, labelInfo.radius),
+                    pmIgnore:true
                 }),
                 zIndexOffset: 2100 // Stellt sicher, dass Labels oben liegen
             }).addTo(AppState.jumpVisualizationLayerGroup);
@@ -1095,7 +1101,8 @@ export function drawJumpVisualization(jumpData) {
                 marker: labelMarker,
                 center: labelInfo.center,
                 radius: labelInfo.radius,
-                text: labelInfo.text
+                text: labelInfo.text,
+                pmIgnore: true
             });
         });
     }
@@ -1156,7 +1163,8 @@ export function drawLandingPattern(patternData) {
             color: 'red',
             weight: 3,
             opacity: 0.8,
-            dashArray: '5, 10'
+            dashArray: '5, 10',
+            pmIgnore: true
         }).addTo(AppState.landingPatternLayerGroup); // Fügt es zur LayerGroup hinzu
     });
 
@@ -1165,13 +1173,14 @@ export function drawLandingPattern(patternData) {
         // Die Funktion createArrowIcon muss auch hier im mapManager sein.
         const arrowIcon = createArrowIcon(arrow.position[0], arrow.position[1], arrow.bearing, arrow.color);
 
-        const arrowMarker = L.marker(arrow.position, { icon: arrowIcon })
+        const arrowMarker = L.marker(arrow.position, { icon: arrowIcon, pmIgnore: true })
             .addTo(AppState.landingPatternLayerGroup); // Fügt es zur LayerGroup hinzu
 
         arrowMarker.bindTooltip(arrow.tooltipText, {
             offset: [10, 0],
             direction: 'right',
-            className: 'wind-tooltip'
+            className: 'wind-tooltip',
+            pmIgnore: true
         });
     });
 }
@@ -1203,13 +1212,15 @@ export function createCutAwayMarker(lat, lng) {
         iconSize: [25, 25],
         iconAnchor: [12, 12],
         popupAnchor: [0, -12],
+        pmIgnore: true
         //shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
         //shadowSize: [41, 41],
         //shadowAnchor: [13, 41]
     });
     return L.marker([lat, lng], {
         icon: cutAwayIcon,
-        draggable: true
+        draggable: true,
+        pmIgnore: true
     });
 }
 export function attachCutAwayMarkerDragend(marker) {
@@ -1262,7 +1273,8 @@ export function drawCutAwayVisualization(data) {
         color: 'purple',
         fillColor: 'purple',
         fillOpacity: 0.2,
-        weight: 2
+        weight: 2,
+        pmIgnore: true
     }).addTo(AppState.map);
 
     AppState.cutAwayCircle.bindTooltip(data.tooltipContent, {
@@ -1330,7 +1342,8 @@ export function drawJumpRunTrack(trackData) {
         rotationAngle: trackData.airplane.bearing,
         rotationOrigin: 'center center',
         draggable: true,
-        zIndexOffset: 2000
+        zIndexOffset: 2000,
+        pmIgnore: true
     })
         .bindTooltip('Drag to move Jump Run Track')
         .addTo(AppState.jumpRunTrackLayerGroup);
@@ -1442,10 +1455,11 @@ export function createCustomMarker(lat, lng) {
         iconSize: [32, 32],
         iconAnchor: [16, 20],
         popupAnchor: [0, -32],
+        pmIgnore: true
         //shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
         //shadowSize: [41, 41], shadowAnchor: [13, 32]
     });
-    return L.marker([lat, lng], { icon: customIcon, draggable: true });
+    return L.marker([lat, lng], { icon: customIcon, draggable: true, pmIgnore: true });
 }
 
 // Private Helferfunktion: Hängt die Drag-Logik an.
@@ -1615,9 +1629,11 @@ export function createHarpMarker(latitude, longitude) {
             className: 'harp-marker',
             html: '<div style="width: 14px; height: 14px; background-color: green; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 6px rgba(0,0,0,0.6);"></div>',
             iconSize: [20, 20],
-            iconAnchor: [10, 10]
+            iconAnchor: [10, 10],
+            pmIgnore: true
         }),
-        pane: 'markerPane' // Use standard marker pane
+        pane: 'markerPane',  // Use standard marker pane
+        pmIgnore: true
     });
     console.log('Created HARP marker at:', { latitude, longitude });
     return marker;
@@ -1701,10 +1717,10 @@ export function updateFavoriteMarkers(favorites) {
     });
 
     favorites.forEach(fav => {
-        const marker = L.marker([fav.lat, fav.lng], { icon: starIcon })
+        const marker = L.marker([fav.lat, fav.lng], { icon: starIcon, pmIgnore: true })
             .bindTooltip(fav.label, {
                 permanent: false,
-                direction: 'top'
+                direction: 'top',
             })
             .on('click', () => {
                 // Wenn auf einen Favoriten-Marker geklickt wird, die Position auswählen
