@@ -509,7 +509,7 @@ export async function saveRecordedTrack() {
 
         const { Filesystem, Directory, isNative } = await getCapacitor();
 
-        if (isNative && Filesystem) {
+        if (isNative && Filesystem) { // <-- Prüfe, ob Filesystem nicht null ist
             await Filesystem.writeFile({
                 path: fileName,
                 data: gpxContent,
@@ -518,14 +518,19 @@ export async function saveRecordedTrack() {
             });
             Utils.handleMessage(`Track saved: ${fileName}`);
         } else {
-            // Der Web-Fallback bleibt unverändert
-            const blob = new Blob([gpxContent], { type: "application/gpx+xml;charset=utf-8" });
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = fileName;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
+            // Web-Fallback oder Fehlerfall, wenn Filesystem nicht geladen werden konnte
+            if (isNative) {
+                Utils.handleError("Could not save track: Filesystem module not available.");
+            } else {
+                // Der Web-Fallback bleibt unverändert
+                const blob = new Blob([gpxContent], { type: "application/gpx+xml;charset=utf-8" });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            }
         }
 
     } catch (error) {

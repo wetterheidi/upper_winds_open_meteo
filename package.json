@@ -1,11 +1,11 @@
 {
     "name": "upper_winds_open_meteo",
-    "version": "1.4.0",
-    "description": "Upper winds visualization and jump planner with Leaflet and OpenMeteo",
+    "version": "2.0.0",
+    "description": "DZMAster skydiving tool",
     "scripts": {
-        "start": "vite --config vite.config.web.js",
+        "start": "vite",
         "dev:mobile": "vite --config vite.config.mobile.js",
-        "build:web": "vite build --config vite.config.web.js",
+        "build:web": "vite build",
         "build:mobile": "vite build --config vite.config.mobile.js",
         "build": "npm run build:web && npm run build:mobile",
         "predeploy": "npm run build:web",
