@@ -488,9 +488,9 @@ function _setupGeomanMeasurementHandlers() {
                             map.removeLayer(rubberBandLayer);
                         }
                         rubberBandLayer = L.polyline([lastPoint, currentCenter], {
-                            color: 'blue',
+                            color:' #3388ff',
                             dashArray: '5, 5',
-                            weight: 2,
+                            weight: 3,
                             interactive: false
                         }).addTo(map);
 

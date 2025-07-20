@@ -496,9 +496,9 @@ function _setupGeomanMeasurementHandlers() {
                             map.removeLayer(rubberBandLayer);
                         }
                         rubberBandLayer = L.polyline([lastPoint, currentCenter], {
-                            color: 'blue',
+                            color: ' #3388ff',
                             dashArray: '5, 5',
-                            weight: 2,
+                            weight: 3,
                             interactive: false
                         }).addTo(map);
 
@@ -513,8 +513,8 @@ function _setupGeomanMeasurementHandlers() {
                     } else {
                         // If there are no points, clear the rubber band
                         if (rubberBandLayer) {
-                             map.removeLayer(rubberBandLayer);
-                             rubberBandLayer = null;
+                            map.removeLayer(rubberBandLayer);
+                            rubberBandLayer = null;
                         }
                         liveMeasureLabel.innerHTML = 'Tap to set first point.';
                     }
@@ -530,7 +530,7 @@ function _setupGeomanMeasurementHandlers() {
                         map.fire('move');
                     }, 50);
                 };
-                
+
                 vertexRemoveHandler = () => {
                     setTimeout(() => {
                         updateAllPermanentLineLabels(workingLayer);
@@ -565,17 +565,17 @@ function _setupGeomanMeasurementHandlers() {
                         L.DomUtil.setPosition(liveMeasureLabel, moveEvent.containerPoint.add([15, -15]));
                     }
                 };
-                
+
                 vertexAddHandler = () => {
                     setTimeout(() => updateAllPermanentLineLabels(workingLayer), 50);
                 };
-                
+
                 vertexRemoveHandler = () => {
                     setTimeout(() => {
-                         updateAllPermanentLineLabels(workingLayer);
+                        updateAllPermanentLineLabels(workingLayer);
                     }, 50);
                 };
-                
+
                 map.on('mousemove', mouseMoveHandler);
                 workingLayer.on('pm:vertexadded', vertexAddHandler);
                 workingLayer.on('pm:vertexremoved', vertexRemoveHandler);
@@ -587,7 +587,7 @@ function _setupGeomanMeasurementHandlers() {
                 };
             }
         } else if (e.shape === 'Circle') {
-             if (isMobileDevice()) {
+            if (isMobileDevice()) {
                 liveMeasureLabel.innerHTML = '';
                 // Position label at map center initially
                 const mapSize = map.getSize();
@@ -1087,7 +1087,7 @@ export function drawJumpVisualization(jumpData) {
             // Fügen Sie die Option dem zweiten Argument von L.circle hinzu
             L.circle(circleInfo.center, {
                 ...circleInfo, // Übernimmt alle bestehenden Optionen
-                pmIgnore: true 
+                pmIgnore: true
             }).addTo(AppState.jumpVisualizationLayerGroup);
         });
     }
@@ -1205,7 +1205,7 @@ export function drawLandingPattern(patternData) {
             offset: [10, 0],
             direction: 'right',
             className: 'wind-tooltip',
-            pmIgnore:true
+            pmIgnore: true
         });
     });
 }
@@ -1559,10 +1559,10 @@ export function createHarpMarker(latitude, longitude) {
             className: 'harp-marker',
             html: '<div style="width: 14px; height: 14px; background-color: green; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 6px rgba(0,0,0,0.6);"></div>',
             iconSize: [20, 20],
-            iconAnchor: [10, 10], 
+            iconAnchor: [10, 10],
         }),
         pane: 'markerPane',
-        pmIgnore: true 
+        pmIgnore: true
     });
     console.log('Created HARP marker at:', { latitude, longitude });
     return marker;
