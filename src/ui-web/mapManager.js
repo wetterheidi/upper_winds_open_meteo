@@ -226,6 +226,7 @@ function _addStandardMapControls() {
         editMode: true,
         dragMode: true,
         removalMode: true,
+        rotateMode: false
     });
 
     AppState.map.pm.setLang('en');
@@ -364,6 +365,7 @@ function _setupGeomanMeasurementHandlers() {
     let lastKnownLatLngs = null;
     let lastKnownCircleState = null;
     let currentLayer = null;
+    let isDrawingCompleted = false; // Flag to track if drawing was completed or cancelled
 
     // Helper function for permanent line labels
     function createPermanentLineLabel(latlngs, index) {
@@ -462,6 +464,7 @@ function _setupGeomanMeasurementHandlers() {
     startPolling();
 
     map.on('pm:drawstart', (e) => {
+        isDrawingCompleted = false; // Reset the flag at the start of any drawing action
         const workingLayer = e.workingLayer;
         persistentLabelsGroup.clearLayers();
         liveMeasureLabel.style.display = 'block';
@@ -520,6 +523,7 @@ function _setupGeomanMeasurementHandlers() {
                     workingLayer.off('pm:vertexadded', vertexAddHandler);
                     if (rubberBandLayer) {
                         map.removeLayer(rubberBandLayer);
+                        rubberBandLayer = null; // Ensure rubber band is cleared
                     }
                 };
             } else {
@@ -621,6 +625,7 @@ function _setupGeomanMeasurementHandlers() {
         };
 
         map.once('pm:create', (createEvent) => {
+            isDrawingCompleted = true; // Mark the drawing as successfully completed
             finalize();
             if (createEvent.shape === 'Line' && createEvent.layer instanceof L.Polyline) {
                 updateAllPermanentLineLabels(createEvent.layer);
@@ -638,9 +643,11 @@ function _setupGeomanMeasurementHandlers() {
         });
 
         map.once('pm:drawend', () => {
-            if (!workingLayer.getLatLngs && !workingLayer.getLatLng && !workingLayer.getRadius) {
-                finalize();
-                persistentLabelsGroup.clearLayers();
+            // If drawend fires but create did not, the action was cancelled.
+            if (!isDrawingCompleted) {
+                console.log("Drawing was cancelled, cleaning up visuals.");
+                finalize(); // This will execute our cleanup function.
+                persistentLabelsGroup.clearLayers(); // Also clear any permanent labels.
             }
         });
     });
