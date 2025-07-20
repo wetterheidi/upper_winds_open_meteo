@@ -358,16 +358,37 @@ export async function exportToGpx(sliderIndex, interpStep, heightUnit) {
     gpxContent += `      <trkpt lat="${jumpRunEndLat}" lon="${jumpRunEndLng}"><ele>${exitAltitudeMSL}</ele></trkpt>\n`;
     gpxContent += `    </trkseg>\n  </trk>\n</gpx>`;
 
-    const blob = new Blob([gpxContent], { type: "application/gpx+xml;charset=utf-8" });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
     const time = Utils.formatTime(AppState.weatherData.time[sliderIndex]).replace(/ /g, '_').replace(/:/g, '');
-    a.href = url;
-    a.download = `${time}_JumpRun_Track.gpx`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    const filename = `${time}_JumpRun_Track.gpx`;
+
+    try {
+        const { Filesystem, Directory, isNative } = await getCapacitor();
+        if (isNative && Filesystem) {
+            // Native mobile App: Speichere in Documents/DZMaster
+            await Filesystem.writeFile({
+                path: `DZMaster/${filename}`,
+                data: gpxContent,
+                directory: Directory.Documents,
+                encoding: 'utf8',
+                recursive: true
+            });
+            Utils.handleMessage(`GPX saved in Documents/DZMaster`);
+        } else {
+            // Fallback für den Webbrowser
+            const blob = new Blob([gpxContent], { type: "application/gpx+xml;charset=utf-8" });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }
+    } catch (error) {
+        console.error("Error saving GPX file:", error);
+        Utils.handleError("Could not save GPX file.");
+    }
 }
 
 /**
@@ -376,7 +397,7 @@ export async function exportToGpx(sliderIndex, interpStep, heightUnit) {
  * @param {number} interpStep Der Interpolationsschritt für die Wetterdaten.
  * @param {string} heightUnit Die aktuell ausgewählte Höheneinheit ('m' oder 'ft').
  */
-export function exportLandingPatternToGpx() {
+export async function exportLandingPatternToGpx() {
     console.log("--- GPX Landing Pattern Export gestartet ---");
 
     const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
@@ -454,19 +475,37 @@ export function exportLandingPatternToGpx() {
     console.log("Schritt 4: GPX-String wurde erfolgreich erstellt.");
     console.log(gpxContent); // Gibt den GPX-Inhalt in die Konsole aus
 
-    const blob = new Blob([gpxContent], { type: "application/gpx+xml;charset=utf-8" });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
     const time = Utils.formatTime(AppState.weatherData.time[sliderIndex]).replace(/ /g, '_').replace(/:/g, '');
-    a.download = `${time}_Landing_Pattern.gpx`;
-    a.href = url;
-    document.body.appendChild(a);
+    const filename = `${time}_Landing_Pattern.gpx`;
 
-    console.log("Schritt 5: Download-Link erstellt. Der Download wird jetzt ausgelöst...");
-    a.click();
-
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    try {
+        const { Filesystem, Directory, isNative } = await getCapacitor();
+        if (isNative && Filesystem) {
+            // Native mobile App: Speichere in Documents/DZMaster
+            await Filesystem.writeFile({
+                path: `DZMaster/${filename}`,
+                data: gpxContent,
+                directory: Directory.Documents,
+                encoding: 'utf8',
+                recursive: true
+            });
+            Utils.handleMessage(`Landing Pattern GPX saved in Documents/DZMaster`);
+        } else {
+            // Fallback für den Webbrowser
+            const blob = new Blob([gpxContent], { type: "application/gpx+xml;charset=utf-8" });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }
+    } catch (error) {
+        console.error("Error saving Landing Pattern GPX file:", error);
+        Utils.handleError("Could not save Landing Pattern GPX file.");
+    }
     console.log("--- GPX Landing Pattern Export beendet ---");
 }
 
@@ -500,23 +539,27 @@ export async function saveRecordedTrack() {
         }).filter(Boolean);
 
         if (trackpointStrings.length < 2) {
-            Utils.handleError("Nicht genügend gültige Punkte für einen Track zum Speichern.");
+            Utils.handleError("Not enough valid data points to save track.");
             return;
         }
 
         const gpxContent = `${header}\n${trackpointStrings.join('\n')}\n${footer}`;
         const fileName = `Skydive_Track_${DateTime.utc().toFormat('yyyy-MM-dd_HHmm')}.gpx`;
 
+        // HINZUGEFÜGT: "await", um auf das Laden der Module zu warten
         const { Filesystem, Directory, isNative } = await getCapacitor();
 
-        if (isNative && Filesystem) { // <-- Prüfe, ob Filesystem nicht null ist
+        if (isNative && Filesystem) {
+            // HINZUGEFÜGT: "await", um auf das Speichern der Datei zu warten
             await Filesystem.writeFile({
-                path: fileName,
+                path: `DZMaster/${fileName}`,
                 data: gpxContent,
                 directory: Directory.Documents,
-                encoding: 'utf8'
+                encoding: 'utf8',
+                recursive: true
             });
-            Utils.handleMessage(`Track saved: ${fileName}`);
+            // Diese Nachricht wird jetzt erst NACH dem erfolgreichen Speichern angezeigt
+            Utils.handleMessage(`Track saved in Documents/DZMaster`);
         } else {
             // Web-Fallback oder Fehlerfall, wenn Filesystem nicht geladen werden konnte
             if (isNative) {
@@ -534,8 +577,8 @@ export async function saveRecordedTrack() {
         }
 
     } catch (error) {
-        console.error("Fehler während saveRecordedTrack:", error);
-        Utils.handleError("Konnte den Track nicht speichern.");
+        console.error("Error in saveRecordedTrack:", error);
+        Utils.handleError("Could not save track.");
     } finally {
         AppState.recordedTrackPoints = [];
     }
