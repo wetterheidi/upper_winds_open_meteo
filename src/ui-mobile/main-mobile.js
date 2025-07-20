@@ -12,16 +12,18 @@ import * as EventManager from './eventManager.js';
 import * as Coordinates from './coordinates.js';
 import * as JumpPlanner from '../core/jumpPlanner.js';
 import * as mapManager from './mapManager.js';
-import { saveRecordedTrack } from '../core/trackManager.js'; 
+import { saveRecordedTrack } from '../core/trackManager.js';
 import * as weatherManager from '../core/weatherManager.js';
 import { cacheVisibleTiles, cacheTilesForDIP } from '../core/tileCache.js';
 import { getSliderValue, displayError, displayMessage, displayProgress, hideProgress, applyDeviceSpecificStyles } from './ui.js';
 import * as AutoupdateManager from '../core/autoupdateManager.js';
 import { DateTime } from 'luxon';
 import * as displayManager from './displayManager.js';
-import * as liveTrackingManager from '../core/liveTrackingManager.js'; 
+import * as liveTrackingManager from '../core/liveTrackingManager.js';
 import * as EnsembleManager from '../core/ensembleManager.js';
 import * as LocationManager from '../core/locationManager.js';
+import { getCapacitor } from '../core/capacitor-adapter.js';
+import { Directory } from '@capacitor/filesystem';
 
 "use strict";
 
@@ -229,7 +231,7 @@ export function calculateJump() {
                 fillColor: 'darkgreen',
                 fillOpacity: 0.2,
                 weight: 2,
-                tooltip: tooltipContent 
+                tooltip: tooltipContent
             });
         }
     }
@@ -464,12 +466,13 @@ export async function updateToCurrentHour() {
 /**
  * Erstellt eine Textdatei mit den Wetterdaten im ausgewählten Format und stößt den Download an.
  */
-export function downloadTableAsAscii(format) {
+export async function downloadTableAsAscii(format) {
     if (!AppState.weatherData || !AppState.weatherData.time) {
         Utils.handleError('No weather data available to download.');
         return;
     }
 
+    // --- Datenvorbereitung (unverändert) ---
     const index = document.getElementById('timeSlider').value || 0;
     const model = document.getElementById('modelSelect').value.toUpperCase();
     const time = Utils.formatTime(AppState.weatherData.time[index]).replace(' ', '_');
@@ -481,23 +484,16 @@ export function downloadTableAsAscii(format) {
         'HEIDIS': { interpStep: 100, heightUnit: 'm', refLevel: 'AGL', temperatureUnit: 'C', windUnit: 'm/s' },
         'Customized': {}
     };
-
     const requirements = formatRequirements[format] || {};
-
     const exportSettings = {
         interpStep: requirements.interpStep || getInterpolationStep(),
-        heightUnit: requirements.heightUnit || Settings.getValue('heightUnit', 'radio', 'm'),
-        refLevel: requirements.refLevel || document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL',
-        windUnit: requirements.windUnit || Settings.getValue('windUnit', 'radio', 'kt'),
-        temperatureUnit: requirements.temperatureUnit || Settings.getValue('temperatureUnit', 'radio', 'C')
+        heightUnit: requirements.heightUnit || Settings.getValue('heightUnit', 'm'),
+        refLevel: requirements.refLevel || Settings.getValue('refLevel', 'AGL'),
+        windUnit: requirements.windUnit || Settings.getValue('windUnit', 'kt'),
+        temperatureUnit: requirements.temperatureUnit || Settings.getValue('temperatureUnit', 'C')
     };
-
     const interpolatedData = weatherManager.interpolateWeatherData(
-        AppState.weatherData,
-        index,
-        exportSettings.interpStep,
-        Math.round(AppState.lastAltitude),
-        exportSettings.heightUnit
+        AppState.weatherData, index, exportSettings.interpStep, Math.round(AppState.lastAltitude), exportSettings.heightUnit
     );
 
     if (!interpolatedData || interpolatedData.length === 0) {
@@ -507,31 +503,28 @@ export function downloadTableAsAscii(format) {
 
     let content = '';
     let header = '';
-
+    // --- Header-Erstellung (unverändert) ---
     switch (format) {
         case 'ATAK':
-            header = `Alt Dir Spd\n${exportSettings.heightUnit}${exportSettings.refLevel}\n`;
+            header = `Alt\tDir\tSpd\n${exportSettings.heightUnit}${exportSettings.refLevel}\tdeg\tkts\n`;
             break;
         case 'Windwatch':
             const elevationFt = Math.round(Utils.convertHeight(AppState.lastAltitude, 'ft'));
             header = `Version 1.0, ID = 9999999999\n${time}, Ground Level: ${elevationFt} ft\nWindsond ${model}\nAGL[ft] Wind[°] Speed[km/h]\n`;
             break;
-        case 'HEIDIS':
-        case 'Customized':
         default:
             header = `h(${exportSettings.heightUnit}${exportSettings.refLevel}) p(hPa) T(${exportSettings.temperatureUnit}) Dew(${exportSettings.temperatureUnit}) Dir(°) Spd(${exportSettings.windUnit}) RH(%)\n`;
             break;
     }
     content += header;
-
+    // --- Inhalts-Erstellung (unverändert) ---
     interpolatedData.forEach(data => {
         const displayHeight = Math.round(data.displayHeight);
         const displayDir = Math.round(data.dir);
         const displaySpd = Utils.convertWind(data.spd, exportSettings.windUnit, 'km/h');
         const formattedSpd = Number.isFinite(displaySpd) ? (exportSettings.windUnit === 'bft' ? Math.round(displaySpd) : displaySpd.toFixed(1)) : 'N/A';
-
         if (format === 'ATAK' || format === 'Windwatch') {
-            content += `${displayHeight} ${displayDir} ${Math.round(displaySpd)}\n`;
+            content += `${displayHeight}\t${displayDir}\t${Math.round(displaySpd)}\n`;
         } else {
             const displayPressure = data.pressure === 'N/A' ? 'N/A' : data.pressure.toFixed(1);
             const displayTemp = Utils.convertTemperature(data.temp, exportSettings.temperatureUnit);
@@ -543,15 +536,34 @@ export function downloadTableAsAscii(format) {
         }
     });
 
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    // --- NEUE SPEICHERLOGIK ---
+    try {
+        const { Filesystem, isNative } = await getCapacitor();
+        if (isNative && Filesystem) {
+            // Native mobile App: Verwende die Filesystem API
+            await Filesystem.writeFile({
+                path: filename,
+                data: content,
+                directory: Directory.Documents, // Speichert im "Dokumente"-Ordner
+                encoding: 'utf8'
+            });
+            Utils.handleMessage(`File saved: ${filename}`);
+        } else {
+            // Fallback für Webbrowser
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }
+    } catch (error) {
+        console.error("Error saving file:", error);
+        Utils.handleError("Could not save file.");
+    }
 }
 
 /**
@@ -821,7 +833,7 @@ function updateDashboardPanel(data) {
 
         let displayDistance;
         let displayDistUnit;
-        
+
         // KORREKTUR: Berücksichtigt jetzt 'ft' und 'mi' für die Distanz
         if (heightUnit === 'ft') {
             const distanceFeet = Utils.convertHeight(distanceMeters, 'ft');
@@ -848,7 +860,7 @@ function updateDashboardPanel(data) {
         const bearing = Math.round(Utils.calculateBearing(latitude, longitude, dipPos.lat, dipPos.lng));
         bearingEl.textContent = bearing;
     }
-    
+
     // ... (Der restliche Teil der Funktion für Gleitverhältnisse bleibt unverändert)
     const glideRequiredEl = document.getElementById('dashboard-glide-required');
     const glideCurrentEl = document.getElementById('dashboard-glide-current');
@@ -963,19 +975,19 @@ function setupAppEventListeners() {
         }
 
         // 2. Kernlogik ausführen
-        resetJumpRunDirection(true); 
-        await weatherManager.fetchWeatherForLocation(lat, lng); 
+        resetJumpRunDirection(true);
+        await weatherManager.fetchWeatherForLocation(lat, lng);
 
         if (Settings.state.userSettings.calculateJump) {
-            calculateJump(); 
+            calculateJump();
             JumpPlanner.calculateCutAway();
         }
 
-        mapManager.recenterMap(true); 
+        mapManager.recenterMap(true);
         AppState.isManualPanning = false;
 
         // 3. UI-Updates anstoßen, die von den neuen Daten abhängen
-        displayManager.updateJumpRunTrackDisplay(); 
+        displayManager.updateJumpRunTrackDisplay();
         displayManager.updateLandingPatternDisplay();
     });
 

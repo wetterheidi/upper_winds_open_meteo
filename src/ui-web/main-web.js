@@ -534,7 +534,7 @@ export function downloadTableAsAscii(format) {
 
     switch (format) {
         case 'ATAK':
-            header = `Alt Dir Spd\n${exportSettings.heightUnit}${exportSettings.refLevel}\n`;
+            header = `Alt\tDir\tSpd\n${exportSettings.heightUnit}${exportSettings.refLevel}\tdeg\tkts\n`;
             break;
         case 'Windwatch':
             const elevationFt = Math.round(Utils.convertHeight(AppState.lastAltitude, 'ft'));
@@ -555,7 +555,7 @@ export function downloadTableAsAscii(format) {
         const formattedSpd = Number.isFinite(displaySpd) ? (exportSettings.windUnit === 'bft' ? Math.round(displaySpd) : displaySpd.toFixed(1)) : 'N/A';
 
         if (format === 'ATAK' || format === 'Windwatch') {
-            content += `${displayHeight} ${displayDir} ${Math.round(displaySpd)}\n`;
+            content += `${displayHeight}\t${displayDir}\t${Math.round(displaySpd)}\n`;
         } else {
             const displayPressure = data.pressure === 'N/A' ? 'N/A' : data.pressure.toFixed(1);
             const displayTemp = Utils.convertTemperature(data.temp, exportSettings.temperatureUnit);
