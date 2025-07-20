@@ -351,6 +351,15 @@ function _setupGeomanMeasurementHandlers() {
 
     console.log('Leaflet-Geoman Version:', L.PM.version);
 
+    // Stop click propagation on the Geoman toolbar to prevent map clicks
+    const geomanToolbar = document.querySelector('.leaflet-pm-toolbar');
+    if (geomanToolbar) {
+        // We use mousedown because it fires before click and is more reliable for preventing unwanted map interactions.
+        geomanToolbar.addEventListener('mousedown', (e) => {
+            L.DomEvent.stopPropagation(e);
+        });
+    }
+
     const liveMeasureLabel = L.DomUtil.create('div', 'leaflet-measure-label', map.getContainer());
     const persistentLabelsGroup = L.layerGroup().addTo(map);
 
@@ -461,7 +470,7 @@ function _setupGeomanMeasurementHandlers() {
         persistentLabelsGroup.clearLayers();
         liveMeasureLabel.style.display = 'block';
 
-        let mouseMoveHandler, vertexAddHandler, mapMoveHandler, cleanup;
+        let mouseMoveHandler, vertexAddHandler, vertexRemoveHandler, mapMoveHandler, cleanup;
 
         if (e.shape === 'Line') {
             if (isMobileDevice()) {
@@ -493,6 +502,13 @@ function _setupGeomanMeasurementHandlers() {
                         const mapSize = map.getSize();
                         const labelPos = L.point(mapSize.x / 2 + 20, mapSize.y / 2 - 40);
                         L.DomUtil.setPosition(liveMeasureLabel, labelPos);
+                    } else {
+                        // If there are no points, clear the rubber band
+                        if (rubberBandLayer) {
+                             map.removeLayer(rubberBandLayer);
+                             rubberBandLayer = null;
+                        }
+                        liveMeasureLabel.innerHTML = 'Tap to set first point.';
                     }
                 };
 
@@ -506,16 +522,26 @@ function _setupGeomanMeasurementHandlers() {
                         map.fire('move');
                     }, 50);
                 };
+                
+                vertexRemoveHandler = () => {
+                    setTimeout(() => {
+                        updateAllPermanentLineLabels(workingLayer);
+                        // Trigger the move handler to update the rubber band and label
+                        map.fire('move');
+                    }, 50);
+                };
 
                 map.on('move', mapMoveHandler);
                 workingLayer.on('pm:vertexadded', vertexAddHandler);
+                workingLayer.on('pm:vertexremoved', vertexRemoveHandler);
 
                 cleanup = () => {
                     map.off('move', mapMoveHandler);
                     workingLayer.off('pm:vertexadded', vertexAddHandler);
+                    workingLayer.off('pm:vertexremoved', vertexRemoveHandler);
                     if (rubberBandLayer) {
                         map.removeLayer(rubberBandLayer);
-                        rubberBandLayer = null; // Ensure rubber band is cleared
+                        rubberBandLayer = null;
                     }
                 };
             } else {
@@ -531,18 +557,29 @@ function _setupGeomanMeasurementHandlers() {
                         L.DomUtil.setPosition(liveMeasureLabel, moveEvent.containerPoint.add([15, -15]));
                     }
                 };
+                
                 vertexAddHandler = () => {
-                    setTimeout(() => updateAllPermanentLineLabels(workingLayer), 300);
+                    setTimeout(() => updateAllPermanentLineLabels(workingLayer), 50);
                 };
+                
+                vertexRemoveHandler = () => {
+                    setTimeout(() => {
+                         updateAllPermanentLineLabels(workingLayer);
+                    }, 50);
+                };
+                
                 map.on('mousemove', mouseMoveHandler);
                 workingLayer.on('pm:vertexadded', vertexAddHandler);
+                workingLayer.on('pm:vertexremoved', vertexRemoveHandler);
+
                 cleanup = () => {
                     map.off('mousemove', mouseMoveHandler);
                     workingLayer.off('pm:vertexadded', vertexAddHandler);
+                    workingLayer.off('pm:vertexremoved', vertexRemoveHandler);
                 };
             }
         } else if (e.shape === 'Circle') {
-            if (isMobileDevice()) {
+             if (isMobileDevice()) {
                 liveMeasureLabel.innerHTML = '';
                 // Position label at map center initially
                 const mapSize = map.getSize();
