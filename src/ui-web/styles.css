@@ -850,11 +850,10 @@ input[type="checkbox"][style*="opacity: 0.5"] {
 .wind-tooltip,
 .cutaway-tooltip,
 .ensemble-tooltip {
-    background: rgba(0, 0, 0, 0.8);
-    color: white;
+    background: rgba(255, 255, 255, 0.8);
     border: none;
     border-radius: 3px;
-    padding: 5px;
+    padding: 2px;
     font-size: 12px;
     white-space: nowrap;
 }

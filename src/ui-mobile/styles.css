@@ -891,7 +891,7 @@ input[type="checkbox"][style*="opacity: 1"] {
 #crosshair::after { top: 50%; left: 0; height: 2px; width: 100%; transform: translateY(-50%); }
 
 /* --- Tooltips & Labels --- */
-.wind-tooltip { background: rgba(0, 0, 0, 0.8); color: white; border: none; border-radius: 3px; padding: 5px; font-size: 12px; white-space: nowrap; }
+.wind-tooltip { background: rgba(255, 255, 255, 0.8); border: none; border-radius: 3px; padding: 2px; font-size: 12px; white-space: nowrap; }
 .cutaway-tooltip { background-color: rgba(255, 255, 255, 0.8); border: 1px solid red; border-radius: 3px; padding: 5px; font-size: 12px; white-space: nowrap; }
 .ensemble-tooltip { background-color: rgba(255, 255, 255, 0.9); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 3px; padding: 5px 8px; font-size: 12px; white-space: nowrap; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
 .isoline-label { background: rgba(255, 255, 255, 0.7) !important; color: blue !important; font-weight: bold; border: none; border-radius: 3px; padding: 0; line-height: 1 !important; text-align: center; overflow: hidden !important; z-index: 2100 !important; pointer-events: none !important; }
