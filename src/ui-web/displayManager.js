@@ -339,6 +339,12 @@ export function updateJumpRunTrackDisplay() {
         console.log('Conditions not met to show JRT, clearing display.');
         mapManager.drawJumpRunTrack(null); // Sagt dem mapManager, alles zu löschen.
         AppState.lastTrackData = null; // Setzt die gespeicherten Track-Daten zurück.
+        
+        const directionInput = document.getElementById('jumpRunTrackDirection');
+        if (directionInput && !Settings.state.userSettings.customJumpRunDirection) {
+            directionInput.value = '';
+        }
+
         return; // Beendet die Funktion hier.
     }
 
@@ -356,8 +362,16 @@ export function updateJumpRunTrackDisplay() {
     ); // Und an die Core-Funktion übergeben
     const harpAnchor = AppState.harpMarker ? AppState.harpMarker.getLatLng() : null;
     const trackData = JumpPlanner.jumpRunTrack(interpolatedData, harpAnchor);
+    
+    const directionInput = document.getElementById('jumpRunTrackDirection');
+
     if (trackData && trackData.latlngs?.length === 2 && trackData.latlngs.every(ll => Number.isFinite(ll[0]) && Number.isFinite(ll[1]))) {
         console.log('Drawing jump run track with data:', trackData);
+
+        if (directionInput && !Settings.state.userSettings.customJumpRunDirection) {
+            directionInput.value = trackData.direction;
+        }
+
         const drawData = {
             path: {
                 latlngs: trackData.latlngs,
@@ -393,6 +407,9 @@ export function updateJumpRunTrackDisplay() {
         console.warn('No valid track data to display:', trackData);
         mapManager.drawJumpRunTrack(null); // Sicherheitshalber auch hier löschen
         AppState.lastTrackData = null;
+        if (directionInput && !Settings.state.userSettings.customJumpRunDirection) {
+            directionInput.value = '';
+        }
     }
 }
 

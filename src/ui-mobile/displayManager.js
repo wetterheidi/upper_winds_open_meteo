@@ -338,33 +338,42 @@ export function updateJumpRunTrackDisplay() {
         AppState.weatherData &&
         AppState.lastLat &&
         AppState.lastLng &&
-        Settings.state.isCalculateJumpUnlocked &&
-        Settings.state.userSettings.calculateJump;
+        Settings.state.isCalculateJumpUnlocked;
 
-    // Wenn die Bedingungen NICHT erfüllt sind, lösche den Track.
     if (!shouldShow) {
         console.log('Conditions not met to show JRT, clearing display.');
         mapManager.drawJumpRunTrack(null); // Sagt dem mapManager, alles zu löschen.
         AppState.lastTrackData = null; // Setzt die gespeicherten Track-Daten zurück.
-        return; // Beendet die Funktion hier.
+        
+        const directionInput = document.getElementById('jumpRunTrackDirection');
+        if (directionInput && !Settings.state.userSettings.customJumpRunDirection) {
+            directionInput.value = '';
+        }
+        return;
     }
 
-    // Wenn die Bedingungen erfüllt sind, zeichne den Track.
-    // Neuer Code:
     const sliderIndex = getSliderValue();
-    const interpStep = getInterpolationStep(); // Wert in der UI-Schicht holen
-    const heightUnit = getHeightUnit(); // Höheinheit aus den Einstellungen
+    const interpStep = getInterpolationStep();
+    const heightUnit = getHeightUnit();
     const interpolatedData = weatherManager.interpolateWeatherData(
-        AppState.weatherData, // Das Haupt-Wetterdatenobjekt
+        AppState.weatherData,
         sliderIndex,
         interpStep,
         Math.round(AppState.lastAltitude),
         heightUnit
-    ); // Und an die Core-Funktion übergeben
+    );
     const harpAnchor = AppState.harpMarker ? AppState.harpMarker.getLatLng() : null;
     const trackData = JumpPlanner.jumpRunTrack(interpolatedData, harpAnchor);
+    
+    const directionInput = document.getElementById('jumpRunTrackDirection');
+
     if (trackData && trackData.latlngs?.length === 2 && trackData.latlngs.every(ll => Number.isFinite(ll[0]) && Number.isFinite(ll[1]))) {
         console.log('Drawing jump run track with data:', trackData);
+        
+        if (directionInput && !Settings.state.userSettings.customJumpRunDirection) {
+            directionInput.value = trackData.direction;
+        }
+
         const drawData = {
             path: {
                 latlngs: trackData.latlngs,
@@ -378,7 +387,7 @@ export function updateJumpRunTrackDisplay() {
                 tooltipText: `Approach: ${trackData.direction}°, ${trackData.approachLength} m`,
                 originalLatLngs: AppState.lastTrackData?.approachLatLngs?.length === 2 ? AppState.lastTrackData.approachLatLngs : trackData.approachLatLngs
             } : null,
-            trackLength: trackData.trackLength, // Wichtig für Drag-and-Drop
+            trackLength: trackData.trackLength,
             airplane: {
                 position: L.latLng(trackData.latlngs[1][0], trackData.latlngs[1][1]),
                 bearing: trackData.direction,
@@ -398,8 +407,11 @@ export function updateJumpRunTrackDisplay() {
         console.log('Updated AppState.lastTrackData:', AppState.lastTrackData);
     } else {
         console.warn('No valid track data to display:', trackData);
-        mapManager.drawJumpRunTrack(null); // Sicherheitshalber auch hier löschen
+        mapManager.drawJumpRunTrack(null);
         AppState.lastTrackData = null;
+        if (directionInput && !Settings.state.userSettings.customJumpRunDirection) {
+            directionInput.value = '';
+        }
     }
 }
 
