@@ -2,6 +2,7 @@
     "name": "upper_winds_open_meteo",
     "version": "2.0.0",
     "description": "DZMAster skydiving tool",
+    "type": "module",
     "scripts": {
         "start": "vite",
         "dev:mobile": "vite --config vite.config.mobile.js",

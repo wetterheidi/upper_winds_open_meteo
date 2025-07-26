@@ -231,6 +231,15 @@ function _addStandardMapControls() {
 
     AppState.map.pm.setLang('en');
 
+    // Wir prüfen, ob wir auf einem Mobilgerät sind.
+    if (isMobileDevice()) {
+        // Setze globale Geoman-Optionen, um die "Geisterlinie" unsichtbar zu machen.
+        AppState.map.pm.setGlobalOptions({
+            hintlineStyle: { opacity: 0, color: 'green' }  // Die Linie vom letzten Punkt zum Mauszeiger/Fadenkreuz
+        });
+        console.log("Geoman global options set for mobile to hide helper lines.");
+    }
+
     console.log('Standard map controls including Geoman have been added.');
 }
 function _setupCustomPanes() {
@@ -362,12 +371,17 @@ function _setupGeomanMeasurementHandlers() {
     // Stop click propagation on the Geoman toolbar to prevent map clicks
     const geomanToolbar = document.querySelector('.leaflet-pm-toolbar');
     if (geomanToolbar) {
-        // We use mousedown because it fires before click and is more reliable for preventing unwanted map interactions.
-        geomanToolbar.addEventListener('mousedown', (e) => {
-            L.DomEvent.stopPropagation(e);
+        // Eine Liste aller Events, die potenziell zur Karte durchsickern könnten.
+        const eventsToStop = ['click', 'dblclick', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'pointerdown', 'pointerup', 'contextmenu'];
+
+        eventsToStop.forEach(eventType => {
+            geomanToolbar.addEventListener(eventType, (e) => {
+                L.DomEvent.stopPropagation(e);
+                // Optional: Zum Debuggen in der Konsole anzeigen, welches Event gestoppt wurde
+                console.log(`Stopped '${e.type}' event on Geoman toolbar.`);
+            });
         });
     }
-
     const liveMeasureLabel = L.DomUtil.create('div', 'leaflet-measure-label', map.getContainer());
     const persistentLabelsGroup = L.layerGroup().addTo(map);
 

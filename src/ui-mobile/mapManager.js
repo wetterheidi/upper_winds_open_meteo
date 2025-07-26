@@ -208,7 +208,7 @@ function _addStandardMapControls() {
     });
 
     L.control.zoom({ position: 'topright' }).addTo(AppState.map);
-    
+
     L.control.scale({
         position: 'bottomleft',
         metric: true,
@@ -233,6 +233,15 @@ function _addStandardMapControls() {
     });
 
     AppState.map.pm.setLang('en');
+
+    // Wir prüfen, ob wir auf einem Mobilgerät sind.
+    if (isMobileDevice()) {
+        // Setze globale Geoman-Optionen, um die "Geisterlinie" unsichtbar zu machen.
+        AppState.map.pm.setGlobalOptions({
+            hintlineStyle: { opacity: 0, color: 'green' }  // Die Linie vom letzten Punkt zum Mauszeiger/Fadenkreuz
+        });
+        console.log("Geoman global options set for mobile to hide helper lines.");
+    }
 
     console.log('Standard map controls including Geoman have been added.');
 }
@@ -354,9 +363,15 @@ function _setupGeomanMeasurementHandlers() {
     // Stop click propagation on the Geoman toolbar to prevent map clicks
     const geomanToolbar = document.querySelector('.leaflet-pm-toolbar');
     if (geomanToolbar) {
-        // We use mousedown because it fires before click and is more reliable for preventing unwanted map interactions.
-        geomanToolbar.addEventListener('mousedown', (e) => {
-            L.DomEvent.stopPropagation(e);
+        // Eine Liste aller Events, die potenziell zur Karte durchsickern könnten.
+        const eventsToStop = ['click', 'dblclick', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'pointerdown', 'pointerup', 'contextmenu'];
+
+        eventsToStop.forEach(eventType => {
+            geomanToolbar.addEventListener(eventType, (e) => {
+                L.DomEvent.stopPropagation(e);
+                // Optional: Zum Debuggen in der Konsole anzeigen, welches Event gestoppt wurde
+                console.log(`Stopped '${e.type}' event on Geoman toolbar.`);
+            });
         });
     }
 
@@ -488,7 +503,7 @@ function _setupGeomanMeasurementHandlers() {
                             map.removeLayer(rubberBandLayer);
                         }
                         rubberBandLayer = L.polyline([lastPoint, currentCenter], {
-                            color:' #3388ff',
+                            color: ' #3388ff',
                             dashArray: '5, 5',
                             weight: 3,
                             interactive: false
@@ -505,8 +520,8 @@ function _setupGeomanMeasurementHandlers() {
                     } else {
                         // If there are no points, clear the rubber band
                         if (rubberBandLayer) {
-                             map.removeLayer(rubberBandLayer);
-                             rubberBandLayer = null;
+                            map.removeLayer(rubberBandLayer);
+                            rubberBandLayer = null;
                         }
                         liveMeasureLabel.innerHTML = 'Tap to set first point.';
                     }
@@ -522,7 +537,7 @@ function _setupGeomanMeasurementHandlers() {
                         map.fire('move');
                     }, 50);
                 };
-                
+
                 vertexRemoveHandler = () => {
                     setTimeout(() => {
                         updateAllPermanentLineLabels(workingLayer);
@@ -557,17 +572,17 @@ function _setupGeomanMeasurementHandlers() {
                         L.DomUtil.setPosition(liveMeasureLabel, moveEvent.containerPoint.add([15, -15]));
                     }
                 };
-                
+
                 vertexAddHandler = () => {
                     setTimeout(() => updateAllPermanentLineLabels(workingLayer), 50);
                 };
-                
+
                 vertexRemoveHandler = () => {
                     setTimeout(() => {
-                         updateAllPermanentLineLabels(workingLayer);
+                        updateAllPermanentLineLabels(workingLayer);
                     }, 50);
                 };
-                
+
                 map.on('mousemove', mouseMoveHandler);
                 workingLayer.on('pm:vertexadded', vertexAddHandler);
                 workingLayer.on('pm:vertexremoved', vertexRemoveHandler);
@@ -579,7 +594,7 @@ function _setupGeomanMeasurementHandlers() {
                 };
             }
         } else if (e.shape === 'Circle') {
-             if (isMobileDevice()) {
+            if (isMobileDevice()) {
                 liveMeasureLabel.innerHTML = '';
                 // Position label at map center initially
                 const mapSize = map.getSize();
@@ -968,7 +983,7 @@ function _setupCoreMapEventHandlers() {
     }, { passive: false }); // passive: false is required to allow preventDefault
     // --- END: Add Double-Tap/Touch Functionality ---
 
-     _setupGeomanMeasurementHandlers();
+    _setupGeomanMeasurementHandlers();
     console.log('All core map event handlers have been set up.');
 }
 function _setupCrosshairCoordinateHandler(map) {
@@ -1135,7 +1150,7 @@ export function drawJumpVisualization(jumpData) {
                     html: `<span style="font-size: ${isSmall ? '8px' : '10px'}">${labelInfo.text}</span>`,
                     iconSize: isSmall ? [50, 12] : [60, 14],
                     iconAnchor: calculateLabelAnchor(labelInfo.center, labelInfo.radius),
-                    pmIgnore:true
+                    pmIgnore: true
                 }),
                 zIndexOffset: 2100 // Stellt sicher, dass Labels oben liegen
             }).addTo(AppState.jumpVisualizationLayerGroup);
