@@ -22,14 +22,8 @@ import * as displayManager from './displayManager.js';
 import * as liveTrackingManager from '../core/liveTrackingManager.js';
 import * as EnsembleManager from '../core/ensembleManager.js';
 import * as LocationManager from '../core/locationManager.js';
-import { getCapacitor } from '@/core/capacitor-adapter.js';
-
-async function init() {
-  const { Directory } = await getCapacitor();
-  console.log('Directory:', Directory.Data);
-}
-
-init();
+import { getCapacitor } from '../core/capacitor-adapter.js';
+import { Directory } from '@capacitor/filesystem';
 
 "use strict";
 
