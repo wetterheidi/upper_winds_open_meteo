@@ -262,7 +262,7 @@ export async function stopPositionTracking() {
         if (isNative && BackgroundGeolocation) {
             await BackgroundGeolocation.removeWatcher({ id: AppState.watchId });
             console.log("[LiveTrackingManager] Stopped Capacitor Background Geolocation watcher.");
-        } else {
+        } else if (navigator.geolocation) { // Hinzugefügte Prüfung für Web-Browser
             navigator.geolocation.clearWatch(AppState.watchId);
             console.log("[LiveTrackingManager] Stopped navigator.geolocation watcher.");
         }

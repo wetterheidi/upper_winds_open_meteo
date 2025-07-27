@@ -343,6 +343,12 @@ async function _handleGeolocation(defaultCenter, defaultZoom) {
                 timeout: 10000
             });
             _geolocationSuccessCallback(position, defaultZoom);
+        } else if (navigator.geolocation) { // Fallback zur Web-API
+            navigator.geolocation.getCurrentPosition(
+                (position) => _geolocationSuccessCallback(position, defaultZoom),
+                (geoError) => _geolocationErrorCallback(geoError, defaultCenter, defaultZoom),
+                { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+            );
         } else {
             // Dies sollte in der mobilen App nie passieren, ist aber ein guter Fallback
             _geolocationErrorCallback({ message: "Native Geolocation not available." }, defaultCenter, defaultZoom);

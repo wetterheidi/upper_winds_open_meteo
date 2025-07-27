@@ -997,6 +997,24 @@ export class Utils {
         tooltipContent += `<br>Descent Rate: ${descentRate} m/s`;
         return tooltipContent;
     }
+
+    /**
+     * Prüft, ob die übergebenen Werte gültige geographische Koordinaten sind.
+     * @param {number} lat - Die geographische Breite.
+     * @param {number} lng - Die geographische Länge.
+     * @returns {boolean} True, wenn die Koordinaten gültig sind.
+     */
+    static isValidLatLng(lat, lng) {
+        return (
+            typeof lat === 'number' &&
+            typeof lng === 'number' &&
+            !isNaN(lat) && !isNaN(lng) &&
+            lat >= -90 && lat <= 90 &&
+            lng >= -180 && lng <= 180 &&
+            !(lat === 0 && lng === 0) // Verhindert ungültige Null-Koordinaten
+        );
+    }
+
 }
 
 window.Utils = Utils;

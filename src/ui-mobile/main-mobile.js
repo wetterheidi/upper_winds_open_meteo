@@ -147,6 +147,15 @@ function initializeUIElements() {
 
     const directionSpan = document.getElementById('jumpRunTrackDirection');
     if (directionSpan) directionSpan.textContent = '-';
+
+    // Explizit den Slider auf die aktuelle Stunde setzen
+    const slider = document.getElementById('timeSlider');
+    if (slider) {
+        const currentUtcHour = new Date().getUTCHours();
+        slider.value = currentUtcHour;
+        console.log(`[App] Initialized timeSlider to current UTC hour: ${currentUtcHour}`);
+    }
+
     updateUIState();
 }
 
@@ -1549,16 +1558,127 @@ document.addEventListener('DOMContentLoaded', async () => {
     Settings.state.userSettings.showTable = true;
     applyDeviceSpecificStyles();
 
-    await mapManager.initializeMap();
+    // Explizit den Slider auf die aktuelle Stunde setzen
+    const slider = document.getElementById('timeSlider');
+    if (slider) {
+        const currentUtcHour = new Date().getUTCHours();
+        slider.value = currentUtcHour;
+        console.log(`[App] Initialized timeSlider to current UTC hour: ${currentUtcHour}`);
+    }
+
+    // KORREKTUR: Der Event-Listener wird hier registriert, BEVOR das Event ausgelöst wird.
+    document.addEventListener('location:selected', async (event) => {
+        const { lat, lng, source } = event.detail;
+        console.log(`App: Event 'location:selected' empfangen. Quelle: ${source}, Koordinaten: ${lat}, ${lng}`);
+
+        // Validierung der Koordinaten
+        if (!Utils.isValidLatLng(lat, lng)) {
+            console.warn('[App] Ungültige Koordinaten empfangen:', { lat, lng });
+            Utils.handleError('Ungültige Position ausgewählt. Verwende Standardposition.');
+            return;
+        }
+
+        const loadingElement = document.getElementById('loading');
+        if (loadingElement) loadingElement.style.display = 'block';
+
+        try {
+            AppState.lastLat = lat;
+            AppState.lastLng = lng;
+
+            const isInitialLoad = (source === 'geolocation' || source === 'geolocation_fallback');
+            const currentTimeToPreserve = isInitialLoad ? null : (AppState.weatherData?.time?.[getSliderValue()] || null);
+
+            console.log(`[App] Fetching weather data for lat: ${lat}, lng: ${lng}, time: ${currentTimeToPreserve || 'current'}`);
+            const newWeatherData = await weatherManager.fetchWeatherForLocation(lat, lng, currentTimeToPreserve);
+
+            if (newWeatherData) {
+                console.log('[App] Weather data loaded successfully:', newWeatherData);
+                await updateUIWithNewWeatherData(newWeatherData, isInitialLoad ? null : getSliderValue());
+            } else {
+                AppState.weatherData = null;
+                Utils.handleError('Keine Wetterdaten verfügbar.');
+            }
+
+            await mapManager.createOrUpdateMarker(lat, lng);
+            await displayManager.refreshMarkerPopup();
+
+            if (source !== 'marker_click') {
+                mapManager.recenterMap(true);
+            }
+            AppState.isManualPanning = false;
+
+            if (source === 'geolocation' || source === 'geolocation_fallback') {
+                console.log('[App] Starting initial caching after geolocation...');
+                cacheTilesForDIP({
+                    map: AppState.map,
+                    lastLat: lat,
+                    lastLng: lng,
+                    baseMaps: AppState.baseMaps,
+                    onProgress: displayProgress,
+                    onComplete: displayMessage,
+                    onCancel: () => displayMessage('Caching cancelled.'),
+                    radiusKm: 5,
+                    silent: true
+                });
+            }
+        } catch (error) {
+            console.error('[App] Fehler beim Verarbeiten von "location:selected":', error);
+            displayError(error.message);
+        } finally {
+            if (loadingElement) loadingElement.style.display = 'none';
+        }
+    });
+
+    // Initialisiert die Karte und prüft, ob Wetterdaten geladen wurden
+    try {
+        console.log('[App] Starting map initialization...');
+        await mapManager.initializeMap();
+        console.log('[App] Map initialization completed.');
+
+        // Prüfe, ob Wetterdaten geladen wurden
+        if (!AppState.weatherData) {
+            console.warn('[App] No weather data loaded after map initialization.');
+            // Prüfe, ob eine gültige Position vorliegt
+            if (!Utils.isValidLatLng(AppState.lastLat, AppState.lastLng)) {
+                console.warn('[App] Keine gültige Position nach Karteninitialisierung. Verwende Fallback.');
+                const fallbackLat = 51.505; // Beispiel: London
+                const fallbackLng = -0.09;
+                AppState.lastLat = fallbackLat;
+                AppState.lastLng = fallbackLng;
+                document.dispatchEvent(new CustomEvent('location:selected', {
+                    detail: { lat: fallbackLat, lng: fallbackLng, source: 'geolocation_fallback' }
+                }));
+            } else {
+                // Gültige Position vorhanden, aber keine Wetterdaten -> erneuter Versuch
+                console.log('[App] Retrying weather data fetch with existing coordinates:', AppState.lastLat, AppState.lastLng);
+                document.dispatchEvent(new CustomEvent('location:selected', {
+                    detail: { lat: AppState.lastLat, lng: AppState.lastLng, source: 'geolocation_retry' }
+                }));
+            }
+        }
+    } catch (error) {
+        console.error('[App] Fehler bei der Karteninitialisierung:', error);
+        displayError('Konnte Karte nicht initialisieren. Verwende Standardposition.');
+
+        // Fallback: Verwende eine Standardposition
+        const fallbackLat = 51.505; // Beispiel: London
+        const fallbackLng = -0.09;
+        console.log(`[App] Using fallback coordinates: ${fallbackLat}, ${fallbackLng}`);
+        AppState.lastLat = fallbackLat;
+        AppState.lastLng = fallbackLng;
+        document.dispatchEvent(new CustomEvent('location:selected', {
+            detail: { lat: fallbackLat, lng: fallbackLng, source: 'geolocation_fallback' }
+        }));
+    }
+
+    // Alle anderen Listener können sicher nach der Karteninitialisierung eingerichtet werden.
     setupAppEventListeners();
     AutoupdateManager.setupAutoupdate();
-
-    // EINZIGER AUFRUF FÜR ALLE EVENT LISTENER
     EventManager.initializeEventListeners();
-
     Coordinates.initializeLocationSearch();
+
     // Initiales Zeichnen der Favoriten-Marker beim Start
-    const initialFavorites = LocationManager.getCoordHistory().filter(item => item.isFavorite);
+   const initialFavorites = LocationManager.getCoordHistory().filter(item => item.isFavorite);
     if (initialFavorites.length > 0) {
         console.log(`[App] Found ${initialFavorites.length} favorite(s) on startup, plotting on map.`);
         mapManager.updateFavoriteMarkers(initialFavorites);
@@ -1576,11 +1696,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const { newPosition, originalTrackData } = event.detail;
 
-        // Schritt 1: Den korrekten Ankerpunkt bestimmen (HARP oder DIP)
         let anchorPosition;
         const harpAnchor = AppState.harpMarker ? AppState.harpMarker.getLatLng() : null;
 
-        // Wenn ein HARP-Marker existiert, ist er IMMER der Anker
         if (harpAnchor) {
             anchorPosition = harpAnchor;
             console.log("JRT-Ankerpunkt ist HARP.");
@@ -1591,30 +1709,26 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const trackLength = originalTrackData.trackLength;
         const trackDirection = originalTrackData.airplane.bearing;
-        const newEndPoint = newPosition; // Die neue Position des Flugzeugs
+        const newEndPoint = newPosition;
 
-        // Schritt 2: Den NEUEN STARTPUNKT des Tracks berechnen, indem wir vom neuen Endpunkt zurückgehen.
         const [newStartLat, newStartLng] = Utils.calculateNewCenter(
             newEndPoint.lat,
             newEndPoint.lng,
-            trackLength, // Die GESAMTE Länge des Tracks
-            (trackDirection + 180) % 360 // Entgegen der Flugrichtung
+            trackLength,
+            (trackDirection + 180) % 360
         );
         const newStartPoint = L.latLng(newStartLat, newStartLng);
 
-        // Schritt 3: Den Verschiebungs-Vektor vom Ankerpunkt zum NEUEN STARTPUNKT berechnen.
         const totalDistance = AppState.map.distance(anchorPosition, newStartPoint);
         const bearingFromAnchorToStart = Utils.calculateBearing(anchorPosition.lat, anchorPosition.lng, newStartPoint.lat, newStartPoint.lng);
 
-        // Schritt 4: Den Vektor in Vorwärts- und Quer-Offsets zerlegen.
         let angleDifference = bearingFromAnchorToStart - trackDirection;
-        angleDifference = (angleDifference + 180) % 360 - 180; // Winkel normalisieren
+        angleDifference = (angleDifference + 180) % 360 - 180;
 
         const angleRad = angleDifference * (Math.PI / 180);
         const forwardOffset = Math.round(totalDistance * Math.cos(angleRad));
         const lateralOffset = Math.round(totalDistance * Math.sin(angleRad));
 
-        // Schritt 5: Settings und UI aktualisieren.
         Settings.state.userSettings.jumpRunTrackOffset = lateralOffset;
         Settings.state.userSettings.jumpRunTrackForwardOffset = forwardOffset;
         Settings.save();
@@ -1622,8 +1736,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         setInputValueSilently('jumpRunTrackOffset', lateralOffset);
         setInputValueSilently('jumpRunTrackForwardOffset', forwardOffset);
 
-        // Schritt 6: Den Track neu zeichnen lassen. Die `jumpPlanner` Funktion verwendet
-        // jetzt den Anker + die neuen Offsets und kommt zum korrekten Ergebnis.
         displayManager.updateJumpRunTrackDisplay();
     });
 
@@ -1632,110 +1744,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         displayManager.updateJumpRunTrackDisplay();
     });
 
-    document.addEventListener('location:selected', async (event) => {
-        const { lat, lng, source } = event.detail;
-        console.log(`App: Event 'location:selected' empfangen. Quelle: ${source}`);
-
-        const loadingElement = document.getElementById('loading');
-        if (loadingElement) loadingElement.style.display = 'block';
-
-        try {
-            const sliderIndex = getSliderValue();
-            const currentTimeToPreserve = AppState.weatherData?.time?.[sliderIndex] || null;
-
-            const newWeatherData = await weatherManager.fetchWeatherForLocation(lat, lng, currentTimeToPreserve);
-
-            if (newWeatherData) {
-                const isInitialLoad = (source === 'geolocation' || source === 'geolocation_fallback');
-                await updateUIWithNewWeatherData(newWeatherData, isInitialLoad ? null : sliderIndex);
-            } else {
-                AppState.weatherData = null;
-            }
-
-            await mapManager.createOrUpdateMarker(lat, lng);
-            await displayManager.refreshMarkerPopup();
-
-            // Only recenter for non-marker-click interactions
-            if (source !== 'marker_click') {
-                mapManager.recenterMap(true);
-            }
-            AppState.isManualPanning = false;
-
-            if (source === 'geolocation' || source === 'geolocation_fallback') {
-                console.log("Starte initiales Caching nach Geolocation...");
-                cacheTilesForDIP({
-                    map: AppState.map,
-                    lastLat: lat,
-                    lastLng: lng,
-                    baseMaps: AppState.baseMaps,
-                    onProgress: displayProgress,
-                    onComplete: displayMessage,
-                    onCancel: () => displayMessage('Caching cancelled.'),
-                    radiusKm: 5,
-                    silent: true // <- DIESE ZEILE IST ENTSCHEIDEND
-                });
-            }
-
-            if (source === 'marker_drag' || source === 'dblclick' || source === 'search' || source === 'favorite_marker') {
-                console.log(`Starte Caching für neue Position via ${source}...`);
-                cacheTilesForDIP({
-                    map: AppState.map,
-                    lastLat: lat,
-                    lastLng: lng,
-                    baseMaps: AppState.baseMaps,
-                    onProgress: displayProgress,
-                    onComplete: displayMessage,
-                    onCancel: () => displayMessage('Caching cancelled.'),
-                    radiusKm: 5,
-                    silent: true // <- DIESE ZEILE IST ENTSCHEIDEND
-                });
-            }
-
-            if (Settings.state.userSettings.showJumpMasterLine) {
-                updateJumpMasterLineAndPanel();
-            }
-
-            if (Settings.state.userSettings.selectedEnsembleModels.length > 0) {
-                console.log("DIP moved, triggering ensemble recalculation...");
-                const ensembleSuccess = await EnsembleManager.fetchEnsembleWeatherData();
-                if (ensembleSuccess) {
-                    EnsembleManager.processAndVisualizeEnsemble(getSliderValue());
-                }
-            }
-        } catch (error) {
-            console.error('Fehler beim Verarbeiten von "location:selected":', error);
-            displayError(error.message);
-        } finally {
-            if (loadingElement) loadingElement.style.display = 'none';
-        }
-    });
-
-    document.addEventListener('autoupdate:tick', async (event) => {
-        // Nur reagieren, wenn Autoupdate in den Settings auch wirklich aktiv ist
-        if (!Settings.state.userSettings.autoupdate) {
-            return;
-        }
-
-        const now = new Date();
-        const slider = document.getElementById('timeSlider');
-        if (!slider) return;
-
-        const currentUtcHour = now.getUTCHours();
-        const sliderHour = parseInt(slider.value, 10);
-
-        // Nur updaten, wenn sich die Stunde geändert hat, oder beim allerersten Start des Timers
-        if (currentUtcHour !== sliderHour || event.detail.isInitialTick) {
-            console.log(`[App] Autoupdate triggered. Current Hour: ${currentUtcHour}, Slider Hour: ${sliderHour}`);
-            await updateToCurrentHour();
-        }
-    });
-
     // Teilt Leaflet die neue, korrekte Kartengröße mit.
     setTimeout(() => {
         if (AppState.map) {
             AppState.map.invalidateSize();
         }
-    }, 100); // Eine kleine Verzögerung von 100ms ist sicher.
+    }, 100);
 });
 
 // =================================================================
