@@ -53,6 +53,8 @@ async function initMap() {
     AppState.jumpRunTrackLayerGroup = L.layerGroup().addTo(AppState.map);
     AppState.favoritesLayerGroup = L.layerGroup().addTo(AppState.map); // <-- NEUE ZEILE HINZUFÜGEN
     console.log('Favorite marker layer added!');
+    AppState.poiLayerGroup = L.layerGroup().addTo(AppState.map); // <-- NEUE ZEILE HINZUFÜGEN
+    console.log('POI marker layer added!');
 
     _setupBaseLayersAndHandling();
     _addStandardMapControls();
@@ -81,7 +83,7 @@ async function initMap() {
     console.log('initMap finished.');
 }
 
-// HILFSFUNKTIONEN FÜR initMap (innerhalb von app.js)
+// HILFSFUNKTIONEN FÜR initMap
 function _initializeBasicMapInstance(defaultCenter, defaultZoom) {
     AppState.lastLat = AppState.lastLat || defaultCenter[0];
     AppState.lastLng = AppState.lastLng || defaultCenter[1];
@@ -1565,6 +1567,49 @@ export function recenterMap(force = false, moveMarkerToCenter = false) {
             AppState.map.panTo([AppState.currentMarker.getLatLng().lat - offsetLat, AppState.currentMarker.getLatLng().lng], { animate: force });
         }
     }
+}
+
+/**
+ * Zeichnet Marker für gefundene Points of Interest (POIs) auf die Karte.
+ * @param {Array<Object>} pois - Ein Array von POI-Objekten.
+ */
+export function updatePoiMarkers(pois) {
+    if (!AppState.map || !AppState.poiLayerGroup) {
+        console.warn('Cannot update POI markers: map or layer group not ready.');
+        return;
+    }
+
+    // Zuerst alle alten POI-Marker entfernen
+    AppState.poiLayerGroup.clearLayers();
+
+    if (!pois || pois.length === 0) {
+        return; // Nichts zu zeichnen
+    }
+
+    // Ein Icon für die POI-Marker (z.B. ein Fallschirm-Emoji)
+    const poiIcon = L.divIcon({
+        html: '🪂',
+        className: 'poi-marker-icon', // Eigene Klasse für potenzielles Styling
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+    });
+
+    pois.forEach(poi => {
+        const marker = L.marker([poi.lat, poi.lon], { icon: poiIcon, pmIgnore: true })
+            .bindTooltip(poi.display_name, {
+                permanent: false,
+                direction: 'top',
+            })
+            .on('click', () => {
+                // Wenn auf einen POI-Marker geklickt wird, die Position auswählen
+                document.dispatchEvent(new CustomEvent('location:selected', {
+                    detail: { lat: poi.lat, lng: poi.lon, source: 'poi_marker' },
+                    bubbles: true
+                }));
+            });
+
+        AppState.poiLayerGroup.addLayer(marker);
+    });
 }
 
 //Live Position Funktionen

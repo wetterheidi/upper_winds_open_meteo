@@ -48,7 +48,8 @@ export const AppState = {
     ensembleLayerGroup: null, // Eigene LayerGroup für Ensemble-Visualisierungen
     ensembleScenarioCircles: {}, // Speichert die Leaflet-Layer für die Szenario-Kreise, z.B. { min_wind: circleLayer, mean_wind: circleLayer }
     heatmapLayer: null, // Für die Referenz auf den Heatmap-Layer
-    favoritesLayerGroup: null,          // <-- NEUE ZEILE HINZUFÜGEN
+    favoritesLayerGroup: null, 
+    poiLayerGroup: null,
     isArmed: false,
     isAutoRecording: false,
     isManualRecording: false, // <-- NEUE ZEILE

@@ -994,6 +994,7 @@ input[type="checkbox"][style*="opacity: 1"] {
 #snackbar.show { visibility: visible; transform: translateX(-50%) translateY(0); opacity: 1; }
 #snackbar.success { background-color: #4CAF50; }
 #snackbar.error { background-color: #f44336; }
+#snackbar.warning { background-color: #fff3cd; color: #856404; }
 
 #progress-snackbar { visibility: hidden; position: absolute; bottom: calc(55px + env(safe-area-inset-bottom) + 80px); left: 50%; transform: translateX(-50%) translateY(200%); background-color: #3f51b5; color: white; padding: 14px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.25); z-index: 2011; display: flex; align-items: center; gap: 12px; min-width: 280px; box-sizing: border-box; opacity: 0; transition: visibility 0s, opacity 0.4s ease-in-out, transform 0.4s ease-in-out; }
 #progress-snackbar.show { visibility: visible; opacity: 1; transform: translateX(-50%) translateY(0); }

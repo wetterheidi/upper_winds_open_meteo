@@ -976,6 +976,9 @@ input[type="checkbox"][style*="opacity: 0.5"] {
     background-color: #ffcccc;
 }
 
+#message.warning {
+    background-color: #fff3cd !important;
+}
 .modal {
     position: fixed;
     top: 0;

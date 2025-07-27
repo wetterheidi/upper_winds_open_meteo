@@ -2,7 +2,7 @@ import { Utils } from './utils.js';
 import * as mgrs from 'mgrs';
 
 let searchCache = JSON.parse(localStorage.getItem('searchCache')) || {};
-let isAddingFavorite = false; 
+let isAddingFavorite = false;
 
 /**
  * Attempts to parse user input as coordinates.
@@ -186,35 +186,161 @@ export async function performSearch(query) {
     if (searchCache[query]) {
         return searchCache[query]; // Ergebnisse aus dem Cache zurückgeben
     }
+    try {
+        // 1. Die URL wird auf die Open-Meteo Geocoding API umgestellt.
+        const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=10&language=de&format=json`;
 
-    // --- Phase 2: API-Aufruf mit Wiederholungslogik ---
-    const maxRetries = 3;
-    const retryDelay = 1500;
-
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-            const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&addressdetails=1`;
-            const response = await fetch(url, { headers: { 'User-Agent': 'DZMaster/1.0' } });
-            if (!response.ok) {
-                throw new Error(`Nominatim API Error: ${response.statusText}`);
-            }
-            const data = await response.json();
-            
-            // Ergebnis im Cache speichern
-            searchCache[query] = data;
-            localStorage.setItem('searchCache', JSON.stringify(searchCache));
-            
-            return data; // Erfolgreiches Ergebnis zurückgeben
-
-        } catch (error) {
-            console.error(`Search attempt ${attempt} failed:`, error);
-            if (attempt === maxRetries) {
-                // Nach dem letzten Versuch einen Fehler werfen oder ein leeres Array zurückgeben
-                Utils.handleError("Could not find location. Please check network.");
-                return []; 
-            }
-            await new Promise(resolve => setTimeout(resolve, retryDelay));
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Geocoding API Error: ${response.statusText}`);
         }
+        const data = await response.json();
+
+        // 2. Die Antwort der API wird in das Format umgewandelt, das die UI erwartet.
+        if (!data.results) {
+            return []; // Keine Ergebnisse gefunden
+        }
+
+        const formattedResults = data.results.map(item => {
+            // Wir bauen einen aussagekräftigen Anzeigenamen zusammen.
+            const displayNameParts = [
+                item.name,
+                item.admin1, // z.B. Bundesland oder Region
+                item.country
+            ];
+
+            return {
+                // Filtern leere Teile heraus und verbinden sie mit Kommas
+                display_name: displayNameParts.filter(Boolean).join(', '),
+                lat: item.latitude,
+                lon: item.longitude
+            };
+        });
+
+        // Ergebnis im Cache speichern
+        searchCache[query] = formattedResults;
+        localStorage.setItem('searchCache', JSON.stringify(searchCache));
+
+        return formattedResults; // Die formatierten Ergebnisse zurückgeben
+
+    } catch (error) {
+        console.error("Search failed:", error);
+        Utils.handleError("Could not find location. Please check network.");
+        return [];
+    }
+}
+
+/**
+ * Finds parachuting-related POIs in a bounding box using Overpass API.
+ * @param {number} minLat - Minimum latitude of the bounding box.
+ * @param {number} minLon - Minimum longitude of the bounding box.
+ * @param {number} maxLat - Maximum latitude of the bounding box.
+ * @param {number} maxLon - Maximum longitude of the bounding box.
+ * @returns {Promise<Array>} Array of POIs with {display_name, lat, lon, type}.
+ */
+export async function findParachutingPOIs(minLat, minLon, maxLat, maxLon) {
+    console.log('findParachutingPOIs: Searching for POIs in bbox:', { minLat, minLon, maxLat, maxLon });
+
+    // Validate bounding box
+    if (isNaN(minLat) || isNaN(minLon) || isNaN(maxLat) || isNaN(maxLon) ||
+        minLat < -90 || maxLat > 90 || minLon < -180 || maxLon > 180 ||
+        minLat > maxLat || minLon > maxLon) {
+        console.error('findParachutingPOIs: Invalid bounding box coordinates');
+        Utils.handleError('Invalid map bounds for POI search.');
+        return [];
+    }
+
+    // Cache key based on bounding box
+    const cacheKey = `parachutingPOIs_${minLat}_${minLon}_${maxLat}_${maxLon}`;
+    if (searchCache[cacheKey]) {
+        console.log('findParachutingPOIs: Returning cached results for bbox:', cacheKey);
+        return searchCache[cacheKey];
+    }
+
+    try {
+        // Overpass QL query for parachuting-related POIs
+        const overpassQuery = `
+            [out:json][timeout:50][bbox:${minLat},${minLon},${maxLat},${maxLon}];
+            (
+                node["sport"="parachuting"];
+                way["sport"="parachuting"];
+                relation["sport"="parachuting"];
+                node["name"~"Skydive",i];
+                way["name"~"Skydive",i];
+                relation["name"~"Skydive",i];
+                node["name"~"Fallschirmspringen",i];
+                way["name"~"Fallschirmspringen",i];
+                relation["name"~"Fallschirmspringen",i];
+                node["tourism"="attraction"]["name"~"Skydive",i];
+                node["tourism"="attraction"]["name"~"Fallschirmspringen",i];
+                node["aeroway"="aerodrome"]["destination"~"skydiving",i];
+                way["aeroway"="aerodrome"]["destination"~"skydiving",i];
+                node["leisure"="sports_centre"]["sport"~"parachuting",i];
+                way["leisure"="sports_centre"]["sport"~"parachuting",i];
+                node["aeroway"="aerodrome"]["name"~"Flugplatz",i];
+                way["aeroway"="aerodrome"]["name"~"Flugplatz",i];
+            );
+            out center;
+        `;
+        const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(overpassQuery)}`;
+
+        console.log('findParachutingPOIs: Sending Overpass query:', overpassQuery);
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Overpass API Error: ${response.statusText}`);
+        }
+        const data = await response.json();
+
+        console.log('findParachutingPOIs: Raw Overpass response:', data);
+
+        const results = data.elements.map(item => {
+            const tags = item.tags || {};
+            const displayNameParts = [
+                tags.name,
+                tags["addr:street"] || tags.street,
+                tags["addr:city"] || tags.city,
+                tags["addr:state"] || tags.state,
+                tags["addr:country"] || tags.country,
+                tags['sport'] ? `(${tags['sport']})` : null,
+                tags['aeroway'] === 'aerodrome' ? '(Airfield)' : null
+            ].filter(Boolean).join(', ');
+
+            return {
+                display_name: displayNameParts || 'Unnamed Parachuting Location',
+                lat: item.lat || item.center?.lat,
+                lon: item.lon || item.center?.lon,
+                type: tags['sport'] || tags['aeroway'] || tags['leisure'] || 'parachuting'
+            };
+        });
+
+        // Filter out duplicates based on proximity (within 100m)
+        const uniqueResults = [];
+        const seenCoords = new Set();
+        for (const result of results) {
+            const coordKey = `${result.lat.toFixed(5)}_${result.lon.toFixed(5)}`;
+            if (!seenCoords.has(coordKey)) {
+                seenCoords.add(coordKey);
+                uniqueResults.push(result);
+            }
+        }
+
+        console.log('findParachutingPOIs: Caching results for bbox:', cacheKey);
+        searchCache[cacheKey] = uniqueResults;
+        localStorage.setItem('searchCache', JSON.stringify(searchCache));
+
+        if (uniqueResults.length === 0) {
+            console.log('findParachutingPOIs: No parachuting POIs found in bbox');
+            Utils.handleMessage('No parachuting locations found in this area.');
+        } else {
+            console.log('findParachutingPOIs: Found POIs:', uniqueResults);
+            Utils.handleMessage(`Found ${uniqueResults.length} parachuting location(s) in this area.`);
+        }
+
+        return uniqueResults;
+    } catch (error) {
+        console.error('findParachutingPOIs: Search failed:', error);
+        Utils.handleError('Could not find parachuting locations. Please check network.');
+        return [];
     }
 }
 
@@ -223,8 +349,8 @@ export function updateFavoriteStatus(lat, lng, name, isFavorite) {
     const newLat = parseFloat(lat.toFixed(5));
     const newLng = parseFloat(lng.toFixed(5));
 
-    const existingEntry = history.find(entry => 
-        Math.abs(entry.lat - newLat) < 0.0001 && 
+    const existingEntry = history.find(entry =>
+        Math.abs(entry.lat - newLat) < 0.0001 &&
         Math.abs(entry.lng - newLng) < 0.0001
     );
 
@@ -238,10 +364,10 @@ export function updateFavoriteStatus(lat, lng, name, isFavorite) {
         // Füge einen komplett neuen Favoriten hinzu, falls er nicht im Verlauf war
         history.unshift({ lat: newLat, lng: newLng, label: name, isFavorite: true, timestamp: Date.now() });
     }
-    
-    saveCoordHistory(history); 
-    _dispatchFavoritesUpdate(); 
-    
+
+    saveCoordHistory(history);
+    _dispatchFavoritesUpdate();
+
     // Gib eine Erfolgsmeldung zurück
     if (isFavorite) {
         Utils.handleMessage(`"${name}" saved as favorite.`);

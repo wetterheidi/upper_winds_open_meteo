@@ -171,6 +171,40 @@ export function displayError(message) {
     }, UI_DEFAULTS.MESSAGE_TIMEOUT_MS);
 }
 
+export function displayWarning(message) {
+    console.log('displayWarning called with:', message);
+    let messageElement = document.getElementById('message');
+    if (!messageElement) {
+        messageElement = document.createElement('div');
+        messageElement.id = 'message';
+        // ... (der restliche Code zum Erstellen des Elements bleibt gleich)
+        messageElement.style.position = 'fixed';
+        messageElement.style.top = '5px';
+        messageElement.style.right = '5px';
+        messageElement.style.width = isMobileDevice() ? '70%' : '30%';
+        messageElement.style.borderRadius = '5px 5px 5px 5px';
+        messageElement.style.color = '#000000';
+        messageElement.style.padding = '6px';
+        messageElement.style.zIndex = '9998';
+        messageElement.style.textAlign = 'center';
+        document.body.appendChild(messageElement);
+        window.addEventListener('resize', () => {
+            messageElement.style.width = isMobileDevice() ? '70%' : '30%';
+        });
+    }
+    
+    // Setze den Text und die neue CSS-Klasse
+    messageElement.textContent = message;
+    messageElement.className = 'warning'; // Wendet unseren neuen Stil an
+    messageElement.style.display = 'block';
+
+    clearTimeout(window.messageTimeout);
+    window.messageTimeout = setTimeout(() => {
+        messageElement.style.display = 'none';
+        messageElement.className = ''; // Klasse wieder entfernen
+    }, UI_DEFAULTS.MESSAGE_TIMEOUT_MS);
+}
+
 export function getSliderValue() {
     return parseInt(document.getElementById('timeSlider')?.value) || 0;
 }
@@ -238,5 +272,20 @@ export function cleanupSelectedEnsembleModels(availableModels) {
     if (selected.length !== updated.length) {
         Settings.state.userSettings.selectedEnsembleModels = updated;
         Settings.save();
+    }
+}
+
+export function toggleLoading(show, message = 'Loading...') {
+    const loadingElement = document.getElementById('loading');
+    if (!loadingElement) return;
+
+    const textElement = loadingElement.querySelector('p');
+    if (show) {
+        if (textElement) {
+            textElement.textContent = message;
+        }
+        loadingElement.style.display = 'flex';
+    } else {
+        loadingElement.style.display = 'none';
     }
 }

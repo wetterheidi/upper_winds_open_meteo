@@ -9,7 +9,7 @@ import * as Coordinates from '../ui-web/coordinates.js';
 import { TileCache, cacheTilesForDIP, cacheVisibleTiles } from '../core/tileCache.js';
 import { loadGpxTrack, loadCsvTrackUTC, exportToGpx, exportLandingPatternToGpx } from '../core/trackManager.js';
 import { fetchEnsembleWeatherData, processAndVisualizeEnsemble, clearEnsembleVisualizations } from '../core/ensembleManager.js';
-import { getSliderValue, displayMessage, hideProgress, displayProgress } from './ui.js';
+import { getSliderValue, displayMessage, hideProgress, displayProgress, displayWarning, toggleLoading } from './ui.js';
 import { updateModelSelectUI, cleanupSelectedEnsembleModels } from './ui.js';
 import 'leaflet-gpx';
 import * as LocationManager from '../core/locationManager.js';
@@ -1136,6 +1136,58 @@ export function updateEnsembleModelUI(availableModels) {
     });
 }
 
+// --- Search ---
+
+function setupPoiSearchButton() {
+    const poiButton = document.getElementById('findPoisInViewBtn');
+    if (!poiButton) {
+        console.warn('POI search button not found.');
+        return;
+    }
+
+    poiButton.addEventListener('click', async () => {
+        if (!AppState.map) {
+            Utils.handleError("Map is not available.");
+            return;
+        }
+
+        const currentZoom = AppState.map.getZoom();
+        const minZoomForPoiSearch = 10;
+
+        if (currentZoom < minZoomForPoiSearch) {
+            displayWarning(`Please zoom in to Level ${minZoomForPoiSearch}+ to search for dropzones.`);
+            return;
+        }
+
+        try {
+            // KORREKTUR: Rufe toggleLoading mit dem spezifischen Text auf
+            toggleLoading(true, 'Searching for Dropzones...');
+            
+            const bounds = AppState.map.getBounds();
+            const sw = bounds.getSouthWest();
+            const ne = bounds.getNorthEast();
+
+            const poiResults = await LocationManager.findParachutingPOIs(
+                sw.lat, sw.lng, ne.lat, ne.lng
+            );
+
+            mapManager.updatePoiMarkers(poiResults);
+
+            // Der dynamische Import für renderResultsList bleibt unverändert
+            const coordinatesModule = await import('./coordinates.js');
+            if (coordinatesModule && typeof coordinatesModule.renderResultsList === 'function') {
+                coordinatesModule.renderResultsList(poiResults);
+            }
+        } catch (error) {
+            console.error("Error during POI search:", error);
+            Utils.handleError("An error occurred during the search.");
+        } finally {
+            // KORREKTUR: Schalte den Spinner über die Funktion wieder aus
+            toggleLoading(false);
+        }
+    });
+}
+
 // =================================================================
 // 4. Haupt-Initialisierungsfunktion
 // =================================================================
@@ -1183,8 +1235,14 @@ export function initializeEventListeners() {
     // 7. Live-Funktionen
     setupHarpCoordInputEvents();
 
-    // 8. Event Listener für Karten-Interaktionen
+    // 8. Search
+    setupPoiSearchButton();
+
+    // 9. Event Listener für Karten-Interaktionen
     setupMapEventListeners();
+
+    document.addEventListener('loading:start', (e) => toggleLoading(true, e.detail.message));
+    document.addEventListener('loading:stop', () => toggleLoading(false));
 
     listenersInitialized = true;
     console.log("Event listeners initialized successfully (first and only time).");

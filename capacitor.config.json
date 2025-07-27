@@ -17,6 +17,14 @@
   "server": {
     "hostname": "app.local",
     "androidScheme": "https",
-    "iosScheme": "https"
+    "iosScheme": "https",
+    "allowNavigation": [
+      "api.open-meteo.com",
+      "geocoding-api.open-meteo.com",
+      "overpass-api.de",
+      "*.tile.openstreetmap.org",
+      "*.tile.opentopomap.org",
+      "server.arcgisonline.com"
+    ]
   }
 }
