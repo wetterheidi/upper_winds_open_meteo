@@ -333,29 +333,60 @@ async function _geolocationErrorCallback(error, defaultCenter, defaultZoom) {
 }
 
 async function _handleGeolocation(defaultCenter, defaultZoom) {
+    console.log('MapManager: Starting geolocation handling...');
     try {
         // Hole die Module über den Adapter
         const { Geolocation, isNative } = await getCapacitor();
 
         if (isNative && Geolocation) {
+            // Prüfe den Berechtigungsstatus
+            console.log('[MapManager] Checking geolocation permissions...');
+            let permissionStatus = await Geolocation.checkPermissions();
+            let hasPermission = permissionStatus.location === 'granted' || permissionStatus.location === 'provisional'; // Unterstützt iOS "Wenn geteilt"
+            console.log('[MapManager] Permission status:', permissionStatus);
+
+            if (!hasPermission) {
+                console.log('[MapManager] Requesting geolocation permissions...');
+                const result = await Geolocation.requestPermissions({ permissions: ['location'] });
+                hasPermission = result.location === 'granted' || result.location === 'provisional';
+                console.log('[MapManager] Permission request result:', result);
+
+                if (!hasPermission) {
+                    console.warn('[MapManager] Geolocation permission denied or not granted.');
+                    Utils.handleMessage('Bitte erlaube den Zugriff auf deinen Standort in den Einstellungen, um die aktuelle Position zu verwenden.');
+                    throw new Error('Geolocation permission not granted');
+                }
+            }
+
+            // Versuche, die aktuelle Position abzurufen
+            console.log('[MapManager] Attempting to fetch current position...');
             const position = await Geolocation.getCurrentPosition({
                 enableHighAccuracy: true,
-                timeout: 10000
+                timeout: 10000,
+                maximumAge: 0
             });
-            _geolocationSuccessCallback(position, defaultZoom);
-        } else if (navigator.geolocation) { // Fallback zur Web-API
+            console.log('[MapManager] Current position retrieved:', position.coords);
+            await _geolocationSuccessCallback(position, defaultZoom);
+        } else if (navigator.geolocation) {
+            // Fallback zur Web-API (für Emulator oder Web)
+            console.log('[MapManager] Using browser geolocation API...');
             navigator.geolocation.getCurrentPosition(
                 (position) => _geolocationSuccessCallback(position, defaultZoom),
-                (geoError) => _geolocationErrorCallback(geoError, defaultCenter, defaultZoom),
+                (geoError) => {
+                    console.error('[MapManager] Browser geolocation error:', geoError);
+                    _geolocationErrorCallback(geoError, defaultCenter, defaultZoom);
+                },
                 { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
             );
         } else {
-            // Dies sollte in der mobilen App nie passieren, ist aber ein guter Fallback
-            _geolocationErrorCallback({ message: "Native Geolocation not available." }, defaultCenter, defaultZoom);
+            console.warn('[MapManager] No geolocation API available.');
+            Utils.handleMessage('Standortzugriff nicht verfügbar. Verwende Standardposition.');
+            await _geolocationErrorCallback({ message: 'Geolocation not available' }, defaultCenter, defaultZoom);
         }
     } catch (error) {
-        console.error('Fehler beim Abrufen des Standorts mit Capacitor:', error);
-        _geolocationErrorCallback(error, defaultCenter, defaultZoom);
+        console.error('[MapManager] Error during geolocation handling:', error);
+        Utils.handleMessage('Fehler beim Abrufen des Standorts. Verwende Standardposition.');
+        await _geolocationErrorCallback(error, defaultCenter, defaultZoom);
     }
 }
 

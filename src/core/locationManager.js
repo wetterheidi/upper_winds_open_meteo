@@ -262,23 +262,9 @@ export async function findParachutingPOIs(minLat, minLon, maxLat, maxLon) {
         const overpassQuery = `
             [out:json][timeout:50][bbox:${minLat},${minLon},${maxLat},${maxLon}];
             (
-                node["sport"="parachuting"];
-                way["sport"="parachuting"];
-                relation["sport"="parachuting"];
-                node["name"~"Skydive",i];
-                way["name"~"Skydive",i];
-                relation["name"~"Skydive",i];
-                node["name"~"Fallschirmspringen",i];
-                way["name"~"Fallschirmspringen",i];
-                relation["name"~"Fallschirmspringen",i];
-                node["tourism"="attraction"]["name"~"Skydive",i];
-                node["tourism"="attraction"]["name"~"Fallschirmspringen",i];
-                node["aeroway"="aerodrome"]["destination"~"skydiving",i];
-                way["aeroway"="aerodrome"]["destination"~"skydiving",i];
-                node["leisure"="sports_centre"]["sport"~"parachuting",i];
-                way["leisure"="sports_centre"]["sport"~"parachuting",i];
-                node["aeroway"="aerodrome"]["name"~"Flugplatz",i];
-                way["aeroway"="aerodrome"]["name"~"Flugplatz",i];
+                nwr["sport"="parachuting"];
+                nwr[~"^(name|description|alt_name|official_name)$"~"Skydiv|Fallschirm|Dropzone|Sprungplatz|Tandemspr", i];
+                nwr["aeroway"~"aerodrome|airfield"]["service"~"skydiving|parachuting", i];
             );
             out center;
         `;
