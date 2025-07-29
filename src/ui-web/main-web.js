@@ -853,25 +853,32 @@ function setupAppEventListeners() {
 
         const currentZoom = AppState.map.getZoom();
 
-        // FEHLERBEHEBUNG: Die Neuberechnung bei Zoom/Pan wird entfernt.
-        // Die Visualisierungen werden nur noch ausgeblendet, wenn der Zoom-Level außerhalb des gültigen Bereichs liegt.
+        // Überprüft, ob die Sprungberechnung aktiv ist
         if (Settings.state.userSettings.calculateJump && AppState.weatherData && AppState.lastLat) {
             if (currentZoom < UI_DEFAULTS.MIN_ZOOM || currentZoom > UI_DEFAULTS.MAX_ZOOM) {
-                mapManager.drawJumpVisualization(null); // Visualisierung ausblenden
+                mapManager.drawJumpVisualization(null); // Blendet Kreise aus
+            } else {
+                // NEU: Zeichnet die Kreise neu, wenn der Zoom wieder im gültigen Bereich ist
+                calculateJump();
             }
         }
+
+        // Überprüft, ob der Jump Run Track angezeigt werden soll
         if (Settings.state.userSettings.showJumpRunTrack) {
             if (currentZoom < UI_DEFAULTS.MIN_ZOOM || currentZoom > UI_DEFAULTS.MAX_ZOOM) {
-                mapManager.drawJumpRunTrack(null); // JRT ausblenden
+                mapManager.drawJumpRunTrack(null); // Blendet JRT aus
+            } else {
+                // NEU: Zeichnet den JRT neu, wenn der Zoom wieder im gültigen Bereich ist
+                displayManager.updateJumpRunTrackDisplay();
             }
         }
-        // Das Landing Pattern wird bei Zoom-Änderungen weiterhin aktualisiert,
-        // da seine Sichtbarkeit vom Zoom abhängt, die Berechnung aber schnell ist.
+
+        // Das Landing Pattern wird weiterhin bei jeder Bewegung aktualisiert
         if (Settings.state.userSettings.showLandingPattern) {
             displayManager.updateLandingPatternDisplay();
         }
 
-        // Das Caching bei Kartenbewegung bleibt erhalten.
+        // Das Caching bei Kartenbewegung bleibt unverändert
         cacheVisibleTiles({
             map: AppState.map,
             baseMaps: AppState.baseMaps,

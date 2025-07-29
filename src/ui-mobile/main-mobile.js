@@ -930,15 +930,20 @@ function setupAppEventListeners() {
 
         const currentZoom = AppState.map.getZoom();
 
-        // FEHLERBEHEBUNG: Die Neuberechnung bei Zoom/Pan wird entfernt.
         if (Settings.state.userSettings.calculateJump && AppState.weatherData && AppState.lastLat) {
             if (currentZoom < UI_DEFAULTS.MIN_ZOOM || currentZoom > UI_DEFAULTS.MAX_ZOOM) {
-                mapManager.drawJumpVisualization(null);
+                mapManager.drawJumpVisualization(null); // Visualisierung ausblenden
+            } else {
+                // NEU: Wenn der Zoom wieder im gültigen Bereich ist, die Visualisierung neu zeichnen.
+                calculateJump();
             }
         }
         if (Settings.state.userSettings.showJumpRunTrack) {
             if (currentZoom < UI_DEFAULTS.MIN_ZOOM || currentZoom > UI_DEFAULTS.MAX_ZOOM) {
-                mapManager.drawJumpRunTrack(null);
+                mapManager.drawJumpRunTrack(null); // JRT ausblenden
+            } else {
+                // NEU: Wenn der Zoom wieder im gültigen Bereich ist, den JRT neu zeichnen.
+                displayManager.updateJumpRunTrackDisplay();
             }
         }
         if (Settings.state.userSettings.showLandingPattern) {
