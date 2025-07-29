@@ -930,17 +930,14 @@ function setupAppEventListeners() {
 
         const currentZoom = AppState.map.getZoom();
 
+        // FEHLERBEHEBUNG: Die Neuberechnung bei Zoom/Pan wird entfernt.
         if (Settings.state.userSettings.calculateJump && AppState.weatherData && AppState.lastLat) {
-            if (currentZoom >= UI_DEFAULTS.MIN_ZOOM && currentZoom <= UI_DEFAULTS.MAX_ZOOM) {
-                calculateJump();
-            } else {
+            if (currentZoom < UI_DEFAULTS.MIN_ZOOM || currentZoom > UI_DEFAULTS.MAX_ZOOM) {
                 mapManager.drawJumpVisualization(null);
             }
         }
         if (Settings.state.userSettings.showJumpRunTrack) {
-            if (currentZoom >= UI_DEFAULTS.MIN_ZOOM && currentZoom <= UI_DEFAULTS.MAX_ZOOM) {
-                displayManager.updateJumpRunTrackDisplay();
-            } else {
+            if (currentZoom < UI_DEFAULTS.MIN_ZOOM || currentZoom > UI_DEFAULTS.MAX_ZOOM) {
                 mapManager.drawJumpRunTrack(null);
             }
         }
@@ -948,8 +945,6 @@ function setupAppEventListeners() {
             displayManager.updateLandingPatternDisplay();
         }
 
-        // Die Caching-Logik kann hier ebenfalls angestoßen werden, falls gewünscht,
-        // oder separat bleiben, wie im eventManager gezeigt.
         cacheVisibleTiles({
             map: AppState.map,
             baseMaps: AppState.baseMaps,
@@ -1444,6 +1439,16 @@ function setupAppEventListeners() {
         }
     });
 
+    document.addEventListener('ui:landingPatternEnabled', () => {
+        console.log('[main-mobile] Landing pattern enabled, updating display.');
+        displayManager.updateLandingPatternDisplay();
+    });
+
+    document.addEventListener('ui:landingPatternDisabled', () => {
+        console.log('[main-mobile] Landing pattern disabled, clearing display.');
+        mapManager.drawLandingPattern(null); // Ruft die Funktion zum Löschen des Musters auf
+    });
+
     document.addEventListener('ui:invalidInput', (e) => {
         const { id, defaultValue } = e.detail;
         console.log(`[main-mobile] Received invalid input for ${id}. Resetting UI to ${defaultValue}.`);
@@ -1678,7 +1683,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     Coordinates.initializeLocationSearch();
 
     // Initiales Zeichnen der Favoriten-Marker beim Start
-   const initialFavorites = LocationManager.getCoordHistory().filter(item => item.isFavorite);
+    const initialFavorites = LocationManager.getCoordHistory().filter(item => item.isFavorite);
     if (initialFavorites.length > 0) {
         console.log(`[App] Found ${initialFavorites.length} favorite(s) on startup, plotting on map.`);
         mapManager.updateFavoriteMarkers(initialFavorites);
@@ -1744,12 +1749,25 @@ document.addEventListener('DOMContentLoaded', async () => {
         displayManager.updateJumpRunTrackDisplay();
     });
 
-    // Teilt Leaflet die neue, korrekte Kartengröße mit.
     setTimeout(() => {
         if (AppState.map) {
+            console.log("[App] Finalizing layout: invalidating map size and redrawing overlays.");
             AppState.map.invalidateSize();
+
+            // Erzwinge eine Neuberechnung und Neuzeichnung der Overlays,
+            // nachdem die Kartengröße finalisiert wurde.
+            if (Settings.state.userSettings.showJumpRunTrack) {
+                displayManager.updateJumpRunTrackDisplay();
+            }
+            if (Settings.state.userSettings.showLandingPattern) {
+                displayManager.updateLandingPatternDisplay();
+            }
+            // `calculateJump` zeichnet alle Kreise (Exit, Canopy etc.) neu
+            if (Settings.state.userSettings.calculateJump) {
+                calculateJump();
+            }
         }
-    }, 100);
+    }, 250); // Ein etwas längerer Timeout für mehr Sicherheit auf langsameren Geräten.
 });
 
 // =================================================================

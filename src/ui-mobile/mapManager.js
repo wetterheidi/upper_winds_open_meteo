@@ -333,7 +333,7 @@ async function _geolocationErrorCallback(error, defaultCenter, defaultZoom) {
 }
 
 async function _handleGeolocation(defaultCenter, defaultZoom) {
-    console.log('MapManager: Starting geolocation handling...');
+    console.log('[MapManager] Starting geolocation handling at', new Date().toISOString());
     try {
         // Hole die Module über den Adapter
         const { Geolocation, isNative } = await getCapacitor();
@@ -342,38 +342,67 @@ async function _handleGeolocation(defaultCenter, defaultZoom) {
             // Prüfe den Berechtigungsstatus
             console.log('[MapManager] Checking geolocation permissions...');
             let permissionStatus = await Geolocation.checkPermissions();
-            let hasPermission = permissionStatus.location === 'granted' || permissionStatus.location === 'provisional'; // Unterstützt iOS "Wenn geteilt"
-            console.log('[MapManager] Permission status:', permissionStatus);
+            console.log('[MapManager] Permission status:', JSON.stringify(permissionStatus));
 
+            let hasPermission = permissionStatus.location === 'granted' || permissionStatus.location === 'provisional';
             if (!hasPermission) {
                 console.log('[MapManager] Requesting geolocation permissions...');
-                const result = await Geolocation.requestPermissions({ permissions: ['location'] });
-                hasPermission = result.location === 'granted' || result.location === 'provisional';
-                console.log('[MapManager] Permission request result:', result);
+                try {
+                    const result = await Geolocation.requestPermissions({ permissions: ['location'] });
+                    hasPermission = result.location === 'granted' || result.location === 'provisional';
+                    console.log('[MapManager] Permission request result:', JSON.stringify(result));
 
-                if (!hasPermission) {
-                    console.warn('[MapManager] Geolocation permission denied or not granted.');
-                    Utils.handleMessage('Bitte erlaube den Zugriff auf deinen Standort in den Einstellungen, um die aktuelle Position zu verwenden.');
-                    throw new Error('Geolocation permission not granted');
+                    if (!hasPermission) {
+                        console.warn('[MapManager] Geolocation permission denied or not granted:', result);
+                        Utils.handleMessage('Bitte erlaube den Standortzugriff in den Einstellungen, um deine aktuelle Position zu verwenden.');
+                        throw new Error(`Geolocation permission not granted: ${JSON.stringify(result)}`);
+                    } else if (result.location === 'provisional') {
+                        console.log('[MapManager] Provisional permission granted. Prompting user to share location...');
+                        Utils.handleMessage('Bitte teile deinen Standort, um die Karte mit deiner Position zu laden.');
+                    }
+                } catch (permError) {
+                    console.error('[MapManager] Error requesting permissions:', permError);
+                    throw permError;
                 }
             }
 
             // Versuche, die aktuelle Position abzurufen
             console.log('[MapManager] Attempting to fetch current position...');
-            const position = await Geolocation.getCurrentPosition({
-                enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 0
-            });
-            console.log('[MapManager] Current position retrieved:', position.coords);
-            await _geolocationSuccessCallback(position, defaultZoom);
+            let position = null;
+            let attempts = 0;
+            const maxAttempts = 3;
+            while (!position && attempts < maxAttempts) {
+                try {
+                    console.log(`[MapManager] Attempt ${attempts + 1} to fetch current position...`);
+                    position = await Geolocation.getCurrentPosition({
+                        enableHighAccuracy: true,
+                        timeout: 20000, // Erhöhtes Timeout für iOS 18.5
+                        maximumAge: 0
+                    });
+                    console.log('[MapManager] Current position retrieved:', JSON.stringify(position.coords));
+                    await _geolocationSuccessCallback(position, defaultZoom);
+                } catch (error) {
+                    console.error('[MapManager] Error fetching position on attempt', attempts + 1, ':', error.message);
+                    attempts++;
+                    if (attempts < maxAttempts && permissionStatus.location === 'provisional') {
+                        console.log('[MapManager] Retrying due to provisional permission...');
+                        Utils.handleMessage('Standortfreigabe erforderlich. Bitte teile deinen Standort.');
+                        await new Promise(resolve => setTimeout(resolve, 3000)); // Warte 3 Sekunden
+                    } else {
+                        throw error;
+                    }
+                }
+            }
         } else if (navigator.geolocation) {
-            // Fallback zur Web-API (für Emulator oder Web)
+            // Fallback zur Web-API
             console.log('[MapManager] Using browser geolocation API...');
             navigator.geolocation.getCurrentPosition(
-                (position) => _geolocationSuccessCallback(position, defaultZoom),
+                (position) => {
+                    console.log('[MapManager] Browser position retrieved:', JSON.stringify(position.coords));
+                    _geolocationSuccessCallback(position, defaultZoom);
+                },
                 (geoError) => {
-                    console.error('[MapManager] Browser geolocation error:', geoError);
+                    console.error('[MapManager] Browser geolocation error:', geoError.message);
                     _geolocationErrorCallback(geoError, defaultCenter, defaultZoom);
                 },
                 { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
@@ -384,7 +413,7 @@ async function _handleGeolocation(defaultCenter, defaultZoom) {
             await _geolocationErrorCallback({ message: 'Geolocation not available' }, defaultCenter, defaultZoom);
         }
     } catch (error) {
-        console.error('[MapManager] Error during geolocation handling:', error);
+        console.error('[MapManager] Error during geolocation handling:', error.message);
         Utils.handleMessage('Fehler beim Abrufen des Standorts. Verwende Standardposition.');
         await _geolocationErrorCallback(error, defaultCenter, defaultZoom);
     }
@@ -901,96 +930,60 @@ function _setupCoreMapEventHandlers() {
         }
     });
 
+    let longPressTimeout;
 
+    // Standard contextmenu für Android und Desktop
     AppState.map.on('contextmenu', (e) => {
-        // Rechtsklick/Langes Drücken verschiebt jetzt den DIP
         const { lat, lng } = e.latlng;
-        console.log('MapManager: Rechtsklick/Langes Drücken erkannt. Sende "location:selected"-Event.');
-
+        console.log('MapManager: Standard-Rechtsklick/Langes Drücken erkannt.');
         const mapSelectEvent = new CustomEvent('location:selected', {
-            detail: {
-                lat: lat,
-                lng: lng,
-                source: 'contextmenu' // Wir ändern die Quelle zur besseren Nachverfolgung
-            },
+            detail: { lat, lng, source: 'contextmenu' },
             bubbles: true,
             cancelable: true
         });
         AppState.map.getContainer().dispatchEvent(mapSelectEvent);
     });
 
-    // Touchstart (Doppel-Tipp) auf dem Kartencontainer
+    // Manuelle Erkennung für langes Drücken für iOS
     const mapContainer = AppState.map.getContainer();
-    mapContainer.addEventListener('touchstart', async (e) => {
-        if (e.touches.length !== 1 || e.target.closest('.leaflet-marker-icon')) return; // Ignoriere Multi-Touch oder Klick auf Marker
-        const currentTime = new Date().getTime();
-        const timeSinceLastTap = currentTime - lastTapTime; // lastTapTime ist eine module-level Variable
-        const tapThreshold = 300; // ms
-        if (timeSinceLastTap < tapThreshold && timeSinceLastTap > 0) {
-            e.preventDefault(); // Verhindere Standard-Touch-Aktionen wie Zoom
+    mapContainer.addEventListener('touchstart', (e) => {
+        // Ignoriere, wenn mehr als ein Finger auf dem Bildschirm ist
+        if (e.touches.length > 1) {
+            clearTimeout(longPressTimeout);
+            return;
+        }
+        
+        // Starte den Timer für langes Drücken
+        longPressTimeout = setTimeout(() => {
+            // Verhindere das Auslösen des normalen "click"-Events
+            e.preventDefault();
+
+            // KORREKTUR: Hole die Koordinaten relativ zum Karten-Container
             const rect = mapContainer.getBoundingClientRect();
-            const touchX = e.touches[0].clientX - rect.left;
-            const touchY = e.touches[0].clientY - rect.top;
-            const latlng = AppState.map.containerPointToLatLng([touchX, touchY]);
+            const touch = e.touches[0];
+            const x = touch.clientX - rect.left;
+            const y = touch.clientY - rect.top;
+            const latlng = AppState.map.containerPointToLatLng([x, y]);
+            
+            console.log('MapManager: Manuelles langes Drücken (iOS) erkannt.');
+            const mapSelectEvent = new CustomEvent('location:selected', {
+                detail: { lat: latlng.lat, lng: latlng.lng, source: 'longpress_ios' },
+                bubbles: true,
+                cancelable: true
+            });
+            AppState.map.getContainer().dispatchEvent(mapSelectEvent);
 
-            await _handleMapDblClick({ latlng: latlng, containerPoint: L.point(touchX, touchY), layerPoint: AppState.map.latLngToLayerPoint(latlng) });
-        }
-        lastTapTime = currentTime; // Aktualisiere die Zeit des letzten Taps
-
-        if (e.touches.length === 2 && Settings.state.userSettings.showJumpRunTrack) {
-            e.preventDefault(); // Verhindert das Standard-Zooming von Leaflet
-
-            isRotatingJRT = true;
-            const touch1 = e.touches[0];
-            const touch2 = e.touches[1];
-
-            // Berechne den initialen Winkel zwischen den Fingern
-            initialJrtAngle = Math.atan2(touch2.clientY - touch1.clientY, touch2.clientX - touch1.clientX) * 180 / Math.PI;
-
-            // Speichere die aktuelle JRT-Richtung
-            const directionInput = document.getElementById('jumpRunTrackDirection');
-            initialJrtDirection = parseFloat(directionInput.value) || JumpPlanner.jumpRunTrack(null)?.direction || 0;
-        }
-    }, { passive: false }); // passive: false ist wichtig, um preventDefault zu erlauben
-
-    mapContainer.addEventListener('touchmove', (e) => {
-        if (!isRotatingJRT || e.touches.length !== 2) return;
-
-        e.preventDefault(); // Weiterhin das Zoomen verhindern
-
-        const touch1 = e.touches[0];
-        const touch2 = e.touches[1];
-
-        // Berechne den aktuellen Winkel und die Änderung
-        const currentAngle = Math.atan2(touch2.clientY - touch1.clientY, touch2.clientX - touch1.clientX) * 180 / Math.PI;
-        const angleChange = currentAngle - initialJrtAngle;
-        let newDirection = (initialJrtDirection + angleChange + 360) % 360;
-
-        // Um ein flüssiges Neuzeichnen zu gewährleisten, verwenden wir requestAnimationFrame
-        requestAnimationFrame(() => {
-            // Aktualisiere das UI-Inputfeld und die Settings
-            const directionInput = document.getElementById('jumpRunTrackDirection');
-            directionInput.value = Math.round(newDirection);
-            Settings.state.userSettings.customJumpRunDirection = Math.round(newDirection);
-
-            // Zeichne den JRT neu
-            updateJumpRunTrackDisplay();
-        });
+        }, 500); // 500ms für langes Drücken
     }, { passive: false });
 
-    mapContainer.addEventListener('touchend', (e) => {
-        if (isRotatingJRT) {
-            // Sobald weniger als zwei Finger auf dem Bildschirm sind, beenden wir die Rotation
-            if (e.touches.length < 2) {
-                isRotatingJRT = false;
+    mapContainer.addEventListener('touchend', () => {
+        // Stoppe den Timer, wenn der Finger angehoben wird
+        clearTimeout(longPressTimeout);
+    });
 
-                // Speichere den finalen Wert in den Settings
-                const directionInput = document.getElementById('jumpRunTrackDirection');
-                Settings.state.userSettings.customJumpRunTrackDirection = parseFloat(directionInput.value);
-                Settings.save();
-                console.log("JRT rotation finished, final direction saved.");
-            }
-        }
+    mapContainer.addEventListener('touchmove', () => {
+        // Stoppe den Timer, wenn der Finger bewegt wird
+        clearTimeout(longPressTimeout);
     });
 
     // Optionale, einfache Click/Mousedown-Handler (falls benötigt)

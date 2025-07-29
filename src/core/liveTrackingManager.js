@@ -168,7 +168,7 @@ const debouncedPositionUpdate = Utils.debounce(async (position) => {
  * @private
  */
 async function checkAndRequestPermissions() {
-    const { Geolocation } = await getCapacitorModules();
+    const { Geolocation } = await getCapacitor();
     let permissions = await Geolocation.checkPermissions();
     console.log('Initial geolocation permissions state:', permissions.location);
 
@@ -192,7 +192,7 @@ async function checkAndRequestPermissions() {
 
 /**
  * Startet die kontinuierliche Abfrage der GPS-Position des Geräts.
- * Verwendet `navigator.geolocation.watchPosition` für regelmäßige Updates.
+ * Verwendet das Capacitor Geolocation-Plugin für native Plattformen und navigator.geolocation als Fallback für Web.
  * Löst ein 'tracking:started'-Event aus, um andere Teile der Anwendung zu informieren.
  * @returns {void}
  */
@@ -200,21 +200,28 @@ export async function startPositionTracking() {
     if (AppState.watchId !== null) return;
     console.log("[LiveTrackingManager] Attempting to start position tracking...");
 
-    const { BackgroundGeolocation, isNative } = await getCapacitor();
+    const { Geolocation, isNative } = await getCapacitor();
 
-    if (isNative && BackgroundGeolocation) {
+    if (isNative && Geolocation) {
         try {
-            await BackgroundGeolocation.addWatcher({
-                    id: "primary-watcher",
-                    backgroundMessage: "Tracking your position for DZMaster.",
-                    backgroundTitle: "DZMaster is tracking",
-                    requestPermissions: true,
-                    stale: false,
-                    distanceFilter: 5 // In Metern
+            // Prüfe und fordere Berechtigungen an
+            const permissions = await checkAndRequestPermissions();
+            if (!permissions) {
+                console.warn("[LiveTrackingManager] Permissions not granted, stopping tracking.");
+                return;
+            }
+
+            // Starte native Hintergrund-Tracking mit Capacitor Geolocation
+            const watchId = await Geolocation.watchPosition(
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
                 },
                 (position, error) => {
                     if (error) {
-                        Utils.handleError(`Background Geolocation error: ${error.message}`);
+                        console.error("[LiveTrackingManager] Geolocation error:", error.message);
+                        Utils.handleError(`Geolocation error: ${error.message}`);
                         stopPositionTracking();
                         return;
                     }
@@ -223,12 +230,12 @@ export async function startPositionTracking() {
                     }
                 }
             );
-            AppState.watchId = "primary-watcher"; // Speichern der Watcher-ID
+            AppState.watchId = watchId;
+            console.log("[LiveTrackingManager] Native Geolocation watcher started:", watchId);
             document.dispatchEvent(new CustomEvent('tracking:started'));
-            console.log("[LiveTrackingManager] Background Geolocation watcher added.");
-
         } catch (error) {
-            Utils.handleError(`Failed to start background tracking: ${error.message}`);
+            console.error("[LiveTrackingManager] Failed to start native tracking:", error);
+            Utils.handleError(`Failed to start tracking: ${error.message}`);
         }
     } else {
         console.log("[LiveTrackingManager] Using navigator.geolocation for tracking (Web).");
@@ -238,12 +245,15 @@ export async function startPositionTracking() {
             return;
         }
         AppState.watchId = navigator.geolocation.watchPosition(
-            (position) => debouncedPositionUpdate(position), // Standard-Positionsobjekt
+            (position) => debouncedPositionUpdate(position),
             (error) => {
+                console.error("[LiveTrackingManager] Geolocation error:", error.message);
                 Utils.handleError(`Geolocation error: ${error.message}`);
                 stopPositionTracking();
-            }, { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+            },
+            { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
         );
+        console.log("[LiveTrackingManager] Web Geolocation watcher started:", AppState.watchId);
         document.dispatchEvent(new CustomEvent('tracking:started'));
     }
 }
@@ -257,14 +267,18 @@ export async function startPositionTracking() {
  */
 export async function stopPositionTracking() {
     if (AppState.watchId !== null) {
-        const { BackgroundGeolocation, isNative } = await getCapacitor();
+        const { Geolocation, isNative } = await getCapacitor(); // Korrigiert: getCapacitor
 
-        if (isNative && BackgroundGeolocation) {
-            await BackgroundGeolocation.removeWatcher({ id: AppState.watchId });
-            console.log("[LiveTrackingManager] Stopped Capacitor Background Geolocation watcher.");
-        } else if (navigator.geolocation) { // Hinzugefügte Prüfung für Web-Browser
+        if (isNative && Geolocation) {
+            try {
+                await Geolocation.clearWatch({ id: AppState.watchId });
+                console.log("[LiveTrackingManager] Stopped native Geolocation watcher:", AppState.watchId);
+            } catch (error) {
+                console.error("[LiveTrackingManager] Error stopping native watcher:", error);
+            }
+        } else if (navigator.geolocation) {
             navigator.geolocation.clearWatch(AppState.watchId);
-            console.log("[LiveTrackingManager] Stopped navigator.geolocation watcher.");
+            console.log("[LiveTrackingManager] Stopped navigator.geolocation watcher:", AppState.watchId);
         }
         AppState.watchId = null;
     }

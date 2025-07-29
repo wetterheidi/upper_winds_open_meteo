@@ -788,6 +788,13 @@ function setupCheckboxEvents() {
     setupCheckbox('showLandingPattern', 'showLandingPattern', (checkbox) => {
         Settings.state.userSettings.showLandingPattern = checkbox.checked;
         Settings.save();
+
+        // Sende ein spezifisches Event, je nach Zustand der Checkbox
+        if (checkbox.checked) {
+            document.dispatchEvent(new CustomEvent('ui:landingPatternEnabled'));
+        } else {
+            document.dispatchEvent(new CustomEvent('ui:landingPatternDisabled'));
+        }
     });
 
     setupCheckbox('trackPositionCheckbox', 'trackPosition', (checkbox) => {
