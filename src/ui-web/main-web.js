@@ -856,9 +856,9 @@ function setupAppEventListeners() {
         // Überprüft, ob die Sprungberechnung aktiv ist
         if (Settings.state.userSettings.calculateJump && AppState.weatherData && AppState.lastLat) {
             if (currentZoom < UI_DEFAULTS.MIN_ZOOM || currentZoom > UI_DEFAULTS.MAX_ZOOM) {
-                mapManager.drawJumpVisualization(null); // Blendet Kreise aus
+                mapManager.drawJumpVisualization(null); // This hides the circles
             } else {
-                // NEU: Zeichnet die Kreise neu, wenn der Zoom wieder im gültigen Bereich ist
+                // This is the missing part: redraw the circles when zooming back in
                 calculateJump();
             }
         }

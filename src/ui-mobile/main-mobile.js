@@ -932,9 +932,9 @@ function setupAppEventListeners() {
 
         if (Settings.state.userSettings.calculateJump && AppState.weatherData && AppState.lastLat) {
             if (currentZoom < UI_DEFAULTS.MIN_ZOOM || currentZoom > UI_DEFAULTS.MAX_ZOOM) {
-                mapManager.drawJumpVisualization(null); // Visualisierung ausblenden
+                mapManager.drawJumpVisualization(null); // This hides the circles
             } else {
-                // NEU: Wenn der Zoom wieder im gültigen Bereich ist, die Visualisierung neu zeichnen.
+                // This is the missing part: redraw the circles when zooming back in
                 calculateJump();
             }
         }
