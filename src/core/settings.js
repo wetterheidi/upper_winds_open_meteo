@@ -1,5 +1,5 @@
 // === Settings Module ===
-import { FEATURE_PASSWORD } from './config.js'; 
+import { FEATURE_PASSWORD } from './config.js';
 
 export const getInterpolationStep = () => {
     const selectElement = document.getElementById('interpStep');
@@ -55,7 +55,7 @@ export const Settings = {
         showJumpRunTrack: false,
         showExitArea: false,
         showCanopyArea: false,
-        showCutAwayFinder: false, 
+        showCutAwayFinder: false,
         jumpRunTrackOffset: 0,
         jumpRunTrackForwardOffset: 0,
         aircraftSpeedKt: 90,
@@ -94,79 +94,62 @@ export const Settings = {
      * Ensures stored settings are merged correctly with defaults.
      */
     initialize() {
-        let storedSettings = {};
-        let storedUnlockedFeatures = { landingPattern: false, calculateJump: false };
+        // 1. Passwort-Hash des aktuellen Passworts in der Konfiguration erstellen
+        const currentPasswordHash = FEATURE_PASSWORD.split('').reduce((acc, char) => {
+            return char.charCodeAt(0) + ((acc << 5) - acc);
+        }, 0);
 
-        // Load settings from localStorage
-        try {
-            const settingsRaw = localStorage.getItem('upperWindsSettings');
-            if (settingsRaw) {
-                storedSettings = JSON.parse(settingsRaw);
-                console.log('Loaded settings from localStorage:', storedSettings);
-            } else {
-                console.log('No settings found in localStorage, using defaults');
-            }
-        } catch (error) {
-            this.handleError(error, 'Failed to load settings. Using defaults.');
-        }
-
-        // Load unlocked features from localStorage
+        // 2. Gespeicherte Freischaltungen laden
+        let storedUnlockedFeatures = { planner: false, plannerHash: null };
         try {
             const featuresRaw = localStorage.getItem('unlockedFeatures');
             if (featuresRaw) {
-                storedUnlockedFeatures = JSON.parse(featuresRaw);
-                console.log('Loaded unlocked features from localStorage:', storedUnlockedFeatures);
-            } else {
-                console.log('No unlocked features found in localStorage, using defaults');
+                storedUnlockedFeatures = { ...storedUnlockedFeatures, ...JSON.parse(featuresRaw) };
             }
         } catch (error) {
             this.handleError(error, 'Failed to load unlocked features. Using defaults.');
         }
 
-        // Merge stored settings with defaults
-        this.state.userSettings = { ...this.defaultSettings, ...storedSettings };
-        console.log('Initialized userSettings:', this.state.userSettings);
+        // 3. Jedes Feature validieren
+        const isPlannerUnlocked = storedUnlockedFeatures.planner && storedUnlockedFeatures.plannerHash === currentPasswordHash;
 
-        // Reset HARP coordinates to null at startup
+        if (storedUnlockedFeatures.planner && !isPlannerUnlocked) {
+            console.warn("Password for 'planner' has changed. Re-locking feature.");
+            storedUnlockedFeatures = { planner: false, plannerHash: null }; // Komplett zurücksetzen
+            this.saveUnlockedFeatures(); // Den neuen, gesperrten Zustand sofort speichern
+        }
+
+        // 4. Den finalen, validierten Zustand setzen
+        this.state.unlockedFeatures = storedUnlockedFeatures;
+        this.state.isPlannerUnlocked = isPlannerUnlocked;
+        
+        // Laden der Benutzereinstellungen (unverändert)
+        let storedSettings = {};
+        try {
+            const settingsRaw = localStorage.getItem('upperWindsSettings');
+            if (settingsRaw) {
+                storedSettings = JSON.parse(settingsRaw);
+            }
+        } catch (error) {
+            this.handleError(error, 'Failed to load settings. Using defaults.');
+        }
+
+        this.state.userSettings = { ...this.defaultSettings, ...storedSettings };
+
+        // ... (Ihr restlicher Code zum Zurücksetzen von HARP, Offsets, etc. bleibt hier)
         this.state.userSettings.harpLat = null;
         this.state.userSettings.harpLng = null;
-        console.log('Reset HARP coordinates to null at startup');
-
-        // Reset jumpMasterLineTarget to DIP if it was HARP
         if (this.state.userSettings.jumpMasterLineTarget === 'HARP') {
-            console.log('Reset jumpMasterLineTarget to DIP due to cleared HARP coordinates');
             this.state.userSettings.jumpMasterLineTarget = 'DIP';
         }
-
-        // FÜGEN SIE DIE FOLGENDEN ZWEI ZEILEN HIER HINZU:
         this.state.userSettings.jumpRunTrackOffset = 0;
         this.state.userSettings.jumpRunTrackForwardOffset = 0;
-        console.log('Reset JRT offsets to 0 at startup');
-        
-        // Reset ensemble models
-        this.state.userSettings.selectedEnsembleModels = [...this.defaultSettings.selectedEnsembleModels]; // Setzt auf leeres Array (gemäß defaultSettings)
-        this.state.userSettings.currentEnsembleScenario = this.defaultSettings.currentEnsembleScenario; // z.B. 'all_models'
-
-        // Setzt den "Cut Away Finder" bei jedem Start zuverlässig auf "false".
         this.state.userSettings.showCutAwayFinder = false;
-        console.log('Forced "showCutAwayFinder" to false on startup.');
-
-        // Update unlocked features
-        this.state.unlockedFeatures = {
-            landingPattern: storedUnlockedFeatures.landingPattern || true,
-            calculateJump: storedUnlockedFeatures.calculateJump || true,
-            planner: storedUnlockedFeatures.planner || false // Hinzufügen
-        };
-
-        // Validate baseMaps
-        const validBaseMaps = ['OpenStreetMap', 'OpenTopoMap', 'Esri Satellite', 'Esri Street', 'Esri Topo', 'Esri Satellite + OSM'];
-        if (!validBaseMaps.includes(this.state.userSettings.baseMaps)) {
-            console.warn(`Invalid baseMaps setting: ${this.state.userSettings.baseMaps}, resetting to default`);
-            this.state.userSettings.baseMaps = this.defaultSettings.baseMaps;
-        }
-
-        // Save updated settings to persist the reset
-        //this.save();
+        
+        console.log('Final initialized state:', {
+            isPlannerUnlocked: this.state.isPlannerUnlocked,
+            userSettings: this.state.userSettings
+        });
     },
 
     /**
@@ -188,22 +171,26 @@ export const Settings = {
 
     saveUnlockStatus(feature, isUnlocked) {
         try {
+            // Erstellen eines einfachen Hash-Wertes des aktuellen Passworts
+            const passwordHash = this.FEATURE_PASSWORD.split('').reduce((acc, char) => {
+                return char.charCodeAt(0) + ((acc << 5) - acc);
+            }, 0);
+
             if (feature === 'landingPattern') {
                 this.state.unlockedFeatures.landingPattern = isUnlocked;
+                this.state.unlockedFeatures.landingPatternHash = isUnlocked ? passwordHash : null; // Hash speichern
                 this.state.isLandingPatternUnlocked = isUnlocked;
             } else if (feature === 'calculateJump') {
                 this.state.unlockedFeatures.calculateJump = isUnlocked;
-                this.state.isCalculateJumpUnlocked = isUnlocked;
-            } else if (feature === 'planner') { // <-- NEUEN ELSE-IF-BLOCK HINZUFÜGEN
+                this.state.unlockedFeatures.calculateJumpHash = isUnlocked ? passwordHash : null; // Hash speichern
+            } else if (feature === 'planner') {
                 this.state.unlockedFeatures.planner = isUnlocked;
+                this.state.unlockedFeatures.plannerHash = isUnlocked ? passwordHash : null; // Hash speichern
                 this.state.isPlannerUnlocked = isUnlocked;
             }
-            this.saveUnlockedFeatures();
-            console.log('Saved unlock status:', {
-                landingPattern: this.state.isLandingPatternUnlocked,
-                calculateJump: this.state.isCalculateJumpUnlocked,
-                planner: this.state.isPlannerUnlocked // Hinzufügen
-            });
+
+            this.saveUnlockedFeatures(); // Diese Funktion speichert das ganze unlockedFeatures-Objekt
+            console.log('Saved unlock status with password hash:', this.state.unlockedFeatures);
         } catch (error) {
             Utils.handleError('Failed to save unlock status.');
         }
@@ -475,11 +462,12 @@ export const Settings = {
      * @param {string} feature - Feature name ('landingPattern', 'calculateJump').
      * @returns {boolean} True if unlocked.
      */
-    isFeatureUnlocked(feature) {
-        // In der mobilen App sind landingPattern und calculateJump immer freigeschaltet
-        if (feature === 'landingPattern' || feature === 'calculateJump') {
-            return true;
+isFeatureUnlocked(feature) {
+        // Diese Funktion prüft jetzt einfach den finalen Zustand, der in `initialize` festgelegt wurde.
+        if (feature === 'planner') {
+            return this.state.isPlannerUnlocked;
         }
+        // Für andere Features (falls Sie welche hinzufügen)
         return !!this.state.unlockedFeatures[feature] || false;
     }
 };
