@@ -43,10 +43,6 @@ function setupCheckbox(id, setting, callback) {
         });
         console.log(`Attached change and click listeners to ${id}`);
         // Apply visual indication for locked features
-        if (id === 'showLandingPattern' && !(Settings.isFeatureUnlocked('landingPattern') && Settings.state.isLandingPatternUnlocked)) {
-            checkbox.style.opacity = '0.5';
-            checkbox.title = 'Feature locked. Click to enter password.';
-        }
     } else {
         console.warn(`Checkbox ${id} not found`);
     }
@@ -613,21 +609,9 @@ function setupCheckboxEvents() {
     });
 
     setupCheckbox('showLandingPattern', 'showLandingPattern', (checkbox) => {
-        // Die Einstellung direkt basierend auf dem Status der Checkbox speichern
         Settings.state.userSettings.showLandingPattern = checkbox.checked;
         Settings.save();
-
-        // Das zugehörige Untermenü ein- oder ausblenden
-        const submenu = checkbox.closest('li')?.querySelector('ul.submenu');
-        if (submenu) {
-            submenu.classList.toggle('hidden', !checkbox.checked);
-        }
-
-        if (checkbox.checked) {
-            document.dispatchEvent(new CustomEvent('ui:landingPatternEnabled'));
-        } else {
-            document.dispatchEvent(new CustomEvent('ui:landingPatternDisabled'));
-        }
+        document.dispatchEvent(new CustomEvent('ui:landingPatternEnabled'));
     });
 
     setupCheckbox('trackPositionCheckbox', 'trackPosition', (checkbox) => {

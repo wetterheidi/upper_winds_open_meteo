@@ -226,7 +226,7 @@ export function updateLandingPatternDisplay() {
     const markerLatLng = AppState.currentMarker.getLatLng();
     if (!markerLatLng) return;
 
-    if (!Settings.state.isLandingPatternUnlocked || !Settings.state.userSettings.showLandingPattern || !AppState.weatherData || AppState.map.getZoom() < UI_DEFAULTS.LANDING_PATTERN_MIN_ZOOM) {
+    if (!Settings.state.userSettings.showLandingPattern || !AppState.weatherData || AppState.map.getZoom() < UI_DEFAULTS.LANDING_PATTERN_MIN_ZOOM) {
         mapManager.drawLandingPattern(null);
         return;
     }
@@ -338,7 +338,7 @@ export function updateJumpRunTrackDisplay() {
         AppState.weatherData &&
         AppState.lastLat &&
         AppState.lastLng &&
-        Settings.state.isCalculateJumpUnlocked;
+        Settings.state.userSettings.calculateJump;
 
     if (!shouldShow) {
         console.log('Conditions not met to show JRT, clearing display.');

@@ -72,16 +72,19 @@ export const getDownloadFormat = () => Settings.getValue('downloadFormat', 'radi
  * basierend auf dem Speicher freigeschaltet sind.
  */
 function initializeApp() {
+    setAppContext(true);
     Settings.initialize();
-    setAppContext(false);
-    // Synchronize global variables with Settings.state.unlockedFeatures
-    Settings.state.isLandingPatternUnlocked = Settings.state.unlockedFeatures.landingPattern;
-    Settings.state.isCalculateJumpUnlocked = Settings.state.unlockedFeatures.calculateJump;
-    Settings.state.userSettings.showJumpMasterLine = false;
-    console.log('Initial unlock status:', { isLandingPatternUnlocked: Settings.state.isLandingPatternUnlocked, isCalculateJumpUnlocked: Settings.state.isCalculateJumpUnlocked });
+    
+    // VEREINFACHT: Diese Zeilen sind nicht mehr nötig. Landing Pattern und Calculate Jump
+    // sind in der mobilen App immer "verfügbar", da der Planner-Tab immer da ist.
+    // Settings.state.isLandingPatternUnlocked = true;
+    // Settings.state.isCalculateJumpUnlocked = true;
+    
+    // Die Prüfung für den Planner bleibt bestehen, falls Sie sie zukünftig nutzen wollen.
+    Settings.state.isPlannerUnlocked = Settings.state.unlockedFeatures.planner;
+    console.log('Initial unlock status for planner:', Settings.state.isPlannerUnlocked);
 
     if (AppState.isInitialized) {
-        console.log('App already initialized, skipping');
         return;
     }
     AppState.isInitialized = true;
@@ -141,20 +144,6 @@ function initializeUIElements() {
     Settings.state.userSettings.jumperSeparation = separation;
     Settings.save();
 
-    // Set initial tooltip and style for locked state
-    const landingPatternCheckbox = document.getElementById('showLandingPattern');
-    const calculateJumpCheckbox = document.getElementById('calculateJumpCheckbox');
-    if (landingPatternCheckbox) {
-        landingPatternCheckbox.title = (Settings.isFeatureUnlocked('landingPattern') && Settings.state.isLandingPatternUnlocked) ? '' : 'Feature locked. Click to enter password.';
-        landingPatternCheckbox.style.opacity = (Settings.isFeatureUnlocked('landingPattern') && Settings.state.isLandingPatternUnlocked) ? '1' : '0.5';
-        console.log('Initialized showLandingPattern UI:', { checked: landingPatternCheckbox.checked, opacity: landingPatternCheckbox.style.opacity });
-    }
-    if (calculateJumpCheckbox) {
-        calculateJumpCheckbox.title = (Settings.isFeatureUnlocked('calculateJump') && Settings.state.isCalculateJumpUnlocked) ? '' : 'Feature locked. Click to enter password.';
-        calculateJumpCheckbox.style.opacity = (Settings.isFeatureUnlocked('calculateJump') && Settings.state.isCalculateJumpUnlocked) ? '1' : '0.5';
-        console.log('Initialized calculateJumpCheckbox UI:', { checked: calculateJumpCheckbox.checked, opacity: calculateJumpCheckbox.style.opacity });
-    }
-
     const jumpMasterCheckbox = document.getElementById('showJumpMasterLine');
     if (jumpMasterCheckbox) {
         jumpMasterCheckbox.disabled = !Settings.state.userSettings.trackPosition;
@@ -193,7 +182,7 @@ export function calculateJump() {
         exitAltitude = Utils.convertFeetToMeters(exitAltitude);
     }
 
-    if (!Settings.state.isCalculateJumpUnlocked || !Settings.state.userSettings.calculateJump) {
+    if (!Settings.state.userSettings.calculateJump) {
         mapManager.drawJumpVisualization(null);
         mapManager.drawCutAwayVisualization(null);
         return;

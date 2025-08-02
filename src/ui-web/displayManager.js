@@ -112,7 +112,7 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
         customLandingDirectionRRInput.value = Math.round(AppState.landingWindDir);
     }
 
-    const refLevel = document.getElementById('refLevel')?.value || 'AGL'; 
+    const refLevel = document.getElementById('refLevel')?.value || 'AGL';
     const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
     const windSpeedUnit = Settings.getValue('windUnit', 'radio', 'kt');
     const temperatureUnit = Settings.getValue('temperatureUnit', 'radio', 'C');
@@ -219,7 +219,7 @@ export function updateLandingPatternDisplay() {
     const markerLatLng = AppState.currentMarker.getLatLng();
     if (!markerLatLng) return;
 
-    if (!Settings.state.isLandingPatternUnlocked || !Settings.state.userSettings.showLandingPattern || !AppState.weatherData || AppState.map.getZoom() < UI_DEFAULTS.LANDING_PATTERN_MIN_ZOOM) {
+    if (!Settings.state.userSettings.showLandingPattern || !AppState.weatherData || AppState.map.getZoom() < UI_DEFAULTS.LANDING_PATTERN_MIN_ZOOM) {
         mapManager.drawLandingPattern(null);
         return;
     }
@@ -331,7 +331,6 @@ export function updateJumpRunTrackDisplay() {
         AppState.weatherData &&
         AppState.lastLat &&
         AppState.lastLng &&
-        Settings.state.isCalculateJumpUnlocked &&
         Settings.state.userSettings.calculateJump;
 
     // Wenn die Bedingungen NICHT erfüllt sind, lösche den Track.
@@ -339,7 +338,7 @@ export function updateJumpRunTrackDisplay() {
         console.log('Conditions not met to show JRT, clearing display.');
         mapManager.drawJumpRunTrack(null); // Sagt dem mapManager, alles zu löschen.
         AppState.lastTrackData = null; // Setzt die gespeicherten Track-Daten zurück.
-        
+
         const directionInput = document.getElementById('jumpRunTrackDirection');
         if (directionInput && !Settings.state.userSettings.customJumpRunDirection) {
             directionInput.value = '';
@@ -362,7 +361,7 @@ export function updateJumpRunTrackDisplay() {
     ); // Und an die Core-Funktion übergeben
     const harpAnchor = AppState.harpMarker ? AppState.harpMarker.getLatLng() : null;
     const trackData = JumpPlanner.jumpRunTrack(interpolatedData, harpAnchor);
-    
+
     const directionInput = document.getElementById('jumpRunTrackDirection');
 
     if (trackData && trackData.latlngs?.length === 2 && trackData.latlngs.every(ll => Number.isFinite(ll[0]) && Number.isFinite(ll[1]))) {

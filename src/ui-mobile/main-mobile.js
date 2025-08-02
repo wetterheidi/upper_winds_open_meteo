@@ -79,18 +79,17 @@ export const getDownloadFormat = () => Settings.getValue('downloadFormat', 'csv'
 function initializeApp() {
     setAppContext(true);
     Settings.initialize();
-    // Synchronize global variables with Settings.state.unlockedFeatures
-    Settings.state.isLandingPatternUnlocked = true;
-    Settings.state.isCalculateJumpUnlocked = true;
-    Settings.state.isPlannerUnlocked = Settings.state.unlockedFeatures.planner; // Hinzufügen
-    console.log('Initial unlock status:', {
-        isLandingPatternUnlocked: Settings.state.isLandingPatternUnlocked,
-        isCalculateJumpUnlocked: Settings.state.isCalculateJumpUnlocked,
-        isPlannerUnlocked: Settings.state.isPlannerUnlocked // Hinzufügen
-    });
+    
+    // VEREINFACHT: Diese Zeilen sind nicht mehr nötig. Landing Pattern und Calculate Jump
+    // sind in der mobilen App immer "verfügbar", da der Planner-Tab immer da ist.
+    // Settings.state.isLandingPatternUnlocked = true;
+    // Settings.state.isCalculateJumpUnlocked = true;
+    
+    // Die Prüfung für den Planner bleibt bestehen, falls Sie sie zukünftig nutzen wollen.
+    Settings.state.isPlannerUnlocked = Settings.state.unlockedFeatures.planner;
+    console.log('Initial unlock status for planner:', Settings.state.isPlannerUnlocked);
 
     if (AppState.isInitialized) {
-        console.log('App already initialized, skipping');
         return;
     }
     AppState.isInitialized = true;
@@ -184,7 +183,7 @@ export function calculateJump() {
         exitAltitude = Utils.convertFeetToMeters(exitAltitude);
     }
 
-    if (!Settings.state.isCalculateJumpUnlocked || !Settings.state.userSettings.calculateJump) {
+    if (!Settings.state.userSettings.calculateJump) {
         mapManager.drawJumpVisualization(null);
         mapManager.drawCutAwayVisualization(null);
         return;
