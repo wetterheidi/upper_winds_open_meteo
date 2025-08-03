@@ -19,6 +19,7 @@
         "vite": "^6.3.5"
     },
     "dependencies": {
+        "@capacitor-community/background-geolocation": "^1.2.25",
         "@capacitor/android": "^7.4.0",
         "@capacitor/cli": "^7.3.0",
         "@capacitor/core": "^7.4.2",

@@ -170,16 +170,27 @@ const debouncedPositionUpdate = Utils.debounce(async (position) => {
 async function checkAndRequestPermissions() {
     const { Geolocation } = await getCapacitor();
     let permissions = await Geolocation.checkPermissions();
-    console.log('Initial geolocation permissions state:', permissions.location);
+    console.log('Initial geolocation permissions state:', permissions);
 
     if (permissions.location === 'denied') {
-        Utils.handleError('GPS permission was denied. Please enable it in the app settings.');
+        Utils.handleError('GPS permission was denied. Please enable "Always" in the app settings.');
         return false;
     }
 
     if (permissions.location === 'prompt' || permissions.location === 'prompt-with-rationale') {
-        permissions = await Geolocation.requestPermissions();
-        console.log('New geolocation permissions state:', permissions.location);
+        try {
+            permissions = await Geolocation.requestPermissions({ permissions: ['location', 'coarseLocation'] });
+            console.log('New geolocation permissions state:', permissions);
+            // Auf iOS explizit "always" prüfen
+            if (window.Capacitor.getPlatform() === 'ios' && permissions.location !== 'granted') {
+                Utils.handleError('Please allow "Always" location access in Settings for background tracking.');
+                return false;
+            }
+        } catch (error) {
+            console.error('[LiveTrackingManager] Permission request error:', error);
+            Utils.handleError(`Failed to request permissions: ${error.message}`);
+            return false;
+        }
     }
 
     if (permissions.location !== 'granted') {
@@ -201,11 +212,13 @@ export async function startPositionTracking() {
     console.log("[LiveTrackingManager] Attempting to start position tracking...");
 
     const { Geolocation, isNative } = await getCapacitor();
+    console.log("[LiveTrackingManager] Platform:", window.Capacitor.getPlatform(), "IsNative:", isNative);
 
     if (isNative && Geolocation) {
         try {
             // Prüfe und fordere Berechtigungen an
             const permissions = await checkAndRequestPermissions();
+            console.log("[LiveTrackingManager] Permissions result:", permissions);
             if (!permissions) {
                 console.warn("[LiveTrackingManager] Permissions not granted, stopping tracking.");
                 return;
@@ -220,12 +233,13 @@ export async function startPositionTracking() {
                 },
                 (position, error) => {
                     if (error) {
-                        console.error("[LiveTrackingManager] Geolocation error:", error.message);
-                        Utils.handleError(`Geolocation error: ${error.message}`);
+                        console.error("[LiveTrackingManager] Geolocation error:", error);
+                        Utils.handleError(`Geolocation error: ${error.message || 'Unknown error'}`);
                         stopPositionTracking();
                         return;
                     }
                     if (position) {
+                        console.log("[LiveTrackingManager] Received position:", position.coords);
                         debouncedPositionUpdate(position);
                     }
                 }
@@ -235,7 +249,7 @@ export async function startPositionTracking() {
             document.dispatchEvent(new CustomEvent('tracking:started'));
         } catch (error) {
             console.error("[LiveTrackingManager] Failed to start native tracking:", error);
-            Utils.handleError(`Failed to start tracking: ${error.message}`);
+            Utils.handleError(`Failed to start tracking: ${error.message || 'Unknown error'}`);
         }
     } else {
         console.log("[LiveTrackingManager] Using navigator.geolocation for tracking (Web).");
@@ -245,10 +259,13 @@ export async function startPositionTracking() {
             return;
         }
         AppState.watchId = navigator.geolocation.watchPosition(
-            (position) => debouncedPositionUpdate(position),
+            (position) => {
+                console.log("[LiveTrackingManager] Web position:", position.coords);
+                debouncedPositionUpdate(position);
+            },
             (error) => {
-                console.error("[LiveTrackingManager] Geolocation error:", error.message);
-                Utils.handleError(`Geolocation error: ${error.message}`);
+                console.error("[LiveTrackingManager] Web Geolocation error:", error);
+                Utils.handleError(`Geolocation error: ${error.message || 'Unknown error'}`);
                 stopPositionTracking();
             },
             { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
