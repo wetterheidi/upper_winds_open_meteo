@@ -1098,6 +1098,11 @@ input[type="checkbox"][style*="opacity: 0.5"] {
     z-index: 2000 !important; /* Stellt sicher, dass sie über anderen Elementen liegt */
 }
 
+.pm-textarea{
+    text-align: center !important;
+    padding-left: 0 !important;
+}
+
 /* === LIVE MARKER STYLES === */
 .live-marker-container { 
     background: transparent; 
