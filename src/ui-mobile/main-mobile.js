@@ -79,12 +79,12 @@ export const getDownloadFormat = () => Settings.getValue('downloadFormat', 'csv'
 function initializeApp() {
     setAppContext(true);
     Settings.initialize();
-    
+
     // VEREINFACHT: Diese Zeilen sind nicht mehr nötig. Landing Pattern und Calculate Jump
     // sind in der mobilen App immer "verfügbar", da der Planner-Tab immer da ist.
     // Settings.state.isLandingPatternUnlocked = true;
     // Settings.state.isCalculateJumpUnlocked = true;
-    
+
     // Die Prüfung für den Planner bleibt bestehen, falls Sie sie zukünftig nutzen wollen.
     Settings.state.isPlannerUnlocked = Settings.state.unlockedFeatures.planner;
     console.log('Initial unlock status for planner:', Settings.state.isPlannerUnlocked);
@@ -948,7 +948,15 @@ function setupAppEventListeners() {
         if (Settings.state.userSettings.showLandingPattern) {
             displayManager.updateLandingPatternDisplay();
         }
-
+        if (Settings.state.userSettings.selectedEnsembleModels.length > 0) {
+            if (currentZoom < UI_DEFAULTS.MIN_ZOOM || currentZoom > UI_DEFAULTS.MAX_ZOOM) {
+                // `clearEnsembleVisualizations` aus dem `ensembleManager` aufrufen.
+                EnsembleManager.clearEnsembleVisualizations();
+            } else {
+                // `processAndVisualizeEnsemble` mit dem aktuellen Slider-Wert aufrufen, um die Visualisierungen neu zu zeichnen.
+                EnsembleManager.processAndVisualizeEnsemble(getSliderValue(), getInterpolationStep());
+            }
+        }
         cacheVisibleTiles({
             map: AppState.map,
             baseMaps: AppState.baseMaps,

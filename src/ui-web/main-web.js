@@ -867,6 +867,14 @@ function setupAppEventListeners() {
             displayManager.updateLandingPatternDisplay();
         }
 
+        if (Settings.state.userSettings.selectedEnsembleModels.length > 0) {
+            if (currentZoom < UI_DEFAULTS.MIN_ZOOM || currentZoom > UI_DEFAULTS.MAX_ZOOM) {
+                EnsembleManager.clearEnsembleVisualizations();
+            } else {
+                EnsembleManager.processAndVisualizeEnsemble(getSliderValue(), getInterpolationStep());
+            }
+        }
+
         // Das Caching bei Kartenbewegung bleibt unverändert
         cacheVisibleTiles({
             map: AppState.map,
