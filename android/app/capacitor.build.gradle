@@ -12,6 +12,7 @@ dependencies {
     implementation project(':capacitor-community-background-geolocation')
     implementation project(':capacitor-filesystem')
     implementation project(':capacitor-geolocation')
+    implementation project(':capacitor-splash-screen')
     implementation project(':capawesome-capacitor-file-picker')
 
 }

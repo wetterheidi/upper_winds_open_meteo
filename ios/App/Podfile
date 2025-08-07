@@ -14,6 +14,7 @@ def capacitor_pods
   pod 'CapacitorCommunityBackgroundGeolocation', :path => '../../node_modules/@capacitor-community/background-geolocation'
   pod 'CapacitorFilesystem', :path => '../../node_modules/@capacitor/filesystem'
   pod 'CapacitorGeolocation', :path => '../../node_modules/@capacitor/geolocation'
+  pod 'CapacitorSplashScreen', :path => '../../node_modules/@capacitor/splash-screen'
   pod 'CapawesomeCapacitorFilePicker', :path => '../../node_modules/@capawesome/capacitor-file-picker'
 end
 
