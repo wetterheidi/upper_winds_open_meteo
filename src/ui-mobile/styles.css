@@ -891,6 +891,69 @@ input[type="checkbox"][style*="opacity: 1"] {
     animation: pulse-blue 1.5s infinite;
 }
 
+/* Fügen Sie diesen Block am Ende des Abschnitts "Dashboard" hinzu */
+.dashboard-toggle {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 15px;
+    background-color: #e9ecef;
+    border-radius: 8px;
+    padding: 4px;
+}
+
+.toggle-btn {
+    flex: 1;
+    padding: 10px;
+    background-color: transparent;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: bold;
+    color: #495057;
+    cursor: pointer;
+    transition: background-color 0.3s, color 0.3s;
+}
+
+.toggle-btn.active {
+    background-color: var(--primary-color);
+    color: white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.dashboard-grid-jm {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+
+.dashboard-grid-jm .dashboard-item {
+    background-color: var(--background-medium);
+    padding: 10px;
+    border-radius: 6px;
+    text-align: center;
+}
+
+.dashboard-grid-jm .span-2 {
+    grid-column: 1 / -1;
+}
+
+.dashboard-grid-jm .dashboard-label {
+    font-size: 12px;
+    color: #666;
+    text-transform: uppercase;
+    margin-bottom: 5px;
+}
+
+.dashboard-grid-jm .dashboard-value {
+    font-size: 18px;
+    font-weight: bold;
+    color: var(--text-color);
+}
+
+.dashboard-grid-jm .accuracy-item .dashboard-value {
+    font-size: 14px;
+    font-weight: normal;
+}
 
 /* --- Track Upload --- */
 #track-upload>div:first-child {

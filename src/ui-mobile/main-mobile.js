@@ -693,6 +693,7 @@ export function updateJumpMasterLineAndPanel(positionData = null) {
     if (!AppState.liveMarker) {
         mapManager.clearJumpMasterLine();
         mapManager.hideLivePositionControl();
+        updateJumpMasterDashboard(null);
         return;
     }
 
@@ -749,12 +750,79 @@ export function updateJumpMasterLineAndPanel(positionData = null) {
         refLevel: Settings.getValue('refLevel', 'AGL')
     };
 
-    mapManager.updateLivePositionControl({
+    // Datenobjekt für beide Dashboards zusammenstellen
+    const fullDashboardData = {
         ...data,
         showJumpMasterLine: showJML,
-        jumpMasterLineData, // ist entweder ein Objekt mit Daten oder null
+        jumpMasterLineData,
         ...settingsForPanel
-    });
+    };
+
+    // Aktualisiert das Jumpmaster-Dashboard (inkl. der Detailansicht)
+    updateJumpMasterDashboard(fullDashboardData);
+
+    // Aktualisiert das Live-Position-Overlay auf der Karte
+    mapManager.updateLivePositionControl(fullDashboardData);
+}
+
+function updateJumpMasterDashboard(data) {
+    const dashboard = document.getElementById('jumpmaster-view-mobile');
+    if (!dashboard) return;
+
+    if (!data) {
+        dashboard.classList.add('hidden');
+        return;
+    }
+
+    // UI-Elemente referenzieren (mit "-mobile" Suffix)
+    const coordsEl = document.getElementById('dashboard-jm-coords-mobile');
+    const altitudeEl = document.getElementById('dashboard-jm-altitude-mobile');
+    const directionEl = document.getElementById('dashboard-jm-direction-mobile');
+    const speedEl = document.getElementById('dashboard-jm-speed-mobile');
+    const accuracyEl = document.getElementById('dashboard-jm-accuracy-mobile');
+
+    if (!coordsEl || !altitudeEl || !directionEl || !speedEl || !accuracyEl) return;
+
+    // Werte formatieren und anzeigen (gleiche Logik wie in der Web-Version)
+    const settings = {
+        heightUnit: getHeightUnit(),
+        effectiveWindUnit: getWindSpeedUnit() === 'bft' ? 'kt' : getWindSpeedUnit(),
+        coordFormat: getCoordinateFormat(),
+        refLevel: Settings.getValue('refLevel', 'AGL')
+    };
+
+    const coords = Utils.convertCoords(data.latitude, data.longitude, settings.coordFormat);
+    let coordText = (settings.coordFormat === 'MGRS') ? coords.lat : `${coords.lat}, ${coords.lng}`;
+    if (settings.coordFormat === 'DMS') {
+        const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
+        coordText = `${formatDMS(coords.lat)}, ${formatDMS(coords.lng)}`;
+    }
+    coordsEl.textContent = coordText;
+
+    let altText = "N/A";
+    if (data.deviceAltitude !== null) {
+        let displayAltitude = (settings.refLevel === 'AGL' && AppState.lastAltitude) ? data.deviceAltitude - parseFloat(AppState.lastAltitude) : data.deviceAltitude;
+        altText = `${Math.round(Utils.convertHeight(displayAltitude, settings.heightUnit))} ${settings.heightUnit}`;
+    }
+    altitudeEl.textContent = altText;
+
+    directionEl.textContent = `${data.direction}°`;
+    const displaySpeed = Utils.convertWind(data.speedMs, settings.effectiveWindUnit, 'm/s');
+    const formattedSpeed = settings.effectiveWindUnit === 'bft' ? Math.round(displaySpeed) : displaySpeed.toFixed(1);
+    speedEl.textContent = `${formattedSpeed} ${settings.effectiveWindUnit}`;
+    accuracyEl.textContent = `± ${Math.round(Utils.convertHeight(data.accuracy, settings.heightUnit))} ${settings.heightUnit}`;
+
+    const jmlDetails = document.getElementById('jumpmaster-line-details-mobile');
+    const showJML = data.showJumpMasterLine;
+
+    jmlDetails.classList.toggle('hidden', !showJML);
+
+    if (showJML && data.jumpMasterLineData) {
+        document.getElementById('dashboard-jm-target-label-mobile').textContent = `JML to ${data.jumpMasterLineData.target}`;
+        document.getElementById('dashboard-jm-bearing-mobile').textContent = `${data.jumpMasterLineData.bearing}°`;
+        document.getElementById('dashboard-jm-distance-mobile').textContent = `${Math.round(Utils.convertHeight(data.jumpMasterLineData.distance, settings.heightUnit))} ${settings.heightUnit}`;
+        document.getElementById('dashboard-jm-tot-mobile').textContent = data.jumpMasterLineData.tot < 1200 ? `X - ${data.jumpMasterLineData.tot} s` : 'N/A';
+    }
 }
 
 /**

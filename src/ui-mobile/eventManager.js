@@ -1073,6 +1073,29 @@ function setupClearHistoricalDate() {
     }
 }
 
+function setupDashboardToggleEvents() {
+    const jumperBtn = document.getElementById('jumper-view-btn');
+    const jumpmasterBtn = document.getElementById('jumpmaster-view-btn');
+    const jumperView = document.getElementById('jumper-view');
+    const jumpmasterView = document.getElementById('jumpmaster-view-mobile');
+
+    if (!jumperBtn || !jumpmasterBtn || !jumperView || !jumpmasterView) return;
+
+    jumperBtn.addEventListener('click', () => {
+        jumperBtn.classList.add('active');
+        jumpmasterBtn.classList.remove('active');
+        jumperView.classList.remove('hidden');
+        jumpmasterView.classList.add('hidden');
+    });
+
+    jumpmasterBtn.addEventListener('click', () => {
+        jumpmasterBtn.classList.add('active');
+        jumperBtn.classList.remove('active');
+        jumpmasterView.classList.remove('hidden');
+        jumperView.classList.add('hidden');
+    });
+}
+
 // --- Cache Management ---
 
 function setupCacheManagement() {
@@ -1432,6 +1455,7 @@ export function initializeEventListeners() {
     setupGpxExportEvent();
 
     // 6. App-Management & Cache
+    setupDashboardToggleEvents();
     setupCacheManagement();
     setupCacheSettings();
 

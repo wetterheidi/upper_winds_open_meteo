@@ -330,7 +330,8 @@
                         </li>
                         <li>
                             <label class="radio-label">
-                                <input type="checkbox" id="lockInteractionCheckbox" name="lockInteraction"> Lock all Points
+                                <input type="checkbox" id="lockInteractionCheckbox" name="lockInteraction"> Lock all
+                                Points
                             </label>
                         </li>
                     </ul>
@@ -385,61 +386,113 @@
         </div>
 
         <div id="panel-dashboard" class="content-panel hidden">
-            <div class="dashboard-grid">
-                <div class="dashboard-card">
-                    <div class="card-label">Speed</div>
-                    <div id="dashboard-speed" class="card-value">---</div>
-                    <div id="dashboard-speed-unit" class="card-unit">kt</div>
-                </div>
-                <div class="dashboard-card">
-                    <div class="card-label">Direction</div>
-                    <div id="dashboard-direction" class="card-value">---</div>
-                    <div class="card-unit">deg</div>
-                </div>
-                <div class="dashboard-row-split">
+            <div class="dashboard-toggle">
+                <button id="jumper-view-btn" class="toggle-btn active">JUMPER</button>
+                <button id="jumpmaster-view-btn" class="toggle-btn">JUMPMASTER</button>
+            </div>
+
+            <div id="jumper-view">
+                <div class="dashboard-grid">
                     <div class="dashboard-card">
-                        <div class="card-label">Altitude</div>
-                        <div id="dashboard-altitude" class="card-value">---</div>
-                        <div id="dashboard-altitude-unit" class="card-unit">m</div>
+                        <div class="card-label">Speed</div>
+                        <div id="dashboard-speed" class="card-value">---</div>
+                        <div id="dashboard-speed-unit" class="card-unit">kt</div>
                     </div>
                     <div class="dashboard-card">
-                        <div class="card-label">Range</div>
-                        <div id="dashboard-range" class="card-value">---</div>
-                        <div id="dashboard-range-unit" class="card-unit">m</div>
-                    </div>
-                </div>
-                <div class="dashboard-row-split">
-                    <div class="dashboard-card">
-                        <div class="card-label">Glide to DIP</div>
-                        <div id="dashboard-glide-required" class="card-value">---</div>
-                        <div class="card-unit"></div>
-                    </div>
-                    <div class="dashboard-card">
-                        <div class="card-label">Glide Ratio</div>
-                        <div id="dashboard-glide-current" class="card-value">---</div>
-                        <div class="card-unit"></div>
-                    </div>
-                </div>
-                <div class="dashboard-row-split">
-                    <div class="dashboard-card">
-                        <div class="card-label">Bearing to DIP</div>
-                        <div id="dashboard-bearing" class="card-value">---</div>
+                        <div class="card-label">Direction</div>
+                        <div id="dashboard-direction" class="card-value">---</div>
                         <div class="card-unit">deg</div>
                     </div>
-                    <div class="dashboard-card">
-                        <div class="card-label">Distance to DIP</div>
-                        <div id="dashboard-distance" class="card-value">---</div>
-                        <div id="dashboard-distance-unit" class="card-unit">m</div>
+                    <div class="dashboard-row-split">
+                        <div class="dashboard-card">
+                            <div class="card-label">Altitude</div>
+                            <div id="dashboard-altitude" class="card-value">---</div>
+                            <div id="dashboard-altitude-unit" class="card-unit">m</div>
+                        </div>
+                        <div class="dashboard-card">
+                            <div class="card-label">Range</div>
+                            <div id="dashboard-range" class="card-value">---</div>
+                            <div id="dashboard-range-unit" class="card-unit">m</div>
+                        </div>
                     </div>
-                    <div class="dashboard-card" id="auto-record-card">
-                        <button id="arm-recording-button" class="arm-button">
-                            Arm Recording
-                        </button>
+                    <div class="dashboard-row-split">
+                        <div class="dashboard-card">
+                            <div class="card-label">Glide to DIP</div>
+                            <div id="dashboard-glide-required" class="card-value">---</div>
+                            <div class="card-unit"></div>
+                        </div>
+                        <div class="dashboard-card">
+                            <div class="card-label">Glide Ratio</div>
+                            <div id="dashboard-glide-current" class="card-value">---</div>
+                            <div class="card-unit"></div>
+                        </div>
                     </div>
-                    <div class="dashboard-card" id="manual-record-card">
-                        <button id="manual-recording-button" class="arm-button">
-                            Start Recording
-                        </button>
+                    <div class="dashboard-row-split">
+                        <div class="dashboard-card">
+                            <div class="card-label">Bearing to DIP</div>
+                            <div id="dashboard-bearing" class="card-value">---</div>
+                            <div class="card-unit">deg</div>
+                        </div>
+                        <div class="dashboard-card">
+                            <div class="card-label">Distance to DIP</div>
+                            <div id="dashboard-distance" class="card-value">---</div>
+                            <div id="dashboard-distance-unit" class="card-unit">m</div>
+                        </div>
+                        <div class="dashboard-card" id="auto-record-card">
+                            <button id="arm-recording-button" class="arm-button">
+                                Arm Recording
+                            </button>
+                        </div>
+                        <div class="dashboard-card" id="manual-record-card">
+                            <button id="manual-recording-button" class="arm-button">
+                                Start Recording
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="jumpmaster-view-mobile" class="hidden">
+                <div class="dashboard-grid-jm">
+                    <div class="dashboard-item span-2">
+                        <div class="dashboard-label">Position</div>
+                        <div class="dashboard-value" id="dashboard-jm-coords-mobile">--</div>
+                    </div>
+                    <div class="dashboard-item span-2">
+                        <div class="dashboard-label">Altitude</div>
+                        <div class="dashboard-value" id="dashboard-jm-altitude-mobile">--</div>
+                    </div>
+                    <div class="dashboard-item">
+                        <div class="dashboard-label">Direction</div>
+                        <div class="dashboard-value" id="dashboard-jm-direction-mobile">--</div>
+                    </div>
+                    <div class="dashboard-item">
+                        <div class="dashboard-label">Speed</div>
+                        <div class="dashboard-value" id="dashboard-jm-speed-mobile">--</div>
+                    </div>
+                    <div class="dashboard-item span-2 accuracy-item">
+                        <div class="dashboard-label">Accuracy</div>
+                        <div class="dashboard-value" id="dashboard-jm-accuracy-mobile">--</div>
+                    </div>
+                </div>
+                <div id="jumpmaster-line-details-mobile" class="hidden">
+                    <hr>
+                    <div class="dashboard-grid-jm">
+                        <div class="dashboard-item span-2">
+                            <div class="dashboard-label" id="dashboard-jm-target-label-mobile">JML to --</div>
+                        </div>
+                        <div class="dashboard-item">
+                            <div class="dashboard-label">Bearing</div>
+                            <div class="dashboard-value" id="dashboard-jm-bearing-mobile">--</div>
+                        </div>
+                        <div class="dashboard-item">
+                            <div class="dashboard-label">Distance</div>
+                            <div class="dashboard-value" id="dashboard-jm-distance-mobile">--</div>
+                        </div>
+                        <div class="dashboard-item span-2">
+                            <div class="dashboard-label">Time to Target</div>
+                            <div class="dashboard-value" id="dashboard-jm-tot-mobile">--</div>
+                        </div>
                     </div>
                 </div>
             </div>
