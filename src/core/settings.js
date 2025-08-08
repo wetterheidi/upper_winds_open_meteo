@@ -1,5 +1,3 @@
-// In: src/core/settings.js
-
 import { FEATURE_PASSWORD } from './config.js'; 
 
 export const getInterpolationStep = () => {
@@ -67,6 +65,7 @@ export const Settings = {
         autoupdate: false,
         selectedEnsembleModels: [],
         currentEnsembleScenario: 'all_models',
+        isInteractionLocked: false,
     },
 
     state: {
@@ -119,6 +118,7 @@ export const Settings = {
         this.state.userSettings = { ...this.defaultSettings, ...storedSettings };
         
         // Zurücksetzen der nicht-persistenten Einstellungen
+        this.state.userSettings.isInteractionLocked = false;
         this.state.userSettings.harpLat = null;
         this.state.userSettings.harpLng = null;
         this.state.userSettings.jumpRunTrackOffset = 0;

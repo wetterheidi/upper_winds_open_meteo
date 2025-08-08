@@ -5,7 +5,7 @@ import { AppState } from '../core/state.js';
 import { Settings } from '../core/settings.js';
 import { Utils } from '../core/utils.js';
 import { TileCache } from '../core/tileCache.js';
-import { updateOfflineIndicator, isMobileDevice } from './ui.js';
+import { updateOfflineIndicator, isMobileDevice, displayWarning } from './ui.js';
 //import './public/vendor/Leaflet.PolylineMeasure.js'; // Pfad ggf. anpassen
 import { UI_DEFAULTS, ICON_URLS, ENSEMBLE_VISUALIZATION } from '../core/constants.js'; // Importiere UI-Defaults
 import { getCapacitor } from '../core/capacitor-adapter.js';
@@ -803,6 +803,29 @@ function _setupGeomanMeasurementHandlers() {
         liveMeasureLabel.style.display = 'none';
     });
 }
+export function toggleGeoManControls(locked) {
+    if (!AppState.map || !AppState.map.pm) return;
+    const toolbar = document.querySelector('.leaflet-pm-toolbar');
+
+    if (locked) {
+        // Toolbar sofort ausblenden, um weitere Klicks zu verhindern
+        if (toolbar) toolbar.style.display = 'none';
+
+        // WICHTIG: Nur die Modi deaktivieren, die auch wirklich aktiv sind.
+        if (AppState.map.pm.globalDrawModeEnabled()) {
+            AppState.map.pm.disableDraw();
+        }
+        if (AppState.map.pm.globalEditModeEnabled()) {
+            AppState.map.pm.disableGlobalEditMode();
+        }
+        if (AppState.map.pm.globalRemovalModeEnabled()) {
+            AppState.map.pm.disableGlobalRemovalMode();
+        }
+    } else {
+        // Toolbar wieder anzeigen
+        if (toolbar) toolbar.style.display = 'block';
+    }
+}
 function _initializeCoordsControlAndHandlers() {
     AppState.coordsControl = new L.Control.Coordinates();
     AppState.coordsControl.addTo(AppState.map);
@@ -952,7 +975,7 @@ function _setupCoreMapEventHandlers() {
             clearTimeout(longPressTimeout);
             return;
         }
-        
+
         // Starte den Timer für langes Drücken
         longPressTimeout = setTimeout(() => {
             // Verhindere das Auslösen des normalen "click"-Events
@@ -964,7 +987,7 @@ function _setupCoreMapEventHandlers() {
             const x = touch.clientX - rect.left;
             const y = touch.clientY - rect.top;
             const latlng = AppState.map.containerPointToLatLng([x, y]);
-            
+
             console.log('MapManager: Manuelles langes Drücken (iOS) erkannt.');
             const mapSelectEvent = new CustomEvent('location:selected', {
                 detail: { lat: latlng.lat, lng: latlng.lng, source: 'longpress_ios' },
@@ -1077,13 +1100,15 @@ function _setupMouseCoordinateHandler(map) {
 
 // Die einzelnen komplexen Event-Handler
 function _handleMapDblClick(e) {
-    // Diese Funktion platziert jetzt den Cut-Away-Marker
+    if (Settings.state.userSettings.isInteractionLocked) {
+        displayWarning("Interaction is locked. Please unlock to move points.");
+        return;
+    }
     if (!Settings.state.userSettings.showCutAwayFinder) {
         return;
     }
     const { lat, lng } = e.latlng;
 
-    // Erstellt oder bewegt den Cut-Away-Marker
     if (AppState.cutAwayMarker) {
         AppState.cutAwayMarker.setLatLng([lat, lng]);
     } else {
@@ -1091,7 +1116,6 @@ function _handleMapDblClick(e) {
         attachCutAwayMarkerDragend(AppState.cutAwayMarker);
     }
 
-    // Speichert die Position und löst die Neuberechnung aus
     AppState.cutAwayLat = lat;
     AppState.cutAwayLng = lng;
     updateCutAwayMarkerPopup(AppState.cutAwayMarker, lat, lng);
@@ -1299,29 +1323,28 @@ function clearJumpRunTrack() {
 }
 export function createCutAwayMarker(lat, lng) {
     const cutAwayIcon = L.icon({
-        iconUrl: ICON_URLS.CUTAWAY_MARKER, // Du benötigst dieses Bild im Projektverzeichnis
+        iconUrl: ICON_URLS.CUTAWAY_MARKER,
         iconSize: [25, 25],
         iconAnchor: [12, 12],
         popupAnchor: [0, -12],
         pmIgnore: true
-        //shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-        //shadowSize: [41, 41],
-        //shadowAnchor: [13, 41]
     });
     return L.marker([lat, lng], {
         icon: cutAwayIcon,
-        draggable: true,
+        draggable: !Settings.state.userSettings.isInteractionLocked,
         pmIgnore: true
     });
 }
 export function attachCutAwayMarkerDragend(marker) {
+    marker.on('mousedown', () => {
+        if (Settings.state.userSettings.isInteractionLocked) {
+            displayWarning("Interaction is locked. Please unlock to move points.");
+        }
+    });
     marker.on('dragend', (e) => {
         const position = marker.getLatLng();
         AppState.cutAwayLat = position.lat;
         AppState.cutAwayLng = position.lng;
-        console.log('Cut-away marker dragged to:', { lat: AppState.cutAwayLat, lng: AppState.cutAwayLng });
-
-        // Popup aktualisieren und Neuberechnung anstoßen
         updateCutAwayMarkerPopup(marker, AppState.cutAwayLat, AppState.cutAwayLng);
         const cutawayEvent = new CustomEvent('cutaway:marker_placed', { bubbles: true });
         AppState.map.getContainer().dispatchEvent(cutawayEvent);
@@ -1432,14 +1455,19 @@ export function drawJumpRunTrack(trackData) {
         icon: airplaneIcon,
         rotationAngle: trackData.airplane.bearing,
         rotationOrigin: 'center center',
-        draggable: true,
+        draggable: !Settings.state.userSettings.isInteractionLocked,
         zIndexOffset: 2000,
         pmIgnore: true
     })
         .bindTooltip('Drag to move Jump Run Track')
         .addTo(AppState.jumpRunTrackLayerGroup);
 
-    airplaneMarker.on('mousedown', () => AppState.map.dragging.disable());
+    airplaneMarker.on('mousedown', () => {
+        if (Settings.state.userSettings.isInteractionLocked) {
+            displayWarning("Interaction is locked. Please unlock to move points.");
+        }
+        AppState.map.dragging.disable();
+    });
     airplaneMarker.on('mouseup', () => AppState.map.dragging.enable());
 
     airplaneMarker.on('drag', (e) => {
@@ -1472,6 +1500,13 @@ export function drawJumpRunTrack(trackData) {
                 Number.isFinite(ll[1]) ? ll[1] + deltaLng : ll[1]
             ]);
             approachPolyline.setLatLngs(newApproachLatLngs);
+        }
+    });
+
+    airplaneMarker.on('dragstart', (e) => {
+        if (Settings.state.userSettings.isInteractionLocked) {
+             e.target.dragging.disable();
+             displayWarning("Interaction is locked. Please unlock to move points."); // <-- KORREKTUR
         }
     });
 
@@ -1547,17 +1582,23 @@ export function createCustomMarker(lat, lng) {
         iconAnchor: [16, 20],
         popupAnchor: [0, -32],
         pmIgnore: true
-        //shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-        //shadowSize: [41, 41], shadowAnchor: [13, 32]
     });
-    return L.marker([lat, lng], { icon: customIcon, draggable: true, pmIgnore: true });
+    return L.marker([lat, lng], {
+        icon: customIcon,
+        draggable: !Settings.state.userSettings.isInteractionLocked,
+        pmIgnore: true
+    });
 }
 
 // Private Helferfunktion: Hängt die Drag-Logik an.
 export function attachMarkerDragend(marker) {
+    marker.on('mousedown', () => {
+        if (Settings.state.userSettings.isInteractionLocked) {
+            displayWarning("Interaction is locked. Please unlock to move points.");
+        }
+    });
     marker.on('dragend', (e) => {
         const position = marker.getLatLng();
-        // Sendet ein Event, auf das app.js lauschen kann, um Neuberechnungen anzustoßen.
         const mapSelectEvent = new CustomEvent('location:selected', {
             detail: { lat: position.lat, lng: position.lng, source: 'marker_drag' },
             bubbles: true
@@ -1732,26 +1773,28 @@ export function updateLivePositionControl(data) {
 }
 
 export function handleHarpPlacement(e) {
+    if (Settings.state.userSettings.isInteractionLocked) {
+        displayWarning("Interaction is locked. Please unlock to move points.");
+        AppState.isPlacingHarp = false;
+        AppState.map.off('click', handleHarpPlacement);
+        return;
+    }
     if (!AppState.isPlacingHarp) return;
     const { lat, lng } = e.latlng;
     if (AppState.harpMarker) {
         AppState.harpMarker.setLatLng([lat, lng]);
-        console.log('Updated HARP marker position:', { lat, lng });
     } else {
         AppState.harpMarker = createHarpMarker(lat, lng).addTo(AppState.map);
-        console.log('Placed new HARP marker:', { lat, lng });
     }
     Settings.state.userSettings.harpLat = lat;
     Settings.state.userSettings.harpLng = lng;
     Settings.save();
     AppState.isPlacingHarp = false;
     AppState.map.off('click', handleHarpPlacement);
-    console.log('HARP placement mode deactivated');
-    // Enable HARP radio button
+
     const harpRadio = document.querySelector('input[name="jumpMasterLineTarget"][value="HARP"]');
     if (harpRadio) {
         harpRadio.disabled = false;
-        console.log('Enabled HARP radio button');
     }
     document.dispatchEvent(new CustomEvent('ui:recalculateJump'));
     document.dispatchEvent(new CustomEvent('harp:updated'));
@@ -1764,12 +1807,10 @@ export function createHarpMarker(latitude, longitude) {
             html: '<div style="width: 14px; height: 14px; background-color: green; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 6px rgba(0,0,0,0.6);"></div>',
             iconSize: [20, 20],
             iconAnchor: [10, 10],
-            pmIgnore: true
         }),
-        pane: 'markerPane',  // Use standard marker pane
+        pane: 'markerPane',
         pmIgnore: true
     });
-    console.log('Created HARP marker at:', { latitude, longitude });
     return marker;
 }
 

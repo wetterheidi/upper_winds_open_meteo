@@ -654,6 +654,34 @@ function setupCheckboxEvents() {
         document.dispatchEvent(new CustomEvent('ui:jumpMasterLineTargetChanged'));
     });
 
+    setupCheckbox('lockInteractionCheckbox', 'isInteractionLocked', (checkbox) => {
+        const isLocked = checkbox.checked;
+        Settings.state.userSettings.isInteractionLocked = isLocked;
+        Settings.save();
+        
+        // GeoMan-Steuerung (de-)aktivieren
+        mapManager.toggleGeoManControls(isLocked);
+
+        // Draggable-Status des JRT-Markers aktualisieren, falls er existiert
+        if (AppState.jumpRunTrackLayerGroup) {
+            AppState.jumpRunTrackLayerGroup.eachLayer(layer => {
+                if (layer instanceof L.Marker && layer.options.icon && layer.options.icon.options.iconUrl.includes('airplane')) {
+                    if (isLocked) {
+                        layer.dragging.disable();
+                    } else {
+                        layer.dragging.enable();
+                    }
+                }
+            });
+        }
+        
+        if(isLocked) {
+            Utils.handleMessage("Map interactions are now locked.");
+        } else {
+            Utils.handleMessage("Map interactions are now unlocked.");
+        }
+    });
+    
     const placeHarpButton = document.getElementById('placeHarpButton');
     if (placeHarpButton) {
         placeHarpButton.addEventListener('click', () => {

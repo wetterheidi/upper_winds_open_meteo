@@ -52,12 +52,12 @@ export const AppState = {
     poiLayerGroup: null,
     isArmed: false,
     isAutoRecording: false,
-    isManualRecording: false, // <-- NEUE ZEILE
+    isManualRecording: false, 
     recordedTrackPoints: [],
-    autoRecordingStartTime: null, // <--- DIESE ZEILE HINZUFÜGEN
+    autoRecordingStartTime: null, 
     altitudeCorrectionOffset: 0, 
+    isInteractionLocked: false,
 
-    // --- NEUE ZUSTANDS-VARIABLEN ---
     ismapInitialized: false,              // von mapManager.js
     hasTileErrorSwitched: false,        // von mapManager.js
     isCachingCancelled: false,          // von tileCache.js
