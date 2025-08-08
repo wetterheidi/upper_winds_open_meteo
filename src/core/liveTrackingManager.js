@@ -212,7 +212,7 @@ export async function startPositionTracking() {
     console.log("[LiveTrackingManager] Attempting to start position tracking...");
 
     const { Geolocation, isNative } = await getCapacitor();
-    console.log("[LiveTrackingManager] Platform:", window.Capacitor.getPlatform(), "IsNative:", isNative);
+    console.log("[LiveTrackingManager] Platform:", isNative ? window.Capacitor.getPlatform() : 'Web', "IsNative:", isNative);
 
     if (isNative && Geolocation) {
         try {
