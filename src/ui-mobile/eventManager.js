@@ -1348,6 +1348,7 @@ function setupJmlTargetToggleEvents() {
 
     harpBtn.addEventListener('click', () => {
         if (harpRadioPlanner && harpRadioPlanner.disabled) {
+            console.warn("HARP marker is not placed yet.");
             Utils.handleMessage("Place a HARP marker first.");
             return;
         }

@@ -824,7 +824,6 @@ function updateJumpMasterDashboard(data) {
         const currentTarget = Settings.state.userSettings.jumpMasterLineTarget;
         dipBtn.classList.toggle('active', currentTarget === 'DIP');
         harpBtn.classList.toggle('active', currentTarget === 'HARP');
-        harpBtn.disabled = harpRadioPlanner.disabled;
         harpBtn.style.opacity = harpBtn.disabled ? 0.5 : 1;
     }
 
