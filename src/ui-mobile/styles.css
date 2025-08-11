@@ -955,6 +955,10 @@ input[type="checkbox"][style*="opacity: 1"] {
     font-weight: normal;
 }
 
+.jml-target-toggle {
+    margin-top: 15px;
+}
+
 /* --- Track Upload --- */
 #track-upload>div:first-child {
     position: relative;

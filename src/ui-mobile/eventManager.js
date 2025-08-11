@@ -1333,6 +1333,29 @@ function setupHarpCoordInputEvents() {
         }
     });
 }
+function setupJmlTargetToggleEvents() {
+    const dipBtn = document.getElementById('jml-target-dip-btn');
+    const harpBtn = document.getElementById('jml-target-harp-btn');
+    const harpRadioPlanner = document.querySelector('input[name="jumpMasterLineTarget"][value="HARP"]');
+
+    if (!dipBtn || !harpBtn) return;
+
+    dipBtn.addEventListener('click', () => {
+        Settings.state.userSettings.jumpMasterLineTarget = 'DIP';
+        Settings.save();
+        document.dispatchEvent(new CustomEvent('ui:jumpMasterLineTargetChanged'));
+    });
+
+    harpBtn.addEventListener('click', () => {
+        if (harpRadioPlanner && harpRadioPlanner.disabled) {
+            Utils.handleMessage("Place a HARP marker first.");
+            return;
+        }
+        Settings.state.userSettings.jumpMasterLineTarget = 'HARP';
+        Settings.save();
+        document.dispatchEvent(new CustomEvent('ui:jumpMasterLineTargetChanged'));
+    });
+}
 
 // --- Ensemble-spezifische UI-Updates ---
 
@@ -1467,6 +1490,7 @@ export function initializeEventListeners() {
 
     // 6. App-Management & Cache
     setupDashboardToggleEvents();
+    setupJmlTargetToggleEvents();
     setupCacheManagement();
     setupCacheSettings();
 
