@@ -40,23 +40,47 @@ export function getSeparationFromTAS(ias) {
  * @param {number} elevation - Die Geländehöhe am Absetzpunkt in Metern AMSL.
  * @returns {{time: number, distance: number, directionDeg: number, path: object[]}|null} Ein Objekt mit Freifallzeit, Versatzdistanz, Richtung und dem Trajektorienpfad, oder null bei einem Fehler.
  */
-export function calculateFreeFall(weatherData, exitAltitude, openingAltitude, interpolatedData, startLat, startLng, elevation) {
+export function calculateFreeFall(weatherData, exitAltitude, openingAltitude, interpolatedData, startLat, startLng, elevation, jumpRunDirection) {
     if (!weatherData || !weatherData.time || !interpolatedData || interpolatedData.length === 0) return null;
     if (!Number.isFinite(startLat) || !Number.isFinite(startLng) || !Number.isFinite(elevation)) return null;
 
+    console.log("--- calculateFreeFall: Berechnung gestartet ---");
     const hStart = elevation + exitAltitude;
     const hStop = elevation + openingAltitude - CANOPY_OPENING_BUFFER_METERS;
 
     // Pass interpolatedData down to jumpRunTrack
-    const jumpRunData = jumpRunTrack(interpolatedData);
-    const jumpRunDirection = jumpRunData ? jumpRunData.direction : 0;
     const aircraftSpeedKt = Settings.state.userSettings.aircraftSpeedKt;
     const exitAltitudeFt = exitAltitude / 0.3048;
     const aircraftSpeedTAS = Utils.calculateTAS(aircraftSpeedKt, exitAltitudeFt);
-    let aircraftSpeedMps = (aircraftSpeedTAS === 'N/A') ? (aircraftSpeedKt * CONVERSIONS.KNOTS_TO_MPS) : (aircraftSpeedTAS * CONVERSIONS.KNOTS_TO_MPS);
 
-    const vxInitial = Math.cos(jumpRunDirection * Math.PI / 180) * aircraftSpeedMps;
-    const vyInitial = Math.sin(jumpRunDirection * Math.PI / 180) * aircraftSpeedMps;
+    // --- START DER KORREKTUR: Ground Speed statt Airspeed verwenden ---
+    let groundSpeedMps;
+    if (aircraftSpeedTAS !== 'N/A' && Number.isFinite(aircraftSpeedTAS)) {
+        const heights = interpolatedData.map(d => d.height);
+        const windDirAtExit = Utils.linearInterpolate(heights.map(h => h - elevation), interpolatedData.map(d => d.dir), exitAltitude);
+        const windSpeedMpsAtExit = Utils.linearInterpolate(heights.map(h => h - elevation), interpolatedData.map(d => Utils.convertWind(d.spd, 'm/s', 'km/h')), exitAltitude);
+
+        console.log(`[Freifall-Input] Wind in Absetzhöhe (${exitAltitude}m AGL): ${windDirAtExit.toFixed(1)}° @ ${windSpeedMpsAtExit.toFixed(1)} m/s`);
+
+        const tasMps = aircraftSpeedTAS * CONVERSIONS.KNOTS_TO_MPS;
+        const windToRad = (windDirAtExit + 180) * Math.PI / 180;
+        const windU = windSpeedMpsAtExit * Math.sin(windToRad);
+        const windV = windSpeedMpsAtExit * Math.cos(windToRad);
+
+        const headingRad = jumpRunDirection * Math.PI / 180;
+        const tasU = tasMps * Math.sin(headingRad);
+        const tasV = tasMps * Math.cos(headingRad);
+
+        groundSpeedMps = Math.sqrt(Math.pow(tasU + windU, 2) + Math.pow(tasV + windV, 2));
+    } else {
+        // Fallback, falls TAS nicht berechnet werden kann
+        groundSpeedMps = aircraftSpeedKt * CONVERSIONS.KNOTS_TO_MPS;
+    }
+
+    console.log(`[Freifall-Input] JRT-Richtung: ${jumpRunDirection}°, TAS: ${aircraftSpeedTAS} kt, Berechnete Ground Speed: ${groundSpeedMps.toFixed(1)} m/s`);
+
+    const vxInitial = Math.cos(jumpRunDirection * Math.PI / 180) * groundSpeedMps;
+    const vyInitial = Math.sin(jumpRunDirection * Math.PI / 180) * groundSpeedMps;
 
     const heights = interpolatedData.map(d => d.height);
     const windDirs = interpolatedData.map(d => Number.isFinite(d.dir) ? parseFloat(d.dir) : 0);
@@ -113,6 +137,9 @@ export function calculateFreeFall(weatherData, exitAltitude, openingAltitude, in
     let directionDeg = Math.atan2(final.y, final.x) * 180 / Math.PI;
     directionDeg = (directionDeg + 360) % 360;
 
+    console.log(`[Freifall-Ergebnis] Zeit: ${final.time.toFixed(1)} s, Distanz: ${distance.toFixed(0)} m, Richtung: ${directionDeg.toFixed(1)}°`);
+    console.log("--- calculateFreeFall: Berechnung beendet ---");
+
     return {
         time: final.time, distance: distance, directionDeg: directionDeg,
         path: trajectory.map(p => ({ latLng: Utils.calculateNewCenter(startLat, startLng, Math.sqrt(p.x * p.x + p.y * p.y), Math.atan2(p.y, p.x) * 180 / Math.PI), height: p.height, time: p.time })),
@@ -159,7 +186,9 @@ export function calculateExitCircle(interpolatedData) {
     const newCenterBlue = Utils.calculateNewCenter(blueLat, blueLng, meanWind[1] * flyTime, meanWind[0]);
     const newCenterRed = Utils.calculateNewCenter(AppState.lastLat, AppState.lastLng, meanWindFull[1] * flyTimeFull, meanWindFull[0]);
 
-    const freeFallResult = calculateFreeFall(AppState.weatherData, exitAltitude, openingAltitude, interpolatedData, AppState.lastLat, AppState.lastLng, elevation);
+    const jumpRunData = jumpRunTrack(interpolatedData);
+    const jumpRunDirection = jumpRunData ? jumpRunData.direction : 0;
+    const freeFallResult = calculateFreeFall(AppState.weatherData, exitAltitude, openingAltitude, interpolatedData, AppState.lastLat, AppState.lastLng, elevation, jumpRunDirection);
     if (!freeFallResult) return null;
 
     const greenShiftDirection = (freeFallResult.directionDeg + 180) % 360;
@@ -244,7 +273,9 @@ export function calculateCanopyCircles(interpolatedData) {
     const meanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, elevation + legHeightDownwind, elevation + safetyHeight + openingAltitude - CANOPY_OPENING_BUFFER_METERS);
     const meanWindFull = Utils.calculateMeanWind(heights, uComponents, vComponents, elevation + safetyHeight, elevation + openingAltitude - CANOPY_OPENING_BUFFER_METERS);
 
-    const freeFallResult = calculateFreeFall(AppState.weatherData, exitAltitude, openingAltitude, interpolatedData, AppState.lastLat, AppState.lastLng, elevation);
+    const jumpRunData = jumpRunTrack(interpolatedData);
+    const jumpRunDirection = jumpRunData ? jumpRunData.direction : 0;
+    const freeFallResult = calculateFreeFall(AppState.weatherData, exitAltitude, openingAltitude, interpolatedData, AppState.lastLat, AppState.lastLng, elevation, jumpRunDirection);
     if (!freeFallResult) return null;
 
     const landingPatternCoords = calculateLandingPatternCoords(AppState.lastLat, AppState.lastLng, interpolatedData);

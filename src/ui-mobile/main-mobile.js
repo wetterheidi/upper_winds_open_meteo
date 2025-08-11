@@ -1348,10 +1348,24 @@ function setupAppEventListeners() {
 
             // ... (die restlichen cases bleiben wie im vorherigen Schritt) ...
             case 'jumpRunTrackDirection':
+                // Offsets bei manueller Richtungsänderung zurücksetzen
+                Settings.state.userSettings.jumpRunTrackOffset = 0;
+                Settings.state.userSettings.jumpRunTrackForwardOffset = 0;
+                setInputValueSilently('jumpRunTrackOffset', 0);
+                setInputValueSilently('jumpRunTrackForwardOffset', 0);
+                Settings.save(); // Wichtig: Geänderte Offsets speichern
+
+                if (AppState.weatherData) {
+                    displayManager.updateJumpRunTrackDisplay();
+                    calculateJump(); // Exit Circles SOFORT neu berechnen
+                }
+                break;
+
             case 'jumpRunTrackOffset':
             case 'jumpRunTrackForwardOffset':
                 if (AppState.weatherData) {
                     displayManager.updateJumpRunTrackDisplay();
+                    calculateJump(); // Auch bei Offset-Änderung Kreise neu berechnen
                 }
                 break;
 

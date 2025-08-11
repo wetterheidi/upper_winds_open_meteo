@@ -376,16 +376,30 @@ function setupJumpRunTrackEvents() {
         directionInput.value = Settings.state.userSettings.customJumpRunDirection || '';
         directionInput.addEventListener('change', () => {
             const value = parseFloat(directionInput.value);
+
+            // KORREKTUR: Offsets bei manueller Eingabe zurücksetzen
+            Settings.state.userSettings.jumpRunTrackOffset = 0;
+            Settings.state.userSettings.jumpRunTrackForwardOffset = 0;
+            const offsetInput = document.getElementById('jumpRunTrackOffset');
+            const forwardOffsetInput = document.getElementById('jumpRunTrackForwardOffset');
+            if (offsetInput) offsetInput.value = 0;
+            if (forwardOffsetInput) forwardOffsetInput.value = 0;
+            console.log('Manuelle JRT-Richtungsänderung: Offsets auf 0 zurückgesetzt.');
+
             if (Number.isFinite(value) && value >= 0 && value <= 360) {
                 Settings.state.userSettings.customJumpRunDirection = value;
-                console.log(`Setting 'customJumpRunDirection' on change to:`, value);
+                console.log(`Set 'customJumpRunDirection' on change to:`, value);
             } else {
                 Settings.state.userSettings.customJumpRunDirection = null;
                 directionInput.value = '';
                 console.log('Invalid direction, resetting to calculated.');
             }
             Settings.save();
+
+            // Bestehende Funktion zum Neuzeichnen der Linie
             displayManager.updateJumpRunTrackDisplay();
+            // NEU: Event auslösen, um die Neuberechnung der Exit Circles anzustoßen
+            document.dispatchEvent(new CustomEvent('ui:recalculateJump'));
         });
     }
 
@@ -658,7 +672,7 @@ function setupCheckboxEvents() {
         const isLocked = checkbox.checked;
         Settings.state.userSettings.isInteractionLocked = isLocked;
         Settings.save();
-        
+
         // GeoMan-Steuerung (de-)aktivieren
         mapManager.toggleGeoManControls(isLocked);
 
@@ -674,14 +688,14 @@ function setupCheckboxEvents() {
                 }
             });
         }
-        
-        if(isLocked) {
+
+        if (isLocked) {
             Utils.handleMessage("Map interactions are now locked.");
         } else {
             Utils.handleMessage("Map interactions are now unlocked.");
         }
     });
-    
+
     const placeHarpButton = document.getElementById('placeHarpButton');
     if (placeHarpButton) {
         placeHarpButton.addEventListener('click', () => {
@@ -1174,7 +1188,7 @@ function setupPoiSearchButton() {
         try {
             // KORREKTUR: Rufe toggleLoading mit dem spezifischen Text auf
             toggleLoading(true, 'Searching for Dropzones...');
-            
+
             const bounds = AppState.map.getBounds();
             const sw = bounds.getSouthWest();
             const ne = bounds.getNorthEast();
