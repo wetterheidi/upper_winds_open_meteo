@@ -18,28 +18,33 @@ import { getCapacitor } from './capacitor-adapter.js';
  * @returns {Promise<string>} Ein Promise, das zum Textinhalt der Datei auflöst.
  */
 async function readFileContent(file) {
-    // NEU: Module über die asynchrone Funktion abrufen
-    const { Filesystem, isNative } = await getCapacitor();
+    const { Filesystem, isNative, Directory } = await getCapacitor();
 
-    // Prüfen, ob die App nativ läuft UND ein `path` für die Capacitor-API vorhanden ist.
-    if (window.Capacitor && window.Capacitor.isNativePlatform() && file.path) {
-        console.log(`[trackManager] Lese Datei über Capacitor Filesystem API: ${file.path}`);
+    if (isNative && file.path && Filesystem) {
+        console.log(`[trackManager] Reading file via Capacitor Filesystem API: ${file.path}`);
         try {
-            // Der Rest Ihrer Funktion bleibt exakt gleich!
+            // KORREKTUR: Datei direkt als UTF-8 Text einlesen
             const result = await Filesystem.readFile({
-                path: file.path
-                // Hinweis: Möglicherweise müssen Sie hier das korrekte Directory angeben,
-                // je nachdem, wo der FilePicker die Dateien speichert, z.B.
-                // directory: Directory.Documents
+                path: file.path,
+                // Hinweis: Je nach Android-Version und wie der Picker die Datei zurückgibt,
+                // ist 'directory' eventuell nicht nötig. Falls doch, ist 'Directory.Cache' oft eine gute Wahl.
+                // directory: Directory.Cache,
+                encoding: 'utf8'
             });
-            return atob(result.data);
+            // KORREKTUR: Das Ergebnis ist bereits der Textinhalt, kein atob() nötig
+            return result.data;
         } catch (error) {
-            console.error('[trackManager] Fehler beim Lesen der Datei mit Capacitor:', error);
+            console.error('[trackManager] Error reading file with Capacitor:', error);
+            // Fallback für den Fall, dass der Pfad nicht direkt lesbar ist (z.B. bei Content-URIs)
+            if (file.webPath) {
+                 const response = await fetch(file.webPath);
+                 return await response.text();
+            }
             throw new Error('Could not read file using native API.');
         }
     } else {
-        // Der Web-Fallback bleibt ebenfalls unverändert.
-        console.log(`[trackManager] Lese Datei über Web FileReader: ${file.name}`);
+        // Der Web-Fallback bleibt unverändert und korrekt
+        console.log(`[trackManager] Reading file via Web FileReader: ${file.name}`);
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = (e) => resolve(e.target.result);

@@ -607,50 +607,52 @@ function setupDeselectAllEnsembleButton() {
 
 function setupTrackEvents() {
     const uploadButton = document.getElementById('uploadTrackButton');
-    const trackFileInput = document.getElementById('trackFileInput');
+    // Das trackFileInput wird für die native App nicht mehr benötigt
     const fileNameDisplay = document.getElementById('fileNameDisplay');
     const clearTrackButton = document.getElementById('clearTrack');
 
-    if (!uploadButton || !trackFileInput || !fileNameDisplay || !clearTrackButton) {
+    if (!uploadButton || !fileNameDisplay || !clearTrackButton) {
         console.error('One or more track upload elements are missing from the DOM.');
         return;
     }
 
-    // Ein Klick auf unseren gestylten Button löst den Klick auf den versteckten Input aus.
-    uploadButton.addEventListener('click', () => {
-        trackFileInput.click();
-    });
+    // Klick auf den Button startet den nativen File Picker
+    uploadButton.addEventListener('click', async () => {
+        try {
+            const result = await FilePicker.pickFiles({
+                types: ['application/gpx+xml', 'text/csv', 'text/comma-separated-values'],
+                readData: false // Wir lesen die Daten später selbst mit dem Pfad
+            });
 
-    // Dieser Listener wird aktiv, sobald der Benutzer eine Datei ausgewählt hat.
-    trackFileInput.addEventListener('change', async (e) => {
-        const loadingElement = document.getElementById('loading');
-        if (e.target.files && e.target.files.length > 0) {
-            const file = e.target.files[0];
+            const file = result.files[0];
+            if (!file) return;
 
-            // UI aktualisieren
+            const loadingElement = document.getElementById('loading');
             fileNameDisplay.textContent = file.name;
             fileNameDisplay.style.fontStyle = 'normal';
             if (loadingElement) loadingElement.style.display = 'block';
 
             const extension = file.name.split('.').pop().toLowerCase();
-            try {
-                if (extension === 'gpx') {
-                    await loadGpxTrack(file); // Ruft die importierte Funktion auf
-                } else if (extension === 'csv') {
-                    await loadCsvTrackUTC(file); // Ruft die importierte Funktion auf
-                } else {
-                    Utils.handleError('Unsupported file type. Please upload a .gpx or .csv file.');
-                }
-            } catch (error) {
-                console.error('Error during track file processing:', error);
-                Utils.handleError('Failed to process track file.');
-            } finally {
-                if (loadingElement) loadingElement.style.display = 'none';
+            
+            // WICHTIG: Wir übergeben das native 'file'-Objekt (inkl. 'path') an die Ladefunktionen
+            if (extension === 'gpx') {
+                await loadGpxTrack(file);
+            } else if (extension === 'csv') {
+                await loadCsvTrackUTC(file);
+            } else {
+                Utils.handleError('Unsupported file type. Please upload a .gpx or .csv file.');
             }
+
+        } catch (error) {
+            // Fehlerbehandlung, z.B. wenn der Nutzer die Auswahl abbricht
+            console.log('File picker was cancelled or failed.', error);
+        } finally {
+            const loadingElement = document.getElementById('loading');
+            if (loadingElement) loadingElement.style.display = 'none';
         }
     });
 
-    // Logik für den "Clear Track" Button
+    // Die Logik für den "Clear Track" Button bleibt unverändert
     clearTrackButton.addEventListener('click', (e) => {
         e.stopPropagation();
         if (!AppState.map) { Utils.handleError('Cannot clear track: map not initialized.'); return; }
@@ -662,7 +664,8 @@ function setupTrackEvents() {
                 AppState.gpxPoints = [];
                 AppState.isTrackLoaded = false;
 
-                trackFileInput.value = ''; // Input zurücksetzen
+                const trackFileInput = document.getElementById('trackFileInput');
+                if(trackFileInput) trackFileInput.value = ''; // Input zurücksetzen
                 fileNameDisplay.textContent = 'No file chosen';
                 fileNameDisplay.style.fontStyle = 'italic';
 
