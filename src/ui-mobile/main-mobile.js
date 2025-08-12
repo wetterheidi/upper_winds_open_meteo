@@ -688,6 +688,8 @@ export function updateUIState() {
  * @param {object|null} [positionData=null] - Die neuesten Positionsdaten vom GPS.
  */
 export function updateJumpMasterLineAndPanel(positionData = null) {
+    console.log('[main-mobile] Event "tracking:positionUpdated" received. Data:', event.detail);
+
     // 1. Grundvoraussetzung: Ist Live-Tracking überhaupt aktiv?
     // Wenn kein Live-Marker da ist, ist Tracking aus -> alles aufräumen und beenden.
     if (!AppState.liveMarker) {
@@ -701,7 +703,7 @@ export function updateJumpMasterLineAndPanel(positionData = null) {
     const livePos = AppState.liveMarker.getLatLng();
     if (!livePos) return; // Sicherheitsabfrage
 
-    const data = positionData || { // Fallback, falls keine neuen Daten übergeben wurden
+    const dataForUpdate = positionData || {
         latitude: livePos.lat,
         longitude: livePos.lng,
         speedMs: AppState.lastSmoothedSpeedMs,
@@ -730,7 +732,7 @@ export function updateJumpMasterLineAndPanel(positionData = null) {
         if (targetPos) {
             const distance = AppState.map.distance(livePos, targetPos);
             const bearing = Math.round(Utils.calculateBearing(livePos.lat, livePos.lng, targetPos.lat, targetPos.lng));
-            const speedMs = data.speedMs > 1 ? data.speedMs : 1;
+            const speedMs = dataForUpdate.speedMs > 1 ? dataForUpdate.speedMs : 1;
             const tot = Math.round(distance / speedMs);
             jumpMasterLineData = { distance, bearing, tot, target: targetName };
             mapManager.drawJumpMasterLine(livePos, targetPos);
@@ -740,9 +742,7 @@ export function updateJumpMasterLineAndPanel(positionData = null) {
         mapManager.clearJumpMasterLine();
     }
 
-    // 4. Das Panel IMMER aktualisieren, solange das Tracking läuft
-    // Die updateLivePositionControl-Funktion im mapManager ist schlau genug, die JML-Infos
-    // nur anzuzeigen, wenn jumpMasterLineData nicht null ist.
+    // SAMMELT ALLE BENÖTIGTEN EINSTELLUNGEN
     const settingsForPanel = {
         heightUnit: getHeightUnit(),
         effectiveWindUnit: getWindSpeedUnit() === 'bft' ? 'kt' : getWindSpeedUnit(),
@@ -750,99 +750,94 @@ export function updateJumpMasterLineAndPanel(positionData = null) {
         refLevel: Settings.getValue('refLevel', 'AGL')
     };
 
-    // Datenobjekt für beide Dashboards zusammenstellen
-    const fullDashboardData = {
-        ...data,
+    // ERSTELLT DAS FINALE DATENOBJEKT FÜR ALLE UI-KOMPONENTEN
+    const fullUpdateData = {
+        ...dataForUpdate,
         showJumpMasterLine: showJML,
         jumpMasterLineData,
-        ...settingsForPanel
+        ...settingsForPanel // Fügt die Einheiten hinzu
     };
 
     // Aktualisiert das Jumpmaster-Dashboard (inkl. der Detailansicht)
-    updateJumpMasterDashboard(fullDashboardData);
+    updateJumpMasterDashboard(fullUpdateData);
 
     // Aktualisiert das Live-Position-Overlay auf der Karte
-    mapManager.updateLivePositionControl(fullDashboardData);
+    mapManager.updateLivePositionControl(fullUpdateData);
 }
 
 function updateJumpMasterDashboard(data) {
     const dashboard = document.getElementById('jumpmaster-view-mobile');
     if (!dashboard) return;
 
-    // Das Dashboard wird nur aktualisiert, wenn Daten vorhanden sind.
-    // Wenn data null ist, passiert nichts, der letzte Zustand bleibt sichtbar.
-    if (!data) return; 
-
-    // Referenzen auf alle mobilen Dashboard-Elemente holen
-    const coordsEl = document.getElementById('dashboard-jm-coords-mobile');
-    const altitudeEl = document.getElementById('dashboard-jm-altitude-mobile');
-    const directionEl = document.getElementById('dashboard-jm-direction-mobile');
-    const speedEl = document.getElementById('dashboard-jm-speed-mobile');
-    const accuracyEl = document.getElementById('dashboard-jm-accuracy-mobile');
-    const jmlDetails = document.getElementById('jumpmaster-line-details-mobile');
-    
-    // Sicherheitsabfrage, falls die Hauptelemente nicht gefunden werden
-    if (!coordsEl || !altitudeEl || !directionEl || !speedEl || !accuracyEl || !jmlDetails) {
-        console.error("Einige Hauptelemente des mobilen Jumpmaster-Dashboards wurden nicht gefunden.");
+    if (!data) {
+        const jmlDetails = document.getElementById('jumpmaster-line-details-mobile');
+        if (jmlDetails) jmlDetails.classList.add('hidden');
         return;
     }
 
-    // Werte formatieren und anzeigen (unveränderte Logik)
-    const settings = {
-        heightUnit: getHeightUnit(),
-        effectiveWindUnit: getWindSpeedUnit() === 'bft' ? 'kt' : getWindSpeedUnit(),
-        coordFormat: getCoordinateFormat(),
-        refLevel: Settings.getValue('refLevel', 'AGL')
+    // --- Block 1: Haupt-Dashboard ---
+    const mainElements = {
+        coordsEl: document.getElementById('dashboard-jm-coords-mobile'),
+        altitudeEl: document.getElementById('dashboard-jm-altitude-mobile'),
+        directionEl: document.getElementById('dashboard-jm-direction-mobile'),
+        speedEl: document.getElementById('dashboard-jm-speed-mobile'),
+        accuracyEl: document.getElementById('dashboard-jm-accuracy-mobile')
     };
     
-    const coords = Utils.convertCoords(data.latitude, data.longitude, settings.coordFormat);
-    let coordText = (settings.coordFormat === 'MGRS') ? coords.lat : `${coords.lat}, ${coords.lng}`;
-    if (settings.coordFormat === 'DMS') {
-        const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
-        coordText = `${formatDMS(coords.lat)}, ${formatDMS(coords.lng)}`;
+    // Prüfen, ob alle Hauptelemente vorhanden sind
+    if (Object.values(mainElements).some(el => !el)) {
+        console.error("Jumpmaster Dashboard: Ein oder mehrere Haupt-UI-Elemente wurden nicht gefunden. Bitte überprüfen Sie die IDs.");
+        return;
     }
-    coordsEl.textContent = coordText;
 
-    let altText = "N/A";
-    if (data.deviceAltitude !== null) {
-        let displayAltitude = (settings.refLevel === 'AGL' && AppState.lastAltitude) ? data.deviceAltitude - parseFloat(AppState.lastAltitude) : data.deviceAltitude;
-        altText = `${Math.round(Utils.convertHeight(displayAltitude, settings.heightUnit))} ${settings.heightUnit}`;
-    }
-    altitudeEl.textContent = altText;
+    const { heightUnit, effectiveWindUnit, coordFormat, refLevel, latitude, longitude, deviceAltitude, accuracy, speedMs, direction, showJumpMasterLine, jumpMasterLineData } = data;
     
-    directionEl.textContent = `${data.direction}°`;
-    const displaySpeed = Utils.convertWind(data.speedMs, settings.effectiveWindUnit, 'm/s');
-    const formattedSpeed = settings.effectiveWindUnit === 'bft' ? Math.round(displaySpeed) : displaySpeed.toFixed(1);
-    speedEl.textContent = `${formattedSpeed} ${settings.effectiveWindUnit}`;
-    accuracyEl.textContent = `± ${Math.round(Utils.convertHeight(data.accuracy, settings.heightUnit))} ${settings.heightUnit}`;
+    // Hauptwerte aktualisieren...
+    const coords = Utils.convertCoords(latitude, longitude, coordFormat);
+    mainElements.coordsEl.textContent = (coordFormat === 'MGRS') ? coords.lat : `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+    mainElements.altitudeEl.textContent = deviceAltitude !== null ? `${Math.round(Utils.convertHeight(deviceAltitude - (refLevel === 'AGL' ? AppState.lastAltitude || 0 : 0), heightUnit))} ${heightUnit}` : "N/A";
+    mainElements.directionEl.textContent = `${direction}°`;
+    const displaySpeed = Utils.convertWind(speedMs, effectiveWindUnit, 'm/s');
+    mainElements.speedEl.textContent = `${Number.isFinite(displaySpeed) ? displaySpeed.toFixed(1) : 'N/A'} ${effectiveWindUnit}`;
+    mainElements.accuracyEl.textContent = `± ${Math.round(Utils.convertHeight(accuracy, heightUnit))} ${heightUnit}`;
 
-    // JML Target Toggle Buttons aktualisieren
+    // --- Block 2: JML Toggle ---
     const dipBtn = document.getElementById('jml-target-dip-btn');
     const harpBtn = document.getElementById('jml-target-harp-btn');
-    const harpRadioPlanner = document.querySelector('input[name="jumpMasterLineTarget"][value="HARP"]');
-    if (dipBtn && harpBtn && harpRadioPlanner) {
-        const currentTarget = Settings.state.userSettings.jumpMasterLineTarget;
-        dipBtn.classList.toggle('active', currentTarget === 'DIP');
-        harpBtn.classList.toggle('active', currentTarget === 'HARP');
-        harpBtn.style.opacity = harpBtn.disabled ? 0.5 : 1;
+    if (dipBtn && harpBtn) {
+        dipBtn.classList.toggle('active', Settings.state.userSettings.jumpMasterLineTarget === 'DIP');
+        harpBtn.classList.toggle('active', Settings.state.userSettings.jumpMasterLineTarget === 'HARP');
+        harpBtn.style.opacity = AppState.harpMarker ? 1 : 0.5;
     }
 
-    // JML Detailansicht steuern
-    const showJML = data.showJumpMasterLine;
-    jmlDetails.classList.toggle('hidden', !showJML);
+    // --- Block 3: JML Detailansicht ---
+    const jmlDetails = document.getElementById('jumpmaster-line-details-mobile');
+    if (jmlDetails) {
+        jmlDetails.classList.toggle('hidden', !showJumpMasterLine);
 
-    if (showJML && data.jumpMasterLineData) {
-        // Elemente für JML-Details holen und aktualisieren
-        const targetLabel = document.getElementById('dashboard-jm-target-label-mobile');
-        const bearingEl = document.getElementById('dashboard-jm-bearing-mobile');
-        const distanceEl = document.getElementById('dashboard-jm-distance-mobile');
-        const totEl = document.getElementById('dashboard-jm-tot-mobile');
+        if (showJumpMasterLine && jumpMasterLineData) {
+            // DETAILLIERTE PRÜFUNG: Jedes Element einzeln prüfen und loggen, falls es fehlt.
+            const detailElements = {
+                targetLabel: document.getElementById('dashboard-jm-target-label-mobile'),
+                bearingEl: document.getElementById('dashboard-jm-bearing-mobile'),
+                distanceEl: document.getElementById('dashboard-jm-distance-mobile'),
+                totEl: document.getElementById('dashboard-jm-tot-mobile')
+            };
 
-        if (targetLabel && bearingEl && distanceEl && totEl) {
-            targetLabel.textContent = `JML to ${data.jumpMasterLineData.target}`;
-            bearingEl.textContent = `${data.jumpMasterLineData.bearing}°`;
-            distanceEl.textContent = `${Math.round(Utils.convertHeight(data.jumpMasterLineData.distance, settings.heightUnit))} ${settings.heightUnit}`;
-            totEl.textContent = data.jumpMasterLineData.tot < 1200 ? `X - ${data.jumpMasterLineData.tot} s` : 'N/A';
+            let allDetailsFound = true;
+            for (const key in detailElements) {
+                if (!detailElements[key]) {
+                    console.error(`Jumpmaster Dashboard Fehler: Das Detail-Element für '${key}' (erwartete ID: ${key.replace('El', '-mobile').replace('targetLabel', 'dashboard-jm-target-label-mobile')}) wurde nicht in der index.html gefunden!`);
+                    allDetailsFound = false;
+                }
+            }
+            
+            if (allDetailsFound) {
+                detailElements.targetLabel.textContent = `JML to ${jumpMasterLineData.target}`;
+                detailElements.bearingEl.textContent = `${jumpMasterLineData.bearing}°`;
+                detailElements.distanceEl.textContent = `${Math.round(Utils.convertHeight(jumpMasterLineData.distance, heightUnit))} ${heightUnit}`;
+                detailElements.totEl.textContent = jumpMasterLineData.tot < 1200 ? `X - ${jumpMasterLineData.tot} s` : 'N/A';
+            }
         }
     }
 }
@@ -1203,6 +1198,7 @@ function setupAppEventListeners() {
     });
 
     document.addEventListener('tracking:positionUpdated', (event) => {
+        console.log('[main-mobile] Event "tracking:positionUpdated" received. Data:', event.detail);
         updateJumpMasterLineAndPanel(event.detail);
         updateDashboardPanel(event.detail);
         if (AppState.isAutoRecording) {

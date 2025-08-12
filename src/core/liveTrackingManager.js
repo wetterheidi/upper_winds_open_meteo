@@ -148,6 +148,8 @@ const debouncedPositionUpdate = Utils.debounce(async (position) => {
         bubbles: true, cancelable: true
     });
 
+    console.log('[LiveTrackingManager] Dispatching tracking:positionUpdated with data:', event.detail);
+
     if (AppState.isAutoRecording || AppState.isManualRecording) {
         console.log(`Recording point. Live Altitude (deviceAltitude): ${deviceAltitude}, DIP Altitude (lastAltitude): ${AppState.lastAltitude}`);
 
