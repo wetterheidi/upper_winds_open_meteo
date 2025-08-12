@@ -916,6 +916,12 @@ function _setupCoreMapEventHandlers() {
 
 
     AppState.map.on('contextmenu', (e) => {
+
+        if (Settings.state.userSettings.isInteractionLocked) {
+            displayWarning("Interaction is locked. Please unlock to place a new DIP.");
+            return; // Aktion unterbinden
+        }
+        
         // Rechtsklick/Langes Drücken verschiebt jetzt den DIP
         const { lat, lng } = e.latlng;
         console.log('MapManager: Rechtsklick/Langes Drücken erkannt. Sende "location:selected"-Event.');

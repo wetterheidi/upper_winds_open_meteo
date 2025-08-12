@@ -676,7 +676,7 @@ function setupCheckboxEvents() {
         // GeoMan-Steuerung (de-)aktivieren
         mapManager.toggleGeoManControls(isLocked);
 
-        // Draggable-Status des JRT-Markers aktualisieren, falls er existiert
+        // Draggable-Status des JRT-Markers (Flugzeug) aktualisieren
         if (AppState.jumpRunTrackLayerGroup) {
             AppState.jumpRunTrackLayerGroup.eachLayer(layer => {
                 if (layer instanceof L.Marker && layer.options.icon && layer.options.icon.options.iconUrl.includes('airplane')) {
@@ -688,6 +688,40 @@ function setupCheckboxEvents() {
                 }
             });
         }
+
+        // --- NEUER, KORRIGIERTER CODEBLOCK ---
+        // Aktualisiert den Draggable-Status für die anderen Marker
+
+        // DIP Marker (Hauptmarker)
+        if (AppState.currentMarker) {
+            if (isLocked) {
+                AppState.currentMarker.dragging.disable();
+            } else {
+                AppState.currentMarker.dragging.enable();
+            }
+        }
+
+        // HARP Marker
+        if (AppState.harpMarker) {
+            // HINWEIS: Der HARP-Marker war ursprünglich nicht verschiebbar. 
+            // Diese Zeilen fügen die Sperr-Logik hinzu, falls er doch verschiebbar gemacht wird.
+            if (isLocked) {
+                if (AppState.harpMarker.dragging) AppState.harpMarker.dragging.disable();
+            } else {
+                if (AppState.harpMarker.dragging) AppState.harpMarker.dragging.enable();
+            }
+        }
+
+        // Cutaway Marker
+        if (AppState.cutAwayMarker) {
+            if (isLocked) {
+                AppState.cutAwayMarker.dragging.disable();
+            } else {
+                AppState.cutAwayMarker.dragging.enable();
+            }
+        }
+        // --- ENDE DES NEUEN CODEBLOCKS ---
+
 
         if (isLocked) {
             Utils.handleMessage("Map interactions are now locked.");

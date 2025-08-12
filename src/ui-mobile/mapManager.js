@@ -957,6 +957,12 @@ function _setupCoreMapEventHandlers() {
 
     // Standard contextmenu für Android und Desktop
     AppState.map.on('contextmenu', (e) => {
+
+        if (Settings.state.userSettings.isInteractionLocked) {
+            displayWarning("Interaction is locked. Please unlock to place a new DIP.");
+            return; // Aktion unterbinden
+        }
+
         const { lat, lng } = e.latlng;
         console.log('MapManager: Standard-Rechtsklick/Langes Drücken erkannt.');
         const mapSelectEvent = new CustomEvent('location:selected', {
@@ -978,6 +984,12 @@ function _setupCoreMapEventHandlers() {
 
         // Starte den Timer für langes Drücken
         longPressTimeout = setTimeout(() => {
+
+            if (Settings.state.userSettings.isInteractionLocked) {
+                displayWarning("Interaction is locked. Please unlock to place a new DIP.");
+                return; // Aktion unterbinden
+            }
+            
             // Verhindere das Auslösen des normalen "click"-Events
             e.preventDefault();
 
