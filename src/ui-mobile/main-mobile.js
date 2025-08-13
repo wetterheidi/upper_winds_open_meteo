@@ -1654,6 +1654,17 @@ function setupAppEventListeners() {
         }
     });
 
+    document.addEventListener('track:point_added', () => {
+        if (AppState.recordedTrackPoints.length > 1) {
+            mapManager.drawRecordedTrack(AppState.recordedTrackPoints);
+        }
+    });
+
+    document.addEventListener('sensor:disarmed', () => {
+        // ... bestehender Code
+        mapManager.clearRecordedTrack(); // Linie entfernen
+    });
+
     document.addEventListener('sensor:landing_detected', () => {
         saveRecordedTrack();
         AppState.isAutoRecording = false;

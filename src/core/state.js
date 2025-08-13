@@ -54,6 +54,7 @@ export const AppState = {
     isAutoRecording: false,
     isManualRecording: false, 
     recordedTrackPoints: [],
+    recordedTrackLayer: null,
     autoRecordingStartTime: null, 
     altitudeCorrectionOffset: 0, 
     isInteractionLocked: false,

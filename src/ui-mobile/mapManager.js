@@ -1876,7 +1876,39 @@ export function clearHarpMarker() {
     }
     Utils.handleMessage('HARP marker cleared');
 }
-// --- ENDE DES NEUEN BLOCKS ---
+
+/**
+ * Zeichnet den aktuell aufgezeichneten Track als Linie auf der Karte.
+ * @param {Array<object>} points - Ein Array von Trackpunkten ({lat, lng}).
+ */
+export function drawRecordedTrack(points) {
+    if (!AppState.map) return;
+
+    // Alte Linie entfernen, um sie zu aktualisieren
+    if (AppState.recordedTrackLayer) {
+        AppState.map.removeLayer(AppState.recordedTrackLayer);
+    }
+
+    if (points.length < 2) return;
+
+    const latlngs = points.map(p => [p.lat, p.lng]);
+
+    AppState.recordedTrackLayer = L.polyline(latlngs, {
+        color: '#ff0000', // Rote Farbe für den Live-Track
+        weight: 3,
+        opacity: 0.8
+    }).addTo(AppState.map);
+}
+
+/**
+ * Entfernt die Track-Linie von der Karte.
+ */
+export function clearRecordedTrack() {
+    if (AppState.map && AppState.recordedTrackLayer) {
+        AppState.map.removeLayer(AppState.recordedTrackLayer);
+        AppState.recordedTrackLayer = null;
+    }
+}
 
 /**
  * Zeichnet Marker für alle favorisierten Orte auf der Karte.

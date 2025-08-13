@@ -61,7 +61,7 @@ const debouncedPositionUpdate = Utils.debounce(async (position) => {
     // Offset-Berechnung nur beim allerersten validen Punkt einer Aufzeichnung
     if (AppState.recordedTrackPoints.length === 0 && AppState.altitudeCorrectionOffset === 0 && deviceAltitude !== null && AppState.lastAltitude !== 'N/A') {
         const heightDifference = Math.abs(deviceAltitude - AppState.lastAltitude);
-        
+
         // Plausibilitätscheck: Ist der Unterschied < 150m?
         // Das deutet auf einen Start am Boden hin.
         if (heightDifference < 150) {
@@ -138,8 +138,8 @@ const debouncedPositionUpdate = Utils.debounce(async (position) => {
     // Event mit den neuen Daten auslösen
     const event = new CustomEvent('tracking:positionUpdated', {
         detail: {
-            latitude, longitude, 
-            deviceAltitude: correctedAltitude, 
+            latitude, longitude,
+            deviceAltitude: correctedAltitude,
             altitudeAccuracy, accuracy,
             speedMs: AppState.lastSmoothedSpeedMs,
             descentRateMps: AppState.lastSmoothedDescentRateMps,
@@ -159,6 +159,8 @@ const debouncedPositionUpdate = Utils.debounce(async (position) => {
             ele: correctedAltitude,
             time: DateTime.utc()
         });
+
+        document.dispatchEvent(new CustomEvent('track:point_added'));
     }
 
     document.dispatchEvent(event);
