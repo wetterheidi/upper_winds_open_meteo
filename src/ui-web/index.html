@@ -19,6 +19,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-gpx/1.7.0/gpx.min.js" defer></script>
     <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js" defer></script>
     <script src="https://unpkg.com/leaflet-rotatedmarker@0.2.0/leaflet.rotatedMarker.js" defer></script>
+    <script src="https://unpkg.com/@tmcw/togeojson@4.7.0/dist/togeojson.umd.js" defer></script>
 </head>
 
 <body>
@@ -608,14 +609,14 @@
 
                                 <div
                                     style="position: relative; display: flex; align-items: center; justify-content: flex-end;">
-                                    <span class="info-icon info-button-shared" data-info="GPX or FlySight-CSV">i</span>
+                                    <span class="info-icon info-button-shared" data-info="GPX, KML or FlySight-CSV">i</span>
                                     <div id="trackInfoPopup" class="info-popup"></div>
                                 </div>
 
                                 <div>
                                     <button type="button" id="uploadTrackButton" class="btn btn-primary">Choose
                                         File...</button>
-                                    <input type="file" id="trackFileInput" accept=".gpx,.csv" class="hidden">
+                                    <input type="file" id="trackFileInput" accept=".gpx,.csv,.kml" class="hidden">
                                     <span id="fileNameDisplay" class="file-name-display">No file chosen</span>
                                 </div>
 

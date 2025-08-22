@@ -7,7 +7,7 @@ import * as displayManager from './displayManager.js';
 import * as mapManager from './mapManager.js';
 import * as Coordinates from './coordinates.js';
 import { TileCache, cacheTilesForDIP, cacheVisibleTiles } from '../core/tileCache.js';
-import { loadGpxTrack, loadCsvTrackUTC, exportToGpx, exportLandingPatternToGpx } from '../core/trackManager.js';
+import { loadKmlTrack, loadGpxTrack, loadCsvTrackUTC, exportToGpx, exportLandingPatternToGpx } from '../core/trackManager.js';
 import { SensorManager } from './sensorManager.js';
 import * as liveTrackingManager from '../core/liveTrackingManager.js';
 import { fetchEnsembleWeatherData, processAndVisualizeEnsemble, clearEnsembleVisualizations } from '../core/ensembleManager.js';
@@ -639,6 +639,8 @@ function setupTrackEvents() {
                 await loadGpxTrack(file);
             } else if (extension === 'csv') {
                 await loadCsvTrackUTC(file);
+            } else if (extension === 'kml') { 
+                await loadKmlTrack(file);
             } else {
                 Utils.handleError('Unsupported file type. Please upload a .gpx or .csv file.');
             }

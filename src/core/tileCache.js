@@ -532,9 +532,6 @@ async function cacheVisibleTiles({ map, baseMaps, onProgress, onComplete, onCanc
         return;
     }
 
-    // Die Logik innerhalb der Funktion bleibt EXAKT GLEICH wie zuvor.
-    // ... von `const bounds = map.getBounds();`
-    // ... bis zum Ende der Funktion ...
     const bounds = map.getBounds();
     const zoom = map.getZoom();
     const zoomLevels = Settings.state.userSettings.cacheZoomLevels || Settings.defaultSettings.cacheZoomLevels;
@@ -569,7 +566,7 @@ async function cacheVisibleTiles({ map, baseMaps, onProgress, onComplete, onCanc
         if (onComplete) onComplete('Selected base map not available for caching.');
         return;
     }
-    // ... (Rest der Logik zum Füllen von tileLayers) ...
+
     if (Settings.state.userSettings.baseMaps === 'Esri Satellite + OSM') {
         tileLayers.push(
             { name: 'Esri Satellite', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', normalizedUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' },
@@ -577,13 +574,19 @@ async function cacheVisibleTiles({ map, baseMaps, onProgress, onComplete, onCanc
         );
     } else {
         const layer = baseMaps[Settings.state.userSettings.baseMaps];
-        tileLayers.push({
-            name: Settings.state.userSettings.baseMaps,
-            url: layer.options.url || layer._url,
-            subdomains: layer.options.subdomains,
-            normalizedUrl: (layer.options.url || layer._url).replace(/{s}\./, '')
-        });
+        // --- KORREKTUR START ---
+        // Prüft, ob der Layer und seine URL-Eigenschaft existieren, bevor er zum Caching hinzugefügt wird.
+        if (layer && (layer.options.url || layer._url)) {
+            tileLayers.push({
+                name: Settings.state.userSettings.baseMaps,
+                url: layer.options.url || layer._url,
+                subdomains: layer.options.subdomains,
+                normalizedUrl: (layer.options.url || layer._url).replace(/{s}\./, '')
+            });
+        }
+        // --- KORREKTUR ENDE ---
     }
+
 
     let cachedCount = 0;
     let failedCount = 0;
@@ -591,7 +594,6 @@ async function cacheVisibleTiles({ map, baseMaps, onProgress, onComplete, onCanc
     const failedTiles = [];
     AppState.isCachingCancelled = false;
 
-    // Wichtig: onProgress MUSS eine Funktion sein, bevor sie aufgerufen wird.
     if (onProgress) {
         onProgress(0, totalTiles, () => {
             AppState.isCachingCancelled = true;
@@ -601,9 +603,7 @@ async function cacheVisibleTiles({ map, baseMaps, onProgress, onComplete, onCanc
 
     for (const layer of tileLayers) {
         if (AppState.isCachingCancelled) break;
-        // ... (fetchPromises-Logik bleibt gleich, aber achten Sie auf die onProgress-Aufrufe)
         const fetchPromises = tiles.map(async (tile, index) => {
-            // ...
             if (onProgress) {
                 onProgress(cachedCount + failedCount, totalTiles, () => {
                     AppState.isCachingCancelled = true;

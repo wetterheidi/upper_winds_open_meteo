@@ -133,7 +133,29 @@ function _setupBaseLayersAndHandling() {
             })
         ], {
             attribution: '© Esri, USDA, USGS | © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        })
+        }),
+        "OpenTopoMap + Airspaces": L.layerGroup([
+            L.tileLayer.cached('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+                maxZoom: 17,
+                attribution: '© <a href="https://www.openstreetmap.org/copyright">OSM</a>, <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)',
+                subdomains: ['a', 'b', 'c']
+            }),
+            L.tileLayer.cached('https://nwy-tiles-api.prod.newaydata.com/tiles/{z}/{x}/{y}.png?path=latest/aero/latest', {
+                maxZoom: 19,
+                attribution: '© <a href="https://www.openflightmaps.org">openflightmaps.org</a>',
+                opacity: 0.5,
+                zIndex: 2,
+                updateWhenIdle: true,
+                keepBuffer: 2,
+                subdomains: ['a', 'b', 'c']
+            })
+        ], {
+            attribution: '© Esri, USDA, USGS | © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        }),
+        "Open Flight Map": L.tileLayer.cached('https://nwy-tiles-api.prod.newaydata.com/tiles/{z}/{x}/{y}.png?path=latest/aero/latest', {
+            maxZoom: 19,
+            attribution: '© <a href="https://www.openflightmaps.org">openflightmaps.org</a>'
+        }),
     };
 
     const openMeteoAttribution = 'Weather data by <a href="https://open-meteo.com">Open-Meteo</a>';
@@ -921,7 +943,7 @@ function _setupCoreMapEventHandlers() {
             displayWarning("Interaction is locked. Please unlock to place a new DIP.");
             return; // Aktion unterbinden
         }
-        
+
         // Rechtsklick/Langes Drücken verschiebt jetzt den DIP
         const { lat, lng } = e.latlng;
         console.log('MapManager: Rechtsklick/Langes Drücken erkannt. Sende "location:selected"-Event.');

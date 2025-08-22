@@ -55,6 +55,57 @@ async function readFileContent(file) {
 }
 
 /**
+ * Lädt und verarbeitet eine KML-Datei.
+ * @param {File} file - Das vom Benutzer ausgewählte KML-Datei-Objekt.
+ * @returns {Promise<object|null>} Ein Promise, das zu den Metadaten des Tracks auflöst oder null bei einem Fehler.
+ */
+export async function loadKmlTrack(file) {
+    if (!AppState.map) { 
+        Utils.handleError('Map not initialized.'); 
+        return null; 
+    }
+    AppState.isLoadingGpx = true;
+
+    try {
+        const kmlData = await readFileContent(file);
+        const parser = new DOMParser();
+        const xml = parser.parseFromString(kmlData, 'text/xml');
+
+        // togeojson umwandeln
+        const geojson = toGeoJSON.kml(xml);
+        
+        const points = [];
+        // Durch alle Features im GeoJSON iterieren (z.B. Linien, Punkte)
+        L.geoJSON(geojson, {
+            onEachFeature: function (feature, layer) {
+                if (feature.geometry && feature.geometry.type === 'LineString') {
+                    // Koordinaten aus einem Linien-Track extrahieren
+                    feature.geometry.coordinates.forEach(coord => {
+                        const [lng, lat, ele] = coord;
+                        // Zeitinformationen sind in KML oft nicht pro Punkt verfügbar
+                        points.push({ lat, lng, ele: ele || null, time: null });
+                    });
+                }
+            }
+        });
+
+        if (points.length < 2) {
+            throw new Error('KML file contains no valid track with at least two points.');
+        }
+
+        const trackMetaData = await renderTrack(points, file.name);
+        return trackMetaData;
+
+    } catch (error) {
+        console.error('[trackManager] Error in loadKmlTrack:', error);
+        Utils.handleError('Error parsing KML file: ' + error.message);
+        return null;
+    } finally {
+        AppState.isLoadingGpx = false;
+    }
+}
+
+/**
  * Lädt und verarbeitet eine GPX-Datei. Liest die Datei, extrahiert die Trackpunkte
  * und ruft die renderTrack-Funktion auf, um sie auf der Karte darzustellen.
  * @param {File} file - Das vom Benutzer ausgewählte GPX-Datei-Objekt.
