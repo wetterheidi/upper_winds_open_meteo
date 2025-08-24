@@ -850,11 +850,10 @@ input[type="checkbox"][style*="opacity: 0.5"] {
 .wind-tooltip,
 .cutaway-tooltip,
 .ensemble-tooltip {
-    background: rgba(0, 0, 0, 0.8);
-    color: white;
+    background: rgba(255, 255, 255, 0.8);
     border: none;
     border-radius: 3px;
-    padding: 5px;
+    padding: 2px;
     font-size: 12px;
     white-space: nowrap;
 }
@@ -878,6 +877,52 @@ input[type="checkbox"][style*="opacity: 0.5"] {
     line-height: 24px;
 }
 
+/* === ANZEIGE FÜR GEOMAN-MESSWERKZEUG === */
+.leaflet-measure-label {
+    position: absolute; /* Wichtig für die Positionierung auf der Karte */
+    font: 9px 'Roboto', sans-serif;
+    font-weight: bold;
+    background-color: rgba(210, 251, 186, 0.9); /* Heller, leicht gelblicher Hintergrund */
+    color: #333;
+    padding: 5px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    white-space: nowrap; /* Verhindert Zeilenumbrüche */
+    text-align: left;
+    pointer-events: none; /* Sorgt dafür, dass das Label keine Klicks abfängt */
+    display: none;        /* Wird per JavaScript auf 'block' gesetzt, wenn die Messung beginnt */
+    z-index: 9000;        /* Stellt sicher, dass es über fast allem anderen liegt */
+}
+
+/* Stil für die hervorgehobene Distanz-Anzeige */
+.bold-distance {
+    font-weight: bold !important;
+}
+
+/* === ZUSÄTZLICHE STILE FÜR PERMANENTE GEOMAN-LABELS === */
+.geoman-permanent-label {
+    background: rgba(255, 255, 224, 0.9);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 5px 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    min-width: 50px;
+    font-size: 9px;
+    line-height: 1;
+}
+
+/* NEU: Diese Regel steuert gezielt den Text im Label */
+.geoman-permanent-label div {
+    font-size: 9px; /* Hier können Sie die Schriftgröße jetzt anpassen */
+    font-weight: normal;
+    text-align: left;
+    line-height: 1; /* Verbessert den Zeilenabstand */
+    color: var(--text-color);
+}
+
+/* Leere Klasse, um Leaflet-Standardstile zu vermeiden */
+.geoman-label-container { }
 
 /* =================================================================== */
 /* 7. MODALE & NACHRICHTEN
@@ -931,6 +976,9 @@ input[type="checkbox"][style*="opacity: 0.5"] {
     background-color: #ffcccc;
 }
 
+#message.warning {
+    background-color: #fff3cd !important;
+}
 .modal {
     position: fixed;
     top: 0;
@@ -1039,4 +1087,51 @@ input[type="checkbox"][style*="opacity: 0.5"] {
     100% {
         box-shadow: 0 0 0 0 rgba(23, 162, 184, 0);
     }
+}
+
+/* === GEOMAN TOOLBAR SICHTBARKEITS-FIX === */
+/* Stellt sicher, dass die Geoman Toolbar immer sichtbar und klickbar ist */
+.leaflet-pm-toolbar {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    z-index: 2000 !important; /* Stellt sicher, dass sie über anderen Elementen liegt */
+}
+
+.pm-textarea{
+    text-align: center !important;
+    padding-left: 0 !important;
+}
+
+/* === LIVE MARKER STYLES === */
+.live-marker-container { 
+    background: transparent; 
+    border: none; 
+}
+.live-marker-wrapper { 
+    width: 24px; 
+    height: 24px; 
+    display: flex; 
+    justify-content: center; 
+    align-items: center; 
+    transition: transform 0.3s ease-out; 
+}
+.live-marker-dot { 
+    width: 14px; 
+    height: 14px; 
+    background-color: #007bff; 
+    border-radius: 50%; 
+    border: 2px solid white; 
+    box-shadow: 0 0 6px rgba(0,0,0,0.6); 
+}
+.live-marker-arrow { 
+    width: 0; 
+    height: 0; 
+    border-left: 6px solid transparent; 
+    border-right: 6px solid transparent; 
+    border-bottom: 10px solid #007bff; 
+    position: absolute; 
+    top: -1px; 
+    left: 50%; 
+    transform: translateX(-50%); 
 }

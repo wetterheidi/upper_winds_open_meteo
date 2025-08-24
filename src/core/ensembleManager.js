@@ -195,7 +195,8 @@ function drawEnsembleCircle(exitResult, color, label) {
         fillColor: color,
         fillOpacity: 0.15,
         weight: 2,
-        dashArray: '5, 10'
+        dashArray: '5, 10',
+        pmIgnore: true
     }).addTo(AppState.ensembleLayerGroup);
 
     const userWindUnit = Settings.getValue('windUnit',  'kt');

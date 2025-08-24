@@ -105,25 +105,23 @@ function showSnackbar(message, type = 'default') {
         document.body.appendChild(snackbar);
     }
 
-    // Setzt die Nachricht und den Typ (CSS-Klasse)
     snackbar.textContent = message;
-    snackbar.className = 'show'; // Startet die Einblende-Animation
+    // Setze die Klassen basierend auf dem Typ
+    snackbar.className = 'show'; // Startet immer mit 'show'
     if (type === 'success') {
         snackbar.classList.add('success');
     } else if (type === 'error') {
         snackbar.classList.add('error');
+    } else if (type === 'warning') { // NEUE Bedingung
+        snackbar.classList.add('warning');
     }
 
-    // Alte Timeouts löschen, falls vorhanden
     if (window.snackbarTimeout) {
         clearTimeout(window.snackbarTimeout);
     }
 
-    // Nach 3 Sekunden die Ausblende-Animation starten
     window.snackbarTimeout = setTimeout(() => {
         snackbar.className = snackbar.className.replace('show', '');
-        // Alte Typ-Klassen entfernen für die nächste Nachricht
-        snackbar.classList.remove('success', 'error');
     }, 3000);
 }
 
@@ -140,8 +138,6 @@ export function displayError(message) {
     // Die neue Funktion mit dem Typ 'error' aufrufen
     showSnackbar(message, 'error');
 }
-
-// In src/ui-mobile/ui.js
 
 /**
  * Zeigt eine Fortschritts-Snackbar am unteren Bildschirmrand an.
@@ -196,6 +192,11 @@ export function displayProgress(current, total, cancelCallback) {
     }
 }
 
+export function displayWarning(message) {
+    console.log('displayWarning called with:', message);
+    showSnackbar(message, 'warning');
+}
+
 /**
  * Versteckt die Fortschritts-Snackbar.
  */
@@ -224,5 +225,20 @@ export function updateOfflineIndicator() {
         offlineIndicator.classList.remove('show');
     } else {
         offlineIndicator.classList.add('show');
+    }
+}
+
+export function toggleLoading(show, message = 'Loading...') {
+    const loadingElement = document.getElementById('loading');
+    if (!loadingElement) return;
+
+    const textElement = loadingElement.querySelector('p');
+    if (show) {
+        if (textElement) {
+            textElement.textContent = message;
+        }
+        loadingElement.style.display = 'flex';
+    } else {
+        loadingElement.style.display = 'none';
     }
 }

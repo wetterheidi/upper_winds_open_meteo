@@ -1,5 +1,8 @@
-// == Project: Skydiving Weather and Jump Planner ==
-// == Constants and Global Variables ==
+// =================================================================
+//  1. IMPORTE & GLOBALE VARIABLEN
+// =================================================================
+// Beschreibung: Alle Abhängigkeiten von anderen Modulen werden hier zentral geladen.
+
 import { AppState } from '../core/state.js';
 import { Utils } from '../core/utils.js';
 import { Settings, getInterpolationStep, setAppContext } from '../core/settings.js';
@@ -9,33 +12,25 @@ import * as EventManager from './eventManager.js';
 import * as Coordinates from './coordinates.js';
 import * as JumpPlanner from '../core/jumpPlanner.js';
 import * as mapManager from './mapManager.js';
-import { loadGpxTrack, loadCsvTrackUTC, exportToGpx, saveRecordedTrack } from '../core/trackManager.js'; // ÄNDERN SIE DIESE ZEILE
+import { saveRecordedTrack } from '../core/trackManager.js';
 import * as weatherManager from '../core/weatherManager.js';
 import { cacheVisibleTiles, cacheTilesForDIP } from '../core/tileCache.js';
 import { getSliderValue, displayError, displayMessage, displayProgress, hideProgress, applyDeviceSpecificStyles } from './ui.js';
 import * as AutoupdateManager from '../core/autoupdateManager.js';
 import { DateTime } from 'luxon';
 import * as displayManager from './displayManager.js';
-import * as liveTrackingManager from '../core/liveTrackingManager.js'; // <-- DIESE ZEILE HINZUFÜGEN
+import * as liveTrackingManager from '../core/liveTrackingManager.js';
 import * as EnsembleManager from '../core/ensembleManager.js';
 import * as LocationManager from '../core/locationManager.js';
-
-export const getTemperatureUnit = () => Settings.getValue('temperatureUnit', 'C');
-export const getHeightUnit = () => Settings.getValue('heightUnit', 'm');
-export const getWindSpeedUnit = () => Settings.getValue('windUnit', 'kt');
-export const getCoordinateFormat = () => Settings.getValue('coordFormat', 'Decimal');
+import { getCapacitor } from '../core/capacitor-adapter.js';
+import { Directory } from '@capacitor/filesystem';
 
 "use strict";
 
+// Eine debounced-Version der Sprungberechnung, um bei schnellen UI-Änderungen
+// die Performance zu schonen.
 export const debouncedCalculateJump = Utils.debounce(calculateJump, 300);
-export const getDownloadFormat = () => Settings.getValue('downloadFormat', 'csv');
 
-// == Tile caching ==
-Utils.setErrorHandler(displayError);
-Utils.setMessageHandler(displayMessage);
-Utils.handleMessage = displayMessage;
-
-// == Map Initialization and Interaction ==
 L.Control.Coordinates = L.Control.extend({
     options: { position: 'bottomleft' },
     onAdd: function (map) {
@@ -52,21 +47,288 @@ L.Control.Coordinates = L.Control.extend({
         this._container.innerHTML = content;
     }
 });
-let elevationCache = new Map();
-let qfeCache = new Map();
-let lastTapTime = 0;
 
-// == Weather Data Handling ==
+// =================================================================
+//  2. EINSTELLUNGS-HELFER (GETTER)
+// =================================================================
+// Beschreibung: Kurze und klare Funktionen, um auf häufig genutzte
+// Benutzereinstellungen zuzugreifen. Das vermeidet wiederholten Code.
+
+Utils.setErrorHandler(displayError);
+Utils.setMessageHandler(displayMessage);
+Utils.handleMessage = displayMessage;
+
+export const getTemperatureUnit = () => Settings.getValue('temperatureUnit', 'C');
+export const getHeightUnit = () => Settings.getValue('heightUnit', 'm');
+export const getWindSpeedUnit = () => Settings.getValue('windUnit', 'kt');
+export const getCoordinateFormat = () => Settings.getValue('coordFormat', 'Decimal');
+export const getDownloadFormat = () => Settings.getValue('downloadFormat', 'csv');
+
+// =================================================================
+//  3. INITIALISIERUNG
+// =================================================================
+// Beschreibung: Diese Funktionen werden beim Start der Anwendung aufgerufen,
+// um den Grundzustand herzustellen, die UI zu initialisieren und
+// die Event-Listener zu registrieren.
 
 /**
- * Holt die Benutzereingaben für die Höhenlimits, stößt die Berechnung des Mittelwindes
- * in 'utils.js' an und schreibt das formatierte Ergebnis in das entsprechende HTML-Element.
- * Dient als Controller-Funktion für die Mittelwind-Anzeige.
+ * Initialisiert den Hauptzustand der Anwendung. Setzt den App-Kontext (Web vs. Mobile),
+ * lädt die Einstellungen und stellt sicher, dass Features (wie der Planner)
+ * basierend auf dem Speicher freigeschaltet sind.
+ */
+function initializeApp() {
+    setAppContext(true);
+    Settings.initialize();
+
+    // VEREINFACHT: Diese Zeilen sind nicht mehr nötig. Landing Pattern und Calculate Jump
+    // sind in der mobilen App immer "verfügbar", da der Planner-Tab immer da ist.
+    // Settings.state.isLandingPatternUnlocked = true;
+    // Settings.state.isCalculateJumpUnlocked = true;
+
+    // Die Prüfung für den Planner bleibt bestehen, falls Sie sie zukünftig nutzen wollen.
+    Settings.state.isPlannerUnlocked = Settings.state.unlockedFeatures.planner;
+    console.log('Initial unlock status for planner:', Settings.state.isPlannerUnlocked);
+
+    if (AppState.isInitialized) {
+        return;
+    }
+    AppState.isInitialized = true;
+    console.log('Initializing app');
+}
+
+/**
+ * Füllt alle UI-Elemente (Dropdowns, Checkboxen, Input-Felder) mit den Werten,
+ * die aus dem Speicher geladen wurden. Stellt den letzten Zustand der UI wieder her.
+ */
+function initializeUIElements() {
+    applySettingToInput('canopySpeed', Settings.state.userSettings.canopySpeed);
+    applySettingToInput('descentRate', Settings.state.userSettings.descentRate);
+    applySettingToInput('legHeightDownwind', Settings.state.userSettings.legHeightDownwind);
+    applySettingToInput('legHeightBase', Settings.state.userSettings.legHeightBase);
+    applySettingToInput('legHeightFinal', Settings.state.userSettings.legHeightFinal);
+    applySettingToInput('customLandingDirectionLL', Settings.state.userSettings.customLandingDirectionLL);
+    applySettingToInput('customLandingDirectionRR', Settings.state.userSettings.customLandingDirectionRR);
+    applySettingToInput('lowerLimit', Settings.state.userSettings.lowerLimit);
+    applySettingToInput('upperLimit', Settings.state.userSettings.upperLimit);
+    applySettingToInput('openingAltitude', Settings.state.userSettings.openingAltitude);
+    applySettingToInput('exitAltitude', Settings.state.userSettings.exitAltitude);
+    applySettingToInput('safetyHeight', Settings.state.userSettings.safetyHeight);
+    applySettingToSelect('interpStep', Settings.state.userSettings.interpStep);
+    applySettingToInput('aircraftSpeedKt', Settings.state.userSettings.aircraftSpeedKt);
+    applySettingToInput('jumpRunTrackOffset', Settings.state.userSettings.jumpRunTrackOffset);
+    applySettingToInput('numberOfJumpers', Settings.state.userSettings.numberOfJumpers);
+    applySettingToCheckbox('showTableCheckbox', Settings.state.userSettings.showTable);
+    applySettingToCheckbox('showJumpRunTrack', Settings.state.userSettings.showJumpRunTrack);
+    applySettingToCheckbox('showCanopyAreaCheckbox', Settings.state.userSettings.showCanopyArea);
+    applySettingToCheckbox('showExitAreaCheckbox', Settings.state.userSettings.showExitArea);
+    applySettingToCheckbox('showCutAwayFinder', Settings.state.userSettings.showCutAwayFinder);
+    Settings.state.userSettings.isCustomJumpRunDirection = Settings.state.userSettings.isCustomJumpRunDirection || false;
+
+    const customLL = document.getElementById('customLandingDirectionLL');
+    const customRR = document.getElementById('customLandingDirectionRR');
+    if (customLL && Settings.state.userSettings.customLandingDirectionLL !== '' && !isNaN(Settings.state.userSettings.customLandingDirectionLL)) {
+        customLL.value = Settings.state.userSettings.customLandingDirectionLL;
+    }
+    if (customRR && Settings.state.userSettings.customLandingDirectionRR !== '' && !isNaN(Settings.state.userSettings.customLandingDirectionRR)) {
+        customRR.value = Settings.state.userSettings.customLandingDirectionRR;
+    }
+    const separation = JumpPlanner.getSeparationFromTAS(Settings.state.userSettings.aircraftSpeedKt);
+    applySettingToInput('jumperSeparation', separation);
+    Settings.state.userSettings.jumperSeparation = separation;
+    Settings.save();
+
+    const jumpMasterCheckbox = document.getElementById('showJumpMasterLine');
+    if (jumpMasterCheckbox) {
+        jumpMasterCheckbox.disabled = !Settings.state.userSettings.trackPosition;
+        jumpMasterCheckbox.style.opacity = jumpMasterCheckbox.disabled ? '0.5' : '1';
+        jumpMasterCheckbox.title = jumpMasterCheckbox.disabled ? 'Enable Live Tracking to use Jump Master Line' : '';
+    }
+
+    const directionSpan = document.getElementById('jumpRunTrackDirection');
+    if (directionSpan) directionSpan.textContent = '-';
+
+    // Explizit den Slider auf die aktuelle Stunde setzen
+    const slider = document.getElementById('timeSlider');
+    if (slider) {
+        const currentUtcHour = new Date().getUTCHours();
+        slider.value = currentUtcHour;
+        console.log(`[App] Initialized timeSlider to current UTC hour: ${currentUtcHour}`);
+    }
+
+    updateUIState();
+}
+
+// =================================================================
+//  4. KERNLOGIK & "CONTROLLER"-FUNKTIONEN
+// =================================================================
+// Beschreibung: Dies sind die zentralen Funktionen, die Berechnungen anstoßen
+// und den Zustand der Anwendung verändern. Sie werden typischerweise durch
+// Benutzerinteraktionen (Events) aufgerufen.
+
+/**
+ * Orchestriert die gesamte Berechnung und Visualisierung des Sprungablaufs.
+ * Diese Funktion ist ein zentraler Controller: Sie sammelt Daten aus der UI und dem AppState,
+ * ruft die Berechnungslogik im `jumpPlanner` auf und weist den `mapManager` an,
+ * die Ergebnisse (Exit-Kreise, Schirmfahrt-Bereiche etc.) auf der Karte zu zeichnen.
+ */
+export function calculateJump() {
+    const index = getSliderValue();
+    const interpStep = getInterpolationStep();
+    const heightUnit = getHeightUnit();
+    let openingAltitude = Settings.state.userSettings.openingAltitude;
+    let exitAltitude = Settings.state.userSettings.exitAltitude;
+
+    if (heightUnit === 'ft') {
+        openingAltitude = Utils.convertFeetToMeters(openingAltitude);
+        exitAltitude = Utils.convertFeetToMeters(exitAltitude);
+    }
+
+    if (!Settings.state.userSettings.calculateJump) {
+        mapManager.drawJumpVisualization(null);
+        mapManager.drawCutAwayVisualization(null);
+        return;
+    }
+
+    if (!AppState.weatherData || !AppState.lastLat || !AppState.lastLng) {
+        mapManager.drawJumpVisualization(null);
+        return;
+    }
+
+    // Daten einmal zentral vorbereiten
+    const interpolatedData = weatherManager.interpolateWeatherData(
+        AppState.weatherData, // Das Haupt-Wetterdatenobjekt
+        index,
+        interpStep,
+        Math.round(AppState.lastAltitude),
+        heightUnit
+    );
+
+
+    const visualizationData = {
+        exitCircles: [],
+        canopyCircles: [],
+        canopyLabels: []
+    };
+
+    // --- EXIT AREA ---
+    if (Settings.state.userSettings.showExitArea) {
+        const exitResult = JumpPlanner.calculateExitCircle(interpolatedData); // Korrekt
+        if (exitResult) {
+            // Der hellgrüne Kreis (gesamter möglicher Bereich)
+            visualizationData.exitCircles.push({
+                center: [exitResult.greenLat, exitResult.greenLng],
+                radius: exitResult.greenRadius,
+                color: 'green',
+                fillColor: 'green',
+                fillOpacity: 0.2,
+                weight: 2
+            });
+
+            // Erstellen des Tooltip-Inhalts
+            const tooltipContent = `
+                Exit areas calculated with:<br>
+                Throw/Drift: ${Number.isFinite(exitResult.freeFallDirection) ? Math.round(exitResult.freeFallDirection) : 'N/A'}° ${Number.isFinite(exitResult.freeFallDistance) ? Math.round(exitResult.freeFallDistance) : 'N/A'} m<br>
+                Free Fall Time: ${exitResult.freeFallTime != null && !isNaN(exitResult.freeFallTime) ? Math.round(exitResult.freeFallTime) : 'N/A'} sec
+            `;
+
+            // Der dunkelgrüne Kreis (Bereich bis zum Downwind) bekommt den Tooltip
+            visualizationData.exitCircles.push({
+                center: [exitResult.darkGreenLat, exitResult.darkGreenLng],
+                radius: exitResult.darkGreenRadius,
+                color: 'darkgreen',
+                fillColor: 'darkgreen',
+                fillOpacity: 0.2,
+                weight: 2,
+                tooltip: tooltipContent
+            });
+        }
+    }
+
+    // --- CANOPY AREA ---
+    if (Settings.state.userSettings.showCanopyArea) {
+        const canopyResult = JumpPlanner.calculateCanopyCircles(interpolatedData); // Korrekt
+        if (canopyResult) {
+            const redCenter = Utils.calculateNewCenter(canopyResult.redLat, canopyResult.redLng, canopyResult.displacementFull, canopyResult.directionFull);
+            visualizationData.canopyCircles.push({
+                center: redCenter,
+                radius: canopyResult.radiusFull,
+                color: 'red',
+                weight: 2,
+                opacity: 0.8,
+                fillOpacity: 0
+            });
+
+            canopyResult.additionalBlueRadii.forEach((radius, i) => {
+                const center = Utils.calculateNewCenter(canopyResult.blueLat, canopyResult.blueLng, canopyResult.additionalBlueDisplacements[i], canopyResult.additionalBlueDirections[i]);
+                visualizationData.canopyCircles.push({
+                    center: center,
+                    radius: radius,
+                    color: 'blue',
+                    weight: 1,
+                    fillColor: 'blue',
+                    fillOpacity: 0.1,
+                    opacity: 1 // Rand ist voll sichtbar
+                });
+                visualizationData.canopyLabels.push({
+                    center: center,
+                    radius: radius,
+                    text: `${Math.round(canopyResult.additionalBlueUpperLimits[i])}m`
+                });
+            });
+        }
+    }
+
+    mapManager.drawJumpVisualization(visualizationData);
+
+    // --- CUT-AWAY-FINDER ---
+    let cutawayDrawData = null;
+    if (Settings.state.userSettings.showCutAwayFinder && AppState.cutAwayLat !== null) {
+        const result = JumpPlanner.calculateCutAway(interpolatedData); // Daten übergeben
+        if (result) {
+            cutawayDrawData = {
+                center: result.center,
+                radius: result.radius,
+                tooltipContent: result.tooltipContent
+            };
+        }
+    }
+    mapManager.drawCutAwayVisualization(cutawayDrawData);
+}
+export function calculateJumpRunTrack() {
+    if (!Settings.state.userSettings.showJumpRunTrack || !Settings.state.userSettings.calculateJump || !AppState.weatherData || !AppState.lastLat || !AppState.lastLng) {
+        console.log('Skipping calculateJumpRunTrack: conditions not met');
+        return null;
+    }
+    console.log('Calculating jump run track...');
+    displayManager.updateJumpRunTrackDisplay();
+    const trackData = JumpPlanner.jumpRunTrack();
+    return trackData;
+}
+export function validateLegHeights(final, base, downwind) {
+    const finalVal = parseInt(final.value) || 100;
+    const baseVal = parseInt(base.value) || 200;
+    const downwindVal = parseInt(downwind.value) || 300;
+
+    if (baseVal <= finalVal) {
+        Utils.handleError('Base leg must start higher than final leg.');
+        return false;
+    }
+    if (downwindVal <= baseVal) {
+        Utils.handleError('Downwind leg must start higher than base leg.');
+        return false;
+    }
+    return true;
+}
+
+/**
+ * Berechnet den Mittelwind für die in der UI definierten Höhenschichten.
+ * Liest die Werte aus den Input-Feldern, holt die interpolierten Wetterdaten
+ * und ruft die Berechnungslogik in `Utils.js` auf. Das Ergebnis wird
+ * direkt in das entsprechende UI-Element geschrieben.
  */
 export function calculateMeanWind() {
     console.log('Calculating mean wind with model:', document.getElementById('modelSelect').value, 'weatherData:', AppState.weatherData);
 
-    // KORREKTUR: Deklarationen an den Anfang der Funktion verschoben
     const refLevel = Settings.getValue('refLevel', 'AGL');
     const heightUnit = getHeightUnit();
     const windSpeedUnit = getWindSpeedUnit();
@@ -102,10 +364,7 @@ export function calculateMeanWind() {
 
     if (refLevel === 'AMSL' && upperLimit < baseHeight) {
         Utils.handleError(`The entire selected layer (${Math.round(Utils.convertHeight(lowerLimit, heightUnit))}-${Math.round(Utils.convertHeight(upperLimit, heightUnit))} ${heightUnit}) is below the terrain altitude of ${Math.round(Utils.convertHeight(baseHeight, heightUnit))} ${heightUnit}.`);
-
-        // NEU: Setze das Ergebnisfeld auf einen klaren Status
         document.getElementById('meanWindResult').innerHTML = 'Mean wind: N/A (Layer is below ground)';
-
         return;
     }
 
@@ -113,17 +372,17 @@ export function calculateMeanWind() {
         // Die Benachrichtigung bleibt erhalten
         Utils.handleMessage(`Note: Lower limit adjusted to terrain altitude (${Math.round(Utils.convertHeight(baseHeight, heightUnit))} ${heightUnit}) as it cannot be below ground level.`);
 
-        // NEU: Berechne den korrigierten Wert in der aktuell angezeigten Einheit
+        //Berechne den korrigierten Wert in der aktuell angezeigten Einheit
         const correctedLowerLimit = Math.round(Utils.convertHeight(baseHeight, heightUnit));
 
-        // NEU: Aktualisiere das Input-Feld in der UI
+        //Aktualisiere das Input-Feld in der UI
         applySettingToInput('lowerLimit', correctedLowerLimit);
 
-        // NEU: Speichere die Korrektur in den Settings
+        //Speichere die Korrektur in den Settings
         Settings.state.userSettings.lowerLimit = correctedLowerLimit;
         Settings.save();
 
-        // NEU: Setze die lokale Variable für die laufende Berechnung auf den korrekten Wert (in Metern)
+        //Setze die lokale Variable für die laufende Berechnung auf den korrekten Wert (in Metern)
         lowerLimit = baseHeight;
     }
 
@@ -153,107 +412,10 @@ export function calculateMeanWind() {
     document.getElementById('meanWindResult').innerHTML = result;
     console.log('Calculated Mean Wind:', result, 'u:', meanWind[2], 'v:', meanWind[3]);
 }
-/**
- * Erstellt eine Textdatei mit den Wetterdaten im ausgewählten Format und stößt den Download an.
- * Passt die Datenaufbereitung je nach gewähltem Format an (HEIDIS, ATAK, etc.).
- * @param {string} format - Das gewünschte Ausgabeformat (z.B. 'HEIDIS', 'ATAK').
- */
-export function downloadTableAsAscii(format) {
-    if (!AppState.weatherData || !AppState.weatherData.time) {
-        Utils.handleError('No weather data available to download.');
-        return;
-    }
-
-    const index = document.getElementById('timeSlider').value || 0;
-    const model = document.getElementById('modelSelect').value.toUpperCase();
-    const time = Utils.formatTime(AppState.weatherData.time[index]).replace(' ', '_');
-    const filename = `${time}_${model}_${format}.txt`;
-
-    const formatRequirements = {
-        'ATAK': { interpStep: 1000, heightUnit: 'ft', refLevel: 'AGL', windUnit: 'kt' },
-        'Windwatch': { interpStep: 100, heightUnit: 'ft', refLevel: 'AGL', windUnit: 'km/h' },
-        'HEIDIS': { interpStep: 100, heightUnit: 'm', refLevel: 'AGL', temperatureUnit: 'C', windUnit: 'm/s' },
-        'Customized': {}
-    };
-
-    const requirements = formatRequirements[format] || {};
-
-    const exportSettings = {
-        interpStep: requirements.interpStep || getInterpolationStep(),
-        heightUnit: requirements.heightUnit || Settings.getValue('heightUnit', 'radio', 'm'),
-        refLevel: requirements.refLevel || document.querySelector('input[name="refLevel"]:checked')?.value || 'AGL',
-        windUnit: requirements.windUnit || Settings.getValue('windUnit', 'radio', 'kt'),
-        temperatureUnit: requirements.temperatureUnit || Settings.getValue('temperatureUnit', 'radio', 'C')
-    };
-
-    const interpolatedData = weatherManager.interpolateWeatherData(
-        AppState.weatherData,
-        index,
-        exportSettings.interpStep,
-        Math.round(AppState.lastAltitude),
-        exportSettings.heightUnit
-    );
-
-    if (!interpolatedData || interpolatedData.length === 0) {
-        Utils.handleError('No interpolated data available to download.');
-        return;
-    }
-
-    let content = '';
-    let header = '';
-
-    switch (format) {
-        case 'ATAK':
-            header = `Alt Dir Spd\n${exportSettings.heightUnit}${exportSettings.refLevel}\n`;
-            break;
-        case 'Windwatch':
-            const elevationFt = Math.round(Utils.convertHeight(AppState.lastAltitude, 'ft'));
-            header = `Version 1.0, ID = 9999999999\n${time}, Ground Level: ${elevationFt} ft\nWindsond ${model}\nAGL[ft] Wind[°] Speed[km/h]\n`;
-            break;
-        case 'HEIDIS':
-        case 'Customized':
-        default:
-            header = `h(${exportSettings.heightUnit}${exportSettings.refLevel}) p(hPa) T(${exportSettings.temperatureUnit}) Dew(${exportSettings.temperatureUnit}) Dir(°) Spd(${exportSettings.windUnit}) RH(%)\n`;
-            break;
-    }
-    content += header;
-
-    interpolatedData.forEach(data => {
-        const displayHeight = Math.round(data.displayHeight);
-        const displayDir = Math.round(data.dir);
-        const displaySpd = Utils.convertWind(data.spd, exportSettings.windUnit, 'km/h');
-        const formattedSpd = Number.isFinite(displaySpd) ? (exportSettings.windUnit === 'bft' ? Math.round(displaySpd) : displaySpd.toFixed(1)) : 'N/A';
-
-        if (format === 'ATAK' || format === 'Windwatch') {
-            content += `${displayHeight} ${displayDir} ${Math.round(displaySpd)}\n`;
-        } else {
-            const displayPressure = data.pressure === 'N/A' ? 'N/A' : data.pressure.toFixed(1);
-            const displayTemp = Utils.convertTemperature(data.temp, exportSettings.temperatureUnit);
-            const formattedTemp = displayTemp === 'N/A' ? 'N/A' : displayTemp.toFixed(1);
-            const displayDew = Utils.convertTemperature(data.dew, exportSettings.temperatureUnit);
-            const formattedDew = displayDew === 'N/A' ? 'N/A' : displayDew.toFixed(1);
-            const formattedRH = data.rh === 'N/A' ? 'N/A' : Math.round(data.rh);
-            content += `${displayHeight} ${displayPressure} ${formattedTemp} ${formattedDew} ${displayDir} ${formattedSpd} ${formattedRH}\n`;
-        }
-    });
-
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
-}
-
-// == Autoupdate Functionality ==
 
 /**
- * Aktualisiert die Wetterdaten auf die aktuell laufende Stunde.
- * Wird vom autoupdateManager aufgerufen, um sicherzustellen, dass die Anzeige
- * immer die relevanteste Vorhersage zeigt.
+ * Holt die Wetterdaten für die aktuell eingestellte Stunde, wenn die Autoupdate-Funktion
+ * aktiv ist. Stößt danach alle notwendigen UI-Updates und Neuberechnungen an.
  */
 export async function updateToCurrentHour() {
     if (!AppState.lastLat || !AppState.lastLng) {
@@ -309,141 +471,114 @@ export async function updateToCurrentHour() {
     }
 }
 
-// == Landing Pattern, Jump and Free Fall Stuff ==
-
 /**
- * Orchestriert die gesamte Berechnung und Visualisierung des Sprungablaufs.
- * Holt die notwendigen Daten aus dem AppState, ruft die Berechnungslogik
- * im jumpPlanner auf und weist den mapManager an, die Ergebnisse (Exit-Kreise,
- * Canopy-Bereiche, Cut-Away-Punkt) auf der Karte zu zeichnen.
+ * Erstellt eine Textdatei mit den Wetterdaten im ausgewählten Format und stößt den Download an.
  */
-export function calculateJump() {
-    const index = getSliderValue();
-    const interpStep = getInterpolationStep();
-    const heightUnit = getHeightUnit();
-    let openingAltitude = Settings.state.userSettings.openingAltitude;
-    let exitAltitude = Settings.state.userSettings.exitAltitude;
-
-    // NEU: Konvertiere die Höhen in Meter, bevor sie an die Physik-Engine gehen
-    if (heightUnit === 'ft') {
-        openingAltitude = Utils.convertFeetToMeters(openingAltitude);
-        exitAltitude = Utils.convertFeetToMeters(exitAltitude);
-    }
-
-    if (!Settings.state.isCalculateJumpUnlocked || !Settings.state.userSettings.calculateJump) {
-        mapManager.drawJumpVisualization(null);
-        mapManager.drawCutAwayVisualization(null);
+export async function downloadTableAsAscii(format) {
+    if (!AppState.weatherData || !AppState.weatherData.time) {
+        Utils.handleError('No weather data available to download.');
         return;
     }
 
-    if (!AppState.weatherData || !AppState.lastLat || !AppState.lastLng) {
-        mapManager.drawJumpVisualization(null);
-        return;
-    }
+    // --- Datenvorbereitung (unverändert) ---
+    const index = document.getElementById('timeSlider').value || 0;
+    const model = document.getElementById('modelSelect').value.toUpperCase();
+    const time = Utils.formatTime(AppState.weatherData.time[index]).replace(' ', '_');
+    const filename = `${time}_${model}_${format}.txt`;
 
-    // Daten einmal zentral vorbereiten
-    const sliderIndex = getSliderValue();
+    const formatRequirements = {
+        'ATAK': { interpStep: 1000, heightUnit: 'ft', refLevel: 'AGL', windUnit: 'kt' },
+        'Windwatch': { interpStep: 100, heightUnit: 'ft', refLevel: 'AGL', windUnit: 'km/h' },
+        'HEIDIS': { interpStep: 100, heightUnit: 'm', refLevel: 'AGL', temperatureUnit: 'C', windUnit: 'm/s' },
+        'Customized': {}
+    };
+    const requirements = formatRequirements[format] || {};
+    const exportSettings = {
+        interpStep: requirements.interpStep || getInterpolationStep(),
+        heightUnit: requirements.heightUnit || Settings.getValue('heightUnit', 'm'),
+        refLevel: requirements.refLevel || Settings.getValue('refLevel', 'AGL'),
+        windUnit: requirements.windUnit || Settings.getValue('windUnit', 'kt'),
+        temperatureUnit: requirements.temperatureUnit || Settings.getValue('temperatureUnit', 'C')
+    };
     const interpolatedData = weatherManager.interpolateWeatherData(
-        AppState.weatherData, // Das Haupt-Wetterdatenobjekt
-        index,
-        interpStep,
-        Math.round(AppState.lastAltitude),
-        heightUnit
+        AppState.weatherData, index, exportSettings.interpStep, Math.round(AppState.lastAltitude), exportSettings.heightUnit
     );
 
-
-    const visualizationData = {
-        exitCircles: [],
-        canopyCircles: [],
-        canopyLabels: []
-    };
-
-    // --- EXIT AREA ---
-    if (Settings.state.userSettings.showExitArea) {
-        const exitResult = JumpPlanner.calculateExitCircle(interpolatedData); // Korrekt
-        if (exitResult) {
-            // Der hellgrüne Kreis (gesamter möglicher Bereich)
-            visualizationData.exitCircles.push({
-                center: [exitResult.greenLat, exitResult.greenLng],
-                radius: exitResult.greenRadius,
-                color: 'green',
-                fillColor: 'green',
-                fillOpacity: 0.2,
-                weight: 2
-            });
-
-            // Erstellen des Tooltip-Inhalts
-            const tooltipContent = `
-                Exit areas calculated with:<br>
-                Throw/Drift: ${Number.isFinite(exitResult.freeFallDirection) ? Math.round(exitResult.freeFallDirection) : 'N/A'}° ${Number.isFinite(exitResult.freeFallDistance) ? Math.round(exitResult.freeFallDistance) : 'N/A'} m<br>
-                Free Fall Time: ${exitResult.freeFallTime != null && !isNaN(exitResult.freeFallTime) ? Math.round(exitResult.freeFallTime) : 'N/A'} sec
-            `;
-
-            // Der dunkelgrüne Kreis (Bereich bis zum Downwind) bekommt den Tooltip
-            visualizationData.exitCircles.push({
-                center: [exitResult.darkGreenLat, exitResult.darkGreenLng],
-                radius: exitResult.darkGreenRadius,
-                color: 'darkgreen',
-                fillColor: 'darkgreen',
-                fillOpacity: 0.2,
-                weight: 2,
-                tooltip: tooltipContent // Hier wird der Tooltip hinzugefügt
-            });
-        }
+    if (!interpolatedData || interpolatedData.length === 0) {
+        Utils.handleError('No interpolated data available to download.');
+        return;
     }
 
-    // --- CANOPY AREA ---
-    if (Settings.state.userSettings.showCanopyArea) {
-        const canopyResult = JumpPlanner.calculateCanopyCircles(interpolatedData); // Korrekt
-        if (canopyResult) {
-            const redCenter = Utils.calculateNewCenter(canopyResult.redLat, canopyResult.redLng, canopyResult.displacementFull, canopyResult.directionFull);
-            visualizationData.canopyCircles.push({
-                center: redCenter,
-                radius: canopyResult.radiusFull,
-                color: 'red',
-                weight: 2,
-                opacity: 0.8,
-                fillOpacity: 0
-            });
-
-            canopyResult.additionalBlueRadii.forEach((radius, i) => {
-                const center = Utils.calculateNewCenter(canopyResult.blueLat, canopyResult.blueLng, canopyResult.additionalBlueDisplacements[i], canopyResult.additionalBlueDirections[i]);
-                visualizationData.canopyCircles.push({
-                    center: center,
-                    radius: radius,
-                    color: 'blue',
-                    weight: 1,
-                    fillColor: 'blue',
-                    fillOpacity: 0.1,
-                    opacity: 1 // Rand ist voll sichtbar
-                });
-                visualizationData.canopyLabels.push({
-                    center: center,
-                    radius: radius,
-                    text: `${Math.round(canopyResult.additionalBlueUpperLimits[i])}m`
-                });
-            });
-        }
+    let content = '';
+    let header = '';
+    // --- Header-Erstellung (unverändert) ---
+    switch (format) {
+        case 'ATAK':
+            header = `Alt\tDir\tSpd\n${exportSettings.heightUnit}${exportSettings.refLevel}\tdeg\tkts\n`;
+            break;
+        case 'Windwatch':
+            const elevationFt = Math.round(Utils.convertHeight(AppState.lastAltitude, 'ft'));
+            header = `Version 1.0, ID = 9999999999\n${time}, Ground Level: ${elevationFt} ft\nWindsond ${model}\nAGL[ft] Wind[°] Speed[km/h]\n`;
+            break;
+        default:
+            header = `h(${exportSettings.heightUnit}${exportSettings.refLevel}) p(hPa) T(${exportSettings.temperatureUnit}) Dew(${exportSettings.temperatureUnit}) Dir(°) Spd(${exportSettings.windUnit}) RH(%)\n`;
+            break;
     }
-
-    mapManager.drawJumpVisualization(visualizationData);
-
-    // --- CUT-AWAY-FINDER ---
-    let cutawayDrawData = null;
-    if (Settings.state.userSettings.showCutAwayFinder && AppState.cutAwayLat !== null) {
-        const result = JumpPlanner.calculateCutAway(interpolatedData); // Daten übergeben
-        if (result) {
-            // Erstelle die "Bauanleitung" für den Cut-Away-Kreis.
-            cutawayDrawData = {
-                center: result.center,
-                radius: result.radius,
-                tooltipContent: result.tooltipContent
-            };
+    content += header;
+    // --- Inhalts-Erstellung (unverändert) ---
+    interpolatedData.forEach(data => {
+        const displayHeight = Math.round(data.displayHeight);
+        const displayDir = Math.round(data.dir);
+        const displaySpd = Utils.convertWind(data.spd, exportSettings.windUnit, 'km/h');
+        const formattedSpd = Number.isFinite(displaySpd) ? (exportSettings.windUnit === 'bft' ? Math.round(displaySpd) : displaySpd.toFixed(1)) : 'N/A';
+        if (format === 'ATAK' || format === 'Windwatch') {
+            content += `${displayHeight}\t${displayDir}\t${Math.round(displaySpd)}\n`;
+        } else {
+            const displayPressure = data.pressure === 'N/A' ? 'N/A' : data.pressure.toFixed(1);
+            const displayTemp = Utils.convertTemperature(data.temp, exportSettings.temperatureUnit);
+            const formattedTemp = displayTemp === 'N/A' ? 'N/A' : displayTemp.toFixed(1);
+            const displayDew = Utils.convertTemperature(data.dew, exportSettings.temperatureUnit);
+            const formattedDew = displayDew === 'N/A' ? 'N/A' : displayDew.toFixed(1);
+            const formattedRH = data.rh === 'N/A' ? 'N/A' : Math.round(data.rh);
+            content += `${displayHeight} ${displayPressure} ${formattedTemp} ${formattedDew} ${displayDir} ${formattedSpd} ${formattedRH}\n`;
         }
+    });
+
+    // --- NEUE SPEICHERLOGIK ---
+    try {
+        const { Filesystem, isNative } = await getCapacitor();
+        if (isNative && Filesystem) {
+            // Native mobile App: Verwende die Filesystem API
+            await Filesystem.writeFile({
+                path: filename,
+                data: content,
+                directory: Directory.Documents, // Speichert im "Dokumente"-Ordner
+                encoding: 'utf8'
+            });
+            Utils.handleMessage(`File saved: ${filename}`);
+        } else {
+            // Fallback für Webbrowser
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }
+    } catch (error) {
+        console.error("Error saving file:", error);
+        Utils.handleError("Could not save file.");
     }
-    // Übergib die fertige Bauanleitung an den Zeichner (auch wenn sie 'null' ist, um alte Kreise zu löschen).
-    mapManager.drawCutAwayVisualization(cutawayDrawData);
 }
+
+/**
+ * Setzt die manuell eingegebene Richtung für den Jump Run Track zurück
+ * und löst bei Bedarf eine Neuzeichnung mit der berechneten Richtung aus.
+ * @param {boolean} [triggerUpdate=true] - Wenn true, wird der Track sofort neu gezeichnet.
+ */
 export function resetJumpRunDirection(triggerUpdate = true) {
     // 1. Gespeicherten Wert in den Settings löschen
     Settings.state.userSettings.customJumpRunDirection = null;
@@ -461,39 +596,106 @@ export function resetJumpRunDirection(triggerUpdate = true) {
         displayManager.updateJumpRunTrackDisplay();
     }
 }
-export function calculateJumpRunTrack() {
-    if (!Settings.state.userSettings.showJumpRunTrack || !Settings.state.userSettings.calculateJump || !AppState.weatherData || !AppState.lastLat || !AppState.lastLng) {
-        console.log('Skipping calculateJumpRunTrack: conditions not met');
-        return null;
-    }
-    console.log('Calculating jump run track...');
-    displayManager.updateJumpRunTrackDisplay();
-    const trackData = JumpPlanner.jumpRunTrack();
-    return trackData;
-}
-export function validateLegHeights(final, base, downwind) {
-    const finalVal = parseInt(final.value) || 100;
-    const baseVal = parseInt(base.value) || 200;
-    const downwindVal = parseInt(downwind.value) || 300;
 
-    if (baseVal <= finalVal) {
-        Utils.handleError('Base leg must start higher than final leg.');
-        return false;
+// =================================================================
+//  5. UI-UPDATE & "VIEW"-FUNKTIONEN
+// =================================================================
+// Beschreibung: Diese Funktionen sind dafür zuständig, die Benutzeroberfläche
+// zu aktualisieren, wenn sich Daten oder der Zustand der Anwendung ändern.
+
+/**
+ * Aktualisiert die gesamte Wetteranzeige, nachdem neue Wetterdaten geladen wurden.
+ * Setzt den Zeit-Slider, die Wettertabelle, das Marker-Popup und die Modell-Infos
+ * auf den neuesten Stand und stößt Neuberechnungen für den Sprungablauf an.
+ * @param {object} newWeatherData - Das neu von der API abgerufene Wetterdatenobjekt.
+ * @param {number|null} [preservedIndex=null] - Der Index des Sliders, der beibehalten werden soll.
+ */
+export async function updateUIWithNewWeatherData(newWeatherData, preservedIndex = null) {
+    AppState.weatherData = newWeatherData;
+    const slider = document.getElementById('timeSlider');
+
+    if (!slider) return;
+
+    const findLastValidDataIndex = (weatherData) => {
+        const dataArray = weatherData?.temperature_2m;
+        if (!dataArray || dataArray.length === 0) return 0;
+        for (let i = dataArray.length - 1; i >= 0; i--) {
+            if (dataArray[i] !== null && dataArray[i] !== undefined) {
+                return i;
+            }
+        }
+        return 0;
+    };
+
+    const lastValidIndex = findLastValidDataIndex(newWeatherData);
+    slider.max = lastValidIndex;
+    slider.disabled = slider.max <= 0;
+
+    // Wenn ein Index übergeben wurde und dieser gültig ist, verwenden wir ihn.
+    // Ansonsten verwenden wir das Standardverhalten (aktuelle Stunde).
+    if (preservedIndex !== null && preservedIndex <= lastValidIndex) {
+        slider.value = preservedIndex;
+        console.log(`Slider restored to preserved index: ${preservedIndex}`);
+    } else {
+        const currentUtcHour = new Date().getUTCHours();
+        if (currentUtcHour <= lastValidIndex) {
+            slider.value = currentUtcHour;
+        } else {
+            slider.value = lastValidIndex;
+        }
+        console.log(`Slider set to default (current hour or max): ${slider.value}`);
     }
-    if (downwindVal <= baseVal) {
-        Utils.handleError('Downwind leg must start higher than base leg.');
-        return false;
+
+    await displayManager.updateWeatherDisplay(slider.value, 'weather-table-container', 'selectedTime');
+    await displayManager.refreshMarkerPopup();
+    if (AppState.lastAltitude !== 'N/A') {
+        calculateMeanWind();
     }
-    return true;
+    displayManager.updateModelInfoPopup();
+    Settings.updateModelRunInfo(AppState.lastModelRun, AppState.lastLat, AppState.lastLng);
+
+    console.log("Model changed. Triggering recalculation of jump parameters.");
+    displayManager.updateLandingPatternDisplay();
+    if (Settings.state.userSettings.calculateJump) {
+        calculateJump();
+    }
+    if (Settings.state.userSettings.showJumpRunTrack) {
+        displayManager.updateJumpRunTrackDisplay();
+    }
 }
 
-// == Live Tracking ==
+/**
+ * Aktualisiert den Zustand von UI-Elementen, die voneinander abhängig sind.
+ * (z.B. Deaktivieren von Checkboxen, wenn eine übergeordnete Funktion ausgeschaltet ist).
+ */
+export function updateUIState() {
+    const info = document.getElementById('info');
+    if (info) info.style.display = Settings.state.userSettings.showTable ? 'block' : 'none';
+    const customLL = document.getElementById('customLandingDirectionLL');
+    const customRR = document.getElementById('customLandingDirectionRR');
+    const showJumpRunTrackCheckbox = document.getElementById('showJumpRunTrack');
+    const showExitAreaCheckbox = document.getElementById('showExitAreaCheckbox');
+    if (customLL) customLL.disabled = Settings.state.userSettings.landingDirection !== 'LL';
+    if (customRR) customRR.disabled = Settings.state.userSettings.landingDirection !== 'RR';
+    if (showJumpRunTrackCheckbox) showJumpRunTrackCheckbox.disabled = false; // Keine Sperre durch calculateJump
+    if (showExitAreaCheckbox) showExitAreaCheckbox.disabled = false; // Keine Sperre durch calculateJump
+    Settings.updateUnitLabels();
+}
+
+/**
+ * Aktualisiert die Jump-Master-Linie auf der Karte und die Daten im Jumpmaster-Panel.
+ * Wird bei jeder neuen GPS-Position aufgerufen, wenn das Live-Tracking aktiv ist.
+ * @param {object|null} [positionData=null] - Die neuesten Positionsdaten vom GPS.
+ */
 export function updateJumpMasterLineAndPanel(positionData = null) {
+    console.log('[main-mobile] Event "tracking:positionUpdated" received. Data:', event.detail);
+
     // 1. Grundvoraussetzung: Ist Live-Tracking überhaupt aktiv?
     // Wenn kein Live-Marker da ist, ist Tracking aus -> alles aufräumen und beenden.
     if (!AppState.liveMarker) {
         mapManager.clearJumpMasterLine();
         mapManager.hideLivePositionControl();
+        updateJumpMasterDashboard(null);
         return;
     }
 
@@ -501,7 +703,7 @@ export function updateJumpMasterLineAndPanel(positionData = null) {
     const livePos = AppState.liveMarker.getLatLng();
     if (!livePos) return; // Sicherheitsabfrage
 
-    const data = positionData || { // Fallback, falls keine neuen Daten übergeben wurden
+    const dataForUpdate = positionData || {
         latitude: livePos.lat,
         longitude: livePos.lng,
         speedMs: AppState.lastSmoothedSpeedMs,
@@ -530,7 +732,7 @@ export function updateJumpMasterLineAndPanel(positionData = null) {
         if (targetPos) {
             const distance = AppState.map.distance(livePos, targetPos);
             const bearing = Math.round(Utils.calculateBearing(livePos.lat, livePos.lng, targetPos.lat, targetPos.lng));
-            const speedMs = data.speedMs > 1 ? data.speedMs : 1;
+            const speedMs = dataForUpdate.speedMs > 1 ? dataForUpdate.speedMs : 1;
             const tot = Math.round(distance / speedMs);
             jumpMasterLineData = { distance, bearing, tot, target: targetName };
             mapManager.drawJumpMasterLine(livePos, targetPos);
@@ -540,9 +742,7 @@ export function updateJumpMasterLineAndPanel(positionData = null) {
         mapManager.clearJumpMasterLine();
     }
 
-    // 4. Das Panel IMMER aktualisieren, solange das Tracking läuft
-    // Die updateLivePositionControl-Funktion im mapManager ist schlau genug, die JML-Infos
-    // nur anzuzeigen, wenn jumpMasterLineData nicht null ist.
+    // SAMMELT ALLE BENÖTIGTEN EINSTELLUNGEN
     const settingsForPanel = {
         heightUnit: getHeightUnit(),
         effectiveWindUnit: getWindSpeedUnit() === 'bft' ? 'kt' : getWindSpeedUnit(),
@@ -550,12 +750,96 @@ export function updateJumpMasterLineAndPanel(positionData = null) {
         refLevel: Settings.getValue('refLevel', 'AGL')
     };
 
-    mapManager.updateLivePositionControl({
-        ...data,
+    // ERSTELLT DAS FINALE DATENOBJEKT FÜR ALLE UI-KOMPONENTEN
+    const fullUpdateData = {
+        ...dataForUpdate,
         showJumpMasterLine: showJML,
-        jumpMasterLineData, // ist entweder ein Objekt mit Daten oder null
-        ...settingsForPanel
-    });
+        jumpMasterLineData,
+        ...settingsForPanel // Fügt die Einheiten hinzu
+    };
+
+    // Aktualisiert das Jumpmaster-Dashboard (inkl. der Detailansicht)
+    updateJumpMasterDashboard(fullUpdateData);
+
+    // Aktualisiert das Live-Position-Overlay auf der Karte
+    mapManager.updateLivePositionControl(fullUpdateData);
+}
+
+function updateJumpMasterDashboard(data) {
+    const dashboard = document.getElementById('jumpmaster-view-mobile');
+    if (!dashboard) return;
+
+    if (!data) {
+        const jmlDetails = document.getElementById('jumpmaster-line-details-mobile');
+        if (jmlDetails) jmlDetails.classList.add('hidden');
+        return;
+    }
+
+    // --- Block 1: Haupt-Dashboard ---
+    const mainElements = {
+        coordsEl: document.getElementById('dashboard-jm-coords-mobile'),
+        altitudeEl: document.getElementById('dashboard-jm-altitude-mobile'),
+        directionEl: document.getElementById('dashboard-jm-direction-mobile'),
+        speedEl: document.getElementById('dashboard-jm-speed-mobile'),
+        accuracyEl: document.getElementById('dashboard-jm-accuracy-mobile')
+    };
+    
+    // Prüfen, ob alle Hauptelemente vorhanden sind
+    if (Object.values(mainElements).some(el => !el)) {
+        console.error("Jumpmaster Dashboard: Ein oder mehrere Haupt-UI-Elemente wurden nicht gefunden. Bitte überprüfen Sie die IDs.");
+        return;
+    }
+
+    const { heightUnit, effectiveWindUnit, coordFormat, refLevel, latitude, longitude, deviceAltitude, accuracy, speedMs, direction, showJumpMasterLine, jumpMasterLineData } = data;
+    
+    // Hauptwerte aktualisieren...
+    const coords = Utils.convertCoords(latitude, longitude, coordFormat);
+    mainElements.coordsEl.textContent = (coordFormat === 'MGRS') ? coords.lat : `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+    mainElements.altitudeEl.textContent = deviceAltitude !== null ? `${Math.round(Utils.convertHeight(deviceAltitude - (refLevel === 'AGL' ? AppState.lastAltitude || 0 : 0), heightUnit))} ${heightUnit}` : "N/A";
+    mainElements.directionEl.textContent = `${direction}°`;
+    const displaySpeed = Utils.convertWind(speedMs, effectiveWindUnit, 'm/s');
+    mainElements.speedEl.textContent = `${Number.isFinite(displaySpeed) ? displaySpeed.toFixed(1) : 'N/A'} ${effectiveWindUnit}`;
+    mainElements.accuracyEl.textContent = `± ${Math.round(Utils.convertHeight(accuracy, heightUnit))} ${heightUnit}`;
+
+    // --- Block 2: JML Toggle ---
+    const dipBtn = document.getElementById('jml-target-dip-btn');
+    const harpBtn = document.getElementById('jml-target-harp-btn');
+    if (dipBtn && harpBtn) {
+        dipBtn.classList.toggle('active', Settings.state.userSettings.jumpMasterLineTarget === 'DIP');
+        harpBtn.classList.toggle('active', Settings.state.userSettings.jumpMasterLineTarget === 'HARP');
+        harpBtn.style.opacity = AppState.harpMarker ? 1 : 0.5;
+    }
+
+    // --- Block 3: JML Detailansicht ---
+    const jmlDetails = document.getElementById('jumpmaster-line-details-mobile');
+    if (jmlDetails) {
+        jmlDetails.classList.toggle('hidden', !showJumpMasterLine);
+
+        if (showJumpMasterLine && jumpMasterLineData) {
+            // DETAILLIERTE PRÜFUNG: Jedes Element einzeln prüfen und loggen, falls es fehlt.
+            const detailElements = {
+                targetLabel: document.getElementById('dashboard-jm-target-label-mobile'),
+                bearingEl: document.getElementById('dashboard-jm-bearing-mobile'),
+                distanceEl: document.getElementById('dashboard-jm-distance-mobile'),
+                totEl: document.getElementById('dashboard-jm-tot-mobile')
+            };
+
+            let allDetailsFound = true;
+            for (const key in detailElements) {
+                if (!detailElements[key]) {
+                    console.error(`Jumpmaster Dashboard Fehler: Das Detail-Element für '${key}' (erwartete ID: ${key.replace('El', '-mobile').replace('targetLabel', 'dashboard-jm-target-label-mobile')}) wurde nicht in der index.html gefunden!`);
+                    allDetailsFound = false;
+                }
+            }
+            
+            if (allDetailsFound) {
+                detailElements.targetLabel.textContent = `JML to ${jumpMasterLineData.target}`;
+                detailElements.bearingEl.textContent = `${jumpMasterLineData.bearing}°`;
+                detailElements.distanceEl.textContent = `${Math.round(Utils.convertHeight(jumpMasterLineData.distance, heightUnit))} ${heightUnit}`;
+                detailElements.totEl.textContent = jumpMasterLineData.tot < 1200 ? `X - ${jumpMasterLineData.tot} s` : 'N/A';
+            }
+        }
+    }
 }
 
 /**
@@ -581,19 +865,31 @@ function updateDashboardPanel(data) {
         altitudeEl.textContent = displayAltitude;
         altitudeUnitEl.textContent = `${heightUnit} abv DIP`;
 
-        // Range-Berechnung
         if (rangeEl && rangeUnitEl && descentRateMps > 0.1) {
             const timeToGround = altitudeAGL / descentRateMps;
             const rangeMeters = speedMs * timeToGround;
 
             let displayRange;
             let displayUnit;
-            if (rangeMeters > 1000) {
-                displayRange = (rangeMeters / 1000).toFixed(1);
-                displayUnit = 'km';
-            } else {
-                displayRange = Math.round(rangeMeters);
-                displayUnit = 'm';
+
+            // KORREKTUR: Berücksichtigt jetzt 'ft' und 'mi'
+            if (heightUnit === 'ft') {
+                const rangeFeet = Utils.convertHeight(rangeMeters, 'ft');
+                if (rangeFeet > 5280) { // Wenn über eine Meile
+                    displayRange = (rangeFeet / 5280).toFixed(1);
+                    displayUnit = 'mi';
+                } else {
+                    displayRange = Math.round(rangeFeet);
+                    displayUnit = 'ft';
+                }
+            } else { // Standard 'm'
+                if (rangeMeters > 1000) {
+                    displayRange = (rangeMeters / 1000).toFixed(1);
+                    displayUnit = 'km';
+                } else {
+                    displayRange = Math.round(rangeMeters);
+                    displayUnit = 'm';
+                }
             }
             rangeEl.textContent = displayRange;
             rangeUnitEl.textContent = displayUnit;
@@ -602,10 +898,7 @@ function updateDashboardPanel(data) {
         }
     }
 
-    // --- Speed, Direction, Bearing, Distance, Glide Ratios (unverändert) ---
-    // Der Rest der Funktion bleibt exakt so, wie er im vorherigen Schritt war.
-    // ... (Code für Speed, Direction, Bearing, Distance & Glide Ratios hier einfügen) ...
-    // Speed
+    // --- Speed, Direction, Bearing, Distance, Glide Ratios ---
     const speedEl = document.getElementById('dashboard-speed');
     const speedUnitEl = document.getElementById('dashboard-speed-unit');
     const windUnit = getWindSpeedUnit();
@@ -615,13 +908,11 @@ function updateDashboardPanel(data) {
         speedUnitEl.textContent = windUnit;
     }
 
-    // Direction
     const directionEl = document.getElementById('dashboard-direction');
     if (direction !== 'N/A' && directionEl) {
         directionEl.textContent = Math.round(direction);
     }
 
-    // Bearing und Distance to DIP
     const dipMarker = AppState.currentMarker;
     const bearingEl = document.getElementById('dashboard-bearing');
     const distanceEl = document.getElementById('dashboard-distance');
@@ -635,12 +926,25 @@ function updateDashboardPanel(data) {
 
         let displayDistance;
         let displayDistUnit;
-        if (distanceMeters > 1000) {
-            displayDistance = (distanceMeters / 1000).toFixed(1);
-            displayDistUnit = 'km';
-        } else {
-            displayDistance = Math.round(distanceMeters);
-            displayDistUnit = 'm';
+
+        // KORREKTUR: Berücksichtigt jetzt 'ft' und 'mi' für die Distanz
+        if (heightUnit === 'ft') {
+            const distanceFeet = Utils.convertHeight(distanceMeters, 'ft');
+            if (distanceFeet > 5280) { // Wenn über eine Meile
+                displayDistance = (distanceFeet / 5280).toFixed(1);
+                displayDistUnit = 'mi';
+            } else {
+                displayDistance = Math.round(distanceFeet);
+                displayDistUnit = 'ft';
+            }
+        } else { // Standard 'm'
+            if (distanceMeters > 1000) {
+                displayDistance = (distanceMeters / 1000).toFixed(1);
+                displayDistUnit = 'km';
+            } else {
+                displayDistance = Math.round(distanceMeters);
+                displayDistUnit = 'm';
+            }
         }
 
         distanceEl.textContent = displayDistance;
@@ -650,13 +954,12 @@ function updateDashboardPanel(data) {
         bearingEl.textContent = bearing;
     }
 
-    // Gleitverhältnisse
+    // ... (Der restliche Teil der Funktion für Gleitverhältnisse bleibt unverändert)
     const glideRequiredEl = document.getElementById('dashboard-glide-required');
     const glideCurrentEl = document.getElementById('dashboard-glide-current');
     let requiredRatio = null;
     let currentRatio = null;
 
-    // 1. Erforderliches Gleitverhältnis zum DIP berechnen
     if (dipMarker && distanceMeters !== null && glideRequiredEl) {
         const dipAltitude = AppState.lastAltitude || 0;
         const altitudeDifference = deviceAltitude - dipAltitude;
@@ -668,7 +971,6 @@ function updateDashboardPanel(data) {
         }
     }
 
-    // 2. Aktuelles Gleitverhältnis berechnen
     if (glideCurrentEl && speedMs > 0 && descentRateMps > 0.1) {
         currentRatio = speedMs / descentRateMps;
         glideCurrentEl.textContent = currentRatio.toFixed(1);
@@ -676,232 +978,70 @@ function updateDashboardPanel(data) {
         glideCurrentEl.textContent = "---";
     }
 
-    // 3. Farbe basierend auf dem Vergleich der Gleitverhältnisse setzen
     if (glideCurrentEl && requiredRatio !== null && currentRatio !== null) {
-        // Toleranzbereich definieren (z.B. 10% des erforderlichen Wertes)
         const tolerance = 0.10 * requiredRatio;
-
-        // CSS-Klassen entfernen, bevor die neue gesetzt wird
         glideCurrentEl.classList.remove('glide-good', 'glide-ok', 'glide-bad');
-
         if (currentRatio > requiredRatio + tolerance) {
-            // Deutlich besser -> Grün
             glideCurrentEl.classList.add('glide-good');
         } else if (currentRatio < requiredRatio - tolerance) {
-            // Deutlich schlechter -> Rot
             glideCurrentEl.classList.add('glide-bad');
         } else {
-            // Innerhalb der Toleranz -> Gelb
             glideCurrentEl.classList.add('glide-ok');
         }
     } else if (glideCurrentEl) {
-        // Falls keine Berechnung möglich ist, alle Farbklassen entfernen
         glideCurrentEl.classList.remove('glide-good', 'glide-ok', 'glide-bad');
     }
 }
 
-// == UI and Event Handling ==
-function initializeApp() {
-    setAppContext(true);
-    Settings.initialize();
-    // Synchronize global variables with Settings.state.unlockedFeatures
-    Settings.state.isLandingPatternUnlocked = true;
-    Settings.state.isCalculateJumpUnlocked = true;
-    Settings.state.isPlannerUnlocked = Settings.state.unlockedFeatures.planner; // Hinzufügen
-    console.log('Initial unlock status:', {
-        isLandingPatternUnlocked: Settings.state.isLandingPatternUnlocked,
-        isCalculateJumpUnlocked: Settings.state.isCalculateJumpUnlocked,
-        isPlannerUnlocked: Settings.state.isPlannerUnlocked // Hinzufügen
-    });
-
-    if (AppState.isInitialized) {
-        console.log('App already initialized, skipping');
-        return;
-    }
-    AppState.isInitialized = true;
-    console.log('Initializing app');
-}
-function initializeUIElements() {
-    applySettingToInput('canopySpeed', Settings.state.userSettings.canopySpeed);
-    applySettingToInput('descentRate', Settings.state.userSettings.descentRate);
-    applySettingToInput('legHeightDownwind', Settings.state.userSettings.legHeightDownwind);
-    applySettingToInput('legHeightBase', Settings.state.userSettings.legHeightBase);
-    applySettingToInput('legHeightFinal', Settings.state.userSettings.legHeightFinal);
-    applySettingToInput('customLandingDirectionLL', Settings.state.userSettings.customLandingDirectionLL);
-    applySettingToInput('customLandingDirectionRR', Settings.state.userSettings.customLandingDirectionRR);
-    applySettingToInput('lowerLimit', Settings.state.userSettings.lowerLimit);
-    applySettingToInput('upperLimit', Settings.state.userSettings.upperLimit);
-    applySettingToInput('openingAltitude', Settings.state.userSettings.openingAltitude);
-    applySettingToInput('exitAltitude', Settings.state.userSettings.exitAltitude);
-    applySettingToInput('safetyHeight', Settings.state.userSettings.safetyHeight);
-    applySettingToSelect('interpStep', Settings.state.userSettings.interpStep);
-    applySettingToInput('aircraftSpeedKt', Settings.state.userSettings.aircraftSpeedKt);
-    applySettingToInput('jumpRunTrackOffset', Settings.state.userSettings.jumpRunTrackOffset);
-    applySettingToInput('numberOfJumpers', Settings.state.userSettings.numberOfJumpers);
-    applySettingToCheckbox('showTableCheckbox', Settings.state.userSettings.showTable);
-    applySettingToCheckbox('showJumpRunTrack', Settings.state.userSettings.showJumpRunTrack);
-    applySettingToCheckbox('showCanopyAreaCheckbox', Settings.state.userSettings.showCanopyArea);
-    applySettingToCheckbox('showExitAreaCheckbox', Settings.state.userSettings.showExitArea);
-    applySettingToCheckbox('showCutAwayFinder', Settings.state.userSettings.showCutAwayFinder);
-    Settings.state.userSettings.isCustomJumpRunDirection = Settings.state.userSettings.isCustomJumpRunDirection || false;
-
-    const customLL = document.getElementById('customLandingDirectionLL');
-    const customRR = document.getElementById('customLandingDirectionRR');
-    if (customLL && Settings.state.userSettings.customLandingDirectionLL !== '' && !isNaN(Settings.state.userSettings.customLandingDirectionLL)) {
-        customLL.value = Settings.state.userSettings.customLandingDirectionLL;
-    }
-    if (customRR && Settings.state.userSettings.customLandingDirectionRR !== '' && !isNaN(Settings.state.userSettings.customLandingDirectionRR)) {
-        customRR.value = Settings.state.userSettings.customLandingDirectionRR;
-    }
-    const separation = JumpPlanner.getSeparationFromTAS(Settings.state.userSettings.aircraftSpeedKt);
-    applySettingToInput('jumperSeparation', separation);
-    Settings.state.userSettings.jumperSeparation = separation;
-    Settings.save();
-
-    const jumpMasterCheckbox = document.getElementById('showJumpMasterLine');
-    if (jumpMasterCheckbox) {
-        jumpMasterCheckbox.disabled = !Settings.state.userSettings.trackPosition;
-        jumpMasterCheckbox.style.opacity = jumpMasterCheckbox.disabled ? '0.5' : '1';
-        jumpMasterCheckbox.title = jumpMasterCheckbox.disabled ? 'Enable Live Tracking to use Jump Master Line' : '';
-    }
-
-    const directionSpan = document.getElementById('jumpRunTrackDirection');
-    if (directionSpan) directionSpan.textContent = '-';
-    updateUIState();
-}
-export function updateUIState() {
-    const info = document.getElementById('info');
-    if (info) info.style.display = Settings.state.userSettings.showTable ? 'block' : 'none';
-    const customLL = document.getElementById('customLandingDirectionLL');
-    const customRR = document.getElementById('customLandingDirectionRR');
-    const showJumpRunTrackCheckbox = document.getElementById('showJumpRunTrack');
-    const showExitAreaCheckbox = document.getElementById('showExitAreaCheckbox');
-    if (customLL) customLL.disabled = Settings.state.userSettings.landingDirection !== 'LL';
-    if (customRR) customRR.disabled = Settings.state.userSettings.landingDirection !== 'RR';
-    if (showJumpRunTrackCheckbox) showJumpRunTrackCheckbox.disabled = false; // Keine Sperre durch calculateJump
-    if (showExitAreaCheckbox) showExitAreaCheckbox.disabled = false; // Keine Sperre durch calculateJump
-    Settings.updateUnitLabels();
-}
-
+// =================================================================
+//  6. EVENT LISTENER SETUP
+// =================================================================
+// Beschreibung: Hier werden alle Event-Listener der Anwendung registriert.
+// Diese Funktionen werden nur einmal beim Start in `DOMContentLoaded` aufgerufen.
+// Sie lauschen auf Benutzerinteraktionen und System-Events und rufen die
+// entsprechenden Controller-Funktionen auf.
 
 /**
- * Aktualisiert den AppState und die UI-Komponenten (insb. den Slider)
- * basierend auf neu geladenen Wetterdaten.
- * @param {object} newWeatherData Die neu von der API abgerufenen Wetterdaten.
+ * Registriert alle globalen Event-Listener für die Anwendung.
+ * Dies umfasst benutzerdefinierte Events wie 'map:moved' oder 'ui:settingChanged'
+ * sowie DOM-Events, die von verschiedenen UI-Komponenten ausgelöst werden.
  */
-export async function updateUIWithNewWeatherData(newWeatherData, preservedIndex = null) {
-    AppState.weatherData = newWeatherData;
-    const slider = document.getElementById('timeSlider');
-
-    if (!slider) return;
-
-    // ... (Logik für lastValidIndex bleibt unverändert) ...
-    const findLastValidDataIndex = (weatherData) => {
-        const dataArray = weatherData?.temperature_2m;
-        if (!dataArray || dataArray.length === 0) return 0;
-        for (let i = dataArray.length - 1; i >= 0; i--) {
-            if (dataArray[i] !== null && dataArray[i] !== undefined) {
-                return i;
-            }
-        }
-        return 0;
-    };
-
-    const lastValidIndex = findLastValidDataIndex(newWeatherData);
-    slider.max = lastValidIndex;
-    slider.disabled = slider.max <= 0;
-
-    // NEUE LOGIK:
-    // Wenn ein Index übergeben wurde und dieser gültig ist, verwenden wir ihn.
-    // Ansonsten verwenden wir das Standardverhalten (aktuelle Stunde).
-    if (preservedIndex !== null && preservedIndex <= lastValidIndex) {
-        slider.value = preservedIndex;
-        console.log(`Slider restored to preserved index: ${preservedIndex}`);
-    } else {
-        const currentUtcHour = new Date().getUTCHours();
-        if (currentUtcHour <= lastValidIndex) {
-            slider.value = currentUtcHour;
-        } else {
-            slider.value = lastValidIndex;
-        }
-        console.log(`Slider set to default (current hour or max): ${slider.value}`);
-    }
-
-    // ... (restliche Funktion bleibt unverändert)
-    await displayManager.updateWeatherDisplay(slider.value, 'weather-table-container', 'selectedTime');
-    await displayManager.refreshMarkerPopup();
-    if (AppState.lastAltitude !== 'N/A') {
-        calculateMeanWind();
-    }
-    displayManager.updateModelInfoPopup();
-    Settings.updateModelRunInfo(AppState.lastModelRun, AppState.lastLat, AppState.lastLng);
-
-    console.log("Model changed. Triggering recalculation of jump parameters.");
-    displayManager.updateLandingPatternDisplay();
-    if (Settings.state.userSettings.calculateJump) {
-        calculateJump();
-    }
-    if (Settings.state.userSettings.showJumpRunTrack) {
-        displayManager.updateJumpRunTrackDisplay();
-    }
-}
-
-// == Setup values ==
-function applySettingToCheckbox(id, value) {
-    const element = document.getElementById(id);
-    if (element) element.checked = value;
-}
-function applySettingToSelect(id, value) {
-    const element = document.getElementById(id);
-    if (element) element.value = value;
-    else console.warn(`Element ${id} not found`);
-}
-export function applySettingToInput(id, value) {
-    const element = document.getElementById(id);
-    if (element) element.value = value;
-}
-export function setInputValueSilently(id, value) {
-    const input = document.getElementById(id);
-    if (input) {
-        const lastValue = input.value;
-        input.value = value;
-        console.log(`Set ${id} silently:`, { old: lastValue, new: value });
-    }
-}
-function applySettingToRadio(name, value) {
-    const radio = document.querySelector(`input[name="${name}"][value="${value}"]`);
-    if (radio) radio.checked = true;
-    else console.warn(`Radio ${name} with value ${value} not found`);
-}
 function setupAppEventListeners() {
     console.log("[App] Setting up application event listeners...");
 
     document.addEventListener('map:moved', () => {
         console.log('[main-mobile] Map has moved or zoomed. Updating visualizations based on new view.');
 
-        // Die komplette Logik aus dem alten mapMoveHandler kommt hierher:
         const currentZoom = AppState.map.getZoom();
 
         if (Settings.state.userSettings.calculateJump && AppState.weatherData && AppState.lastLat) {
-            if (currentZoom >= UI_DEFAULTS.MIN_ZOOM && currentZoom <= UI_DEFAULTS.MAX_ZOOM) {
-                calculateJump();
+            if (currentZoom < UI_DEFAULTS.MIN_ZOOM || currentZoom > UI_DEFAULTS.MAX_ZOOM) {
+                mapManager.drawJumpVisualization(null); // This hides the circles
             } else {
-                mapManager.drawJumpVisualization(null);
+                // This is the missing part: redraw the circles when zooming back in
+                calculateJump();
             }
         }
         if (Settings.state.userSettings.showJumpRunTrack) {
-            if (currentZoom >= UI_DEFAULTS.MIN_ZOOM && currentZoom <= UI_DEFAULTS.MAX_ZOOM) {
-                displayManager.updateJumpRunTrackDisplay();
+            if (currentZoom < UI_DEFAULTS.MIN_ZOOM || currentZoom > UI_DEFAULTS.MAX_ZOOM) {
+                mapManager.drawJumpRunTrack(null); // JRT ausblenden
             } else {
-                mapManager.drawJumpRunTrack(null);
+                // NEU: Wenn der Zoom wieder im gültigen Bereich ist, den JRT neu zeichnen.
+                displayManager.updateJumpRunTrackDisplay();
             }
         }
         if (Settings.state.userSettings.showLandingPattern) {
             displayManager.updateLandingPatternDisplay();
         }
-
-        // Die Caching-Logik kann hier ebenfalls angestoßen werden, falls gewünscht,
-        // oder separat bleiben, wie im eventManager gezeigt.
+        if (Settings.state.userSettings.selectedEnsembleModels.length > 0) {
+            if (currentZoom < UI_DEFAULTS.MIN_ZOOM || currentZoom > UI_DEFAULTS.MAX_ZOOM) {
+                // `clearEnsembleVisualizations` aus dem `ensembleManager` aufrufen.
+                EnsembleManager.clearEnsembleVisualizations();
+            } else {
+                // `processAndVisualizeEnsemble` mit dem aktuellen Slider-Wert aufrufen, um die Visualisierungen neu zu zeichnen.
+                EnsembleManager.processAndVisualizeEnsemble(getSliderValue(), getInterpolationStep());
+            }
+        }
         cacheVisibleTiles({
             map: AppState.map,
             baseMaps: AppState.baseMaps,
@@ -921,8 +1061,6 @@ function setupAppEventListeners() {
         const { lat, lng, source } = event.detail;
         console.log(`App: Event 'map:location_selected' von '${source}' empfangen.`);
 
-        // --- HIER IST JETZT DIE GESAMTE ANWENDUNGSLOGIK ---
-
         // 1. Marker-Position im AppState und UI aktualisieren
         AppState.lastLat = lat;
         AppState.lastLng = lng;
@@ -934,24 +1072,23 @@ function setupAppEventListeners() {
         // Bewege den Marker (falls die Aktion nicht schon vom Marker selbst kam)
         if (source !== 'marker_drag') {
             // Annahme: Sie haben eine moveMarker-Funktion im mapManager
-            // Dies ist ein Befehl von app.js an mapManager.js
             mapManager.moveMarker(lat, lng);
         }
 
         // 2. Kernlogik ausführen
-        resetJumpRunDirection(true); // resetJumpRunDirection muss in app.js sein
-        await weatherManager.fetchWeatherForLocation(lat, lng); // fetchWeather... muss in app.js sein
+        resetJumpRunDirection(true);
+        await weatherManager.fetchWeatherForLocation(lat, lng);
 
         if (Settings.state.userSettings.calculateJump) {
-            calculateJump(); // calculateJump muss in app.js sein
+            calculateJump();
             JumpPlanner.calculateCutAway();
         }
 
-        mapManager.recenterMap(true); // recenterMap ist jetzt im mapManager
+        mapManager.recenterMap(true);
         AppState.isManualPanning = false;
 
         // 3. UI-Updates anstoßen, die von den neuen Daten abhängen
-        displayManager.updateJumpRunTrackDisplay(); // update... Funktionen sind jetzt im mapManager
+        displayManager.updateJumpRunTrackDisplay();
         displayManager.updateLandingPatternDisplay();
     });
 
@@ -991,9 +1128,6 @@ function setupAppEventListeners() {
             const { lat, lng, timestamp, historicalDate, summary } = event.detail;
             console.log('[main-mobile] Event "track:loaded" empfangen, starte Aktionen.');
 
-            // =======================================================
-            // HIER DIE NEUE LOGIK EINFÜGEN
-            // =======================================================
             if (historicalDate) {
                 console.log("Historischer Track geladen, deaktiviere Autoupdate.");
                 const autoupdateCheckbox = document.getElementById('autoupdateCheckbox');
@@ -1007,9 +1141,6 @@ function setupAppEventListeners() {
                 Settings.save();
                 Utils.handleMessage("Autoupdate disabled for historical track viewing.");
             }
-            // =======================================================
-            // ENDE DER NEUEN LOGIK
-            // =======================================================
 
             await mapManager.createOrUpdateMarker(lat, lng);
             const newWeatherData = await weatherManager.fetchWeatherForLocation(lat, lng, timestamp);
@@ -1067,6 +1198,7 @@ function setupAppEventListeners() {
     });
 
     document.addEventListener('tracking:positionUpdated', (event) => {
+        console.log('[main-mobile] Event "tracking:positionUpdated" received. Data:', event.detail);
         updateJumpMasterLineAndPanel(event.detail);
         updateDashboardPanel(event.detail);
         if (AppState.isAutoRecording) {
@@ -1075,6 +1207,12 @@ function setupAppEventListeners() {
     });
 
     document.addEventListener('jml:targetChanged', () => {
+        updateJumpMasterLineAndPanel();
+    });
+
+    document.addEventListener('harp:updated', () => {
+        console.log('[App] HARP has been updated, triggering JRT and JM dashboard recalculation.');
+        displayManager.updateJumpRunTrackDisplay();
         updateJumpMasterLineAndPanel();
     });
 
@@ -1136,7 +1274,7 @@ function setupAppEventListeners() {
                         }
                     });
                 }
-                // Ihr Wunsch: GPX-Tooltips aktualisieren (Logik bleibt hier, wird bei Bedarf getriggert)
+                //GPX-Tooltips aktualisieren (Logik bleibt hier, wird bei Bedarf getriggert)
                 if (AppState.gpxLayer && AppState.gpxPoints.length > 0) {
                     const groundAltitude = AppState.lastAltitude !== 'N/A' && !isNaN(AppState.lastAltitude) ? parseFloat(AppState.lastAltitude) : null;
                     const windUnit = getWindSpeedUnit();
@@ -1161,7 +1299,6 @@ function setupAppEventListeners() {
                         }
                     });
                 }
-            // Fall-through: Nach den spezifischen Aktionen sollen auch die allgemeinen Updates für diese Einheit laufen.
 
             case 'windUnit':
             case 'refLevel':
@@ -1208,11 +1345,9 @@ function setupAppEventListeners() {
                 displayManager.updateJumpRunTrackDisplay();
                 break;
 
-            // --- NEU: Eigener Fall für die Cut-Away-Höhe ---
+            //Eigener Fall für die Cut-Away-Höhe ---
             case 'cutAwayAltitude':
                 if (AppState.weatherData && AppState.cutAwayLat !== null) {
-                    // calculateJump() ruft intern auch die Neuberechnung des Cut-Aways auf.
-                    // Dies ist der sauberste Weg, ohne Code zu duplizieren.
                     calculateJump();
                 }
                 break;
@@ -1237,10 +1372,24 @@ function setupAppEventListeners() {
 
             // ... (die restlichen cases bleiben wie im vorherigen Schritt) ...
             case 'jumpRunTrackDirection':
+                // Offsets bei manueller Richtungsänderung zurücksetzen
+                Settings.state.userSettings.jumpRunTrackOffset = 0;
+                Settings.state.userSettings.jumpRunTrackForwardOffset = 0;
+                setInputValueSilently('jumpRunTrackOffset', 0);
+                setInputValueSilently('jumpRunTrackForwardOffset', 0);
+                Settings.save(); // Wichtig: Geänderte Offsets speichern
+
+                if (AppState.weatherData) {
+                    displayManager.updateJumpRunTrackDisplay();
+                    calculateJump(); // Exit Circles SOFORT neu berechnen
+                }
+                break;
+
             case 'jumpRunTrackOffset':
             case 'jumpRunTrackForwardOffset':
                 if (AppState.weatherData) {
                     displayManager.updateJumpRunTrackDisplay();
+                    calculateJump(); // Auch bei Offset-Änderung Kreise neu berechnen
                 }
                 break;
 
@@ -1308,8 +1457,6 @@ function setupAppEventListeners() {
             // oder einen neu eingegebenen benutzerdefinierten Wert.
             displayManager.updateJumpRunTrackDisplay();
         } else {
-            // Wenn die Box DEAKTIVIERT wird:
-
             // 1. Die Visualisierung von der Karte entfernen.
             mapManager.drawJumpRunTrack(null);
 
@@ -1393,7 +1540,7 @@ function setupAppEventListeners() {
                     const newWeatherData = await weatherManager.fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, null);
 
                     if (newWeatherData) {
-                        // NEU: Rufe die zentrale Funktion auf, die alle spezifischen Updates durchführt
+                        //Rufe die zentrale Funktion auf, die alle spezifischen Updates durchführt
                         await updateUIWithNewWeatherData(newWeatherData);
                     }
                 } catch (error) {
@@ -1410,11 +1557,20 @@ function setupAppEventListeners() {
         }
     });
 
+    document.addEventListener('ui:landingPatternEnabled', () => {
+        console.log('[main-mobile] Landing pattern enabled, updating display.');
+        displayManager.updateLandingPatternDisplay();
+    });
+
+    document.addEventListener('ui:landingPatternDisabled', () => {
+        console.log('[main-mobile] Landing pattern disabled, clearing display.');
+        mapManager.drawLandingPattern(null); // Ruft die Funktion zum Löschen des Musters auf
+    });
+
     document.addEventListener('ui:invalidInput', (e) => {
         const { id, defaultValue } = e.detail;
         console.log(`[main-mobile] Received invalid input for ${id}. Resetting UI to ${defaultValue}.`);
 
-        // Hier wird die Funktion aufgerufen, die vorher im eventManager stand
         applySettingToInput(id, defaultValue);
     });
 
@@ -1431,7 +1587,7 @@ function setupAppEventListeners() {
             // Führe alle notwendigen UI-Updates aus
             await displayManager.updateWeatherDisplay(getSliderValue(), 'weather-table-container', 'selectedTime');
 
-            // NEU: Ruft die Funktion auf, die die Labels aktualisiert
+            //Ruft die Funktion auf, die die Labels aktualisiert
             if (key === 'heightUnit' || key === 'refLevel') {
                 Settings.updateUnitLabels();
             }
@@ -1498,8 +1654,18 @@ function setupAppEventListeners() {
         }
     });
 
+    document.addEventListener('track:point_added', () => {
+        if (AppState.recordedTrackPoints.length > 1) {
+            mapManager.drawRecordedTrack(AppState.recordedTrackPoints);
+        }
+    });
+
+    document.addEventListener('sensor:disarmed', () => {
+        // ... bestehender Code
+        mapManager.clearRecordedTrack(); // Linie entfernen
+    });
+
     document.addEventListener('sensor:landing_detected', () => {
-        // ... (bestehende Logik)
         saveRecordedTrack();
         AppState.isAutoRecording = false;
 
@@ -1513,6 +1679,11 @@ function setupAppEventListeners() {
 
 }
 
+// =================================================================
+//  7. ANWENDUNGS-STARTPUNKT
+// =================================================================
+// Beschreibung: Der Code in diesem Block wird ausgeführt, sobald das
+// HTML-Dokument vollständig geladen ist. Er startet die gesamte Anwendung.
 document.addEventListener('DOMContentLoaded', async () => {
     initializeApp();
     initializeUIElements();
@@ -1521,22 +1692,131 @@ document.addEventListener('DOMContentLoaded', async () => {
     Settings.state.userSettings.showTable = true;
     applyDeviceSpecificStyles();
 
-    await mapManager.initializeMap();
+    // Explizit den Slider auf die aktuelle Stunde setzen
+    const slider = document.getElementById('timeSlider');
+    if (slider) {
+        const currentUtcHour = new Date().getUTCHours();
+        slider.value = currentUtcHour;
+        console.log(`[App] Initialized timeSlider to current UTC hour: ${currentUtcHour}`);
+    }
+
+    // KORREKTUR: Der Event-Listener wird hier registriert, BEVOR das Event ausgelöst wird.
+    document.addEventListener('location:selected', async (event) => {
+        const { lat, lng, source } = event.detail;
+        console.log(`App: Event 'location:selected' empfangen. Quelle: ${source}, Koordinaten: ${lat}, ${lng}`);
+
+        // Validierung der Koordinaten
+        if (!Utils.isValidLatLng(lat, lng)) {
+            console.warn('[App] Ungültige Koordinaten empfangen:', { lat, lng });
+            Utils.handleError('Ungültige Position ausgewählt. Verwende Standardposition.');
+            return;
+        }
+
+        const loadingElement = document.getElementById('loading');
+        if (loadingElement) loadingElement.style.display = 'block';
+
+        try {
+            AppState.lastLat = lat;
+            AppState.lastLng = lng;
+
+            const isInitialLoad = (source === 'geolocation' || source === 'geolocation_fallback');
+            const currentTimeToPreserve = isInitialLoad ? null : (AppState.weatherData?.time?.[getSliderValue()] || null);
+
+            console.log(`[App] Fetching weather data for lat: ${lat}, lng: ${lng}, time: ${currentTimeToPreserve || 'current'}`);
+            const newWeatherData = await weatherManager.fetchWeatherForLocation(lat, lng, currentTimeToPreserve);
+
+            if (newWeatherData) {
+                console.log('[App] Weather data loaded successfully:', newWeatherData);
+                await updateUIWithNewWeatherData(newWeatherData, isInitialLoad ? null : getSliderValue());
+            } else {
+                AppState.weatherData = null;
+                Utils.handleError('Keine Wetterdaten verfügbar.');
+            }
+
+            await mapManager.createOrUpdateMarker(lat, lng);
+            await displayManager.refreshMarkerPopup();
+
+            if (source !== 'marker_click') {
+                mapManager.recenterMap(true);
+            }
+            AppState.isManualPanning = false;
+
+            if (source === 'geolocation' || source === 'geolocation_fallback') {
+                console.log('[App] Starting initial caching after geolocation...');
+                cacheTilesForDIP({
+                    map: AppState.map,
+                    lastLat: lat,
+                    lastLng: lng,
+                    baseMaps: AppState.baseMaps,
+                    onProgress: displayProgress,
+                    onComplete: displayMessage,
+                    onCancel: () => displayMessage('Caching cancelled.'),
+                    radiusKm: 5,
+                    silent: true
+                });
+            }
+        } catch (error) {
+            console.error('[App] Fehler beim Verarbeiten von "location:selected":', error);
+            displayError(error.message);
+        } finally {
+            if (loadingElement) loadingElement.style.display = 'none';
+        }
+    });
+
+    // Initialisiert die Karte und prüft, ob Wetterdaten geladen wurden
+    try {
+        console.log('[App] Starting map initialization...');
+        await mapManager.initializeMap();
+        console.log('[App] Map initialization completed.');
+
+        // Prüfe, ob Wetterdaten geladen wurden
+        if (!AppState.weatherData) {
+            console.warn('[App] No weather data loaded after map initialization.');
+            // Prüfe, ob eine gültige Position vorliegt
+            if (!Utils.isValidLatLng(AppState.lastLat, AppState.lastLng)) {
+                console.warn('[App] Keine gültige Position nach Karteninitialisierung. Verwende Fallback.');
+                const fallbackLat = 51.505; // Beispiel: London
+                const fallbackLng = -0.09;
+                AppState.lastLat = fallbackLat;
+                AppState.lastLng = fallbackLng;
+                document.dispatchEvent(new CustomEvent('location:selected', {
+                    detail: { lat: fallbackLat, lng: fallbackLng, source: 'geolocation_fallback' }
+                }));
+            } else {
+                // Gültige Position vorhanden, aber keine Wetterdaten -> erneuter Versuch
+                console.log('[App] Retrying weather data fetch with existing coordinates:', AppState.lastLat, AppState.lastLng);
+                document.dispatchEvent(new CustomEvent('location:selected', {
+                    detail: { lat: AppState.lastLat, lng: AppState.lastLng, source: 'geolocation_retry' }
+                }));
+            }
+        }
+    } catch (error) {
+        console.error('[App] Fehler bei der Karteninitialisierung:', error);
+        displayError('Konnte Karte nicht initialisieren. Verwende Standardposition.');
+
+        // Fallback: Verwende eine Standardposition
+        const fallbackLat = 51.505; // Beispiel: London
+        const fallbackLng = -0.09;
+        console.log(`[App] Using fallback coordinates: ${fallbackLat}, ${fallbackLng}`);
+        AppState.lastLat = fallbackLat;
+        AppState.lastLng = fallbackLng;
+        document.dispatchEvent(new CustomEvent('location:selected', {
+            detail: { lat: fallbackLat, lng: fallbackLng, source: 'geolocation_fallback' }
+        }));
+    }
+
+    // Alle anderen Listener können sicher nach der Karteninitialisierung eingerichtet werden.
     setupAppEventListeners();
     AutoupdateManager.setupAutoupdate();
-
-    // EINZIGER AUFRUF FÜR ALLE EVENT LISTENER
     EventManager.initializeEventListeners();
-
     Coordinates.initializeLocationSearch();
-    // --- NEUER BLOCK ---
+
     // Initiales Zeichnen der Favoriten-Marker beim Start
     const initialFavorites = LocationManager.getCoordHistory().filter(item => item.isFavorite);
     if (initialFavorites.length > 0) {
         console.log(`[App] Found ${initialFavorites.length} favorite(s) on startup, plotting on map.`);
         mapManager.updateFavoriteMarkers(initialFavorites);
     }
-    // --- ENDE NEUER BLOCK ---
 
     document.addEventListener('cutaway:marker_placed', () => {
         console.log("App: Event 'cutaway:marker_placed' empfangen. Neuberechnung wird ausgelöst.");
@@ -1550,11 +1830,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const { newPosition, originalTrackData } = event.detail;
 
-        // Schritt 1: Den korrekten Ankerpunkt bestimmen (HARP oder DIP)
         let anchorPosition;
         const harpAnchor = AppState.harpMarker ? AppState.harpMarker.getLatLng() : null;
 
-        // Wenn ein HARP-Marker existiert, ist er IMMER der Anker
         if (harpAnchor) {
             anchorPosition = harpAnchor;
             console.log("JRT-Ankerpunkt ist HARP.");
@@ -1565,30 +1843,26 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const trackLength = originalTrackData.trackLength;
         const trackDirection = originalTrackData.airplane.bearing;
-        const newEndPoint = newPosition; // Die neue Position des Flugzeugs
+        const newEndPoint = newPosition;
 
-        // Schritt 2: Den NEUEN STARTPUNKT des Tracks berechnen, indem wir vom neuen Endpunkt zurückgehen.
         const [newStartLat, newStartLng] = Utils.calculateNewCenter(
             newEndPoint.lat,
             newEndPoint.lng,
-            trackLength, // Die GESAMTE Länge des Tracks
-            (trackDirection + 180) % 360 // Entgegen der Flugrichtung
+            trackLength,
+            (trackDirection + 180) % 360
         );
         const newStartPoint = L.latLng(newStartLat, newStartLng);
 
-        // Schritt 3: Den Verschiebungs-Vektor vom Ankerpunkt zum NEUEN STARTPUNKT berechnen.
         const totalDistance = AppState.map.distance(anchorPosition, newStartPoint);
         const bearingFromAnchorToStart = Utils.calculateBearing(anchorPosition.lat, anchorPosition.lng, newStartPoint.lat, newStartPoint.lng);
 
-        // Schritt 4: Den Vektor in Vorwärts- und Quer-Offsets zerlegen.
         let angleDifference = bearingFromAnchorToStart - trackDirection;
-        angleDifference = (angleDifference + 180) % 360 - 180; // Winkel normalisieren
+        angleDifference = (angleDifference + 180) % 360 - 180;
 
         const angleRad = angleDifference * (Math.PI / 180);
         const forwardOffset = Math.round(totalDistance * Math.cos(angleRad));
         const lateralOffset = Math.round(totalDistance * Math.sin(angleRad));
 
-        // Schritt 5: Settings und UI aktualisieren.
         Settings.state.userSettings.jumpRunTrackOffset = lateralOffset;
         Settings.state.userSettings.jumpRunTrackForwardOffset = forwardOffset;
         Settings.save();
@@ -1596,8 +1870,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         setInputValueSilently('jumpRunTrackOffset', lateralOffset);
         setInputValueSilently('jumpRunTrackForwardOffset', forwardOffset);
 
-        // Schritt 6: Den Track neu zeichnen lassen. Die `jumpPlanner` Funktion verwendet
-        // jetzt den Anker + die neuen Offsets und kommt zum korrekten Ergebnis.
         displayManager.updateJumpRunTrackDisplay();
     });
 
@@ -1606,110 +1878,58 @@ document.addEventListener('DOMContentLoaded', async () => {
         displayManager.updateJumpRunTrackDisplay();
     });
 
-    document.addEventListener('location:selected', async (event) => {
-        const { lat, lng, source } = event.detail;
-        console.log(`App: Event 'location:selected' empfangen. Quelle: ${source}`);
-
-        const loadingElement = document.getElementById('loading');
-        if (loadingElement) loadingElement.style.display = 'block';
-
-        try {
-            const sliderIndex = getSliderValue();
-            const currentTimeToPreserve = AppState.weatherData?.time?.[sliderIndex] || null;
-
-            const newWeatherData = await weatherManager.fetchWeatherForLocation(lat, lng, currentTimeToPreserve);
-
-            if (newWeatherData) {
-                const isInitialLoad = (source === 'geolocation' || source === 'geolocation_fallback');
-                await updateUIWithNewWeatherData(newWeatherData, isInitialLoad ? null : sliderIndex);
-            } else {
-                AppState.weatherData = null;
-            }
-
-            await mapManager.createOrUpdateMarker(lat, lng);
-            await displayManager.refreshMarkerPopup();
-
-            // Only recenter for non-marker-click interactions
-            if (source !== 'marker_click') {
-                mapManager.recenterMap(true);
-            }
-            AppState.isManualPanning = false;
-
-            if (source === 'geolocation' || source === 'geolocation_fallback') {
-                console.log("Starte initiales Caching nach Geolocation...");
-                cacheTilesForDIP({
-                    map: AppState.map,
-                    lastLat: lat,
-                    lastLng: lng,
-                    baseMaps: AppState.baseMaps,
-                    onProgress: displayProgress,
-                    onComplete: displayMessage,
-                    onCancel: () => displayMessage('Caching cancelled.'),
-                    radiusKm: 5,
-                    silent: true // <- DIESE ZEILE IST ENTSCHEIDEND
-                });
-            }
-
-            if (source === 'marker_drag' || source === 'dblclick' || source === 'search' || source === 'favorite_marker') {
-                console.log(`Starte Caching für neue Position via ${source}...`);
-                cacheTilesForDIP({
-                    map: AppState.map,
-                    lastLat: lat,
-                    lastLng: lng,
-                    baseMaps: AppState.baseMaps,
-                    onProgress: displayProgress,
-                    onComplete: displayMessage,
-                    onCancel: () => displayMessage('Caching cancelled.'),
-                    radiusKm: 5,
-                    silent: true // <- DIESE ZEILE IST ENTSCHEIDEND
-                });
-            }
-
-            if (Settings.state.userSettings.showJumpMasterLine) {
-                updateJumpMasterLineAndPanel();
-            }
-
-            if (Settings.state.userSettings.selectedEnsembleModels.length > 0) {
-                console.log("DIP moved, triggering ensemble recalculation...");
-                const ensembleSuccess = await EnsembleManager.fetchEnsembleWeatherData();
-                if (ensembleSuccess) {
-                    EnsembleManager.processAndVisualizeEnsemble(getSliderValue());
-                }
-            }
-        } catch (error) {
-            console.error('Fehler beim Verarbeiten von "location:selected":', error);
-            displayError(error.message);
-        } finally {
-            if (loadingElement) loadingElement.style.display = 'none';
-        }
-    });
-
-    document.addEventListener('autoupdate:tick', async (event) => {
-        // Nur reagieren, wenn Autoupdate in den Settings auch wirklich aktiv ist
-        if (!Settings.state.userSettings.autoupdate) {
-            return;
-        }
-
-        const now = new Date();
-        const slider = document.getElementById('timeSlider');
-        if (!slider) return;
-
-        const currentUtcHour = now.getUTCHours();
-        const sliderHour = parseInt(slider.value, 10);
-
-        // Nur updaten, wenn sich die Stunde geändert hat, oder beim allerersten Start des Timers
-        if (currentUtcHour !== sliderHour || event.detail.isInitialTick) {
-            console.log(`[App] Autoupdate triggered. Current Hour: ${currentUtcHour}, Slider Hour: ${sliderHour}`);
-            await updateToCurrentHour();
-        }
-    });
-
-    // Teilt Leaflet die neue, korrekte Kartengröße mit.
     setTimeout(() => {
         if (AppState.map) {
+            console.log("[App] Finalizing layout: invalidating map size and redrawing overlays.");
             AppState.map.invalidateSize();
+
+            // Erzwinge eine Neuberechnung und Neuzeichnung der Overlays,
+            // nachdem die Kartengröße finalisiert wurde.
+            if (Settings.state.userSettings.showJumpRunTrack) {
+                displayManager.updateJumpRunTrackDisplay();
+            }
+            if (Settings.state.userSettings.showLandingPattern) {
+                displayManager.updateLandingPatternDisplay();
+            }
+            // `calculateJump` zeichnet alle Kreise (Exit, Canopy etc.) neu
+            if (Settings.state.userSettings.calculateJump) {
+                calculateJump();
+            }
         }
-    }, 100); // Eine kleine Verzögerung von 100ms ist sicher.
+    }, 250); // Ein etwas längerer Timeout für mehr Sicherheit auf langsameren Geräten.
 });
+
+// =================================================================
+//  8. HILFSFUNKTIONEN (INTERN)
+// =================================================================
+// Beschreibung: Kleinere Helfer, die hauptsächlich von `initializeUIElements`
+// verwendet werden, um den Code sauber zu halten.
+
+function applySettingToCheckbox(id, value) {
+    const element = document.getElementById(id);
+    if (element) element.checked = value;
+}
+function applySettingToSelect(id, value) {
+    const element = document.getElementById(id);
+    if (element) element.value = value;
+    else console.warn(`Element ${id} not found`);
+}
+export function applySettingToInput(id, value) {
+    const element = document.getElementById(id);
+    if (element) element.value = value;
+}
+export function setInputValueSilently(id, value) {
+    const input = document.getElementById(id);
+    if (input) {
+        const lastValue = input.value;
+        input.value = value;
+        console.log(`Set ${id} silently:`, { old: lastValue, new: value });
+    }
+}
+function applySettingToRadio(name, value) {
+    const radio = document.querySelector(`input[name="${name}"][value="${value}"]`);
+    if (radio) radio.checked = true;
+    else console.warn(`Radio ${name} with value ${value} not found`);
+}
 
 window.simulateFreefall = () => document.dispatchEvent(new CustomEvent('sensor:freefall_detected'));

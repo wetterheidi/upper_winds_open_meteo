@@ -18,34 +18,90 @@ import { getCapacitor } from './capacitor-adapter.js';
  * @returns {Promise<string>} Ein Promise, das zum Textinhalt der Datei auflöst.
  */
 async function readFileContent(file) {
-    // NEU: Module über die asynchrone Funktion abrufen
-    const { Filesystem, isNative } = await getCapacitor();
+    const { Filesystem, isNative, Directory } = await getCapacitor();
 
-    // Prüfen, ob die App nativ läuft UND ein `path` für die Capacitor-API vorhanden ist.
-    if (window.Capacitor && window.Capacitor.isNativePlatform() && file.path) {
-        console.log(`[trackManager] Lese Datei über Capacitor Filesystem API: ${file.path}`);
+    if (isNative && file.path && Filesystem) {
+        console.log(`[trackManager] Reading file via Capacitor Filesystem API: ${file.path}`);
         try {
-            // Der Rest Ihrer Funktion bleibt exakt gleich!
+            // KORREKTUR: Datei direkt als UTF-8 Text einlesen
             const result = await Filesystem.readFile({
-                path: file.path
-                // Hinweis: Möglicherweise müssen Sie hier das korrekte Directory angeben,
-                // je nachdem, wo der FilePicker die Dateien speichert, z.B.
-                // directory: Directory.Documents
+                path: file.path,
+                // Hinweis: Je nach Android-Version und wie der Picker die Datei zurückgibt,
+                // ist 'directory' eventuell nicht nötig. Falls doch, ist 'Directory.Cache' oft eine gute Wahl.
+                // directory: Directory.Cache,
+                encoding: 'utf8'
             });
-            return atob(result.data);
+            // KORREKTUR: Das Ergebnis ist bereits der Textinhalt, kein atob() nötig
+            return result.data;
         } catch (error) {
-            console.error('[trackManager] Fehler beim Lesen der Datei mit Capacitor:', error);
+            console.error('[trackManager] Error reading file with Capacitor:', error);
+            // Fallback für den Fall, dass der Pfad nicht direkt lesbar ist (z.B. bei Content-URIs)
+            if (file.webPath) {
+                 const response = await fetch(file.webPath);
+                 return await response.text();
+            }
             throw new Error('Could not read file using native API.');
         }
     } else {
-        // Der Web-Fallback bleibt ebenfalls unverändert.
-        console.log(`[trackManager] Lese Datei über Web FileReader: ${file.name}`);
+        // Der Web-Fallback bleibt unverändert und korrekt
+        console.log(`[trackManager] Reading file via Web FileReader: ${file.name}`);
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = (e) => resolve(e.target.result);
             reader.onerror = (e) => reject(new Error('Error reading file.'));
             reader.readAsText(file);
         });
+    }
+}
+
+/**
+ * Lädt und verarbeitet eine KML-Datei.
+ * @param {File} file - Das vom Benutzer ausgewählte KML-Datei-Objekt.
+ * @returns {Promise<object|null>} Ein Promise, das zu den Metadaten des Tracks auflöst oder null bei einem Fehler.
+ */
+export async function loadKmlTrack(file) {
+    if (!AppState.map) { 
+        Utils.handleError('Map not initialized.'); 
+        return null; 
+    }
+    AppState.isLoadingGpx = true;
+
+    try {
+        const kmlData = await readFileContent(file);
+        const parser = new DOMParser();
+        const xml = parser.parseFromString(kmlData, 'text/xml');
+
+        // togeojson umwandeln
+        const geojson = toGeoJSON.kml(xml);
+        
+        const points = [];
+        // Durch alle Features im GeoJSON iterieren (z.B. Linien, Punkte)
+        L.geoJSON(geojson, {
+            onEachFeature: function (feature, layer) {
+                if (feature.geometry && feature.geometry.type === 'LineString') {
+                    // Koordinaten aus einem Linien-Track extrahieren
+                    feature.geometry.coordinates.forEach(coord => {
+                        const [lng, lat, ele] = coord;
+                        // Zeitinformationen sind in KML oft nicht pro Punkt verfügbar
+                        points.push({ lat, lng, ele: ele || null, time: null });
+                    });
+                }
+            }
+        });
+
+        if (points.length < 2) {
+            throw new Error('KML file contains no valid track with at least two points.');
+        }
+
+        const trackMetaData = await renderTrack(points, file.name);
+        return trackMetaData;
+
+    } catch (error) {
+        console.error('[trackManager] Error in loadKmlTrack:', error);
+        Utils.handleError('Error parsing KML file: ' + error.message);
+        return null;
+    } finally {
+        AppState.isLoadingGpx = false;
     }
 }
 
@@ -358,16 +414,37 @@ export async function exportToGpx(sliderIndex, interpStep, heightUnit) {
     gpxContent += `      <trkpt lat="${jumpRunEndLat}" lon="${jumpRunEndLng}"><ele>${exitAltitudeMSL}</ele></trkpt>\n`;
     gpxContent += `    </trkseg>\n  </trk>\n</gpx>`;
 
-    const blob = new Blob([gpxContent], { type: "application/gpx+xml;charset=utf-8" });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
     const time = Utils.formatTime(AppState.weatherData.time[sliderIndex]).replace(/ /g, '_').replace(/:/g, '');
-    a.href = url;
-    a.download = `${time}_JumpRun_Track.gpx`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    const filename = `${time}_JumpRun_Track.gpx`;
+
+    try {
+        const { Filesystem, Directory, isNative } = await getCapacitor();
+        if (isNative && Filesystem) {
+            // Native mobile App: Speichere in Documents/DZMaster
+            await Filesystem.writeFile({
+                path: `DZMaster/${filename}`,
+                data: gpxContent,
+                directory: Directory.Documents,
+                encoding: 'utf8',
+                recursive: true
+            });
+            Utils.handleMessage(`GPX saved in Documents/DZMaster`);
+        } else {
+            // Fallback für den Webbrowser
+            const blob = new Blob([gpxContent], { type: "application/gpx+xml;charset=utf-8" });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }
+    } catch (error) {
+        console.error("Error saving GPX file:", error);
+        Utils.handleError("Could not save GPX file.");
+    }
 }
 
 /**
@@ -376,7 +453,7 @@ export async function exportToGpx(sliderIndex, interpStep, heightUnit) {
  * @param {number} interpStep Der Interpolationsschritt für die Wetterdaten.
  * @param {string} heightUnit Die aktuell ausgewählte Höheneinheit ('m' oder 'ft').
  */
-export function exportLandingPatternToGpx() {
+export async function exportLandingPatternToGpx() {
     console.log("--- GPX Landing Pattern Export gestartet ---");
 
     const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
@@ -454,19 +531,37 @@ export function exportLandingPatternToGpx() {
     console.log("Schritt 4: GPX-String wurde erfolgreich erstellt.");
     console.log(gpxContent); // Gibt den GPX-Inhalt in die Konsole aus
 
-    const blob = new Blob([gpxContent], { type: "application/gpx+xml;charset=utf-8" });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
     const time = Utils.formatTime(AppState.weatherData.time[sliderIndex]).replace(/ /g, '_').replace(/:/g, '');
-    a.download = `${time}_Landing_Pattern.gpx`;
-    a.href = url;
-    document.body.appendChild(a);
+    const filename = `${time}_Landing_Pattern.gpx`;
 
-    console.log("Schritt 5: Download-Link erstellt. Der Download wird jetzt ausgelöst...");
-    a.click();
-
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    try {
+        const { Filesystem, Directory, isNative } = await getCapacitor();
+        if (isNative && Filesystem) {
+            // Native mobile App: Speichere in Documents/DZMaster
+            await Filesystem.writeFile({
+                path: `DZMaster/${filename}`,
+                data: gpxContent,
+                directory: Directory.Documents,
+                encoding: 'utf8',
+                recursive: true
+            });
+            Utils.handleMessage(`Landing Pattern GPX saved in Documents/DZMaster`);
+        } else {
+            // Fallback für den Webbrowser
+            const blob = new Blob([gpxContent], { type: "application/gpx+xml;charset=utf-8" });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }
+    } catch (error) {
+        console.error("Error saving Landing Pattern GPX file:", error);
+        Utils.handleError("Could not save Landing Pattern GPX file.");
+    }
     console.log("--- GPX Landing Pattern Export beendet ---");
 }
 
@@ -500,37 +595,46 @@ export async function saveRecordedTrack() {
         }).filter(Boolean);
 
         if (trackpointStrings.length < 2) {
-            Utils.handleError("Nicht genügend gültige Punkte für einen Track zum Speichern.");
+            Utils.handleError("Not enough valid data points to save track.");
             return;
         }
 
         const gpxContent = `${header}\n${trackpointStrings.join('\n')}\n${footer}`;
         const fileName = `Skydive_Track_${DateTime.utc().toFormat('yyyy-MM-dd_HHmm')}.gpx`;
 
+        // HINZUGEFÜGT: "await", um auf das Laden der Module zu warten
         const { Filesystem, Directory, isNative } = await getCapacitor();
 
         if (isNative && Filesystem) {
+            // HINZUGEFÜGT: "await", um auf das Speichern der Datei zu warten
             await Filesystem.writeFile({
-                path: fileName,
+                path: `DZMaster/${fileName}`,
                 data: gpxContent,
                 directory: Directory.Documents,
-                encoding: 'utf8'
+                encoding: 'utf8',
+                recursive: true
             });
-            Utils.handleMessage(`Track saved: ${fileName}`);
+            // Diese Nachricht wird jetzt erst NACH dem erfolgreichen Speichern angezeigt
+            Utils.handleMessage(`Track saved in Documents/DZMaster`);
         } else {
-            // Der Web-Fallback bleibt unverändert
-            const blob = new Blob([gpxContent], { type: "application/gpx+xml;charset=utf-8" });
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = fileName;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
+            // Web-Fallback oder Fehlerfall, wenn Filesystem nicht geladen werden konnte
+            if (isNative) {
+                Utils.handleError("Could not save track: Filesystem module not available.");
+            } else {
+                // Der Web-Fallback bleibt unverändert
+                const blob = new Blob([gpxContent], { type: "application/gpx+xml;charset=utf-8" });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            }
         }
 
     } catch (error) {
-        console.error("Fehler während saveRecordedTrack:", error);
-        Utils.handleError("Konnte den Track nicht speichern.");
+        console.error("Error in saveRecordedTrack:", error);
+        Utils.handleError("Could not save track.");
     } finally {
         AppState.recordedTrackPoints = [];
     }

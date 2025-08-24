@@ -6,15 +6,10 @@ import { Utils } from '../core/utils.js';
 import * as displayManager from './displayManager.js';
 import * as mapManager from './mapManager.js';
 import * as Coordinates from '../ui-web/coordinates.js';
-import * as JumpPlanner from '../core/jumpPlanner.js';
 import { TileCache, cacheTilesForDIP, cacheVisibleTiles } from '../core/tileCache.js';
-import { loadGpxTrack, loadCsvTrackUTC, exportToGpx, exportLandingPatternToGpx } from '../core/trackManager.js';
-import * as weatherManager from '../core/weatherManager.js';
-import * as liveTrackingManager from '../core/liveTrackingManager.js';
+import { loadKmlTrack,loadGpxTrack, loadCsvTrackUTC, exportToGpx, exportLandingPatternToGpx } from '../core/trackManager.js';
 import { fetchEnsembleWeatherData, processAndVisualizeEnsemble, clearEnsembleVisualizations } from '../core/ensembleManager.js';
-import { getSliderValue, displayMessage, hideProgress, displayProgress } from './ui.js';
-import * as AutoupdateManager from '../core/autoupdateManager.js';
-import { UI_DEFAULTS } from '../core/constants.js';
+import { getSliderValue, displayMessage, hideProgress, displayProgress, displayWarning, toggleLoading } from './ui.js';
 import { updateModelSelectUI, cleanupSelectedEnsembleModels } from './ui.js';
 import 'leaflet-gpx';
 import * as LocationManager from '../core/locationManager.js';
@@ -29,11 +24,6 @@ let listenersInitialized = false;
 // 2. Allgemeine Hilfsfunktionen
 // =================================================================
 
-function dispatchAppEvent(eventName, detail = {}) {
-    console.log(`[EventManager] Dispatching event: ${eventName}`, detail);
-    const event = new CustomEvent(eventName, { detail, bubbles: true, cancelable: true });
-    document.dispatchEvent(event);
-}
 function setupCheckbox(id, setting, callback) {
     console.log(`setupCheckbox called for id: ${id}`);
     const checkbox = document.getElementById(id);
@@ -53,10 +43,6 @@ function setupCheckbox(id, setting, callback) {
         });
         console.log(`Attached change and click listeners to ${id}`);
         // Apply visual indication for locked features
-        if (id === 'showLandingPattern' && !(Settings.isFeatureUnlocked('landingPattern') && Settings.state.isLandingPatternUnlocked)) {
-            checkbox.style.opacity = '0.5';
-            checkbox.title = 'Feature locked. Click to enter password.';
-        }
     } else {
         console.warn(`Checkbox ${id} not found`);
     }
@@ -128,44 +114,6 @@ function setupInput(id, eventType, debounceTime, validationCallback) {
         }));
     }, debounceTime));
 }
-function toggleSubmenu(element, submenu, isVisible) {
-    console.log(`toggleSubmenu called for ${element.textContent || element.id}: ${isVisible ? 'show' : 'hide'}`);
-    if (submenu) {
-        // Sicherstellen, dass die Klasse .submenu vorhanden ist
-        if (!submenu.classList.contains('submenu')) {
-            submenu.classList.add('submenu');
-        }
-
-        // Klasse umschalten und Aria-Attribut für Barrierefreiheit setzen
-        submenu.classList.toggle('hidden', !isVisible);
-        element.setAttribute('aria-expanded', isVisible);
-        console.log(`Submenu toggled for ${element.textContent || element.id}: ${isVisible ? 'shown' : 'hidden'}`);
-
-        // WICHTIG: Die "forceVisibility"-Logik beibehalten, um UI-Bugs zu verhindern
-        let attempts = 0;
-        const maxAttempts = 5;
-        const forceVisibility = () => {
-            const currentState = {
-                isHidden: submenu.classList.contains('hidden'),
-                displayStyle: window.getComputedStyle(submenu).display
-            };
-
-            // Wenn das Menü geöffnet sein SOLL, aber aus irgendeinem Grund versteckt ist...
-            if (isVisible && (currentState.isHidden || currentState.displayStyle === 'none')) {
-                console.warn(`Submenu for ${element.textContent || element.id} was hidden unexpectedly. Forcing it to be visible.`);
-                submenu.classList.remove('hidden');
-                submenu.style.display = 'block'; // Erzwingt die Sichtbarkeit
-                attempts++;
-                if (attempts < maxAttempts) {
-                    setTimeout(forceVisibility, 100); // Erneuter Check nach kurzer Zeit
-                }
-            }
-        };
-        setTimeout(forceVisibility, 100); // Initialer Check
-    } else {
-        console.warn(`Submenu for ${element.textContent || element.id} not found`);
-    }
-}
 
 // =================================================================
 // 3. UI-Komponenten-spezifische Setup-Funktionen
@@ -202,7 +150,6 @@ function setupSidebarEvents() {
         icon.addEventListener('click', () => {
             const panelId = icon.dataset.panelId;
 
-            // --- NEUE PASSWORT-PRÜFUNG ---
             if (panelId === 'panel-planner' && !Settings.isFeatureUnlocked('planner')) {
                 Settings.showPasswordModal('planner',
                     () => { // onSuccess
@@ -215,7 +162,6 @@ function setupSidebarEvents() {
                 );
                 return; // Funktion hier beenden, um das Panel nicht zu öffnen
             }
-            // --- ENDE PASSWORT-PRÜFUNG ---
 
             const isAlreadyActive = mainLayout.classList.contains('sidebar-expanded') && activePanelId === panelId;
 
@@ -337,13 +283,10 @@ function setupMapEventListeners() {
         });
     }, 1000);
 
-    const debouncedMapMoveHandler = Utils.debounce(mapMoveHandler, 500);
-
     // Wir registrieren den einen, zentralen Handler für beide Events
     AppState.map.on('zoomend', mapMoveHandler);
     AppState.map.on('moveend', mapMoveHandler);
     AppState.map.on('moveend', debouncedCacheHandler); // Caching kann parallel laufen
-
 }
 function setupModelInfoButtonEvents() {
     const modelInfoButton = document.getElementById('modelInfoButton');
@@ -433,16 +376,30 @@ function setupJumpRunTrackEvents() {
         directionInput.value = Settings.state.userSettings.customJumpRunDirection || '';
         directionInput.addEventListener('change', () => {
             const value = parseFloat(directionInput.value);
+
+            // KORREKTUR: Offsets bei manueller Eingabe zurücksetzen
+            Settings.state.userSettings.jumpRunTrackOffset = 0;
+            Settings.state.userSettings.jumpRunTrackForwardOffset = 0;
+            const offsetInput = document.getElementById('jumpRunTrackOffset');
+            const forwardOffsetInput = document.getElementById('jumpRunTrackForwardOffset');
+            if (offsetInput) offsetInput.value = 0;
+            if (forwardOffsetInput) forwardOffsetInput.value = 0;
+            console.log('Manuelle JRT-Richtungsänderung: Offsets auf 0 zurückgesetzt.');
+
             if (Number.isFinite(value) && value >= 0 && value <= 360) {
                 Settings.state.userSettings.customJumpRunDirection = value;
-                console.log(`Setting 'customJumpRunDirection' on change to:`, value);
+                console.log(`Set 'customJumpRunDirection' on change to:`, value);
             } else {
                 Settings.state.userSettings.customJumpRunDirection = null;
                 directionInput.value = '';
                 console.log('Invalid direction, resetting to calculated.');
             }
             Settings.save();
+
+            // Bestehende Funktion zum Neuzeichnen der Linie
             displayManager.updateJumpRunTrackDisplay();
+            // NEU: Event auslösen, um die Neuberechnung der Exit Circles anzustoßen
+            document.dispatchEvent(new CustomEvent('ui:recalculateJump'));
         });
     }
 
@@ -514,7 +471,7 @@ function setupDeselectAllEnsembleButton() {
     deselectButton.addEventListener('click', () => {
         // 1. Finde alle Checkboxen der Ensemble-Modelle
         const ensembleCheckboxes = document.querySelectorAll('#ensembleModelsSubmenu input[type="checkbox"]');
-        
+
         // 2. Entferne bei allen den Haken
         ensembleCheckboxes.forEach(checkbox => {
             checkbox.checked = false;
@@ -554,7 +511,7 @@ function setupTrackEvents() {
         const loadingElement = document.getElementById('loading');
         if (e.target.files && e.target.files.length > 0) {
             const file = e.target.files[0];
-            
+
             // UI aktualisieren
             fileNameDisplay.textContent = file.name;
             fileNameDisplay.style.fontStyle = 'normal';
@@ -562,11 +519,12 @@ function setupTrackEvents() {
 
             const extension = file.name.split('.').pop().toLowerCase();
             try {
-                // *** HIER IST DIE KORREKTE VERARBEITUNGSLOGIK ***
                 if (extension === 'gpx') {
                     await loadGpxTrack(file); // Ruft die importierte Funktion auf
                 } else if (extension === 'csv') {
                     await loadCsvTrackUTC(file); // Ruft die importierte Funktion auf
+                } else if (extension === 'kml') { // NEUE BEDINGUNG
+                    await loadKmlTrack(file);
                 } else {
                     Utils.handleError('Unsupported file type. Please upload a .gpx or .csv file.');
                 }
@@ -583,18 +541,18 @@ function setupTrackEvents() {
     clearTrackButton.addEventListener('click', (e) => {
         e.stopPropagation();
         if (!AppState.map) { Utils.handleError('Cannot clear track: map not initialized.'); return; }
-        
+
         if (AppState.gpxLayer) {
             try {
                 if (AppState.map.hasLayer(AppState.gpxLayer)) AppState.map.removeLayer(AppState.gpxLayer);
                 AppState.gpxLayer = null;
                 AppState.gpxPoints = [];
                 AppState.isTrackLoaded = false;
-                
+
                 trackFileInput.value = ''; // Input zurücksetzen
                 fileNameDisplay.textContent = 'No file chosen';
                 fileNameDisplay.style.fontStyle = 'italic';
-                
+
             } catch (error) {
                 Utils.handleError('Failed to clear track: ' + error.message);
             }
@@ -611,13 +569,11 @@ function setupGpxExportEvent() {
 
     const exportButton = document.getElementById('exportGpxButton');
     if (exportButton) {
-        // Hinzufügen von 'async', um 'await' verwenden zu können
         exportButton.addEventListener('click', async () => {
             const sliderIndex = getSliderValue();
             const interpStep = getInterpolationStep();
             const heightUnit = Settings.getValue('heightUnit', 'm');
 
-            // 'await' stellt sicher, dass auf die Fertigstellung der Funktion gewartet wird
             await exportToGpx(sliderIndex, interpStep, heightUnit);
         });
     }
@@ -641,14 +597,12 @@ function setupCheckboxEvents() {
     setupCheckbox('showExitAreaCheckbox', 'showExitArea', (checkbox) => {
         Settings.state.userSettings.showExitArea = checkbox.checked;
         Settings.save();
-        // Event auslösen, anstatt Logik auszuführen
         document.dispatchEvent(new CustomEvent('ui:jumpFeatureChanged'));
     });
 
     setupCheckbox('showCanopyAreaCheckbox', 'showCanopyArea', (checkbox) => {
         Settings.state.userSettings.showCanopyArea = checkbox.checked;
         Settings.save();
-        // Dasselbe Event auslösen
         document.dispatchEvent(new CustomEvent('ui:jumpFeatureChanged'));
     });
 
@@ -671,22 +625,9 @@ function setupCheckboxEvents() {
     });
 
     setupCheckbox('showLandingPattern', 'showLandingPattern', (checkbox) => {
-        // Die Einstellung direkt basierend auf dem Status der Checkbox speichern
         Settings.state.userSettings.showLandingPattern = checkbox.checked;
         Settings.save();
-
-        // Das zugehörige Untermenü ein- oder ausblenden
-        const submenu = checkbox.closest('li')?.querySelector('ul.submenu');
-        if (submenu) {
-            submenu.classList.toggle('hidden', !checkbox.checked);
-        }
-
-        // Ein Event auslösen, damit der Rest der Anwendung reagieren kann
-        if (checkbox.checked) {
-            document.dispatchEvent(new CustomEvent('ui:landingPatternEnabled'));
-        } else {
-            document.dispatchEvent(new CustomEvent('ui:landingPatternDisabled'));
-        }
+        document.dispatchEvent(new CustomEvent('ui:landingPatternEnabled'));
     });
 
     setupCheckbox('trackPositionCheckbox', 'trackPosition', (checkbox) => {
@@ -709,7 +650,6 @@ function setupCheckboxEvents() {
         Settings.state.userSettings.showJumpMasterLine = checkbox.checked;
         Settings.save();
 
-        // Event auslösen, damit main-web.js reagieren kann
         document.dispatchEvent(new CustomEvent('ui:showJumpMasterLineChanged'));
 
         // Untermenü ein-/ausblenden
@@ -730,13 +670,86 @@ function setupCheckboxEvents() {
         document.dispatchEvent(new CustomEvent('ui:jumpMasterLineTargetChanged'));
     });
 
+    setupCheckbox('lockInteractionCheckbox', 'isInteractionLocked', (checkbox) => {
+        const isLocked = checkbox.checked;
+        Settings.state.userSettings.isInteractionLocked = isLocked;
+        Settings.save();
+
+        // GeoMan-Steuerung (de-)aktivieren
+        mapManager.toggleGeoManControls(isLocked);
+
+        // Draggable-Status des JRT-Markers (Flugzeug) aktualisieren
+        if (AppState.jumpRunTrackLayerGroup) {
+            AppState.jumpRunTrackLayerGroup.eachLayer(layer => {
+                if (layer instanceof L.Marker && layer.options.icon && layer.options.icon.options.iconUrl.includes('airplane')) {
+                    if (isLocked) {
+                        layer.dragging.disable();
+                    } else {
+                        layer.dragging.enable();
+                    }
+                }
+            });
+        }
+
+        // --- NEUER, KORRIGIERTER CODEBLOCK ---
+        // Aktualisiert den Draggable-Status für die anderen Marker
+
+        // DIP Marker (Hauptmarker)
+        if (AppState.currentMarker) {
+            if (isLocked) {
+                AppState.currentMarker.dragging.disable();
+            } else {
+                AppState.currentMarker.dragging.enable();
+            }
+        }
+
+        // HARP Marker
+        if (AppState.harpMarker) {
+            // HINWEIS: Der HARP-Marker war ursprünglich nicht verschiebbar. 
+            // Diese Zeilen fügen die Sperr-Logik hinzu, falls er doch verschiebbar gemacht wird.
+            if (isLocked) {
+                if (AppState.harpMarker.dragging) AppState.harpMarker.dragging.disable();
+            } else {
+                if (AppState.harpMarker.dragging) AppState.harpMarker.dragging.enable();
+            }
+        }
+
+        // Cutaway Marker
+        if (AppState.cutAwayMarker) {
+            if (isLocked) {
+                AppState.cutAwayMarker.dragging.disable();
+            } else {
+                AppState.cutAwayMarker.dragging.enable();
+            }
+        }
+        // --- ENDE DES NEUEN CODEBLOCKS ---
+
+
+        if (isLocked) {
+            Utils.handleMessage("Map interactions are now locked.");
+        } else {
+            Utils.handleMessage("Map interactions are now unlocked.");
+        }
+    });
+
     const placeHarpButton = document.getElementById('placeHarpButton');
     if (placeHarpButton) {
         placeHarpButton.addEventListener('click', () => {
             AppState.isPlacingHarp = true;
             console.log('HARP placement mode activated');
-            AppState.map.on('click', mapManager.handleHarpPlacement); // Use imported function
+            AppState.map.on('click', mapManager.handleHarpPlacement);
             Utils.handleMessage('Click the map to place the HARP marker');
+
+            // NEUE LOGIK: Sidebar schließen und Karte anpassen
+            const mainLayout = document.querySelector('.main-layout');
+            if (mainLayout) {
+                mainLayout.classList.remove('sidebar-expanded', 'data-panel-visible');
+            }
+            document.querySelectorAll('.sidebar-icon.active').forEach(icon => icon.classList.remove('active'));
+
+            setTimeout(() => {
+                if (AppState.map) AppState.map.invalidateSize({ animate: true });
+            }, 300); // Warten auf die CSS-Transition
         });
     }
 
@@ -753,22 +766,11 @@ function setupCheckboxEvents() {
     }
 }
 function setupRadioEvents() {
-    // --- NEU: Diese Aufrufe werden entfernt, da sie jetzt von setupSelectEvents gehandhabt werden ---
-    // setupRadioGroup('refLevel', () => Settings.updateUnitLabels());
-    // setupRadioGroup('heightUnit', () => { ... });
-    // setupRadioGroup('temperatureUnit', () => { });
-    // setupRadioGroup('windUnit', () => { ... });
-    // setupRadioGroup('timeZone', () => { });
-    // setupRadioGroup('coordFormat', () => { });
-    // setupRadioGroup('downloadFormat', () => { });
-
-    // Diese Aufrufe bleiben, da sie für echte Radio-Buttons sind
     setupRadioGroup('landingDirection', () => { });
     setupRadioGroup('jumpMasterLineTarget', () => {
         document.dispatchEvent(new CustomEvent('ui:jumpMasterLineTargetChanged'));
     });
 
-    //Ensemble stuff
     const scenarioRadios = document.querySelectorAll('input[name="ensembleScenario"]');
     scenarioRadios.forEach(radio => {
         radio.addEventListener('change', async () => { // Die Funktion zu 'async' machen
@@ -834,10 +836,7 @@ function setupSelectEvents() {
     });
 }
 function setupInputEvents() {
-    // Jeder Aufruf speichert jetzt nur noch den Wert und löst das 'ui:inputChanged' Event aus.
-    // Die Validierungslogik bleibt als Callback erhalten.
-
-    // Helfer-Funktion, die den Event-Listener für die Bein-Höhen erstellt
+    // Helfer-Funktion, die den Event-Listener für die legHeight erstellt
     const createLegHeightListener = (id, defaultValue) => {
         const input = document.getElementById(id);
         if (!input) return;
@@ -876,7 +875,7 @@ function setupInputEvents() {
         });
     };
 
-    // Die neuen Listener für die Bein-Höhen erstellen
+    // Die neuen Listener für die legHeight erstellen
     createLegHeightListener('legHeightFinal', 100);
     createLegHeightListener('legHeightBase', 200);
     createLegHeightListener('legHeightDownwind', 300);
@@ -901,7 +900,7 @@ function setupInputEvents() {
         if (isNaN(value) || value < 500 || value > 15000) {
             Utils.handleError('Exit altitude must be between 500 and 15000 meters.');
 
-            // NEU: Event auslösen, um die UI zurückzusetzen
+            //Event auslösen, um die UI zurückzusetzen
             document.dispatchEvent(new CustomEvent('ui:invalidInput', {
                 detail: { id: 'exitAltitude', defaultValue: 3000 }
             }));
@@ -934,7 +933,6 @@ function setupDownloadEvents() {
     const downloadButton = document.getElementById('downloadButton');
     if (downloadButton) {
         downloadButton.addEventListener('click', () => {
-            // Event auslösen
             document.dispatchEvent(new CustomEvent('ui:downloadClicked'));
         });
     }
@@ -943,7 +941,6 @@ function setupClearHistoricalDate() {
     const clearButton = document.getElementById('clearHistoricalDate');
     if (clearButton) {
         clearButton.addEventListener('click', () => {
-            // Event auslösen
             document.dispatchEvent(new CustomEvent('ui:clearDateClicked'));
         });
     }
@@ -967,8 +964,7 @@ function setupCacheManagement() {
     resetButton.id = 'resetButton';
     resetButton.textContent = 'Reset Settings';
     resetButton.title = 'Resets all settings to their default values and locks all features';
-    
-    // *** HIER IST DIE ÄNDERUNG FÜR DEN RESET-BUTTON ***
+
     resetButton.className = 'btn btn-danger'; // Weist die neuen CSS-Klassen zu
 
     resetButton.addEventListener('click', () => {
@@ -978,9 +974,9 @@ function setupCacheManagement() {
             window.location.reload();
         }
     });
-    
+
     // Grid-Layout-Logik beibehalten
-    buttonWrapper.appendChild(document.createElement('label')); 
+    buttonWrapper.appendChild(document.createElement('label'));
     buttonWrapper.appendChild(resetButton);
 
     // --- Clear Tile Cache Button ---
@@ -988,8 +984,7 @@ function setupCacheManagement() {
     clearCacheButton.id = 'clearCacheButton';
     clearCacheButton.textContent = 'Clear Tile Cache';
     clearCacheButton.title = 'Clears cached map tiles. Pan/zoom to cache more tiles for offline use.';
-    
-    // *** HIER IST DIE ÄNDERUNG FÜR DEN CACHE-BUTTON ***
+
     clearCacheButton.className = 'btn btn-danger'; // Weist die neuen CSS-Klassen zu
 
     clearCacheButton.addEventListener('click', async () => {
@@ -1096,7 +1091,6 @@ function setupCacheSettings() {
                 lastLat: AppState.lastLat,
                 lastLng: AppState.lastLng,
                 baseMaps: AppState.baseMaps,
-                // NEU: Die Callback-Funktionen übergeben
                 onProgress: displayProgress,
                 onComplete: (message) => {
                     hideProgress();
@@ -1135,30 +1129,32 @@ function setupHarpCoordInputEvents() {
         const parsedCoords = LocationManager.parseQueryAsCoordinates(inputValue);
 
         if (parsedCoords) {
-            // Clear existing HARP marker if it exists
             if (AppState.harpMarker) {
                 AppState.map.removeLayer(AppState.harpMarker);
             }
-
-            // Create and add new HARP marker
             AppState.harpMarker = mapManager.createHarpMarker(parsedCoords.lat, parsedCoords.lng).addTo(AppState.map);
-            console.log('Placed HARP marker at:', parsedCoords);
-
-            // Update settings
+            AppState.map.panTo([parsedCoords.lat, parsedCoords.lng]);
             Settings.state.userSettings.harpLat = parsedCoords.lat;
             Settings.state.userSettings.harpLng = parsedCoords.lng;
             Settings.save();
             Utils.handleMessage('HARP marker placed successfully.');
-
-            // Enable HARP radio button and set it to checked
             harpRadio.disabled = false;
             harpRadio.checked = true;
-            console.log('Enabled HARP radio button and set to checked');
-
-            // Trigger JML update if live tracking is active and HARP is selected
             document.dispatchEvent(new CustomEvent('ui:jumpMasterLineTargetChanged'));
             document.dispatchEvent(new CustomEvent('ui:recalculateJump'));
             document.dispatchEvent(new CustomEvent('harp:updated'));
+
+            //Sidebar schließen und Karte anpassen
+            const mainLayout = document.querySelector('.main-layout');
+            if (mainLayout) {
+                mainLayout.classList.remove('sidebar-expanded', 'data-panel-visible');
+            }
+            document.querySelectorAll('.sidebar-icon.active').forEach(icon => icon.classList.remove('active'));
+
+            setTimeout(() => {
+                if (AppState.map) AppState.map.invalidateSize({ animate: true });
+            }, 300);
+
         } else {
             Utils.handleError('Invalid coordinates. Please enter a valid MGRS or Decimal Degree format.');
         }
@@ -1199,6 +1195,58 @@ export function updateEnsembleModelUI(availableModels) {
         label.append(checkbox, ` ${model.replace(/_/g, ' ').toUpperCase()}`);
         li.appendChild(label);
         submenu.appendChild(li);
+    });
+}
+
+// --- Search ---
+
+function setupPoiSearchButton() {
+    const poiButton = document.getElementById('findPoisInViewBtn');
+    if (!poiButton) {
+        console.warn('POI search button not found.');
+        return;
+    }
+
+    poiButton.addEventListener('click', async () => {
+        if (!AppState.map) {
+            Utils.handleError("Map is not available.");
+            return;
+        }
+
+        const currentZoom = AppState.map.getZoom();
+        const minZoomForPoiSearch = 10;
+
+        if (currentZoom < minZoomForPoiSearch) {
+            displayWarning(`Please zoom in to Level ${minZoomForPoiSearch}+ to search for dropzones.`);
+            return;
+        }
+
+        try {
+            // KORREKTUR: Rufe toggleLoading mit dem spezifischen Text auf
+            toggleLoading(true, 'Searching for Dropzones...');
+
+            const bounds = AppState.map.getBounds();
+            const sw = bounds.getSouthWest();
+            const ne = bounds.getNorthEast();
+
+            const poiResults = await LocationManager.findParachutingPOIs(
+                sw.lat, sw.lng, ne.lat, ne.lng
+            );
+
+            mapManager.updatePoiMarkers(poiResults);
+
+            // Der dynamische Import für renderResultsList bleibt unverändert
+            const coordinatesModule = await import('./coordinates.js');
+            if (coordinatesModule && typeof coordinatesModule.renderResultsList === 'function') {
+                coordinatesModule.renderResultsList(poiResults);
+            }
+        } catch (error) {
+            console.error("Error during POI search:", error);
+            Utils.handleError("An error occurred during the search.");
+        } finally {
+            // KORREKTUR: Schalte den Spinner über die Funktion wieder aus
+            toggleLoading(false);
+        }
     });
 }
 
@@ -1249,8 +1297,14 @@ export function initializeEventListeners() {
     // 7. Live-Funktionen
     setupHarpCoordInputEvents();
 
-    // 8. Event Listener für Karten-Interaktionen
+    // 8. Search
+    setupPoiSearchButton();
+
+    // 9. Event Listener für Karten-Interaktionen
     setupMapEventListeners();
+
+    document.addEventListener('loading:start', (e) => toggleLoading(true, e.detail.message));
+    document.addEventListener('loading:stop', () => toggleLoading(false));
 
     listenersInitialized = true;
     console.log("Event listeners initialized successfully (first and only time).");

@@ -5,7 +5,7 @@ import { AppState } from '../core/state.js';
 import { Settings } from '../core/settings.js';
 import { Utils } from '../core/utils.js';
 import { TileCache } from '../core/tileCache.js';
-import { updateOfflineIndicator, isMobileDevice } from './ui.js';
+import { updateOfflineIndicator, isMobileDevice, displayWarning } from './ui.js';
 //import './public/vendor/Leaflet.PolylineMeasure.js'; // Pfad ggf. anpassen
 import { UI_DEFAULTS, ICON_URLS, ENSEMBLE_VISUALIZATION } from '../core/constants.js'; // Importiere UI-Defaults
 import { getCapacitor } from '../core/capacitor-adapter.js';
@@ -53,6 +53,8 @@ async function initMap() {
     AppState.jumpRunTrackLayerGroup = L.layerGroup().addTo(AppState.map);
     AppState.favoritesLayerGroup = L.layerGroup().addTo(AppState.map); // <-- NEUE ZEILE HINZUFÜGEN
     console.log('Favorite marker layer added!');
+    AppState.poiLayerGroup = L.layerGroup().addTo(AppState.map); // <-- NEUE ZEILE HINZUFÜGEN
+    console.log('POI marker layer added!');
 
     _setupBaseLayersAndHandling();
     _addStandardMapControls();
@@ -81,7 +83,7 @@ async function initMap() {
     console.log('initMap finished.');
 }
 
-// HILFSFUNKTIONEN FÜR initMap (innerhalb von app.js)
+// HILFSFUNKTIONEN FÜR initMap
 function _initializeBasicMapInstance(defaultCenter, defaultZoom) {
     AppState.lastLat = AppState.lastLat || defaultCenter[0];
     AppState.lastLng = AppState.lastLng || defaultCenter[1];
@@ -194,200 +196,56 @@ function _addStandardMapControls() {
         console.error("Karte nicht initialisiert, bevor Controls hinzugefügt werden können.");
         return;
     }
+
     L.control.layers(AppState.baseMaps, null, { position: 'topright' }).addTo(AppState.map);
     AppState.map.on('baselayerchange', function (e) {
-        console.log(`Base map changed to: ${e.name}`);
         if (Settings && Settings.state && Settings.state.userSettings) {
             Settings.state.userSettings.baseMaps = e.name;
             Settings.save();
-            console.log(`Saved selected base map "${e.name}" to settings.`);
-        } else {
-            console.error("Settings object not properly available to save base map choice.");
         }
         AppState.hasTileErrorSwitched = false;
         if (AppState.lastLat && AppState.lastLng && typeof cacheTilesForDIP === 'function') {
             cacheTilesForDIP({ map: AppState.map, lastLat: AppState.lastLat, lastLng: AppState.lastLng, baseMaps: AppState.baseMaps });
         }
     });
+
     L.control.zoom({ position: 'topright' }).addTo(AppState.map);
-    const polylineMeasureControl = L.control.polylineMeasure({
-        position: 'topright',
-        unit: 'kilometres',
-        showBearings: true,
-        clearMeasurementsOnStop: false,
-        showClearControl: true,
-        showUnitControl: true,
-        tooltipTextFinish: 'Click to finish the line<br>',
-        tooltipTextDelete: 'Shift-click to delete point',
-        tooltipTextMove: 'Drag to move point<br>',
-        tooltipTextResume: 'Click to resume line<br>',
-        tooltipTextAdd: 'Click to add point<br>',
-        measureControlTitleOn: 'Start measuring distance and bearing',
-        measureControlTitleOff: 'Stop measuring'
-    }).addTo(AppState.map);
-
-    if (isMobileDevice()) {
-        let isMeasuring = false;
-        let lastPoint = null;
-        let rubberBandLayer = null;
-        let measureLabel = L.DomUtil.create('div', 'leaflet-measure-label', AppState.map.getContainer());
-
-        // Variablen für Tap-Erkennung
-        let touchStartTime = 0;
-        let touchStartPos = null;
-        let isPotentialTap = false;
-        const tapTimeThreshold = 300; // Max. Dauer für einen Tap (ms)
-        const tapMoveThreshold = 10; // Max. Bewegung für einen Tap (Pixel)
-
-        const cleanupMeasurementUI = () => {
-            isMeasuring = false;
-            if (rubberBandLayer) {
-                AppState.map.removeLayer(rubberBandLayer);
-                rubberBandLayer = null;
-            }
-            if (measureLabel) {
-                measureLabel.style.display = 'none';
-                measureLabel.innerHTML = '';
-            }
-            lastPoint = null;
-            console.log('Measurement UI cleaned up');
-        };
-
-        AppState.map.on('polylinemeasure:start', function (e) {
-            isMeasuring = true;
-            lastPoint = null; // Erster Punkt wird durch Tap gesetzt
-            if (measureLabel) measureLabel.style.display = 'block';
-            console.log('Measurement started, lastPoint:', lastPoint);
-        });
-
-        AppState.map.on('polylinemeasure:finish', cleanupMeasurementUI);
-        AppState.map.on('polylinemeasure:clear', cleanupMeasurementUI);
-
-        AppState.map.on('polylinemeasure:add', function (e) {
-            // Aktualisiere lastPoint basierend auf dem neu hinzugefügten Punkt
-            if (e.currentLine && typeof e.currentLine.getLatLngs === 'function') {
-                const points = e.currentLine.getLatLngs();
-                if (points && points.length > 0) {
-                    lastPoint = points[points.length - 1];
-                    console.log('Point added, updated lastPoint:', lastPoint);
-                }
-            } else {
-                lastPoint = e.latlng;
-                console.log('Point added (fallback), updated lastPoint:', lastPoint);
-            }
-
-            // Entferne die gestrichelte Linie, da ein neuer Punkt gesetzt wurde
-            if (rubberBandLayer) {
-                AppState.map.removeLayer(rubberBandLayer);
-                rubberBandLayer = null;
-            }
-
-            // Trigger move-Event, um die gestrichelte Linie sofort anzuzeigen
-            setTimeout(() => AppState.map.fire('move'), 0);
-        });
-
-        // Touch-Handler mit Tap-Erkennung
-        AppState.map.getContainer().addEventListener('touchstart', function (e) {
-            if (!isMeasuring || e.touches.length !== 1 || e.target.closest('.leaflet-marker-icon')) return;
-
-            // Kein preventDefault/stopPropagation, um Panning zu erlauben
-            touchStartTime = Date.now();
-            touchStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-            isPotentialTap = true;
-
-            console.log('Touch started, potential tap at:', touchStartPos);
-        }, { passive: true }); // Passive, um Leaflet-Panning nicht zu blockieren
-
-        AppState.map.getContainer().addEventListener('touchmove', function (e) {
-            if (!isPotentialTap || !isMeasuring) return;
-
-            const currentPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-            const distanceMoved = Math.sqrt(
-                Math.pow(currentPos.x - touchStartPos.x, 2) +
-                Math.pow(currentPos.y - touchStartPos.y, 2)
-            );
-
-            if (distanceMoved > tapMoveThreshold) {
-                isPotentialTap = false;
-                console.log('Touch moved too far, canceling tap');
-            }
-        }, { passive: true });
-
-        AppState.map.getContainer().addEventListener('touchend', function (e) {
-            if (!isMeasuring || !isPotentialTap) return;
-
-            const touchEndTime = Date.now();
-            const touchDuration = touchEndTime - touchStartTime;
-
-            if (touchDuration <= tapTimeThreshold) {
-                // Bestätigter Tap: Setze Punkt
-                const rect = AppState.map.getContainer().getBoundingClientRect();
-                const touchX = touchStartPos.x - rect.left;
-                const touchY = touchStartPos.y - rect.top;
-                const latlng = AppState.map.containerPointToLatLng([touchX, touchY]);
-
-                // Simuliere ein click-Event für das Plugin
-                const clickEvent = new MouseEvent('click', {
-                    bubbles: true,
-                    cancelable: true,
-                    clientX: touchStartPos.x,
-                    clientY: touchStartPos.y
-                });
-                AppState.map.getContainer().dispatchEvent(clickEvent);
-
-                // Feedback für den Nutzer
-                Utils.handleMessage('Punkt gesetzt');
-                console.log('Tap confirmed, simulated click at:', latlng);
-
-                // Visuelle Bestätigung
-                const tempCircle = L.circle(latlng, { radius: 5, color: 'blue' }).addTo(AppState.map);
-                setTimeout(() => AppState.map.removeLayer(tempCircle), 500);
-            }
-
-            isPotentialTap = false;
-        }, { passive: true });
-
-        AppState.map.on('move', function () {
-            if (isMeasuring && lastPoint) {
-                const currentCenter = AppState.map.getCenter();
-
-                if (rubberBandLayer) {
-                    AppState.map.removeLayer(rubberBandLayer);
-                }
-                rubberBandLayer = L.polyline([lastPoint, currentCenter], {
-                    color: 'blue',
-                    dashArray: '5, 5',
-                    weight: 2,
-                    interactive: false
-                }).addTo(AppState.map);
-
-                const distance = lastPoint.distanceTo(currentCenter);
-                const bearing = Utils.calculateBearing(lastPoint.lat, lastPoint.lng, currentCenter.lat, currentCenter.lng);
-                const distanceText = distance < 1000 ? `${distance.toFixed(0)} m` : `${(distance / 1000).toFixed(2)} km`;
-
-                if (measureLabel) {
-                    measureLabel.innerHTML = `In: ${bearing.toFixed(0)}°<br><span class="bold-distance">${distanceText}</span>`; const mapSize = AppState.map.getSize();
-                    const labelPos = L.point(mapSize.x / 2 + 20, mapSize.y / 2 - 40);
-                    L.DomUtil.setPosition(measureLabel, labelPos);
-                }
-
-                console.log('Move event triggered, drawing rubberBandLayer from:', lastPoint, 'to:', currentCenter);
-            } else {
-                console.log('Move event skipped: isMeasuring=', isMeasuring, 'lastPoint=', lastPoint);
-            }
-        });
-    }
 
     L.control.scale({
         position: 'bottomleft',
         metric: true,
         imperial: false,
-        maxWidth: 100,
-        background: 'rgba(255, 255, 255, 0.8)',
-        padding: '5px',
-        borderRadius: '4px'
+        maxWidth: 100
     }).addTo(AppState.map);
-    console.log('Standard map controls and baselayerchange handler added.');
+
+    // Jetzt, wo die Ladereihenfolge stimmt, ist dies der saubere und richtige Weg:
+    AppState.map.pm.addControls({
+        position: 'topright',
+        drawMarker: true,
+        drawCircleMarker: false,
+        drawPolyline: true,
+        drawPolygon: false,
+        drawRectangle: false,
+        drawCircle: true,
+        cutPolygon: false,
+        editMode: true,
+        dragMode: true,
+        removalMode: true,
+        rotateMode: false
+    });
+
+    AppState.map.pm.setLang('en');
+
+    // Wir prüfen, ob wir auf einem Mobilgerät sind.
+    if (isMobileDevice()) {
+        // Setze globale Geoman-Optionen, um die "Geisterlinie" unsichtbar zu machen.
+        AppState.map.pm.setGlobalOptions({
+            hintlineStyle: { opacity: 0, color: 'green' }  // Die Linie vom letzten Punkt zum Mauszeiger/Fadenkreuz
+        });
+        console.log("Geoman global options set for mobile to hide helper lines.");
+    }
+
+    console.log('Standard map controls including Geoman have been added.');
 }
 function _setupCustomPanes() {
     AppState.map.createPane('gpxTrackPane');
@@ -475,23 +333,497 @@ async function _geolocationErrorCallback(error, defaultCenter, defaultZoom) {
 }
 
 async function _handleGeolocation(defaultCenter, defaultZoom) {
+    console.log('[MapManager] Starting geolocation handling at', new Date().toISOString());
     try {
         // Hole die Module über den Adapter
         const { Geolocation, isNative } = await getCapacitor();
 
         if (isNative && Geolocation) {
-            const position = await Geolocation.getCurrentPosition({
-                enableHighAccuracy: true,
-                timeout: 10000
-            });
-            _geolocationSuccessCallback(position, defaultZoom);
+            // Prüfe den Berechtigungsstatus
+            console.log('[MapManager] Checking geolocation permissions...');
+            let permissionStatus = await Geolocation.checkPermissions();
+            console.log('[MapManager] Permission status:', JSON.stringify(permissionStatus));
+
+            let hasPermission = permissionStatus.location === 'granted' || permissionStatus.location === 'provisional';
+            if (!hasPermission) {
+                console.log('[MapManager] Requesting geolocation permissions...');
+                try {
+                    const result = await Geolocation.requestPermissions({ permissions: ['location'] });
+                    hasPermission = result.location === 'granted' || result.location === 'provisional';
+                    console.log('[MapManager] Permission request result:', JSON.stringify(result));
+
+                    if (!hasPermission) {
+                        console.warn('[MapManager] Geolocation permission denied or not granted:', result);
+                        Utils.handleMessage('Bitte erlaube den Standortzugriff in den Einstellungen, um deine aktuelle Position zu verwenden.');
+                        throw new Error(`Geolocation permission not granted: ${JSON.stringify(result)}`);
+                    } else if (result.location === 'provisional') {
+                        console.log('[MapManager] Provisional permission granted. Prompting user to share location...');
+                        Utils.handleMessage('Bitte teile deinen Standort, um die Karte mit deiner Position zu laden.');
+                    }
+                } catch (permError) {
+                    console.error('[MapManager] Error requesting permissions:', permError);
+                    throw permError;
+                }
+            }
+
+            // Versuche, die aktuelle Position abzurufen
+            console.log('[MapManager] Attempting to fetch current position...');
+            let position = null;
+            let attempts = 0;
+            const maxAttempts = 3;
+            while (!position && attempts < maxAttempts) {
+                try {
+                    console.log(`[MapManager] Attempt ${attempts + 1} to fetch current position...`);
+                    position = await Geolocation.getCurrentPosition({
+                        enableHighAccuracy: true,
+                        timeout: 20000, // Erhöhtes Timeout für iOS 18.5
+                        maximumAge: 0
+                    });
+                    console.log('[MapManager] Current position retrieved:', JSON.stringify(position.coords));
+                    await _geolocationSuccessCallback(position, defaultZoom);
+                } catch (error) {
+                    console.error('[MapManager] Error fetching position on attempt', attempts + 1, ':', error.message);
+                    attempts++;
+                    if (attempts < maxAttempts && permissionStatus.location === 'provisional') {
+                        console.log('[MapManager] Retrying due to provisional permission...');
+                        Utils.handleMessage('Standortfreigabe erforderlich. Bitte teile deinen Standort.');
+                        await new Promise(resolve => setTimeout(resolve, 3000)); // Warte 3 Sekunden
+                    } else {
+                        throw error;
+                    }
+                }
+            }
+        } else if (navigator.geolocation) {
+            // Fallback zur Web-API
+            console.log('[MapManager] Using browser geolocation API...');
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    console.log('[MapManager] Browser position retrieved:', JSON.stringify(position.coords));
+                    _geolocationSuccessCallback(position, defaultZoom);
+                },
+                (geoError) => {
+                    console.error('[MapManager] Browser geolocation error:', geoError.message);
+                    _geolocationErrorCallback(geoError, defaultCenter, defaultZoom);
+                },
+                { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+            );
         } else {
-            // Dies sollte in der mobilen App nie passieren, ist aber ein guter Fallback
-            _geolocationErrorCallback({ message: "Native Geolocation not available." }, defaultCenter, defaultZoom);
+            console.warn('[MapManager] No geolocation API available.');
+            Utils.handleMessage('Standortzugriff nicht verfügbar. Verwende Standardposition.');
+            await _geolocationErrorCallback({ message: 'Geolocation not available' }, defaultCenter, defaultZoom);
         }
     } catch (error) {
-        console.error('Fehler beim Abrufen des Standorts mit Capacitor:', error);
-        _geolocationErrorCallback(error, defaultCenter, defaultZoom);
+        console.error('[MapManager] Error during geolocation handling:', error.message);
+        Utils.handleMessage('Fehler beim Abrufen des Standorts. Verwende Standardposition.');
+        await _geolocationErrorCallback(error, defaultCenter, defaultZoom);
+    }
+}
+
+function _setupGeomanMeasurementHandlers() {
+    const map = AppState.map;
+    if (!map) {
+        console.log('No map available');
+        return;
+    }
+
+    console.log('Leaflet-Geoman Version:', L.PM.version);
+
+    // Stop click propagation on the Geoman toolbar to prevent map clicks
+    const geomanToolbar = document.querySelector('.leaflet-pm-toolbar');
+    if (geomanToolbar) {
+        // Eine Liste aller Events, die potenziell zur Karte durchsickern könnten.
+        const eventsToStop = ['click', 'dblclick', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'pointerdown', 'pointerup', 'contextmenu'];
+
+        eventsToStop.forEach(eventType => {
+            geomanToolbar.addEventListener(eventType, (e) => {
+                L.DomEvent.stopPropagation(e);
+                // Optional: Zum Debuggen in der Konsole anzeigen, welches Event gestoppt wurde
+                console.log(`Stopped '${e.type}' event on Geoman toolbar.`);
+            });
+        });
+    }
+
+    const liveMeasureLabel = L.DomUtil.create('div', 'leaflet-measure-label', map.getContainer());
+    const persistentLabelsGroup = L.layerGroup().addTo(map);
+
+    let lastKnownLatLngs = null;
+    let lastKnownCircleState = null;
+    let currentLayer = null;
+    let isDrawingCompleted = false; // Flag to track if drawing was completed or cancelled
+
+    // Helper function for permanent line labels
+    function createPermanentLineLabel(latlngs, index) {
+        const currentPoint = latlngs[index];
+        const prevPoint = index > 0 ? latlngs[index - 1] : null;
+        if (!prevPoint) return;
+
+        const nextPoint = index < latlngs.length - 1 ? latlngs[index + 1] : null;
+        const inBearing = Utils.calculateBearing(prevPoint.lat, prevPoint.lng, currentPoint.lat, currentPoint.lng);
+        const segmentDistance = prevPoint.distanceTo(currentPoint);
+        const segmentDistanceText = segmentDistance < 1000 ? `${segmentDistance.toFixed(0)} m` : `${(segmentDistance / 1000).toFixed(2)} km`;
+
+        let totalDistance = 0;
+        for (let i = 1; i <= index; i++) {
+            totalDistance += latlngs[i - 1].distanceTo(latlngs[i]);
+        }
+        const totalDistanceText = totalDistance < 1000 ? `${totalDistance.toFixed(0)} m` : `${(totalDistance / 1000).toFixed(2)} km`;
+
+        const outBearingText = nextPoint ? `${Utils.calculateBearing(currentPoint.lat, currentPoint.lng, nextPoint.lat, nextPoint.lng).toFixed(0)}°` : '---';
+
+        const labelContent = `
+            <div class="geoman-permanent-label">
+                <div>In: ${inBearing.toFixed(0)}°</div>
+                <div>Out: ${outBearingText}</div>
+                <div>+: ${segmentDistanceText}</div>
+                <div>∑: ${totalDistanceText}</div>
+            </div>
+        `;
+
+        const marker = L.marker(currentPoint, {
+            icon: L.divIcon({ className: 'geoman-label-container', html: labelContent, iconAnchor: [-5, -5] }),
+            pmIgnore: true
+        });
+        marker.addTo(persistentLabelsGroup);
+    }
+
+    // Helper function for permanent circle labels
+    function createPermanentCircleLabel(layer) {
+        const center = layer.getLatLng();
+        const radius = layer.getRadius();
+        const radiusText = radius < 1000 ? `${radius.toFixed(0)} m` : `${(radius / 1000).toFixed(2)} km`;
+        const labelContent = `<div class="geoman-permanent-label">Radius:<br> ${radiusText}</div>`;
+        const label = L.marker(center, {
+            icon: L.divIcon({ className: 'geoman-label-container', html: labelContent, iconAnchor: [0, 0] }),
+            pmIgnore: true
+        });
+        label.addTo(persistentLabelsGroup);
+        layer.permanentLabel = label;
+    }
+
+    function updateAllPermanentLineLabels(layer) {
+        if (!layer || !(layer instanceof L.Polyline)) return;
+        persistentLabelsGroup.clearLayers();
+        const latlngs = layer.getLatLngs();
+        if (Array.isArray(latlngs[0])) {
+            latlngs.forEach((subLatlngs) => {
+                subLatlngs.forEach((_, index) => createPermanentLineLabel(subLatlngs, index));
+            });
+        } else {
+            latlngs.forEach((_, index) => createPermanentLineLabel(latlngs, index));
+        }
+        lastKnownLatLngs = JSON.stringify(latlngs);
+        currentLayer = layer;
+    }
+
+    function updateCircleLabel(layer) {
+        if (!layer || !(layer instanceof L.Circle)) return;
+        if (layer.permanentLabel) {
+            persistentLabelsGroup.removeLayer(layer.permanentLabel);
+        }
+        createPermanentCircleLabel(layer);
+    }
+
+    function startPolling() {
+        setInterval(() => {
+            if (currentLayer) {
+                if (currentLayer instanceof L.Polyline) {
+                    const currentLatLngs = JSON.stringify(currentLayer.getLatLngs());
+                    if (currentLatLngs !== lastKnownLatLngs) {
+                        updateAllPermanentLineLabels(currentLayer);
+                    }
+                } else if (currentLayer instanceof L.Circle) {
+                    const currentState = JSON.stringify({
+                        center: currentLayer.getLatLng(),
+                        radius: currentLayer.getRadius()
+                    });
+                    if (currentState !== lastKnownCircleState) {
+                        updateCircleLabel(currentLayer);
+                        lastKnownCircleState = currentState;
+                    }
+                }
+            }
+        }, 500);
+    }
+
+    startPolling();
+
+    map.on('pm:drawstart', (e) => {
+        isDrawingCompleted = false; // Reset the flag at the start of any drawing action
+        const workingLayer = e.workingLayer;
+        persistentLabelsGroup.clearLayers();
+        liveMeasureLabel.style.display = 'block';
+
+        let mouseMoveHandler, vertexAddHandler, vertexRemoveHandler, mapMoveHandler, cleanup;
+
+        if (e.shape === 'Line') {
+            if (isMobileDevice()) {
+                liveMeasureLabel.innerHTML = 'Tap to set first point.';
+                let lastPoint = null;
+                let rubberBandLayer = null;
+
+                mapMoveHandler = () => {
+                    const latlngs = workingLayer.getLatLngs();
+                    if (latlngs.length > 0) {
+                        lastPoint = latlngs[latlngs.length - 1];
+                        const currentCenter = map.getCenter();
+
+                        if (rubberBandLayer) {
+                            map.removeLayer(rubberBandLayer);
+                        }
+                        rubberBandLayer = L.polyline([lastPoint, currentCenter], {
+                            color: ' #3388ff',
+                            dashArray: '5, 5',
+                            weight: 3,
+                            interactive: false
+                        }).addTo(map);
+
+                        const distance = lastPoint.distanceTo(currentCenter);
+                        const bearing = Utils.calculateBearing(lastPoint.lat, lastPoint.lng, currentCenter.lat, currentCenter.lng);
+                        const distanceText = distance < 1000 ? `${distance.toFixed(0)} m` : `${(distance / 1000).toFixed(2)} km`;
+
+                        liveMeasureLabel.innerHTML = `In: ${bearing.toFixed(0)}°<br>Out: ---°<br>+: ${distanceText}`;
+                        const mapSize = map.getSize();
+                        const labelPos = L.point(mapSize.x / 2 + 20, mapSize.y / 2 - 40);
+                        L.DomUtil.setPosition(liveMeasureLabel, labelPos);
+                    } else {
+                        // If there are no points, clear the rubber band
+                        if (rubberBandLayer) {
+                            map.removeLayer(rubberBandLayer);
+                            rubberBandLayer = null;
+                        }
+                        liveMeasureLabel.innerHTML = 'Tap to set first point.';
+                    }
+                };
+
+                vertexAddHandler = () => {
+                    if (rubberBandLayer) {
+                        map.removeLayer(rubberBandLayer);
+                        rubberBandLayer = null;
+                    }
+                    setTimeout(() => {
+                        updateAllPermanentLineLabels(workingLayer);
+                        map.fire('move');
+                    }, 50);
+                };
+
+                vertexRemoveHandler = () => {
+                    setTimeout(() => {
+                        updateAllPermanentLineLabels(workingLayer);
+                        // Trigger the move handler to update the rubber band and label
+                        map.fire('move');
+                    }, 50);
+                };
+
+                map.on('move', mapMoveHandler);
+                workingLayer.on('pm:vertexadded', vertexAddHandler);
+                workingLayer.on('pm:vertexremoved', vertexRemoveHandler);
+
+                cleanup = () => {
+                    map.off('move', mapMoveHandler);
+                    workingLayer.off('pm:vertexadded', vertexAddHandler);
+                    workingLayer.off('pm:vertexremoved', vertexRemoveHandler);
+                    if (rubberBandLayer) {
+                        map.removeLayer(rubberBandLayer);
+                        rubberBandLayer = null;
+                    }
+                };
+            } else {
+                liveMeasureLabel.innerHTML = 'Click to set the first point.';
+                mouseMoveHandler = (moveEvent) => {
+                    const latlngs = workingLayer.getLatLngs();
+                    if (latlngs.length > 0) {
+                        const lastPoint = latlngs[latlngs.length - 1];
+                        const distance = lastPoint.distanceTo(moveEvent.latlng);
+                        const bearing = Utils.calculateBearing(lastPoint.lat, lastPoint.lng, moveEvent.latlng.lat, moveEvent.latlng.lng);
+                        const distanceText = distance < 1000 ? `${distance.toFixed(0)} m` : `${(distance / 1000).toFixed(2)} km`;
+                        liveMeasureLabel.innerHTML = `In: ${bearing.toFixed(0)}°<br>Out: ---°<br>+: ${distanceText}`;
+                        L.DomUtil.setPosition(liveMeasureLabel, moveEvent.containerPoint.add([15, -15]));
+                    }
+                };
+
+                vertexAddHandler = () => {
+                    setTimeout(() => updateAllPermanentLineLabels(workingLayer), 50);
+                };
+
+                vertexRemoveHandler = () => {
+                    setTimeout(() => {
+                        updateAllPermanentLineLabels(workingLayer);
+                    }, 50);
+                };
+
+                map.on('mousemove', mouseMoveHandler);
+                workingLayer.on('pm:vertexadded', vertexAddHandler);
+                workingLayer.on('pm:vertexremoved', vertexRemoveHandler);
+
+                cleanup = () => {
+                    map.off('mousemove', mouseMoveHandler);
+                    workingLayer.off('pm:vertexadded', vertexAddHandler);
+                    workingLayer.off('pm:vertexremoved', vertexRemoveHandler);
+                };
+            }
+        } else if (e.shape === 'Circle') {
+            if (isMobileDevice()) {
+                liveMeasureLabel.innerHTML = '';
+                // Position label at map center initially
+                const mapSize = map.getSize();
+                const initialLabelPos = L.point(mapSize.x / 2, mapSize.y / 2 - 40);
+                L.DomUtil.setPosition(liveMeasureLabel, initialLabelPos);
+                let centerSet = false;
+
+                mapMoveHandler = () => {
+                    if (centerSet) {
+                        const center = workingLayer.getLatLng();
+                        if (center) {
+                            const crosshairPos = map.getCenter();
+                            const radius = center.distanceTo(crosshairPos);
+                            workingLayer.setRadius(radius);
+
+                            const radiusText = radius < 1000 ? `${radius.toFixed(0)} m` : `${(radius / 1000).toFixed(2)} km`;
+                            liveMeasureLabel.innerHTML = `Radius: ${radiusText}`;
+                            const mapSize = map.getSize();
+                            const labelPos = L.point(mapSize.x / 2, mapSize.y / 2 - 40);
+                            L.DomUtil.setPosition(liveMeasureLabel, labelPos);
+                        }
+                    }
+                };
+
+                vertexAddHandler = () => {
+                    if (!centerSet) {
+                        centerSet = true;
+                        liveMeasureLabel.innerHTML = 'Move map to adjust radius. Tap again to finish.';
+                        const mapSize = map.getSize();
+                        const labelPos = L.point(mapSize.x / 2, mapSize.y / 2 - 40);
+                        L.DomUtil.setPosition(liveMeasureLabel, labelPos);
+                        map.on('move', mapMoveHandler);
+                    } else {
+                        // Second tap: finalize radius
+                        finalize();
+                        updateCircleLabel(workingLayer);
+                        currentLayer = workingLayer;
+                        lastKnownCircleState = JSON.stringify({
+                            center: workingLayer.getLatLng(),
+                            radius: workingLayer.getRadius()
+                        });
+                    }
+                };
+
+                workingLayer.on('pm:vertexadded', vertexAddHandler);
+
+                cleanup = () => {
+                    map.off('move', mapMoveHandler);
+                    workingLayer.off('pm:vertexadded', vertexAddHandler);
+                    centerSet = false;
+                    liveMeasureLabel.style.display = 'none';
+                };
+            } else {
+                liveMeasureLabel.innerHTML = 'Click and drag to draw a circle.';
+                mouseMoveHandler = (moveEvent) => {
+                    const center = workingLayer.getLatLng();
+                    if (center) {
+                        const radius = center.distanceTo(moveEvent.latlng);
+                        const radiusText = radius < 1000 ? `${radius.toFixed(0)} m` : `${(radius / 1000).toFixed(2)} km`;
+                        liveMeasureLabel.innerHTML = `Radius: ${radiusText}`;
+                        L.DomUtil.setPosition(liveMeasureLabel, moveEvent.containerPoint.add([15, -15]));
+                    }
+                };
+                map.on('mousemove', mouseMoveHandler);
+                cleanup = () => map.off('mousemove', mouseMoveHandler);
+            }
+        }
+
+        const finalize = () => {
+            if (cleanup) cleanup();
+            liveMeasureLabel.style.display = 'none';
+        };
+
+        map.once('pm:create', (createEvent) => {
+            isDrawingCompleted = true; // Mark the drawing as successfully completed
+            finalize();
+            if (createEvent.shape === 'Line' && createEvent.layer instanceof L.Polyline) {
+                updateAllPermanentLineLabels(createEvent.layer);
+            } else if (createEvent.shape === 'Circle' && createEvent.layer instanceof L.Circle) {
+                updateCircleLabel(createEvent.layer);
+                currentLayer = createEvent.layer;
+                lastKnownCircleState = JSON.stringify({
+                    center: createEvent.layer.getLatLng(),
+                    radius: createEvent.layer.getRadius()
+                });
+            }
+            if (createEvent.layer.pm) {
+                createEvent.layer.pm.enable();
+            }
+        });
+
+        map.once('pm:drawend', () => {
+            // If drawend fires but create did not, the action was cancelled.
+            if (!isDrawingCompleted) {
+                console.log("Drawing was cancelled, cleaning up visuals.");
+                finalize(); // This will execute our cleanup function.
+                persistentLabelsGroup.clearLayers(); // Also clear any permanent labels.
+            }
+        });
+    });
+
+    map.on('pm:edit', (e) => {
+        if (e.shape === 'Line' && e.layer instanceof L.Polyline) {
+            setTimeout(() => updateAllPermanentLineLabels(e.layer), 300);
+        } else if (e.shape === 'Circle' && e.layer instanceof L.Circle) {
+            // Update live label during dragging
+            if (isMobileDevice()) {
+                liveMeasureLabel.style.display = 'block';
+                const radius = e.layer.getRadius();
+                const radiusText = radius < 1000 ? `${radius.toFixed(0)} m` : `${(radius / 1000).toFixed(2)} km`;
+                liveMeasureLabel.innerHTML = `Radius: ${radiusText}`;
+                const mapSize = map.getSize();
+                const labelPos = L.point(mapSize.x / 2, mapSize.y / 2 - 40);
+                L.DomUtil.setPosition(liveMeasureLabel, labelPos);
+            }
+            setTimeout(() => {
+                updateCircleLabel(e.layer);
+                currentLayer = e.layer;
+                lastKnownCircleState = JSON.stringify({
+                    center: e.layer.getLatLng(),
+                    radius: e.layer.getRadius()
+                });
+            }, 300);
+        }
+    });
+
+    map.on('pm:editend', () => {
+        if (isMobileDevice()) {
+            liveMeasureLabel.style.display = 'none';
+        }
+    });
+
+    map.on('pm:remove', (e) => {
+        persistentLabelsGroup.clearLayers();
+        lastKnownCircleState = null;
+        lastKnownLatLngs = null;
+        currentLayer = null;
+        liveMeasureLabel.style.display = 'none';
+    });
+}
+export function toggleGeoManControls(locked) {
+    if (!AppState.map || !AppState.map.pm) return;
+    const toolbar = document.querySelector('.leaflet-pm-toolbar');
+
+    if (locked) {
+        // Toolbar sofort ausblenden, um weitere Klicks zu verhindern
+        if (toolbar) toolbar.style.display = 'none';
+
+        // WICHTIG: Nur die Modi deaktivieren, die auch wirklich aktiv sind.
+        if (AppState.map.pm.globalDrawModeEnabled()) {
+            AppState.map.pm.disableDraw();
+        }
+        if (AppState.map.pm.globalEditModeEnabled()) {
+            AppState.map.pm.disableGlobalEditMode();
+        }
+        if (AppState.map.pm.globalRemovalModeEnabled()) {
+            AppState.map.pm.disableGlobalRemovalMode();
+        }
+    } else {
+        // Toolbar wieder anzeigen
+        if (toolbar) toolbar.style.display = 'block';
     }
 }
 function _initializeCoordsControlAndHandlers() {
@@ -621,96 +953,72 @@ function _setupCoreMapEventHandlers() {
         }
     });
 
+    let longPressTimeout;
 
+    // Standard contextmenu für Android und Desktop
     AppState.map.on('contextmenu', (e) => {
-        // Rechtsklick/Langes Drücken verschiebt jetzt den DIP
-        const { lat, lng } = e.latlng;
-        console.log('MapManager: Rechtsklick/Langes Drücken erkannt. Sende "location:selected"-Event.');
 
+        if (Settings.state.userSettings.isInteractionLocked) {
+            displayWarning("Interaction is locked. Please unlock to place a new DIP.");
+            return; // Aktion unterbinden
+        }
+
+        const { lat, lng } = e.latlng;
+        console.log('MapManager: Standard-Rechtsklick/Langes Drücken erkannt.');
         const mapSelectEvent = new CustomEvent('location:selected', {
-            detail: {
-                lat: lat,
-                lng: lng,
-                source: 'contextmenu' // Wir ändern die Quelle zur besseren Nachverfolgung
-            },
+            detail: { lat, lng, source: 'contextmenu' },
             bubbles: true,
             cancelable: true
         });
         AppState.map.getContainer().dispatchEvent(mapSelectEvent);
     });
 
-    // Touchstart (Doppel-Tipp) auf dem Kartencontainer
+    // Manuelle Erkennung für langes Drücken für iOS
     const mapContainer = AppState.map.getContainer();
-    mapContainer.addEventListener('touchstart', async (e) => {
-        if (e.touches.length !== 1 || e.target.closest('.leaflet-marker-icon')) return; // Ignoriere Multi-Touch oder Klick auf Marker
-        const currentTime = new Date().getTime();
-        const timeSinceLastTap = currentTime - lastTapTime; // lastTapTime ist eine module-level Variable
-        const tapThreshold = 300; // ms
-        if (timeSinceLastTap < tapThreshold && timeSinceLastTap > 0) {
-            e.preventDefault(); // Verhindere Standard-Touch-Aktionen wie Zoom
+    mapContainer.addEventListener('touchstart', (e) => {
+        // Ignoriere, wenn mehr als ein Finger auf dem Bildschirm ist
+        if (e.touches.length > 1) {
+            clearTimeout(longPressTimeout);
+            return;
+        }
+
+        // Starte den Timer für langes Drücken
+        longPressTimeout = setTimeout(() => {
+
+            if (Settings.state.userSettings.isInteractionLocked) {
+                displayWarning("Interaction is locked. Please unlock to place a new DIP.");
+                return; // Aktion unterbinden
+            }
+            
+            // Verhindere das Auslösen des normalen "click"-Events
+            e.preventDefault();
+
+            // KORREKTUR: Hole die Koordinaten relativ zum Karten-Container
             const rect = mapContainer.getBoundingClientRect();
-            const touchX = e.touches[0].clientX - rect.left;
-            const touchY = e.touches[0].clientY - rect.top;
-            const latlng = AppState.map.containerPointToLatLng([touchX, touchY]);
+            const touch = e.touches[0];
+            const x = touch.clientX - rect.left;
+            const y = touch.clientY - rect.top;
+            const latlng = AppState.map.containerPointToLatLng([x, y]);
 
-            await _handleMapDblClick({ latlng: latlng, containerPoint: L.point(touchX, touchY), layerPoint: AppState.map.latLngToLayerPoint(latlng) });
-        }
-        lastTapTime = currentTime; // Aktualisiere die Zeit des letzten Taps
+            console.log('MapManager: Manuelles langes Drücken (iOS) erkannt.');
+            const mapSelectEvent = new CustomEvent('location:selected', {
+                detail: { lat: latlng.lat, lng: latlng.lng, source: 'longpress_ios' },
+                bubbles: true,
+                cancelable: true
+            });
+            AppState.map.getContainer().dispatchEvent(mapSelectEvent);
 
-        if (e.touches.length === 2 && Settings.state.userSettings.showJumpRunTrack) {
-            e.preventDefault(); // Verhindert das Standard-Zooming von Leaflet
-
-            isRotatingJRT = true;
-            const touch1 = e.touches[0];
-            const touch2 = e.touches[1];
-
-            // Berechne den initialen Winkel zwischen den Fingern
-            initialJrtAngle = Math.atan2(touch2.clientY - touch1.clientY, touch2.clientX - touch1.clientX) * 180 / Math.PI;
-
-            // Speichere die aktuelle JRT-Richtung
-            const directionInput = document.getElementById('jumpRunTrackDirection');
-            initialJrtDirection = parseFloat(directionInput.value) || JumpPlanner.jumpRunTrack(null)?.direction || 0;
-        }
-    }, { passive: false }); // passive: false ist wichtig, um preventDefault zu erlauben
-
-    mapContainer.addEventListener('touchmove', (e) => {
-        if (!isRotatingJRT || e.touches.length !== 2) return;
-
-        e.preventDefault(); // Weiterhin das Zoomen verhindern
-
-        const touch1 = e.touches[0];
-        const touch2 = e.touches[1];
-
-        // Berechne den aktuellen Winkel und die Änderung
-        const currentAngle = Math.atan2(touch2.clientY - touch1.clientY, touch2.clientX - touch1.clientX) * 180 / Math.PI;
-        const angleChange = currentAngle - initialJrtAngle;
-        let newDirection = (initialJrtDirection + angleChange + 360) % 360;
-
-        // Um ein flüssiges Neuzeichnen zu gewährleisten, verwenden wir requestAnimationFrame
-        requestAnimationFrame(() => {
-            // Aktualisiere das UI-Inputfeld und die Settings
-            const directionInput = document.getElementById('jumpRunTrackDirection');
-            directionInput.value = Math.round(newDirection);
-            Settings.state.userSettings.customJumpRunDirection = Math.round(newDirection);
-
-            // Zeichne den JRT neu
-            updateJumpRunTrackDisplay();
-        });
+        }, 500); // 500ms für langes Drücken
     }, { passive: false });
 
-    mapContainer.addEventListener('touchend', (e) => {
-        if (isRotatingJRT) {
-            // Sobald weniger als zwei Finger auf dem Bildschirm sind, beenden wir die Rotation
-            if (e.touches.length < 2) {
-                isRotatingJRT = false;
+    mapContainer.addEventListener('touchend', () => {
+        // Stoppe den Timer, wenn der Finger angehoben wird
+        clearTimeout(longPressTimeout);
+    });
 
-                // Speichere den finalen Wert in den Settings
-                const directionInput = document.getElementById('jumpRunTrackDirection');
-                Settings.state.userSettings.customJumpRunTrackDirection = parseFloat(directionInput.value);
-                Settings.save();
-                console.log("JRT rotation finished, final direction saved.");
-            }
-        }
+    mapContainer.addEventListener('touchmove', () => {
+        // Stoppe den Timer, wenn der Finger bewegt wird
+        clearTimeout(longPressTimeout);
     });
 
     // Optionale, einfache Click/Mousedown-Handler (falls benötigt)
@@ -742,6 +1050,7 @@ function _setupCoreMapEventHandlers() {
     }, { passive: false }); // passive: false is required to allow preventDefault
     // --- END: Add Double-Tap/Touch Functionality ---
 
+    _setupGeomanMeasurementHandlers();
     console.log('All core map event handlers have been set up.');
 }
 function _setupCrosshairCoordinateHandler(map) {
@@ -803,13 +1112,15 @@ function _setupMouseCoordinateHandler(map) {
 
 // Die einzelnen komplexen Event-Handler
 function _handleMapDblClick(e) {
-    // Diese Funktion platziert jetzt den Cut-Away-Marker
+    if (Settings.state.userSettings.isInteractionLocked) {
+        displayWarning("Interaction is locked. Please unlock to move points.");
+        return;
+    }
     if (!Settings.state.userSettings.showCutAwayFinder) {
         return;
     }
     const { lat, lng } = e.latlng;
 
-    // Erstellt oder bewegt den Cut-Away-Marker
     if (AppState.cutAwayMarker) {
         AppState.cutAwayMarker.setLatLng([lat, lng]);
     } else {
@@ -817,7 +1128,6 @@ function _handleMapDblClick(e) {
         attachCutAwayMarkerDragend(AppState.cutAwayMarker);
     }
 
-    // Speichert die Position und löst die Neuberechnung aus
     AppState.cutAwayLat = lat;
     AppState.cutAwayLng = lng;
     updateCutAwayMarkerPopup(AppState.cutAwayMarker, lat, lng);
@@ -858,7 +1168,8 @@ export function drawJumpVisualization(jumpData) {
                 color: circleInfo.color,
                 fillColor: circleInfo.fillColor,
                 fillOpacity: circleInfo.fillOpacity,
-                weight: circleInfo.weight || 2
+                weight: circleInfo.weight || 2,
+                pmIgnore: true
             }).addTo(AppState.jumpVisualizationLayerGroup);
 
             // NEU: Wenn eine Tooltip-Information vorhanden ist, binde sie.
@@ -875,7 +1186,11 @@ export function drawJumpVisualization(jumpData) {
     // Zeichne Canopy-Kreise
     if (jumpData.canopyCircles) {
         jumpData.canopyCircles.forEach(circleInfo => {
-            L.circle(circleInfo.center, circleInfo).addTo(AppState.jumpVisualizationLayerGroup);
+            // Fügen Sie die Option dem zweiten Argument von L.circle hinzu
+            L.circle(circleInfo.center, {
+                ...circleInfo, // Übernimmt alle bestehenden Optionen
+                pmIgnore: true
+            }).addTo(AppState.jumpVisualizationLayerGroup);
         });
     }
 
@@ -902,7 +1217,8 @@ export function drawJumpVisualization(jumpData) {
                     className: `isoline-label ${isSmall ? 'isoline-label-small' : 'isoline-label-large'}`,
                     html: `<span style="font-size: ${isSmall ? '8px' : '10px'}">${labelInfo.text}</span>`,
                     iconSize: isSmall ? [50, 12] : [60, 14],
-                    iconAnchor: calculateLabelAnchor(labelInfo.center, labelInfo.radius)
+                    iconAnchor: calculateLabelAnchor(labelInfo.center, labelInfo.radius),
+                    pmIgnore: true
                 }),
                 zIndexOffset: 2100 // Stellt sicher, dass Labels oben liegen
             }).addTo(AppState.jumpVisualizationLayerGroup);
@@ -912,7 +1228,8 @@ export function drawJumpVisualization(jumpData) {
                 marker: labelMarker,
                 center: labelInfo.center,
                 radius: labelInfo.radius,
-                text: labelInfo.text
+                text: labelInfo.text,
+                pmIgnore: true
             });
         });
     }
@@ -973,7 +1290,8 @@ export function drawLandingPattern(patternData) {
             color: 'red',
             weight: 3,
             opacity: 0.8,
-            dashArray: '5, 10'
+            dashArray: '5, 10',
+            pmIgnore: true
         }).addTo(AppState.landingPatternLayerGroup); // Fügt es zur LayerGroup hinzu
     });
 
@@ -982,13 +1300,14 @@ export function drawLandingPattern(patternData) {
         // Die Funktion createArrowIcon muss auch hier im mapManager sein.
         const arrowIcon = createArrowIcon(arrow.position[0], arrow.position[1], arrow.bearing, arrow.color);
 
-        const arrowMarker = L.marker(arrow.position, { icon: arrowIcon })
+        const arrowMarker = L.marker(arrow.position, { icon: arrowIcon, pmIgnore: true })
             .addTo(AppState.landingPatternLayerGroup); // Fügt es zur LayerGroup hinzu
 
         arrowMarker.bindTooltip(arrow.tooltipText, {
             offset: [10, 0],
             direction: 'right',
-            className: 'wind-tooltip'
+            className: 'wind-tooltip',
+            pmIgnore: true
         });
     });
 }
@@ -1016,27 +1335,28 @@ function clearJumpRunTrack() {
 }
 export function createCutAwayMarker(lat, lng) {
     const cutAwayIcon = L.icon({
-        iconUrl: ICON_URLS.CUTAWAY_MARKER, // Du benötigst dieses Bild im Projektverzeichnis
+        iconUrl: ICON_URLS.CUTAWAY_MARKER,
         iconSize: [25, 25],
         iconAnchor: [12, 12],
         popupAnchor: [0, -12],
-        //shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-        //shadowSize: [41, 41],
-        //shadowAnchor: [13, 41]
+        pmIgnore: true
     });
     return L.marker([lat, lng], {
         icon: cutAwayIcon,
-        draggable: true
+        draggable: !Settings.state.userSettings.isInteractionLocked,
+        pmIgnore: true
     });
 }
 export function attachCutAwayMarkerDragend(marker) {
+    marker.on('mousedown', () => {
+        if (Settings.state.userSettings.isInteractionLocked) {
+            displayWarning("Interaction is locked. Please unlock to move points.");
+        }
+    });
     marker.on('dragend', (e) => {
         const position = marker.getLatLng();
         AppState.cutAwayLat = position.lat;
         AppState.cutAwayLng = position.lng;
-        console.log('Cut-away marker dragged to:', { lat: AppState.cutAwayLat, lng: AppState.cutAwayLng });
-
-        // Popup aktualisieren und Neuberechnung anstoßen
         updateCutAwayMarkerPopup(marker, AppState.cutAwayLat, AppState.cutAwayLng);
         const cutawayEvent = new CustomEvent('cutaway:marker_placed', { bubbles: true });
         AppState.map.getContainer().dispatchEvent(cutawayEvent);
@@ -1079,7 +1399,8 @@ export function drawCutAwayVisualization(data) {
         color: 'purple',
         fillColor: 'purple',
         fillOpacity: 0.2,
-        weight: 2
+        weight: 2,
+        pmIgnore: true
     }).addTo(AppState.map);
 
     AppState.cutAwayCircle.bindTooltip(data.tooltipContent, {
@@ -1146,13 +1467,19 @@ export function drawJumpRunTrack(trackData) {
         icon: airplaneIcon,
         rotationAngle: trackData.airplane.bearing,
         rotationOrigin: 'center center',
-        draggable: true,
-        zIndexOffset: 2000
+        draggable: !Settings.state.userSettings.isInteractionLocked,
+        zIndexOffset: 2000,
+        pmIgnore: true
     })
         .bindTooltip('Drag to move Jump Run Track')
         .addTo(AppState.jumpRunTrackLayerGroup);
 
-    airplaneMarker.on('mousedown', () => AppState.map.dragging.disable());
+    airplaneMarker.on('mousedown', () => {
+        if (Settings.state.userSettings.isInteractionLocked) {
+            displayWarning("Interaction is locked. Please unlock to move points.");
+        }
+        AppState.map.dragging.disable();
+    });
     airplaneMarker.on('mouseup', () => AppState.map.dragging.enable());
 
     airplaneMarker.on('drag', (e) => {
@@ -1185,6 +1512,13 @@ export function drawJumpRunTrack(trackData) {
                 Number.isFinite(ll[1]) ? ll[1] + deltaLng : ll[1]
             ]);
             approachPolyline.setLatLngs(newApproachLatLngs);
+        }
+    });
+
+    airplaneMarker.on('dragstart', (e) => {
+        if (Settings.state.userSettings.isInteractionLocked) {
+             e.target.dragging.disable();
+             displayWarning("Interaction is locked. Please unlock to move points."); // <-- KORREKTUR
         }
     });
 
@@ -1259,17 +1593,24 @@ export function createCustomMarker(lat, lng) {
         iconSize: [32, 32],
         iconAnchor: [16, 20],
         popupAnchor: [0, -32],
-        //shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-        //shadowSize: [41, 41], shadowAnchor: [13, 32]
+        pmIgnore: true
     });
-    return L.marker([lat, lng], { icon: customIcon, draggable: true });
+    return L.marker([lat, lng], {
+        icon: customIcon,
+        draggable: !Settings.state.userSettings.isInteractionLocked,
+        pmIgnore: true
+    });
 }
 
 // Private Helferfunktion: Hängt die Drag-Logik an.
 export function attachMarkerDragend(marker) {
+    marker.on('mousedown', () => {
+        if (Settings.state.userSettings.isInteractionLocked) {
+            displayWarning("Interaction is locked. Please unlock to move points.");
+        }
+    });
     marker.on('dragend', (e) => {
         const position = marker.getLatLng();
-        // Sendet ein Event, auf das app.js lauschen kann, um Neuberechnungen anzustoßen.
         const mapSelectEvent = new CustomEvent('location:selected', {
             detail: { lat: position.lat, lng: position.lng, source: 'marker_drag' },
             bubbles: true
@@ -1309,6 +1650,49 @@ export function recenterMap(force = false, moveMarkerToCenter = false) {
             AppState.map.panTo([AppState.currentMarker.getLatLng().lat - offsetLat, AppState.currentMarker.getLatLng().lng], { animate: force });
         }
     }
+}
+
+/**
+ * Zeichnet Marker für gefundene Points of Interest (POIs) auf die Karte.
+ * @param {Array<Object>} pois - Ein Array von POI-Objekten.
+ */
+export function updatePoiMarkers(pois) {
+    if (!AppState.map || !AppState.poiLayerGroup) {
+        console.warn('Cannot update POI markers: map or layer group not ready.');
+        return;
+    }
+
+    // Zuerst alle alten POI-Marker entfernen
+    AppState.poiLayerGroup.clearLayers();
+
+    if (!pois || pois.length === 0) {
+        return; // Nichts zu zeichnen
+    }
+
+    // Ein Icon für die POI-Marker (z.B. ein Fallschirm-Emoji)
+    const poiIcon = L.divIcon({
+        html: '🪂',
+        className: 'poi-marker-icon', // Eigene Klasse für potenzielles Styling
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+    });
+
+    pois.forEach(poi => {
+        const marker = L.marker([poi.lat, poi.lon], { icon: poiIcon, pmIgnore: true })
+            .bindTooltip(poi.display_name, {
+                permanent: false,
+                direction: 'top',
+            })
+            .on('click', () => {
+                // Wenn auf einen POI-Marker geklickt wird, die Position auswählen
+                document.dispatchEvent(new CustomEvent('location:selected', {
+                    detail: { lat: poi.lat, lng: poi.lon, source: 'poi_marker' },
+                    bubbles: true
+                }));
+            });
+
+        AppState.poiLayerGroup.addLayer(marker);
+    });
 }
 
 //Live Position Funktionen
@@ -1401,26 +1785,28 @@ export function updateLivePositionControl(data) {
 }
 
 export function handleHarpPlacement(e) {
+    if (Settings.state.userSettings.isInteractionLocked) {
+        displayWarning("Interaction is locked. Please unlock to move points.");
+        AppState.isPlacingHarp = false;
+        AppState.map.off('click', handleHarpPlacement);
+        return;
+    }
     if (!AppState.isPlacingHarp) return;
     const { lat, lng } = e.latlng;
     if (AppState.harpMarker) {
         AppState.harpMarker.setLatLng([lat, lng]);
-        console.log('Updated HARP marker position:', { lat, lng });
     } else {
         AppState.harpMarker = createHarpMarker(lat, lng).addTo(AppState.map);
-        console.log('Placed new HARP marker:', { lat, lng });
     }
     Settings.state.userSettings.harpLat = lat;
     Settings.state.userSettings.harpLng = lng;
     Settings.save();
     AppState.isPlacingHarp = false;
     AppState.map.off('click', handleHarpPlacement);
-    console.log('HARP placement mode deactivated');
-    // Enable HARP radio button
+
     const harpRadio = document.querySelector('input[name="jumpMasterLineTarget"][value="HARP"]');
     if (harpRadio) {
         harpRadio.disabled = false;
-        console.log('Enabled HARP radio button');
     }
     document.dispatchEvent(new CustomEvent('ui:recalculateJump'));
     document.dispatchEvent(new CustomEvent('harp:updated'));
@@ -1432,11 +1818,11 @@ export function createHarpMarker(latitude, longitude) {
             className: 'harp-marker',
             html: '<div style="width: 14px; height: 14px; background-color: green; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 6px rgba(0,0,0,0.6);"></div>',
             iconSize: [20, 20],
-            iconAnchor: [10, 10]
+            iconAnchor: [10, 10],
         }),
-        pane: 'markerPane' // Use standard marker pane
+        pane: 'markerPane',
+        pmIgnore: true
     });
-    console.log('Created HARP marker at:', { latitude, longitude });
     return marker;
 }
 
@@ -1490,7 +1876,39 @@ export function clearHarpMarker() {
     }
     Utils.handleMessage('HARP marker cleared');
 }
-// --- ENDE DES NEUEN BLOCKS ---
+
+/**
+ * Zeichnet den aktuell aufgezeichneten Track als Linie auf der Karte.
+ * @param {Array<object>} points - Ein Array von Trackpunkten ({lat, lng}).
+ */
+export function drawRecordedTrack(points) {
+    if (!AppState.map) return;
+
+    // Alte Linie entfernen, um sie zu aktualisieren
+    if (AppState.recordedTrackLayer) {
+        AppState.map.removeLayer(AppState.recordedTrackLayer);
+    }
+
+    if (points.length < 2) return;
+
+    const latlngs = points.map(p => [p.lat, p.lng]);
+
+    AppState.recordedTrackLayer = L.polyline(latlngs, {
+        color: '#ff0000', // Rote Farbe für den Live-Track
+        weight: 3,
+        opacity: 0.8
+    }).addTo(AppState.map);
+}
+
+/**
+ * Entfernt die Track-Linie von der Karte.
+ */
+export function clearRecordedTrack() {
+    if (AppState.map && AppState.recordedTrackLayer) {
+        AppState.map.removeLayer(AppState.recordedTrackLayer);
+        AppState.recordedTrackLayer = null;
+    }
+}
 
 /**
  * Zeichnet Marker für alle favorisierten Orte auf der Karte.
@@ -1518,10 +1936,10 @@ export function updateFavoriteMarkers(favorites) {
     });
 
     favorites.forEach(fav => {
-        const marker = L.marker([fav.lat, fav.lng], { icon: starIcon })
+        const marker = L.marker([fav.lat, fav.lng], { icon: starIcon, pmIgnore: true })
             .bindTooltip(fav.label, {
                 permanent: false,
-                direction: 'top'
+                direction: 'top',
             })
             .on('click', () => {
                 // Wenn auf einen Favoriten-Marker geklickt wird, die Position auswählen

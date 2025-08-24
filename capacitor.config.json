@@ -2,21 +2,31 @@
   "appId": "com.wetterheidi.dzmaster",
   "appName": "Wetterheidi",
   "webDir": "dist/mobile",
+  "loggingBehavior": "debug",
   "plugins": {
     "SplashScreen": {
       "launchShowDuration": 3000,
       "launchAutoHide": true,
-      "backgroundColor": "#FFFFFF",
+      "backgroundColor": "#ffffff",
       "androidSplashResourceName": "splash",
       "androidScaleType": "CENTER_CROP",
-      "showSpinner": false,
       "splashFullScreen": true,
-      "splashImmersive": true
+      "splashImmersive": true,
+      "layoutName": "launch_screen",
+      "useDialog": false
     }
   },
   "server": {
     "hostname": "app.local",
     "androidScheme": "https",
-    "iosScheme": "https"
+    "iosScheme": "https",
+    "allowNavigation": [
+      "api.open-meteo.com",
+      "geocoding-api.open-meteo.com",
+      "overpass-api.de",
+      "*.tile.openstreetmap.org",
+      "*.tile.opentopomap.org",
+      "server.arcgisonline.com"
+    ]
   }
 }

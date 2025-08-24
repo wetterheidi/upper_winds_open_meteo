@@ -40,8 +40,8 @@ export async function fetchWeatherForLocation(lat, lng, currentTime = null) {
  * @private
  */
 async function fetchWeather(lat, lon, currentTime = null) {
-    const loadingElement = document.getElementById('loading');
-    if (loadingElement) loadingElement.style.display = 'block';
+    // Sende ein Event, damit die UI den Lade-Spinner anzeigen kann
+    document.dispatchEvent(new CustomEvent('loading:start', { detail: { message: 'Fetching Weather...' } }));
 
     try {
         const selectedModelValue = document.getElementById('modelSelect')?.value || Settings.defaultSettings.model;
@@ -116,8 +116,9 @@ async function fetchWeather(lat, lon, currentTime = null) {
         displayError(`Failed to fetch weather: ${error.message}`);
         return null;
     } finally {
-        if (loadingElement) loadingElement.style.display = 'none';
-    }
+        // Sende ein Event, damit die UI den Lade-Spinner ausblenden kann
+        document.dispatchEvent(new CustomEvent('loading:stop'));
+     }
 }
 
 /**
