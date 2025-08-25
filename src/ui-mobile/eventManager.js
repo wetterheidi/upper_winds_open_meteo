@@ -620,8 +620,15 @@ function setupTrackEvents() {
     uploadButton.addEventListener('click', async () => {
         try {
             const result = await FilePicker.pickFiles({
-                types: ['application/gpx+xml', 'text/csv', 'text/comma-separated-values'],
-                readData: false // Wir lesen die Daten später selbst mit dem Pfad
+                types: [
+                    'application/gpx+xml',
+                    'text/csv',
+                    'text/comma-separated-values',
+                    'application/octet-stream', // Erlaubt generische Binärdateien
+                    'public.content',           // Generischer Inhaltstyp für iOS
+                    'public.data'               // Generischer Datentyp für iOS
+                ],
+                readData: false
             });
 
             const file = result.files[0];
@@ -639,7 +646,7 @@ function setupTrackEvents() {
                 await loadGpxTrack(file);
             } else if (extension === 'csv') {
                 await loadCsvTrackUTC(file);
-            } else if (extension === 'kml') { 
+            } else if (extension === 'kml') {
                 await loadKmlTrack(file);
             } else {
                 Utils.handleError('Unsupported file type. Please upload a .gpx or .csv file.');

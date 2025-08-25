@@ -37,8 +37,8 @@ async function readFileContent(file) {
             console.error('[trackManager] Error reading file with Capacitor:', error);
             // Fallback für den Fall, dass der Pfad nicht direkt lesbar ist (z.B. bei Content-URIs)
             if (file.webPath) {
-                 const response = await fetch(file.webPath);
-                 return await response.text();
+                const response = await fetch(file.webPath);
+                return await response.text();
             }
             throw new Error('Could not read file using native API.');
         }
@@ -60,9 +60,9 @@ async function readFileContent(file) {
  * @returns {Promise<object|null>} Ein Promise, das zu den Metadaten des Tracks auflöst oder null bei einem Fehler.
  */
 export async function loadKmlTrack(file) {
-    if (!AppState.map) { 
-        Utils.handleError('Map not initialized.'); 
-        return null; 
+    if (!AppState.map) {
+        Utils.handleError('Map not initialized.');
+        return null;
     }
     AppState.isLoadingGpx = true;
 
@@ -73,17 +73,34 @@ export async function loadKmlTrack(file) {
 
         // togeojson umwandeln
         const geojson = toGeoJSON.kml(xml);
-        
+
         const points = [];
-        // Durch alle Features im GeoJSON iterieren (z.B. Linien, Punkte)
+        // Durch alle Features im GeoJSON iterieren
         L.geoJSON(geojson, {
             onEachFeature: function (feature, layer) {
+                // Prüfen, ob Zeitstempel für den gesamten Track vorhanden sind
+                const times = feature.properties.coordTimes || feature.properties.times;
+
                 if (feature.geometry && feature.geometry.type === 'LineString') {
-                    // Koordinaten aus einem Linien-Track extrahieren
-                    feature.geometry.coordinates.forEach(coord => {
+                    feature.geometry.coordinates.forEach((coord, index) => {
                         const [lng, lat, ele] = coord;
-                        // Zeitinformationen sind in KML oft nicht pro Punkt verfügbar
-                        points.push({ lat, lng, ele: ele || null, time: null });
+                        let time = null;
+
+                        // Zeitstempel zuordnen, falls vorhanden
+                        if (times && times[index]) {
+                            const timeStr = times[index];
+                            let normalizedTime = null;
+                            if (timeStr) {
+                                if (timeStr.includes('.')) {
+                                    normalizedTime = timeStr.split('.')[0] + 'Z';
+                                } else {
+                                    normalizedTime = timeStr;
+                                }
+                            }
+                            time = normalizedTime ? DateTime.fromISO(normalizedTime, { zone: 'utc' }) : null;
+                        }
+
+                        points.push({ lat, lng, ele: ele || null, time: time });
                     });
                 }
             }
@@ -129,7 +146,25 @@ export async function loadGpxTrack(file) {
             if (isNaN(lat) || isNaN(lng)) continue;
             const ele = trackpoints[i].getElementsByTagName('ele')[0]?.textContent;
             const time = trackpoints[i].getElementsByTagName('time')[0]?.textContent;
-            points.push({ lat, lng, ele: ele ? parseFloat(ele) : null, time: time ? DateTime.fromISO(time, { zone: 'utc' }) : null });
+            //console.log(`[trackManager] GPX Point ${i}: lat=${lat}, lng=${lng}, ele=${ele}, time=${time}`);
+            let normalizedTime = null;
+            if (time) {
+
+                // Nur wenn Millisekunden vorhanden sind, schneide sie ab.
+                if (time.includes('.')) {
+                    normalizedTime = time.split('.')[0] + 'Z';
+                    //console.log(`[trackManager] Normalized Time changed: ${normalizedTime}`);
+                } else {
+                    normalizedTime = time; // Ansonsten den String unverändert lassen
+                    //console.log(`[trackManager] Normalized Time unchanged: ${normalizedTime}`);
+                }
+            }
+            points.push({
+                lat,
+                lng,
+                ele: ele ? parseFloat(ele) : null,
+                time: normalizedTime ? DateTime.fromISO(normalizedTime, { zone: 'utc' }) : null
+            });
         }
         if (points.length < 2) throw new Error('GPX track has insufficient points.');
 
@@ -171,11 +206,22 @@ export async function loadCsvTrackUTC(file) {
                         const lng = parseFloat(data[3]);
                         const ele = parseFloat(data[4]);
                         if (isNaN(lat) || isNaN(lng) || isNaN(ele)) return;
+                        let normalizedTimeStr = null;
+                        if (timeStr) {
+                            if (timeStr.includes('.')) {
+                                normalizedTimeStr = timeStr.split('.')[0] + 'Z';
+                            } else {
+                                normalizedTimeStr = timeStr;
+                            }
+                        }
                         let time = null;
                         try {
-                            time = DateTime.fromISO(timeStr, { setZone: true }).toUTC();
+                            // Verwenden Sie hier die normalisierte Zeit
+                            time = DateTime.fromISO(normalizedTimeStr, { setZone: true }).toUTC();
                             if (!time.isValid) time = null;
-                        } catch (parseError) { /* istanbul ignore next */ time = null; }
+                        } catch (parseError) {
+                            time = null;
+                        }
                         points.push({ lat, lng, ele, time });
                     }
                 },

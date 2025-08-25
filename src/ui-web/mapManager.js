@@ -136,8 +136,8 @@ function _setupBaseLayersAndHandling() {
         }),
         "OpenTopoMap + Airspaces": L.layerGroup([
             L.tileLayer.cached('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-                maxZoom: 17,
-                attribution: '© <a href="https://www.openstreetmap.org/copyright">OSM</a>, <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)',
+                maxZoom: 19,
+                attribution: '© <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)',
                 subdomains: ['a', 'b', 'c']
             }),
             L.tileLayer.cached('https://nwy-tiles-api.prod.newaydata.com/tiles/{z}/{x}/{y}.png?path=latest/aero/latest', {

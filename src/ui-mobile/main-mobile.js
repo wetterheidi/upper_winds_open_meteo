@@ -783,7 +783,7 @@ function updateJumpMasterDashboard(data) {
         speedEl: document.getElementById('dashboard-jm-speed-mobile'),
         accuracyEl: document.getElementById('dashboard-jm-accuracy-mobile')
     };
-    
+
     // Prüfen, ob alle Hauptelemente vorhanden sind
     if (Object.values(mainElements).some(el => !el)) {
         console.error("Jumpmaster Dashboard: Ein oder mehrere Haupt-UI-Elemente wurden nicht gefunden. Bitte überprüfen Sie die IDs.");
@@ -791,7 +791,7 @@ function updateJumpMasterDashboard(data) {
     }
 
     const { heightUnit, effectiveWindUnit, coordFormat, refLevel, latitude, longitude, deviceAltitude, accuracy, speedMs, direction, showJumpMasterLine, jumpMasterLineData } = data;
-    
+
     // Hauptwerte aktualisieren...
     const coords = Utils.convertCoords(latitude, longitude, coordFormat);
     mainElements.coordsEl.textContent = (coordFormat === 'MGRS') ? coords.lat : `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
@@ -831,7 +831,7 @@ function updateJumpMasterDashboard(data) {
                     allDetailsFound = false;
                 }
             }
-            
+
             if (allDetailsFound) {
                 detailElements.targetLabel.textContent = `JML to ${jumpMasterLineData.target}`;
                 detailElements.bearingEl.textContent = `${jumpMasterLineData.bearing}°`;
@@ -1125,6 +1125,12 @@ function setupAppEventListeners() {
     document.addEventListener('track:loaded', async (event) => {
         const loadingElement = document.getElementById('loading');
         try {
+            if (!event || !event.detail) {
+                console.error('[main-mobile] "track:loaded" event fired without detail object.', event);
+                Utils.handleError('Received invalid track data. Please try again.');
+                return; // Beendet die Funktion sicher, um einen Absturz zu verhindern.
+            }
+
             const { lat, lng, timestamp, historicalDate, summary } = event.detail;
             console.log('[main-mobile] Event "track:loaded" empfangen, starte Aktionen.');
 
