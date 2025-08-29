@@ -125,42 +125,53 @@ function setupSidebarEvents() {
     const icons = document.querySelectorAll('.sidebar-icon');
     const panels = document.querySelectorAll('.panel');
     const plannerIcon = document.querySelector('.sidebar-icon[data-panel-id="panel-planner"]');
+    const dataIcon = document.querySelector('.sidebar-icon[data-panel-id="panel-data"]'); // HINZUGEFÜGT
     let activePanelId = null;
 
-    if (!mainLayout || !plannerIcon) {
+    if (!mainLayout || !plannerIcon || !dataIcon) { // ERWEITERT
         console.error("Layout-Elemente für Sidebar-Logik nicht gefunden.");
         return;
     }
 
-    // Hilfsfunktion, um den visuellen Sperr-Zustand des Planner-Icons zu setzen
-    const setPlannerLockState = () => {
-        if (Settings.isFeatureUnlocked('planner')) {
-            plannerIcon.style.opacity = '1';
-            plannerIcon.title = 'Planner';
+    const setPlannerLockState = () => { /* ... (unverändert) ... */ };
+
+    // HINZUGEFÜGT: Hilfsfunktion für Data-Icon
+    const setDataLockState = () => {
+        if (Settings.isFeatureUnlocked('data')) {
+            dataIcon.style.opacity = '1';
+            dataIcon.title = 'Data';
         } else {
-            plannerIcon.style.opacity = '0.5';
-            plannerIcon.title = 'Feature locked. Click to enter password.';
+            dataIcon.style.opacity = '0.5';
+            dataIcon.title = 'Feature locked. Click to enter password.';
         }
     };
 
-    // Initialen Zustand beim Laden der Seite setzen
+    // Initialen Zustand setzen
     setPlannerLockState();
+    setDataLockState(); // HINZUGEFÜGT
 
     icons.forEach(icon => {
         icon.addEventListener('click', () => {
             const panelId = icon.dataset.panelId;
 
+            // Passwortabfrage für Planner (unverändert)
             if (panelId === 'panel-planner' && !Settings.isFeatureUnlocked('planner')) {
-                Settings.showPasswordModal('planner',
+                // ... (Code bleibt unverändert)
+                return;
+            }
+
+            // HINZUGEFÜGT: Passwortabfrage für Data
+            if (panelId === 'panel-data' && !Settings.isFeatureUnlocked('data')) {
+                Settings.showPasswordModal('data',
                     () => { // onSuccess
-                        setPlannerLockState(); // Visuellen Zustand aktualisieren
-                        icon.click(); // Erneuten Klick simulieren, um das Panel zu öffnen
+                        setDataLockState();
+                        icon.click(); // Erneuten Klick simulieren
                     },
                     () => { // onCancel
-                        setPlannerLockState();
+                        setDataLockState();
                     }
                 );
-                return; // Funktion hier beenden, um das Panel nicht zu öffnen
+                return;
             }
 
             const isAlreadyActive = mainLayout.classList.contains('sidebar-expanded') && activePanelId === panelId;

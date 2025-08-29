@@ -178,18 +178,21 @@ function setupTabBarEvents() {
     }
 
     const setPlannerLockState = () => {
-        const plannerTabButton = document.getElementById('planner-tab-button');
-        if (!plannerTabButton) return;
-        if (Settings.isFeatureUnlocked('planner')) {
-            plannerTabButton.style.opacity = '1';
-            plannerTabButton.title = 'Open Planner';
-        } else {
-            plannerTabButton.style.opacity = '0.5';
-            plannerTabButton.title = 'Feature locked. Tap to enter password.';
-        }
+        const plannerTab = document.querySelector('.tab-button[data-panel="planner"]');
+        if (!plannerTab) return;
+        plannerTab.style.opacity = Settings.isFeatureUnlocked('planner') ? '1' : '0.5';
+        plannerTab.title = Settings.isFeatureUnlocked('planner') ? 'Planner' : 'Feature locked';
+    };
+    const setDataLockState = () => {
+        const dataTab = document.querySelector('.tab-button[data-panel="data"]');
+        if (!dataTab) return;
+        dataTab.style.opacity = Settings.isFeatureUnlocked('data') ? '1' : '0.5';
+        dataTab.title = Settings.isFeatureUnlocked('data') ? 'Data' : 'Feature locked';
     };
 
+    // Initialen Zustand setzen
     setPlannerLockState();
+    setDataLockState();
 
     tabBar.addEventListener('click', (e) => {
         const button = e.target.closest('.tab-button');
@@ -231,6 +234,19 @@ function setupTabBarEvents() {
                 trackPositionCheckbox.checked = true;
                 trackPositionCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
             }
+        }
+
+        if (panelId === 'data' && !Settings.isFeatureUnlocked('data')) {
+            Settings.showPasswordModal('data',
+                () => { // onSuccess
+                    setDataLockState();
+                    button.click(); // Klick simulieren, um Tab zu öffnen
+                },
+                () => { // onCancel
+                    setDataLockState();
+                }
+            );
+            return; // Wichtig: Panel nicht öffnen
         }
 
         // Planner-Lock-Logik

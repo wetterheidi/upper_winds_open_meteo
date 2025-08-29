@@ -1,3 +1,5 @@
+// src/core/settings.js
+
 import { FEATURE_PASSWORD } from './config.js'; 
 
 export const getInterpolationStep = () => {
@@ -72,9 +74,12 @@ export const Settings = {
         userSettings: null,
         unlockedFeatures: {
             planner: false,
-            plannerHash: null // Nur noch der Planner ist relevant
+            plannerHash: null,
+            data: false, // Hinzugefügt
+            dataHash: null // Hinzugefügt
         },
-        isPlannerUnlocked: false // Nur noch dieser Status zählt
+        isPlannerUnlocked: false,
+        isDataUnlocked: false // Hinzugefügt
     },
 
     initialize() {
@@ -84,7 +89,7 @@ export const Settings = {
         }, 0);
 
         // 2. Gespeicherte Freischaltungen laden
-        let storedUnlockedFeatures = { planner: false, plannerHash: null };
+        let storedUnlockedFeatures = { planner: false, plannerHash: null, data: false, dataHash: null }; // Hinzugefügt
         try {
             const featuresRaw = localStorage.getItem('unlockedFeatures');
             if (featuresRaw) {
@@ -98,13 +103,25 @@ export const Settings = {
         const isPlannerUnlocked = storedUnlockedFeatures.planner && storedUnlockedFeatures.plannerHash === currentPasswordHash;
         if (storedUnlockedFeatures.planner && !isPlannerUnlocked) {
             console.warn("Password for 'planner' has changed. Re-locking feature.");
-            storedUnlockedFeatures = { planner: false, plannerHash: null };
-            this.saveUnlockedFeatures();
+            storedUnlockedFeatures.planner = false; // Zurücksetzen
+            storedUnlockedFeatures.plannerHash = null;
         }
 
-        // 4. Den finalen, validierten Zustand setzen
+        // 4. Data-Feature validieren
+        const isDataUnlocked = storedUnlockedFeatures.data && storedUnlockedFeatures.dataHash === currentPasswordHash;
+        if (storedUnlockedFeatures.data && !isDataUnlocked) {
+            console.warn("Password for 'data' has changed. Re-locking feature.");
+            storedUnlockedFeatures.data = false; // Zurücksetzen
+            storedUnlockedFeatures.dataHash = null;
+        }
+        
+        this.saveUnlockedFeatures();
+
+
+        // 5. Den finalen, validierten Zustand setzen
         this.state.unlockedFeatures = storedUnlockedFeatures;
         this.state.isPlannerUnlocked = isPlannerUnlocked;
+        this.state.isDataUnlocked = isDataUnlocked;
         
         // Laden der Benutzereinstellungen
         let storedSettings = {};
@@ -127,6 +144,7 @@ export const Settings = {
 
         console.log('Final initialized state:', {
             isPlannerUnlocked: this.state.isPlannerUnlocked,
+            isDataUnlocked: this.state.isDataUnlocked // Hinzugefügt
         });
     },
 
@@ -148,6 +166,10 @@ export const Settings = {
                 this.state.unlockedFeatures.planner = isUnlocked;
                 this.state.unlockedFeatures.plannerHash = isUnlocked ? passwordHash : null;
                 this.state.isPlannerUnlocked = isUnlocked;
+            } else if (feature === 'data') { // Hinzugefügt
+                this.state.unlockedFeatures.data = isUnlocked;
+                this.state.unlockedFeatures.dataHash = isUnlocked ? passwordHash : null;
+                this.state.isDataUnlocked = isUnlocked;
             }
             
             this.saveUnlockedFeatures();
@@ -236,6 +258,9 @@ export const Settings = {
 isFeatureUnlocked(feature) {
         if (feature === 'planner') {
             return this.state.isPlannerUnlocked;
+        }
+        if (feature === 'data') { // Hinzugefügt
+            return this.state.isDataUnlocked;
         }
         // Alle anderen Features sind jetzt nicht mehr separat gesperrt.
         // Ihre Verfügbarkeit wird nur durch die Sichtbarkeit des Planner-Tabs gesteuert.
