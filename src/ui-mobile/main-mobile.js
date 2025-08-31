@@ -79,16 +79,6 @@ export const getDownloadFormat = () => Settings.getValue('downloadFormat', 'csv'
 function initializeApp() {
     setAppContext(true);
     Settings.initialize();
-
-    // VEREINFACHT: Diese Zeilen sind nicht mehr nötig. Landing Pattern und Calculate Jump
-    // sind in der mobilen App immer "verfügbar", da der Planner-Tab immer da ist.
-    // Settings.state.isLandingPatternUnlocked = true;
-    // Settings.state.isCalculateJumpUnlocked = true;
-
-    // Die Prüfung für den Planner bleibt bestehen, falls Sie sie zukünftig nutzen wollen.
-    Settings.state.isPlannerUnlocked = Settings.state.unlockedFeatures.planner;
-    console.log('Initial unlock status for planner:', Settings.state.isPlannerUnlocked);
-
     if (AppState.isInitialized) {
         return;
     }
@@ -156,6 +146,32 @@ function initializeUIElements() {
     }
 
     updateUIState();
+}
+
+function updateLockStatesUI() {
+    // Update Planner Tab Button
+    const plannerTab = document.querySelector('.tab-button[data-panel="planner"]');
+    if (plannerTab) {
+        if (Settings.isFeatureUnlocked('planner')) {
+            plannerTab.style.opacity = '1';
+            plannerTab.title = 'Planner';
+        } else {
+            plannerTab.style.opacity = '0.5';
+            plannerTab.title = 'Feature locked. Tap to enter password.';
+        }
+    }
+
+    // Update Data Tab Button
+    const dataTab = document.querySelector('.tab-button[data-panel="data"]');
+    if (dataTab) {
+        if (Settings.isFeatureUnlocked('data')) {
+            dataTab.style.opacity = '1';
+            dataTab.title = 'Data';
+        } else {
+            dataTab.style.opacity = '0.5';
+            dataTab.title = 'Feature locked. Tap to enter password.';
+        }
+    }
 }
 
 // =================================================================
@@ -1693,6 +1709,7 @@ function setupAppEventListeners() {
 document.addEventListener('DOMContentLoaded', async () => {
     initializeApp();
     initializeUIElements();
+    updateLockStatesUI();
 
     // In der mobilen App soll die Tabelle im Data-Panel immer angezeigt werden.
     Settings.state.userSettings.showTable = true;
@@ -1883,6 +1900,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.log('[App] HARP has been updated, triggering JRT recalculation.');
         displayManager.updateJumpRunTrackDisplay();
     });
+
+    document.addEventListener('ui:lockStateChanged', updateLockStatesUI);
 
     setTimeout(() => {
         if (AppState.map) {

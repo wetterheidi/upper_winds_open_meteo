@@ -177,29 +177,25 @@ function setupTabBarEvents() {
         return;
     }
 
-    const setPlannerLockState = () => {
-        const plannerTab = document.querySelector('.tab-button[data-panel="planner"]');
-        if (!plannerTab) return;
-        plannerTab.style.opacity = Settings.isFeatureUnlocked('planner') ? '1' : '0.5';
-        plannerTab.title = Settings.isFeatureUnlocked('planner') ? 'Planner' : 'Feature locked';
-    };
-    const setDataLockState = () => {
-        const dataTab = document.querySelector('.tab-button[data-panel="data"]');
-        if (!dataTab) return;
-        dataTab.style.opacity = Settings.isFeatureUnlocked('data') ? '1' : '0.5';
-        dataTab.title = Settings.isFeatureUnlocked('data') ? 'Data' : 'Feature locked';
-    };
-
-    // Initialen Zustand setzen
-    setPlannerLockState();
-    setDataLockState();
-
     tabBar.addEventListener('click', (e) => {
         const button = e.target.closest('.tab-button');
         if (!button) return;
 
         const panelId = button.dataset.panel;
 
+        if ((panelId === 'planner' || panelId === 'data') && !Settings.isFeatureUnlocked(panelId)) {
+            Settings.showPasswordModal(
+                panelId,
+                () => { // onSuccess
+                    // Das 'ui:lockStateChanged' Event aktualisiert die UI.
+                    // Wir simulieren nur den Klick erneut, um das Panel zu öffnen.
+                    button.click();
+                },
+                () => { /* onCancel: nichts tun */ }
+            );
+            return; // Klick-Verarbeitung hier stoppen
+        }
+        
         // 1. Slider-Sichtbarkeit steuern (wie zuvor)
         if (panelId === 'map' || panelId === 'data') {
             sliderContainer.style.display = 'flex';
