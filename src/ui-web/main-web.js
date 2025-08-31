@@ -74,12 +74,12 @@ export const getDownloadFormat = () => Settings.getValue('downloadFormat', 'radi
 function initializeApp() {
     setAppContext(true);
     Settings.initialize();
-    
+
     // VEREINFACHT: Diese Zeilen sind nicht mehr nötig. Landing Pattern und Calculate Jump
     // sind in der mobilen App immer "verfügbar", da der Planner-Tab immer da ist.
     // Settings.state.isLandingPatternUnlocked = true;
     // Settings.state.isCalculateJumpUnlocked = true;
-    
+
     // Die Prüfung für den Planner bleibt bestehen, falls Sie sie zukünftig nutzen wollen.
     Settings.state.isPlannerUnlocked = Settings.state.unlockedFeatures.planner;
     console.log('Initial unlock status for planner:', Settings.state.isPlannerUnlocked);
@@ -672,6 +672,31 @@ export function updateUIState() {
     if (showJumpRunTrackCheckbox) showJumpRunTrackCheckbox.disabled = !Settings.state.userSettings.calculateJump;
     if (showExitAreaCheckbox) showExitAreaCheckbox.disabled = !Settings.state.userSettings.calculateJump; // Disable unless calculateJump is on
     Settings.updateUnitLabels();
+}
+function updateLockStatesUI() {
+    // Update Planner Icon
+    const plannerIcon = document.querySelector('.sidebar-icon[data-panel-id="panel-planner"]');
+    if (plannerIcon) {
+        if (Settings.isFeatureUnlocked('planner')) {
+            plannerIcon.style.opacity = '1';
+            plannerIcon.title = 'Planner';
+        } else {
+            plannerIcon.style.opacity = '0.5';
+            plannerIcon.title = 'Feature locked. Click to enter password.';
+        }
+    }
+
+    // Update Data Icon
+    const dataIcon = document.querySelector('.sidebar-icon[data-panel-id="panel-data"]');
+    if (dataIcon) {
+        if (Settings.isFeatureUnlocked('data')) {
+            dataIcon.style.opacity = '1';
+            dataIcon.title = 'Data';
+        } else {
+            dataIcon.style.opacity = '0.5';
+            dataIcon.title = 'Feature locked. Click to enter password.';
+        }
+    }
 }
 
 /**
@@ -1483,6 +1508,7 @@ function setupAppEventListeners() {
 document.addEventListener('DOMContentLoaded', async () => {
     initializeApp();
     initializeUIElements();
+    updateLockStatesUI();
     applyDeviceSpecificStyles();
     await mapManager.initializeMap();
     setupAppEventListeners();
@@ -1673,6 +1699,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             await updateToCurrentHour();
         }
     });
+
+    document.addEventListener('ui:lockStateChanged', updateLockStatesUI);
 });
 
 // =================================================================

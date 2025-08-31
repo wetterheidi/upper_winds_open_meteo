@@ -124,57 +124,36 @@ function setupSidebarEvents() {
     const mainLayout = document.querySelector('.main-layout');
     const icons = document.querySelectorAll('.sidebar-icon');
     const panels = document.querySelectorAll('.panel');
-    const plannerIcon = document.querySelector('.sidebar-icon[data-panel-id="panel-planner"]');
-    const dataIcon = document.querySelector('.sidebar-icon[data-panel-id="panel-data"]'); // HINZUGEFÜGT
     let activePanelId = null;
 
-    if (!mainLayout || !plannerIcon || !dataIcon) { // ERWEITERT
+    if (!mainLayout) {
         console.error("Layout-Elemente für Sidebar-Logik nicht gefunden.");
         return;
     }
-
-    const setPlannerLockState = () => { /* ... (unverändert) ... */ };
-
-    // HINZUGEFÜGT: Hilfsfunktion für Data-Icon
-    const setDataLockState = () => {
-        if (Settings.isFeatureUnlocked('data')) {
-            dataIcon.style.opacity = '1';
-            dataIcon.title = 'Data';
-        } else {
-            dataIcon.style.opacity = '0.5';
-            dataIcon.title = 'Feature locked. Click to enter password.';
-        }
-    };
-
-    // Initialen Zustand setzen
-    setPlannerLockState();
-    setDataLockState(); // HINZUGEFÜGT
+    
+    // Die alten setPlannerLockState und setDataLockState Funktionen werden komplett entfernt.
 
     icons.forEach(icon => {
         icon.addEventListener('click', () => {
-            const panelId = icon.dataset.panelId;
+            const panelIdRaw = icon.dataset.panelId; // z.B. "panel-planner"
+            const feature = panelIdRaw.replace('panel-', ''); // z.B. "planner"
 
-            // Passwortabfrage für Planner (unverändert)
-            if (panelId === 'panel-planner' && !Settings.isFeatureUnlocked('planner')) {
-                // ... (Code bleibt unverändert)
-                return;
-            }
-
-            // HINZUGEFÜGT: Passwortabfrage für Data
-            if (panelId === 'panel-data' && !Settings.isFeatureUnlocked('data')) {
-                Settings.showPasswordModal('data',
+            // Generische Prüfung für alle sperrbaren Features
+            if ((feature === 'planner' || feature === 'data') && !Settings.isFeatureUnlocked(feature)) {
+                Settings.showPasswordModal(
+                    feature,
                     () => { // onSuccess
-                        setDataLockState();
-                        icon.click(); // Erneuten Klick simulieren
+                        // Nach erfolgreichem Entsperren wird das 'ui:lockStateChanged'-Event die UI aktualisieren.
+                        // Wir simulieren nur den Klick erneut, um das Panel zu öffnen.
+                        icon.click();
                     },
-                    () => { // onCancel
-                        setDataLockState();
-                    }
+                    () => { /* onCancel: nichts tun */ }
                 );
-                return;
+                return; // Klick-Verarbeitung hier stoppen
             }
 
-            const isAlreadyActive = mainLayout.classList.contains('sidebar-expanded') && activePanelId === panelId;
+            // Der Rest der Logik zum Öffnen und Schließen der Panels bleibt unverändert
+            const isAlreadyActive = mainLayout.classList.contains('sidebar-expanded') && activePanelId === panelIdRaw;
 
             mainLayout.classList.remove('sidebar-expanded', 'data-panel-visible');
             icons.forEach(i => i.classList.remove('active'));
@@ -184,9 +163,9 @@ function setupSidebarEvents() {
             } else {
                 mainLayout.classList.add('sidebar-expanded');
                 icon.classList.add('active');
-                activePanelId = panelId;
-                panels.forEach(p => p.classList.toggle('hidden', p.id !== panelId));
-                if (panelId === 'panel-data') {
+                activePanelId = panelIdRaw;
+                panels.forEach(p => p.classList.toggle('hidden', p.id !== panelIdRaw));
+                if (panelIdRaw === 'panel-data') {
                     mainLayout.classList.add('data-panel-visible');
                 }
             }

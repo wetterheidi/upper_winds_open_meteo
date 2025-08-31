@@ -1,6 +1,6 @@
 // src/core/settings.js
 
-import { FEATURE_PASSWORD } from './config.js'; 
+import { FEATURE_PASSWORD_PLANNER, FEATURE_PASSWORD_DATA } from './config.js';
 
 export const getInterpolationStep = () => {
     const selectElement = document.getElementById('interpStep');
@@ -18,7 +18,8 @@ export function setAppContext(isMobile) {
 }
 
 export const Settings = {
-    FEATURE_PASSWORD: 'DZMasterTest',
+    FEATURE_PASSWORD_PLANNER: FEATURE_PASSWORD_PLANNER,
+    FEATURE_PASSWORD_DATA: FEATURE_PASSWORD_DATA,
 
     defaultSettings: {
         model: 'icon_global',
@@ -72,58 +73,47 @@ export const Settings = {
 
     state: {
         userSettings: null,
+        // DIES IST JETZT DIE EINZIGE QUELLE DER WAHRHEIT FÜR DEN SPERRSTATUS
         unlockedFeatures: {
             planner: false,
             plannerHash: null,
-            data: false, // Hinzugefügt
-            dataHash: null // Hinzugefügt
-        },
-        isPlannerUnlocked: false,
-        isDataUnlocked: false // Hinzugefügt
+            data: false,
+            dataHash: null
+        }
     },
 
     initialize() {
-        // 1. Passwort-Hash des aktuellen Passworts in der Konfiguration erstellen
-        const currentPasswordHash = this.FEATURE_PASSWORD.split('').reduce((acc, char) => {
-            return char.charCodeAt(0) + ((acc << 5) - acc);
-        }, 0);
+        // 1. Hashes für beide Passwörter erstellen
+        const plannerPasswordHash = this.FEATURE_PASSWORD_PLANNER.split('').reduce((acc, char) => (char.charCodeAt(0) + ((acc << 5) - acc)), 0);
+        const dataPasswordHash = this.FEATURE_PASSWORD_DATA.split('').reduce((acc, char) => (char.charCodeAt(0) + ((acc << 5) - acc)), 0);
 
         // 2. Gespeicherte Freischaltungen laden
-        let storedUnlockedFeatures = { planner: false, plannerHash: null, data: false, dataHash: null }; // Hinzugefügt
+        let features = { planner: false, plannerHash: null, data: false, dataHash: null };
         try {
-            const featuresRaw = localStorage.getItem('unlockedFeatures');
-            if (featuresRaw) {
-                storedUnlockedFeatures = { ...storedUnlockedFeatures, ...JSON.parse(featuresRaw) };
+            const raw = localStorage.getItem('unlockedFeatures');
+            if (raw) {
+                features = { ...features, ...JSON.parse(raw) };
             }
         } catch (error) {
             this.handleError(error, 'Failed to load unlocked features.');
         }
 
-        // 3. Planner-Feature validieren
-        const isPlannerUnlocked = storedUnlockedFeatures.planner && storedUnlockedFeatures.plannerHash === currentPasswordHash;
-        if (storedUnlockedFeatures.planner && !isPlannerUnlocked) {
-            console.warn("Password for 'planner' has changed. Re-locking feature.");
-            storedUnlockedFeatures.planner = false; // Zurücksetzen
-            storedUnlockedFeatures.plannerHash = null;
-        }
-
-        // 4. Data-Feature validieren
-        const isDataUnlocked = storedUnlockedFeatures.data && storedUnlockedFeatures.dataHash === currentPasswordHash;
-        if (storedUnlockedFeatures.data && !isDataUnlocked) {
-            console.warn("Password for 'data' has changed. Re-locking feature.");
-            storedUnlockedFeatures.data = false; // Zurücksetzen
-            storedUnlockedFeatures.dataHash = null;
-        }
+        // 3. Status basierend auf den geladenen Daten und aktuellen Hashes validieren
+        const isPlannerStillUnlocked = features.planner && features.plannerHash === plannerPasswordHash;
+        const isDataStillUnlocked = features.data && features.dataHash === dataPasswordHash;
         
+        // 4. Den finalen, bereinigten Zustand direkt im state-Objekt setzen
+        this.state.unlockedFeatures = {
+            planner: isPlannerStillUnlocked,
+            plannerHash: isPlannerStillUnlocked ? plannerPasswordHash : null,
+            data: isDataStillUnlocked,
+            dataHash: isDataStillUnlocked ? dataPasswordHash : null
+        };
+
+        // 5. Den bereinigten Zustand immer zurück in den localStorage schreiben
         this.saveUnlockedFeatures();
-
-
-        // 5. Den finalen, validierten Zustand setzen
-        this.state.unlockedFeatures = storedUnlockedFeatures;
-        this.state.isPlannerUnlocked = isPlannerUnlocked;
-        this.state.isDataUnlocked = isDataUnlocked;
         
-        // Laden der Benutzereinstellungen
+        // --- Laden der User-Settings (unverändert) ---
         let storedSettings = {};
         try {
             const settingsRaw = localStorage.getItem('upperWindsSettings');
@@ -131,54 +121,43 @@ export const Settings = {
         } catch (error) {
             this.handleError(error, 'Failed to load settings.');
         }
-
         this.state.userSettings = { ...this.defaultSettings, ...storedSettings };
         
-        // Zurücksetzen der nicht-persistenten Einstellungen
+        // Nicht-persistente Einstellungen zurücksetzen
         this.state.userSettings.isInteractionLocked = false;
         this.state.userSettings.harpLat = null;
         this.state.userSettings.harpLng = null;
         this.state.userSettings.jumpRunTrackOffset = 0;
         this.state.userSettings.jumpRunTrackForwardOffset = 0;
         this.state.userSettings.showCutAwayFinder = false;
-
-        console.log('Final initialized state:', {
-            isPlannerUnlocked: this.state.isPlannerUnlocked,
-            isDataUnlocked: this.state.isDataUnlocked // Hinzugefügt
-        });
-    },
-
-    save() {
-        const settingsToSave = { ...this.state.userSettings };
-        delete settingsToSave.customJumpRunDirection;
-        try {
-            localStorage.setItem('upperWindsSettings', JSON.stringify(settingsToSave));
-        } catch (error) {
-            console.error('Failed to save settings to localStorage:', error);
-        }
     },
 
     saveUnlockStatus(feature, isUnlocked) {
-        try {
-            const passwordHash = this.FEATURE_PASSWORD.split('').reduce((acc, char) => (char.charCodeAt(0) + ((acc << 5) - acc)), 0);
-
-            if (feature === 'planner') {
-                this.state.unlockedFeatures.planner = isUnlocked;
-                this.state.unlockedFeatures.plannerHash = isUnlocked ? passwordHash : null;
-                this.state.isPlannerUnlocked = isUnlocked;
-            } else if (feature === 'data') { // Hinzugefügt
-                this.state.unlockedFeatures.data = isUnlocked;
-                this.state.unlockedFeatures.dataHash = isUnlocked ? passwordHash : null;
-                this.state.isDataUnlocked = isUnlocked;
-            }
-            
-            this.saveUnlockedFeatures();
-            console.log('Saved unlock status:', this.state.unlockedFeatures);
-        } catch (error) {
-            Utils.handleError('Failed to save unlock status.');
+        if (feature === 'planner') {
+            const hash = this.FEATURE_PASSWORD_PLANNER.split('').reduce((acc, char) => (char.charCodeAt(0) + ((acc << 5) - acc)), 0);
+            this.state.unlockedFeatures.planner = isUnlocked;
+            this.state.unlockedFeatures.plannerHash = isUnlocked ? hash : null;
+        } else if (feature === 'data') {
+            const hash = this.FEATURE_PASSWORD_DATA.split('').reduce((acc, char) => (char.charCodeAt(0) + ((acc << 5) - acc)), 0);
+            this.state.unlockedFeatures.data = isUnlocked;
+            this.state.unlockedFeatures.dataHash = isUnlocked ? hash : null;
         }
+        this.saveUnlockedFeatures();
     },
 
+    isFeatureUnlocked(feature) {
+        if (feature === 'planner') {
+            return this.state.unlockedFeatures.planner;
+        }
+        if (feature === 'data') {
+            return this.state.unlockedFeatures.data;
+        }
+        if (['landingPattern', 'calculateJump'].includes(feature)) {
+            return true;
+        }
+        return false;
+    },
+    
     showPasswordModal(feature, onSuccess, onCancel) {
         const modal = document.getElementById('passwordModal');
         const input = document.getElementById('passwordInput');
@@ -190,6 +169,8 @@ export const Settings = {
 
         if (!modal || !input || !submitBtn || !cancelBtn || !header || !message) return;
 
+        const correctPassword = feature === 'planner' ? this.FEATURE_PASSWORD_PLANNER : this.FEATURE_PASSWORD_DATA;
+
         const featureName = feature.charAt(0).toUpperCase() + feature.slice(1);
         header.textContent = `${featureName} Access`;
         message.textContent = `Please enter the password to enable the ${featureName.toLowerCase()} functionality:`;
@@ -198,9 +179,11 @@ export const Settings = {
         modal.style.display = 'flex';
 
         const submitHandler = () => {
-            if (input.value === this.FEATURE_PASSWORD) {
+            if (input.value === correctPassword) {
                 modal.style.display = 'none';
                 this.saveUnlockStatus(feature, true);
+                // NEU: Ein Event auslösen, auf das die UI hören kann
+                document.dispatchEvent(new CustomEvent('ui:lockStateChanged'));
                 onSuccess();
             } else {
                 error.textContent = 'Incorrect password';
@@ -216,12 +199,22 @@ export const Settings = {
         };
     },
 
-    saveUnlockedFeatures() {
+    saveUnlockedFeatures(featuresToSave = this.state.unlockedFeatures) {
         try {
-            const featuresString = JSON.stringify(this.state.unlockedFeatures);
+            const featuresString = JSON.stringify(featuresToSave);
             localStorage.setItem('unlockedFeatures', featuresString);
         } catch (error) {
             this.handleError(error, 'Failed to save unlocked features to localStorage.');
+        }
+    },
+    
+    save() {
+        const settingsToSave = { ...this.state.userSettings };
+        delete settingsToSave.customJumpRunDirection;
+        try {
+            localStorage.setItem('upperWindsSettings', JSON.stringify(settingsToSave));
+        } catch (error) {
+            console.error('Failed to save settings to localStorage:', error);
         }
     },
     
@@ -242,31 +235,10 @@ export const Settings = {
         return defaultValue;
     },
 
-    updateUnitLabels() {
-        // Diese Funktion bleibt unverändert
-    },
-
-    updateModelRunInfo(lastModelRun, lastLat, lastLng) {
-        // Diese Funktion bleibt unverändert
-    },
-
+    updateUnitLabels() {},
+    updateModelRunInfo(lastModelRun, lastLat, lastLng) {},
     handleError(error, userMessage = 'An error occurred.') {
         console.error('Settings Error:', error);
-        Utils.handleError(userMessage);
+        // Utils.handleError(userMessage); // Auskommentiert, falls Utils hier nicht verfügbar ist
     },
-
-isFeatureUnlocked(feature) {
-        if (feature === 'planner') {
-            return this.state.isPlannerUnlocked;
-        }
-        if (feature === 'data') { // Hinzugefügt
-            return this.state.isDataUnlocked;
-        }
-        // Alle anderen Features sind jetzt nicht mehr separat gesperrt.
-        // Ihre Verfügbarkeit wird nur durch die Sichtbarkeit des Planner-Tabs gesteuert.
-        if (feature === 'landingPattern' || feature === 'calculateJump') {
-            return true;
-        }
-        return !!this.state.unlockedFeatures[feature] || false;
-    }
 };
