@@ -433,13 +433,6 @@ export class Utils {
         return isNaN(wca) ? 0 : wca; // Negative if wind from left, positive if from right
     }
 
-    /**
-     * Calculate ground speed
-     */
-    static calculateGroundSpeed(trueAirspeed, headwind) {
-        return trueAirspeed - headwind;
-    }
-
     static calculateCourseFromHeading(trueHeading, windDirection, windSpeed, trueAirspeed) {
         // Wind angle relative to heading
         const windAngle = Utils.calculateWindAngle(trueHeading, windDirection);
@@ -490,7 +483,9 @@ export class Utils {
         const windAngle = Utils.calculateWindAngle(trueCourse, windDirection);
         const { crosswind, headwind } = Utils.calculateWindComponents(windSpeed, windAngle);
         const wca = Utils.calculateWCA(crosswind, trueAirspeed);
-        const groundSpeed = Utils.calculateGroundSpeed(trueAirspeed, headwind);
+        const groundSpeed = trueAirspeed > Math.abs(crosswind)
+            ? Math.sqrt(Math.pow(trueAirspeed, 2) - Math.pow(crosswind, 2)) - headwind
+            : -headwind; // Wenn der Seitenwind zu stark ist, bewegt man sich nur mit dem Gegenwind rückwärts.
 
         return {
             crosswind: Number(crosswind.toFixed(2)),
@@ -1017,4 +1012,4 @@ export class Utils {
 
 }
 
-window.Utils = Utils;
+//window.Utils = Utils;
