@@ -103,8 +103,9 @@ body {
     display: flex;
     justify-content: space-around;
     align-items: flex-start;
-    padding-top: 5px;
-    background-color: var(--background-light);
+    padding-top: 20px;
+    padding-bottom: 80px;
+    background-color: white !important;
     border-top: 1px solid var(--border-color);
     box-sizing: border-box;
     z-index: 1001;
@@ -144,7 +145,7 @@ body {
     align-items: center;
     justify-content: center;
     /* Zentriert den Inhalt (Icon & Label) */
-    background: none;
+    background: white !important;
     border: none;
     color: #888888;
     flex-grow: 1;
@@ -163,6 +164,7 @@ body {
     /* Verhindert zusätzlichen Zeilenabstand */
     margin-bottom: 2px;
     /* Kleiner Abstand zum Label */
+    background: white !important;
 }
 
 .tab-button .label {
@@ -171,7 +173,7 @@ body {
 }
 
 .tab-button:hover {
-    background: var(--primary-color);
+    background: white;
 }
 
 .tab-button.active {
@@ -1032,7 +1034,7 @@ input[type="checkbox"][style*="opacity: 1"] {
 }
 
 .leaflet-control-container .leaflet-bottom {
-    bottom: 10px;
+    bottom: 5px;
 }
 
 .leaflet-control-coordinates,
