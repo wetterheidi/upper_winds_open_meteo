@@ -1,9 +1,7 @@
-// vitest.config.js
-import { defineConfig } from 'vitest/config';
-
-export default defineConfig({
+/** @type {import('vitest').UserConfig} */
+export default {
   test: {
-    // Schließt den Ordner ein, in dem Ihre Tests liegen
-    include: ['src/**/*.{test,spec}.js'],
+    environment: 'node',
+    globals: true,
   },
-});
+};
