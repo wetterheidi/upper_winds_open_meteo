@@ -14,8 +14,8 @@ import { JUMP_RUN_DEFAULTS, CUTAWAY_VISUALIZATION_RADIUS_METERS, JUMPER_SEPARATI
 export function getSeparationFromTAS(ias) {
     const exitAltitudeFt = Settings.state.userSettings.exitAltitude * CONVERSIONS.METERS_TO_FEET;
     const tas = Utils.calculateTAS(ias, exitAltitudeFt);
-    if (tas === 'N/A') {
-        console.warn('TAS calculation failed, using default separation');
+    if (tas === 'N/A' || !Number.isFinite(tas) || tas <= 0) {  // NEU: Ergänzung für negative/ungültige TAS
+        console.warn('TAS calculation failed or invalid, using default separation');
         return Settings.defaultSettings.jumperSeparation;
     }
     const speeds = Object.keys(JUMPER_SEPARATION_TABLE).map(Number).sort((a, b) => b - a);
@@ -43,6 +43,10 @@ export function getSeparationFromTAS(ias) {
 export function calculateFreeFall(weatherData, exitAltitude, openingAltitude, interpolatedData, startLat, startLng, elevation, jumpRunDirection) {
     if (!weatherData || !weatherData.time || !interpolatedData || interpolatedData.length === 0) return null;
     if (!Number.isFinite(startLat) || !Number.isFinite(startLng) || !Number.isFinite(elevation)) return null;
+
+    // NEU: Überprüfung auf gültige Höhen und Koordinaten
+    if (exitAltitude <= openingAltitude || exitAltitude < 0 || openingAltitude < 0) return null;
+    if (startLat < -90 || startLat > 90 || startLng < -180 || startLng > 180) return null;
 
     console.log("--- calculateFreeFall: Berechnung gestartet ---");
     const hStart = elevation + exitAltitude;
@@ -161,8 +165,9 @@ export function calculateExitCircle(interpolatedData) {
     const openingAltitude = parseInt(document.getElementById('openingAltitude')?.value) || 1200;
     const legHeightDownwind = parseInt(document.getElementById('legHeightDownwind')?.value) || 300;
     const descentRate = parseFloat(document.getElementById('descentRate')?.value) || 3.5;
-    const canopySpeedMps = (parseFloat(document.getElementById('canopySpeed')?.value) || 20) * CONVERSIONS.KNOTS_TO_MPS;
-    const safetyHeight = Settings.state.userSettings.safetyHeight || 0; // NEU
+    const canopySpeedKt = parseFloat(document.getElementById('canopySpeed')?.value) || 20;
+    const canopySpeedMps = canopySpeedKt * CONVERSIONS.KNOTS_TO_MPS;
+    const safetyHeight = Settings.state.userSettings.safetyHeight || 0;
 
     const reductionDistance = (safetyHeight / descentRate) * canopySpeedMps;
 
@@ -194,6 +199,12 @@ export function calculateExitCircle(interpolatedData) {
     const greenShiftDirection = (freeFallResult.directionDeg + 180) % 360;
     const greenCenter = Utils.calculateNewCenter(newCenterRed[0], newCenterRed[1], freeFallResult.distance, greenShiftDirection);
     const darkGreenCenter = Utils.calculateNewCenter(newCenterBlue[0], newCenterBlue[1], freeFallResult.distance, greenShiftDirection);
+
+    console.log(`[calculateExitCircle] freeFallResult: distance=${freeFallResult.distance.toFixed(2)} m, directionDeg=${freeFallResult.directionDeg.toFixed(1)}°`);
+    console.log(`[calculateExitCircle] meanWind: dir=${meanWind[0].toFixed(1)}°, speed=${meanWind[1].toFixed(2)} m/s`);
+    console.log(`[calculateExitCircle] greenCenter: lat=${greenCenter[0]}, lng=${greenCenter[1]}`);
+    console.log(`[calculateExitCircle] darkGreenCenter: lat=${darkGreenCenter[0]}, lng=${darkGreenCenter[1]}`);
+    console.log(`[calculateExitCircle] expected downwindStart: lat=52.51657818951595, lng=13.413705547188442`);
 
     return {
         greenLat: greenCenter[0], greenLng: greenCenter[1],
@@ -297,6 +308,29 @@ export function calculateCanopyCircles(interpolatedData) {
             additionalBlueUpperLimits.push(currentUpper - elevation);
         }
     }
+
+    // Berechnung der tatsächlichen Mittelpunkte mit Windversatz
+    const redCircleCenter = Utils.calculateNewCenter(
+        AppState.lastLat,
+        AppState.lastLng,
+        meanWindFull[1] * flyTimeFull,
+        meanWindFull[0]
+    );
+    console.log('[calculateCanopyCircles] Tatsächlicher Mittelpunkt roter Kreis:', {
+        lat: redCircleCenter[0],
+        lng: redCircleCenter[1]
+    });
+
+    const blueCircleCenter = Utils.calculateNewCenter(
+        blueLat,
+        blueLng,
+        meanWind[1] * flyTime,
+        meanWind[0]
+    );
+    console.log('[calculateCanopyCircles] Tatsächlicher Mittelpunkt blauer Kreis:', {
+        lat: blueCircleCenter[0],
+        lng: blueCircleCenter[1]
+    });
 
     return {
         blueLat, blueLng, redLat: AppState.lastLat, redLng: AppState.lastLng,
