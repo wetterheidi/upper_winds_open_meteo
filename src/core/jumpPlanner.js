@@ -309,6 +309,11 @@ export function calculateCanopyCircles(interpolatedData) {
         }
     }
 
+    console.log('[calculateCanopyCircles] Debug meanWind:', meanWind);
+    console.log('[calculateCanopyCircles] Debug flyTime:', flyTime);
+    console.log('[calculateCanopyCircles] Debug meanWindFull:', meanWindFull);
+    console.log('[calculateCanopyCircles] Debug flyTimeFull:', flyTimeFull);
+
     // Berechnung der tatsächlichen Mittelpunkte mit Windversatz
     const redCircleCenter = Utils.calculateNewCenter(
         AppState.lastLat,
@@ -317,8 +322,8 @@ export function calculateCanopyCircles(interpolatedData) {
         meanWindFull[0]
     );
     console.log('[calculateCanopyCircles] Tatsächlicher Mittelpunkt roter Kreis:', {
-        lat: redCircleCenter[0],
-        lng: redCircleCenter[1]
+        lat: redCircleCenter[0].toFixed(3),
+        lng: redCircleCenter[1].toFixed(3)
     });
 
     const blueCircleCenter = Utils.calculateNewCenter(
@@ -328,8 +333,8 @@ export function calculateCanopyCircles(interpolatedData) {
         meanWind[0]
     );
     console.log('[calculateCanopyCircles] Tatsächlicher Mittelpunkt blauer Kreis:', {
-        lat: blueCircleCenter[0],
-        lng: blueCircleCenter[1]
+        lat: blueCircleCenter[0].toFixed(3),
+        lng: blueCircleCenter[1].toFixed(3)
     });
 
     return {

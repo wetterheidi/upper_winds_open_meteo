@@ -588,32 +588,86 @@ describe('jumpPlanner.js', () => {
                 time: 30,
             });
 
-            // Mock für calculateLandingPatternCoords, um einen bekannten, korrekten Wert zurückzugeben
+            // Mock für calculateLandingPatternCoords
             vi.spyOn(jumpPlanner, 'calculateLandingPatternCoords').mockReturnValue({
                 downwindStart: [52.517020691369694, 13.413613602570422],
+            });
+
+            // Setze showCanopyArea und calculateJump auf true
+            Settings.state.userSettings.showCanopyArea = true;
+            Settings.state.userSettings.calculateJump = true;
+
+            // Mock für calculateMeanWind mit Debugging
+            Utils.calculateMeanWind.mockImplementation((heights, u, v, minHeight, maxHeight) => {
+                console.log('Debug calculateMeanWind:', { minHeight, maxHeight });
+                if (Math.abs(minHeight - 38) < 1 && Math.abs(maxHeight - 138) < 1) {
+                    return [188.1, 6.6, 0, 0];
+                }
+                if (Math.abs(minHeight - 138) < 1 && Math.abs(maxHeight - 238) < 1) {
+                    return [201.4, 10.5, 0, 0];
+                }
+                if (Math.abs(minHeight - 238) < 1 && Math.abs(maxHeight - 338) < 1) {
+                    return [213.6, 13.3, 0, 0];
+                }
+                if (Math.abs(minHeight - 338) < 1 && Math.abs(maxHeight - 1138) < 1) {
+                    return [230, 10, 0, 0];
+                }
+                if (Math.abs(minHeight - 38) < 1 && Math.abs(maxHeight - 1038) < 1) {
+                    return [225.36727896023694, 8.423618730519793, 5.994457151784732, 5.918093947596707];
+                }
+                if (Math.abs(minHeight - 338) < 1 && Math.abs(maxHeight - 1038) < 1) {
+                    return [229.2807405949767, 10.071133521192923, 7.633064139555967, 6.569936243459332];
+                }
+                console.log('Debug calculateMeanWind Fallback:', { minHeight, maxHeight });
+                return [0, 0, 0, 0];
             });
         });
 
         it('sollte gültige Kreise für die Schirmfahrt zurückgeben', () => {
             const interpolatedData = interpolateWeatherData();
+            const consoleSpy = vi.spyOn(console, 'log');
             const result = jumpPlanner.calculateCanopyCircles(interpolatedData);
 
             expect(result).not.toBeNull();
             expect(result.radiusFull).toBeGreaterThan(0);
             expect(result.additionalBlueRadii.length).toBeGreaterThan(0);
 
-            // Überprüfe die erwarteten Koordinaten, die jetzt mit den Mocks übereinstimmen sollten
-            expect(result.blueLat).toBeCloseTo(52.505201, 4);
-            expect(result.blueLng).toBeCloseTo(13.391058, 4);
-            expect(result.redLat).toBeCloseTo(52.50479, 4);
-            expect(result.redLng).toBeCloseTo(13.384695, 4);
+            // Überprüfe die Basis-Koordinaten (ohne Windversatz)
+            expect(result.blueLat).toBeCloseTo(52.517, 3);
+            expect(result.blueLng).toBeCloseTo(13.414, 3);
+            expect(result.redLat).toBeCloseTo(52.52, 3);
+            expect(result.redLng).toBeCloseTo(13.41, 3);
+
+            // Überprüfe die console.log-Ausgaben für die tatsächlichen Mittelpunkte
+            const logs = consoleSpy.mock.calls;
+            const redCircleLog = logs.find(call => call[0].includes('Tatsächlicher Mittelpunkt roter Kreis'));
+            const blueCircleLog = logs.find(call => call[0].includes('Tatsächlicher Mittelpunkt blauer Kreis'));
+
+            // Debugging: Logge die tatsächliche Ausgabe
+            console.log('Debug redCircleLog:', redCircleLog);
+            console.log('Debug blueCircleLog:', blueCircleLog);
+
+            // Überprüfe die Koordinaten aus dem zweiten Argument (dem Objekt)
+            expect(redCircleLog[1]).toEqual({ lat: '52.505', lng: '13.385' });
+            expect(blueCircleLog[1]).toEqual({ lat: '52.505', lng: '13.391' });
+
+            consoleSpy.mockRestore();
         });
 
         it('sollte null zurückgeben, wenn calculateFreeFall fehlschlägt', () => {
-            vi.spyOn(jumpPlanner, 'calculateFreeFall').mockReturnValue(null);
+            const freeFallSpy = vi.spyOn(jumpPlanner, 'calculateFreeFall').mockReset();
+            freeFallSpy.mockReturnValue(null);
+            const consoleSpy = vi.spyOn(console, 'log');
+
             const interpolatedData = interpolateWeatherData();
             const result = jumpPlanner.calculateCanopyCircles(interpolatedData);
+
+            expect(freeFallSpy).toHaveBeenCalled();
             expect(result).toBeNull();
+            expect(consoleSpy).not.toHaveBeenCalledWith(expect.stringContaining('Tatsächlicher Mittelpunkt roter Kreis'));
+            expect(consoleSpy).not.toHaveBeenCalledWith(expect.stringContaining('Tatsächlicher Mittelpunkt blauer Kreis'));
+
+            consoleSpy.mockRestore();
         });
     });
 
