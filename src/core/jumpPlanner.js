@@ -284,11 +284,6 @@ export function calculateCanopyCircles(interpolatedData) {
     const meanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, elevation + legHeightDownwind, elevation + safetyHeight + openingAltitude - CANOPY_OPENING_BUFFER_METERS);
     const meanWindFull = Utils.calculateMeanWind(heights, uComponents, vComponents, elevation + safetyHeight, elevation + openingAltitude - CANOPY_OPENING_BUFFER_METERS);
 
-    const jumpRunData = jumpRunTrack(interpolatedData);
-    const jumpRunDirection = jumpRunData ? jumpRunData.direction : 0;
-    const freeFallResult = calculateFreeFall(AppState.weatherData, exitAltitude, openingAltitude, interpolatedData, AppState.lastLat, AppState.lastLng, elevation, jumpRunDirection);
-    if (!freeFallResult) return null;
-
     const landingPatternCoords = calculateLandingPatternCoords(AppState.lastLat, AppState.lastLng, interpolatedData);
     let [blueLat, blueLng] = landingPatternCoords.downwindStart;
     if (!Number.isFinite(blueLat)) { blueLat = AppState.lastLat; blueLng = AppState.lastLng; }
@@ -345,7 +340,6 @@ export function calculateCanopyCircles(interpolatedData) {
         displacement: meanWind[1] * flyTime, direction: meanWind[0],
         displacementFull: meanWindFull[1] * flyTimeFull, directionFull: meanWindFull[0],
         meanWindForFullCanopyDir: meanWindFull[0], meanWindForFullCanopySpeedMps: meanWindFull[1],
-        freeFallDirection: freeFallResult.directionDeg, freeFallDistance: freeFallResult.distance, freeFallTime: freeFallResult.time
     };
 }
 

@@ -580,7 +580,7 @@ describe('jumpPlanner.js', () => {
 
     describe('calculateCanopyCircles', () => {
         beforeEach(() => {
-            // Mock für die FreeFall-Berechnung
+            // Mock für die FreeFall-Berechnung (für den ersten Test)
             vi.spyOn(jumpPlanner, 'calculateFreeFall').mockReturnValue({
                 distance: 1000,
                 directionDeg: 270,
@@ -593,9 +593,33 @@ describe('jumpPlanner.js', () => {
                 downwindStart: [52.517020691369694, 13.413613602570422],
             });
 
+            console.log('Debug beforeEach: Einstellungen', {
+                showCanopyArea: Settings.state.userSettings.showCanopyArea,
+                calculateJump: Settings.state.userSettings.calculateJump,
+                weatherData: AppState.weatherData,
+                lastLat: AppState.lastLat,
+                lastLng: AppState.lastLng
+            });
             // Setze showCanopyArea und calculateJump auf true
             Settings.state.userSettings.showCanopyArea = true;
             Settings.state.userSettings.calculateJump = true;
+            AppState.weatherData = {
+                // Verwenden Sie eine minimale, gültige Struktur, um die Guard-Klausel zu bestehen
+                time: ['2025-09-04T00:00:00Z'],
+                temperature_2m: [17.7],
+                relative_humidity_2m: [76],
+                surface_pressure: [1007.2],
+                wind_speed_10m: [7.6],
+                wind_direction_10m: [177],
+                geopotential_height_1000hPa: [100.00] // Mindestens ein Drucklevel
+            };
+            Settings.state.userSettings.descentRate = 3.5;
+            AppState.elevation = 38;
+            AppState.safetyHeight = 0;
+            AppState.openingAltitude = 1200;
+            AppState.lastLat = 52.52; // Setze lastLat
+            AppState.lastLng = 13.41; // Setze lastLng
+            const CANOPY_OPENING_BUFFER_METERS = 200;
 
             // Mock für calculateMeanWind mit Debugging
             Utils.calculateMeanWind.mockImplementation((heights, u, v, minHeight, maxHeight) => {
@@ -654,15 +678,26 @@ describe('jumpPlanner.js', () => {
             consoleSpy.mockRestore();
         });
 
-        it('sollte null zurückgeben, wenn calculateFreeFall fehlschlägt', () => {
-            const freeFallSpy = vi.spyOn(jumpPlanner, 'calculateFreeFall').mockReset();
-            freeFallSpy.mockReturnValue(null);
-            const consoleSpy = vi.spyOn(console, 'log');
+        it('sollte null zurückgeben, wenn showCanopyArea deaktiviert ist', () => {
+            console.log('Debug Test: Einstellungen vor Aufruf', {
+                showCanopyArea: Settings.state.userSettings.showCanopyArea,
+                calculateJump: Settings.state.userSettings.calculateJump,
+                weatherData: AppState.weatherData,
+                lastLat: AppState.lastLat,
+                lastLng: AppState.lastLng
+            });
+            Settings.state.userSettings.showCanopyArea = false;
+            Settings.state.userSettings.calculateJump = true;
+            AppState.weatherData = {};
+            AppState.lastLat = 52.52;
+            AppState.lastLng = 13.41;
 
+            const consoleSpy = vi.spyOn(console, 'log');
             const interpolatedData = interpolateWeatherData();
+            console.log('Debug Test: interpolatedData', interpolatedData);
             const result = jumpPlanner.calculateCanopyCircles(interpolatedData);
 
-            expect(freeFallSpy).toHaveBeenCalled();
+            console.log('Debug Test: Nach calculateCanopyCircles', { result });
             expect(result).toBeNull();
             expect(consoleSpy).not.toHaveBeenCalledWith(expect.stringContaining('Tatsächlicher Mittelpunkt roter Kreis'));
             expect(consoleSpy).not.toHaveBeenCalledWith(expect.stringContaining('Tatsächlicher Mittelpunkt blauer Kreis'));
