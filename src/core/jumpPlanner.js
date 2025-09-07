@@ -158,9 +158,23 @@ export function calculateFreeFall(weatherData, exitAltitude, openingAltitude, in
  * @returns {{greenLat: number, greenLng: number, darkGreenLat: number, darkGreenLng: number, greenRadius: number, darkGreenRadius: number, freeFallDirection: number, freeFallDistance: number, freeFallTime: number}|null} Ein Objekt mit den Koordinaten und Radien für die Visualisierung oder null.
  */
 export function calculateExitCircle(interpolatedData) {
-    if (!Settings.state.userSettings.showExitArea || !Settings.state.userSettings.calculateJump || !AppState.weatherData || !AppState.lastLat || !AppState.lastLng) return null;
-    if (!interpolatedData || interpolatedData.length === 0) return null;
-
+    console.log('Debug calculateExitCircle: Start', {
+        showExitArea: Settings.state.userSettings.showExitArea,
+        calculateJump: Settings.state.userSettings.calculateJump,
+        weatherData: !!AppState.weatherData,
+        lastLat: AppState.lastLat,
+        lastLng: AppState.lastLng,
+        lastAltitude: AppState.lastAltitude,
+        interpolatedData: !!interpolatedData && interpolatedData.length > 0
+    });
+    if (!Settings.state.userSettings.showExitArea || !Settings.state.userSettings.calculateJump || !AppState.weatherData || !AppState.lastLat || !AppState.lastLng) {
+        console.log('Debug calculateExitCircle: Frühe Rückgabe wegen Einstellungen');
+        return null;
+    }
+    if (!interpolatedData || interpolatedData.length === 0) {
+        console.log('Debug calculateExitCircle: Frühe Rückgabe wegen interpolatedData');
+        return null;
+    }
     const exitAltitude = parseInt(document.getElementById('exitAltitude')?.value) || 3000;
     const openingAltitude = parseInt(document.getElementById('openingAltitude')?.value) || 1200;
     const legHeightDownwind = parseInt(document.getElementById('legHeightDownwind')?.value) || 300;
@@ -168,6 +182,10 @@ export function calculateExitCircle(interpolatedData) {
     const canopySpeedKt = parseFloat(document.getElementById('canopySpeed')?.value) || 20;
     const canopySpeedMps = canopySpeedKt * CONVERSIONS.KNOTS_TO_MPS;
     const safetyHeight = Settings.state.userSettings.safetyHeight || 0;
+
+    console.log('Debug calculateExitCircle: Eingabewerte', {
+        exitAltitude, openingAltitude, legHeightDownwind, descentRate, canopySpeedKt, safetyHeight
+    });
 
     const reductionDistance = (safetyHeight / descentRate) * canopySpeedMps;
 
@@ -181,20 +199,40 @@ export function calculateExitCircle(interpolatedData) {
     const flyTimeFull = (openingAltitude - CANOPY_OPENING_BUFFER_METERS) / descentRate;
     const horizontalCanopyDistanceFull = flyTimeFull * canopySpeedMps;
 
+    console.log('Debug calculateExitCircle: Berechnungen', {
+        flyTime, horizontalCanopyDistance, flyTimeFull, horizontalCanopyDistanceFull, reductionDistance
+    });
+
     const meanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, elevation + safetyHeight + legHeightDownwind, elevation + openingAltitude - CANOPY_OPENING_BUFFER_METERS);
     const meanWindFull = Utils.calculateMeanWind(heights, uComponents, vComponents, elevation + safetyHeight, elevation + openingAltitude - CANOPY_OPENING_BUFFER_METERS);
 
-    const landingPatternCoords = calculateLandingPatternCoords(AppState.lastLat, AppState.lastLng, interpolatedData);
-    let [blueLat, blueLng] = landingPatternCoords.downwindStart;
-    if (!Number.isFinite(blueLat)) { blueLat = AppState.lastLat; blueLng = AppState.lastLng; }
+    console.log('Debug calculateExitCircle: meanWind', meanWind);
+    console.log('Debug calculateExitCircle: meanWindFull', meanWindFull);
 
+    console.log('Debug calculateExitCircle: Vor calculateLandingPatternCoords');
+    const landingPatternCoords = calculateLandingPatternCoords(AppState.lastLat, AppState.lastLng, interpolatedData);
+    console.log('Debug calculateExitCircle: Nach calculateLandingPatternCoords', landingPatternCoords);
+    let [blueLat, blueLng] = landingPatternCoords.downwindStart;
+    if (!Number.isFinite(blueLat)) {
+        console.log('Debug calculateExitCircle: Fallback zu lastLat/lastLng');
+        blueLat = AppState.lastLat;
+        blueLng = AppState.lastLng;
+    }
     const newCenterBlue = Utils.calculateNewCenter(blueLat, blueLng, meanWind[1] * flyTime, meanWind[0]);
     const newCenterRed = Utils.calculateNewCenter(AppState.lastLat, AppState.lastLng, meanWindFull[1] * flyTimeFull, meanWindFull[0]);
 
+    console.log('Debug calculateExitCircle: newCenterBlue', newCenterBlue);
+    console.log('Debug calculateExitCircle: newCenterRed', newCenterRed);
+
+    console.log('Debug calculateExitCircle: Vor calculateFreeFall');
     const jumpRunData = jumpRunTrack(interpolatedData);
     const jumpRunDirection = jumpRunData ? jumpRunData.direction : 0;
     const freeFallResult = calculateFreeFall(AppState.weatherData, exitAltitude, openingAltitude, interpolatedData, AppState.lastLat, AppState.lastLng, elevation, jumpRunDirection);
-    if (!freeFallResult) return null;
+    console.log('Debug calculateExitCircle: Nach calculateFreeFall', freeFallResult);
+    if (!freeFallResult) {
+        console.log('Debug calculateExitCircle: Rückgabe null wegen freeFall');
+        return null;
+    }
 
     const greenShiftDirection = (freeFallResult.directionDeg + 180) % 360;
     const greenCenter = Utils.calculateNewCenter(newCenterRed[0], newCenterRed[1], freeFallResult.distance, greenShiftDirection);
@@ -206,16 +244,17 @@ export function calculateExitCircle(interpolatedData) {
     console.log(`[calculateExitCircle] darkGreenCenter: lat=${darkGreenCenter[0]}, lng=${darkGreenCenter[1]}`);
     console.log(`[calculateExitCircle] expected downwindStart: lat=52.51657818951595, lng=13.413705547188442`);
 
-    return {
+    const result = {
         greenLat: greenCenter[0], greenLng: greenCenter[1],
         darkGreenLat: darkGreenCenter[0], darkGreenLng: darkGreenCenter[1],
-        // NEU: Reduziere die Radien, aber stelle sicher, dass sie nicht negativ werden
         greenRadius: Math.max(0, horizontalCanopyDistanceFull - reductionDistance),
         darkGreenRadius: Math.max(0, horizontalCanopyDistance - reductionDistance),
         freeFallDirection: freeFallResult.directionDeg,
         freeFallDistance: freeFallResult.distance,
         freeFallTime: freeFallResult.time
     };
+    console.log('Debug calculateExitCircle: Ergebnis', result);
+    return result;
 }
 
 export function calculateCutAway(interpolatedData) {
