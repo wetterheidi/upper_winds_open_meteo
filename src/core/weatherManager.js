@@ -113,7 +113,7 @@ async function fetchWeather(lat, lon, currentTime = null) {
 
     } catch (error) {
         console.error("[fetchWeather] Error:", error);
-        displayError(`Failed to fetch weather: ${error.message}`);
+        Utils.handleError(`Failed to fetch weather: ${error.message}`); // KORRIGIERTE ZEILE
         return null;
     } finally {
         // Sende ein Event, damit die UI den Lade-Spinner ausblenden kann
