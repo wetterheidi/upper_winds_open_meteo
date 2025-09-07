@@ -279,11 +279,16 @@ export function interpolateWeatherData(weatherData, sliderIndex, interpStep, bas
 
         let dataPoint;
         if (heightAGLInMeters === 0) {
+            // NEU: Finde das höchste Drucklevel (niedrigste Höhe) mit Wolkendaten
+            const lowestAltitudePressureLevel = Math.max(...validPressureLevels);
+            const surfaceCloudCover = weatherData[`cloud_cover_${lowestAltitudePressureLevel}hPa`]?.[sliderIndex] ?? 'N/A';
+
             dataPoint = {
                 height: heightASLInMeters,
                 pressure: surfacePressure,
                 temp: weatherData.temperature_2m[sliderIndex],
                 rh: weatherData.relative_humidity_2m[sliderIndex],
+                cc: surfaceCloudCover, // NEU: Weise den gefundenen Wert zu
                 spd: weatherData.wind_speed_10m[sliderIndex],
                 dir: weatherData.wind_direction_10m[sliderIndex],
                 dew: Utils.calculateDewpoint(weatherData.temperature_2m[sliderIndex], weatherData.relative_humidity_2m[sliderIndex])

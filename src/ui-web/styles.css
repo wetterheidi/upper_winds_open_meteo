@@ -592,39 +592,39 @@ input[type="checkbox"][style*="opacity: 0.5"] {
     text-align: center;
 }
 
-#weather-table-container tr.humidity-low {
-    background: var(--background-light) !important;
+/* === NEU: Farbkodierung für Wolkenbedeckung === */
+#weather-table-container tr.cloud-cover-clear { /* 0-10% */
+    background: #e3f2fd !important; /* Sehr helles Blau */
+}
+#weather-table-container tr.cloud-cover-few { /* 11-30% */
+    background: hsl(205, 36%, 86%) !important; /* Helles Blau */
+}
+#weather-table-container tr.cloud-cover-scattered { /* 31-60% */
+    background: #e0e0e0 !important; /* Helles Grau */
+}
+#weather-table-container tr.cloud-cover-broken { /* 61-90% */
+    background: #b0bec5 !important; /* Mittelgrau */
+}
+#weather-table-container tr.cloud-cover-overcast { /* 91-100% */
+    background: #78909c !important; /* Dunkelgrau */
+    color: white !important; /* Hellerer Text für besseren Kontrast */
 }
 
-#weather-table-container tr.humidity-moderate {
-    background: #F4F4F4 !important;
-}
-
-#weather-table-container tr.humidity-high {
-    background: #cdcdcd !important;
-}
-
-#weather-table-container tr.humidity-saturated {
-    background: #B9B9B9 !important;
-    color: white !important;
-}
-
-#weather-table-container tr.wind-low {
+#weather-table-container tr.wind-low td {
     border: 2px solid lightblue !important;
 }
 
-#weather-table-container tr.wind-moderate {
+#weather-table-container tr.wind-moderate td {
     border: 2px solid lightgreen !important;
 }
 
-#weather-table-container tr.wind-high {
+#weather-table-container tr.wind-high td {
     border: 2px solid #f5f34f !important;
 }
 
-#weather-table-container tr.wind-very-high {
+#weather-table-container tr.wind-very-high td {
     border: 2px solid #ffcccc !important;
 }
-
 
 /* --- Jumpmaster Panel --- */
 #panel-jumpmaster ul {

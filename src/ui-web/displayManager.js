@@ -148,14 +148,17 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
             else if (spdInKt <= 16) windClass = 'wind-high';
             else windClass = 'wind-very-high';
         }
-        const humidity = data.rh;
-        let humidityClass = '';
-        if (humidity !== 'N/A' && Number.isFinite(humidity)) {
-            if (humidity < 65) humidityClass = 'humidity-low';
-            else if (humidity >= 65 && humidity <= 85) humidityClass = 'humidity-moderate';
-            else if (humidity > 85 && humidity < 100) humidityClass = 'humidity-high';
-            else if (humidity === 100) humidityClass = 'humidity-saturated';
+
+        const cloudCover = data.cc;
+        let cloudCoverClass = '';
+        if (cloudCover !== 'N/A' && Number.isFinite(cloudCover)) {
+            if (cloudCover <= 10) cloudCoverClass = 'cloud-cover-clear';
+            else if (cloudCover <= 25) cloudCoverClass = 'cloud-cover-few';
+            else if (cloudCover <= 50) cloudCoverClass = 'cloud-cover-scattered';
+            else if (cloudCover <= 87) cloudCoverClass = 'cloud-cover-broken';
+            else cloudCoverClass = 'cloud-cover-overcast';
         }
+
         const displayHeight = refLevel === 'AMSL' ? data.displayHeight + (heightUnit === 'ft' ? Math.round(surfaceHeight * 3.28084) : surfaceHeight) : data.displayHeight;
         const displayTemp = Utils.convertTemperature(data.temp, temperatureUnit === 'C' ? '°C' : '°F');
         const formattedTemp = displayTemp === 'N/A' ? 'N/A' : displayTemp.toFixed(0);
@@ -174,8 +177,7 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
         const speedKt = Math.round(Utils.convertWind(spd, 'kt', 'km/h') / 5) * 5;
         const windBarbSvg = data.dir === 'N/A' || isNaN(speedKt) ? 'N/A' : Utils.generateWindBarb(data.dir, speedKt);
 
-        // Gibt den fertigen HTML-String für eine Zeile zurück
-        return `<tr class="${windClass} ${humidityClass}">
+        return `<tr class="${windClass} ${cloudCoverClass}">
                     <td>${Math.round(displayHeight)}</td>
                     <td>${Utils.roundToTens(data.dir)}</td>
                     <td>${formattedWind}</td>
