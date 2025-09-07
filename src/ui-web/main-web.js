@@ -1253,6 +1253,7 @@ function setupAppEventListeners() {
             case 'landingDirection':
                 updateUIState();
                 displayManager.updateLandingPatternDisplay();
+                calculateJump(); // Exit und blaue Kreise müssen neu berechnet werden
                 break;
         }
     });
@@ -1324,6 +1325,7 @@ function setupAppEventListeners() {
             case 'customLandingDirectionRR':
                 if (AppState.weatherData) {
                     displayManager.updateLandingPatternDisplay();
+                    calculateJump(); // Exit und blaue Kreise müssen neu berechnet werden
                 }
                 break;
 

@@ -1342,6 +1342,8 @@ function setupAppEventListeners() {
                 // Beeinflusst das UI-State und das Landemuster
                 updateUIState();
                 displayManager.updateLandingPatternDisplay();
+                calculateJump(); // Auch die Exit-Kreise und die blauen Kreise müssen neu berechnet werden
+                if (AppState.map) { AppState.map.invalidateSize(); }
                 break;
 
             // Für 'temperatureUnit', 'timeZone', 'downloadFormat' ist keine zusätzliche Aktion nötig,
@@ -1428,6 +1430,8 @@ function setupAppEventListeners() {
             case 'customLandingDirectionRR':
                 if (AppState.weatherData) {
                     displayManager.updateLandingPatternDisplay();
+                    calculateJump(); // Exit Circles und blaue Kreise müssen neu berechnet werden
+                    if (AppState.map) { AppState.map.invalidateSize(); }
                 }
                 break;
 
