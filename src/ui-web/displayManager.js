@@ -181,6 +181,7 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
                     <td>${formattedWind}</td>
                     <td>${windBarbSvg}</td>
                     <td>${formattedTemp}</td>
+                    <td>${data.cc}</td> <!-- NEUE SPALTE für Wolkenbedeckung -->
                 </tr>`;
     }).join(''); // .join('') fügt alle Zeilen zu einem einzigen String zusammen
 
@@ -194,6 +195,7 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
                     <th>Spd (${windSpeedUnit})</th>
                     <th>Wind</th>
                     <th>T (${temperatureUnit === 'C' ? '°C' : '°F'})</th>
+                    <th>CC (%)</th> <!-- NEUE SPALTE für Wolkenbedeckung -->
                 </tr>
             </thead>
             <tbody>
