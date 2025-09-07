@@ -232,7 +232,7 @@ export function calculateJump() {
         if (exitResult) {
             // Der hellgrüne Kreis (gesamter möglicher Bereich)
             visualizationData.exitCircles.push({
-                center: [exitResult.greenLat, exitResult.greenLng],
+                center: [exitResult.greenLatFull, exitResult.greenLngFull],
                 radius: exitResult.greenRadius,
                 color: 'green',
                 fillColor: 'green',
@@ -249,7 +249,7 @@ export function calculateJump() {
 
             // Der dunkelgrüne Kreis (Bereich bis zum Downwind) bekommt den Tooltip
             visualizationData.exitCircles.push({
-                center: [exitResult.darkGreenLat, exitResult.darkGreenLng],
+                center: [exitResult.greenLat, exitResult.greenLng],
                 radius: exitResult.darkGreenRadius,
                 color: 'darkgreen',
                 fillColor: 'darkgreen',

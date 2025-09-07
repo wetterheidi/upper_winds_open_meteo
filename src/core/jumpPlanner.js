@@ -155,7 +155,7 @@ export function calculateFreeFall(weatherData, exitAltitude, openingAltitude, in
  * Diese Kreise repräsentieren den Bereich, in dem sich der Springer nach dem Freifall befindet,
  * relativ zum geplanten Landepunkt.
  * @param {object[]} interpolatedData - Die interpolierten Wetterdaten.
- * @returns {{greenLat: number, greenLng: number, darkGreenLat: number, darkGreenLng: number, greenRadius: number, darkGreenRadius: number, freeFallDirection: number, freeFallDistance: number, freeFallTime: number}|null} Ein Objekt mit den Koordinaten und Radien für die Visualisierung oder null.
+ * @returns {{greenLatFull: number, greenLngFull: number, greenLat: number, greenLng: number, greenRadius: number, darkGreenRadius: number, freeFallDirection: number, freeFallDistance: number, freeFallTime: number}|null} Ein Objekt mit den Koordinaten und Radien für die Visualisierung oder null.
  */
 export function calculateExitCircle(interpolatedData) {
     console.log('Debug calculateExitCircle: Start', {
@@ -235,18 +235,18 @@ export function calculateExitCircle(interpolatedData) {
     }
 
     const greenShiftDirection = (freeFallResult.directionDeg + 180) % 360;
-    const greenCenter = Utils.calculateNewCenter(newCenterRed[0], newCenterRed[1], freeFallResult.distance, greenShiftDirection);
-    const darkGreenCenter = Utils.calculateNewCenter(newCenterBlue[0], newCenterBlue[1], freeFallResult.distance, greenShiftDirection);
+    const greenCenterFull = Utils.calculateNewCenter(newCenterRed[0], newCenterRed[1], freeFallResult.distance, greenShiftDirection);
+    const greenCenter = Utils.calculateNewCenter(newCenterBlue[0], newCenterBlue[1], freeFallResult.distance, greenShiftDirection);
 
     console.log(`[calculateExitCircle] freeFallResult: distance=${freeFallResult.distance.toFixed(2)} m, directionDeg=${freeFallResult.directionDeg.toFixed(1)}°`);
     console.log(`[calculateExitCircle] meanWind: dir=${meanWind[0].toFixed(1)}°, speed=${meanWind[1].toFixed(2)} m/s`);
+    console.log(`[calculateExitCircle] greenCenterFull: lat=${greenCenterFull[0]}, lng=${greenCenterFull[1]}`);
     console.log(`[calculateExitCircle] greenCenter: lat=${greenCenter[0]}, lng=${greenCenter[1]}`);
-    console.log(`[calculateExitCircle] darkGreenCenter: lat=${darkGreenCenter[0]}, lng=${darkGreenCenter[1]}`);
     console.log(`[calculateExitCircle] expected downwindStart: lat=52.51657818951595, lng=13.413705547188442`);
 
     const result = {
+        greenLatFull: greenCenterFull[0], greenLngFull: greenCenterFull[1],
         greenLat: greenCenter[0], greenLng: greenCenter[1],
-        darkGreenLat: darkGreenCenter[0], darkGreenLng: darkGreenCenter[1],
         greenRadius: Math.max(0, horizontalCanopyDistanceFull - reductionDistance),
         darkGreenRadius: Math.max(0, horizontalCanopyDistance - reductionDistance),
         freeFallDirection: freeFallResult.directionDeg,

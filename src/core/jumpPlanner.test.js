@@ -855,10 +855,10 @@ describe('jumpPlanner.js', () => {
         expect(result.greenRadius).toBeGreaterThan(0);
         expect(result.darkGreenRadius).toBeGreaterThan(0);
         // Erwartete Koordinaten (passe an, wenn Goldstandard anders ist)
-        expect(result.greenLat).toBeCloseTo(52.5068998344266, 6);
-        expect(result.greenLng).toBeCloseTo(13.387756166757413, 6);
-        expect(result.darkGreenLat).toBeCloseTo(52.50731059424332, 6);
-        expect(result.darkGreenLng).toBeCloseTo(13.39411897771106, 6);
+        expect(result.greenLatFull).toBeCloseTo(52.5068998344266, 6);
+        expect(result.greenLngFull).toBeCloseTo(13.387756166757413, 6);
+        expect(result.greenLat).toBeCloseTo(52.50731059424332, 6);
+        expect(result.greenLng).toBeCloseTo(13.39411897771106, 6);
         expect(result.freeFallDistance).toBeCloseTo(312.90, 2); // Aus Mock
         freeFallSpy.mockRestore();
     });

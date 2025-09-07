@@ -537,8 +537,8 @@ function calculateExitCircleForEnsemble(profileIdentifier, sliderIndex, specific
 
     if (result) {
         return {
-            centerLat: result.darkGreenLat,
-            centerLng: result.darkGreenLng,
+            centerLat: result.greenLat,
+            centerLng: result.greenLng,
             radius: result.darkGreenRadius,
             meanWindDir: meanWindResult.meanWindDir,
             meanWindSpeedMps: meanWindResult.meanWindSpeedMps,
