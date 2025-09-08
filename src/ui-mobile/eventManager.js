@@ -967,17 +967,14 @@ function setupCheckboxEvents() {
     }
 }
 function setupRadioEvents() {
-    setupRadioGroup('refLevel', () => Settings.updateUnitLabels());
+    setupRadioGroup('refLevel', () => { });
 
-    setupRadioGroup('heightUnit', () => {
-        Settings.updateUnitLabels(); // Passt die Labels der UI an
-    });
+    setupRadioGroup('heightUnit', () => { });
 
     setupRadioGroup('temperatureUnit', () => { }); // Löst nur das Event aus
 
-    setupRadioGroup('windUnit', () => {
-        Settings.updateUnitLabels(); // Lokale UI-Aktion, kann bleiben
-    });
+    setupRadioGroup('windUnit', () => { });
+    
     setupRadioGroup('timeZone', () => { }); // Löst nur das Event aus
 
     setupRadioGroup('coordFormat', () => { });

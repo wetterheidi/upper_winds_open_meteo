@@ -1,5 +1,3 @@
-// src/core/native-imports.js
-
 // Diese Datei wird NUR im nativen Build importiert und bündelt alle
 // echten Capacitor-Plugins.
 

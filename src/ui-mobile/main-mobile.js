@@ -668,7 +668,6 @@ export async function updateUIWithNewWeatherData(newWeatherData, preservedIndex 
         calculateMeanWind();
     }
     displayManager.updateModelInfoPopup();
-    Settings.updateModelRunInfo(AppState.lastModelRun, AppState.lastLat, AppState.lastLng);
 
     console.log("Model changed. Triggering recalculation of jump parameters.");
     displayManager.updateLandingPatternDisplay();
@@ -695,7 +694,6 @@ export function updateUIState() {
     if (customRR) customRR.disabled = Settings.state.userSettings.landingDirection !== 'RR';
     if (showJumpRunTrackCheckbox) showJumpRunTrackCheckbox.disabled = false; // Keine Sperre durch calculateJump
     if (showExitAreaCheckbox) showExitAreaCheckbox.disabled = false; // Keine Sperre durch calculateJump
-    Settings.updateUnitLabels();
 }
 
 /**
@@ -1614,9 +1612,7 @@ function setupAppEventListeners() {
             await displayManager.updateWeatherDisplay(getSliderValue(), 'weather-table-container', 'selectedTime');
 
             //Ruft die Funktion auf, die die Labels aktualisiert
-            if (key === 'heightUnit' || key === 'refLevel') {
-                Settings.updateUnitLabels();
-            }
+            if (key === 'heightUnit' || key === 'refLevel') {  }
 
             if (AppState.lastAltitude !== 'N/A') {
                 calculateMeanWind();

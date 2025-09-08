@@ -1,7 +1,18 @@
-// src/core/settings.js
+/**
+ * @file settings.js
+ * @description Zentrales Modul zur Verwaltung aller Benutzereinstellungen.
+ * Verantwortlich für das Laden, Speichern und Abrufen von Einstellungen sowie
+ * für die Verwaltung von freischaltbaren Features.
+ */
 
 import { FEATURE_PASSWORD_PLANNER, FEATURE_PASSWORD_DATA } from './config.js';
 
+let IS_MOBILE_APP = false;
+
+/**
+ * Hilfsfunktion zum schnellen Abrufen des aktuell im UI ausgewählten Interpolationsschritts.
+ * @returns {string} Der Wert des Interpolationsschritts (z.B. "200").
+ */
 export const getInterpolationStep = () => {
     const selectElement = document.getElementById('interpStep');
     if (selectElement) {
@@ -10,8 +21,10 @@ export const getInterpolationStep = () => {
     return '200';
 };
 
-let IS_MOBILE_APP = false;
-
+/**
+ * Legt den globalen Kontext fest, ob die App als native mobile App läuft.
+ * @param {boolean} isMobile - True, wenn es sich um die native App handelt.
+ */
 export function setAppContext(isMobile) {
     IS_MOBILE_APP = isMobile;
     console.log(`App context set to: ${IS_MOBILE_APP ? 'Mobile' : 'Web'}`);
@@ -21,6 +34,11 @@ export const Settings = {
     FEATURE_PASSWORD_PLANNER: FEATURE_PASSWORD_PLANNER,
     FEATURE_PASSWORD_DATA: FEATURE_PASSWORD_DATA,
 
+    /**
+ * Ein Objekt, das alle Standardeinstellungen der Anwendung enthält.
+ * Dient als Fallback, falls keine gespeicherten Einstellungen vorhanden sind.
+ * @type {object}
+ */
     defaultSettings: {
         model: 'icon_global',
         refLevel: 'AGL',
@@ -50,7 +68,7 @@ export const Settings = {
         showJumpRunTrack: false,
         showExitArea: false,
         showCanopyArea: false,
-        showCutAwayFinder: false, 
+        showCutAwayFinder: false,
         jumpRunTrackOffset: 0,
         jumpRunTrackForwardOffset: 0,
         aircraftSpeedKt: 90,
@@ -71,9 +89,12 @@ export const Settings = {
         isInteractionLocked: false,
     },
 
+    /**
+ * Der aktuelle Zustand der Einstellungen, inklusive der vom Benutzer gespeicherten Werte
+ * und dem Status der freigeschalteten Features.
+ */
     state: {
         userSettings: null,
-        // DIES IST JETZT DIE EINZIGE QUELLE DER WAHRHEIT FÜR DEN SPERRSTATUS
         unlockedFeatures: {
             planner: false,
             plannerHash: null,
@@ -82,6 +103,14 @@ export const Settings = {
         }
     },
 
+    // ===================================================================
+    // 2. Initialisierung & Speichern/Laden
+    // ===================================================================
+
+    /**
+     * Initialisiert das Settings-Modul. Lädt Benutzereinstellungen und den
+     * Freischaltungsstatus aus dem Local Storage und validiert sie.
+     */
     initialize() {
         // 1. Hashes für beide Passwörter erstellen
         const plannerPasswordHash = this.FEATURE_PASSWORD_PLANNER.split('').reduce((acc, char) => (char.charCodeAt(0) + ((acc << 5) - acc)), 0);
@@ -101,7 +130,7 @@ export const Settings = {
         // 3. Status basierend auf den geladenen Daten und aktuellen Hashes validieren
         const isPlannerStillUnlocked = features.planner && features.plannerHash === plannerPasswordHash;
         const isDataStillUnlocked = features.data && features.dataHash === dataPasswordHash;
-        
+
         // 4. Den finalen, bereinigten Zustand direkt im state-Objekt setzen
         this.state.unlockedFeatures = {
             planner: isPlannerStillUnlocked,
@@ -112,7 +141,7 @@ export const Settings = {
 
         // 5. Den bereinigten Zustand immer zurück in den localStorage schreiben
         this.saveUnlockedFeatures();
-        
+
         // --- Laden der User-Settings (unverändert) ---
         let storedSettings = {};
         try {
@@ -122,7 +151,7 @@ export const Settings = {
             this.handleError(error, 'Failed to load settings.');
         }
         this.state.userSettings = { ...this.defaultSettings, ...storedSettings };
-        
+
         // Nicht-persistente Einstellungen zurücksetzen
         this.state.userSettings.isInteractionLocked = false;
         this.state.userSettings.harpLat = null;
@@ -132,19 +161,29 @@ export const Settings = {
         this.state.userSettings.showCutAwayFinder = false;
     },
 
-    saveUnlockStatus(feature, isUnlocked) {
-        if (feature === 'planner') {
-            const hash = this.FEATURE_PASSWORD_PLANNER.split('').reduce((acc, char) => (char.charCodeAt(0) + ((acc << 5) - acc)), 0);
-            this.state.unlockedFeatures.planner = isUnlocked;
-            this.state.unlockedFeatures.plannerHash = isUnlocked ? hash : null;
-        } else if (feature === 'data') {
-            const hash = this.FEATURE_PASSWORD_DATA.split('').reduce((acc, char) => (char.charCodeAt(0) + ((acc << 5) - acc)), 0);
-            this.state.unlockedFeatures.data = isUnlocked;
-            this.state.unlockedFeatures.dataHash = isUnlocked ? hash : null;
+    /**
+     * Speichert die aktuellen Benutzereinstellungen im Local Storage.
+     * Bestimmte transiente (nicht dauerhafte) Einstellungen werden vor dem Speichern entfernt.
+     */
+    save() {
+        const settingsToSave = { ...this.state.userSettings };
+        delete settingsToSave.customJumpRunDirection;
+        try {
+            localStorage.setItem('upperWindsSettings', JSON.stringify(settingsToSave));
+        } catch (error) {
+            console.error('Failed to save settings to localStorage:', error);
         }
-        this.saveUnlockedFeatures();
     },
 
+    // ===================================================================
+    // 3. Feature-Freischaltung & Passwort-Modal
+    // ===================================================================
+
+    /**
+     * Überprüft, ob ein bestimmtes Feature freigeschaltet ist.
+     * @param {('planner'|'data')} feature - Der Name des Features.
+     * @returns {boolean} True, wenn das Feature freigeschaltet ist.
+     */
     isFeatureUnlocked(feature) {
         if (feature === 'planner') {
             return this.state.unlockedFeatures.planner;
@@ -157,7 +196,13 @@ export const Settings = {
         }
         return false;
     },
-    
+
+    /**
+     * Zeigt das Passwort-Modal an, um ein Feature freizuschalten.
+     * @param {('planner'|'data')} feature - Das freizuschaltende Feature.
+     * @param {function} onSuccess - Callback-Funktion bei korrekter Passworteingabe.
+     * @param {function} onCancel - Callback-Funktion bei Abbruch.
+     */
     showPasswordModal(feature, onSuccess, onCancel) {
         const modal = document.getElementById('passwordModal');
         const input = document.getElementById('passwordInput');
@@ -199,6 +244,29 @@ export const Settings = {
         };
     },
 
+    /**
+     * Speichert den Freischaltungsstatus für ein Feature.
+     * @param {('planner'|'data')} feature - Das Feature, dessen Status gespeichert wird.
+     * @param {boolean} isUnlocked - Der neue Freischaltungsstatus.
+     * @private
+     */
+    saveUnlockStatus(feature, isUnlocked) {
+        if (feature === 'planner') {
+            const hash = this.FEATURE_PASSWORD_PLANNER.split('').reduce((acc, char) => (char.charCodeAt(0) + ((acc << 5) - acc)), 0);
+            this.state.unlockedFeatures.planner = isUnlocked;
+            this.state.unlockedFeatures.plannerHash = isUnlocked ? hash : null;
+        } else if (feature === 'data') {
+            const hash = this.FEATURE_PASSWORD_DATA.split('').reduce((acc, char) => (char.charCodeAt(0) + ((acc << 5) - acc)), 0);
+            this.state.unlockedFeatures.data = isUnlocked;
+            this.state.unlockedFeatures.dataHash = isUnlocked ? hash : null;
+        }
+        this.saveUnlockedFeatures();
+    },
+
+    /**
+     * Speichert das gesamte `unlockedFeatures`-Objekt im Local Storage.
+     * @private
+     */
     saveUnlockedFeatures(featuresToSave = this.state.unlockedFeatures) {
         try {
             const featuresString = JSON.stringify(featuresToSave);
@@ -207,17 +275,18 @@ export const Settings = {
             this.handleError(error, 'Failed to save unlocked features to localStorage.');
         }
     },
-    
-    save() {
-        const settingsToSave = { ...this.state.userSettings };
-        delete settingsToSave.customJumpRunDirection;
-        try {
-            localStorage.setItem('upperWindsSettings', JSON.stringify(settingsToSave));
-        } catch (error) {
-            console.error('Failed to save settings to localStorage:', error);
-        }
-    },
-    
+
+    // ===================================================================
+    // 4. Hilfsfunktionen
+    // ===================================================================
+
+    /**
+  * Ruft den Wert einer Einstellung ab. Priorisiert den Wert aus dem `userSettings`-Objekt,
+  * versucht aber auch, den Wert direkt aus dem DOM auszulesen (z.B. für Radio-Buttons).
+  * @param {string} name - Der Name der Einstellung.
+  * @param {*} [defaultValue] - Ein optionaler Standardwert, falls nichts gefunden wird.
+  * @returns {*} Der Wert der Einstellung.
+  */
     getValue(name, type, defaultValue) {
         if (defaultValue === undefined && typeof type !== 'string') {
             defaultValue = type;
@@ -235,8 +304,6 @@ export const Settings = {
         return defaultValue;
     },
 
-    updateUnitLabels() {},
-    updateModelRunInfo(lastModelRun, lastLat, lastLng) {},
     handleError(error, userMessage = 'An error occurred.') {
         console.error('Settings Error:', error);
         // Utils.handleError(userMessage); // Auskommentiert, falls Utils hier nicht verfügbar ist

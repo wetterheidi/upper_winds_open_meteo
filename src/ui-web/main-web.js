@@ -644,7 +644,6 @@ export async function updateUIWithNewWeatherData(newWeatherData, preservedIndex 
     if (AppState.lastAltitude !== 'N/A') {
         calculateMeanWind();
     }
-    Settings.updateModelRunInfo(AppState.lastModelRun, AppState.lastLat, AppState.lastLng);
     displayManager.updateModelInfoPopup();
     console.log("Model changed. Triggering recalculation of jump parameters.");
     displayManager.updateLandingPatternDisplay();
@@ -671,7 +670,6 @@ export function updateUIState() {
     if (customRR) customRR.disabled = Settings.state.userSettings.landingDirection !== 'RR';
     if (showJumpRunTrackCheckbox) showJumpRunTrackCheckbox.disabled = !Settings.state.userSettings.calculateJump;
     if (showExitAreaCheckbox) showExitAreaCheckbox.disabled = !Settings.state.userSettings.calculateJump; // Disable unless calculateJump is on
-    Settings.updateUnitLabels();
 }
 function updateLockStatesUI() {
     // Update Planner Icon
