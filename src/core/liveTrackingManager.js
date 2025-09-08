@@ -1,4 +1,10 @@
-// liveTrackingManager.js
+/**
+ * @file liveTrackingManager.js
+ * @description Verwaltet das Live-Tracking der GPS-Position des Geräts,
+ * die Verarbeitung der Positionsdaten und die manuelle Aufzeichnung von Tracks.
+ * Nutzt Capacitor Geolocation für native Plattformen und `navigator.geolocation` als Fallback.
+ */
+
 "use strict";
 
 import { UI_DEFAULTS, SMOOTHING_DEFAULTS } from './constants.js';
@@ -11,44 +17,181 @@ import { saveRecordedTrack } from './trackManager.js'; // <-- NEU: Importieren
 // Zähler, um die ersten ungenauen Web-Geolocation-Events zu überspringen
 let webUpdateCounter = 0;
 
-// --- Private Hilfsfunktionen ---
+// ===================================================================
+// 1. Öffentliche Hauptfunktionen (API des Moduls)
+// ===================================================================
 
 /**
- * Erstellt ein benutzerdefiniertes Leaflet-Icon für den Live-Marker,
- * das einen Punkt und einen Pfeil enthält, der in die angegebene Richtung gedreht ist.
- * @param {number|string} direction - Die Bewegungsrichtung in Grad (0-360).
- * @returns {L.DivIcon} Das konfigurierte Leaflet DivIcon.
+ * Startet die kontinuierliche Abfrage der GPS-Position des Geräts.
+ * Verwendet das Capacitor Geolocation-Plugin für native Plattformen und navigator.geolocation als Fallback für Web.
+ * Löst ein 'tracking:started'-Event aus, um andere Teile der Anwendung zu informieren.
+ * @returns {void}
  */
-function createLiveMarkerIcon(direction) {
-    // Stellt sicher, dass die Rotation eine gültige Zahl ist, ansonsten 0.
-    const rotation = (typeof direction === 'number' && isFinite(direction)) ? direction : 0;
+export async function startPositionTracking() {
+    if (AppState.watchId !== null) return;
+    console.log("[LiveTrackingManager] Attempting to start position tracking...");
 
-    // Das HTML für das Icon: ein Wrapper für die Rotation, der Punkt und der Pfeil.
-    const iconHtml = `
-        <div class="live-marker-wrapper" style="transform: rotate(${rotation}deg);">
-            <div class="live-marker-dot"></div>
-            <div class="live-marker-arrow"></div>
-        </div>
-    `;
+    const { Geolocation, isNative } = await getCapacitor();
+    console.log("[LiveTrackingManager] Platform:", isNative ? window.Capacitor.getPlatform() : 'Web', "IsNative:", isNative);
 
-    return L.divIcon({
-        className: 'live-marker-container', // Container-Klasse ohne Standard-Leaflet-Stile
-        html: iconHtml,
-        iconSize: [24, 24], // Größe des Icons
-        iconAnchor: [12, 12],
-        pmIgnore: true
-    });
-}
+    if (isNative && Geolocation) {
+        // --- Native Logik (iOS/Android) ---
+        try {
+            // Prüfe und fordere Berechtigungen an
+            const permissions = await checkAndRequestPermissions();
+            console.log("[LiveTrackingManager] Permissions result:", permissions);
+            if (!permissions) {
+                console.warn("[LiveTrackingManager] Permissions not granted, stopping tracking.");
+                return;
+            }
 
-function updateAccuracyCircle(lat, lng, accuracy) {
-    if (AppState.accuracyCircle) {
-        AppState.map.removeLayer(AppState.accuracyCircle);
+            // Starte native Hintergrund-Tracking mit Capacitor Geolocation
+            const watchId = await Geolocation.watchPosition(
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                },
+                (position, error) => {
+                    if (error) {
+                        console.error("[LiveTrackingManager] Geolocation error:", error);
+                        Utils.handleError(`Geolocation error: ${error.message || 'Unknown error'}`);
+                        stopPositionTracking();
+                        return;
+                    }
+                    if (position) {
+                        console.log("[LiveTrackingManager] Received position:", position.coords);
+                        debouncedPositionUpdate(position);
+                    }
+                }
+            );
+            AppState.watchId = watchId;
+            console.log("[LiveTrackingManager] Native Geolocation watcher started:", watchId);
+            document.dispatchEvent(new CustomEvent('tracking:started'));
+        } catch (error) {
+            console.error("[LiveTrackingManager] Failed to start native tracking:", error);
+            Utils.handleError(`Failed to start tracking: ${error.message || 'Unknown error'}`);
+        }
+    } else {
+        // --- Web-Fallback-Logik ---
+        console.log("[LiveTrackingManager] Using navigator.geolocation for tracking (Web).");
+        if (!navigator.geolocation) {
+            Utils.handleError("Geolocation is not supported by your browser.");
+            document.dispatchEvent(new CustomEvent('tracking:stopped'));
+            return;
+        }
+        AppState.watchId = navigator.geolocation.watchPosition(
+            (position) => {
+                console.log("[LiveTrackingManager] Web position:", position.coords);
+                debouncedPositionUpdate(position);
+            },
+            (error) => {
+                console.error("[LiveTrackingManager] Web Geolocation error:", error);
+                Utils.handleError(`Geolocation error: ${error.message || 'Unknown error'}`);
+                stopPositionTracking();
+            },
+            { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+        );
+        console.log("[LiveTrackingManager] Web Geolocation watcher started:", AppState.watchId);
+        document.dispatchEvent(new CustomEvent('tracking:started'));
     }
-    AppState.accuracyCircle = L.circle([lat, lng], {
-        radius: accuracy, color: 'blue', fillOpacity: 0.1, weight: 1, dashArray: '5, 5', pmIgnore: true
-    }).addTo(AppState.map);
 }
 
+/**
+ * Beendet die kontinuierliche Abfrage der GPS-Position.
+ * Löscht den Watcher, entfernt die zugehörigen Marker und Kreise von der Karte
+ * und setzt die Tracking-Variablen im AppState zurück.
+ * Löst ein 'tracking:stopped'-Event aus.
+ * @returns {void}
+ */
+export async function stopPositionTracking() {
+    if (AppState.watchId !== null) {
+        const { Geolocation, isNative } = await getCapacitor(); // Korrigiert: getCapacitor
+
+        if (isNative && Geolocation) {
+            try {
+                await Geolocation.clearWatch({ id: AppState.watchId });
+                console.log("[LiveTrackingManager] Stopped native Geolocation watcher:", AppState.watchId);
+            } catch (error) {
+                console.error("[LiveTrackingManager] Error stopping native watcher:", error);
+            }
+        } else if (navigator.geolocation) {
+            navigator.geolocation.clearWatch(AppState.watchId);
+            console.log("[LiveTrackingManager] Stopped navigator.geolocation watcher:", AppState.watchId);
+        }
+        AppState.watchId = null;
+    }
+
+    // UI-Elemente von der Karte entfernen
+    if (AppState.liveMarker) AppState.map.removeLayer(AppState.liveMarker);
+    if (AppState.accuracyCircle) AppState.map.removeLayer(AppState.accuracyCircle);
+    
+    // Zustand zurücksetzen
+    AppState.liveMarker = null;
+    AppState.accuracyCircle = null;
+    AppState.prevLat = null;
+    AppState.prevLng = null;
+    AppState.altitudeCorrectionOffset = 0;
+    document.dispatchEvent(new CustomEvent('tracking:stopped'));
+}
+
+/**
+ * Startet oder stoppt die manuelle Aufzeichnung eines Tracks.
+ * Wird durch den neuen Button im Dashboard gesteuert.
+ */
+export function toggleManualRecording() {
+    if (AppState.isAutoRecording) {
+        Utils.handleMessage("Cannot start manual recording while auto-recording is active.");
+        return;
+    }
+
+    AppState.isManualRecording = !AppState.isManualRecording;
+
+    if (AppState.isManualRecording) {
+        // Manuelle Aufnahme starten
+        AppState.recordedTrackPoints = []; // Track zurücksetzen
+        AppState.altitudeCorrectionOffset = 0; // WICHTIG: Offset zurücksetzen
+        startPositionTracking(); // Tracking starten, falls es nicht läuft
+        Utils.handleMessage("Manual recording started.");
+        document.dispatchEvent(new CustomEvent('sensor:freefall_detected')); // Simuliert den Start
+    } else {
+        // Manuelle Aufnahme stoppen
+        Utils.handleMessage("Manual recording stopped. Saving track...");
+        saveRecordedTrack(); // Track speichern
+        // Das Tracking wird hier NICHT gestoppt, da es unabhängig weiterlaufen kann.
+        document.dispatchEvent(new CustomEvent('sensor:disarmed'));
+    }
+
+    // Button-Zustand in der UI aktualisieren
+    const manualButton = document.getElementById('manual-recording-button');
+    if (manualButton) {
+        if (AppState.isManualRecording) {
+            manualButton.textContent = "Stop Recording";
+            manualButton.classList.add('recording');
+        } else {
+            manualButton.textContent = "Start Recording";
+            manualButton.classList.remove('recording');
+        }
+    }
+}
+
+// ===================================================================
+// 2. Zentrale Verarbeitungslogik
+// ===================================================================
+
+/**
+ * Verarbeitet die eingehenden Positionsdaten. Diese Funktion wird gedebounced aufgerufen,
+ * um die App bei hoher Frequenz von GPS-Updates nicht zu überlasten.
+ * Sie berechnet Geschwindigkeit, Richtung, Sinkrate, glättet die Werte,
+ * aktualisiert den Live-Marker auf der Karte, zeichnet den Track auf und löst ein
+ * 'tracking:positionUpdated'-Event aus.
+ *
+ * HINWEIS (ToDo): Diese Funktion ist sehr umfangreich. Sie könnte in Zukunft in
+ * kleinere, spezialisierte Funktionen aufgeteilt werden (z.B. eine für die
+ * Höhenkorrektur, eine für die Geschwindigkeitsberechnung, eine für das Event-Dispatching).
+ * @param {GeolocationPosition} position - Das Positionsobjekt von der Geolocation-API.
+ * @private
+ */
 const debouncedPositionUpdate = Utils.debounce(async (position) => {
     console.log("[LiveTrackingManager] Received position data:", position);
     if (!AppState.map) {
@@ -166,8 +309,55 @@ const debouncedPositionUpdate = Utils.debounce(async (position) => {
     document.dispatchEvent(event);
 }, 300);
 
+// ===================================================================
+// 3. Interne Hilfsfunktionen
+// ===================================================================
+
 /**
- * Prüft die GPS-Berechtigungen und fordert sie bei Bedarf an.
+ * Erstellt ein benutzerdefiniertes Leaflet-Icon für den Live-Marker.
+ * @param {number|string} direction - Die Bewegungsrichtung in Grad (0-360).
+ * @returns {L.DivIcon} Das konfigurierte Leaflet DivIcon.
+ * @private
+ */
+function createLiveMarkerIcon(direction) {
+    // Stellt sicher, dass die Rotation eine gültige Zahl ist, ansonsten 0.
+    const rotation = (typeof direction === 'number' && isFinite(direction)) ? direction : 0;
+
+    // Das HTML für das Icon: ein Wrapper für die Rotation, der Punkt und der Pfeil.
+    const iconHtml = `
+        <div class="live-marker-wrapper" style="transform: rotate(${rotation}deg);">
+            <div class="live-marker-dot"></div>
+            <div class="live-marker-arrow"></div>
+        </div>
+    `;
+
+    return L.divIcon({
+        className: 'live-marker-container', // Container-Klasse ohne Standard-Leaflet-Stile
+        html: iconHtml,
+        iconSize: [24, 24], // Größe des Icons
+        iconAnchor: [12, 12],
+        pmIgnore: true
+    });
+}
+
+/**
+ * Zeichnet oder aktualisiert den Genauigkeitskreis um den Live-Marker.
+ * @param {number} lat - Breite.
+ * @param {number} lng - Länge.
+ * @param {number} accuracy - Genauigkeit in Metern.
+ * @private
+ */
+function updateAccuracyCircle(lat, lng, accuracy) {
+    if (AppState.accuracyCircle) {
+        AppState.map.removeLayer(AppState.accuracyCircle);
+    }
+    AppState.accuracyCircle = L.circle([lat, lng], {
+        radius: accuracy, color: 'blue', fillOpacity: 0.1, weight: 1, dashArray: '5, 5', pmIgnore: true
+    }).addTo(AppState.map);
+}
+
+/**
+ * Prüft die GPS-Berechtigungen und fordert sie bei Bedarf an (nur für native Apps).
  * @returns {Promise<boolean>} Gibt `true` zurück, wenn die Berechtigung erteilt wurde.
  * @private
  */
@@ -205,151 +395,3 @@ async function checkAndRequestPermissions() {
     return true;
 }
 
-/**
- * Startet die kontinuierliche Abfrage der GPS-Position des Geräts.
- * Verwendet das Capacitor Geolocation-Plugin für native Plattformen und navigator.geolocation als Fallback für Web.
- * Löst ein 'tracking:started'-Event aus, um andere Teile der Anwendung zu informieren.
- * @returns {void}
- */
-export async function startPositionTracking() {
-    if (AppState.watchId !== null) return;
-    console.log("[LiveTrackingManager] Attempting to start position tracking...");
-
-    const { Geolocation, isNative } = await getCapacitor();
-    console.log("[LiveTrackingManager] Platform:", isNative ? window.Capacitor.getPlatform() : 'Web', "IsNative:", isNative);
-
-    if (isNative && Geolocation) {
-        try {
-            // Prüfe und fordere Berechtigungen an
-            const permissions = await checkAndRequestPermissions();
-            console.log("[LiveTrackingManager] Permissions result:", permissions);
-            if (!permissions) {
-                console.warn("[LiveTrackingManager] Permissions not granted, stopping tracking.");
-                return;
-            }
-
-            // Starte native Hintergrund-Tracking mit Capacitor Geolocation
-            const watchId = await Geolocation.watchPosition(
-                {
-                    enableHighAccuracy: true,
-                    timeout: 10000,
-                    maximumAge: 0
-                },
-                (position, error) => {
-                    if (error) {
-                        console.error("[LiveTrackingManager] Geolocation error:", error);
-                        Utils.handleError(`Geolocation error: ${error.message || 'Unknown error'}`);
-                        stopPositionTracking();
-                        return;
-                    }
-                    if (position) {
-                        console.log("[LiveTrackingManager] Received position:", position.coords);
-                        debouncedPositionUpdate(position);
-                    }
-                }
-            );
-            AppState.watchId = watchId;
-            console.log("[LiveTrackingManager] Native Geolocation watcher started:", watchId);
-            document.dispatchEvent(new CustomEvent('tracking:started'));
-        } catch (error) {
-            console.error("[LiveTrackingManager] Failed to start native tracking:", error);
-            Utils.handleError(`Failed to start tracking: ${error.message || 'Unknown error'}`);
-        }
-    } else {
-        console.log("[LiveTrackingManager] Using navigator.geolocation for tracking (Web).");
-        if (!navigator.geolocation) {
-            Utils.handleError("Geolocation is not supported by your browser.");
-            document.dispatchEvent(new CustomEvent('tracking:stopped'));
-            return;
-        }
-        AppState.watchId = navigator.geolocation.watchPosition(
-            (position) => {
-                console.log("[LiveTrackingManager] Web position:", position.coords);
-                debouncedPositionUpdate(position);
-            },
-            (error) => {
-                console.error("[LiveTrackingManager] Web Geolocation error:", error);
-                Utils.handleError(`Geolocation error: ${error.message || 'Unknown error'}`);
-                stopPositionTracking();
-            },
-            { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
-        );
-        console.log("[LiveTrackingManager] Web Geolocation watcher started:", AppState.watchId);
-        document.dispatchEvent(new CustomEvent('tracking:started'));
-    }
-}
-
-/**
- * Beendet die kontinuierliche Abfrage der GPS-Position.
- * Löscht den Watcher, entfernt die zugehörigen Marker und Kreise von der Karte
- * und setzt die Tracking-Variablen im AppState zurück.
- * Löst ein 'tracking:stopped'-Event aus.
- * @returns {void}
- */
-export async function stopPositionTracking() {
-    if (AppState.watchId !== null) {
-        const { Geolocation, isNative } = await getCapacitor(); // Korrigiert: getCapacitor
-
-        if (isNative && Geolocation) {
-            try {
-                await Geolocation.clearWatch({ id: AppState.watchId });
-                console.log("[LiveTrackingManager] Stopped native Geolocation watcher:", AppState.watchId);
-            } catch (error) {
-                console.error("[LiveTrackingManager] Error stopping native watcher:", error);
-            }
-        } else if (navigator.geolocation) {
-            navigator.geolocation.clearWatch(AppState.watchId);
-            console.log("[LiveTrackingManager] Stopped navigator.geolocation watcher:", AppState.watchId);
-        }
-        AppState.watchId = null;
-    }
-
-    if (AppState.liveMarker) AppState.map.removeLayer(AppState.liveMarker);
-    if (AppState.accuracyCircle) AppState.map.removeLayer(AppState.accuracyCircle);
-    AppState.liveMarker = null;
-    AppState.accuracyCircle = null;
-    AppState.prevLat = null;
-    AppState.prevLng = null;
-    AppState.altitudeCorrectionOffset = 0;
-    document.dispatchEvent(new CustomEvent('tracking:stopped'));
-}
-
-/**
- * Startet oder stoppt die manuelle Aufzeichnung eines Tracks.
- * Wird durch den neuen Button im Dashboard gesteuert.
- */
-export function toggleManualRecording() {
-    if (AppState.isAutoRecording) {
-        Utils.handleMessage("Cannot start manual recording while auto-recording is active.");
-        return;
-    }
-
-    AppState.isManualRecording = !AppState.isManualRecording;
-
-    if (AppState.isManualRecording) {
-        // Manuelle Aufnahme starten
-        AppState.recordedTrackPoints = []; // Track zurücksetzen
-        AppState.altitudeCorrectionOffset = 0; // WICHTIG: Offset zurücksetzen
-        startPositionTracking(); // Tracking starten, falls es nicht läuft
-        Utils.handleMessage("Manual recording started.");
-        document.dispatchEvent(new CustomEvent('sensor:freefall_detected')); // Simuliert den Start
-    } else {
-        // Manuelle Aufnahme stoppen
-        Utils.handleMessage("Manual recording stopped. Saving track...");
-        saveRecordedTrack(); // Track speichern
-        // Das Tracking wird hier NICHT gestoppt, da es unabhängig weiterlaufen kann.
-        document.dispatchEvent(new CustomEvent('sensor:disarmed'));
-    }
-
-    // Button-Zustand in der UI aktualisieren
-    const manualButton = document.getElementById('manual-recording-button');
-    if (manualButton) {
-        if (AppState.isManualRecording) {
-            manualButton.textContent = "Stop Recording";
-            manualButton.classList.add('recording');
-        } else {
-            manualButton.textContent = "Start Recording";
-            manualButton.classList.remove('recording');
-        }
-    }
-}
