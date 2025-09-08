@@ -11,11 +11,8 @@ import { UI_DEFAULTS, SMOOTHING_DEFAULTS } from './constants.js';
 import { AppState } from './state.js';
 import { Utils } from './utils.js';
 import { getCapacitor } from './capacitor-adapter.js';
-import { DateTime } from 'luxon'; // <--- DIESE ZEILE HINZUFÜGEN
-import { saveRecordedTrack } from './trackManager.js'; // <-- NEU: Importieren
-
-// Zähler, um die ersten ungenauen Web-Geolocation-Events zu überspringen
-let webUpdateCounter = 0;
+import { DateTime } from 'luxon'; 
+import { saveRecordedTrack } from './trackManager.js'; 
 
 // ===================================================================
 // 1. Öffentliche Hauptfunktionen (API des Moduls)
@@ -394,4 +391,3 @@ async function checkAndRequestPermissions() {
 
     return true;
 }
-
