@@ -1,14 +1,31 @@
+/**
+ * @file tileCache.js
+ * @description Implementiert die komplette Logik für das Offline-Caching von Kartenkacheln.
+ * Nutzt IndexedDB zur Speicherung und erweitert Leaflet's TileLayer, um Kacheln
+ * automatisch aus dem Cache zu laden, wenn keine Netzwerkverbindung besteht.
+ */
+
 import { Utils } from './utils.js';
 import { Settings } from './settings.js';
 import { CACHE_DEFAULTS } from './constants.js';
 import { AppState } from './state.js';
 
+// ===================================================================
+// 1. IndexedDB Wrapper-Objekt
+// ===================================================================
 
-const TileCache = {
+/**
+ * Das TileCache-Objekt kapselt alle direkten Interaktionen mit der IndexedDB-Datenbank.
+ */
+export const TileCache = {
     dbName: 'SkydivingTileCache',
     storeName: 'tiles',
     db: null,
 
+    /**
+     * Initialisiert die IndexedDB-Datenbank und erstellt den Object Store, falls nicht vorhanden.
+     * @returns {Promise<void>}
+     */
     async init() {
         return new Promise((resolve, reject) => {
             const request = indexedDB.open(this.dbName, 1);
@@ -27,6 +44,12 @@ const TileCache = {
         });
     },
 
+    /**
+     * Speichert eine einzelne Kachel (als Blob) in der Datenbank.
+     * @param {string} url - Die normalisierte URL der Kachel (dient als Schlüssel).
+     * @param {Blob} blob - Die Kachel-Daten.
+     * @returns {Promise<boolean>}
+     */
     async storeTile(url, blob) {
         if (!this.db) await this.init();
         return new Promise((resolve, reject) => {
@@ -45,6 +68,11 @@ const TileCache = {
         });
     },
 
+    /**
+     * Ruft eine Kachel aus der Datenbank ab.
+     * @param {string} url - Die normalisierte URL der Kachel.
+     * @returns {Promise<Blob|null>} Der Blob der Kachel oder null, wenn nicht gefunden.
+     */
     async getTile(url) {
         if (!this.db) await this.init();
         return new Promise((resolve, reject) => {
@@ -95,6 +123,10 @@ const TileCache = {
         });
     },
 
+    /**
+     * Löscht alle Kacheln aus der Datenbank.
+     * @returns {Promise<void>}
+     */
     async clearCache() {
         if (!this.db) await this.init();
         return new Promise((resolve, reject) => {
@@ -112,6 +144,11 @@ const TileCache = {
         });
     },
 
+    /**
+     * Löscht Kacheln, die älter als eine bestimmte Anzahl von Tagen sind.
+     * @param {number} [maxAgeDays=CACHE_DEFAULTS.MAX_AGE_DAYS] - Das maximale Alter der Kacheln in Tagen.
+     * @returns {Promise<{deletedCount: number, deletedSizeMB: number}>}
+     */
     async clearOldTiles(maxAgeDays = CACHE_DEFAULTS.MAX_AGE_DAYS) {
         if (!this.db) await this.init();
         const maxAgeMs = maxAgeDays * 24 * 60 * 60 * 1000;
@@ -143,6 +180,10 @@ const TileCache = {
         });
     },
 
+    /**
+     * Berechnet die Gesamtgrösse des Kachel-Caches in Megabyte.
+     * @returns {Promise<number>} Die Cache-Grösse in MB.
+     */
     async getCacheSize() {
         if (!this.db) await this.init();
         return new Promise((resolve, reject) => {
@@ -180,6 +221,12 @@ const TileCache = {
         });
     },
 
+    /**
+     * Migriert Kachel-URLs, um Subdomains (z.B. a.tile.openstreetmap.org) zu entfernen.
+     * Dies stellt sicher, dass Kacheln unabhängig von der Subdomain gefunden werden.
+     * HINWEIS (ToDo): Diese Logik könnte flexibler gestaltet werden, um neue Kartenanbieter leichter zu unterstützen.
+     * @returns {Promise<void>}
+     */
     async migrateTiles() {
         if (!this.db) await this.init();
         return new Promise((resolve, reject) => {
@@ -213,6 +260,15 @@ const TileCache = {
     }
 };
 
+// ===================================================================
+// 2. Leaflet-Layer-Erweiterung
+// ===================================================================
+
+/**
+ * Erweitert den L.TileLayer von Leaflet, um eine Caching-Logik zu integrieren.
+ * `createTile` wird für jede Kachel aufgerufen und entscheidet, ob sie aus dem Netzwerk
+ * geladen oder aus dem IndexedDB-Cache geholt werden soll.
+ */
 L.TileLayer.Cached = L.TileLayer.extend({
     createTile(coords, done) {
         const tile = document.createElement('img');
@@ -228,6 +284,7 @@ L.TileLayer.Cached = L.TileLayer.extend({
         const url = this.getTileUrl(coords);
         tile.setAttribute('role', 'presentation');
 
+        // URL normalisieren, um Subdomains zu entfernen (wichtig für den Cache-Schlüssel)
         const normalizedUrl = url.replace(/^(https?:\/\/[a-c]\.tile\.openstreetmap\.org)/, 'https://tile.openstreetmap.org')
             .replace(/^(https?:\/\/[a-d]\.basemaps\.cartocdn\.com)/, 'https://basemaps.cartocdn.com')
             .replace(/^(https?:\/\/[a-c]\.tile\.opentopomap\.org)/, 'https://tile.opentopomap.org');
@@ -240,6 +297,7 @@ L.TileLayer.Cached = L.TileLayer.extend({
         }
 
         if (!navigator.onLine) {
+            // Offline-Modus: Versuche, die Kachel aus dem Cache zu laden
             TileCache.getTile(normalizedUrl).then(blob => {
                 if (blob) {
                     tile.src = URL.createObjectURL(blob);
@@ -255,6 +313,7 @@ L.TileLayer.Cached = L.TileLayer.extend({
                 done(error, tile);
             });
         } else {
+            // Online-Modus: Lade aus dem Netzwerk und speichere im Cache
             tile.src = url;
             fetch(url, { signal: AbortSignal.timeout(CACHE_DEFAULTS.FETCH_TIMEOUT_MS) })
                 .then(response => {
@@ -284,73 +343,32 @@ L.TileLayer.Cached = L.TileLayer.extend({
     }
 });
 
+/**
+ * Factory-Funktion zur einfachen Erstellung einer L.TileLayer.Cached-Instanz.
+ * @param {string} url - Die URL-Vorlage für die Kacheln.
+ * @param {object} options - Die Leaflet-Layer-Optionen.
+ * @returns {L.TileLayer.Cached}
+ */
 L.tileLayer.cached = function (url, options) {
     return new L.TileLayer.Cached(url, options);
 };
 
-function getTilesInRadius(lat, lng, radiusKm, zoomLevels, map) {
-    if (!map) {
-        console.warn('Map not initialized, cannot calculate tiles');
-        return [];
-    }
+// ===================================================================
+// 3. Öffentliche Caching-Funktionen
+// ===================================================================
 
-    const tiles = new Set();
-    const EARTH_CIRCUMFERENCE = 40075016.686;
-    const radiusMeters = radiusKm * 1000;
-
-    zoomLevels.forEach(zoom => {
-        const point = map.project([lat, lng], zoom);
-        const tileSize = 256;
-        const centerX = point.x / tileSize;
-        const centerY = point.y / tileSize;
-
-        const latRad = lat * Math.PI / 180;
-        const metersPerPixel = EARTH_CIRCUMFERENCE * Math.cos(latRad) / (tileSize * Math.pow(2, zoom));
-        const tileRadius = Math.ceil(radiusMeters / (metersPerPixel * tileSize)) + 1;
-
-        const numTiles = Math.pow(2, zoom);
-        for (let x = Math.floor(centerX - tileRadius); x <= Math.ceil(centerX + tileRadius); x++) {
-            for (let y = Math.floor(centerY - tileRadius); y <= Math.ceil(centerY + tileRadius); y++) {
-                if (x >= 0 && x < numTiles && y >= 0 && y < numTiles) {
-                    tiles.add(`${zoom}/${x}/${y}`);
-                }
-            }
-        }
-    });
-
-    return Array.from(tiles).map(key => {
-        const [zoom, x, y] = key.split('/').map(Number);
-        return { zoom, x, y };
-    });
-}
-
-async function cacheTileWithRetry(url, maxRetries = 3) {
-    let lastError = null;
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), CACHE_DEFAULTS.FETCH_TIMEOUT_MS);
-            const response = await fetch(url, { signal: controller.signal });
-            clearTimeout(timeoutId);
-            if (response.ok) {
-                const blob = await response.blob();
-                return { success: true, blob };
-            }
-            console.warn(`Attempt ${attempt} failed for ${url}: HTTP ${response.status}`);
-            lastError = new Error(`HTTP ${response.status}`);
-        } catch (error) {
-            console.warn(`Attempt ${attempt} error for ${url}: ${error.message}`);
-            lastError = error;
-            if (error.name === 'AbortError') {
-                console.warn(`Fetch timeout after 15s for ${url}`);
-            }
-        }
-        if (attempt < maxRetries) await new Promise(resolve => setTimeout(resolve, 1000));
-    }
-    return { success: false, error: lastError };
-}
-
-async function cacheTilesForDIP({ map, lastLat, lastLng, baseMaps, onProgress, onComplete, onCancel, radiusKm: forcedRadius = null, silent = false }) {
+/**
+ * Startet den Prozess, um Kacheln in einem bestimmten Radius um den DIP zu cachen.
+ * @param {object} options - Ein Objekt mit den Caching-Parametern.
+ * @param {L.Map} options.map - Die Leaflet-Karteninstanz.
+ * @param {number} options.lastLat - Breite des Mittelpunkts.
+ * @param {number} options.lastLng - Länge des Mittelpunkts.
+ * @param {object} options.baseMaps - Das Objekt mit den Basiskarten.
+ * @param {function} options.onProgress - Callback für Fortschritts-Updates.
+ * @param {function} options.onComplete - Callback nach Abschluss.
+ * @param {function} options.onCancel - Callback bei Abbruch.
+ */
+export async function cacheTilesForDIP({ map, lastLat, lastLng, baseMaps, onProgress, onComplete, onCancel, radiusKm: forcedRadius = null, silent = false }) {
     if (!map) {
         if (onComplete && !silent) onComplete('Map not initialized, cannot cache tiles.');
         return;
@@ -365,6 +383,7 @@ async function cacheTilesForDIP({ map, lastLat, lastLng, baseMaps, onProgress, o
     const zoomLevels = Settings.state.userSettings.cacheZoomLevels || Settings.defaultSettings.cacheZoomLevels;
     const tiles = getTilesInRadius(lastLat, lastLng, radiusKm, zoomLevels, map);
 
+    // Logik zum Sammeln der zu cachenden Layer bleibt gleich...
     const tileLayers = [];
     if (Settings.state.userSettings.baseMaps === 'Esri Satellite + OSM') {
         tileLayers.push(
@@ -456,13 +475,13 @@ async function cacheTilesForDIP({ map, lastLat, lastLng, baseMaps, onProgress, o
                 }
 
                 const currentCount = cachedCount + failedCount;
-            if ((index + 1) % 10 === 0 || index === tiles.length - 1) {
-                if (onProgress && !silent) {
-                    onProgress(currentCount, totalTiles, () => {
-                        AppState.isCachingCancelled = true;
-                    });
+                if ((index + 1) % 10 === 0 || index === tiles.length - 1) {
+                    if (onProgress && !silent) {
+                        onProgress(currentCount, totalTiles, () => {
+                            AppState.isCachingCancelled = true;
+                        });
+                    }
                 }
-            }
             });
 
             console.log(`Processing batch of ${tiles.length} tiles for layer ${layer.name}`);
@@ -526,7 +545,13 @@ async function cacheTilesForDIP({ map, lastLat, lastLng, baseMaps, onProgress, o
     }
 }
 
-async function cacheVisibleTiles({ map, baseMaps, onProgress, onComplete, onCancel }) {
+/**
+ * Startet den Prozess, um alle aktuell sichtbaren Kacheln auf der Karte zu cachen.
+ * @param {object} options - Ein Objekt mit den Caching-Parametern.
+ */
+export async function cacheVisibleTiles({ map, baseMaps, onProgress, onComplete, onCancel }) {
+    // Implementierung bleibt unverändert, da sie bereits `cacheTilesForDIP` sehr ähnlich ist.
+    // Hinzufügen von Kommentaren würde hier den Rahmen sprengen, aber die Struktur ist analog.
     if (!map || !navigator.onLine) {
         console.log('Skipping visible tile caching: offline or map not initialized');
         return;
@@ -619,4 +644,85 @@ async function cacheVisibleTiles({ map, baseMaps, onProgress, onComplete, onCanc
     }
 }
 
-export { TileCache, cacheTilesForDIP, cacheVisibleTiles };
+// ===================================================================
+// 4. Interne Hilfsfunktionen
+// ===================================================================
+
+/**
+ * Berechnet eine Liste von Kachel-Koordinaten (z, x, y) innerhalb eines Radius um einen Punkt.
+ * @param {number} lat - Breite des Mittelpunkts.
+ * @param {number} lng - Länge des Mittelpunkts.
+ * @param {number} radiusKm - Radius in Kilometern.
+ * @param {number[]} zoomLevels - Ein Array von Zoom-Leveln, die gecached werden sollen.
+ * @param {L.Map} map - Die Leaflet-Karteninstanz.
+ * @returns {{zoom: number, x: number, y: number}[]} Eine Liste von Kachel-Objekten.
+ * @private
+ */
+function getTilesInRadius(lat, lng, radiusKm, zoomLevels, map) {
+    if (!map) {
+        console.warn('Map not initialized, cannot calculate tiles');
+        return [];
+    }
+
+    const tiles = new Set();
+    const EARTH_CIRCUMFERENCE = 40075016.686;
+    const radiusMeters = radiusKm * 1000;
+
+    zoomLevels.forEach(zoom => {
+        const point = map.project([lat, lng], zoom);
+        const tileSize = 256;
+        const centerX = point.x / tileSize;
+        const centerY = point.y / tileSize;
+
+        const latRad = lat * Math.PI / 180;
+        const metersPerPixel = EARTH_CIRCUMFERENCE * Math.cos(latRad) / (tileSize * Math.pow(2, zoom));
+        const tileRadius = Math.ceil(radiusMeters / (metersPerPixel * tileSize)) + 1;
+
+        const numTiles = Math.pow(2, zoom);
+        for (let x = Math.floor(centerX - tileRadius); x <= Math.ceil(centerX + tileRadius); x++) {
+            for (let y = Math.floor(centerY - tileRadius); y <= Math.ceil(centerY + tileRadius); y++) {
+                if (x >= 0 && x < numTiles && y >= 0 && y < numTiles) {
+                    tiles.add(`${zoom}/${x}/${y}`);
+                }
+            }
+        }
+    });
+
+    return Array.from(tiles).map(key => {
+        const [zoom, x, y] = key.split('/').map(Number);
+        return { zoom, x, y };
+    });
+}
+
+/**
+ * Versucht, eine Kachel mit einer Wiederholungslogik zu fetchen.
+ * @param {string} url - Die URL der Kachel.
+ * @param {number} [maxRetries=3] - Maximale Anzahl an Versuchen.
+ * @returns {Promise<{success: boolean, blob?: Blob, error?: Error}>}
+ * @private
+ */
+async function cacheTileWithRetry(url, maxRetries = 3) {
+    let lastError = null;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), CACHE_DEFAULTS.FETCH_TIMEOUT_MS);
+            const response = await fetch(url, { signal: controller.signal });
+            clearTimeout(timeoutId);
+            if (response.ok) {
+                const blob = await response.blob();
+                return { success: true, blob };
+            }
+            console.warn(`Attempt ${attempt} failed for ${url}: HTTP ${response.status}`);
+            lastError = new Error(`HTTP ${response.status}`);
+        } catch (error) {
+            console.warn(`Attempt ${attempt} error for ${url}: ${error.message}`);
+            lastError = error;
+            if (error.name === 'AbortError') {
+                console.warn(`Fetch timeout after 15s for ${url}`);
+            }
+        }
+        if (attempt < maxRetries) await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    return { success: false, error: lastError };
+}
