@@ -1,63 +1,26 @@
-import { AppState } from './state.js';
-import { Settings } from "./settings.js";
-import { Utils } from "./utils.js";
-import { DateTime } from 'luxon';
-import * as JumpPlanner from './jumpPlanner.js';
-import * as weatherManager from './weatherManager.js';
-import { interpolateWeatherData } from './weatherManager.js';
-import { getCapacitor } from './capacitor-adapter.js';
-
+/**
+ * @file trackManager.js
+ * @description Verwaltet das Laden, Verarbeiten, Anzeigen, Speichern und Exportieren
+ * von GPS-Tracks aus verschiedenen Dateiformaten (GPX, KML, CSV).
+ */
 
 "use strict";
 
-/**
- * **NEU: Interne Hilfsfunktion zum Lesen von Dateiinhalten**
- * Diese Funktion entscheidet, ob die Web-API (FileReader) oder die native Capacitor-API
- * zum Lesen einer Datei verwendet werden soll.
- * @param {File} file - Das vom Benutzer ausgewählte Datei-Objekt.
- * @returns {Promise<string>} Ein Promise, das zum Textinhalt der Datei auflöst.
- */
-async function readFileContent(file) {
-    const { Filesystem, isNative, Directory } = await getCapacitor();
+import { AppState } from './state.js';
+import { Utils } from "./utils.js";
+import { DateTime } from 'luxon';
+import * as JumpPlanner from './jumpPlanner.js';
+import { interpolateWeatherData } from './weatherManager.js';
+import { getCapacitor } from './capacitor-adapter.js';
 
-    if (isNative && file.path && Filesystem) {
-        console.log(`[trackManager] Reading file via Capacitor Filesystem API: ${file.path}`);
-        try {
-            // KORREKTUR: Datei direkt als UTF-8 Text einlesen
-            const result = await Filesystem.readFile({
-                path: file.path,
-                // Hinweis: Je nach Android-Version und wie der Picker die Datei zurückgibt,
-                // ist 'directory' eventuell nicht nötig. Falls doch, ist 'Directory.Cache' oft eine gute Wahl.
-                // directory: Directory.Cache,
-                encoding: 'utf8'
-            });
-            // KORREKTUR: Das Ergebnis ist bereits der Textinhalt, kein atob() nötig
-            return result.data;
-        } catch (error) {
-            console.error('[trackManager] Error reading file with Capacitor:', error);
-            // Fallback für den Fall, dass der Pfad nicht direkt lesbar ist (z.B. bei Content-URIs)
-            if (file.webPath) {
-                const response = await fetch(file.webPath);
-                return await response.text();
-            }
-            throw new Error('Could not read file using native API.');
-        }
-    } else {
-        // Der Web-Fallback bleibt unverändert und korrekt
-        console.log(`[trackManager] Reading file via Web FileReader: ${file.name}`);
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = (e) => resolve(e.target.result);
-            reader.onerror = (e) => reject(new Error('Error reading file.'));
-            reader.readAsText(file);
-        });
-    }
-}
+// ===================================================================
+// 1. Öffentliche Lade- & Speicherfunktionen
+// ===================================================================
 
 /**
- * Lädt und verarbeitet eine KML-Datei.
+ * Lädt und verarbeitet eine KML-Datei. Nutzt die togeojson-Bibliothek zur Konvertierung.
  * @param {File} file - Das vom Benutzer ausgewählte KML-Datei-Objekt.
- * @returns {Promise<object|null>} Ein Promise, das zu den Metadaten des Tracks auflöst oder null bei einem Fehler.
+ * @returns {Promise<object|null>} Ein Promise, das zu den Metadaten des Tracks auflöst.
  */
 export async function loadKmlTrack(file) {
     if (!AppState.map) {
@@ -123,10 +86,9 @@ export async function loadKmlTrack(file) {
 }
 
 /**
- * Lädt und verarbeitet eine GPX-Datei. Liest die Datei, extrahiert die Trackpunkte
- * und ruft die renderTrack-Funktion auf, um sie auf der Karte darzustellen.
+ * Lädt und verarbeitet eine GPX-Datei.
  * @param {File} file - Das vom Benutzer ausgewählte GPX-Datei-Objekt.
- * @returns {Promise<object|null>} Ein Promise, das zu den Metadaten des Tracks auflöst oder null bei einem Fehler.
+ * @returns {Promise<object|null>} Ein Promise, das zu den Metadaten des Tracks auflöst.
  */
 export async function loadGpxTrack(file) {
     if (!AppState.map) { /* istanbul ignore next */ Utils.handleError('Map not initialized.'); return null; }
@@ -180,11 +142,9 @@ export async function loadGpxTrack(file) {
 }
 
 /**
- * Lädt und verarbeitet eine CSV-Datei von einem FlySight-Gerät.
- * Parst die CSV-Daten, extrahiert die Trackpunkte und stellt sie auf der Karte dar.
- * Diese Funktion geht davon aus, dass die Zeitstempel in UTC ('Z-Time') vorliegen.
+ * Lädt und verarbeitet eine CSV-Datei (FlySight-Format, UTC).
  * @param {File} file - Das vom Benutzer ausgewählte CSV-Datei-Objekt.
- * @returns {Promise<object|null>} Ein Promise, das zu den Metadaten des Tracks auflöst oder null bei einem Fehler.
+ * @returns {Promise<object|null>} Ein Promise, das zu den Metadaten des Tracks auflöst.
  */
 export async function loadCsvTrackUTC(file) {
     if (!AppState.map) { /* istanbul ignore next */ Utils.handleError('Map not initialized.'); return null; }
@@ -248,12 +208,324 @@ export async function loadCsvTrackUTC(file) {
 }
 
 /**
- * Rendert einen gegebenen Satz von Trackpunkten auf der Karte.
- * Erstellt eine farbkodierte Polylinie, bei der die Farbe die Höhe über Grund (AGL) anzeigt.
- * Löst nach dem Rendern ein 'track:loaded'-Event aus, um die restliche Anwendung zu informieren.
+ * Speichert die aktuell aufgezeichneten Trackpunkte als GPX-Datei.
+ * @returns {Promise<void>}
+ */
+export async function saveRecordedTrack() {
+    console.log(`--- Starte saveRecordedTrack mit ${AppState.recordedTrackPoints.length} Punkten ---`);
+
+    if (!AppState.recordedTrackPoints || AppState.recordedTrackPoints.length < 2) {
+        Utils.handleError("Keine Track-Daten zum Speichern vorhanden.");
+        return;
+    }
+
+    try {
+        const header = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="DZMaster" xmlns="http://www.topografix.com/GPX/1/1">
+<metadata><name>Skydive Track - ${new Date().toLocaleString()}</name></metadata>
+<trk><name>Recorded Skydive</name><trkseg>`;
+
+        const footer = `</trkseg></trk></gpx>`;
+
+        const trackpointStrings = AppState.recordedTrackPoints.map((p, index) => {
+            if (p && typeof p.lat === 'number' && typeof p.lng === 'number' && p.time) {
+                const ele = (typeof p.ele === 'number') ? p.ele.toFixed(2) : '0';
+                const time = p.time.toISO();
+                const trkpt = `<trkpt lat="${p.lat}" lon="${p.lng}"><ele>${ele}</ele><time>${time}</time></trkpt>`;
+                return trkpt;
+            }
+            return '';
+        }).filter(Boolean);
+
+        if (trackpointStrings.length < 2) {
+            Utils.handleError("Not enough valid data points to save track.");
+            return;
+        }
+
+        const gpxContent = `${header}\n${trackpointStrings.join('\n')}\n${footer}`;
+        const fileName = `Skydive_Track_${DateTime.utc().toFormat('yyyy-MM-dd_HHmm')}.gpx`;
+
+        // HINZUGEFÜGT: "await", um auf das Laden der Module zu warten
+        const { Filesystem, Directory, isNative } = await getCapacitor();
+
+        if (isNative && Filesystem) {
+            // HINZUGEFÜGT: "await", um auf das Speichern der Datei zu warten
+            await Filesystem.writeFile({
+                path: `DZMaster/${fileName}`,
+                data: gpxContent,
+                directory: Directory.Documents,
+                encoding: 'utf8',
+                recursive: true
+            });
+            // Diese Nachricht wird jetzt erst NACH dem erfolgreichen Speichern angezeigt
+            Utils.handleMessage(`Track saved in Documents/DZMaster`);
+        } else {
+            // Web-Fallback oder Fehlerfall, wenn Filesystem nicht geladen werden konnte
+            if (isNative) {
+                Utils.handleError("Could not save track: Filesystem module not available.");
+            } else {
+                // Der Web-Fallback bleibt unverändert
+                const blob = new Blob([gpxContent], { type: "application/gpx+xml;charset=utf-8" });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            }
+        }
+
+    } catch (error) {
+        console.error("Error in saveRecordedTrack:", error);
+        Utils.handleError("Could not save track.");
+    } finally {
+        AppState.recordedTrackPoints = [];
+    }
+}
+
+// ===================================================================
+// 2. Öffentliche Exportfunktionen
+// ===================================================================
+
+/**
+ * Erstellt eine GPX-Datei für den Jump Run Track und löst den Download aus.
+ * HINWEIS (ToDo): Diese Funktion enthält viel Berechnungslogik. Zukünftig könnte
+ * die reine GPX-Erstellung von der Datenberechnung getrennt werden.
+ * @param {number} sliderIndex - Der Index des Zeitschiebereglers.
+ * @param {number} interpStep - Der Interpolationsschritt.
+ * @param {string} heightUnit - Die aktuell ausgewählte Höheneinheit.
+ */
+export async function exportToGpx(sliderIndex, interpStep, heightUnit) {
+    console.log("--- GPX EXPORT DEBUG START ---");
+    if (!Settings.getValue('showJumpRunTrack', false)) {
+        Utils.handleError("Activate 'Show Jump Run Track' to export the track.");
+        return;
+    }
+
+    if (!AppState.weatherData || !AppState.lastLat || !AppState.lastLng || AppState.lastAltitude === 'N/A') {
+        Utils.handleError("Wetterdaten oder DIP-Position nicht verfügbar. GPX-Export nicht möglich.");
+        return;
+    }
+
+    // Höhenreferenzen holen
+    const dipLat = AppState.lastLat;
+    const dipLng = AppState.lastLng;
+    const dipElevation = Math.round(AppState.lastAltitude);
+    const harpAnchor = AppState.harpMarker ? AppState.harpMarker.getLatLng() : null;
+    let harpElevation = null;
+
+    if (harpAnchor) {
+        // Asynchron die Höhe des HARP abrufen
+        harpElevation = await Utils.getAltitude(harpAnchor.lat, harpAnchor.lng);
+        harpElevation = harpElevation !== 'N/A' ? Math.round(harpElevation) : null;
+    }
+
+    const interpolatedData = interpolateWeatherData(
+        AppState.weatherData, sliderIndex, interpStep, dipElevation, heightUnit
+    );
+
+    if (!interpolatedData || interpolatedData.length === 0) {
+        Utils.handleError("Keine Wetterdaten für die GPX-Erstellung verfügbar.");
+        return;
+    }
+
+    const trackData = JumpPlanner.jumpRunTrack(interpolatedData, harpAnchor);
+
+    if (!trackData || !trackData.latlngs || !trackData.approachLatLngs) {
+        Utils.handleError("Jump Run Track konnte nicht berechnet werden.");
+        return;
+    }
+
+    const [approachStartLat, approachStartLng] = trackData.approachLatLngs[1];
+    const [jumpRunStartLat, jumpRunStartLng] = trackData.latlngs[0];
+    const [jumpRunEndLat, jumpRunEndLng] = trackData.latlngs[1];
+
+    // MSL-Höhe für den Absetzvorgang berechnen
+    const exitAltitudeAGL = Settings.getValue('exitAltitude', 3000);
+    const exitAltitudeMSL = dipElevation + exitAltitudeAGL;
+
+    let gpxContent = `<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<gpx version="1.1" creator="DZMaster" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
+  <metadata>
+    <name>Jump Run - ${new Date().toLocaleString()}</name>
+    <desc>Generated by DZMaster. Jump Run Direction: ${trackData.direction}°</desc>
+  </metadata>
+`;
+
+    // Wegpunkte mit korrekten MSL-Höhen einfügen
+    gpxContent += `  <wpt lat="${dipLat}" lon="${dipLng}">\n    <name>DIP</name>\n    <ele>${dipElevation}</ele>\n    <sym>Flag, Blue</sym>\n  </wpt>\n`;
+    if (harpAnchor && harpElevation !== null) {
+        gpxContent += `  <wpt lat="${harpAnchor.lat}" lon="${harpAnchor.lng}">\n    <name>HARP</name>\n    <ele>${harpElevation}</ele>\n    <sym>Flag, Green</sym>\n  </wpt>\n`;
+    }
+    gpxContent += `  <wpt lat="${approachStartLat}" lon="${approachStartLng}">\n    <name>x-2, ${trackData.direction}°</name>\n    <ele>${exitAltitudeMSL}</ele>\n    <sym>Airplane</sym>\n  </wpt>\n`;
+    gpxContent += `  <wpt lat="${jumpRunStartLat}" lon="${jumpRunStartLng}">\n    <name>First Out ${exitAltitudeAGL} m AGL</name>\n    <ele>${exitAltitudeMSL}</ele>\n    <sym>Airplane</sym>\n  </wpt>\n`;
+    gpxContent += `  <wpt lat="${jumpRunEndLat}" lon="${jumpRunEndLng}">\n    <name>Last Out</name>\n    <ele>${exitAltitudeMSL}</ele>\n    <sym>Airplane</sym>\n  </wpt>\n`;
+
+    // Track mit korrekten MSL-Höhen einfügen
+    gpxContent += `  <trk>\n    <name>Jump Run and Approach</name>\n    <trkseg>\n`;
+    gpxContent += `      <trkpt lat="${approachStartLat}" lon="${approachStartLng}"><ele>${exitAltitudeMSL}</ele></trkpt>\n`;
+    gpxContent += `      <trkpt lat="${jumpRunStartLat}" lon="${jumpRunStartLng}"><ele>${exitAltitudeMSL}</ele></trkpt>\n`;
+    gpxContent += `      <trkpt lat="${jumpRunEndLat}" lon="${jumpRunEndLng}"><ele>${exitAltitudeMSL}</ele></trkpt>\n`;
+    gpxContent += `    </trkseg>\n  </trk>\n</gpx>`;
+
+    const time = Utils.formatTime(AppState.weatherData.time[sliderIndex]).replace(/ /g, '_').replace(/:/g, '');
+    const filename = `${time}_JumpRun_Track.gpx`;
+
+    try {
+        const { Filesystem, Directory, isNative } = await getCapacitor();
+        if (isNative && Filesystem) {
+            // Native mobile App: Speichere in Documents/DZMaster
+            await Filesystem.writeFile({
+                path: `DZMaster/${filename}`,
+                data: gpxContent,
+                directory: Directory.Documents,
+                encoding: 'utf8',
+                recursive: true
+            });
+            Utils.handleMessage(`GPX saved in Documents/DZMaster`);
+        } else {
+            // Fallback für den Webbrowser
+            const blob = new Blob([gpxContent], { type: "application/gpx+xml;charset=utf-8" });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }
+    } catch (error) {
+        console.error("Error saving GPX file:", error);
+        Utils.handleError("Could not save GPX file.");
+    }
+}
+
+/**
+ * Erstellt eine GPX-Datei für das Landemuster und löst den Download aus.
+ */
+export async function exportLandingPatternToGpx() {
+    console.log("--- GPX Landing Pattern Export gestartet ---");
+
+    const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
+    const interpStep = Settings.getValue('interpStep', 'select', 200);
+    const heightUnit = Settings.getValue('heightUnit', 'm');
+
+    if (!Settings.getValue('showLandingPattern', false)) {
+        Utils.handleError("Activate 'Landing Pattern' before export.");
+        return;
+    }
+
+    if (!AppState.weatherData || !AppState.lastLat || !AppState.lastLng || AppState.lastAltitude === 'N/A') {
+        Utils.handleError("Wetterdaten oder DIP-Position für GPX-Export nicht verfügbar.");
+        return;
+    }
+    console.log("Schritt 1: Vorbedingungen erfüllt. Wetterdaten und Position vorhanden.");
+
+    const interpolatedData = weatherManager.interpolateWeatherData(
+        AppState.weatherData, sliderIndex, interpStep, Math.round(AppState.lastAltitude), heightUnit
+    );
+
+    if (!interpolatedData || interpolatedData.length === 0) {
+        Utils.handleError("Fehler in Schritt 2: Keine interpolierten Wetterdaten für GPX-Erstellung verfügbar.");
+        return;
+    }
+    console.log("Schritt 2: Wetterdaten erfolgreich interpoliert.");
+
+    const patternDataForExport = JumpPlanner.calculateLandingPatternCoords(AppState.lastLat, AppState.lastLng, interpolatedData);
+
+    // ================== DEBUGGING-BLOCK ==================
+    console.log("Schritt 3: Ergebnis von calculateLandingPatternCoords:", patternDataForExport);
+    if (!patternDataForExport) {
+        Utils.handleError("Fehler in Schritt 3: calculateLandingPatternCoords hat keine Daten zurückgegeben. Export abgebrochen.");
+        return;
+    }
+    console.log("Schritt 3: Koordinaten des Landemusters erfolgreich berechnet.");
+    // =====================================================
+
+    const { downwindStart, baseStart, finalStart, landingPoint } = patternDataForExport;
+
+    const baseHeight = Math.round(AppState.lastAltitude);
+
+    const legHeightDownwind = Settings.getValue('legHeightDownwind', 300);
+    const legHeightBase = Settings.getValue('legHeightBase', 200);
+    const legHeightFinal = Settings.getValue('legHeightFinal', 100);
+
+    const eleDownwind = baseHeight + legHeightDownwind;
+    const eleBase = baseHeight + legHeightBase;
+    const eleFinal = baseHeight + legHeightFinal;
+
+    let gpxContent = `<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<gpx version="1.1" creator="DZMaster" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
+  <metadata>
+    <name>Landing Pattern - ${new Date().toLocaleString()}</name>
+    <desc>Generated by DZMaster Application.</desc>
+  </metadata>
+`;
+
+    gpxContent += `  <wpt lat="${downwindStart[0]}" lon="${downwindStart[1]}"><name>Downwind ${legHeightDownwind} m AGL</name><ele>${eleDownwind}</ele></wpt>\n`;
+    gpxContent += `  <wpt lat="${baseStart[0]}" lon="${baseStart[1]}"><name>Base ${legHeightBase} m AGL</name><ele>${eleBase}</ele></wpt>\n`;
+    gpxContent += `  <wpt lat="${finalStart[0]}" lon="${finalStart[1]}"><name>Final ${legHeightFinal} m AGL</name><ele>${eleFinal}</ele></wpt>\n`;
+    gpxContent += `  <wpt lat="${landingPoint[0]}" lon="${landingPoint[1]}"><name>DIP</name><ele>${baseHeight}</ele></wpt>\n`;
+
+    gpxContent += `  <trk>
+    <name>Landing Pattern</name>
+    <trkseg>
+      <trkpt lat="${downwindStart[0]}" lon="${downwindStart[1]}"><ele>${eleDownwind}</ele></trkpt>
+      <trkpt lat="${baseStart[0]}" lon="${baseStart[1]}"><ele>${eleBase}</ele></trkpt>
+      <trkpt lat="${finalStart[0]}" lon="${finalStart[1]}"><ele>${eleFinal}</ele></trkpt>
+      <trkpt lat="${landingPoint[0]}" lon="${landingPoint[1]}"><ele>${baseHeight}</ele></trkpt>
+    </trkseg>
+  </trk>
+</gpx>`;
+
+    console.log("Schritt 4: GPX-String wurde erfolgreich erstellt.");
+    console.log(gpxContent); // Gibt den GPX-Inhalt in die Konsole aus
+
+    const time = Utils.formatTime(AppState.weatherData.time[sliderIndex]).replace(/ /g, '_').replace(/:/g, '');
+    const filename = `${time}_Landing_Pattern.gpx`;
+
+    try {
+        const { Filesystem, Directory, isNative } = await getCapacitor();
+        if (isNative && Filesystem) {
+            // Native mobile App: Speichere in Documents/DZMaster
+            await Filesystem.writeFile({
+                path: `DZMaster/${filename}`,
+                data: gpxContent,
+                directory: Directory.Documents,
+                encoding: 'utf8',
+                recursive: true
+            });
+            Utils.handleMessage(`Landing Pattern GPX saved in Documents/DZMaster`);
+        } else {
+            // Fallback für den Webbrowser
+            const blob = new Blob([gpxContent], { type: "application/gpx+xml;charset=utf-8" });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }
+    } catch (error) {
+        console.error("Error saving Landing Pattern GPX file:", error);
+        Utils.handleError("Could not save Landing Pattern GPX file.");
+    }
+    console.log("--- GPX Landing Pattern Export beendet ---");
+}
+
+// ===================================================================
+// 3. Zentrale Rendering-Funktion
+// ===================================================================
+
+/**
+ * Rendert einen gegebenen Satz von Trackpunkten auf der Karte als farbkodierte Linie.
+ * Löst nach dem Rendern ein 'track:loaded'-Event aus.
  * @param {object[]} points - Ein Array von Punkt-Objekten, die den Track definieren.
- * @param {string} fileName - Der Name der geladenen Datei für Anzeigezwecke.
- * @returns {Promise<object|null>} Ein Promise, das zu den Metadaten des Tracks auflöst oder null bei einem Fehler.
+ * @param {string} fileName - Der Name der geladenen Datei.
+ * @returns {Promise<object|null>} Ein Promise, das zu den Metadaten des Tracks auflöst.
  * @private
  */
 async function renderTrack(points, fileName) {
@@ -380,310 +652,50 @@ async function renderTrack(points, fileName) {
     }
 }
 
+// ===================================================================
+// 4. Interne Hilfsfunktionen
+// ===================================================================
+
 /**
- * Erstellt eine GPX-Datei als <trk> (Track) und löst den Download aus.
- * Diese Struktur wird von Google Maps und anderen GPS-Programmen bevorzugt.
- * @param {number} sliderIndex Der aktuell im UI ausgewählte Index des Zeitschiebereglers.
- * @param {number} interpStep Der Interpolationsschritt für die Wetterdaten.
- * @param {string} heightUnit Die aktuell ausgewählte Höheneinheit ('m' oder 'ft').
+ * Liest den Textinhalt einer Datei. Nutzt die Capacitor Filesystem API für native
+ * Apps und den Web FileReader als Fallback.
+ * @param {File} file - Das Datei-Objekt.
+ * @returns {Promise<string>} Der Inhalt der Datei als Text.
+ * @private
  */
-export async function exportToGpx(sliderIndex, interpStep, heightUnit) {
-    console.log("--- GPX EXPORT DEBUG START ---");
-    if (!Settings.getValue('showJumpRunTrack', false)) {
-        Utils.handleError("Activate 'Show Jump Run Track' to export the track.");
-        return;
-    }
+async function readFileContent(file) {
+    const { Filesystem, isNative, Directory } = await getCapacitor();
 
-    if (!AppState.weatherData || !AppState.lastLat || !AppState.lastLng || AppState.lastAltitude === 'N/A') {
-        Utils.handleError("Wetterdaten oder DIP-Position nicht verfügbar. GPX-Export nicht möglich.");
-        return;
-    }
-
-    // Höhenreferenzen holen
-    const dipLat = AppState.lastLat;
-    const dipLng = AppState.lastLng;
-    const dipElevation = Math.round(AppState.lastAltitude);
-    const harpAnchor = AppState.harpMarker ? AppState.harpMarker.getLatLng() : null;
-    let harpElevation = null;
-
-    if (harpAnchor) {
-        // Asynchron die Höhe des HARP abrufen
-        harpElevation = await Utils.getAltitude(harpAnchor.lat, harpAnchor.lng);
-        harpElevation = harpElevation !== 'N/A' ? Math.round(harpElevation) : null;
-    }
-
-    const interpolatedData = interpolateWeatherData(
-        AppState.weatherData, sliderIndex, interpStep, dipElevation, heightUnit
-    );
-
-    if (!interpolatedData || interpolatedData.length === 0) {
-        Utils.handleError("Keine Wetterdaten für die GPX-Erstellung verfügbar.");
-        return;
-    }
-
-    const trackData = JumpPlanner.jumpRunTrack(interpolatedData, harpAnchor);
-
-    if (!trackData || !trackData.latlngs || !trackData.approachLatLngs) {
-        Utils.handleError("Jump Run Track konnte nicht berechnet werden.");
-        return;
-    }
-
-    const [approachStartLat, approachStartLng] = trackData.approachLatLngs[1];
-    const [jumpRunStartLat, jumpRunStartLng] = trackData.latlngs[0];
-    const [jumpRunEndLat, jumpRunEndLng] = trackData.latlngs[1];
-
-    // MSL-Höhe für den Absetzvorgang berechnen
-    const exitAltitudeAGL = Settings.getValue('exitAltitude', 3000);
-    const exitAltitudeMSL = dipElevation + exitAltitudeAGL;
-
-    let gpxContent = `<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
-<gpx version="1.1" creator="DZMaster" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
-  <metadata>
-    <name>Jump Run - ${new Date().toLocaleString()}</name>
-    <desc>Generated by DZMaster. Jump Run Direction: ${trackData.direction}°</desc>
-  </metadata>
-`;
-
-    // Wegpunkte mit korrekten MSL-Höhen einfügen
-    gpxContent += `  <wpt lat="${dipLat}" lon="${dipLng}">\n    <name>DIP</name>\n    <ele>${dipElevation}</ele>\n    <sym>Flag, Blue</sym>\n  </wpt>\n`;
-    if (harpAnchor && harpElevation !== null) {
-        gpxContent += `  <wpt lat="${harpAnchor.lat}" lon="${harpAnchor.lng}">\n    <name>HARP</name>\n    <ele>${harpElevation}</ele>\n    <sym>Flag, Green</sym>\n  </wpt>\n`;
-    }
-    gpxContent += `  <wpt lat="${approachStartLat}" lon="${approachStartLng}">\n    <name>x-2, ${trackData.direction}°</name>\n    <ele>${exitAltitudeMSL}</ele>\n    <sym>Airplane</sym>\n  </wpt>\n`;
-    gpxContent += `  <wpt lat="${jumpRunStartLat}" lon="${jumpRunStartLng}">\n    <name>First Out ${exitAltitudeAGL} m AGL</name>\n    <ele>${exitAltitudeMSL}</ele>\n    <sym>Airplane</sym>\n  </wpt>\n`;
-    gpxContent += `  <wpt lat="${jumpRunEndLat}" lon="${jumpRunEndLng}">\n    <name>Last Out</name>\n    <ele>${exitAltitudeMSL}</ele>\n    <sym>Airplane</sym>\n  </wpt>\n`;
-
-    // Track mit korrekten MSL-Höhen einfügen
-    gpxContent += `  <trk>\n    <name>Jump Run and Approach</name>\n    <trkseg>\n`;
-    gpxContent += `      <trkpt lat="${approachStartLat}" lon="${approachStartLng}"><ele>${exitAltitudeMSL}</ele></trkpt>\n`;
-    gpxContent += `      <trkpt lat="${jumpRunStartLat}" lon="${jumpRunStartLng}"><ele>${exitAltitudeMSL}</ele></trkpt>\n`;
-    gpxContent += `      <trkpt lat="${jumpRunEndLat}" lon="${jumpRunEndLng}"><ele>${exitAltitudeMSL}</ele></trkpt>\n`;
-    gpxContent += `    </trkseg>\n  </trk>\n</gpx>`;
-
-    const time = Utils.formatTime(AppState.weatherData.time[sliderIndex]).replace(/ /g, '_').replace(/:/g, '');
-    const filename = `${time}_JumpRun_Track.gpx`;
-
-    try {
-        const { Filesystem, Directory, isNative } = await getCapacitor();
-        if (isNative && Filesystem) {
-            // Native mobile App: Speichere in Documents/DZMaster
-            await Filesystem.writeFile({
-                path: `DZMaster/${filename}`,
-                data: gpxContent,
-                directory: Directory.Documents,
-                encoding: 'utf8',
-                recursive: true
+    if (isNative && file.path && Filesystem) {
+        console.log(`[trackManager] Reading file via Capacitor Filesystem API: ${file.path}`);
+        try {
+            // KORREKTUR: Datei direkt als UTF-8 Text einlesen
+            const result = await Filesystem.readFile({
+                path: file.path,
+                // Hinweis: Je nach Android-Version und wie der Picker die Datei zurückgibt,
+                // ist 'directory' eventuell nicht nötig. Falls doch, ist 'Directory.Cache' oft eine gute Wahl.
+                // directory: Directory.Cache,
+                encoding: 'utf8'
             });
-            Utils.handleMessage(`GPX saved in Documents/DZMaster`);
-        } else {
-            // Fallback für den Webbrowser
-            const blob = new Blob([gpxContent], { type: "application/gpx+xml;charset=utf-8" });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
-        }
-    } catch (error) {
-        console.error("Error saving GPX file:", error);
-        Utils.handleError("Could not save GPX file.");
-    }
-}
-
-/**
- * Erstellt eine GPX-Datei für das Landemuster und löst den Download aus.
- * @param {number} sliderIndex Der aktuell im UI ausgewählte Index des Zeitschiebereglers.
- * @param {number} interpStep Der Interpolationsschritt für die Wetterdaten.
- * @param {string} heightUnit Die aktuell ausgewählte Höheneinheit ('m' oder 'ft').
- */
-export async function exportLandingPatternToGpx() {
-    console.log("--- GPX Landing Pattern Export gestartet ---");
-
-    const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
-    const interpStep = Settings.getValue('interpStep', 'select', 200);
-    const heightUnit = Settings.getValue('heightUnit', 'm');
-
-    if (!Settings.getValue('showLandingPattern', false)) {
-        Utils.handleError("Activate 'Landing Pattern' before export.");
-        return;
-    }
-
-    if (!AppState.weatherData || !AppState.lastLat || !AppState.lastLng || AppState.lastAltitude === 'N/A') {
-        Utils.handleError("Wetterdaten oder DIP-Position für GPX-Export nicht verfügbar.");
-        return;
-    }
-    console.log("Schritt 1: Vorbedingungen erfüllt. Wetterdaten und Position vorhanden.");
-
-    const interpolatedData = weatherManager.interpolateWeatherData(
-        AppState.weatherData, sliderIndex, interpStep, Math.round(AppState.lastAltitude), heightUnit
-    );
-
-    if (!interpolatedData || interpolatedData.length === 0) {
-        Utils.handleError("Fehler in Schritt 2: Keine interpolierten Wetterdaten für GPX-Erstellung verfügbar.");
-        return;
-    }
-    console.log("Schritt 2: Wetterdaten erfolgreich interpoliert.");
-
-    const patternDataForExport = JumpPlanner.calculateLandingPatternCoords(AppState.lastLat, AppState.lastLng, interpolatedData);
-
-    // ================== DEBUGGING-BLOCK ==================
-    console.log("Schritt 3: Ergebnis von calculateLandingPatternCoords:", patternDataForExport);
-    if (!patternDataForExport) {
-        Utils.handleError("Fehler in Schritt 3: calculateLandingPatternCoords hat keine Daten zurückgegeben. Export abgebrochen.");
-        return;
-    }
-    console.log("Schritt 3: Koordinaten des Landemusters erfolgreich berechnet.");
-    // =====================================================
-
-    const { downwindStart, baseStart, finalStart, landingPoint } = patternDataForExport;
-
-    const baseHeight = Math.round(AppState.lastAltitude);
-
-    const legHeightDownwind = Settings.getValue('legHeightDownwind', 300);
-    const legHeightBase = Settings.getValue('legHeightBase', 200);
-    const legHeightFinal = Settings.getValue('legHeightFinal', 100);
-
-    const eleDownwind = baseHeight + legHeightDownwind;
-    const eleBase = baseHeight + legHeightBase;
-    const eleFinal = baseHeight + legHeightFinal;
-
-    let gpxContent = `<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
-<gpx version="1.1" creator="DZMaster" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
-  <metadata>
-    <name>Landing Pattern - ${new Date().toLocaleString()}</name>
-    <desc>Generated by DZMaster Application.</desc>
-  </metadata>
-`;
-
-    gpxContent += `  <wpt lat="${downwindStart[0]}" lon="${downwindStart[1]}"><name>Downwind ${legHeightDownwind} m AGL</name><ele>${eleDownwind}</ele></wpt>\n`;
-    gpxContent += `  <wpt lat="${baseStart[0]}" lon="${baseStart[1]}"><name>Base ${legHeightBase} m AGL</name><ele>${eleBase}</ele></wpt>\n`;
-    gpxContent += `  <wpt lat="${finalStart[0]}" lon="${finalStart[1]}"><name>Final ${legHeightFinal} m AGL</name><ele>${eleFinal}</ele></wpt>\n`;
-    gpxContent += `  <wpt lat="${landingPoint[0]}" lon="${landingPoint[1]}"><name>DIP</name><ele>${baseHeight}</ele></wpt>\n`;
-
-    gpxContent += `  <trk>
-    <name>Landing Pattern</name>
-    <trkseg>
-      <trkpt lat="${downwindStart[0]}" lon="${downwindStart[1]}"><ele>${eleDownwind}</ele></trkpt>
-      <trkpt lat="${baseStart[0]}" lon="${baseStart[1]}"><ele>${eleBase}</ele></trkpt>
-      <trkpt lat="${finalStart[0]}" lon="${finalStart[1]}"><ele>${eleFinal}</ele></trkpt>
-      <trkpt lat="${landingPoint[0]}" lon="${landingPoint[1]}"><ele>${baseHeight}</ele></trkpt>
-    </trkseg>
-  </trk>
-</gpx>`;
-
-    console.log("Schritt 4: GPX-String wurde erfolgreich erstellt.");
-    console.log(gpxContent); // Gibt den GPX-Inhalt in die Konsole aus
-
-    const time = Utils.formatTime(AppState.weatherData.time[sliderIndex]).replace(/ /g, '_').replace(/:/g, '');
-    const filename = `${time}_Landing_Pattern.gpx`;
-
-    try {
-        const { Filesystem, Directory, isNative } = await getCapacitor();
-        if (isNative && Filesystem) {
-            // Native mobile App: Speichere in Documents/DZMaster
-            await Filesystem.writeFile({
-                path: `DZMaster/${filename}`,
-                data: gpxContent,
-                directory: Directory.Documents,
-                encoding: 'utf8',
-                recursive: true
-            });
-            Utils.handleMessage(`Landing Pattern GPX saved in Documents/DZMaster`);
-        } else {
-            // Fallback für den Webbrowser
-            const blob = new Blob([gpxContent], { type: "application/gpx+xml;charset=utf-8" });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
-        }
-    } catch (error) {
-        console.error("Error saving Landing Pattern GPX file:", error);
-        Utils.handleError("Could not save Landing Pattern GPX file.");
-    }
-    console.log("--- GPX Landing Pattern Export beendet ---");
-}
-
-/**
- * Speichert die aufgezeichneten Trackpunkte als GPX-Datei.
- */
-export async function saveRecordedTrack() {
-    console.log(`--- Starte saveRecordedTrack mit ${AppState.recordedTrackPoints.length} Punkten ---`);
-
-    if (!AppState.recordedTrackPoints || AppState.recordedTrackPoints.length < 2) {
-        Utils.handleError("Keine Track-Daten zum Speichern vorhanden.");
-        return;
-    }
-
-    try {
-        const header = `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="DZMaster" xmlns="http://www.topografix.com/GPX/1/1">
-<metadata><name>Skydive Track - ${new Date().toLocaleString()}</name></metadata>
-<trk><name>Recorded Skydive</name><trkseg>`;
-
-        const footer = `</trkseg></trk></gpx>`;
-
-        const trackpointStrings = AppState.recordedTrackPoints.map((p, index) => {
-            if (p && typeof p.lat === 'number' && typeof p.lng === 'number' && p.time) {
-                const ele = (typeof p.ele === 'number') ? p.ele.toFixed(2) : '0';
-                const time = p.time.toISO();
-                const trkpt = `<trkpt lat="${p.lat}" lon="${p.lng}"><ele>${ele}</ele><time>${time}</time></trkpt>`;
-                return trkpt;
+            // KORREKTUR: Das Ergebnis ist bereits der Textinhalt, kein atob() nötig
+            return result.data;
+        } catch (error) {
+            console.error('[trackManager] Error reading file with Capacitor:', error);
+            // Fallback für den Fall, dass der Pfad nicht direkt lesbar ist (z.B. bei Content-URIs)
+            if (file.webPath) {
+                const response = await fetch(file.webPath);
+                return await response.text();
             }
-            return '';
-        }).filter(Boolean);
-
-        if (trackpointStrings.length < 2) {
-            Utils.handleError("Not enough valid data points to save track.");
-            return;
+            throw new Error('Could not read file using native API.');
         }
-
-        const gpxContent = `${header}\n${trackpointStrings.join('\n')}\n${footer}`;
-        const fileName = `Skydive_Track_${DateTime.utc().toFormat('yyyy-MM-dd_HHmm')}.gpx`;
-
-        // HINZUGEFÜGT: "await", um auf das Laden der Module zu warten
-        const { Filesystem, Directory, isNative } = await getCapacitor();
-
-        if (isNative && Filesystem) {
-            // HINZUGEFÜGT: "await", um auf das Speichern der Datei zu warten
-            await Filesystem.writeFile({
-                path: `DZMaster/${fileName}`,
-                data: gpxContent,
-                directory: Directory.Documents,
-                encoding: 'utf8',
-                recursive: true
-            });
-            // Diese Nachricht wird jetzt erst NACH dem erfolgreichen Speichern angezeigt
-            Utils.handleMessage(`Track saved in Documents/DZMaster`);
-        } else {
-            // Web-Fallback oder Fehlerfall, wenn Filesystem nicht geladen werden konnte
-            if (isNative) {
-                Utils.handleError("Could not save track: Filesystem module not available.");
-            } else {
-                // Der Web-Fallback bleibt unverändert
-                const blob = new Blob([gpxContent], { type: "application/gpx+xml;charset=utf-8" });
-                const a = document.createElement('a');
-                a.href = URL.createObjectURL(blob);
-                a.download = fileName;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-            }
-        }
-
-    } catch (error) {
-        console.error("Error in saveRecordedTrack:", error);
-        Utils.handleError("Could not save track.");
-    } finally {
-        AppState.recordedTrackPoints = [];
+    } else {
+        // Der Web-Fallback bleibt unverändert und korrekt
+        console.log(`[trackManager] Reading file via Web FileReader: ${file.name}`);
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.onerror = (e) => reject(new Error('Error reading file.'));
+            reader.readAsText(file);
+        });
     }
 }
-
-
