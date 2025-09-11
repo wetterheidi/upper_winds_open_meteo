@@ -1,3 +1,9 @@
+/**
+ * @file displayManager.js
+ * @description Dieses Modul ist verantwortlich für die Aktualisierung der Benutzeroberfläche (UI).
+ * Es nimmt verarbeitete Daten entgegen und sorgt für die korrekte Darstellung in den
+ * UI-Panels (z.B. Wettertabelle) und auf der Karte (z.B. Landemuster, JRT).
+ */
 import { AppState } from '../core/state.js';
 import { Settings, getInterpolationStep } from '../core/settings.js';
 import { Utils } from '../core/utils.js';
@@ -8,71 +14,9 @@ import { UI_DEFAULTS } from '../core/constants.js'; // UI_DEFAULTS für LANDING_
 import * as JumpPlanner from '../core/jumpPlanner.js';
 import { getCoordinateFormat, getHeightUnit, getTemperatureUnit, getWindSpeedUnit } from './main-mobile.js';
 
-
-/**
- * Aktualisiert den Inhalt des Popups für den Hauptmarker (`currentMarker`).
- * Holt die aktuellen Koordinaten, die Höhe und den QFE-Wert aus dem AppState
- * und rendert den Inhalt neu. Forciert das Öffnen des Popups.
- * @returns {Promise<void>}
- */
-export async function refreshMarkerPopup() {
-    if (!AppState.currentMarker || AppState.lastLat === null) {
-        return;
-    }
-
-    const lat = AppState.lastLat;
-    const lng = AppState.lastLng;
-    const altitude = AppState.lastAltitude;
-
-    // NEU: Die aktuell ausgewählte Höheneinheit abfragen
-    const heightUnit = getHeightUnit();
-    const coordFormat = getCoordinateFormat();
-
-    // NEU: Höhe und Einheit für die Anzeige vorbereiten
-    let displayAltitude = 'N/A';
-    let displayUnit = '';
-
-    if (altitude !== 'N/A') {
-        if (heightUnit === 'ft') {
-            displayAltitude = Math.round(Utils.convertHeight(altitude, 'ft'));
-            displayUnit = 'ft';
-        } else {
-            displayAltitude = altitude; // bleibt in Metern
-            displayUnit = 'm';
-        }
-    }
-
-    const sliderIndex = getSliderValue();
-
-    const coords = Utils.convertCoords(lat, lng, coordFormat);
-
-
-
-    let popupContent;
-    if (coordFormat === 'MGRS') {
-        popupContent = `MGRS: ${coords.lat}<br>Alt: ${displayAltitude} ${displayUnit}`;
-    } else {
-        const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
-        if (coordFormat === 'DMS') {
-            popupContent = `Lat: ${formatDMS(Utils.decimalToDms(lat, true))}<br>Lng: ${formatDMS(Utils.decimalToDms(lng, false))}<br>Alt: ${displayAltitude} ${displayUnit}`;
-        } else {
-            popupContent = `Lat: ${lat.toFixed(5)}<br>Lng: ${lng.toFixed(5)}<br>Alt: ${displayAltitude} ${displayUnit}`;
-        }
-    }
-
-    if (AppState.weatherData && AppState.weatherData.surface_pressure) {
-        const surfacePressure = AppState.weatherData.surface_pressure[sliderIndex];
-        if (surfacePressure) {
-            popupContent += ` QFE: ${surfacePressure.toFixed(0)} hPa`;
-        } else {
-            popupContent += ` QFE: N/A`;
-        }
-    } else {
-        popupContent += ` QFE: N/A`;
-    }
-
-    mapManager.updatePopupContent(AppState.currentMarker, popupContent);
-}
+// ===================================================================
+// 1. Wetter- und Info-Anzeigen
+// ===================================================================
 
 /**
  * Rendert die detaillierte Wettertabelle basierend auf dem ausgewählten Zeitindex.
@@ -213,6 +157,92 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
     tableContainer.innerHTML = output; // <-- Nutzt den Parameter
     timeContainer.innerHTML = `Selected Time: ${time}`; // <-- Nutzt den Parameter
 }
+
+/**
+ * Aktualisiert den Inhalt des Popups für den Hauptmarker (`currentMarker`).
+ * Holt die aktuellen Koordinaten, die Höhe und den QFE-Wert aus dem AppState
+ * und rendert den Inhalt neu. Forciert das Öffnen des Popups.
+ * @returns {Promise<void>}
+ */
+export async function refreshMarkerPopup() {
+    if (!AppState.currentMarker || AppState.lastLat === null) {
+        return;
+    }
+
+    const lat = AppState.lastLat;
+    const lng = AppState.lastLng;
+    const altitude = AppState.lastAltitude;
+
+    // NEU: Die aktuell ausgewählte Höheneinheit abfragen
+    const heightUnit = getHeightUnit();
+    const coordFormat = getCoordinateFormat();
+
+    // NEU: Höhe und Einheit für die Anzeige vorbereiten
+    let displayAltitude = 'N/A';
+    let displayUnit = '';
+
+    if (altitude !== 'N/A') {
+        if (heightUnit === 'ft') {
+            displayAltitude = Math.round(Utils.convertHeight(altitude, 'ft'));
+            displayUnit = 'ft';
+        } else {
+            displayAltitude = altitude; // bleibt in Metern
+            displayUnit = 'm';
+        }
+    }
+
+    const sliderIndex = getSliderValue();
+
+    const coords = Utils.convertCoords(lat, lng, coordFormat);
+
+
+
+    let popupContent;
+    if (coordFormat === 'MGRS') {
+        popupContent = `MGRS: ${coords.lat}<br>Alt: ${displayAltitude} ${displayUnit}`;
+    } else {
+        const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
+        if (coordFormat === 'DMS') {
+            popupContent = `Lat: ${formatDMS(Utils.decimalToDms(lat, true))}<br>Lng: ${formatDMS(Utils.decimalToDms(lng, false))}<br>Alt: ${displayAltitude} ${displayUnit}`;
+        } else {
+            popupContent = `Lat: ${lat.toFixed(5)}<br>Lng: ${lng.toFixed(5)}<br>Alt: ${displayAltitude} ${displayUnit}`;
+        }
+    }
+
+    if (AppState.weatherData && AppState.weatherData.surface_pressure) {
+        const surfacePressure = AppState.weatherData.surface_pressure[sliderIndex];
+        if (surfacePressure) {
+            popupContent += ` QFE: ${surfacePressure.toFixed(0)} hPa`;
+        } else {
+            popupContent += ` QFE: N/A`;
+        }
+    } else {
+        popupContent += ` QFE: N/A`;
+    }
+
+    mapManager.updatePopupContent(AppState.currentMarker, popupContent);
+}
+
+/**
+ * Aktualisiert den Inhalt des Popups für die Modell-Informationen.
+ */
+export function updateModelInfoPopup() {
+    const modelInfoPopup = document.getElementById('modelInfoPopup');
+    const modelSelect = document.getElementById('modelSelect');
+    if (!modelInfoPopup || !modelSelect) return;
+
+    const model = modelSelect.value;
+    const modelRun = AppState.lastModelRun || "N/A"; // Holt den Model-Run aus dem AppState
+
+    const titleContent = `Model: ${model.replace(/_/g, ' ').toUpperCase()}\nRun: ${modelRun}`;
+
+    // Ersetzt Zeilenumbrüche durch <br> für die HTML-Anzeige
+    modelInfoPopup.innerHTML = titleContent.replace(/\n/g, '<br>');
+}
+
+// ===================================================================
+// 2. Sprung-Visualisierungen
+// ===================================================================
 
 /**
  * Zeichnet oder entfernt das Landemuster auf der Karte.
@@ -415,21 +445,4 @@ export function updateJumpRunTrackDisplay() {
             directionInput.value = '';
         }
     }
-}
-
-/**
- * Aktualisiert den Inhalt des Popups für die Modell-Informationen.
- */
-export function updateModelInfoPopup() {
-    const modelInfoPopup = document.getElementById('modelInfoPopup');
-    const modelSelect = document.getElementById('modelSelect');
-    if (!modelInfoPopup || !modelSelect) return;
-
-    const model = modelSelect.value;
-    const modelRun = AppState.lastModelRun || "N/A"; // Holt den Model-Run aus dem AppState
-
-    const titleContent = `Model: ${model.replace(/_/g, ' ').toUpperCase()}\nRun: ${modelRun}`;
-
-    // Ersetzt Zeilenumbrüche durch <br> für die HTML-Anzeige
-    modelInfoPopup.innerHTML = titleContent.replace(/\n/g, '<br>');
 }
