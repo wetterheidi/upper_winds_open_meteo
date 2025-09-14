@@ -504,6 +504,43 @@
             </div>
         </div>
 
+        <div id="panel-search" class="content-panel hidden">
+            <div class="search-bar-container">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="locationSearchInput" placeholder="Look up city or coordinates...">
+                <span id="clearSearchInput" class="clear-icon" style="display: none;">×</span>
+            </div>
+
+            <button id="saveFavoriteBtn" class="btn btn-primary">Save current location as Favorite</button>
+            <button id="findPoisInViewBtn" class="btn btn-secondary">Search for Dropzones in this Area</button>
+            <div id="favoriteModal" class="favorite-modal" style="display: none;">
+                <div class="favorite-modal-content">
+                    <h3>Save Favorite</h3>
+                    <input id="favoriteNameInput" type="text" placeholder="Enter favorite name">
+                    <div class="favorite-modal-actions">
+                        <button id="submitFavoriteName" class="modal-btn">Save</button>
+                        <button id="cancelFavoriteName" class="modal-btn cancel">Cancel</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="locationResults" class="location-results-container">
+                <div id="favorites-section" class="search-section">
+                    <h5>Favorites</h5>
+                    <ul id="favorites-list"></ul>
+                </div>
+                <div id="recents-section" class="search-section">
+                    <h5>Recent Searches</h5>
+                    <ul id="recents-list"></ul>
+                </div>
+
+                <div id="search-results-section" class="search-section" style="display: none;">
+                    <h5>Results</h5>
+                    <ul id="search-results-list"></ul>
+                </div>
+            </div>
+        </div>
+
         <div id="panel-settings" class="content-panel hidden">
 
             <div class="accordion-item">
@@ -624,42 +661,6 @@
             </div>
         </div>
 
-        <div id="panel-search" class="content-panel hidden">
-            <div class="search-bar-container">
-                <span class="search-icon">🔍</span>
-                <input type="text" id="locationSearchInput" placeholder="Look up city or coordinates...">
-                <span id="clearSearchInput" class="clear-icon" style="display: none;">×</span>
-            </div>
-
-            <button id="saveFavoriteBtn" class="btn btn-primary">Save current location as Favorite</button>
-            <button id="findPoisInViewBtn" class="btn btn-secondary">Search for Dropzones in this Area</button>
-            <div id="favoriteModal" class="favorite-modal" style="display: none;">
-                <div class="favorite-modal-content">
-                    <h3>Save Favorite</h3>
-                    <input id="favoriteNameInput" type="text" placeholder="Enter favorite name">
-                    <div class="favorite-modal-actions">
-                        <button id="submitFavoriteName" class="modal-btn">Save</button>
-                        <button id="cancelFavoriteName" class="modal-btn cancel">Cancel</button>
-                    </div>
-                </div>
-            </div>
-
-            <div id="locationResults" class="location-results-container">
-                <div id="favorites-section" class="search-section">
-                    <h5>Favorites</h5>
-                    <ul id="favorites-list"></ul>
-                </div>
-                <div id="recents-section" class="search-section">
-                    <h5>Recent Searches</h5>
-                    <ul id="recents-list"></ul>
-                </div>
-
-                <div id="search-results-section" class="search-section" style="display: none;">
-                    <h5>Results</h5>
-                    <ul id="search-results-list"></ul>
-                </div>
-            </div>
-        </div>
     </div>
 
 
@@ -680,13 +681,13 @@
             <span class="icon">🚀</span>
             <span class="label">Dashboard</span>
         </button>
-        <button class="tab-button" data-panel="settings">
-            <span class="icon">⚙️</span>
-            <span class="label">Settings</span>
-        </button>
         <button class="tab-button" data-panel="search">
             <span class="icon">🔍</span>
             <span class="label">Search</span>
+        </button>
+        <button class="tab-button" data-panel="settings">
+            <span class="icon">⚙️</span>
+            <span class="label">Settings</span>
         </button>
     </nav>
 
