@@ -1,9 +1,23 @@
-// ui.js
+/**
+ * @file ui.js
+ * @description Enthält allgemeine Hilfsfunktionen zur Steuerung der Benutzeroberfläche (UI).
+ * Dies umfasst das Anzeigen von Nachrichten, Ladeindikatoren, die Aktualisierung von
+ * UI-Elementen und die Erkennung des Gerätetyps.
+ */
+
 import { Utils } from '../core/utils.js';
 import { Settings } from '../core/settings.js';
 import { fetchEnsembleWeatherData, processAndVisualizeEnsemble } from '../core/ensembleManager.js';
 import { UI_DEFAULTS, WEATHER_MODELS } from '../core/constants.js';
 
+// ===================================================================
+// 1. Geräte- & Style-Helfer
+// ===================================================================
+
+/**
+ * Prüft, ob die Anwendung auf einem Touch-Gerät oder in einer nativen Capacitor-App läuft.
+ * @returns {boolean} True, wenn es sich um ein mobiles Gerät handelt.
+ */
 export function isMobileDevice() {
     /**
      * Diese Prüfung ist deutlich zuverlässiger als die alte Methode.
@@ -20,16 +34,36 @@ export function isMobileDevice() {
     return hasTouchSupport || isCapacitorApp;
 }
 
+/**
+ * Fügt dem `<body>`-Tag eine CSS-Klasse hinzu, wenn ein Touch-Gerät erkannt wird.
+ * Dies ermöglicht gerätespezifisches Styling (z.B. für das Fadenkreuz).
+ */
 export function applyDeviceSpecificStyles() {
     if (isMobileDevice()) {
         document.body.classList.add('touch-device');
     }
 }
 
+// ===================================================================
+// 2. UI-Zustand abfragen
+// ===================================================================
+
+/**
+ * Ruft den aktuellen numerischen Wert des Zeitschiebereglers ab.
+ * @returns {number} Der Wert des Sliders, oder 0 als Fallback.
+ */
 export function getSliderValue() {
     return parseInt(document.getElementById('timeSlider')?.value) || 0;
 }
 
+// ===================================================================
+// 3. Dynamische UI-Updates
+// ===================================================================
+
+/**
+ * Aktualisiert die Optionen im Dropdown-Menü für die Wettermodelle.
+ * @param {string[]} availableModels - Eine Liste der verfügbaren Modellnamen.
+ */
 export function updateModelSelectUI(availableModels) {
     const modelSelect = document.getElementById('modelSelect');
     if (!modelSelect) return;
@@ -50,6 +84,10 @@ export function updateModelSelectUI(availableModels) {
     }
 }
 
+/**
+ * Aktualisiert die Liste der Checkboxen für die Ensemble-Modelle.
+ * @param {string[]} availableModels - Eine Liste der verfügbaren Modellnamen.
+ */
 export function updateEnsembleModelUI(availableModels) {
     const submenu = document.getElementById('ensembleModelsSubmenu');
     if (!submenu) return;
@@ -87,6 +125,10 @@ export function updateEnsembleModelUI(availableModels) {
     });
 }
 
+/**
+ * Bereinigt die Liste der ausgewählten Ensemble-Modelle, falls einige nicht mehr verfügbar sind.
+ * @param {string[]} availableModels - Eine Liste der verfügbaren Modellnamen.
+ */
 export function cleanupSelectedEnsembleModels(availableModels) {
     let selected = Settings.state.userSettings.selectedEnsembleModels || [];
     let updated = selected.filter(m => availableModels.includes(m));
@@ -96,7 +138,17 @@ export function cleanupSelectedEnsembleModels(availableModels) {
     }
 }
 
-// Eine neue, zentrale Funktion zur Anzeige der Snackbar
+// ===================================================================
+// 4. Benachrichtigungen & Overlays
+// ===================================================================
+
+
+/**
+ * Zeigt eine Snackbar-Benachrichtigung am unteren Bildschirmrand an.
+ * @param {string} message - Die anzuzeigende Nachricht.
+ * @param {'default'|'success'|'error'|'warning'} [type='default'] - Der Typ der Nachricht, der das Aussehen steuert.
+ * @private
+ */
 function showSnackbar(message, type = 'default') {
     let snackbar = document.getElementById('snackbar');
     if (!snackbar) {
@@ -125,25 +177,32 @@ function showSnackbar(message, type = 'default') {
     }, 3000);
 }
 
-// Alte displayMessage-Funktion ersetzen
+/** Zeigt eine Erfolgsmeldung an. */
 export function displayMessage(message) {
     console.log('displayMessage called with:', message);
     // Die neue Funktion mit dem Typ 'success' aufrufen
     showSnackbar(message, 'success');
 }
 
-// Alte displayError-Funktion ersetzen
+/** Zeigt eine Fehlermeldung an. */
 export function displayError(message) {
     console.log('displayError called with:', message);
     // Die neue Funktion mit dem Typ 'error' aufrufen
     showSnackbar(message, 'error');
 }
 
+/** Zeigt eine Warnung an. */
+export function displayWarning(message) {
+    console.log('displayWarning called with:', message);
+    showSnackbar(message, 'warning');
+}
+
+
 /**
  * Zeigt eine Fortschritts-Snackbar am unteren Bildschirmrand an.
  * @param {number} current - Der aktuelle Fortschrittswert.
- * @param {number} total - Der Gesamtwert (für die Prozentberechnung).
- * @param {function} cancelCallback - Eine Funktion, die aufgerufen wird, wenn der Abbrechen-Button geklickt wird.
+ * @param {number} total - Der Gesamtwert für die Prozentberechnung.
+ * @param {function} cancelCallback - Funktion, die bei Klick auf "Abbrechen" aufgerufen wird.
  */
 export function displayProgress(current, total, cancelCallback) {
     let progressSnackbar = document.getElementById('progress-snackbar');
@@ -192,14 +251,7 @@ export function displayProgress(current, total, cancelCallback) {
     }
 }
 
-export function displayWarning(message) {
-    console.log('displayWarning called with:', message);
-    showSnackbar(message, 'warning');
-}
-
-/**
- * Versteckt die Fortschritts-Snackbar.
- */
+/** Versteckt die Fortschritts-Snackbar. */
 export function hideProgress() {
     const progressSnackbar = document.getElementById('progress-snackbar');
     if (progressSnackbar) {
@@ -207,6 +259,9 @@ export function hideProgress() {
     }
 }
 
+/**
+ * Zeigt einen Offline-Indikator an oder versteckt ihn.
+ */
 export function updateOfflineIndicator() {
     console.log('updateOfflineIndicator called, navigator.onLine:', navigator.onLine);
     let offlineIndicator = document.getElementById('offline-indicator');
@@ -228,6 +283,11 @@ export function updateOfflineIndicator() {
     }
 }
 
+/**
+ * Zeigt den globalen Lade-Spinner an oder versteckt ihn.
+ * @param {boolean} show - True, um den Spinner anzuzeigen.
+ * @param {string} [message='Loading...'] - Die anzuzeigende Nachricht.
+ */
 export function toggleLoading(show, message = 'Loading...') {
     const loadingElement = document.getElementById('loading');
     if (!loadingElement) return;
