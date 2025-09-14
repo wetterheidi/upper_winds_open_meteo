@@ -165,6 +165,10 @@ function toggleSubmenu(element, submenu, isVisible) {
 
 // --- Haupt-Layout & Navigation ---
 
+/**
+ * Richtet die Klick-Handler für die Tabbar-Navigation ein, um Panels zu öffnen/schliessen.
+ * @private
+ */
 function setupTabBarEvents() {
     const tabBar = document.getElementById('tab-bar');
     const sliderContainer = document.getElementById('slider-container');
@@ -310,6 +314,11 @@ function setupMenuEvents() {
         }
     });
 }
+
+/**
+ * Richtet die Klick-Handler für alle Akkordeon-Elemente ein.
+ * @private
+ */
 function setupAccordionEvents() {
     const accordionHeaders = document.querySelectorAll('.accordion-header');
     const allAccordionItems = document.querySelectorAll('.accordion-item'); // Alle Elemente holen
@@ -373,6 +382,10 @@ function setupInfoIcons() {
 
 // --- Globale Steuerelemente (Slider, Modellauswahl) ---
 
+/**
+ * Richtet die Event-Listener für den Zeit-Slider ein.
+ * @private
+ */
 function setupSliderEvents() {
     const slider = document.getElementById('timeSlider');
     if (!slider) { /*...*/ return; }
@@ -1507,6 +1520,10 @@ function setupPoiSearchButton() {
 // 4. Haupt-Initialisierungsfunktion
 // =================================================================
 
+/**
+ * Initialisiert alle Event-Listener für die Web-Anwendung.
+ * Diese Funktion sollte nur einmal aufgerufen werden, wenn das DOM geladen ist.
+ */
 export function initializeEventListeners() {
     if (listenersInitialized) {
         return; // Bricht die Funktion sofort ab, wenn sie schon einmal lief
