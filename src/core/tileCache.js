@@ -383,22 +383,35 @@ export async function cacheTilesForDIP({ map, lastLat, lastLng, baseMaps, onProg
     const zoomLevels = Settings.state.userSettings.cacheZoomLevels || Settings.defaultSettings.cacheZoomLevels;
     const tiles = getTilesInRadius(lastLat, lastLng, radiusKm, zoomLevels, map);
 
-    // Logik zum Sammeln der zu cachenden Layer bleibt gleich...
     const tileLayers = [];
-    if (Settings.state.userSettings.baseMaps === 'Esri Satellite + OSM') {
-        tileLayers.push(
-            { name: 'Esri Satellite', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', normalizedUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' },
-            { name: 'OSM Overlay', url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', subdomains: ['a', 'b', 'c'], normalizedUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png' }
-        );
-    } else {
-        const layer = baseMaps[Settings.state.userSettings.baseMaps];
-        if (layer) {
-            tileLayers.push({
-                name: Settings.state.userSettings.baseMaps,
-                url: layer.options.url || layer._url,
-                subdomains: layer.options.subdomains,
-                normalizedUrl: (layer.options.url || layer._url).replace(/{s}\./, '')
+    const selectedLayerName = Settings.state.userSettings.baseMaps;
+    const layer = baseMaps[selectedLayerName];
+
+    if (layer) {
+        if (layer instanceof L.LayerGroup) {
+            // Behandle LayerGroup: Iteriere durch die einzelnen Layer der Gruppe
+            layer.eachLayer(subLayer => {
+                const url = subLayer.options.url || subLayer._url;
+                if (url) {
+                    tileLayers.push({
+                        name: `${selectedLayerName} (${subLayer.options.attribution || 'sub-layer'})`,
+                        url: url,
+                        subdomains: subLayer.options.subdomains,
+                        normalizedUrl: url.replace(/{s}\./, '')
+                    });
+                }
             });
+        } else {
+            // Behandle einzelnen TileLayer
+            const url = layer.options.url || layer._url;
+            if (url) {
+                tileLayers.push({
+                    name: selectedLayerName,
+                    url: url,
+                    subdomains: layer.options.subdomains,
+                    normalizedUrl: url.replace(/{s}\./, '')
+                });
+            }
         }
     }
 
@@ -550,8 +563,6 @@ export async function cacheTilesForDIP({ map, lastLat, lastLng, baseMaps, onProg
  * @param {object} options - Ein Objekt mit den Caching-Parametern.
  */
 export async function cacheVisibleTiles({ map, baseMaps, onProgress, onComplete, onCancel }) {
-    // Implementierung bleibt unverändert, da sie bereits `cacheTilesForDIP` sehr ähnlich ist.
-    // Hinzufügen von Kommentaren würde hier den Rahmen sprengen, aber die Struktur ist analog.
     if (!map || !navigator.onLine) {
         console.log('Skipping visible tile caching: offline or map not initialized');
         return;
@@ -586,32 +597,38 @@ export async function cacheVisibleTiles({ map, baseMaps, onProgress, onComplete,
     console.log(`Caching ${tiles.length} visible tiles at zoom ${zoom} for ${Settings.state.userSettings.baseMaps}`);
 
     const tileLayers = [];
-    if (!baseMaps[Settings.state.userSettings.baseMaps]) {
-        console.warn(`Base map ${Settings.state.userSettings.baseMaps} not found, skipping caching`);
+    const selectedLayerName = Settings.state.userSettings.baseMaps;
+    const layer = baseMaps[selectedLayerName];
+
+    if (layer) {
+        if (layer instanceof L.LayerGroup) {
+            layer.eachLayer(subLayer => {
+                const url = subLayer.options.url || subLayer._url;
+                if (url) {
+                    tileLayers.push({
+                        name: `${selectedLayerName} (${subLayer.options.attribution || 'sub-layer'})`,
+                        url: url,
+                        subdomains: subLayer.options.subdomains,
+                        normalizedUrl: url.replace(/{s}\./, '')
+                    });
+                }
+            });
+        } else {
+            const url = layer.options.url || layer._url;
+            if (url) {
+                tileLayers.push({
+                    name: selectedLayerName,
+                    url: url,
+                    subdomains: layer.options.subdomains,
+                    normalizedUrl: url.replace(/{s}\./, '')
+                });
+            }
+        }
+    } else {
+        console.warn(`Base map ${selectedLayerName} not found, skipping caching`);
         if (onComplete) onComplete('Selected base map not available for caching.');
         return;
     }
-
-    if (Settings.state.userSettings.baseMaps === 'Esri Satellite + OSM') {
-        tileLayers.push(
-            { name: 'Esri Satellite', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', normalizedUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' },
-            { name: 'OSM Overlay', url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', subdomains: ['a', 'b', 'c'], normalizedUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png' }
-        );
-    } else {
-        const layer = baseMaps[Settings.state.userSettings.baseMaps];
-        // --- KORREKTUR START ---
-        // Prüft, ob der Layer und seine URL-Eigenschaft existieren, bevor er zum Caching hinzugefügt wird.
-        if (layer && (layer.options.url || layer._url)) {
-            tileLayers.push({
-                name: Settings.state.userSettings.baseMaps,
-                url: layer.options.url || layer._url,
-                subdomains: layer.options.subdomains,
-                normalizedUrl: (layer.options.url || layer._url).replace(/{s}\./, '')
-            });
-        }
-        // --- KORREKTUR ENDE ---
-    }
-
 
     let cachedCount = 0;
     let failedCount = 0;
