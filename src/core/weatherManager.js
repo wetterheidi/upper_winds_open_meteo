@@ -181,13 +181,13 @@ export function interpolateWeatherData(weatherData, sliderIndex, interpStep, bas
 
             dataPoint = {
                 height: heightASLInMeters,
-                pressure: pressure === 'N/A' ? 'N/A' : Number(pressure.toFixed(1)),
-                temp: Number(temp.toFixed(1)),
-                rh: Number(rh.toFixed(0)),
-                cc: Number(cc.toFixed(0)),
-                spd: Number(spd.toFixed(1)),
-                dir: Number(dir.toFixed(0)),
-                dew: Number(dew.toFixed(1))
+                pressure: Number.isFinite(pressure) ? Number(pressure.toFixed(1)) : 'N/A',
+                temp: Number.isFinite(temp) ? Number(temp.toFixed(1)) : 'N/A',
+                rh: Number.isFinite(rh) ? Number(rh.toFixed(0)) : 'N/A',
+                cc: Number.isFinite(cc) ? Number(cc.toFixed(0)) : 'N/A',
+                spd: Number.isFinite(spd) ? Number(spd.toFixed(1)) : 'N/A',
+                dir: Number.isFinite(dir) ? Number(dir.toFixed(0)) : 'N/A',
+                dew: Number.isFinite(dew) ? Number(dew.toFixed(1)) : 'N/A'
             };
         }
 
