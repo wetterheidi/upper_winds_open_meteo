@@ -32,10 +32,13 @@ export const JUMPER_SEPARATION_TABLE = {
  * Standardwerte und physikalische Annahmen für die Freifall-Simulation.
  */
 export const FREEFALL_PHYSICS = {
-    DEFAULT_AREA_VERTICAL: 0.5,      // m², angenommene Fläche für vertikalen Luftwiderstand
-    DEFAULT_AREA_HORIZONTAL: 0.5,    // m², angenommene Fläche für horizontalen Luftwiderstand
-    DEFAULT_MASS_KG: 80,             // kg, angenommenes Gewicht des Springers
-    DEFAULT_DRAG_COEFFICIENT: 1,     // cw-Wert, dimensionslos
+    TERMINAL_VELOCITY_VERTICAL_MPS: 50, // m/s, typische vertikale Endgeschwindigkeit
+    GRAVITY_ACCELERATION: 9.81,           // m/s², Erdbeschleunigung
+    HORIZONTAL_DRAG_TAU_SECONDS: 5,       // Sekunden, Zeitkonstante für den Abbau der horiz. Geschwindigkeit
+    DEFAULT_AREA_VERTICAL: 0.5,           // m², angenommene Fläche für vertikalen Luftwiderstand
+    DEFAULT_AREA_HORIZONTAL: 0.5,         // m², angenommene Fläche für horizontalen Luftwiderstand
+    DEFAULT_MASS_KG: 80,                  // kg, angenommenes Gewicht des Springers
+    DEFAULT_DRAG_COEFFICIENT: 1,          // cw-Wert, dimensionslos
 };
 
 /**

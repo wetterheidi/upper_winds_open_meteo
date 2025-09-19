@@ -476,112 +476,101 @@ export function calculateCutAway(interpolatedData) {
  * @private
  */
 export function calculateFreeFall(weatherData, exitAltitude, openingAltitude, interpolatedData, startLat, startLng, elevation, jumpRunDirection) {
-    // HINWEIS (ToDo): Diese Funktion ist sehr komplex. Zukünftig könnte sie in kleinere,
-    // testbare Einheiten aufgeteilt werden (z.B. eine für die Groundspeed-Berechnung,
-    // eine für die Trajektorien-Simulation).
-    if (!weatherData || !weatherData.time || !interpolatedData || interpolatedData.length === 0) return null;
-    if (!Number.isFinite(startLat) || !Number.isFinite(startLng) || !Number.isFinite(elevation)) return null;
-
-    // Überprüfung auf gültige Höhen und Koordinaten
-    if (exitAltitude <= openingAltitude || exitAltitude < 0 || openingAltitude < 0) return null;
-    if (startLat < -90 || startLat > 90 || startLng < -180 || startLng > 180) return null;
+    // --- 1. Eingabe-Validierung ---
+    if (!weatherData || !interpolatedData || interpolatedData.length === 0) {
+        Utils.handleError("calculateFreeFall: Wetterdaten fehlen.");
+        return null;
+    }
+    if (!Utils.isValidLatLng(startLat, startLng) || !Number.isFinite(elevation)) {
+        Utils.handleError("calculateFreeFall: Ungültige Startkoordinaten oder Geländehöhe.");
+        return null;
+    }
+    if (exitAltitude <= openingAltitude) {
+        Utils.handleError("calculateFreeFall: Exit-Höhe muss über der Öffnungshöhe liegen.");
+        return null;
+    }
 
     console.log("--- calculateFreeFall: Berechnung gestartet ---");
-    const hStart = elevation + exitAltitude;
-    const hStop = elevation + openingAltitude - CANOPY_OPENING_BUFFER_METERS;
+
+    // --- 2. Parameter & Konstanten extrahieren ---
+    const { TERMINAL_VELOCITY_VERTICAL_MPS, GRAVITY_ACCELERATION, HORIZONTAL_DRAG_TAU_SECONDS } = FREEFALL_PHYSICS;
     const aircraftSpeedKt = Settings.state.userSettings.aircraftSpeedKt;
-    const exitAltitudeFt = exitAltitude / 0.3048;
+    const exitAltitudeFt = exitAltitude / CONVERSIONS.FEET_TO_METERS;
+
+    // --- 3. Ground Speed am Absetzpunkt berechnen ---
     const aircraftSpeedTAS = Utils.calculateTAS(aircraftSpeedKt, exitAltitudeFt);
+    let groundSpeedMps = aircraftSpeedKt * CONVERSIONS.KNOTS_TO_MPS; // Fallback
 
-    // Ground Speed verwenden ---
-    let groundSpeedMps;
-    if (aircraftSpeedTAS !== 'N/A' && Number.isFinite(aircraftSpeedTAS)) {
-        const heights = interpolatedData.map(d => d.height);
-        const windDirAtExit = Utils.linearInterpolate(heights.map(h => h - elevation), interpolatedData.map(d => d.dir), exitAltitude);
-        const windSpeedMpsAtExit = Utils.linearInterpolate(heights.map(h => h - elevation), interpolatedData.map(d => Utils.convertWind(d.spd, 'm/s', 'km/h')), exitAltitude);
-
-        console.log(`[Freifall-Input] Wind in Absetzhöhe (${exitAltitude}m AGL): ${windDirAtExit.toFixed(1)}° @ ${windSpeedMpsAtExit.toFixed(1)} m/s`);
+    if (Number.isFinite(aircraftSpeedTAS)) {
+        const heightsAGL = interpolatedData.map(d => d.height - elevation);
+        const windDirAtExit = Utils.linearInterpolate(heightsAGL, interpolatedData.map(d => d.dir), exitAltitude);
+        const windSpeedMpsAtExit = Utils.linearInterpolate(heightsAGL, interpolatedData.map(d => Utils.convertWind(d.spd, 'm/s', 'km/h')), exitAltitude);
 
         const tasMps = aircraftSpeedTAS * CONVERSIONS.KNOTS_TO_MPS;
         const windToRad = (windDirAtExit + 180) * Math.PI / 180;
         const windU = windSpeedMpsAtExit * Math.sin(windToRad);
         const windV = windSpeedMpsAtExit * Math.cos(windToRad);
-
         const headingRad = jumpRunDirection * Math.PI / 180;
         const tasU = tasMps * Math.sin(headingRad);
         const tasV = tasMps * Math.cos(headingRad);
-
-        groundSpeedMps = Math.sqrt(Math.pow(tasU + windU, 2) + Math.pow(tasV + windV, 2));
-    } else {
-        // Fallback, falls TAS nicht berechnet werden kann
-        groundSpeedMps = aircraftSpeedKt * CONVERSIONS.KNOTS_TO_MPS;
+        groundSpeedMps = Math.sqrt((tasU + windU) ** 2 + (tasV + windV) ** 2);
     }
-
     console.log(`[Freifall-Input] JRT-Richtung: ${jumpRunDirection}°, TAS: ${aircraftSpeedTAS} kt, Berechnete Ground Speed: ${groundSpeedMps.toFixed(1)} m/s`);
 
-    const vxInitial = Math.cos(jumpRunDirection * Math.PI / 180) * groundSpeedMps;
-    const vyInitial = Math.sin(jumpRunDirection * Math.PI / 180) * groundSpeedMps;
+    // --- 4. Dauer des Freien Falls berechnen ---
+    const heightDiff = exitAltitude - openingAltitude;
+    const accelTime = TERMINAL_VELOCITY_VERTICAL_MPS / GRAVITY_ACCELERATION;
+    const accelDist = 0.5 * GRAVITY_ACCELERATION * accelTime ** 2;
+    const constDist = heightDiff > accelDist ? heightDiff - accelDist : 0;
+    const constTime = constDist / TERMINAL_VELOCITY_VERTICAL_MPS;
+    const totalTime = accelTime + constTime;
 
-    const heights = interpolatedData.map(d => d.height);
-    const windDirs = interpolatedData.map(d => Number.isFinite(d.dir) ? parseFloat(d.dir) : 0);
-    const windSpdsMps = interpolatedData.map(d => Utils.convertWind(parseFloat(d.spd) || 0, 'm/s', 'km/h'));
-    const tempsC = interpolatedData.map(d => d.temp);
+    // --- 5. Wurf-Vektor (Throw) berechnen ---
+    const throwDistance = groundSpeedMps * HORIZONTAL_DRAG_TAU_SECONDS;
+    const throwDirection = jumpRunDirection;
 
-    const trajectory = [{ time: 0, height: hStart, vz: 0, vxGround: vxInitial, vyGround: vyInitial, x: 0, y: 0 }];
-    const surfacePressure = weatherData.surface_pressure[0] || 1013.25;
+    // --- 6. Abdrift-Vektor (Drift) durch Wind berechnen ---
+    const uComponents = interpolatedData.map(d => -Utils.convertWind(d.spd, 'm/s', 'km/h') * Math.sin(d.dir * Math.PI / 180));
+    const vComponents = interpolatedData.map(d => -Utils.convertWind(d.spd, 'm/s', 'km/h') * Math.cos(d.dir * Math.PI / 180));
+    const meanWind = Utils.calculateMeanWind(interpolatedData.map(d => d.height), uComponents, vComponents, elevation + openingAltitude, elevation + exitAltitude);
 
-    let current = trajectory[0];
-    while (current.height > hStop) {
-        const windDir = Utils.linearInterpolate(heights, windDirs, current.height);
-        const windSpd = Utils.linearInterpolate(heights, windSpdsMps, current.height);
-        const tempC = Utils.linearInterpolate(heights, tempsC, current.height);
-        const tempK = tempC + CONVERSIONS.CELSIUS_TO_KELVIN;
-        const Rl = ISA_CONSTANTS.GAS_CONSTANT_AIR, g = ISA_CONSTANTS.GRAVITY, dt = 0.5;
-        const rho = (surfacePressure * 100 * Math.exp(-g * (current.height - elevation) / (Rl * tempK))) / (Rl * tempK);
-        const windDirTo = (windDir + 180) % 360;
-        const vxWind = windSpd * Math.cos(windDirTo * Math.PI / 180);
-        const vyWind = windSpd * Math.sin(windDirTo * Math.PI / 180);
-        const vxAir = current.vxGround - vxWind;
-        const vyAir = current.vyGround - vyWind;
-        const vAirMag = Math.sqrt(vxAir * vxAir + vyAir * vyAir);
-        const cdVertical = 1, areaVertical = FREEFALL_PHYSICS.DEFAULT_AREA_VERTICAL, mass = FREEFALL_PHYSICS.DEFAULT_MASS_KG, cdHorizontal = FREEFALL_PHYSICS.DEFAULT_DRAG_COEFFICIENT, areaHorizontal = FREEFALL_PHYSICS.DEFAULT_AREA_HORIZONTAL;
-        const bv = 0.5 * cdVertical * areaVertical * rho / mass;
-        const bh = 0.5 * cdHorizontal * areaHorizontal * rho / mass;
-        const az = -g - bv * current.vz * Math.abs(current.vz);
-        const ax = -bh * vAirMag * vxAir;
-        const ay = -bh * vAirMag * vyAir;
-
-        let nextHeight = current.height + current.vz * dt;
-        let nextVz = current.vz + az * dt;
-        let nextTime = current.time + dt;
-        if (nextHeight <= hStop) {
-            const fraction = (current.height - hStop) / (current.height - nextHeight);
-            nextTime = current.time + dt * fraction;
-            nextHeight = hStop;
-            nextVz = current.vz + az * dt * fraction;
-        }
-        const next = {
-            time: nextTime, height: nextHeight, vz: nextVz,
-            vxGround: vxInitial === 0 ? vxWind : current.vxGround + ax * dt,
-            vyGround: vyInitial === 0 ? vyWind : current.vyGround + ay * dt,
-            x: current.x + (vxInitial === 0 ? vxWind : current.vxGround) * dt,
-            y: current.y + (vyInitial === 0 ? vyWind : current.vyGround) * dt
-        };
-        trajectory.push(next);
-        current = next;
-        if (next.height === hStop) break;
+    if (!meanWind) {
+        Utils.handleError("calculateFreeFall: Konnte mittleren Wind nicht berechnen.");
+        return null;
     }
 
-    const final = trajectory[trajectory.length - 1];
-    const distance = Math.sqrt(final.x * final.x + final.y * final.y);
-    let directionDeg = Math.atan2(final.y, final.x) * 180 / Math.PI;
-    directionDeg = (directionDeg + 360) % 360;
+    const [avgWindDir, avgWindSpeedMps] = meanWind;
+    console.log(`[Freifall-Input] Mittelwind: ${avgWindDir.toFixed(0)}° @ ${(avgWindSpeedMps * 3.6 / 1.852).toFixed(1)} kt`);
 
-    console.log(`[Freifall-Ergebnis] Zeit: ${final.time.toFixed(1)} s, Distanz: ${distance.toFixed(0)} m, Richtung: ${directionDeg.toFixed(1)}°`);
+    const driftToDir = (avgWindDir + 180) % 360;
+    const driftDistance = avgWindSpeedMps * totalTime;
+
+    // --- 7. Gesamtversatz (Throw + Drift) berechnen ---
+    const throwX = throwDistance * Math.cos(throwDirection * Math.PI / 180);
+    const throwY = throwDistance * Math.sin(throwDirection * Math.PI / 180);
+    const driftX = driftDistance * Math.cos(driftToDir * Math.PI / 180);
+    const driftY = driftDistance * Math.sin(driftToDir * Math.PI / 180);
+
+    const totalX = throwX + driftX;
+    const totalY = throwY + driftY;
+    const totalDistance = Math.sqrt(totalX ** 2 + totalY ** 2);
+    const totalDirection = (Math.atan2(totalY, totalX) * 180 / Math.PI + 360) % 360;
+
+    // --- 8. Ergebnis zusammenstellen ---
+    const finalPosition = Utils.calculateNewCenter(startLat, startLng, totalDistance, totalDirection);
+
+    const path = [
+        { latLng: { lat: startLat, lng: startLng }, height: elevation + exitAltitude, time: 0 },
+        { latLng: { lat: finalPosition[0], lng: finalPosition[1] }, height: elevation + openingAltitude, time: totalTime }
+    ];
+
+    console.log(`[Freifall-Ergebnis] Zeit: ${totalTime.toFixed(1)} s, Distanz: ${totalDistance.toFixed(0)} m, Richtung: ${totalDirection.toFixed(1)}°`);
     console.log("--- calculateFreeFall: Berechnung beendet ---");
 
     return {
-        time: final.time, distance: distance, directionDeg: directionDeg,
-        path: trajectory.map(p => ({ latLng: Utils.calculateNewCenter(startLat, startLng, Math.sqrt(p.x * p.x + p.y * p.y), Math.atan2(p.y, p.x) * 180 / Math.PI), height: p.height, time: p.time })),
+        time: totalTime,
+        distance: totalDistance,
+        directionDeg: totalDirection,
+        path: path
     };
 }
