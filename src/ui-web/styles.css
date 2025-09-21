@@ -695,6 +695,14 @@ input[type="checkbox"][style*="opacity: 0.5"] {
     margin: 15px 0;
 }
 
+.dashboard-value.vario-climb {
+    color: #28a745 !important; /* Grün für Steigen */
+}
+
+.dashboard-value.vario-descent {
+    color: #dc3545 !important; /* Rot für Sinken */
+}
+
 /* --- Search Panel --- */
 #panel-search:not(.hidden) #locationResults {
     display: block !important;

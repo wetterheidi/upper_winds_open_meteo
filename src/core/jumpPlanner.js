@@ -544,6 +544,8 @@ export function calculateFreeFall(weatherData, exitAltitude, openingAltitude, in
 
     const driftToDir = (avgWindDir + 180) % 360;
     const driftDistance = avgWindSpeedMps * totalTime;
+    console.log(`[Freifall-Ergebnis] Wurf: ${throwDirection.toFixed(0)}°, Distanz: ${throwDistance.toFixed(0)} m`);
+    console.log(`[Freifall-Ergebnis] Abdrift: ${driftToDir.toFixed(0)}°, Distanz: ${driftDistance.toFixed(0)} m`);
 
     // --- 7. Gesamtversatz (Throw + Drift) berechnen ---
     const throwX = throwDistance * Math.cos(throwDirection * Math.PI / 180);

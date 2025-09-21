@@ -956,6 +956,14 @@ input[type="checkbox"][style*="opacity: 1"] {
     font-weight: normal;
 }
 
+.vario-climb {
+    color: #28a745 !important; /* Grün für Steigen */
+}
+
+.vario-descent {
+    color: #dc3545 !important; /* Rot für Sinken */
+}
+
 .jml-target-toggle {
     margin-top: 15px;
 }

@@ -795,6 +795,7 @@ function updateJumpMasterDashboard(data) {
         altitudeEl: document.getElementById('dashboard-jm-altitude-mobile'),
         directionEl: document.getElementById('dashboard-jm-direction-mobile'),
         speedEl: document.getElementById('dashboard-jm-speed-mobile'),
+        varioEl: document.getElementById('dashboard-jm-vario-mobile'),
         accuracyEl: document.getElementById('dashboard-jm-accuracy-mobile')
     };
 
@@ -804,7 +805,7 @@ function updateJumpMasterDashboard(data) {
         return;
     }
 
-    const { heightUnit, effectiveWindUnit, coordFormat, refLevel, latitude, longitude, deviceAltitude, accuracy, speedMs, direction, showJumpMasterLine, jumpMasterLineData } = data;
+    const { heightUnit, effectiveWindUnit, coordFormat, refLevel, latitude, longitude, deviceAltitude, accuracy, speedMs, direction, showJumpMasterLine, jumpMasterLineData, rateOfClimbMps } = data;
 
     // Hauptwerte aktualisieren...
     const coords = Utils.convertCoords(latitude, longitude, coordFormat);
@@ -814,6 +815,27 @@ function updateJumpMasterDashboard(data) {
     const displaySpeed = Utils.convertWind(speedMs, effectiveWindUnit, 'm/s');
     mainElements.speedEl.textContent = `${Number.isFinite(displaySpeed) ? displaySpeed.toFixed(1) : 'N/A'} ${effectiveWindUnit}`;
     mainElements.accuracyEl.textContent = `± ${Math.round(Utils.convertHeight(accuracy, heightUnit))} ${heightUnit}`;
+    if (mainElements.varioEl) {
+        const varioUnit = heightUnit === 'ft' ? 'ft/min' : 'm/s';
+        let displayVario = 'N/A';
+        mainElements.varioEl.classList.remove('vario-climb', 'vario-descent');
+
+        if (rateOfClimbMps !== null && Number.isFinite(rateOfClimbMps)) {
+            if (varioUnit === 'ft/min') {
+                displayVario = (rateOfClimbMps * 196.85).toFixed(0);
+            } else {
+                displayVario = rateOfClimbMps.toFixed(1);
+            }
+
+            // Farbliche Kennzeichnung
+            if (rateOfClimbMps > 0.5) {
+                mainElements.varioEl.classList.add('vario-climb');
+            } else if (rateOfClimbMps < -0.5) {
+                mainElements.varioEl.classList.add('vario-descent');
+            }
+        }
+        mainElements.varioEl.textContent = `${displayVario} ${varioUnit}`;
+    }
 
     // --- Block 2: JML Toggle ---
     const dipBtn = document.getElementById('jml-target-dip-btn');
@@ -1612,7 +1634,7 @@ function setupAppEventListeners() {
             await displayManager.updateWeatherDisplay(getSliderValue(), 'weather-table-container', 'selectedTime');
 
             //Ruft die Funktion auf, die die Labels aktualisiert
-            if (key === 'heightUnit' || key === 'refLevel') {  }
+            if (key === 'heightUnit' || key === 'refLevel') { }
 
             if (AppState.lastAltitude !== 'N/A') {
                 calculateMeanWind();

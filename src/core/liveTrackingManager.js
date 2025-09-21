@@ -11,8 +11,8 @@ import { UI_DEFAULTS, SMOOTHING_DEFAULTS } from './constants.js';
 import { AppState } from './state.js';
 import { Utils } from './utils.js';
 import { getCapacitor } from './capacitor-adapter.js';
-import { DateTime } from 'luxon'; 
-import { saveRecordedTrack } from './trackManager.js'; 
+import { DateTime } from 'luxon';
+import { saveRecordedTrack } from './trackManager.js';
 
 // ===================================================================
 // 1. Öffentliche Hauptfunktionen (API des Moduls)
@@ -122,7 +122,7 @@ export async function stopPositionTracking() {
     // UI-Elemente von der Karte entfernen
     if (AppState.liveMarker) AppState.map.removeLayer(AppState.liveMarker);
     if (AppState.accuracyCircle) AppState.map.removeLayer(AppState.accuracyCircle);
-    
+
     // Zustand zurücksetzen
     AppState.liveMarker = null;
     AppState.accuracyCircle = null;
@@ -231,7 +231,7 @@ const debouncedPositionUpdate = Utils.debounce(async (position) => {
     const currentTime = Date.now();
     let speedMs = 0;
     let direction = 'N/A';
-    let descentRateMps = 0; // NEU: Variable für die Sinkrate
+    let verticalSpeedMps = 0; // NEU: Variable für die Sinkrate
 
     if (AppState.prevLat !== null && AppState.prevLng !== null && AppState.prevTime !== null && AppState.prevAltitude !== null) {
         const timeDiff = (currentTime - AppState.prevTime) / 1000;
@@ -241,17 +241,17 @@ const debouncedPositionUpdate = Utils.debounce(async (position) => {
             speedMs = distance / timeDiff;
             direction = Utils.calculateBearing(AppState.prevLat, AppState.prevLng, latitude, longitude);
 
-            // NEU: Vertikale Geschwindigkeit (Sinkrate) berechnen
-            const altitudeDiff = AppState.prevAltitude - deviceAltitude; // positiv bei Sinken
-            descentRateMps = altitudeDiff / timeDiff;
+            // Vertikale Geschwindigkeit (Sink- oder Steigrate) berechnen
+            const altitudeDiff = deviceAltitude - AppState.prevAltitude; // negativ bei Sinken
+            verticalSpeedMps = altitudeDiff / timeDiff;
         }
     }
 
     // Glättung der Werte für eine stabilere Anzeige
     const alphaSpeed = speedMs < SMOOTHING_DEFAULTS.SPEED_SMOOTHING_TRESHOLD ? SMOOTHING_DEFAULTS.SPEED_SMOOTHING_LOW : SMOOTHING_DEFAULTS.SPEED_SMOOTHING_HIGH;
     AppState.lastSmoothedSpeedMs = alphaSpeed * speedMs + (1 - alphaSpeed) * AppState.lastSmoothedSpeedMs;
-    const alphaDescent = 0.5; // Fester Glättungsfaktor für die Sinkrate
-    AppState.lastSmoothedDescentRateMps = alphaDescent * descentRateMps + (1 - alphaDescent) * (AppState.lastSmoothedDescentRateMps || 0);
+    const alphaVario = 0.5; // Fester Glättungsfaktor für das Variometer
+    AppState.lastSmoothedRateOfClimbMps = alphaVario * verticalSpeedMps + (1 - alphaVario) * (AppState.lastSmoothedRateOfClimbMps || 0);
 
 
     if (!AppState.liveMarker) {
@@ -282,7 +282,7 @@ const debouncedPositionUpdate = Utils.debounce(async (position) => {
             deviceAltitude: correctedAltitude,
             altitudeAccuracy, accuracy,
             speedMs: AppState.lastSmoothedSpeedMs,
-            descentRateMps: AppState.lastSmoothedDescentRateMps,
+            rateOfClimbMps: AppState.lastSmoothedRateOfClimbMps,
             direction: typeof direction === 'number' ? direction.toFixed(0) : 'N/A'
         },
         bubbles: true, cancelable: true

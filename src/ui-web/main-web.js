@@ -774,6 +774,7 @@ function updateJumpMasterDashboard(data) {
     const directionEl = document.getElementById('dashboard-jm-direction');
     const speedEl = document.getElementById('dashboard-jm-speed');
     const accuracyEl = document.getElementById('dashboard-jm-accuracy');
+    const varioEl = document.getElementById('dashboard-jm-vario');
 
     // Werte formatieren und anzeigen
     const settings = {
@@ -812,6 +813,29 @@ function updateJumpMasterDashboard(data) {
     const formattedSpeed = settings.effectiveWindUnit === 'bft' ? Math.round(displaySpeed) : displaySpeed.toFixed(1);
     speedEl.textContent = `${formattedSpeed} ${settings.effectiveWindUnit}`;
     accuracyEl.textContent = `± ${Math.round(Utils.convertHeight(data.accuracy, settings.heightUnit))} ${settings.heightUnit}`;
+    if (varioEl) {
+        const { rateOfClimbMps } = data;
+        const varioUnit = settings.heightUnit === 'ft' ? 'ft/min' : 'm/s';
+        let displayVario = 'N/A';
+        varioEl.classList.remove('vario-climb', 'vario-descent');
+
+        if (rateOfClimbMps !== null && Number.isFinite(rateOfClimbMps)) {
+            if (varioUnit === 'ft/min') {
+                // Umrechnung von m/s zu ft/min ( * 3.28084 * 60)
+                displayVario = (rateOfClimbMps * 196.85).toFixed(0);
+            } else {
+                displayVario = rateOfClimbMps.toFixed(1);
+            }
+
+            // Farbliche Kennzeichnung
+            if (rateOfClimbMps > 0.5) {
+                varioEl.classList.add('vario-climb');
+            } else if (rateOfClimbMps < -0.5) {
+                varioEl.classList.add('vario-descent');
+            }
+        }
+        varioEl.textContent = `${displayVario} ${varioUnit}`;
+    }
 
     const jmlDetails = document.getElementById('jumpmaster-line-details');
     const showJML = data.showJumpMasterLine;
