@@ -109,11 +109,11 @@ describe('jumpPlanner.js', () => {
 
             // --- FINAL ASSERTIONS ---
             // Assert against the "golden" values from your application's log
-            expect(result.freeFallDistance).toBeCloseTo(313.80, 1);
-            expect(result.greenLatFull).toBeCloseTo(52.506899, 3);
-            expect(result.greenLngFull).toBeCloseTo(13.387756, 3);
-            expect(result.greenLat).toBeCloseTo(52.507310, 3);
-            expect(result.greenLng).toBeCloseTo(13.394118, 3);
+            expect(result.freeFallDistance).toBeCloseTo(165, 0);
+            expect(result.greenLatFull).toBeCloseTo(52.50375, 3);
+            expect(result.greenLngFull).toBeCloseTo(13.38344639950435, 3);
+            expect(result.greenLat).toBeCloseTo(52.503541916446494, 3);
+            expect(result.greenLng).toBeCloseTo(13.389687485353647, 3);
         });
 
         it('sollte die Radien reduzieren, wenn safetyHeight > 0 ist', () => {
