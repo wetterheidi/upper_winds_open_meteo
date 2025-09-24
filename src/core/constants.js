@@ -32,7 +32,7 @@ export const JUMPER_SEPARATION_TABLE = {
  * Standardwerte und physikalische Annahmen für die Freifall-Simulation.
  */
 export const FREEFALL_PHYSICS = {
-    TERMINAL_VELOCITY_VERTICAL_MPS: 50, // m/s, typische vertikale Endgeschwindigkeit
+    TERMINAL_VELOCITY_VERTICAL_MPS: 50,   // m/s, typische vertikale Endgeschwindigkeit Mini: Belly 50-55 m/s, Headdown 69-77 m/s
     GRAVITY_ACCELERATION: 9.81,           // m/s², Erdbeschleunigung
     HORIZONTAL_DRAG_TAU_SECONDS: 5,       // Sekunden, Zeitkonstante für den Abbau der horiz. Geschwindigkeit
     DEFAULT_AREA_VERTICAL: 0.5,           // m², angenommene Fläche für vertikalen Luftwiderstand
