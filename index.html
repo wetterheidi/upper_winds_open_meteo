@@ -19,8 +19,8 @@
     <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js" defer></script>
     <script src="https://unpkg.com/leaflet-rotatedmarker@0.2.0/leaflet.rotatedMarker.js" defer></script>
     <script src="https://unpkg.com/@tmcw/togeojson@4.7.0/dist/togeojson.umd.js" defer></script>
-  <script type="module" crossorigin src="/upper_winds_open_meteo/assets/index-B_Wgg--U.js"></script>
-  <link rel="stylesheet" crossorigin href="/upper_winds_open_meteo/assets/index-DE75XW6H.css">
+  <script type="module" crossorigin src="/upper_winds_open_meteo/assets/index-BOz2pUxs.js"></script>
+  <link rel="stylesheet" crossorigin href="/upper_winds_open_meteo/assets/index-BVXgncy6.css">
 </head>
 
 <body>
@@ -422,7 +422,8 @@
                         </li>
                         <li>
                             <label class="radio-label">
-                                <input type="checkbox" id="lockInteractionCheckbox" name="lockInteraction"> Lock all Points
+                                <input type="checkbox" id="lockInteractionCheckbox" name="lockInteraction"> Lock all
+                                Points
                             </label>
                         </li>
                     </ul>
@@ -446,6 +447,11 @@
                             <div class="dashboard-item">
                                 <div class="dashboard-label">Speed</div>
                                 <div class="dashboard-value" id="dashboard-jm-speed">--</div>
+                            </div>
+
+                            <div class="dashboard-item span-2">
+                                <div class="dashboard-label">Vario</div>
+                                <div class="dashboard-value" id="dashboard-jm-vario">--</div>
                             </div>
 
                             <div class="dashboard-item span-2 accuracy-item">
@@ -610,7 +616,8 @@
 
                                 <div
                                     style="position: relative; display: flex; align-items: center; justify-content: flex-end;">
-                                    <span class="info-icon info-button-shared" data-info="GPX, KML or FlySight-CSV">i</span>
+                                    <span class="info-icon info-button-shared"
+                                        data-info="GPX, KML or FlySight-CSV">i</span>
                                     <div id="trackInfoPopup" class="info-popup"></div>
                                 </div>
 
