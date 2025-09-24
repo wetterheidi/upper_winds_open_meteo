@@ -540,7 +540,7 @@ function createArrowIcon(lat, lng, bearing, color) {
         </svg>
     `;
     return L.divIcon({
-        html: `<div style="transform: rotate(${normalizedBearing}deg); ...">${arrowSvg}</div>`,
+        html: `<div style="transform-origin: center; transform: rotate(${normalizedBearing}deg);">${arrowSvg}</div>`,
         className: 'wind-arrow-icon',
         iconSize: [40, 20],
         iconAnchor: [20, 10]

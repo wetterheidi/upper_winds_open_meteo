@@ -330,7 +330,7 @@ export function calculateCanopyCircles(interpolatedData) {
  * @returns {{downwindLat: number, downwindLng: number, downwindStart: number[], baseStart: number[], finalStart: number[], landingPoint: number[]}|null} Ein Objekt mit den Koordinaten der Eckpunkte oder null bei Fehler.
  */
 export function calculateLandingPatternCoords(lat, lng, interpolatedData) {
-    if (!interpolatedData || interpolatedData.length === 0 || !AppState.lastAltitude) return null;
+    if (!interpolatedData || interpolatedData.length === 0 || AppState.lastAltitude === 'N/A') return null;
 
     const CANOPY_SPEED_KT = parseInt(document.getElementById('canopySpeed').value) || 20;
     const DESCENT_RATE_MPS = parseFloat(document.getElementById('descentRate').value) || 3.5;
@@ -357,7 +357,8 @@ export function calculateLandingPatternCoords(lat, lng, interpolatedData) {
     };
 
     // Final Leg
-    const finalMeanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, baseHeight, baseHeight + LEG_HEIGHT_FINAL);
+    // src/core/jumpPlanner.js
+    const finalMeanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, baseHeight === 0 ? 1 : baseHeight, baseHeight + LEG_HEIGHT_FINAL);
     const finalWindDir = finalMeanWind[0];
     const finalWindSpeedKt = finalMeanWind[1];
     const finalCourse = effectiveLandingWindDir;
@@ -400,16 +401,16 @@ export function calculateLandingPatternCoords(lat, lng, interpolatedData) {
     const downwindStart = calculateLegEndpoint(baseStart[0], baseStart[1], (downwindCourse + 180) % 360, downwindGroundSpeedKt, downwindTime);
 
     // Detailed console.log for each leg
-    console.log(`Landing Pattern Updated:
+    console.log(`[Pattern] Landing Pattern Updated:
         Final Leg: Wind: ${finalWindDir.toFixed(1)}° @ ${finalWindSpeedKt.toFixed(1)}kt, Course: ${finalCourse.toFixed(1)}°, WCA: ${finalWca.toFixed(1)}°, GS: ${finalGroundSpeedKt.toFixed(1)}kt, HW: ${finalHeadwind.toFixed(1)}kt, Length: ${finalLength.toFixed(1)}m
         Base Leg: Wind: ${baseWindDir.toFixed(1)}° @ ${baseWindSpeedKt.toFixed(1)}kt, Course: ${baseCourse.toFixed(1)}°, WCA: ${baseWca.toFixed(1)}°, GS: ${baseGroundSpeedKt.toFixed(1)}kt, HW: ${baseHeadwind.toFixed(1)}kt, Length: ${baseLength.toFixed(1)}m
         Downwind Leg: Wind: ${downwindWindDir.toFixed(1)}° @ ${downwindWindSpeedKt.toFixed(1)}kt, Course: ${downwindCourse.toFixed(1)}°, WCA: ${downwindWca.toFixed(1)}°, GS: ${downwindGroundSpeedKt.toFixed(1)}kt, HW: ${downwindHeadwind.toFixed(1)}kt, Length: ${downwindLength.toFixed(1)}m`);
 
     // Koordinaten-Logs (korrigiert für baseStart)
-    console.log('Coordinates DIP: ', lat, lng, 'Altitude DIP:', baseHeight);
-    console.log('Coordinates final end: ', finalStart[0], finalStart[1], 'Leg Height:', baseHeight + LEG_HEIGHT_FINAL);
-    console.log('Coordinates base end: ', baseStart[0], baseStart[1], 'Leg Height:', baseHeight + LEG_HEIGHT_BASE);
-    console.log('Coordinates downwind end: ', downwindStart[0], downwindStart[1], 'Leg Height:', baseHeight + LEG_HEIGHT_DOWNWIND);
+    console.log('[Pattern] Coordinates DIP: ', lat, lng, 'Altitude DIP:', baseHeight);
+    console.log('[Pattern] Coordinates final end: ', finalStart[0], finalStart[1], 'Leg Height:', baseHeight + LEG_HEIGHT_FINAL);
+    console.log('[Pattern] Coordinates base end: ', baseStart[0], baseStart[1], 'Leg Height:', baseHeight + LEG_HEIGHT_BASE);
+    console.log('[Pattern] Coordinates downwind end: ', downwindStart[0], downwindStart[1], 'Leg Height:', baseHeight + LEG_HEIGHT_DOWNWIND);
 
     return {
         downwindStart: downwindStart,

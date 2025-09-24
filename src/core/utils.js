@@ -415,18 +415,19 @@ export class Utils {
      * Berechnet den mittleren Windvektor über eine definierte Höhenschicht.
      * Nutzt die Trapez-Methode zur Integration der Windkomponenten über die Höhe,
      * um einen präzisen, höhengewichteten Mittelwert zu erhalten.
-     * @param {number[]} heights - Array der Höhen-Stützstellen in Metern.
+     * @param {number[]} heights - Array der Höhen-Stützstellen in Metern (AMSL).
      * @param {number[]} xComponents - Array der U-Windkomponenten.
      * @param {number[]} yComponents - Array der V-Windkomponenten.
-     * @param {number} lowerLimit - Die untere Grenze der Schicht in Metern.
-     * @param {number} upperLimit - Die obere Grenze der Schicht in Metern.
+     * @param {number} lowerLimit - Die untere Grenze der Schicht in Metern (AMSL).
+     * @param {number} upperLimit - Die obere Grenze der Schicht in Metern (AMSL).
      * @returns {number[]|null} Ein Array `[Richtung, Geschwindigkeit, u-Komponente, v-Komponente]` oder null bei einem Fehler.
      */
     static calculateMeanWind(heights, xComponents, yComponents, lowerLimit, upperLimit) {
         try {
-            if (!heights || !xComponents || !yComponents || heights.length < 2) {
-                throw new Error('Invalid input data for calculateMeanWind');
+            if (!heights || !xComponents || !yComponents || heights.length < 2 || lowerLimit >= upperLimit) {
+                throw new Error('Invalid input data or limits for calculateMeanWind');
             }
+
             const dddff = new Array(4);
             let hLayer = [upperLimit];
             let xLayer = [Number(Utils.linearInterpolate(heights, xComponents, upperLimit))];
@@ -447,7 +448,7 @@ export class Utils {
             xLayer.push(xLower);
             yLayer.push(yLower);
 
-            // Sort arrays in descending order of height
+            // Sort arrays in descending order of height to ensure correct integration direction
             const indices = hLayer.map((_, idx) => idx);
             indices.sort((a, b) => hLayer[b] - hLayer[a]);
             hLayer = indices.map(i => hLayer[i]);
@@ -461,8 +462,18 @@ export class Utils {
                 yTrapez += 0.5 * (yLayer[i] + yLayer[i + 1]) * (hLayer[i] - hLayer[i + 1]);
             }
 
-            const xMean = xTrapez / (hLayer[0] - hLayer[hLayer.length - 1]);
-            const yMean = yTrapez / (hLayer[0] - hLayer[hLayer.length - 1]);
+            const heightDifference = hLayer[0] - hLayer[hLayer.length - 1];
+            if (heightDifference === 0) {
+                 // If there's no height difference, return the wind at that specific level
+                dddff[2] = xLower;
+                dddff[3] = yLower;
+                dddff[1] = Utils.windSpeed(xLower, yLower);
+                dddff[0] = Utils.windDirection(xLower, yLower);
+                return dddff;
+            }
+
+            const xMean = xTrapez / heightDifference;
+            const yMean = yTrapez / heightDifference;
 
             dddff[2] = xMean; // u component
             dddff[3] = yMean; // v component
