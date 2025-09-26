@@ -3,11 +3,12 @@
 import { AppState } from '../core/state.js';
 import { Settings, getInterpolationStep } from '../core/settings.js';
 import { Utils } from '../core/utils.js';
+import * as JumpPlanner from '../core/jumpPlanner.js';
 import * as displayManager from './displayManager.js';
 import * as mapManager from './mapManager.js';
 import * as Coordinates from '../ui-web/coordinates.js';
 import { TileCache, cacheTilesForDIP, cacheVisibleTiles } from '../core/tileCache.js';
-import { loadKmlTrack,loadGpxTrack, loadCsvTrackUTC, exportToGpx, exportLandingPatternToGpx } from '../core/trackManager.js';
+import { loadKmlTrack, loadGpxTrack, loadCsvTrackUTC, exportToGpx, exportLandingPatternToGpx } from '../core/trackManager.js';
 import { fetchEnsembleWeatherData, processAndVisualizeEnsemble, clearEnsembleVisualizations } from '../core/ensembleManager.js';
 import { getSliderValue, displayMessage, hideProgress, displayProgress, displayWarning, toggleLoading } from './ui.js';
 import { updateModelSelectUI, cleanupSelectedEnsembleModels } from './ui.js';
@@ -135,7 +136,7 @@ function setupSidebarEvents() {
         console.error("Layout-Elemente für Sidebar-Logik nicht gefunden.");
         return;
     }
-    
+
     // Die alten setPlannerLockState und setDataLockState Funktionen werden komplett entfernt.
 
     icons.forEach(icon => {
@@ -492,6 +493,40 @@ function setupDeselectAllEnsembleButton() {
 
         Utils.handleMessage('All ensemble models deselected.');
     });
+}
+/**
+ * Richtet den Event-Listener für den Terrain-Analyse-Button ein.
+ * @private
+ */
+function setupTerrainAnalysisEvents() {
+    const analyzeTerrainBtn = document.getElementById('analyzeTerrainButton');
+    if (analyzeTerrainBtn) {
+        analyzeTerrainBtn.addEventListener('click', async () => {
+            if (!AppState.weatherData || !AppState.lastLat || !AppState.lastLng) {
+                Utils.handleError("Please select a location and fetch weather data first.");
+                return;
+            }
+
+            toggleLoading(true, 'Analyzing terrain, this may take a moment...');
+
+            try {
+                const dangerousPoints = await JumpPlanner.analyzeTerrainClearance();
+                mapManager.drawTerrainWarning(dangerousPoints);
+
+                if (dangerousPoints.length > 0) {
+                    Utils.handleMessage("Warning: Low clearance areas detected and marked in red.");
+                } else {
+                    Utils.handleMessage("Terrain analysis complete. No low clearance areas found.");
+                }
+
+            } catch (error) {
+                console.error("Terrain analysis failed:", error);
+                Utils.handleError("An error occurred during terrain analysis.");
+            } finally {
+                toggleLoading(false);
+            }
+        });
+    }
 }
 
 // --- Track & Datei-Management ---
@@ -932,6 +967,8 @@ function setupInputEvents() {
     setupInput('jumperSeparation', 'change', 300);
 
     setupInput('cutAwayAltitude', 'change', 300);
+    setupInput('terrainClearanceInput', 'change', 300);
+
     setupInput('historicalDatePicker', 'change', 300);
 }
 function setupDownloadEvents() {
@@ -1294,6 +1331,7 @@ export function initializeEventListeners() {
     setupCutawayRadioButtons();
     setupResetCutAwayMarkerButton();
     setupDeselectAllEnsembleButton();
+    setupTerrainAnalysisEvents();
 
     // 5. Datei- & Track-Management
     setupTrackEvents();

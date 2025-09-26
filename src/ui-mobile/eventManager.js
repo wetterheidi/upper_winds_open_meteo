@@ -3,6 +3,7 @@
 import { AppState } from '../core/state.js';
 import { Settings, getInterpolationStep } from '../core/settings.js';
 import { Utils } from '../core/utils.js';
+import * as JumpPlanner from '../core/jumpPlanner.js';
 import * as displayManager from './displayManager.js';
 import * as mapManager from './mapManager.js';
 import * as Coordinates from './coordinates.js';
@@ -199,7 +200,7 @@ function setupTabBarEvents() {
             );
             return; // Klick-Verarbeitung hier stoppen
         }
-        
+
         // 1. Slider-Sichtbarkeit steuern (wie zuvor)
         if (panelId === 'map' || panelId === 'data') {
             sliderContainer.style.display = 'flex';
@@ -627,6 +628,40 @@ function setupDeselectAllEnsembleButton() {
         Utils.handleMessage('All ensemble models deselected.');
     });
 }
+/**
+ * Richtet den Event-Listener für den Terrain-Analyse-Button ein.
+ * @private
+ */
+function setupTerrainAnalysisEvents() {
+    const analyzeTerrainBtn = document.getElementById('analyzeTerrainButton');
+    if (analyzeTerrainBtn) {
+        analyzeTerrainBtn.addEventListener('click', async () => {
+            if (!AppState.weatherData || !AppState.lastLat || !AppState.lastLng) {
+                Utils.handleError("Please select a location and fetch weather data first.");
+                return;
+            }
+
+            toggleLoading(true, 'Analyzing terrain, this may take a moment...');
+
+            try {
+                const dangerousPoints = await JumpPlanner.analyzeTerrainClearance();
+                mapManager.drawTerrainWarning(dangerousPoints);
+
+                if (dangerousPoints.length > 0) {
+                    Utils.handleMessage("Warning: Low clearance areas detected and marked in red.");
+                } else {
+                    Utils.handleMessage("Terrain analysis complete. No low clearance areas found.");
+                }
+
+            } catch (error) {
+                console.error("Terrain analysis failed:", error);
+                Utils.handleError("An error occurred during terrain analysis.");
+            } finally {
+                toggleLoading(false);
+            }
+        });
+    }
+}
 
 // --- Track & Datei-Management ---
 
@@ -987,7 +1022,7 @@ function setupRadioEvents() {
     setupRadioGroup('temperatureUnit', () => { }); // Löst nur das Event aus
 
     setupRadioGroup('windUnit', () => { });
-    
+
     setupRadioGroup('timeZone', () => { }); // Löst nur das Event aus
 
     setupRadioGroup('coordFormat', () => { });
@@ -1133,6 +1168,8 @@ function setupInputEvents() {
     setupInput('jumperSeparation', 'change', 300);
 
     setupInput('cutAwayAltitude', 'change', 300);
+    setupInput('terrainClearanceInput', 'change', 300);
+
     setupInput('historicalDatePicker', 'change', 300);
 }
 function setupDownloadEvents() {
@@ -1554,6 +1591,7 @@ export function initializeEventListeners() {
     // 4. Spezifische Planner-Funktionen
     setupJumpRunTrackEvents();
     setupCutawayRadioButtons();
+    setupTerrainAnalysisEvents();
     setupResetCutAwayMarkerButton();
     setupDeselectAllEnsembleButton();
 
@@ -1576,6 +1614,7 @@ export function initializeEventListeners() {
 
     // 9. Event Listener für Karten-Interaktionen
     setupMapEventListeners();
+
 
     document.addEventListener('loading:start', (e) => toggleLoading(true, e.detail.message));
     document.addEventListener('loading:stop', () => toggleLoading(false));

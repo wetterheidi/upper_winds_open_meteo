@@ -7,6 +7,7 @@
 import { AppState } from './state.js';
 import { Settings } from './settings.js';
 import { Utils } from './utils.js';
+import * as weatherManager from './weatherManager.js';
 import { JUMP_RUN_DEFAULTS, CUTAWAY_VISUALIZATION_RADIUS_METERS, JUMPER_SEPARATION_TABLE, CONVERSIONS, FREEFALL_PHYSICS, ISA_CONSTANTS, CANOPY_OPENING_BUFFER_METERS, CUTAWAY_VERTICAL_SPEEDS_MPS } from './constants.js';
 
 // ===================================================================
@@ -456,6 +457,86 @@ export function calculateCutAway(interpolatedData) {
     const tooltipContent = `<b>Cut-Away (${stateLabel})</b><br>Cut-Away Altitude: ${cutAwayAltitude} m<br>Displacement: ${meanWindDirection.toFixed(0)}°, ${displacementDistance.toFixed(0)} m<br>Descent Time/Speed: ${descentTime.toFixed(0)} s at ${verticalSpeedSelected.toFixed(1)} m/s<br>`;
 
     return { center: [centerLat, centerLng], radius: CUTAWAY_VISUALIZATION_RADIUS_METERS, tooltipContent };
+}
+
+export async function analyzeTerrainClearance() {
+    // 1. Notwendige Daten und Parameter sammeln (wie zuvor)
+    const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
+    const interpStep = Settings.getValue('interpStep', 'select', 200);
+    const heightUnit = Settings.getValue('heightUnit', 'm');
+    const interpolatedData = weatherManager.interpolateWeatherData(
+        AppState.weatherData, sliderIndex, interpStep, Math.round(AppState.lastAltitude), heightUnit
+    );
+
+    const legHeightDownwind = parseInt(document.getElementById('legHeightDownwind')?.value) || 300;
+    const descentRate = parseFloat(document.getElementById('descentRate')?.value) || 3.5;
+    const canopySpeedMps = (parseFloat(document.getElementById('canopySpeed')?.value) || 20) * CONVERSIONS.KNOTS_TO_MPS;
+    const dipElevation = AppState.lastAltitude;
+
+    // 2. Den kleinsten blauen Kreis identifizieren.
+    const canopyResult = calculateCanopyCircles(interpolatedData);
+    if (!canopyResult || canopyResult.additionalBlueRadii.length === 0) {
+        throw new Error("Could not calculate the smallest canopy circle for analysis.");
+    }
+
+    // Wir nehmen den LETZTEN Kreis aus der Liste, da dies der niedrigste (und kleinste) ist.
+    const smallestCircleIndex = canopyResult.additionalBlueRadii.length - 1;
+    const circleRadius = canopyResult.additionalBlueRadii[smallestCircleIndex];
+    const baseLat = canopyResult.blueLat;
+    const baseLng = canopyResult.blueLng;
+    const displacement = canopyResult.additionalBlueDisplacements[smallestCircleIndex];
+    const direction = canopyResult.additionalBlueDirections[smallestCircleIndex];
+    const circleCenter = Utils.calculateNewCenter(baseLat, baseLng, displacement, direction);
+    const entryAltitudeAGL = canopyResult.additionalBlueUpperLimits[smallestCircleIndex];
+    const downwindStartPoint = L.latLng(baseLat, baseLng);
+
+    // 3. Ein Raster von Punkten INNERHALB des Kreises erstellen (korrigierte Geometrie)
+    const gridSpacingMeters = 75; // Auflösung etwas verringert, um API-Calls zu schonen
+    const pointsToCheck = [];
+    const centerLatLng = L.latLng(circleCenter);
+
+    const latRadius = circleRadius / 111320; // Grad pro Meter
+    for (let i = -circleRadius; i <= circleRadius; i += gridSpacingMeters) {
+        for (let j = -circleRadius; j <= circleRadius; j += gridSpacingMeters) {
+            if (i * i + j * j <= circleRadius * circleRadius) {
+                const pointLat = centerLatLng.lat + (i / 111320);
+                const pointLng = centerLatLng.lng + (j / (111320 * Math.cos(centerLatLng.lat * Math.PI / 180)));
+                pointsToCheck.push(L.latLng(pointLat, pointLng));
+            }
+        }
+    }
+
+    if (pointsToCheck.length === 0) return [];
+
+    // 4. Geländehöhen in Batches abrufen
+    const dangerousPoints = [];
+    const requiredClearance = Settings.getValue('terrainClearance', 100);
+    const batchSize = 100;
+    for (let i = 0; i < pointsToCheck.length; i += batchSize) {
+        const batch = pointsToCheck.slice(i, i + batchSize);
+        Utils.handleMessage(`Analyzing terrain... (${i + batch.length}/${pointsToCheck.length})`);
+        const elevations = await Utils.getMultipleAltitudes(batch);
+
+        for (let j = 0; j < batch.length; j++) {
+            const point = batch[j];
+            const groundEle = elevations[j];
+            if (groundEle === 'N/A' || groundEle === null) continue;
+
+            const distanceToPoint = AppState.map.distance(downwindStartPoint, point);
+            const timeToReach = distanceToPoint / canopySpeedMps;
+            const altitudeLoss = timeToReach * descentRate;
+
+            // Die Höhe des Springers an diesem Punkt ist die Einstiegshöhe minus dem Höhenverlust
+            const skydiverMslAltitude = (dipElevation + entryAltitudeAGL) - altitudeLoss;
+            const clearance = skydiverMslAltitude - groundEle;
+
+            if (clearance < requiredClearance) {
+                dangerousPoints.push(point);
+            }
+        }
+    }
+
+    return dangerousPoints;
 }
 
 // ===================================================================

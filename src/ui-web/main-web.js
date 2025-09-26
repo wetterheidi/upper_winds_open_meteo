@@ -128,6 +128,7 @@ function initializeUIElements() {
     applySettingToCheckbox('showCanopyAreaCheckbox', Settings.state.userSettings.showCanopyArea);
     applySettingToCheckbox('showExitAreaCheckbox', Settings.state.userSettings.showExitArea);
     applySettingToCheckbox('showCutAwayFinder', Settings.state.userSettings.showCutAwayFinder);
+    applySettingToInput('terrainClearanceInput', Settings.state.userSettings.terrainClearance);
     Settings.state.userSettings.isCustomJumpRunDirection = Settings.state.userSettings.isCustomJumpRunDirection || false;
 
     // Ensure UI reflects the stored custom direction without overwriting
@@ -1620,6 +1621,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.addEventListener('location:selected', async (event) => {
         const { lat, lng, source } = event.detail;
         console.log(`App: Event 'location:selected' empfangen. Quelle: ${source}`);
+        mapManager.clearTerrainWarning(); // Alte Terrain-Analyse sofort entfernen
 
         const loadingElement = document.getElementById('loading');
         if (loadingElement) loadingElement.style.display = 'block';

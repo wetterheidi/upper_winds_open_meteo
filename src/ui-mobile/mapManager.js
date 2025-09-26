@@ -426,6 +426,28 @@ export function drawRecordedTrack(points) {
         opacity: 0.8
     }).addTo(AppState.map);
 }
+export function drawTerrainWarning(dangerousPoints) {
+    _initializeTerrainWarningLayer();
+    AppState.terrainWarningLayer.clearLayers();
+
+    if (!dangerousPoints || dangerousPoints.length < 3) {
+        return; // Benötigen mindestens 3 Punkte für ein Polygon
+    }
+
+    // Berechnet die konvexe Hülle, um eine saubere Umrandung zu erhalten
+    const hullPoints = Utils.getConvexHull(dangerousPoints.map(p => [p.lat, p.lng]));
+
+    L.polygon(hullPoints, {
+        color: 'red',
+        fillColor: '#f03',
+        fillOpacity: 0.5,
+        weight: 2,
+        pmIgnore: true
+    }).bindTooltip(
+        "WARNING: Ground clearance in this area may be less than 100m!", 
+        { sticky: true, className: 'cutaway-tooltip' }
+    ).addTo(AppState.terrainWarningLayer);
+}
 
 // Clear Funktionen für die API
 
@@ -523,6 +545,15 @@ export function clearRecordedTrack() {
     if (AppState.map && AppState.recordedTrackLayer) {
         AppState.map.removeLayer(AppState.recordedTrackLayer);
         AppState.recordedTrackLayer = null;
+    }
+}
+/**
+ * Entfernt die Terrain-Warnungs-Visualisierung von der Karte.
+ */
+export function clearTerrainWarning() {
+    if (AppState.terrainWarningLayer) {
+        AppState.terrainWarningLayer.clearLayers();
+        console.log("Terrain warning layer cleared.");
     }
 }
 
@@ -998,6 +1029,11 @@ function _initializeCoordsControlAndHandlers() {
         }
     });
     console.log('Mousemove and mouseout handlers set up.');
+}
+function _initializeTerrainWarningLayer() {
+    if (!AppState.terrainWarningLayer) {
+        AppState.terrainWarningLayer = L.layerGroup().addTo(AppState.map);
+    }
 }
 
 // Setup Funktionen

@@ -464,7 +464,7 @@ export class Utils {
 
             const heightDifference = hLayer[0] - hLayer[hLayer.length - 1];
             if (heightDifference === 0) {
-                 // If there's no height difference, return the wind at that specific level
+                // If there's no height difference, return the wind at that specific level
                 dddff[2] = xLower;
                 dddff[3] = yLower;
                 dddff[1] = Utils.windSpeed(xLower, yLower);
@@ -911,6 +911,32 @@ export class Utils {
         return elevation !== 'N/A' ? elevation : 'N/A';
     }
 
+    /**
+    * Ruft die Geländehöhen für eine Liste von Koordinatenpunkten in Batches ab.
+    * @param {L.LatLng[]} points - Ein Array von Leaflet LatLng-Objekten.
+    * @returns {Promise<number[]>} Ein Array mit den Höhen in Metern.
+    */
+    static async getMultipleAltitudes(points) {
+        if (!points || points.length === 0) {
+            return [];
+        }
+
+        const latitudes = points.map(p => p.lat.toFixed(4)).join(',');
+        const longitudes = points.map(p => p.lng.toFixed(4)).join(',');
+
+        try {
+            const response = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${latitudes}&longitude=${longitudes}`);
+            if (!response.ok) {
+                throw new Error(`Elevation API Error: ${response.status}`);
+            }
+            const data = await response.json();
+            return data.elevation || [];
+        } catch (error) {
+            console.error("Error fetching multiple altitudes:", error);
+            // Im Fehlerfall geben wir ein Array zurück, das die fehlenden Daten signalisiert
+            return points.map(() => 'N/A');
+        }
+    }
     // ===================================================================
     // 6. Allgemeine Hilfs- & UI-Funktionen
     // ===================================================================
@@ -1210,6 +1236,32 @@ export class Utils {
         tooltipContent += `<br>Speed: ${speed} ${windUnit}`;
         tooltipContent += `<br>Descent Rate: ${descentRate} m/s`;
         return tooltipContent;
+    }
+
+    /**
+ * Berechnet die konvexe Hülle einer Punktemenge (Graham Scan Algorithmus).
+ * @param {Array<[number, number]>} points - Ein Array von Punkten, z.B. [[lat1, lng1], [lat2, lng2], ...].
+ * @returns {Array<[number, number]>} Die Punkte, die die konvexe Hülle bilden.
+ */
+    static getConvexHull(points) {
+        points.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+        const crossProduct = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+        const lower = [];
+        for (const p of points) {
+            while (lower.length >= 2 && crossProduct(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) {
+                lower.pop();
+            }
+            lower.push(p);
+        }
+        const upper = [];
+        for (let i = points.length - 1; i >= 0; i--) {
+            const p = points[i];
+            while (upper.length >= 2 && crossProduct(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) {
+                upper.pop();
+            }
+            upper.push(p);
+        }
+        return lower.slice(0, -1).concat(upper.slice(0, -1));
     }
 }
 

@@ -76,6 +76,8 @@ export const Settings = {
         numberOfJumpers: 5,
         cutAwayAltitude: 1000,
         cutAwayState: 'Partially',
+        terrainWarningLayer: null,
+        terrainClearance: 100,
         trackPosition: false,
         showJumpMasterLine: false,
         jumpMasterLineTarget: 'DIP',

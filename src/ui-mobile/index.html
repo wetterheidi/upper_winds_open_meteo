@@ -284,6 +284,15 @@
                             </ul>
                         </li>
                         <li>
+                            <div class="settings-grid" style="grid-template-columns: 1fr auto; gap: 10px;">
+                                <label for="terrainClearanceInput">Min. Clearance (m):</label>
+                                <input type="number" id="terrainClearanceInput" min="0" max="500" step="10" value="100"
+                                    style="width: 80px;">
+                            </div>
+                            <button id="analyzeTerrainButton" class="btn btn-secondary">Analyze Terrain
+                                Clearance</button>
+                        </li>
+                        <li>
                             <button id="exportGpxButton" class="btn btn-primary">Export Jump Run as GPX</button>
                         </li>
                     </ul>
