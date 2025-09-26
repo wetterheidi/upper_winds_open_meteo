@@ -87,6 +87,7 @@ export const Settings = {
         selectedEnsembleModels: [],
         currentEnsembleScenario: 'all_models',
         isInteractionLocked: false,
+        trackAltitudeReference: 'DIP',
     },
 
     /**

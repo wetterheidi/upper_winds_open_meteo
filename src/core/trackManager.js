@@ -12,6 +12,7 @@ import { DateTime } from 'luxon';
 import * as JumpPlanner from './jumpPlanner.js';
 import { interpolateWeatherData } from './weatherManager.js';
 import { getCapacitor } from './capacitor-adapter.js';
+import { Settings } from './settings.js';
 
 // ===================================================================
 // 1. Öffentliche Lade- & Speicherfunktionen
@@ -532,7 +533,6 @@ async function renderTrack(points, fileName) {
     try {
         console.log(`[trackManager] renderTrack called for ${fileName} with ${points.length} points.`);
         if (!AppState.map) {
-            console.warn('[trackManager] Map object in AppState is not available in renderTrack.');
             Utils.handleError('Map not initialized. Cannot render track.');
             return null;
         }
@@ -541,8 +541,17 @@ async function renderTrack(points, fileName) {
             AppState.map.removeLayer(AppState.gpxLayer);
         }
         AppState.gpxLayer = null;
-        AppState.gpxPoints = points;
         AppState.isTrackLoaded = false;
+
+        const altitudeReference = Settings.state.userSettings.trackAltitudeReference || 'DIP';
+
+        if (altitudeReference === 'AGL') {
+            Utils.handleMessage("Fetching ground elevation for all track points...");
+            points = await fetchGroundAltitudesForTrack(points);
+            Utils.handleMessage("Ground elevation data loaded.");
+        }
+        
+        AppState.gpxPoints = points;
 
         const trackMetaData = {
             finalPointData: null,
@@ -573,7 +582,6 @@ async function renderTrack(points, fileName) {
                 trackMetaData.timestampToUseForWeather = roundedTimestamp.toISO();
             }
 
-            // KORREKTUR: Berechnungen VOR die Verwendung verschieben
             const distance = (points.reduce((dist, p, i) => {
                 if (i === 0 || !AppState.map) return 0; const prev = points[i - 1];
                 return dist + AppState.map.distance([prev.lat, prev.lng], [p.lat, p.lng]);
@@ -582,7 +590,6 @@ async function renderTrack(points, fileName) {
             const elevationMin = elevations.length ? Math.min(...elevations).toFixed(0) : 'N/A';
             const elevationMax = elevations.length ? Math.max(...elevations).toFixed(0) : 'N/A';
 
-            // Event erstellen, NACHDEM alle Werte berechnet wurden
             const trackLoadedEvent = new CustomEvent('track:loaded', {
                 detail: {
                     lat: AppState.lastLat,
@@ -595,35 +602,49 @@ async function renderTrack(points, fileName) {
                 bubbles: true,
                 cancelable: true
             });
-
             AppState.map.getContainer().dispatchEvent(trackLoadedEvent);
         }
 
         AppState.gpxLayer = L.layerGroup([], { pane: 'gpxTrackPane' });
-        const groundAltitude = AppState.lastAltitude !== 'N/A' && !isNaN(AppState.lastAltitude) ? parseFloat(AppState.lastAltitude) : null;
+        const groundAltitudeForDip = AppState.lastAltitude !== 'N/A' && !isNaN(AppState.lastAltitude) ? parseFloat(AppState.lastAltitude) : null;
 
         for (let i = 0; i < points.length - 1; i++) {
-            const p1 = points[i]; const p2 = points[i + 1];
-            const ele1 = p1.ele; const ele2 = p2.ele;
+            const p1 = points[i]; 
+            const p2 = points[i + 1];
+            const ele1 = p1.ele; 
+            const ele2 = p2.ele;
             let color = '#808080';
-            if (groundAltitude !== null && ele1 !== null && ele2 !== null) {
-                const agl1 = ele1 - groundAltitude; const agl2 = ele2 - groundAltitude;
-                const avgAgl = (agl1 + agl2) / 2;
-                color = Utils.interpolateColor(avgAgl);
+
+            const altitudeReference = Settings.state.userSettings.trackAltitudeReference || 'DIP';
+            if (altitudeReference === 'AGL') {
+                if (p1.groundEle !== null && p2.groundEle !== null && ele1 !== null && ele2 !== null) {
+                    const agl1 = ele1 - p1.groundEle;
+                    const agl2 = ele2 - p2.groundEle;
+                    const avgAgl = (agl1 + agl2) / 2;
+                    color = Utils.interpolateColor(avgAgl);
+                }
+            } else {
+                if (groundAltitudeForDip !== null && ele1 !== null && ele2 !== null) {
+                    const agl1 = ele1 - groundAltitudeForDip;
+                    const agl2 = ele2 - groundAltitudeForDip;
+                    const avgAgl = (agl1 + agl2) / 2;
+                    color = Utils.interpolateColor(avgAgl);
+                }
             }
+
             const segment = L.polyline([[p1.lat, p1.lng], [p2.lat, p2.lng]], {
                 color: color, weight: 4, opacity: 0.75, pane: 'gpxTrackPane'
-            }).bindTooltip('', { sticky: true });
-
-            segment.on('mousemove', function (e) {
-                const latlng = e.latlng;
-                let closestPoint = points[0]; let minDist = Infinity; let closestIndex = 0;
-                points.forEach((p, index) => {
-                    const dist = Math.sqrt(Math.pow(p.lat - latlng.lat, 2) + Math.pow(p.lng - latlng.lng, 2));
-                    if (dist < minDist) { minDist = dist; closestPoint = p; closestIndex = index; }
-                });
-                segment.setTooltipContent(Utils.getTooltipContent(closestPoint, closestIndex, points, groundAltitude)).openTooltip(latlng);
             });
+
+            // ================== KORRIGIERTER BLOCK START ==================
+            // Wir binden den Tooltip direkt mit dem Inhalt des Startpunktes des Segments.
+            // Das ist effizienter und vermeidet die komplexen `mousemove`-Probleme.
+            segment.bindTooltip(() => {
+                // Die Funktion wird erst aufgerufen, wenn der Tooltip benötigt wird.
+                return Utils.getTooltipContent(p1, i, points, groundAltitudeForDip);
+            }, { sticky: true });
+            // =================== KORRIGIERTER BLOCK ENDE ====================
+
             AppState.gpxLayer.addLayer(segment);
         }
         if (AppState.map) AppState.gpxLayer.addTo(AppState.map);
@@ -698,4 +719,23 @@ async function readFileContent(file) {
             reader.readAsText(file);
         });
     }
+}
+
+/**
+ * Ruft die Geländehöhe für jeden Punkt eines Tracks ab.
+ * @param {object[]} points - Array von Track-Punkten.
+ * @returns {Promise<object[]>} Das Array der Punkte, angereichert mit der Geländehöhe.
+ */
+async function fetchGroundAltitudesForTrack(points) {
+    const pointsWithGroundEle = [];
+    for (const point of points) {
+        const groundEle = await Utils.getAltitude(point.lat, point.lng);
+        pointsWithGroundEle.push({
+            ...point,
+            groundEle: (groundEle !== 'N/A' ? groundEle : null)
+        });
+        // Eine kleine Verzögerung, um die API nicht zu überlasten
+        await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    return pointsWithGroundEle;
 }

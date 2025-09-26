@@ -464,7 +464,7 @@ export class Utils {
 
             const heightDifference = hLayer[0] - hLayer[hLayer.length - 1];
             if (heightDifference === 0) {
-                 // If there's no height difference, return the wind at that specific level
+                // If there's no height difference, return the wind at that specific level
                 dddff[2] = xLower;
                 dddff[3] = yLower;
                 dddff[1] = Utils.windSpeed(xLower, yLower);
@@ -1180,16 +1180,32 @@ export class Utils {
         const heightUnit = Settings.getValue('heightUnit', 'm');
 
         const coords = Utils.convertCoords(point.lat, point.lng, currentCoordFormat);
-        let tooltipContent = currentCoordFormat === 'MGRS' ? `MGRS: ${coords.lat}` : `Lat: ${coords.lat}<br>Lng: ${coords.lng}`;
+        let tooltipContent = currentCoordFormat === 'MGRS' ?
+            `MGRS: ${coords.lat}` :
+            `Lat: ${coords.lat}<br>Lng: ${coords.lng}`;
 
+        const altitudeReference = Settings.state.userSettings.trackAltitudeReference || 'DIP';
         const elevation = point.ele;
-        let aglHeight = (elevation !== null && groundAltitude !== null) ? (elevation - groundAltitude) : null;
+        let aglHeight = null;
+        let referenceLabel = '';
+
+        if (altitudeReference === 'AGL') {
+            // Für AGL, verwenden wir die pro-Punkt-Geländehöhe
+            if (point.groundEle !== null && elevation !== null) {
+                aglHeight = elevation - point.groundEle;
+                referenceLabel = 'AGL';
+            }
+        } else {
+            // Für DIP, verwenden wir die übergebene DIP-Geländehöhe
+            if (groundAltitude !== null && elevation !== null) {
+                aglHeight = elevation - groundAltitude;
+                referenceLabel = 'above DIP';
+            }
+        }
 
         if (aglHeight !== null) {
-            const effectiveHeightUnit = heightUnit || 'm';
-            aglHeight = Utils.convertHeight(aglHeight, effectiveHeightUnit);
-            aglHeight = Math.round(aglHeight);
-            tooltipContent += `<br>Altitude: ${aglHeight} ${effectiveHeightUnit} AGL`;
+            const displayHeight = Math.round(Utils.convertHeight(aglHeight, heightUnit));
+            tooltipContent += `<br>Altitude: ${displayHeight} ${heightUnit} ${referenceLabel}`;
         } else {
             tooltipContent += `<br>Altitude: N/A`;
         }

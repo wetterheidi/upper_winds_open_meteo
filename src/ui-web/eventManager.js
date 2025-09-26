@@ -942,6 +942,25 @@ function setupDownloadEvents() {
         });
     }
 }
+function setupAltitudeReferenceSelect() {
+    const select = document.getElementById('trackAltitudeReference');
+    if (select) {
+        // Initialen Wert aus den Settings setzen
+        select.value = Settings.state.userSettings.trackAltitudeReference || 'DIP';
+
+        select.addEventListener('change', () => {
+            Settings.state.userSettings.trackAltitudeReference = select.value;
+            Settings.save();
+            console.log(`Track altitude reference changed to: ${select.value}`);
+            
+            // Wenn bereits ein Track geladen ist, diesen neu rendern
+            if (AppState.isTrackLoaded) {
+                // Event auslösen, um ein Neuzeichnen des Tracks anzustoßen
+                document.dispatchEvent(new CustomEvent('ui:rerenderTrack'));
+            }
+        });
+    }
+}
 function setupClearHistoricalDate() {
     const clearButton = document.getElementById('clearHistoricalDate');
     if (clearButton) {
@@ -1287,6 +1306,7 @@ export function initializeEventListeners() {
     setupSelectEvents();
     setupInputEvents();
     setupDownloadEvents();
+    setupAltitudeReferenceSelect();
     setupClearHistoricalDate();
 
     // 4. Spezifische Planner-Funktionen
