@@ -1168,7 +1168,7 @@ function setupInputEvents() {
     setupInput('jumperSeparation', 'change', 300);
 
     setupInput('cutAwayAltitude', 'change', 300);
-    setupInput('terrainClearanceInput', 'change', 300);
+    setupInput('terrainClearance', 'change', 300);
 
     setupInput('historicalDatePicker', 'change', 300);
 }

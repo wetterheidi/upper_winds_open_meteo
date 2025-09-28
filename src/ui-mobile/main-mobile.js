@@ -112,7 +112,7 @@ function initializeUIElements() {
     applySettingToCheckbox('showCanopyAreaCheckbox', Settings.state.userSettings.showCanopyArea);
     applySettingToCheckbox('showExitAreaCheckbox', Settings.state.userSettings.showExitArea);
     applySettingToCheckbox('showCutAwayFinder', Settings.state.userSettings.showCutAwayFinder);
-    applySettingToInput('terrainClearanceInput', Settings.state.userSettings.terrainClearance);
+    applySettingToInput('terrainClearance', Settings.state.userSettings.terrainClearance);
     Settings.state.userSettings.isCustomJumpRunDirection = Settings.state.userSettings.isCustomJumpRunDirection || false;
 
     const customLL = document.getElementById('customLandingDirectionLL');

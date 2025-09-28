@@ -478,8 +478,7 @@ export async function analyzeTerrainClearance() {
     if (!canopyResult || canopyResult.additionalBlueRadii.length === 0) {
         throw new Error("Could not calculate the smallest canopy circle for analysis.");
     }
-
-    // Wir nehmen den LETZTEN Kreis aus der Liste, da dies der niedrigste (und kleinste) ist.
+    
     const smallestCircleIndex = canopyResult.additionalBlueRadii.length - 1;
     const circleRadius = canopyResult.additionalBlueRadii[smallestCircleIndex];
     const baseLat = canopyResult.blueLat;
@@ -490,12 +489,20 @@ export async function analyzeTerrainClearance() {
     const entryAltitudeAGL = canopyResult.additionalBlueUpperLimits[smallestCircleIndex];
     const downwindStartPoint = L.latLng(baseLat, baseLng);
 
+    // NEUES LOG 1: Zeigt die Parameter des zu analysierenden Bereichs an
+    console.log(`--- TERRAIN ANALYSIS STARTED ---
+    - Analyzing Circle Center: ${circleCenter[0].toFixed(4)}, ${circleCenter[1].toFixed(4)}
+    - Circle Radius: ${circleRadius.toFixed(0)}m
+    - Skydiver Entry Altitude: ${entryAltitudeAGL.toFixed(0)}m AGL (${(dipElevation + entryAltitudeAGL).toFixed(0)}m MSL)
+    -----------------------------`);
+
+
     // 3. Ein Raster von Punkten INNERHALB des Kreises erstellen (korrigierte Geometrie)
-    const gridSpacingMeters = 75; // Auflösung etwas verringert, um API-Calls zu schonen
+    const gridSpacingMeters = 75;
     const pointsToCheck = [];
     const centerLatLng = L.latLng(circleCenter);
 
-    const latRadius = circleRadius / 111320; // Grad pro Meter
+    const latRadius = circleRadius / 111320;
     for (let i = -circleRadius; i <= circleRadius; i += gridSpacingMeters) {
         for (let j = -circleRadius; j <= circleRadius; j += gridSpacingMeters) {
             if (i * i + j * j <= circleRadius * circleRadius) {
@@ -505,12 +512,11 @@ export async function analyzeTerrainClearance() {
             }
         }
     }
-
+    
     if (pointsToCheck.length === 0) return [];
 
     // 4. Geländehöhen in Batches abrufen
     const dangerousPoints = [];
-    const requiredClearance = Settings.getValue('terrainClearance', 100);
     const batchSize = 100;
     for (let i = 0; i < pointsToCheck.length; i += batchSize) {
         const batch = pointsToCheck.slice(i, i + batchSize);
@@ -525,16 +531,28 @@ export async function analyzeTerrainClearance() {
             const distanceToPoint = AppState.map.distance(downwindStartPoint, point);
             const timeToReach = distanceToPoint / canopySpeedMps;
             const altitudeLoss = timeToReach * descentRate;
-
-            // Die Höhe des Springers an diesem Punkt ist die Einstiegshöhe minus dem Höhenverlust
+            
             const skydiverMslAltitude = (dipElevation + entryAltitudeAGL) - altitudeLoss;
             const clearance = skydiverMslAltitude - groundEle;
+            
+            // NEUES LOG 2: Detaillierte Berechnung für jeden einzelnen Punkt
+            console.log(`[Point Analysis] Lat: ${point.lat.toFixed(4)}, Lng: ${point.lng.toFixed(4)}
+            - Ground MSL: ${groundEle.toFixed(0)}m
+            - Skydiver MSL (estimated): ${skydiverMslAltitude.toFixed(0)}m
+            - CLEARANCE: ${clearance.toFixed(0)}m`);
 
+            const requiredClearance = Settings.getValue('terrainClearance', 100);
             if (clearance < requiredClearance) {
                 dangerousPoints.push(point);
             }
         }
     }
+
+    // NEUES LOG 3: Fasst das Ergebnis zusammen
+    console.log(`--- TERRAIN ANALYSIS FINISHED ---
+    - Points Analyzed: ${pointsToCheck.length}
+    - Dangerous Points Found: ${dangerousPoints.length}
+    --------------------------------`);
 
     return dangerousPoints;
 }

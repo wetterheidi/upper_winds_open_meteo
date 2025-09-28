@@ -403,6 +403,9 @@ export function drawTerrainWarning(dangerousPoints) {
     // Berechnet die konvexe Hülle, um eine saubere Umrandung zu erhalten
     const hullPoints = Utils.getConvexHull(dangerousPoints.map(p => [p.lat, p.lng]));
 
+    // Den aktuellen Schwellenwert direkt hier aus den Einstellungen holen
+    const requiredClearance = Settings.getValue('terrainClearance', 100);
+
     L.polygon(hullPoints, {
         color: 'red',
         fillColor: '#f03',
@@ -410,7 +413,8 @@ export function drawTerrainWarning(dangerousPoints) {
         weight: 2,
         pmIgnore: true
     }).bindTooltip(
-        "WARNING: Ground clearance in this area may be less than 100m!", 
+        // Den Text dynamisch mit dem Wert aus der neuen Variable erstellen
+        `WARNING: Ground clearance in this area may be less than ${requiredClearance}m!`,
         { sticky: true, className: 'cutaway-tooltip' }
     ).addTo(AppState.terrainWarningLayer);
 }
