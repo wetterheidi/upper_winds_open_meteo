@@ -77,6 +77,7 @@ export const Settings = {
         cutAwayAltitude: 1000,
         cutAwayState: 'Partially',
         terrainWarningLayer: null,
+        terrainAnalysisCache: null,
         terrainClearance: 100,
         trackPosition: false,
         showJumpMasterLine: false,

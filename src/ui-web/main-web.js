@@ -1622,6 +1622,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const { lat, lng, source } = event.detail;
         console.log(`App: Event 'location:selected' empfangen. Quelle: ${source}`);
         mapManager.clearTerrainWarning(); // Alte Terrain-Analyse sofort entfernen
+        AppState.terrainAnalysisCache = null;
 
         const loadingElement = document.getElementById('loading');
         if (loadingElement) loadingElement.style.display = 'block';

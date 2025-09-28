@@ -1751,6 +1751,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const { lat, lng, source } = event.detail;
         console.log(`App: Event 'location:selected' empfangen. Quelle: ${source}, Koordinaten: ${lat}, ${lng}`);
         mapManager.clearTerrainWarning(); // Alte Terrain-Analyse sofort entfernen
+        AppState.terrainAnalysisCache = null;
 
         // Validierung der Koordinaten
         if (!Utils.isValidLatLng(lat, lng)) {
