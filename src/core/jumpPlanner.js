@@ -550,17 +550,20 @@ export async function analyzeTerrainClearance() {
     const requiredClearance = Settings.getValue('terrainClearance', 100);
 
     for (const point of pointsWithGroundEle) {
-        if (point.groundEle === null) continue;
+        // Variable explizit deklarieren, um Minifier zu helfen
+        const groundElevation = point.groundEle;
+
+        if (groundElevation === null) continue;
 
         const distanceToPoint = AppState.map.distance(downwindStartPoint, point);
         const timeToReach = distanceToPoint / canopySpeedMps;
         const altitudeLoss = timeToReach * descentRate;
 
         const skydiverMslAltitude = (dipElevation + entryAltitudeAGL) - altitudeLoss;
-        const clearance = skydiverMslAltitude - point.groundEle;
+        const clearance = skydiverMslAltitude - groundElevation;
 
         console.log(`[Point Analysis] Lat: ${point.lat.toFixed(4)}, Lng: ${point.lng.toFixed(4)}
-            - Ground MSL: ${groundEle.toFixed(0)}m
+            - Ground MSL: ${groundElevation.toFixed(0)}m
             - Skydiver MSL (estimated): ${skydiverMslAltitude.toFixed(0)}m
             - CLEARANCE: ${clearance.toFixed(0)}m`);
 
