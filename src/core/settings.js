@@ -5,7 +5,7 @@
  * für die Verwaltung von freischaltbaren Features.
  */
 
-import { FEATURE_PASSWORD_PLANNER, FEATURE_PASSWORD_DATA } from './config.js';
+import { FEATURE_PASSWORD_PLANNER, FEATURE_PASSWORD_DATA, FEATURE_LOCK_ACTIVE } from './config.js';
 
 let IS_MOBILE_APP = false;
 
@@ -188,6 +188,12 @@ export const Settings = {
      * @returns {boolean} True, wenn das Feature freigeschaltet ist.
      */
     isFeatureUnlocked(feature) {
+        // Wenn der Hauptschalter aus ist, ist alles immer freigeschaltet.
+        if (!FEATURE_LOCK_ACTIVE) {
+            return true;
+        }
+
+        // Der Rest der Funktion wird nur ausgeführt, wenn der Passwortschutz aktiv ist.
         if (feature === 'planner') {
             return this.state.unlockedFeatures.planner;
         }
