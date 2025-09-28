@@ -119,7 +119,11 @@ body {
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     padding: 15px;
+    /* Ersetzt das spezifische padding-top und fügt alle Seiten hinzu */
     padding-top: calc(15px + env(safe-area-inset-top));
+    padding-bottom: calc(15px + env(safe-area-inset-bottom));
+    padding-left: calc(15px + env(safe-area-inset-left));
+    padding-right: calc(15px + env(safe-area-inset-right));
     overflow-y: auto;
     box-sizing: border-box;
 }
@@ -1037,11 +1041,13 @@ input[type="checkbox"][style*="opacity: 1"] {
 }
 
 .leaflet-control-container .leaflet-top {
-    top: 10px;
+    /* Fügt den oberen Sicherheitsabstand hinzu */
+    top: calc(10px + env(safe-area-inset-top));
 }
 
 .leaflet-control-container .leaflet-bottom {
-    bottom: 10px;
+    /* Fügt den unteren Sicherheitsabstand hinzu */
+    bottom: calc(10px + env(safe-area-inset-bottom));
 }
 
 .leaflet-control-coordinates,
