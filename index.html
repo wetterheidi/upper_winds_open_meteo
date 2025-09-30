@@ -19,8 +19,9 @@
     <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js" defer></script>
     <script src="https://unpkg.com/leaflet-rotatedmarker@0.2.0/leaflet.rotatedMarker.js" defer></script>
     <script src="https://unpkg.com/@tmcw/togeojson@4.7.0/dist/togeojson.umd.js" defer></script>
-  <script type="module" crossorigin src="/upper_winds_open_meteo/assets/index-BOz2pUxs.js"></script>
-  <link rel="stylesheet" crossorigin href="/upper_winds_open_meteo/assets/index-BVXgncy6.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+  <script type="module" crossorigin src="/upper_winds_open_meteo/assets/index-DQTov1Gr.js"></script>
+  <link rel="stylesheet" crossorigin href="/upper_winds_open_meteo/assets/index-Cd8MQ03L.css">
 </head>
 
 <body>
@@ -129,6 +130,12 @@
                                 <tbody>
                                 </tbody>
                             </table>
+                        </div>
+                        <div id="windspinne-container">
+                            <canvas id="windspinne-chart"></canvas>
+                        </div>
+                        <div id="windspinne-legend" class="windspinne-legend"></div>
+                        <div id="controls-row">
                         </div>
                     </div>
                 </div>
@@ -314,6 +321,15 @@
                                                 Marker</button>
                                         </li>
                                     </ul>
+                                </li>
+                                <li>
+                                    <div class="settings-grid" style="grid-template-columns: 1fr auto; gap: 10px;">
+                                        <label for="terrainClearance">Min. Clearance (m):</label>
+                                        <input type="number" id="terrainClearance" min="0" max="500" step="10"
+                                            value="100" style="width: 80px;">
+                                    </div>
+                                    <button id="analyzeTerrainButton" class="btn btn-secondary">Analyze Terrain
+                                        Clearance</button>
                                 </li>
                                 <li>
                                     <button id="exportGpxButton" class="btn btn-primary">Export Jump Run as GPX</button>
