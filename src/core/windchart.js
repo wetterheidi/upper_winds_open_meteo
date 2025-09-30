@@ -31,26 +31,28 @@ export function generateWindspinne(interpolatedData, userMaxHoehe) {
     };
 
     const linePolarData = [];
-    for (let h = AppState.lastAltitude; h <= loopMaxHoehe; h += 50) { // Start at ground level
+    for (let h = AppState.lastAltitude; h <= loopMaxHoehe; h += 50) {
         const aglHeight = h - AppState.lastAltitude;
         if (aglHeight >= 0) {
             linePolarData.push({
                 r: aglHeight,
-                t: Utils.linearInterpolate(hoehenVektor, ddd_vec, h),
-                speed: Utils.linearInterpolate(hoehenVektor, ff_vec_mps, h) * 1.94384 // to knots
+                // HIER die Änderung vornehmen:
+                t: Utils.linearInterpolateAngle(hoehenVektor, ddd_vec, h),
+                speed: Utils.linearInterpolate(hoehenVektor, ff_vec_mps, h) * 1.94384
             });
         }
     }
 
     const pointsPolarData = [];
     const pointStep = maxRadius <= 4000 ? 200 : 500;
-    for (let h = AppState.lastAltitude; h <= loopMaxHoehe; h += pointStep) { // Start at ground level
+    for (let h = AppState.lastAltitude; h <= loopMaxHoehe; h += pointStep) {
         const aglHeight = h - AppState.lastAltitude;
         if (aglHeight >= 0) {
             pointsPolarData.push({
                 r: aglHeight,
-                t: Utils.linearInterpolate(hoehenVektor, ddd_vec, h),
-                speed: Utils.linearInterpolate(hoehenVektor, ff_vec_mps, h) * 1.94384 // to knots
+                // UND HIER die Änderung vornehmen:
+                t: Utils.linearInterpolateAngle(hoehenVektor, ddd_vec, h),
+                speed: Utils.linearInterpolate(hoehenVektor, ff_vec_mps, h) * 1.94384
             });
         }
     }

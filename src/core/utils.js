@@ -310,6 +310,62 @@ export class Utils {
     }
 
     /**
+     * Führt eine lineare Interpolation für Winkel durch und wählt dabei den kürzesten Weg. (Für Windspinne)
+     * @param {number[]} xVector - Der Vektor der Stützstellen (z.B. Höhen).
+     * @param {number[]} yVector - Der Vektor der Winkelwerte in Grad.
+     * @param {number} xValue - Der Wert, für den ein Winkel gefunden werden soll.
+     * @returns {number} Der interpolierte Winkel in Grad (0-360).
+     */
+    static linearInterpolateAngle(xVector, yVector, xValue) {
+        if (!xVector?.length || !yVector?.length || xVector.length !== yVector.length) {
+            return NaN;
+        }
+
+        // Stellt sicher, dass der Höhenvektor immer absteigend sortiert ist, um die Logik zu vereinfachen
+        let isReversed = false;
+        if (xVector[0] < xVector[xVector.length - 1]) { // Prüft, ob aufsteigend sortiert
+            xVector = [...xVector].reverse();
+            yVector = [...yVector].reverse();
+            isReversed = true;
+        }
+
+        const len = xVector.length;
+        let i = 0;
+        // Findet das Segment, in das der xValue fällt
+        while (i < len && xVector[i] > xValue) {
+            i++;
+        }
+
+        // Behandelt Extrapolation (wenn xValue außerhalb des Bereichs liegt)
+        if (i === 0) i = 1;
+        else if (i === len) i = len - 1;
+
+        const x0 = xVector[i - 1], x1 = xVector[i];
+        let y0 = yVector[i - 1], y1 = yVector[i];
+
+        // --- Die Kernlogik für die Winkelinterpolation ---
+        let diff = y1 - y0;
+        if (diff > 180) diff -= 360;      // Wähle den kürzeren Weg (z.B. 350° -> 10° ist -20°, nicht +340°)
+        if (diff < -180) diff += 360;     // Wähle den kürzeren Weg in die andere Richtung
+
+        if (x1 - x0 === 0) return y0; // Vermeide Division durch Null
+
+        const factor = (xValue - x0) / (x1 - x0);
+        let result = y0 + factor * diff;
+
+        // Normalisiere das Ergebnis auf den Bereich [0, 360)
+        result = (result + 360) % 360;
+        
+        // Macht die Umkehrung der Vektoren rückgängig, falls sie am Anfang stattgefunden hat
+        if(isReversed){
+            xVector.reverse();
+            yVector.reverse();
+        }
+
+        return result;
+    }
+
+    /**
      * Führt eine gewichtete Interpolation zwischen zwei Punkten durch.
      * @param {number} y1 - Wert am Punkt 1.
      * @param {number} y2 - Wert am Punkt 2.
