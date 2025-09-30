@@ -13,6 +13,7 @@ import * as weatherManager from '../core/weatherManager.js';
 import { UI_DEFAULTS } from '../core/constants.js'; // UI_DEFAULTS für LANDING_PATTERN_MIN_ZOOM
 import * as JumpPlanner from '../core/jumpPlanner.js';
 import { getCoordinateFormat, getHeightUnit, getTemperatureUnit, getWindSpeedUnit } from './main-mobile.js';
+import { generateWindspinne } from '../core/windchart.js';
 
 // ===================================================================
 // 1. Wetter- und Info-Anzeigen
@@ -99,7 +100,7 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
             else if (spdInKt <= 16) windClass = 'wind-high';
             else windClass = 'wind-very-high';
         }
-        
+
         const cloudCover = data.cc;
         let cloudCoverClass = '';
         if (cloudCover !== 'N/A' && Number.isFinite(cloudCover)) {
@@ -156,6 +157,10 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
 
     tableContainer.innerHTML = output; // <-- Nutzt den Parameter
     timeContainer.innerHTML = `Selected Time: ${time}`; // <-- Nutzt den Parameter
+    if (interpolatedData.length > 0) {
+        const userMaxHoehe = parseInt(document.getElementById('upperLimit')?.value) || 3000;
+        generateWindspinne(interpolatedData, userMaxHoehe);
+    }
 }
 
 /**
@@ -269,7 +274,7 @@ export function updateLandingPatternDisplay() {
     const heightUnit = Settings.getValue('heightUnit', 'm');
     const windUnit = Settings.getValue('windUnit', 'kt');
     const baseHeight = Math.round(AppState.lastAltitude);
-    
+
     const interpolatedData = weatherManager.interpolateWeatherData(
         AppState.weatherData, sliderIndex, interpStep, baseHeight, heightUnit
     );
@@ -286,7 +291,7 @@ export function updateLandingPatternDisplay() {
         mapManager.drawLandingPattern(null);
         return;
     }
-    
+
     const { downwindStart, baseStart, finalStart, landingPoint } = patternCoords;
 
     // ================== NEU: Logik für Windpfeile wiederhergestellt ==================
@@ -376,7 +381,7 @@ export function updateJumpRunTrackDisplay() {
         console.log('Conditions not met to show JRT, clearing display.');
         mapManager.drawJumpRunTrack(null); // Sagt dem mapManager, alles zu löschen.
         AppState.lastTrackData = null; // Setzt die gespeicherten Track-Daten zurück.
-        
+
         const directionInput = document.getElementById('jumpRunTrackDirection');
         if (directionInput && !Settings.state.userSettings.customJumpRunDirection) {
             directionInput.value = '';
@@ -396,12 +401,12 @@ export function updateJumpRunTrackDisplay() {
     );
     const harpAnchor = AppState.harpMarker ? AppState.harpMarker.getLatLng() : null;
     const trackData = JumpPlanner.jumpRunTrack(interpolatedData, harpAnchor);
-    
+
     const directionInput = document.getElementById('jumpRunTrackDirection');
 
     if (trackData && trackData.latlngs?.length === 2 && trackData.latlngs.every(ll => Number.isFinite(ll[0]) && Number.isFinite(ll[1]))) {
         console.log('Drawing jump run track with data:', trackData);
-        
+
         if (directionInput && !Settings.state.userSettings.customJumpRunDirection) {
             directionInput.value = trackData.direction;
         }

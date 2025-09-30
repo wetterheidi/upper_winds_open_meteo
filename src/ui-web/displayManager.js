@@ -13,6 +13,7 @@ import * as mapManager from './mapManager.js';
 import * as weatherManager from '../core/weatherManager.js';
 import { UI_DEFAULTS } from '../core/constants.js'; // UI_DEFAULTS für LANDING_PATTERN_MIN_ZOOM
 import * as JumpPlanner from '../core/jumpPlanner.js';
+import { generateWindspinne } from '../core/windchart.js';
 
 // ===================================================================
 // 1. Wetter- und Info-Anzeigen
@@ -152,6 +153,10 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
 
     tableContainer.innerHTML = output; // <-- Nutzt den Parameter
     timeContainer.innerHTML = `Selected Time: ${time}`; // <-- Nutzt den Parameter
+    if (interpolatedData.length > 0) {
+        const userMaxHoehe = parseInt(document.getElementById('upperLimit')?.value) || 3000;
+        generateWindspinne(interpolatedData, userMaxHoehe);
+    }
 }
 
 /**

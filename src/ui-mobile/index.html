@@ -21,6 +21,7 @@
     <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js" defer></script>
     <script src="https://unpkg.com/leaflet-rotatedmarker@0.2.0/leaflet.rotatedMarker.js" defer></script>
     <script src="https://unpkg.com/@tmcw/togeojson@4.7.0/dist/togeojson.umd.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
 </head>
 
 <body>
@@ -107,6 +108,12 @@
                         <tbody>
                         </tbody>
                     </table>
+                </div>
+                <div id="windspinne-container">
+                    <canvas id="windspinne-chart"></canvas>
+                </div>
+                <div id="windspinne-legend" class="windspinne-legend"></div>
+                <div id="controls-row">
                 </div>
             </div>
         </div>
