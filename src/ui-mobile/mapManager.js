@@ -1054,10 +1054,6 @@ function _setupBaseLayersAndHandling() {
             attribution: '© <a href="https://www.openstreetmap.org/copyright">OSM</a>, <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)',
             subdomains: ['a', 'b', 'c']
         }),
-        "Esri Satellite": L.tileLayer.cached('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-            maxZoom: 19,
-            attribution: '© Esri, USDA, USGS'
-        }),
         "Esri Street": L.tileLayer.cached('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
             maxZoom: 19,
             attribution: '© Esri, USGS'
@@ -1066,6 +1062,18 @@ function _setupBaseLayersAndHandling() {
             maxZoom: 19,
             attribution: '© Esri, USGS'
         }),
+        "Esri Satellite": L.layerGroup([
+            // Basiskarte: Satellit
+            L.tileLayer.cached('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                maxZoom: 19,
+            }),
+            // Overlay: Nur Labels und Grenzen von Esri (sehr detailliert)
+            L.tileLayer.cached('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+                maxZoom: 19,
+                attribution: '© EsriEsri, USDA, USGS © OpenStreetMap contributors, and the GIS user community',
+                pane: 'shadowPane' // Sorgt dafür, dass Labels über den Satellitenbildern liegen
+            })
+        ]),
         "Esri Satellite + OSM": L.layerGroup([
             L.tileLayer.cached('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
                 maxZoom: 19,
