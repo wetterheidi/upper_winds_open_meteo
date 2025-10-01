@@ -703,8 +703,10 @@ async function exportComprehensiveReport() {
     for (const i of todayIndices) {
         const displayTime = await Utils.getDisplayTime(time[i], lat, lng, 'Z');
         reportContent += `\n--- ${displayTime} ---\n`;
-        // NEU: Spaltenüberschrift für Cloud Cover (CC) hinzugefügt
-        reportContent += `h(${heightUnit}AGL)\tp(hPa)\tT(${tempUnit})\tDew(${tempUnit})\tDir(°)\tSpd(${windUnit})\tRH(%)\tCC(%)\n`;
+        
+        // NEU: Spaltenüberschriften anpassen für das Padding
+        const hHeader = `h(${heightUnit} AGL)`.padEnd(12);
+        reportContent += `${hHeader}\tp(hPa)\tT(${tempUnit})\tDew(${tempUnit})\tDir(°)\tSpd(${windUnit})\tRH(%)\tCC(%)\n`;
         
         const interpolatedData = weatherManager.interpolateWeatherData(
             AppState.weatherData, i, upperAirSettings.interpStep, Math.round(AppState.lastAltitude), upperAirSettings.heightUnit
@@ -717,15 +719,17 @@ async function exportComprehensiveReport() {
                 const dew = Utils.convertTemperature(data.dew, tempUnit);
                 const spd = Utils.convertWind(data.spd, windUnit, 'km/h');
 
+                // NEU: Höhenwert padden für eine saubere Ausrichtung
+                const heightStr = data.displayHeight.toString().padEnd(12);
+
                 const row = [
-                    data.displayHeight,
+                    heightStr,
                     (typeof data.pressure === 'number' ? data.pressure.toFixed(1) : 'N/A'),
                     (typeof temp === 'number' ? temp.toFixed(1) : 'N/A'),
                     (typeof dew === 'number' ? dew.toFixed(1) : 'N/A'),
                     (typeof data.dir === 'number' ? Math.round(data.dir) : 'N/A'),
                     (typeof spd === 'number' ? spd.toFixed(1) : 'N/A'),
                     (typeof data.rh === 'number' ? Math.round(data.rh) : 'N/A'),
-                    // NEU: Wert für Cloud Cover hinzugefügt
                     (typeof data.cc === 'number' ? Math.round(data.cc) : 'N/A')
                 ];
                 reportContent += row.join('\t') + '\n';
