@@ -19,6 +19,7 @@ import * as displayManager from './displayManager.js';
 import * as liveTrackingManager from '../core/liveTrackingManager.js';
 import * as EnsembleManager from '../core/ensembleManager.js';
 import * as LocationManager from '../core/locationManager.js';
+import { DateTime } from 'luxon';
 
 "use strict";
 
@@ -592,7 +593,7 @@ async function downloadSurfaceDataAsAscii() {
 
     for (let i = 0; i < time.length; i++) {
         const displayTime = await Utils.getDisplayTime(time[i], AppState.lastLat, AppState.lastLng, timeZone);
-        
+
         // NEU: Trennt Datum und Zeit korrekt, behält die Zeitzonen-Abkürzung bei
         const timeParts = displayTime.split(' ');
         const date = timeParts[0];
@@ -603,7 +604,7 @@ async function downloadSurfaceDataAsAscii() {
         const formattedSpeed = (typeof speed === 'number') ? speed.toFixed(0) : 'N/A';
         const formattedGust = (typeof gust === 'number') ? gust.toFixed(0) : 'N/A';
         const windString = `${formattedSpeed} G ${formattedGust}`;
-        
+
         const temp = Utils.convertTemperature(temperature_2m[i], tempUnit);
         const formattedTemp = (typeof temp === 'number') ? temp.toFixed(1) : 'N/A';
 
@@ -613,9 +614,122 @@ async function downloadSurfaceDataAsAscii() {
         // NEU: formatierte Temperatur zur Zeile hinzufügen
         content += `${date}\t${timeStr}\t${wind_direction_10m[i]}\t${windString}\t${visibilityStr}\t${weatherStr}\t${formattedTemp}\n`;
     }
-    
+
     // Die Logik zum Speichern der Datei bleibt unverändert
     const blob = new Blob([content], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+}
+
+/**
+ * Erstellt einen vollständigen, formatierten Wetter-Tagesbericht und löst den Download aus.
+ */
+async function exportComprehensiveReport() {
+    if (!AppState.weatherData || !AppState.lastLat || !AppState.lastLng) {
+        Utils.handleError("No weather data available for the report.");
+        return;
+    }
+
+    // 1. Header-Informationen sammeln
+    const lat = AppState.lastLat;
+    const lng = AppState.lastLng;
+    const model = document.getElementById('modelSelect').value.toUpperCase();
+    const modelRun = AppState.lastModelRun || "N/A";
+    const today = DateTime.utc().toFormat('yyyy-MM-dd');
+    
+    let locationName = "Unknown Location";
+    try {
+        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+        const data = await response.json();
+        locationName = data.display_name || `Lat ${lat.toFixed(4)}, Lon ${lng.toFixed(4)}`;
+    } catch (e) {
+        console.warn("Reverse geocoding failed, using coordinates as location name.");
+        locationName = `Lat ${lat.toFixed(4)}, Lon ${lng.toFixed(4)}`;
+    }
+
+    let reportContent = `DZMaster - WEATHER BRIEFING\n`;
+    reportContent += "============================================================\n";
+    reportContent += `Location:       ${locationName}\n`;
+    reportContent += `Model:          ${model}\n`;
+    reportContent += `Model Run:      ${modelRun}\n`;
+    reportContent += `Forecast Day:   ${today}\n`;
+    reportContent += "============================================================\n\n";
+
+    // 2. Bodendaten-Tabelle erstellen
+    reportContent += "SURFACE DATA (Today)\n";
+    reportContent += "------------------------------------------------------------\n";
+    
+    const { time, wind_direction_10m, wind_speed_10m, wind_gusts_10m, visibility, weather_code, temperature_2m } = AppState.weatherData;
+    const windUnit = getWindSpeedUnit();
+    const tempUnit = getTemperatureUnit();
+    const timeZone = Settings.getValue('timeZone', 'radio', 'Z');
+    const timeHeader = `Time (${timeZone})`;
+
+    reportContent += `Date      \t${timeHeader}\tWind Dir\tWind (${windUnit})\tTemp (${tempUnit})\tVisibility (m)\tWeather\n`;
+
+    const todayIndices = time.map((t, i) => DateTime.fromISO(t).toFormat('yyyy-MM-dd') === today ? i : -1).filter(i => i !== -1);
+
+    for (const i of todayIndices) {
+        const displayTime = await Utils.getDisplayTime(time[i], lat, lng, timeZone);
+        const [date, timeStr] = displayTime.split(' ');
+
+        const speed = Utils.convertWind(wind_speed_10m[i], windUnit, 'km/h');
+        const gust = Utils.convertWind(wind_gusts_10m[i], windUnit, 'km/h');
+        const windString = `${(typeof speed === 'number' ? speed.toFixed(0) : 'N/A')} G ${(typeof gust === 'number' ? gust.toFixed(0) : 'N/A')}`;
+        
+        const temp = Utils.convertTemperature(temperature_2m[i], tempUnit);
+        const formattedTemp = (typeof temp === 'number') ? temp.toFixed(1) : 'N/A'; // KORREKTUR hier
+
+        const visibilityStr = visibility?.[i] ?? 'N/A';
+        const weatherStr = Utils.translateWmoCodeToTaf(weather_code?.[i]);
+
+        reportContent += `${date}\t${timeStr}\t${wind_direction_10m[i]}°\t\t${windString}\t\t${formattedTemp}\t\t${visibilityStr}\t\t${weatherStr}\n`;
+    }
+
+    // 3. Stündliche Höhendaten im HEIDIS-Stil hinzufügen
+    reportContent += "\n\nUPPER AIR DATA (Today, hourly, up to 3000m AGL)\n";
+    reportContent += "============================================================\n";
+    
+    const heidisSettings = { interpStep: 100, heightUnit: 'm', refLevel: 'AGL', temperatureUnit: 'C', windUnit: 'm/s' };
+
+    for (const i of todayIndices) {
+        const displayTime = await Utils.getDisplayTime(time[i], lat, lng, 'Z');
+        reportContent += `\n--- ${displayTime} ---\n`;
+        reportContent += `h(m AGL)\tp(hPa)\tT(°C)\tDew(°C)\tDir(°)\tSpd(m/s)\tRH(%)\n`;
+        
+        const interpolatedData = weatherManager.interpolateWeatherData(
+            AppState.weatherData, i, heidisSettings.interpStep, Math.round(AppState.lastAltitude), heidisSettings.heightUnit
+        );
+
+        // NEU: Filtere die Daten und korrigiere die Formatierung
+        interpolatedData
+            .filter(data => data.displayHeight <= 3000)
+            .forEach(data => {
+                const formattedTemp = (typeof data.temp === 'number') ? data.temp.toFixed(1) : 'N/A';
+                const formattedDew = (typeof data.dew === 'number') ? data.dew.toFixed(1) : 'N/A';
+
+                const row = [
+                    data.displayHeight,
+                    data.pressure,
+                    formattedTemp,
+                    formattedDew,
+                    data.dir,
+                    (typeof data.spd === 'number' ? Utils.convertWind(data.spd, 'm/s', 'km/h').toFixed(1) : 'N/A'),
+                    data.rh
+                ];
+                reportContent += row.join('\t') + '\n';
+            });
+    }
+
+    // 4. Download anstoßen (unverändert)
+    const filename = `DZMaster_Briefing_${today}.txt`;
+    const blob = new Blob([reportContent], { type: 'text/plain' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -1542,10 +1656,10 @@ function setupAppEventListeners() {
 
         const downloadFormat = getDownloadFormat();
         if (downloadFormat === 'SurfaceData') {
-            // Ruft die neue, lokale Funktion für den Bodendaten-Export auf
             downloadSurfaceDataAsAscii();
+        } else if (downloadFormat === 'ComprehensiveReport') { // NEUER FALL
+            exportComprehensiveReport();
         } else {
-            // Ruft die bestehende Funktion für den Profildaten-Export auf
             downloadTableAsAscii(downloadFormat);
         }
     });
