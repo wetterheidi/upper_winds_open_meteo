@@ -592,6 +592,64 @@ export async function downloadTableAsAscii(format) {
 }
 
 /**
+ * Erstellt eine Textdatei mit dem zeitlichen Verlauf der Bodendaten (TAB-getrennt) 
+ * und stößt den Download an.
+ */
+async function downloadSurfaceDataAsAscii() {
+    if (!AppState.weatherData || !AppState.weatherData.time) {
+        Utils.handleError('No weather data available to download.');
+        return;
+    }
+
+    // NEU: temperature_2m aus den Wetterdaten extrahieren
+    const { time, wind_direction_10m, wind_speed_10m, wind_gusts_10m, visibility, weather_code, temperature_2m } = AppState.weatherData;
+    const windUnit = getWindSpeedUnit();
+    const tempUnit = getTemperatureUnit(); // Temperatureinheit abrufen
+    const timeZone = Settings.getValue('timeZone', 'radio', 'Z'); // Holt die aktuelle Zeitzonen-Einstellung
+    const model = document.getElementById('modelSelect').value.toUpperCase();
+    const timeForFilename = Utils.formatTime(time[0]).replace(' ', '_');
+    const filename = `${timeForFilename}_${model}_Surface.txt`;
+
+    const timeHeader = `Time (${timeZone})`;
+    let content = `Date\t${timeHeader}\tWind Dir (°)\tWind Spd/Gust (${windUnit})\tVisibility (m)\tWeather\tTemp (${tempUnit})\n`;
+
+    for (let i = 0; i < time.length; i++) {
+        const displayTime = await Utils.getDisplayTime(time[i], AppState.lastLat, AppState.lastLng, timeZone);
+        
+        // NEU: Trennt Datum und Zeit korrekt, behält die Zeitzonen-Abkürzung bei
+        const timeParts = displayTime.split(' ');
+        const date = timeParts[0];
+        const timeStr = timeParts.length > 1 ? timeParts[1] : ''; // z.B. "1200CEST" oder "1000Z"
+
+        const speed = Utils.convertWind(wind_speed_10m[i], windUnit, 'km/h');
+        const gust = Utils.convertWind(wind_gusts_10m[i], windUnit, 'km/h');
+        const formattedSpeed = (typeof speed === 'number') ? speed.toFixed(0) : 'N/A';
+        const formattedGust = (typeof gust === 'number') ? gust.toFixed(0) : 'N/A';
+        const windString = `${formattedSpeed} G ${formattedGust}`;
+        
+        const temp = Utils.convertTemperature(temperature_2m[i], tempUnit);
+        const formattedTemp = (typeof temp === 'number') ? temp.toFixed(1) : 'N/A';
+
+        const visibilityStr = visibility?.[i] ?? 'N/A';
+        const weatherStr = Utils.translateWmoCodeToTaf(weather_code?.[i]);
+
+        // NEU: formatierte Temperatur zur Zeile hinzufügen
+        content += `${date}\t${timeStr}\t${wind_direction_10m[i]}\t${windString}\t${visibilityStr}\t${weatherStr}\t${formattedTemp}\n`;
+    }
+    
+    // Die Logik zum Speichern der Datei bleibt unverändert
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+}
+
+/**
  * Setzt die manuell eingegebene Richtung für den Jump Run Track zurück
  * und löst bei Bedarf eine Neuzeichnung mit der berechneten Richtung aus.
  * @param {boolean} [triggerUpdate=true] - Wenn true, wird der Track sofort neu gezeichnet.
@@ -1572,7 +1630,13 @@ function setupAppEventListeners() {
 
         // Logik, die vorher im eventManager war:
         const downloadFormat = getDownloadFormat();
-        downloadTableAsAscii(downloadFormat);
+        if (downloadFormat === 'SurfaceData') {
+            // Ruft die neue, lokale Funktion für den Bodendaten-Export auf
+            downloadSurfaceDataAsAscii();
+        } else {
+            // Ruft die bestehende Funktion für den Profildaten-Export auf
+            downloadTableAsAscii(downloadFormat);
+        }
     });
 
     document.addEventListener('ui:clearDateClicked', async () => {
