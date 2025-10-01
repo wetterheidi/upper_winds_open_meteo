@@ -48,6 +48,17 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
         return;
     }
 
+    // START: NEUER CODEBLOCK FÜR KONSOLENAUSGABE
+    const visibility = AppState.weatherData.visibility?.[index];
+    const weatherCode = AppState.weatherData.weather_code?.[index];
+    const significantWeather = Utils.translateWmoCodeToTaf(weatherCode); // Übersetzen
+
+    console.log(`--- Bodenwetter für Index ${index} ---`);
+    console.log(`Sichtweite (Visibility): ${visibility ?? 'N/A'} m`);
+    console.log(`Wetter-Code (WMO 4677): ${weatherCode ?? 'N/A'} (${significantWeather})`);
+    console.log(`---------------------------------`);
+    // ENDE: NEUER CODEBLOCK
+
     AppState.landingWindDir = AppState.weatherData.wind_direction_10m[index] || null;
     console.log('landingWindDir updated to:', AppState.landingWindDir);
 
@@ -193,6 +204,8 @@ export async function refreshMarkerPopup() {
 
     const coordFormat = Settings.getValue('coordFormat', 'radio', 'Decimal');
     const sliderIndex = getSliderValue();
+    const weatherCode = AppState.weatherData.weather_code?.[sliderIndex]; // Wettercode holen
+    const significantWeather = Utils.translateWmoCodeToTaf(weatherCode); // Übersetzen
 
     const coords = Utils.convertCoords(lat, lng, coordFormat);
 
@@ -216,6 +229,10 @@ export async function refreshMarkerPopup() {
             popupContent += ` QFE: ${surfacePressure.toFixed(0)} hPa`;
         } else {
             popupContent += ` QFE: N/A`;
+        }
+        // NEU: Signifikantes Wetter zum Popup hinzufügen, falls relevant
+        if (significantWeather && significantWeather !== 'N/A' && significantWeather !== 'SKC') {
+             popupContent += `<br>Weather: ${significantWeather}`;
         }
     } else {
         popupContent += ` QFE: N/A`;

@@ -355,9 +355,9 @@ export class Utils {
 
         // Normalisiere das Ergebnis auf den Bereich [0, 360)
         result = (result + 360) % 360;
-        
+
         // Macht die Umkehrung der Vektoren rückgängig, falls sie am Anfang stattgefunden hat
-        if(isReversed){
+        if (isReversed) {
             xVector.reverse();
             yVector.reverse();
         }
@@ -542,6 +542,28 @@ export class Utils {
             Utils.handleError('Failed to calculate mean wind: ' + error.message);
             return null;
         }
+    }
+
+    /**
+     * Translates a WMO 4677 weather code into a TAF/METAR significant weather string.
+     * @param {number|string} code - The numeric WMO weather code.
+     * @returns {string} The corresponding TAF/METAR code or a descriptive string.
+     */
+    static translateWmoCodeToTaf(code) {
+        const wmoToTafMap = {
+            0: 'SKC', 1: 'SKC', 2: 'SKC', 3: 'SCT', 
+            45: 'FG', 48: 'FZFG', 
+            51: '-DZ', 53: 'DZ', 55: '+DZ', 56: '-FZDZ', 57: 'FZDZ', 
+            61: '-RA', 63: 'RA', 65: '+RA', 66: '-FZRA', 67: 'FZRA', 
+            71: '-SN', 73: 'SN', 75: '+SN', 77: 'SG', 
+            80: '-SHRA', 81: 'SHRA', 82: '+SHRA', 83: '-SHRASN', 85: '-SHSN', 86: 'SHSN',
+            95: 'TS', 96: 'TSGR', 99: '+TSGR'
+        };
+        const codeNum = parseInt(code, 10);
+        if (isNaN(codeNum)) {
+            return 'N/A';
+        }
+        return wmoToTafMap[codeNum] || 'N/A';
     }
 
     // ===================================================================

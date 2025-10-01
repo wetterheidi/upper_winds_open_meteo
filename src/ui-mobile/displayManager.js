@@ -48,6 +48,16 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
         return;
     }
 
+    // START: NEUER CODEBLOCK FÜR KONSOLENAUSGABE
+    const visibility = AppState.weatherData.visibility?.[index];
+    const weatherCode = AppState.weatherData.weather_code?.[index];
+
+    console.log(`--- Bodenwetter für Index ${index} ---`);
+    console.log(`Sichtweite (Visibility): ${visibility ?? 'N/A'} m`);
+    console.log(`Wetter-Code (WMO 4677): ${weatherCode ?? 'N/A'}`);
+    console.log(`---------------------------------`);
+    // ENDE: NEUER CODEBLOCK
+    
     AppState.landingWindDir = AppState.weatherData.wind_direction_10m[index] || null;
     console.log('landingWindDir updated to:', AppState.landingWindDir);
 
