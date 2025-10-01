@@ -636,13 +636,18 @@ async function exportComprehensiveReport() {
         return;
     }
 
-    // 1. Header-Informationen sammeln
+    // 1. Header-Informationen und allgemeine Einstellungen sammeln
     const lat = AppState.lastLat;
     const lng = AppState.lastLng;
     const model = document.getElementById('modelSelect').value.toUpperCase();
     const modelRun = AppState.lastModelRun || "N/A";
     const today = DateTime.utc().toFormat('yyyy-MM-dd');
     
+    const windUnit = getWindSpeedUnit();
+    const tempUnit = getTemperatureUnit();
+    const heightUnit = getHeightUnit();
+    const timeZone = Settings.getValue('timeZone', 'radio', 'Z');
+
     let locationName = "Unknown Location";
     try {
         const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
@@ -666,12 +671,9 @@ async function exportComprehensiveReport() {
     reportContent += "------------------------------------------------------------\n";
     
     const { time, wind_direction_10m, wind_speed_10m, wind_gusts_10m, visibility, weather_code, temperature_2m } = AppState.weatherData;
-    const windUnit = getWindSpeedUnit();
-    const tempUnit = getTemperatureUnit();
-    const timeZone = Settings.getValue('timeZone', 'radio', 'Z');
-    const timeHeader = `Time (${timeZone})`;
+    const timeHeader = `Time(${timeZone})`;
 
-    reportContent += `Date      \t${timeHeader}\tWind Dir\tWind (${windUnit})\tTemp (${tempUnit})\tVisibility (m)\tWeather\n`;
+    reportContent += `Date      \t${timeHeader}\tDir\t        Spd(${windUnit})\t        Temp(${tempUnit})\t        Vis(m)\t        Weather\n`;
 
     const todayIndices = time.map((t, i) => DateTime.fromISO(t).toFormat('yyyy-MM-dd') === today ? i : -1).filter(i => i !== -1);
 
@@ -684,7 +686,7 @@ async function exportComprehensiveReport() {
         const windString = `${(typeof speed === 'number' ? speed.toFixed(0) : 'N/A')} G ${(typeof gust === 'number' ? gust.toFixed(0) : 'N/A')}`;
         
         const temp = Utils.convertTemperature(temperature_2m[i], tempUnit);
-        const formattedTemp = (typeof temp === 'number') ? temp.toFixed(1) : 'N/A'; // KORREKTUR hier
+        const formattedTemp = (typeof temp === 'number') ? temp.toFixed(1) : 'N/A';
 
         const visibilityStr = visibility?.[i] ?? 'N/A';
         const weatherStr = Utils.translateWmoCodeToTaf(weather_code?.[i]);
@@ -692,36 +694,39 @@ async function exportComprehensiveReport() {
         reportContent += `${date}\t${timeStr}\t${wind_direction_10m[i]}°\t\t${windString}\t\t${formattedTemp}\t\t${visibilityStr}\t\t${weatherStr}\n`;
     }
 
-    // 3. Stündliche Höhendaten im HEIDIS-Stil hinzufügen
-    reportContent += "\n\nUPPER AIR DATA (Today, hourly, up to 3000m AGL)\n";
+    // 3. Stündliche Höhendaten im "Customized"-Format hinzufügen
+    reportContent += `\n\nUPPER AIR DATA (Today, hourly, up to 3000m AGL)\n`;
     reportContent += "============================================================\n";
     
-    const heidisSettings = { interpStep: 100, heightUnit: 'm', refLevel: 'AGL', temperatureUnit: 'C', windUnit: 'm/s' };
+    const upperAirSettings = { interpStep: 100, heightUnit: heightUnit, refLevel: 'AGL' };
 
     for (const i of todayIndices) {
         const displayTime = await Utils.getDisplayTime(time[i], lat, lng, 'Z');
         reportContent += `\n--- ${displayTime} ---\n`;
-        reportContent += `h(m AGL)\tp(hPa)\tT(°C)\tDew(°C)\tDir(°)\tSpd(m/s)\tRH(%)\n`;
+        // NEU: Spaltenüberschrift für Cloud Cover (CC) hinzugefügt
+        reportContent += `h(${heightUnit}AGL)\tp(hPa)\tT(${tempUnit})\tDew(${tempUnit})\tDir(°)\tSpd(${windUnit})\tRH(%)\tCC(%)\n`;
         
         const interpolatedData = weatherManager.interpolateWeatherData(
-            AppState.weatherData, i, heidisSettings.interpStep, Math.round(AppState.lastAltitude), heidisSettings.heightUnit
+            AppState.weatherData, i, upperAirSettings.interpStep, Math.round(AppState.lastAltitude), upperAirSettings.heightUnit
         );
 
-        // NEU: Filtere die Daten und korrigiere die Formatierung
         interpolatedData
-            .filter(data => data.displayHeight <= 3000)
+            .filter(data => data.displayHeight <= (heightUnit === 'ft' ? 9843 : 3000))
             .forEach(data => {
-                const formattedTemp = (typeof data.temp === 'number') ? data.temp.toFixed(1) : 'N/A';
-                const formattedDew = (typeof data.dew === 'number') ? data.dew.toFixed(1) : 'N/A';
+                const temp = Utils.convertTemperature(data.temp, tempUnit);
+                const dew = Utils.convertTemperature(data.dew, tempUnit);
+                const spd = Utils.convertWind(data.spd, windUnit, 'km/h');
 
                 const row = [
                     data.displayHeight,
-                    data.pressure,
-                    formattedTemp,
-                    formattedDew,
-                    data.dir,
-                    (typeof data.spd === 'number' ? Utils.convertWind(data.spd, 'm/s', 'km/h').toFixed(1) : 'N/A'),
-                    data.rh
+                    (typeof data.pressure === 'number' ? data.pressure.toFixed(1) : 'N/A'),
+                    (typeof temp === 'number' ? temp.toFixed(1) : 'N/A'),
+                    (typeof dew === 'number' ? dew.toFixed(1) : 'N/A'),
+                    (typeof data.dir === 'number' ? Math.round(data.dir) : 'N/A'),
+                    (typeof spd === 'number' ? spd.toFixed(1) : 'N/A'),
+                    (typeof data.rh === 'number' ? Math.round(data.rh) : 'N/A'),
+                    // NEU: Wert für Cloud Cover hinzugefügt
+                    (typeof data.cc === 'number' ? Math.round(data.cc) : 'N/A')
                 ];
                 reportContent += row.join('\t') + '\n';
             });
