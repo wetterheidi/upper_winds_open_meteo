@@ -725,6 +725,11 @@ export function handleHarpPlacement(e) {
     }
     Settings.state.userSettings.harpLat = lat;
     Settings.state.userSettings.harpLng = lng;
+
+    Settings.state.userSettings.jumpRunTrackOffset = 0;
+    Settings.state.userSettings.jumpRunTrackForwardOffset = 0;
+    console.log('HARP placed. JRT offsets reset to 0.');
+    
     Settings.save();
     AppState.isPlacingHarp = false;
     AppState.map.off('click', handleHarpPlacement);

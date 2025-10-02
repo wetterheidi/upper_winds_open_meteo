@@ -1415,7 +1415,6 @@ function setupHarpCoordInputEvents() {
         const parsedCoords = LocationManager.parseQueryAsCoordinates(inputValue);
 
         if (parsedCoords) {
-            // ... (der Code zum Platzieren des Markers bleibt hier unverändert)
             if (AppState.harpMarker) {
                 AppState.map.removeLayer(AppState.harpMarker);
             }
@@ -1423,6 +1422,11 @@ function setupHarpCoordInputEvents() {
             AppState.map.panTo([parsedCoords.lat, parsedCoords.lng]);
             Settings.state.userSettings.harpLat = parsedCoords.lat;
             Settings.state.userSettings.harpLng = parsedCoords.lng;
+
+            Settings.state.userSettings.jumpRunTrackOffset = 0;
+            Settings.state.userSettings.jumpRunTrackForwardOffset = 0;
+            console.log('HARP placed via coords. JRT offsets reset to 0.');
+ 
             Settings.save();
             Utils.handleMessage('HARP marker placed successfully.');
             harpRadio.disabled = false;

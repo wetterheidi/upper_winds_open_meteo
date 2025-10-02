@@ -665,7 +665,7 @@ async function exportComprehensiveReportAsHtml() {
     const model = document.getElementById('modelSelect').value.toUpperCase();
     const modelRun = AppState.lastModelRun || "N/A";
     const today = DateTime.utc().toFormat('yyyy-MM-dd');
-    
+
     // Die vom Benutzer gewählten Einheiten und Limits zentral abrufen
     const windUnit = getWindSpeedUnit();
     const tempUnit = getTemperatureUnit();
@@ -745,7 +745,7 @@ async function exportComprehensiveReportAsHtml() {
         const gust = Utils.convertWind(wind_gusts_10m[i], windUnit, 'km/h');
         const windString = `${(typeof speed === 'number' ? speed.toFixed(0) : 'N/A')} G ${(typeof gust === 'number' ? gust.toFixed(0) : 'N/A')}`;
         const temp = Utils.convertTemperature(temperature_2m[i], tempUnit);
-        
+
         html += `<tr>
             <td>${date}</td>
             <td>${timeStr}</td>
@@ -780,7 +780,7 @@ async function exportComprehensiveReportAsHtml() {
                         </tr>
                     </thead>
                     <tbody>`;
-        
+
         const interpolatedData = weatherManager.interpolateWeatherData(
             AppState.weatherData, i, 100, Math.round(AppState.lastAltitude), heightUnit
         );
@@ -1478,9 +1478,18 @@ function setupAppEventListeners() {
     });
 
     document.addEventListener('harp:updated', () => {
-        console.log('[App] HARP has been updated, triggering JRT and JM dashboard recalculation.');
+        console.log('[App] HARP has been updated, resetting offsets and triggering JRT recalculation.');
+
+        // NEU: Setzt die sichtbaren Input-Felder auf 0 zurück.
+        setInputValueSilently('jumpRunTrackOffset', 0);
+        setInputValueSilently('jumpRunTrackForwardOffset', 0);
+
+        // Bestehende Logik zum Neuzeichnen des Tracks und der JM-Linie
         displayManager.updateJumpRunTrackDisplay();
-        updateJumpMasterLineAndPanel();
+        // Die folgende Zeile ist nur in main-mobile.js relevant
+        if (typeof updateJumpMasterLineAndPanel === 'function') {
+            updateJumpMasterLineAndPanel();
+        }
     });
 
     document.addEventListener('ui:sliderChanged', async (e) => {
