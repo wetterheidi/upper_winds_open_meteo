@@ -28,12 +28,12 @@
          <key>NSLocationTemporaryUsageDescriptionDictionary</key>
          <dict>
              <key>LocationForMap</key>
-             <string>Wir benötigen deinen Standort, um die Karte und Wetterdaten an deinem aktuellen Standort anzuzeigen.</string>
+             <string>To show current weather and center the map on your position, your precise location will be used once. For example, tapping the 'Save current location as Favorite' button will safe your actual location as favorite.</string>
          </dict>
          <key>NSLocationWhenInUseUsageDescription</key>
-         <string>Location must be shown on map</string>
+         <string>Your location is used to display the map, fetch local weather forecasts, and calculate jump plans like the landing pattern and exit point. For example, it allows the app to center the map on your position and show relevant weather data.</string>
          <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-         <string>Needed to track skydiving</string>
+         <string>This app uses your location in the background to track and record your entire skydive, even if the app is not on screen. For example, it records your flight path from exit to landing, which you can save and analyze later. This requires 'Always' access to ensure the track is not interrupted.</string>
          <key>UIBackgroundModes</key>
 		 <array>
     		<string>location</string>
