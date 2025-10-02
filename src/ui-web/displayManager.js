@@ -76,18 +76,24 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
     // Pass lat and lng to getDisplayTime
     const timeZone = Settings.getValue('timeZone', 'radio', 'Z');
     const time = await Utils.getDisplayTime(AppState.weatherData.time[index], AppState.lastLat, AppState.lastLng, timeZone);
-    const interpStep = getInterpolationStep(); // Wert in der UI-Schicht holen
+    const interpStep = getInterpolationStep();
     const interpolatedData = weatherManager.interpolateWeatherData(
-        AppState.weatherData, // Das Haupt-Wetterdatenobjekt
+        AppState.weatherData,
         index,
         interpStep,
         Math.round(AppState.lastAltitude),
         heightUnit
-    ); // Und an die Core-Funktion übergeben
+    );
     const surfaceHeight = refLevel === 'AMSL' && AppState.lastAltitude !== 'N/A' ? Math.round(AppState.lastAltitude) : 0;
 
+    // NEU: Das obere Limit aus dem UI-Element auslesen
+    const upperLimit = parseInt(document.getElementById('upperLimit')?.value) || 3000;
+
+    // NEU: Die interpolierten Daten basierend auf dem Limit filtern
+    const filteredData = interpolatedData.filter(data => data.displayHeight <= upperLimit);
+
     // NEU: Zuerst alle Zeilen als HTML-Strings generieren
-    const tableRowsHtml = interpolatedData.map(data => {
+    const tableRowsHtml = filteredData.map(data => {
         // ... (Die gesamte Logik zur Berechnung von windClass, humidityClass, displayHeight, etc. bleibt hier drin) ...
         const spd = parseFloat(data.spd);
         let windClass = '';
