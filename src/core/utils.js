@@ -551,7 +551,7 @@ export class Utils {
      */
     static translateWmoCodeToTaf(code) {
         const wmoToTafMap = {
-            0: 'SKC', 1: 'SKC', 2: 'SKC', 3: 'SCT', 
+            0: 'NSW', 1: 'NSW', 2: 'NSW', 3: 'NSW', 
             45: 'FG', 48: 'FZFG', 
             51: '-DZ', 53: 'DZ', 55: '+DZ', 56: '-FZDZ', 57: 'FZDZ', 
             61: '-RA', 63: 'RA', 65: '+RA', 66: '-FZRA', 67: 'FZRA', 

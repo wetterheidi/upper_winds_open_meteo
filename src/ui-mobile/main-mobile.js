@@ -650,121 +650,169 @@ async function downloadSurfaceDataAsAscii() {
 }
 
 /**
- * Erstellt einen vollständigen, formatierten Wetter-Tagesbericht und löst den Download aus.
+ * Erstellt einen vollständigen, formatierten Wetter-Tagesbericht als HTML-Seite
+ * und öffnet diesen in einem neuen Tab.
  */
-async function exportComprehensiveReport() {
+async function exportComprehensiveReportAsHtml() {
     if (!AppState.weatherData || !AppState.lastLat || !AppState.lastLng) {
         Utils.handleError("No weather data available for the report.");
         return;
     }
 
-    // 1. Header-Informationen und allgemeine Einstellungen sammeln
+    // 1. Daten und Einstellungen sammeln
     const lat = AppState.lastLat;
     const lng = AppState.lastLng;
     const model = document.getElementById('modelSelect').value.toUpperCase();
     const modelRun = AppState.lastModelRun || "N/A";
     const today = DateTime.utc().toFormat('yyyy-MM-dd');
-
+    
+    // Die vom Benutzer gewählten Einheiten und Limits zentral abrufen
     const windUnit = getWindSpeedUnit();
     const tempUnit = getTemperatureUnit();
     const heightUnit = getHeightUnit();
     const timeZone = Settings.getValue('timeZone', 'radio', 'Z');
+    // NEU: Dynamisches oberes Limit aus den Einstellungen lesen
+    const upperAirLimit = Settings.getValue('upperLimit', 'number', 3000);
 
-    let locationName = "Unknown Location";
+    let locationName = `Lat ${lat.toFixed(4)}, Lon ${lng.toFixed(4)}`;
     try {
         const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
         const data = await response.json();
-        locationName = data.display_name || `Lat ${lat.toFixed(4)}, Lon ${lng.toFixed(4)}`;
+        locationName = data.display_name || locationName;
     } catch (e) {
-        console.warn("Reverse geocoding failed, using coordinates as location name.");
-        locationName = `Lat ${lat.toFixed(4)}, Lon ${lng.toFixed(4)}`;
+        console.warn("Reverse geocoding failed, using coordinates.");
     }
 
-    let reportContent = `DZMaster - WEATHER BRIEFING\n`;
-    reportContent += "============================================================\n";
-    reportContent += `Location:       ${locationName}\n`;
-    reportContent += `Model:          ${model}\n`;
-    reportContent += `Model Run:      ${modelRun}\n`;
-    reportContent += `Forecast Day:   ${today}\n`;
-    reportContent += "============================================================\n\n";
+    // 2. HTML-String aufbauen
+    let html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>DZMaster Weather Briefing</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 1000px; margin: 20px auto; padding: 20px; }
+        h1, h2, h3 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 0.9em; }
+        th, td { padding: 8px 12px; border: 1px solid #ddd; text-align: left; }
+        th { background-color: #f2f2f2; font-weight: bold; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        .header-info { background-color: #ecf0f1; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+        .header-info p { margin: 5px 0; }
+        .section { margin-top: 40px; }
+        @media print {
+            body { font-size: 10pt; }
+            .container { margin: 0; padding: 0; max-width: 100%; }
+            h1, h2, h3 { page-break-after: avoid; }
+            table { page-break-inside: auto; }
+            tr { page-break-inside: avoid; page-break-after: auto; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>DZMaster - Weather Briefing</h1>
+    <div class="header-info">
+        <p><strong>Location:</strong> ${locationName}</p>
+        <p><strong>Model:</strong> ${model}</p>
+        <p><strong>Model Run:</strong> ${modelRun}</p>
+        <p><strong>Forecast Day:</strong> ${today}</p>
+    </div>
 
-    // 2. Bodendaten-Tabelle erstellen
-    reportContent += "SURFACE DATA (Today)\n";
-    reportContent += "------------------------------------------------------------\n";
+    <div class="section">
+        <h2>Surface Data (Today)</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Time (${timeZone})</th>
+                    <th>Wind Dir (°)</th>
+                    <th>Wind (${windUnit})</th>
+                    <th>Temp (${tempUnit})</th>
+                    <th>Visibility (m)</th>
+                    <th>Weather</th>
+                </tr>
+            </thead>
+            <tbody>`;
 
     const { time, wind_direction_10m, wind_speed_10m, wind_gusts_10m, visibility, weather_code, temperature_2m } = AppState.weatherData;
-    const timeHeader = `Time(${timeZone})`;
-
-    reportContent += `Date      \t${timeHeader}\tDir\t        Spd(${windUnit})\t        Temp(${tempUnit})\t        Vis(m)\t        Weather\n`;
-
     const todayIndices = time.map((t, i) => DateTime.fromISO(t).toFormat('yyyy-MM-dd') === today ? i : -1).filter(i => i !== -1);
 
     for (const i of todayIndices) {
         const displayTime = await Utils.getDisplayTime(time[i], lat, lng, timeZone);
         const [date, timeStr] = displayTime.split(' ');
-
         const speed = Utils.convertWind(wind_speed_10m[i], windUnit, 'km/h');
         const gust = Utils.convertWind(wind_gusts_10m[i], windUnit, 'km/h');
         const windString = `${(typeof speed === 'number' ? speed.toFixed(0) : 'N/A')} G ${(typeof gust === 'number' ? gust.toFixed(0) : 'N/A')}`;
-
         const temp = Utils.convertTemperature(temperature_2m[i], tempUnit);
-        const formattedTemp = (typeof temp === 'number') ? temp.toFixed(1) : 'N/A';
-
-        const visibilityStr = visibility?.[i] ?? 'N/A';
-        const weatherStr = Utils.translateWmoCodeToTaf(weather_code?.[i]);
-
-        reportContent += `${date}\t${timeStr}\t${wind_direction_10m[i]}°\t\t${windString}\t\t${formattedTemp}\t\t${visibilityStr}\t\t${weatherStr}\n`;
+        
+        html += `<tr>
+            <td>${date}</td>
+            <td>${timeStr}</td>
+            <td>${wind_direction_10m[i]}</td>
+            <td>${windString}</td>
+            <td>${(typeof temp === 'number' ? temp.toFixed(1) : 'N/A')}</td>
+            <td>${visibility?.[i] ?? 'N/A'}</td>
+            <td>${Utils.translateWmoCodeToTaf(weather_code?.[i])}</td>
+        </tr>`;
     }
 
-    // 3. Stündliche Höhendaten im "Customized"-Format hinzufügen
-    reportContent += `\n\nUPPER AIR DATA (Today, hourly, up to 3000m AGL)\n`;
-    reportContent += "============================================================\n";
+    html += `</tbody></table></div>`;
 
-    const upperAirSettings = { interpStep: 100, heightUnit: heightUnit, refLevel: 'AGL' };
+    // NEU: Dynamischer Titel für die Höhendaten
+    html += `<div class="section">
+                <h2>Upper Air Data (Today, hourly, up to ${upperAirLimit}${heightUnit} AGL)</h2>`;
 
     for (const i of todayIndices) {
         const displayTime = await Utils.getDisplayTime(time[i], lat, lng, 'Z');
-        reportContent += `\n--- ${displayTime} ---\n`;
-        // NEU: Spaltenüberschrift für Cloud Cover (CC) hinzugefügt
-        reportContent += `h(${heightUnit}AGL)\tp(hPa)\tT(${tempUnit})\tDew(${tempUnit})\tDir(°)\tSpd(${windUnit})\tRH(%)\tCC(%)\n`;
-
+        html += `<h3>${displayTime}</h3>
+                 <table>
+                    <thead>
+                        <tr>
+                            <th>h(${heightUnit} AGL)</th>
+                            <th>p(hPa)</th>
+                            <th>T(${tempUnit})</th>
+                            <th>Dew(${tempUnit})</th>
+                            <th>Dir(°)</th>
+                            <th>Spd(${windUnit})</th>
+                            <th>RH(%)</th>
+                            <th>Clouds(%)</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+        
         const interpolatedData = weatherManager.interpolateWeatherData(
-            AppState.weatherData, i, upperAirSettings.interpStep, Math.round(AppState.lastAltitude), upperAirSettings.heightUnit
+            AppState.weatherData, i, 100, Math.round(AppState.lastAltitude), heightUnit
         );
 
+        // NEU: Filter verwendet jetzt das dynamische Limit
         interpolatedData
-            .filter(data => data.displayHeight <= (heightUnit === 'ft' ? 9843 : 3000))
+            .filter(data => data.displayHeight <= upperAirLimit)
             .forEach(data => {
                 const temp = Utils.convertTemperature(data.temp, tempUnit);
                 const dew = Utils.convertTemperature(data.dew, tempUnit);
                 const spd = Utils.convertWind(data.spd, windUnit, 'km/h');
-
-                const row = [
-                    data.displayHeight,
-                    (typeof data.pressure === 'number' ? data.pressure.toFixed(1) : 'N/A'),
-                    (typeof temp === 'number' ? temp.toFixed(1) : 'N/A'),
-                    (typeof dew === 'number' ? dew.toFixed(1) : 'N/A'),
-                    (typeof data.dir === 'number' ? Math.round(data.dir) : 'N/A'),
-                    (typeof spd === 'number' ? spd.toFixed(1) : 'N/A'),
-                    (typeof data.rh === 'number' ? Math.round(data.rh) : 'N/A'),
-                    // NEU: Wert für Cloud Cover hinzugefügt
-                    (typeof data.cc === 'number' ? Math.round(data.cc) : 'N/A')
-                ];
-                reportContent += row.join('\t') + '\n';
+                html += `<tr>
+                    <td>${data.displayHeight}</td>
+                    <td>${(typeof data.pressure === 'number' ? data.pressure.toFixed(1) : 'N/A')}</td>
+                    <td>${(typeof temp === 'number' ? temp.toFixed(1) : 'N/A')}</td>
+                    <td>${(typeof dew === 'number' ? dew.toFixed(1) : 'N/A')}</td>
+                    <td>${(typeof data.dir === 'number' ? Math.round(data.dir) : 'N/A')}</td>
+                    <td>${(typeof spd === 'number' ? spd.toFixed(1) : 'N/A')}</td>
+                    <td>${(typeof data.rh === 'number' ? Math.round(data.rh) : 'N/A')}</td>
+                    <td>${(typeof data.cc === 'number' ? Math.round(data.cc) : 'N/A')}</td>
+                </tr>`;
             });
+        html += `</tbody></table>`;
     }
 
-    // 4. Download anstoßen (unverändert)
-    const filename = `DZMaster_Briefing_${today}.txt`;
-    const blob = new Blob([reportContent], { type: 'text/plain' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    html += `</div></div></body></html>`;
+
+    // 3. HTML in neuem Tab öffnen
+    const newTab = window.open();
+    newTab.document.open();
+    newTab.document.write(html);
+    newTab.document.close();
 }
 
 /**
@@ -1751,7 +1799,7 @@ function setupAppEventListeners() {
         if (downloadFormat === 'SurfaceData') {
             downloadSurfaceDataAsAscii();
         } else if (downloadFormat === 'ComprehensiveReport') { // NEUER FALL
-            exportComprehensiveReport();
+            exportComprehensiveReportAsHtml();
         } else {
             downloadTableAsAscii(downloadFormat);
         }
