@@ -20,8 +20,8 @@
     <script src="https://unpkg.com/leaflet-rotatedmarker@0.2.0/leaflet.rotatedMarker.js" defer></script>
     <script src="https://unpkg.com/@tmcw/togeojson@4.7.0/dist/togeojson.umd.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
-  <script type="module" crossorigin src="/upper_winds_open_meteo/assets/index-p0fQIEJP.js"></script>
-  <link rel="stylesheet" crossorigin href="/upper_winds_open_meteo/assets/index-Cd8MQ03L.css">
+  <script type="module" crossorigin src="/upper_winds_open_meteo/assets/index-BT8EKaYt.js"></script>
+  <link rel="stylesheet" crossorigin href="/upper_winds_open_meteo/assets/index-Qws2I6_i.css">
 </head>
 
 <body>
@@ -46,7 +46,10 @@
                             <input type="checkbox" id="autoupdateCheckbox">
                         </div>
                     </div>
-                    <input type="range" id="timeSlider" min="0" max="167" value="0" disabled>
+                    <div class="slider-wrapper">
+                        <input type="range" id="timeSlider" min="0" max="167" value="0" disabled>
+                        <div id="slider-labels"></div>
+                    </div>
                     <div id="model-row">
                         <label id="modelLabel" for="modelSelect" title="Model Run">Forecast Model:</label>
                         <select id="modelSelect">
