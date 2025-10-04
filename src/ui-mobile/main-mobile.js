@@ -853,6 +853,8 @@ export function resetJumpRunDirection(triggerUpdate = true) {
  */
 export async function updateUIWithNewWeatherData(newWeatherData, preservedIndex = null) {
     AppState.weatherData = newWeatherData;
+    AppState.cloudThresholds = weatherManager.analyzeCloudLayers(newWeatherData);
+
     const slider = document.getElementById('timeSlider');
 
     if (!slider) return;

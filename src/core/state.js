@@ -37,6 +37,7 @@ export const AppState = {
     // Wetter & Zeit
     // ===================================================================
     weatherData: null,              // @type {object|null} - Das 'hourly' Objekt aus der Open-Meteo API-Antwort.
+    cloudThresholds: [],            // @type {object[]} - NEU: Speichert die berechneten RH-Schwellenwerte für jede Stunde.
     lastModelRun: null,             // @type {string|null} - Zeitstempel des letzten Wettermodell-Laufs.
     landingWindDir: null,           // @type {number|null} - Windrichtung in 10m Höhe für das Landemuster.
     autoupdateInterval: null,       // @type {number|null} - Die ID des Intervall-Timers für das Auto-Update.
@@ -71,7 +72,7 @@ export const AppState = {
     recordedTrackLayer: null,          // @type {L.Polyline|null} - Der Layer für den live aufgezeichneten Track.
     autoRecordingStartTime: null,      // @type {number|null} - Zeitstempel des Starts der Auto-Aufzeichnung.
     altitudeCorrectionOffset: 0,       // @type {number} - Korrekturwert zur Anpassung der Gerätehöhe an die Geländehöhe.
-    
+
     // --- Zwischenspeicher für Berechnungen ---
     prevTime: null,                    // @type {number|null} - Zeitstempel der letzten Position.
     prevLat: null,                     // @type {number|null} - Letzte Breite für Geschwindigkeitsberechnung.
@@ -86,7 +87,7 @@ export const AppState = {
     lastDirection: 'N/A',              // @type {number|string} - Geglättete Richtung in Grad.
     lastTerrainAltitude: 'N/A',        // @type {number|string} - *HINWEIS: Wird von `lastAltitude` abgedeckt, könnte redundant sein.*
     lastEffectiveWindUnit: 'kt',       // @type {string} - *HINWEIS: Gehört eher in `Settings`, da es eine Benutzereinstellung ist.*
-    
+
     // ===================================================================
     // Geladene Tracks & POIs (GPX, KML, CSV)
     // ===================================================================

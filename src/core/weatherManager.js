@@ -16,6 +16,60 @@ import { DateTime } from 'luxon';
 // ===================================================================
 
 /**
+ * Analysiert die Roh-Wetterdaten, um für jeden Zeitpunkt dynamische
+ * Feuchtigkeitsschwellenwerte für die Wolkenerkennung zu bestimmen.
+ * @param {object} weatherData - Das 'hourly' Objekt aus der API-Antwort.
+ * @returns {object[]} Ein Array von Schwellenwert-Objekten für jeden Zeitpunkt.
+ */
+export function analyzeCloudLayers(weatherData) {
+    if (!weatherData || !weatherData.time || weatherData.time.length === 0) {
+        return [];
+    }
+
+    const thresholds = [];
+    const pressureLevels = [1000, 950, 925, 900, 850, 800, 700, 600, 500, 400, 300, 250, 200];
+
+    for (let i = 0; i < weatherData.time.length; i++) {
+        const groundTemp = weatherData.temperature_2m[i];
+        let stockwerke = { low: [], mid: [], high: [] };
+
+        // 1. Druckstufen den Stockwerken zuordnen
+        for (const p of pressureLevels) {
+            const temp = weatherData[`temperature_${p}hPa`]?.[i];
+            const height = weatherData[`geopotential_height_${p}hPa`]?.[i];
+
+            if (temp === null || height === null || temp === undefined || height === undefined) continue;
+
+            if (groundTemp <= 0) { // Sonderfall Kaltluft
+                if (height <= 2000) stockwerke.low.push(p);
+                else if (temp > -30) stockwerke.mid.push(p);
+                else stockwerke.high.push(p);
+            } else { // Normalfall
+                if (temp > 0) stockwerke.low.push(p);
+                else if (temp > -30) stockwerke.mid.push(p);
+                else stockwerke.high.push(p);
+            }
+        }
+
+        // 2. maxCC und RH-Schwelle pro Stockwerk berechnen
+        const getThreshold = (pLevels, defaultHigh, defaultLow) => {
+            if (pLevels.length === 0) return 95; // Konservativer Fallback
+            const maxCC = Math.max(...pLevels.map(p => weatherData[`cloud_cover_${p}hPa`]?.[i] || 0));
+            return maxCC > 50 ? defaultHigh : defaultLow;
+        };
+        
+        thresholds.push({
+            low: getThreshold(stockwerke.low, 85, 75),
+            mid: getThreshold(stockwerke.mid, 80, 70),
+            high: 65 // Fester Wert für hohe Wolken
+        });
+    }
+
+    console.log('[WeatherManager] Cloud layer thresholds analyzed for all timesteps.');
+    return thresholds;
+}
+
+/**
  * Zentraler Einstiegspunkt zum Abrufen von Wetterdaten für einen Standort.
  * Orchestriert die Prüfung verfügbarer Modelle und den eigentlichen Datenabruf.
  * @param {number} lat - Die geographische Breite des Standorts.
@@ -52,6 +106,25 @@ export function interpolateWeatherData(weatherData, sliderIndex, interpStep, bas
         console.warn('No weather data provided or index out of bounds for interpolation');
         return [];
     }
+
+    // ===================================================================
+    // ==== NEUER BLOCK 1: Schwellenwerte abrufen (Löst den Fehler) ====
+    // ===================================================================
+    // Hol dir die vorberechneten Schwellenwerte für den aktuellen Zeitpunkt.
+    // Dieser Block muss am Anfang der Funktion stehen.
+    const currentThresholds = AppState.cloudThresholds[sliderIndex];
+    if (!currentThresholds) {
+        console.warn('No pre-analyzed cloud thresholds for this index. Performing on-the-fly analysis.');
+        // Fallback: Analyse durchführen, falls sie aus irgendeinem Grund fehlt.
+        AppState.cloudThresholds = analyzeCloudLayers(weatherData);
+        if (!AppState.cloudThresholds[sliderIndex]) {
+            console.error('Cloud threshold analysis failed. Cannot interpolate weather data.');
+            return [];
+        }
+    }
+    // ===================================================================
+    // ==== ENDE NEUER BLOCK 1                                         ====
+    // ===================================================================
 
     const allPressureLevels = STANDARD_PRESSURE_LEVELS;
 
@@ -198,9 +271,90 @@ export function interpolateWeatherData(weatherData, sliderIndex, interpStep, bas
             };
         }
 
+        // ===================================================================
+        // ==== NEUER BLOCK 2: Wolkenbedeckung basierend auf RH filtern ====
+        // ===================================================================
+        if (Number.isFinite(dataPoint.temp) && Number.isFinite(dataPoint.rh)) {
+            const temp = dataPoint.temp;
+            const rh = dataPoint.rh;
+            let rhThreshold;
+
+            const groundTemp = weatherData.temperature_2m[sliderIndex];
+            
+            // Bestimme das Stockwerk und den passenden Schwellenwert
+            if (groundTemp <= 0) { // Sonderfall Kaltluft
+                if (heightAGLInMeters <= 2000) {
+                    rhThreshold = currentThresholds.low;
+                } else if (temp > -30) {
+                    rhThreshold = currentThresholds.mid;
+                } else {
+                    rhThreshold = currentThresholds.high;
+                }
+            } else { // Normalfall
+                if (temp > 0) {
+                    rhThreshold = currentThresholds.low;
+                } else if (temp > -30) {
+                    rhThreshold = currentThresholds.mid;
+                } else {
+                    rhThreshold = currentThresholds.high;
+                }
+            }
+
+            // Finale Entscheidung: Wolke ja oder nein?
+            if (rh < rhThreshold) {
+                dataPoint.cc = 0; // Setze Bedeckung auf 0, wenn die Luft zu trocken ist.
+            }
+        }
+        // =================================================================
+        // ==== ENDE NEUER BLOCK 2                                         ====
+        // =================================================================
+
         dataPoint.displayHeight = height;
         interpolatedData.push(dataPoint);
     });
+
+ // =================================================================================
+    // ==== FINALE LOGIK START: Scharfe Wolkenbasis mit "Nearest Neighbor"          ====
+    // =================================================================================
+    let cloudBaseIndex = -1;
+    const SIGNIFICANT_CLOUD_THRESHOLD = 50; // BKN
+
+    // 1. Finde die erste signifikante Wolkenbasis von unten
+    for (let i = 0; i < interpolatedData.length; i++) {
+        if (interpolatedData[i].cc >= SIGNIFICANT_CLOUD_THRESHOLD) {
+            cloudBaseIndex = i;
+            break;
+        }
+    }
+
+    // 2. Wenn eine BKN/OVC-Basis gefunden wurde, bereinige alles darunter
+    if (cloudBaseIndex > 0) {
+        for (let i = 0; i < cloudBaseIndex; i++) {
+            const currentHeight = interpolatedData[i].height;
+            
+            // Finde den Index des nächstgelegenen realen Datenpunktes aus den Rohdaten
+            let closestPressureLevelIndex = -1;
+            let minDistance = Infinity;
+
+            ccHeightData.forEach((h, index) => {
+                const distance = Math.abs(currentHeight - h);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    closestPressureLevelIndex = index;
+                }
+            });
+
+            // Setze den cc-Wert auf den des nächstgelegenen Nachbarn, wenn einer gefunden wurde
+            if (closestPressureLevelIndex !== -1) {
+                interpolatedData[i].cc = ccValueData[closestPressureLevelIndex];
+            } else {
+                 interpolatedData[i].cc = 0; // Fallback, falls etwas schiefgeht
+            }
+        }
+    }
+    // =================================================================================
+    // ==== FINALE LOGIK ENDE                                                         ====
+    // =================================================================================
 
     console.log(`[DEBUG] interpolateWeatherData finished. baseHeight: ${baseHeight}, Returning ${interpolatedData.length} data points. First point:`, interpolatedData[0]);
     return interpolatedData;
@@ -278,7 +432,7 @@ async function fetchWeather(lat, lon, currentTime = null) {
             endDateStr = forecastStart.plus({ days: forecastDays }).toFormat('yyyy-MM-dd');
         }
 
-        const hourlyParams = "surface_pressure,temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,visibility,weather_code,temperature_1000hPa,relative_humidity_1000hPa,wind_speed_1000hPa,wind_direction_1000hPa,geopotential_height_1000hPa,cloud_cover_1000hPa,temperature_950hPa,relative_humidity_950hPa,wind_speed_950hPa,wind_direction_950hPa,geopotential_height_950hPa,cloud_cover_950hPa,temperature_925hPa,relative_humidity_925hPa,wind_speed_925hPa,wind_direction_925hPa,geopotential_height_925hPa,cloud_cover_925hPa,temperature_900hPa,relative_humidity_900hPa,wind_speed_900hPa,wind_direction_900hPa,geopotential_height_900hPa,cloud_cover_900hPa,temperature_850hPa,relative_humidity_850hPa,wind_speed_850hPa,wind_direction_850hPa,geopotential_height_850hPa,cloud_cover_850hPa,temperature_800hPa,relative_humidity_800hPa,wind_speed_800hPa,wind_direction_800hPa,geopotential_height_800hPa,cloud_cover_800hPa,temperature_700hPa,relative_humidity_700hPa,wind_speed_700hPa,wind_direction_700hPa,geopotential_height_700hPa,cloud_cover_700hPa,temperature_600hPa,relative_humidity_600hPa,wind_speed_600hPa,wind_direction_600hPa,geopotential_height_600hPa,cloud_cover_600hPa,temperature_500hPa,relative_humidity_500hPa,wind_speed_500hPa,wind_direction_500hPa,geopotential_height_500hPa,cloud_cover_500hPa,temperature_400hPa,relative_humidity_400hPa,wind_speed_400hPa,wind_direction_400hPa,geopotential_height_400hPa,cloud_cover_400hPa,temperature_300hPa,relative_humidity_300hPa,wind_speed_300hPa,wind_direction_300hPa,geopotential_height_300hPa,cloud_cover_300hPa,temperature_250hPa,relative_humidity_250hPa,wind_speed_250hPa,wind_direction_250hPa,geopotential_height_250hPa,cloud_cover_250hPa,temperature_200hPa,relative_humidity_200hPa,wind_speed_200hPa,wind_direction_200hPa,geopotential_height_200hPa,cloud_cover_200hPa";
+        const hourlyParams = "surface_pressure,temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,visibility,weather_code,cloud_cover_low,cloud_cover_mid,cloud_cover_high,temperature_1000hPa,relative_humidity_1000hPa,wind_speed_1000hPa,wind_direction_1000hPa,geopotential_height_1000hPa,cloud_cover_1000hPa,temperature_950hPa,relative_humidity_950hPa,wind_speed_950hPa,wind_direction_950hPa,geopotential_height_950hPa,cloud_cover_950hPa,temperature_925hPa,relative_humidity_925hPa,wind_speed_925hPa,wind_direction_925hPa,geopotential_height_925hPa,cloud_cover_925hPa,temperature_900hPa,relative_humidity_900hPa,wind_speed_900hPa,wind_direction_900hPa,geopotential_height_900hPa,cloud_cover_900hPa,temperature_850hPa,relative_humidity_850hPa,wind_speed_850hPa,wind_direction_850hPa,geopotential_height_850hPa,cloud_cover_850hPa,temperature_800hPa,relative_humidity_800hPa,wind_speed_800hPa,wind_direction_800hPa,geopotential_height_800hPa,cloud_cover_800hPa,temperature_700hPa,relative_humidity_700hPa,wind_speed_700hPa,wind_direction_700hPa,geopotential_height_700hPa,cloud_cover_700hPa,temperature_600hPa,relative_humidity_600hPa,wind_speed_600hPa,wind_direction_600hPa,geopotential_height_600hPa,cloud_cover_600hPa,temperature_500hPa,relative_humidity_500hPa,wind_speed_500hPa,wind_direction_500hPa,geopotential_height_500hPa,cloud_cover_500hPa,temperature_400hPa,relative_humidity_400hPa,wind_speed_400hPa,wind_direction_400hPa,geopotential_height_400hPa,cloud_cover_400hPa,temperature_300hPa,relative_humidity_300hPa,wind_speed_300hPa,wind_direction_300hPa,geopotential_height_300hPa,cloud_cover_300hPa,temperature_250hPa,relative_humidity_250hPa,wind_speed_250hPa,wind_direction_250hPa,geopotential_height_250hPa,cloud_cover_250hPa,temperature_200hPa,relative_humidity_200hPa,wind_speed_200hPa,wind_direction_200hPa,geopotential_height_200hPa,cloud_cover_200hPa";
         const url = `${baseUrl}?latitude=${lat}&longitude=${lon}&hourly=${hourlyParams}&models=${selectedModelValue}&start_date=${startDateStr}&end_date=${endDateStr}`;
         const response = await fetch(url);
         if (!response.ok) {
