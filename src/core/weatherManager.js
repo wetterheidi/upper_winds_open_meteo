@@ -242,7 +242,7 @@ export function interpolateWeatherData(weatherData, sliderIndex, interpStep, bas
             });
             cc = ccValueData[closestPressureLevelIndex]; // Weise den Wert zu
         }
-        
+
         if (heightAGLInMeters === 0) {
             const lowestAltitudePressureLevel = Math.max(...validPressureLevels);
             const surfaceCloudCover = weatherData[`cloud_cover_${lowestAltitudePressureLevel}hPa`]?.[sliderIndex] ?? 'N/A';
@@ -278,9 +278,6 @@ export function interpolateWeatherData(weatherData, sliderIndex, interpStep, bas
             };
         }
 
-        // ===================================================================
-        // ==== NEUER BLOCK 2: Wolkenbedeckung basierend auf RH filtern ====
-        // ===================================================================
         if (Number.isFinite(dataPoint.temp) && Number.isFinite(dataPoint.rh)) {
             const temp = dataPoint.temp;
             const rh = dataPoint.rh;
@@ -312,56 +309,10 @@ export function interpolateWeatherData(weatherData, sliderIndex, interpStep, bas
                 dataPoint.cc = 0; // Setze Bedeckung auf 0, wenn die Luft zu trocken ist.
             }
         }
-        // =================================================================
-        // ==== ENDE NEUER BLOCK 2                                         ====
-        // =================================================================
 
         dataPoint.displayHeight = height;
         interpolatedData.push(dataPoint);
     });
-
- // =================================================================================
-    // ==== FINALE LOGIK START: Scharfe Wolkenbasis mit "Nearest Neighbor"          ====
-    // =================================================================================
-    let cloudBaseIndex = -1;
-    const SIGNIFICANT_CLOUD_THRESHOLD = 50; // BKN
-
-    // 1. Finde die erste signifikante Wolkenbasis von unten
-    for (let i = 0; i < interpolatedData.length; i++) {
-        if (interpolatedData[i].cc >= SIGNIFICANT_CLOUD_THRESHOLD) {
-            cloudBaseIndex = i;
-            break;
-        }
-    }
-
-    // 2. Wenn eine BKN/OVC-Basis gefunden wurde, bereinige alles darunter
-    if (cloudBaseIndex > 0) {
-        for (let i = 0; i < cloudBaseIndex; i++) {
-            const currentHeight = interpolatedData[i].height;
-            
-            // Finde den Index des nächstgelegenen realen Datenpunktes aus den Rohdaten
-            let closestPressureLevelIndex = -1;
-            let minDistance = Infinity;
-
-            ccHeightData.forEach((h, index) => {
-                const distance = Math.abs(currentHeight - h);
-                if (distance < minDistance) {
-                    minDistance = distance;
-                    closestPressureLevelIndex = index;
-                }
-            });
-
-            // Setze den cc-Wert auf den des nächstgelegenen Nachbarn, wenn einer gefunden wurde
-            if (closestPressureLevelIndex !== -1) {
-                interpolatedData[i].cc = ccValueData[closestPressureLevelIndex];
-            } else {
-                 interpolatedData[i].cc = 0; // Fallback, falls etwas schiefgeht
-            }
-        }
-    }
-    // =================================================================================
-    // ==== FINALE LOGIK ENDE                                                         ====
-    // =================================================================================
 
     console.log(`[DEBUG] interpolateWeatherData finished. baseHeight: ${baseHeight}, Returning ${interpolatedData.length} data points. First point:`, interpolatedData[0]);
     return interpolatedData;
