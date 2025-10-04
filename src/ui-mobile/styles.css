@@ -404,6 +404,32 @@ input[type="checkbox"][style*="opacity: 1"] {
     margin-bottom: 5px;
 }
 
+.slider-wrapper {
+    position: relative;
+    width: 100%;
+    margin-top: 5px;
+    /* Etwas Platz für die Labels unter dem Slider schaffen */
+    margin-bottom: 20px; 
+}
+
+#slider-labels {
+    position: absolute;
+    top: 15px; /* Positioniert die Labels unterhalb des Slider-Griffs */
+    left: 0;
+    right: 0;
+    height: 20px;
+    pointer-events: none; /* Stellt sicher, dass die Labels nicht die Bedienung des Sliders stören */
+}
+
+.slider-label {
+    position: absolute;
+    top: 0;
+    transform: translateX(-50%); /* Zentriert das Label exakt über der Markierung */
+    font-size: 10px;
+    color: #555;
+    white-space: nowrap; /* Verhindert Zeilenumbrüche */
+}
+
 #timeSlider {
     -webkit-appearance: none;
     appearance: none;

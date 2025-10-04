@@ -38,7 +38,10 @@
                     <input type="checkbox" id="autoupdateCheckbox">
                 </div>
             </div>
-            <input type="range" id="timeSlider" min="0" max="167" value="0" disabled>
+            <div class="slider-wrapper">
+                <input type="range" id="timeSlider" min="0" max="167" value="0" disabled>
+                <div id="slider-labels"></div>
+            </div>
             <div id="model-row">
                 <label id="modelLabel" for="modelSelect" title="Model Run">Forecast Model:</label>
                 <select id="modelSelect">
@@ -615,8 +618,8 @@
                             <option value="ATAK">ATAK</option>
                             <option value="Windwatch">Windwatch</option>
                             <option value="Customized">Customized</option>
-                            <option value="SurfaceData">Surface Data</option> 
-                            <option value="ComprehensiveReport">Weather Briefing</option> 
+                            <option value="SurfaceData">Surface Data</option>
+                            <option value="ComprehensiveReport">Weather Briefing</option>
                         </select>
                         <button id="downloadButton" class="btn btn-primary">Download Table</button>
                     </div>

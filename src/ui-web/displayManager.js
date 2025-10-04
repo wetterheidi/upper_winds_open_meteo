@@ -14,6 +14,7 @@ import * as weatherManager from '../core/weatherManager.js';
 import { UI_DEFAULTS } from '../core/constants.js'; // UI_DEFAULTS für LANDING_PATTERN_MIN_ZOOM
 import * as JumpPlanner from '../core/jumpPlanner.js';
 import { generateWindspinne } from '../core/windchart.js';
+import { DateTime } from 'luxon';
 
 // ===================================================================
 // 1. Wetter- und Info-Anzeigen
@@ -262,6 +263,79 @@ export function updateModelInfoPopup() {
 
     // Ersetzt Zeilenumbrüche durch <br> für die HTML-Anzeige
     modelInfoPopup.innerHTML = titleContent.replace(/\\n/g, '<br>');
+}
+
+/**
+ * Erstellt und positioniert Datums-Labels unterhalb des Time-Sliders.
+ * Die Funktion erkennt den Tageswechsel intelligent basierend auf der
+ * ausgewählten Zeitzone und positioniert die Rand-Labels korrekt.
+ */
+export async function updateSliderLabels() {
+    const slider = document.getElementById('timeSlider');
+    const labelsContainer = document.getElementById('slider-labels');
+    if (!slider || !labelsContainer || !AppState.weatherData || !AppState.weatherData.time) {
+        if (labelsContainer) labelsContainer.innerHTML = '';
+        return;
+    }
+
+    labelsContainer.innerHTML = '';
+    const timeArray = AppState.weatherData.time;
+    const totalSteps = parseInt(slider.max, 10);
+    if (totalSteps <= 0) return;
+
+    const timeZoneSetting = Settings.getValue('timeZone', 'radio', 'Z');
+    let locationTimezone = 'utc';
+    if (timeZoneSetting === 'loc' && AppState.lastLat) {
+        const locData = await Utils.getLocationData(AppState.lastLat, AppState.lastLng);
+        locationTimezone = locData.timezone || 'utc';
+    }
+
+    let lastDay = null;
+
+    for (let index = 0; index < timeArray.length; index++) {
+        const timeStr = timeArray[index];
+        const dt = DateTime.fromISO(timeStr, { zone: 'utc' }).setZone(locationTimezone);
+        const currentDay = dt.day;
+
+        if (currentDay !== lastDay) {
+            let bestIndexForNewDay = index;
+            let minHourDiff = Math.abs(dt.hour);
+
+            for (let j = 1; j < 4 && (index + j) < timeArray.length; j++) {
+                const nextDt = DateTime.fromISO(timeArray[index + j], { zone: 'utc' }).setZone(locationTimezone);
+                if (nextDt.day === currentDay) {
+                    if (Math.abs(nextDt.hour) < minHourDiff) {
+                        minHourDiff = Math.abs(nextDt.hour);
+                        bestIndexForNewDay = index + j;
+                    }
+                } else {
+                    break;
+                }
+            }
+
+            if (currentDay !== lastDay) {
+                const label = document.createElement('div');
+                label.className = 'slider-label';
+                label.textContent = dt.toFormat('MMM dd');
+                
+                const positionPercent = (bestIndexForNewDay / totalSteps) * 100;
+
+                if (bestIndexForNewDay === 0) {
+                    label.style.left = '0';
+                    label.style.transform = 'translateX(0)';
+                } else if (positionPercent > 98) {
+                    label.style.left = '100%';
+                    label.style.transform = 'translateX(-100%)';
+                } else {
+                    label.style.left = `${positionPercent}%`;
+                    label.style.transform = 'translateX(0)';
+                }
+                
+                labelsContainer.appendChild(label);
+                lastDay = currentDay;
+            }
+        }
+    }
 }
 
 // ===================================================================

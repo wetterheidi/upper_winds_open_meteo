@@ -887,6 +887,8 @@ export async function updateUIWithNewWeatherData(newWeatherData, preservedIndex 
         console.log(`Slider set to default (current hour or max): ${slider.value}`);
     }
 
+    await displayManager.updateSliderLabels();
+
     await displayManager.updateWeatherDisplay(slider.value, 'weather-table-container', 'selectedTime');
     await displayManager.refreshMarkerPopup();
     if (AppState.lastAltitude !== 'N/A') {
@@ -1863,6 +1865,10 @@ function setupAppEventListeners() {
     document.addEventListener('setting:changed', async (e) => {
         const { key } = e.detail;
         console.log(`[main-mobile] Setting '${key}' changed. Triggering UI updates.`);
+
+        if (key === 'timeZone') {
+            await displayManager.updateSliderLabels();
+        }
 
         // Alle Einheiten-Änderungen erfordern jetzt eine breite Aktualisierung
         const settingsThatTriggerFullUpdate = [
