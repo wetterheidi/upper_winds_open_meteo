@@ -659,19 +659,16 @@ async function exportComprehensiveReportAsHtml() {
         return;
     }
 
-    // 1. Daten und Einstellungen sammeln
     const lat = AppState.lastLat;
     const lng = AppState.lastLng;
     const model = document.getElementById('modelSelect').value.toUpperCase();
     const modelRun = AppState.lastModelRun || "N/A";
     const today = DateTime.utc().toFormat('yyyy-MM-dd');
 
-    // Die vom Benutzer gewählten Einheiten und Limits zentral abrufen
     const windUnit = getWindSpeedUnit();
     const tempUnit = getTemperatureUnit();
     const heightUnit = getHeightUnit();
     const timeZone = Settings.getValue('timeZone', 'radio', 'Z');
-    // NEU: Dynamisches oberes Limit aus den Einstellungen lesen
     const upperAirLimit = Settings.getValue('upperLimit', 'number', 3000);
 
     let locationName = `Lat ${lat.toFixed(4)}, Lon ${lng.toFixed(4)}`;
@@ -683,7 +680,6 @@ async function exportComprehensiveReportAsHtml() {
         console.warn("Reverse geocoding failed, using coordinates.");
     }
 
-    // 2. HTML-String aufbauen
     let html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -728,9 +724,10 @@ async function exportComprehensiveReportAsHtml() {
                     <th>Time (${timeZone})</th>
                     <th>Wind Dir (°)</th>
                     <th>Wind (${windUnit})</th>
-                    <th>Temp (${tempUnit})</th>
                     <th>Visibility (m)</th>
                     <th>Weather</th>
+                    <th>Clouds</th>
+                    <th>Temp (${tempUnit})</th>
                 </tr>
             </thead>
             <tbody>`;
@@ -746,20 +743,28 @@ async function exportComprehensiveReportAsHtml() {
         const windString = `${(typeof speed === 'number' ? speed.toFixed(0) : 'N/A')} G ${(typeof gust === 'number' ? gust.toFixed(0) : 'N/A')}`;
         const temp = Utils.convertTemperature(temperature_2m[i], tempUnit);
 
+        const interpolatedDataForHour = weatherManager.interpolateWeatherData(
+            AppState.weatherData, i, 100, Math.round(AppState.lastAltitude), heightUnit
+        );
+        const cloudLayerString = Utils.getCloudLayersForMetar(interpolatedDataForHour, heightUnit);
+
+        const windDirectionFormatted = Utils.formatWindDirection(wind_direction_10m[i]); // NEU
+        const visibilityStr = Utils.formatVisibility(visibility?.[i]);
+
         html += `<tr>
             <td>${date}</td>
             <td>${timeStr}</td>
-            <td>${wind_direction_10m[i]}</td>
+            <td>${windDirectionFormatted}</td>
             <td>${windString}</td>
-            <td>${(typeof temp === 'number' ? temp.toFixed(1) : 'N/A')}</td>
-            <td>${visibility?.[i] ?? 'N/A'}</td>
+            <td>${visibilityStr}</td>
             <td>${Utils.translateWmoCodeToTaf(weather_code?.[i])}</td>
+            <td>${cloudLayerString}</td>
+            <td>${(typeof temp === 'number' ? temp.toFixed(0) : 'N/A')}</td>
         </tr>`;
     }
 
     html += `</tbody></table></div>`;
 
-    // NEU: Dynamischer Titel für die Höhendaten
     html += `<div class="section">
                 <h2>Upper Air Data (Today, hourly, up to ${upperAirLimit}${heightUnit} AGL)</h2>`;
 
@@ -785,19 +790,20 @@ async function exportComprehensiveReportAsHtml() {
             AppState.weatherData, i, 100, Math.round(AppState.lastAltitude), heightUnit
         );
 
-        // NEU: Filter verwendet jetzt das dynamische Limit
         interpolatedData
             .filter(data => data.displayHeight <= upperAirLimit)
             .forEach(data => {
                 const temp = Utils.convertTemperature(data.temp, tempUnit);
                 const dew = Utils.convertTemperature(data.dew, tempUnit);
                 const spd = Utils.convertWind(data.spd, windUnit, 'km/h');
+                const dirFormatted = Utils.formatWindDirection(data.dir); // NEU
+
                 html += `<tr>
                     <td>${data.displayHeight}</td>
                     <td>${(typeof data.pressure === 'number' ? data.pressure.toFixed(1) : 'N/A')}</td>
                     <td>${(typeof temp === 'number' ? temp.toFixed(1) : 'N/A')}</td>
                     <td>${(typeof dew === 'number' ? dew.toFixed(1) : 'N/A')}</td>
-                    <td>${(typeof data.dir === 'number' ? Math.round(data.dir) : 'N/A')}</td>
+                    <td>${dirFormatted}</td>
                     <td>${(typeof spd === 'number' ? spd.toFixed(1) : 'N/A')}</td>
                     <td>${(typeof data.rh === 'number' ? Math.round(data.rh) : 'N/A')}</td>
                     <td>${(typeof data.cc === 'number' ? Math.round(data.cc) : 'N/A')}</td>
@@ -808,7 +814,6 @@ async function exportComprehensiveReportAsHtml() {
 
     html += `</div></div></body></html>`;
 
-    // 3. HTML in neuem Tab öffnen
     const newTab = window.open();
     newTab.document.open();
     newTab.document.write(html);

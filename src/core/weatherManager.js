@@ -59,8 +59,8 @@ export function analyzeCloudLayers(weatherData) {
         };
         
         thresholds.push({
-            low: getThreshold(stockwerke.low, 85, 75),
-            mid: getThreshold(stockwerke.mid, 80, 70),
+            low: getThreshold(stockwerke.low, 99, 75),
+            mid: getThreshold(stockwerke.mid, 85, 70),
             high: 65 // Fester Wert für hohe Wolken
         });
     }
@@ -107,24 +107,15 @@ export function interpolateWeatherData(weatherData, sliderIndex, interpStep, bas
         return [];
     }
 
-    // ===================================================================
-    // ==== NEUER BLOCK 1: Schwellenwerte abrufen (Löst den Fehler) ====
-    // ===================================================================
-    // Hol dir die vorberechneten Schwellenwerte für den aktuellen Zeitpunkt.
-    // Dieser Block muss am Anfang der Funktion stehen.
-    const currentThresholds = AppState.cloudThresholds[sliderIndex];
+ const currentThresholds = AppState.cloudThresholds[sliderIndex];
     if (!currentThresholds) {
         console.warn('No pre-analyzed cloud thresholds for this index. Performing on-the-fly analysis.');
-        // Fallback: Analyse durchführen, falls sie aus irgendeinem Grund fehlt.
         AppState.cloudThresholds = analyzeCloudLayers(weatherData);
         if (!AppState.cloudThresholds[sliderIndex]) {
             console.error('Cloud threshold analysis failed. Cannot interpolate weather data.');
             return [];
         }
     }
-    // ===================================================================
-    // ==== ENDE NEUER BLOCK 1                                         ====
-    // ===================================================================
 
     const allPressureLevels = STANDARD_PRESSURE_LEVELS;
 
@@ -235,6 +226,23 @@ export function interpolateWeatherData(weatherData, sliderIndex, interpStep, bas
         const heightASLInMeters = baseHeight + heightAGLInMeters;
 
         let dataPoint;
+
+        let cc = 0; // Standardwert ist 0
+        if (ccHeightData.length > 0) {
+            // Finde den Index des nächstgelegenen realen Datenpunktes
+            let closestPressureLevelIndex = 0;
+            let minDistance = Infinity;
+
+            ccHeightData.forEach((h, index) => {
+                const distance = Math.abs(heightASLInMeters - h);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    closestPressureLevelIndex = index;
+                }
+            });
+            cc = ccValueData[closestPressureLevelIndex]; // Weise den Wert zu
+        }
+        
         if (heightAGLInMeters === 0) {
             const lowestAltitudePressureLevel = Math.max(...validPressureLevels);
             const surfaceCloudCover = weatherData[`cloud_cover_${lowestAltitudePressureLevel}hPa`]?.[sliderIndex] ?? 'N/A';
@@ -256,7 +264,6 @@ export function interpolateWeatherData(weatherData, sliderIndex, interpStep, bas
             const dir = Utils.windDirection(windComponents.u, windComponents.v);
             const temp = Utils.linearInterpolate(heightData, tempData, heightASLInMeters);
             const rh = Utils.linearInterpolate(heightData, rhData, heightASLInMeters);
-            const cc = Utils.linearInterpolate(ccHeightData, ccValueData, heightASLInMeters);
             const dew = Utils.calculateDewpoint(temp, rh);
 
             dataPoint = {

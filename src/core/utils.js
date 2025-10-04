@@ -566,6 +566,120 @@ export class Utils {
         return wmoToTafMap[codeNum] || 'N/A';
     }
 
+    /**
+     * Finds and formats up to three significant cloud layers based on METAR rules,
+     * identifying layers by changes in cloud cover density (FEW, SCT, BKN, OVC).
+     * The output is made unambiguous by including the unit.
+     * @param {object[]} interpolatedData - The array of interpolated weather data for a single time step.
+     * @param {string} heightUnit - The user's selected height unit ('m' or 'ft').
+     * @returns {string} The formatted cloud layer string (e.g., "SCT 100m, BKN 700m, OVC 800m").
+     */
+    static getCloudLayersForMetar(interpolatedData, heightUnit) {
+        if (!interpolatedData || interpolatedData.length === 0) {
+            return 'N/A';
+        }
+
+        const reportedLayers = [];
+        let lastReportedCategory = null;
+
+        // Helper to convert percentage to METAR category
+        const getMetarCategory = (cc) => {
+            if (cc <= 5) return null;
+            if (cc <= 25) return 'FEW';
+            if (cc <= 50) return 'SCT';
+            if (cc <= 87) return 'BKN';
+            return 'OVC';
+        };
+        
+        // Map METAR categories to a numerical order for comparison
+        const categoryOrder = { 'FEW': 1, 'SCT': 2, 'BKN': 3, 'OVC': 4 };
+
+        // 1. Iterate upwards through all interpolated data points
+        for (const point of interpolatedData) {
+            const currentCategory = getMetarCategory(point.cc);
+
+            // Skip if there's no cloud or we already have 3 layers
+            if (!currentCategory || reportedLayers.length >= 3) {
+                continue;
+            }
+
+            // Check if the current category is denser than the last one we reported
+            const isNewLayer = !lastReportedCategory || categoryOrder[currentCategory] > categoryOrder[lastReportedCategory];
+
+            if (isNewLayer) {
+                reportedLayers.push({
+                    baseHeight: point.displayHeight,
+                    coverCode: currentCategory
+                });
+                lastReportedCategory = currentCategory;
+            }
+        }
+
+        if (reportedLayers.length === 0) {
+            return 'SKC'; // Sky Clear
+        }
+
+        // 2. Format the identified layers for output
+        return reportedLayers.map(layer => {
+            const height = layer.baseHeight;
+            
+            let formattedHeight;
+            if (heightUnit === 'ft') {
+                // Round to the nearest 100 feet
+                formattedHeight = Math.round(height / 100) * 100;
+                return `${layer.coverCode} ${formattedHeight}ft`;
+            } else {
+                // Round to the nearest 50 meters
+                formattedHeight = Math.round(height / 50) * 50;
+                return `${layer.coverCode} ${formattedHeight}m`;
+            }
+        }).join(', ');
+    }
+
+    /**
+     * Formats visibility in meters according to specific meteorological rounding rules.
+     * @param {number|null|undefined} visibilityInMeters - The visibility value in meters.
+     * @returns {string} The formatted visibility string (e.g., ">10000", "8000", "4500").
+     */
+    static formatVisibility(visibilityInMeters) {
+        const vis = parseFloat(visibilityInMeters);
+
+        if (isNaN(vis)) {
+            return 'N/A';
+        }
+
+        if (vis >= 10000) {
+            return '>10000';
+        } else if (vis >= 5000) {
+            return (Math.round(vis / 1000) * 1000).toString();
+        } else {
+            // Runden auf die nächsten 100m für Werte unter 5km
+            return (Math.round(vis / 100) * 100).toString();
+        }
+    }
+
+    /**
+     * Formats a wind direction for meteorological reports (rounds to 10, uses 360 for north, pads with zero).
+     * @param {number|string} direction - The wind direction in degrees.
+     * @returns {string} The formatted 3-digit wind direction string (e.g., "090", "270", "360").
+     */
+    static formatWindDirection(direction) {
+        const dirNum = parseFloat(direction);
+
+        if (isNaN(dirNum)) {
+            return 'N/A';
+        }
+
+        let roundedDir = Math.round(dirNum / 10) * 10;
+
+        if (roundedDir === 0 || roundedDir >= 360) {
+            roundedDir = 360;
+        }
+
+        // Pad with a leading zero to ensure three digits
+        return roundedDir.toString().padStart(3, '0');
+    }
+
     // ===================================================================
     // 4. Flugphysik & Wind-Dreieck
     // ===================================================================
