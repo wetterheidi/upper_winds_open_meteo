@@ -302,3 +302,46 @@ export function toggleLoading(show, message = 'Loading...') {
         loadingElement.style.display = 'none';
     }
 }
+
+/**
+ * Zeigt ein modales Dialogfenster für wichtige Hinweise an (z.B. Standortnutzung).
+ * @param {object} options - Ein Objekt mit Titel, Nachricht und Callback-Funktionen.
+ * @param {string} options.title - Der Titel des Modals.
+ * @param {string} options.message - Der anzuzeigende Hinweistext.
+ * @param {function} options.onConfirm - Callback, der bei Bestätigung ausgeführt wird.
+ * @param {function} options.onCancel - Callback, der bei Abbruch ausgeführt wird.
+ */
+export function showDisclosureModal({ title, message, onConfirm, onCancel }) {
+    const modal = document.getElementById('locationDisclosureModal');
+    const header = document.getElementById('disclosureHeader');
+    const messageEl = document.getElementById('disclosureMessage');
+    const confirmBtn = document.getElementById('disclosureConfirm');
+    const cancelBtn = document.getElementById('disclosureCancel');
+
+    if (!modal || !header || !messageEl || !confirmBtn || !cancelBtn) {
+        console.error("Disclosure modal elements not found!");
+        onConfirm(); // Als Fallback direkt bestätigen, um die App nicht zu blockieren
+        return;
+    }
+
+    header.textContent = title;
+    messageEl.innerHTML = message; // innerHTML, um ggf. <br> zu erlauben
+    modal.style.display = 'flex';
+
+    // Wichtig: Alte Event-Listener entfernen, um doppelte Ausführung zu verhindern
+    const newConfirmBtn = confirmBtn.cloneNode(true);
+    confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+
+    const newCancelBtn = cancelBtn.cloneNode(true);
+    cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+
+    newConfirmBtn.onclick = () => {
+        modal.style.display = 'none';
+        onConfirm();
+    };
+
+    newCancelBtn.onclick = () => {
+        modal.style.display = 'none';
+        onCancel();
+    };
+}

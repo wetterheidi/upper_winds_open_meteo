@@ -59,7 +59,7 @@ export function analyzeCloudLayers(weatherData) {
         };
         
         thresholds.push({
-            low: getThreshold(stockwerke.low, 99, 75),
+            low: getThreshold(stockwerke.low, 90, 75),
             mid: getThreshold(stockwerke.mid, 85, 70),
             high: 65 // Fester Wert für hohe Wolken
         });
