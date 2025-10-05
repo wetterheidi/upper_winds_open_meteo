@@ -19,6 +19,7 @@ import * as displayManager from './displayManager.js';
 import * as liveTrackingManager from '../core/liveTrackingManager.js';
 import * as EnsembleManager from '../core/ensembleManager.js';
 import * as LocationManager from '../core/locationManager.js';
+import * as AdsbManager from '../core/adsbManager.js';
 import { DateTime } from 'luxon';
 
 "use strict";
@@ -1598,6 +1599,10 @@ function setupAppEventListeners() {
                 }
                 break;
         }
+    });
+
+    document.addEventListener('ui:findJumpShip', () => {
+        AdsbManager.findAndSelectJumpShip();
     });
 
     document.addEventListener('ui:showJumpMasterLineChanged', () => {

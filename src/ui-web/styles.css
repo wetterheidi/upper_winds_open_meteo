@@ -769,6 +769,21 @@ input[type="checkbox"][style*="opacity: 0.5"] {
     color: #dc3545 !important; /* Rot für Sinken */
 }
 
+#aircraftList li {
+    padding: 12px 8px;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+    text-align: left;
+}
+
+#aircraftList li:hover {
+    background-color: #f0f2f5;
+}
+
+#aircraftList li:last-child {
+    border-bottom: none;
+}
+
 /* --- Search Panel --- */
 #panel-search:not(.hidden) #locationResults {
     display: block !important;

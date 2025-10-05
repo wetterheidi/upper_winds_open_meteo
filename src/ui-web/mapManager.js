@@ -796,6 +796,32 @@ export function updatePoiMarkers(pois) {
         AppState.poiLayerGroup.addLayer(marker);
     });
 }
+/**
+ * Erstellt einen Marker für das Absetzflugzeug mit Rotationsmöglichkeit.
+ * @param {number} lat - Breite.
+ * @param {number} lng - Länge.
+ * @param {number} bearing - Flugrichtung in Grad.
+ * @returns {L.Marker} Der erstellte Leaflet-Marker.
+ */
+export function createAircraftMarker(lat, lng, bearing) {
+    const aircraftIcon = L.icon({
+        iconUrl: ICON_URLS.LIVEPLANE_MARKER, // Nutzt die bereits definierte Icon-URL
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
+        color: 'red',
+    });
+
+    const marker = L.marker([lat, lng], {
+        icon: aircraftIcon,
+        rotationAngle: bearing,
+        rotationOrigin: 'center center',
+        zIndexOffset: 1500, // Stellt sicher, dass er über den meisten anderen Dingen liegt
+        pmIgnore: true
+    }).addTo(AppState.map);
+
+    AppState.aircraftMarker = marker; // Speichere den Marker im globalen Zustand
+    return marker;
+}
 
 // ===================================================================
 // 4. Interne Initialisierungs-Helfer
@@ -1847,3 +1873,4 @@ export function recenterMap(force = false) {
         AppState.map.panTo(AppState.currentMarker.getLatLng());
     }
 }
+

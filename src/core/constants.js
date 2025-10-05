@@ -9,6 +9,7 @@
 import defaultMarkerUrl from '/icon-48.png';
 import cutawayMarkerUrl from '/schere_purple.png';
 import airplaneMarkerUrl from '/airplane_orange.png';
+import liveplaneMarkerURL from '/livePlane.png';
 
 // ===================================================================
 // Skydive & Flug-Parameter
@@ -223,5 +224,6 @@ export const ENSEMBLE_VISUALIZATION = {
 export const ICON_URLS = {
     DEFAULT_MARKER: defaultMarkerUrl,
     CUTAWAY_MARKER: cutawayMarkerUrl,
-    AIRPLANE_MARKER: airplaneMarkerUrl
+    AIRPLANE_MARKER: airplaneMarkerUrl,
+    LIVEPLANE_MARKER: liveplaneMarkerURL
 };

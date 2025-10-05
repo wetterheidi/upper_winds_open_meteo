@@ -1182,7 +1182,7 @@ function setupHarpCoordInputEvents() {
             Settings.state.userSettings.jumpRunTrackOffset = 0;
             Settings.state.userSettings.jumpRunTrackForwardOffset = 0;
             console.log('HARP placed via coords. JRT offsets reset to 0.');
- 
+
             Settings.save();
             Utils.handleMessage('HARP marker placed successfully.');
             harpRadio.disabled = false;
@@ -1206,6 +1206,23 @@ function setupHarpCoordInputEvents() {
             Utils.handleError('Invalid coordinates. Please enter a valid MGRS or Decimal Degree format.');
         }
     });
+}
+/**
+ * Richtet den Event-Listener für den ADSB "Find Jump Ship" Button ein.
+ * @private
+ */
+function setupAdsbEvents() {
+    console.log('[EventManager] Trying to setup ADSB events...');
+    const findShipButton = document.getElementById('findJumpShipBtn');
+    if (findShipButton) {
+        console.log('[EventManager] Found "findJumpShipBtn" button.');
+        findShipButton.addEventListener('click', () => {
+            console.log('[EventManager] "findJumpShipBtn" CLICKED! Dispatching ui:findJumpShip event.');
+            document.dispatchEvent(new CustomEvent('ui:findJumpShip'));
+        });
+    } else {
+        console.warn('[EventManager] ADSB "Find Jump Ship" button NOT FOUND in DOM.');
+    }
 }
 
 // --- Ensemble-spezifische UI-Updates ---
@@ -1348,6 +1365,7 @@ export function initializeEventListeners() {
 
     // 7. Live-Funktionen
     setupHarpCoordInputEvents();
+    setupAdsbEvents();
 
     // 8. Search
     setupPoiSearchButton();

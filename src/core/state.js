@@ -65,6 +65,7 @@ export const AppState = {
     livePositionControl: null,         // @type {L.Control|null} - Das Control zur Anzeige der Live-Positionsdaten.
     accuracyCircle: null,              // @type {L.Circle|null} - Der Genauigkeitskreis um den Live-Marker.
     jumpMasterLine: null,              // @type {L.Polyline|null} - Die Linie vom Live-Marker zum Ziel (DIP/HARP).
+    aircraftMarker: null,              // @type {L.Marker|null} - NEU: Der Marker für das Absetzflugzeug.
     isArmed: false,                    // @type {boolean} - True, wenn die automatische Sprungerkennung "scharf" ist.
     isAutoRecording: false,            // @type {boolean} - True, wenn ein Sprung automatisch aufgezeichnet wird.
     isManualRecording: false,          // @type {boolean} - True, wenn ein Sprung manuell aufgezeichnet wird.
