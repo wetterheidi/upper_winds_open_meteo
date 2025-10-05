@@ -418,6 +418,30 @@ export function drawTerrainWarning(dangerousPoints) {
         { sticky: true, className: 'cutaway-tooltip' }
     ).addTo(AppState.terrainWarningLayer);
 }
+/**
+ * Zeichnet oder aktualisiert den Flugpfad des getrackten ADSB-Flugzeugs.
+ * @param {Array<[number, number]>} trackPoints - Ein Array von [lat, lng] Koordinaten.
+ */
+export function drawAircraftTrack(trackPoints) {
+    if (!AppState.map || trackPoints.length < 2) {
+        return;
+    }
+
+    const trackOptions = {
+        color: '#007bff', // Das gleiche Blau wie der Marker
+        weight: 3,
+        opacity: 0.7,
+        pmIgnore: true
+    };
+
+    if (AppState.aircraftTrackLayer) {
+        // Wenn die Linie schon existiert, nur die Punkte aktualisieren
+        AppState.aircraftTrackLayer.setLatLngs(trackPoints);
+    } else {
+        // Ansonsten eine neue Linie erstellen und zur Karte hinzufügen
+        AppState.aircraftTrackLayer = L.polyline(trackPoints, trackOptions).addTo(AppState.map);
+    }
+}
 
 // Clear Funktionen für die API
 
@@ -515,6 +539,15 @@ export function clearTerrainWarning() {
     if (AppState.terrainWarningLayer) {
         AppState.terrainWarningLayer.clearLayers();
         console.log("Terrain warning layer cleared.");
+    }
+}
+/**
+ * Entfernt den Flugpfad des ADSB-Flugzeugs von der Karte.
+ */
+export function clearAircraftTrack() {
+    if (AppState.aircraftTrackLayer) {
+        AppState.map.removeLayer(AppState.aircraftTrackLayer);
+        AppState.aircraftTrackLayer = null;
     }
 }
 

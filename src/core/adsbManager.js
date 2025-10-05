@@ -8,13 +8,18 @@ import * as mapManager from '../ui-web/mapManager.js';
 import { Settings } from './settings.js';
 
 let adsbInterval = null;
-let isPausedForRateLimit = false; // Flag, um die Pausierung zu steuern
+const CORS_PROXY = 'https://corsproxy.io/?';
+
+// NEU: Definiere den Attributions-String als Konstante, um Tippfehler zu vermeiden
+const ADSB_ATTRIBUTION = 'ADS-B Data provided by <a href="https://www.adsbexchange.com/" target="_blank">ADSBexchange.com</a>';
+
+const apiHeaders = new Headers();
+apiHeaders.append("Accept", "application/json");
 
 /**
  * Funktion als An/Aus-Schalter. Startet die Suche oder stoppt ein laufendes Tracking.
  */
 export async function findAndSelectJumpShip() {
-    // Wenn das Tracking bereits läuft, fungiert der Klick als "Stopp"-Befehl.
     if (adsbInterval) {
         stopAircraftTracking();
         Utils.handleMessage("ADSB-Tracking gestoppt.");
@@ -30,32 +35,42 @@ export async function findAndSelectJumpShip() {
 
     try {
         const pos = AppState.liveMarker.getLatLng();
-        const bbox = [pos.lat - 0.3, pos.lat + 0.3, pos.lng - 0.3, pos.lng + 0.3].join(',');
-        const response = await fetch(`https://opensky-network.org/api/states/all?lamin=${bbox.split(',')[0]}&lomin=${bbox.split(',')[2]}&lamax=${bbox.split(',')[1]}&lomax=${bbox.split(',')[3]}`);
+        const apiUrl = `https://api.adsb.lol/v2/lat/${pos.lat}/lon/${pos.lng}/dist/15`;
         
-        if (!response.ok) throw new Error(`OpenSky API Error: ${response.status}`);
+        const response = await fetch(CORS_PROXY + encodeURIComponent(apiUrl), { headers: apiHeaders });
+        
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ msg: "Unbekannter API-Fehler" }));
+            throw new Error(`API Error ${response.status}: ${errorData.msg}`);
+        }
+
         const data = await response.json();
 
-        if (!data.states || data.states.length === 0) {
+        if (!data.ac || data.ac.length === 0) {
             Utils.handleMessage("Keine Flugzeuge in der Nähe gefunden.");
             return;
         }
 
-        const aircraftList = data.states
-            .filter(s => s[5] && s[6] && s[7]) 
-            .map(s => ({
-                icao24: s[0], callsign: s[1].trim() || 'N/A', altitude: Math.round(s[7] * 3.28084),
-                lat: s[6], lon: s[5], track: s[10], velocity: s[9], vertical_rate: s[11]
+        const aircraftList = data.ac
+            .filter(ac => ac.lat && ac.lon && ac.alt_baro)
+            .map(ac => ({
+                icao24: ac.hex,
+                callsign: ac.flight ? ac.flight.trim() : 'N/A',
+                altitude: ac.alt_baro,
+                lat: ac.lat,
+                lon: ac.lon,
+                track: ac.track,
+                velocity: ac.gs,
+                vertical_rate: ac.baro_rate
             }));
 
         showAircraftSelectionModal(aircraftList);
 
     } catch (error) {
         console.error("Fehler bei der ADSB-Abfrage:", error);
-        Utils.handleError("Konnte Flugzeugdaten nicht abrufen.");
+        Utils.handleError(`Konnte Flugzeugdaten nicht abrufen: ${error.message}`);
     }
 }
-
 
 /**
  * Zeigt das Modal zur Flugzeugauswahl an.
@@ -70,6 +85,7 @@ function showAircraftSelectionModal(aircraftList) {
     if (!modal || !list || !cancelBtn) return;
 
     list.innerHTML = ''; 
+    aircraftList.sort((a, b) => b.altitude - a.altitude);
 
     aircraftList.forEach(ac => {
         const li = document.createElement('li');
@@ -96,77 +112,70 @@ function showAircraftSelectionModal(aircraftList) {
 function startAircraftTracking(aircraft) {
     Utils.handleMessage(`Tracking ${aircraft.callsign}...`);
     
-    // UI-Button anpassen, um als "Stop"-Button zu fungieren
+    // UI-Anpassungen für den Button
     const findShipButton = document.getElementById('findJumpShipBtn');
     if (findShipButton) {
         findShipButton.textContent = "Stop ADSB Tracking";
         findShipButton.classList.remove('btn-secondary');
-        findShipButton.classList.add('btn-danger'); // Macht den Button rot
+        findShipButton.classList.add('btn-danger');
     }
 
     if (AppState.aircraftMarker) AppState.map.removeLayer(AppState.aircraftMarker);
     
+    AppState.adsbTrackPoints = [[aircraft.lat, aircraft.lon]];
+    mapManager.clearAircraftTrack();
+
     const marker = mapManager.createAircraftMarker(aircraft.lat, aircraft.lon, aircraft.track);
     marker.bindTooltip("", { permanent: true, direction: 'top', offset: [0, -15], className: 'adsb-tooltip' });
     updateAircraftTooltip(aircraft);
 
-    // Diese innere Funktion wird periodisch aufgerufen
-    const updateAircraftPosition = async () => {
-        if (isPausedForRateLimit) {
-            console.log("ADSB-Tracking ist wegen Rate-Limit pausiert.");
-            return; // Nichts tun, während wir pausieren
-        }
+    // NEU: Attribution zur Karte hinzufügen
+    if (AppState.map && AppState.map.attributionControl) {
+        AppState.map.attributionControl.addAttribution(ADSB_ATTRIBUTION);
+    }
 
+    const updateAircraftPosition = async () => {
         try {
-            const response = await fetch(`https://opensky-network.org/api/states/all?icao24=${aircraft.icao24}`);
+            const apiUrl = `https://api.adsb.lol/v2/hex/${aircraft.icao24}`;
+            const response = await fetch(CORS_PROXY + encodeURIComponent(apiUrl), { headers: apiHeaders });
             
-            // NEUE FEHLERBEHANDLUNG
-            if (response.status === 429) {
-                console.warn("ADSB Rate-Limit erreicht. Pausiere für 60 Sekunden.");
-                Utils.handleError("API-Limit erreicht. ADSB-Tracking pausiert für 60s.");
-                isPausedForRateLimit = true;
-                setTimeout(() => {
-                    isPausedForRateLimit = false;
-                    console.log("ADSB-Tracking nach Pause wieder aufgenommen.");
-                }, 60000); // 60 Sekunden warten
+            if (response.status === 404) {
+                stopAircraftTracking();
+                Utils.handleMessage(`${aircraft.callsign} ist nicht mehr sichtbar. Tracking gestoppt.`);
                 return;
             }
-            if (!response.ok) throw new Error(`API Error: ${response.status}`);
+            if (!response.ok) throw new Error(`API Error ${response.status}`);
 
             const data = await response.json();
 
-            if (data.states && data.states[0]) {
-                const state = data.states[0];
+            if (data.ac && data.ac.length > 0) {
+                const state = data.ac[0];
                 const updatedAircraft = {
-                    callsign: state[1].trim() || 'N/A', lat: state[6], lon: state[5], track: state[10],
-                    altitude: state[7], velocity: state[9], vertical_rate: state[11]
+                    icao24: state.hex,
+                    callsign: state.flight ? state.flight.trim() : 'N/A',
+                    lat: state.lat, lon: state.lon, track: state.track,
+                    altitude: state.alt_baro, velocity: state.gs, vertical_rate: state.baro_rate
                 };
 
                 if (AppState.aircraftMarker && updatedAircraft.lat && updatedAircraft.lon) {
                     AppState.aircraftMarker.setLatLng([updatedAircraft.lat, updatedAircraft.lon]);
                     AppState.aircraftMarker.setRotationAngle(updatedAircraft.track);
                     updateAircraftTooltip(updatedAircraft);
+                    AppState.adsbTrackPoints.push([updatedAircraft.lat, updatedAircraft.lon]);
+                    mapManager.drawAircraftTrack(AppState.adsbTrackPoints);
                 }
-            } else {
-                stopAircraftTracking();
-                Utils.handleMessage(`${aircraft.callsign} ist nicht mehr sichtbar. Tracking gestoppt.`);
             }
         } catch (error) {
-            // Fängt auch den JSON-Parsing-Fehler bei "Too many requests"-Text ab
-            if (error instanceof SyntaxError) {
-                 console.error("Fehler beim ADSB-Tracking: API-Antwort war kein gültiges JSON. Wahrscheinlich ein Rate-Limit.");
-            } else {
-                console.error("Fehler beim ADSB-Tracking:", error);
-            }
+            console.error("Fehler beim ADSB-Tracking:", error);
         }
     };
 
-    updateAircraftPosition(); // Sofortiger erster Aufruf
-    adsbInterval = setInterval(updateAircraftPosition, 10000); // Intervall auf 10 Sekunden erhöht
+    updateAircraftPosition();
+    adsbInterval = setInterval(updateAircraftPosition, 10000); 
 }
 
 /**
- * Stoppt das ADSB-Tracking und entfernt den Marker.
+ * Stoppt das ADSB-Tracking und setzt die UI zurück.
  */
 function stopAircraftTracking() {
     if (adsbInterval) {
@@ -178,10 +187,17 @@ function stopAircraftTracking() {
         AppState.aircraftMarker = null;
     }
 
-    // Button-Zustand zurücksetzen
+    mapManager.clearAircraftTrack();
+    AppState.adsbTrackPoints = [];
+
+    // NEU: Attribution von der Karte entfernen
+    if (AppState.map && AppState.map.attributionControl) {
+        AppState.map.attributionControl.removeAttribution(ADSB_ATTRIBUTION);
+    }
+
     const findShipButton = document.getElementById('findJumpShipBtn');
     if (findShipButton) {
-        findShipButton.textContent = "Find Jump Ship";
+        findShipButton.textContent = "Find Aircraft";
         findShipButton.classList.remove('btn-danger');
         findShipButton.classList.add('btn-secondary');
     }
@@ -189,7 +205,7 @@ function stopAircraftTracking() {
 
 /**
  * Aktualisiert den Inhalt des Tooltips für den Flugzeug-Marker.
- * @param {object} aircraftData - Die aktuellen Flugdaten vom ADSB-Signal.
+ * @param {object} aircraftData - Die aktuellen Flugdaten.
  * @private
  */
 function updateAircraftTooltip(aircraftData) {
@@ -198,18 +214,20 @@ function updateAircraftTooltip(aircraftData) {
     const heightUnit = Settings.getValue('heightUnit', 'm');
     const speedUnit = Settings.getValue('windUnit', 'kt');
 
-    const altitude = Math.round(Utils.convertHeight(aircraftData.altitude, heightUnit));
-    const altitudeText = `${altitude} ${heightUnit}`;
+    const altitudeFt = aircraftData.altitude;
+    const altitudeText = heightUnit === 'm' 
+        ? `${Math.round(altitudeFt * 0.3048)} m`
+        : `${altitudeFt} ft`;
 
-    const speed = Utils.convertWind(aircraftData.velocity, speedUnit, 'm/s');
+    const speedKt = aircraftData.velocity;
+    const speed = Utils.convertWind(speedKt, speedUnit, 'kt');
     const speedText = `${(speedUnit === 'bft' ? Math.round(speed) : speed.toFixed(0))} ${speedUnit}`;
 
-    let verticalRateText = "---";
+    let verticalRateText = "Level";
     if (aircraftData.vertical_rate) {
-        const rateFPM = Math.round(aircraftData.vertical_rate * 196.85);
-        if (rateFPM > 50) verticalRateText = `+${rateFPM} ft/min`;
-        else if (rateFPM < -50) verticalRateText = `${rateFPM} ft/min`;
-        else verticalRateText = "Level";
+        const rateFPM = aircraftData.vertical_rate;
+        if (rateFPM > 100) verticalRateText = `+${rateFPM} ft/min`;
+        else if (rateFPM < -100) verticalRateText = `${rateFPM} ft/min`;
     }
 
     const tooltipContent = `
