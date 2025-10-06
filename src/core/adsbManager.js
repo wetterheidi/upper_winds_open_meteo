@@ -232,7 +232,7 @@ function updateAircraftTooltip(aircraftData) {
 
     const tooltipContent = `
         <strong>${aircraftData.callsign || 'N/A'}</strong><br>
-        Höhe: ${altitudeText}<br>
+        Altitude: ${altitudeText}<br>
         Speed: ${speedText}<br>
         V/S: ${verticalRateText}
     `;

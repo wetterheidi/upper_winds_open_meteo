@@ -102,8 +102,8 @@ export async function startPositionTracking() {
     if (!hasAcknowledged) {
         // Wenn der Hinweis noch nicht gezeigt wurde, zeige das Modal.
         showDisclosureModal({
-            title: "Hinweis zur Standortnutzung",
-            message: "DZMaster erfasst Standortdaten, um die Funktionen <strong>'Live Tracking'</strong> und <strong>'Automatische Sprungaufzeichnung'</strong> zu ermöglichen. Dies geschieht auch, wenn die App im Hintergrund läuft oder der Bildschirm ausgeschaltet ist, um deinen vollständigen Sprung aufzuzeichnen.<br><br>Diese Daten werden nur lokal auf deinem Gerät gespeichert und nicht geteilt.",
+            title: "Notice on Location Use",
+            message: "DZMaster collects location data to enable the functions <strong>'Live Tracking'</strong> and <strong>'Automatic Jump Recording'</strong>. This also happens when the app is running in the background or the screen is off in order to record your complete jump. This data is only stored locally on your device and is not shared.",
             onConfirm: () => {
                 localStorage.setItem('hasAcknowledgedLocationDisclosure', 'true');
                 proceedWithTracking(); // Fahre mit der Berechtigungsanfrage fort
@@ -114,7 +114,7 @@ export async function startPositionTracking() {
                 if (trackCheckbox) trackCheckbox.checked = false;
                 Settings.state.userSettings.trackPosition = false;
                 Settings.save();
-                Utils.handleMessage("Standortzugriff abgebrochen.");
+                Utils.handleMessage("Location access canceled.");
             }
         });
     } else {

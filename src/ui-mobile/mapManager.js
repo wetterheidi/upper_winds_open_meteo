@@ -1902,7 +1902,7 @@ async function _handleGeolocation(defaultCenter, defaultZoom) {
 
                     if (!hasPermission) {
                         console.warn('[MapManager] Geolocation permission denied or not granted:', result);
-                        Utils.handleMessage('Bitte erlaube den Standortzugriff in den Einstellungen, um deine aktuelle Position zu verwenden.');
+                        Utils.handleMessage('Please confirm the location use in your settings to use your live location.');
                         throw new Error(`Geolocation permission not granted: ${JSON.stringify(result)}`);
                     } else if (result.location === 'provisional') {
                         console.log('[MapManager] Provisional permission granted. Prompting user to share location...');
@@ -1934,7 +1934,7 @@ async function _handleGeolocation(defaultCenter, defaultZoom) {
                     attempts++;
                     if (attempts < maxAttempts && permissionStatus.location === 'provisional') {
                         console.log('[MapManager] Retrying due to provisional permission...');
-                        Utils.handleMessage('Standortfreigabe erforderlich. Bitte teile deinen Standort.');
+                        Utils.handleMessage('Geolocation required. Please share your location.');
                         await new Promise(resolve => setTimeout(resolve, 3000)); // Warte 3 Sekunden
                     } else {
                         throw error;
@@ -1957,7 +1957,7 @@ async function _handleGeolocation(defaultCenter, defaultZoom) {
             );
         } else {
             console.warn('[MapManager] No geolocation API available.');
-            Utils.handleMessage('Standortzugriff nicht verfügbar. Verwende Standardposition.');
+            Utils.handleMessage('Geolocation not available. Using default location.');
             await _geolocationErrorCallback({ message: 'Geolocation not available' }, defaultCenter, defaultZoom);
         }
     } catch (error) {
