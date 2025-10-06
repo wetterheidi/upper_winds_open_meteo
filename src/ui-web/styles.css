@@ -852,6 +852,15 @@ input[type="checkbox"][style*="opacity: 0.5"] {
     color: #e74c3c;
 }
 
+.search-item-actions button.home-toggle {
+    opacity: 0.3; /* Inaktive Haus-Icons sind blass */
+    transition: opacity 0.2s ease-in-out; /* Sanfter Übergang */
+}
+
+.search-item-actions button.home-toggle.is-home {
+    opacity: 1.0; /* Das aktive Home-Icon hat volle Deckkraft */
+}
+
 .clear-icon {
     position: absolute;
     right: 12px;

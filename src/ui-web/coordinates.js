@@ -75,6 +75,11 @@ export function initializeLocationSearch() {
 
     // Initial das Panel mit Favoriten/Verlauf füllen
     renderResultsList();
+
+    document.addEventListener('favorites:updated', () => {
+        console.log('[Coordinates] Received favorites:updated event. Rerendering list.');
+        renderResultsList();
+    });
 }
 
 
@@ -101,7 +106,7 @@ function renderResultsList(searchResults = []) {
         const heading = document.createElement('h5');
         heading.textContent = title;
         sectionDiv.appendChild(heading);
-        
+
         const ul = document.createElement('ul');
         items.forEach(item => {
             const li = _createListItem(item);
@@ -130,21 +135,45 @@ function _createListItem(item) {
     const li = document.createElement('li');
     li.className = 'search-item';
 
-    // Klick auf das Element wählt den Ort aus
-    li.addEventListener('click', () => {
+    const textContainer = document.createElement('div');
+    textContainer.className = 'search-item-text';
+    textContainer.innerHTML = `<span class="name">${item.display_name || item.label}</span>`;
+    
+    // Klick auf den Text-Container wählt den Ort aus
+    textContainer.addEventListener('click', () => {
         document.dispatchEvent(new CustomEvent('location:selected', { detail: { lat, lng, source: 'search' }, bubbles: true }));
         LocationManager.addCoordToHistory(lat, lng, item.display_name || item.label, item.isFavorite);
+        // Wechselt zurück zur Kartenansicht
+        document.querySelector('.tab-button[data-panel="map"]').click();
     });
+    li.appendChild(textContainer);
 
-    const nameSpan = document.createElement('span');
-    nameSpan.className = 'search-item-text';
-    nameSpan.innerHTML = `<span class="name">${item.display_name || item.label}</span>`;
-    li.appendChild(nameSpan);
-
-    // Container für die Buttons (Stern, Löschen)
     const actionsDiv = document.createElement('div');
     actionsDiv.className = 'search-item-actions';
 
+    // --- HOME DZ BUTTON ---
+    if (item.isFavorite) {
+        const homeBtn = document.createElement('button');
+        homeBtn.innerHTML = '🏠';
+        homeBtn.title = 'Set as Home DZ';
+        // Die CSS-Klasse wird basierend auf dem 'isHomeDZ'-Flag gesetzt
+        homeBtn.className = `home-toggle ${item.isHomeDZ ? 'is-home' : ''}`; 
+        
+        homeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (item.isHomeDZ) {
+                LocationManager.clearHomeDZ();
+            } else {
+                LocationManager.setHomeDZ(lat, lng);
+            }
+            // **DER ENTSCHEIDENDE FIX:**
+            // Zeichne die gesamte Liste sofort neu, um die Änderung sichtbar zu machen.
+            renderResultsList(); 
+        });
+        actionsDiv.appendChild(homeBtn);
+    }
+
+    // --- FAVORITEN-STERN ---
     const favToggle = document.createElement('button');
     favToggle.className = `favorite-toggle ${item.isFavorite ? 'is-favorite' : ''}`;
     favToggle.innerHTML = '★';
@@ -155,6 +184,7 @@ function _createListItem(item) {
     });
     actionsDiv.appendChild(favToggle);
 
+    // --- LÖSCHEN-BUTTON ---
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'delete-btn';
     deleteBtn.textContent = '×';
@@ -163,7 +193,7 @@ function _createListItem(item) {
         e.stopPropagation();
         if (confirm(`Delete "${item.display_name || item.label}"?`)) {
             LocationManager.removeLocationFromHistory(lat, lng);
-            renderResultsList(); // UI nach dem Löschen neu zeichnen
+            renderResultsList(); // Auch hier die Liste sofort neu zeichnen
         }
     });
     actionsDiv.appendChild(deleteBtn);
@@ -178,20 +208,36 @@ function _createListItem(item) {
  * @param {number} lng - Länge.
  * @param {string} defaultName - Der Standardname, falls der Nutzer keinen eingibt.
  */
-function toggleFavorite(lat, lng, defaultName) {
+function toggleFavorite(lat, lng, defaultName, onFinish) {
     const entry = LocationManager.getCoordHistory().find(e => Math.abs(e.lat - lat) < 0.0001 && Math.abs(e.lng - lng) < 0.0001);
     const isCurrentlyFavorite = entry && entry.isFavorite;
 
     if (isCurrentlyFavorite) {
         LocationManager.updateFavoriteStatus(lat, lng, defaultName, false);
-        renderResultsList();
+        if (onFinish) onFinish(); // Führe den Callback sofort aus
     } else {
-        // Modal zur Namenseingabe für den neuen Favoriten anzeigen
         currentFavoriteData = { lat, lng, defaultName };
         const favoriteModal = document.getElementById('favoriteModal');
         const favoriteNameInput = document.getElementById('favoriteNameInput');
         favoriteNameInput.value = defaultName;
-        favoriteModal.style.display = 'flex';
+        
+        // Sorge dafür, dass nach dem Schließen des Modals (egal wie) neu gezeichnet wird
+        const modalConfirm = () => {
+            const name = favoriteNameInput.value.trim() || currentFavoriteData.defaultName;
+            LocationManager.addOrUpdateFavorite(currentFavoriteData.lat, lng, name);
+            if (onFinish) onFinish();
+            favoriteModal.style.display = 'none';
+        };
+        const modalCancel = () => {
+            if (onFinish) onFinish();
+            favoriteModal.style.display = 'none';
+        };
+
+        // Event-Listener im Modal neu zuweisen
+        document.getElementById('submitFavoriteName').onclick = modalConfirm;
+        document.getElementById('cancelFavoriteName').onclick = modalCancel;
+        
+        favoriteModal.style.display = 'block';
     }
 }
 

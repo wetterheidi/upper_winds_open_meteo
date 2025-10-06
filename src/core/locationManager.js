@@ -186,6 +186,56 @@ export async function findParachutingPOIs(minLat, minLon, maxLat, maxLon) {
     }
 }
 
+// src/core/locationManager.js
+
+/**
+ * Legt einen bestimmten Ort als "Home DZ" fest.
+ * @param {number} lat - Breite des Home DZ.
+ * @param {number} lng - Länge des Home DZ.
+ */
+export function setHomeDZ(lat, lng) {
+    let history = getCoordHistory();
+    let homeDZLabel = 'Home DZ';
+
+    // Setze alle anderen Einträge zurück
+    history.forEach(entry => entry.isHomeDZ = false);
+
+    const existingEntry = history.find(entry =>
+        Math.abs(entry.lat - lat) < 0.0001 && Math.abs(entry.lng - lng) < 0.0001
+    );
+
+    if (existingEntry) {
+        existingEntry.isHomeDZ = true;
+        homeDZLabel = existingEntry.label;
+    } else {
+        // Sollte selten passieren, aber als Fallback
+        history.unshift({ lat, lng, label: 'Home DZ', isFavorite: true, isHomeDZ: true, timestamp: Date.now() });
+    }
+
+    saveCoordHistory(history);
+    Utils.handleMessage(`"${homeDZLabel}" is now your Home DZ.`);
+    _dispatchFavoritesUpdate(); // UI neu zeichnen lassen
+}
+
+/**
+ * Entfernt die "Home DZ"-Markierung.
+ */
+export function clearHomeDZ() {
+    let history = getCoordHistory();
+    history.forEach(entry => entry.isHomeDZ = false);
+    saveCoordHistory(history);
+    Utils.handleMessage("Home DZ removed.");
+    _dispatchFavoritesUpdate();
+}
+
+/**
+ * Ruft den gespeicherten "Home DZ"-Ort ab.
+ * @returns {object|null} Das Home DZ Objekt oder null, wenn keines gesetzt ist.
+ */
+export function getHomeDZ() {
+    return getCoordHistory().find(entry => entry.isHomeDZ);
+}
+
 // ===================================================================
 // 2. Local Storage Management (Favoriten & Verlauf)
 // ===================================================================

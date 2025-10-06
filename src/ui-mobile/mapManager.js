@@ -9,6 +9,7 @@ import { updateOfflineIndicator, isMobileDevice, displayWarning } from './ui.js'
 //import './public/vendor/Leaflet.PolylineMeasure.js'; // Pfad ggf. anpassen
 import { UI_DEFAULTS, ICON_URLS, ENSEMBLE_VISUALIZATION } from '../core/constants.js'; // Importiere UI-Defaults
 import { getCapacitor } from '../core/capacitor-adapter.js';
+import * as LocationManager from '../core/locationManager.js';
 
 let lastTapTime = 0; // Add this line
 let isRotatingJRT = false;
@@ -1839,26 +1840,45 @@ async function _geolocationSuccessCallback(position, defaultZoom) {
 }
 async function _geolocationErrorCallback(error, defaultCenter, defaultZoom) {
     console.warn(`Geolocation error: ${error.message}`);
-    Utils.handleMessage('Unable to retrieve your location. Using default location.');
+    
+    // =================================================================
+    // ==== HIER KOMMT DIE FEHLENDE LOGIK HIN                       ====
+    // =================================================================
+    // Prüfe auf Home DZ, bevor der Default verwendet wird
+    const homeDZ = LocationManager.getHomeDZ();
+    let startLat, startLng, source, message;
 
-    // 1. Setzt den Marker auf den Standardort
-    await createOrUpdateMarker(defaultCenter[0], defaultCenter[1]);
-    AppState.map.setView(defaultCenter, defaultZoom);
+    if (homeDZ) {
+        startLat = homeDZ.lat;
+        startLng = homeDZ.lng;
+        source = 'home_dz_fallback';
+        message = `Using your saved Home DZ: ${homeDZ.label}`;
+    } else {
+        startLat = defaultCenter[0];
+        startLng = defaultCenter[1];
+        source = 'geolocation_fallback';
+        message = 'Unable to retrieve your location. Using default location.';
+    }
+    
+    Utils.handleMessage(message);
+
+    // Setzt den Marker auf den korrekten Startpunkt (Home DZ oder Default)
+    await createOrUpdateMarker(startLat, startLng);
+    AppState.map.setView([startLat, startLng], defaultZoom);
     recenterMap(true);
     AppState.isManualPanning = false;
 
-    // 2. Löst das Event aus, damit die App weitermachen kann
+    // Löst das Event aus, damit die App weitermachen kann
     const mapSelectEvent = new CustomEvent('location:selected', {
-        detail: {
-            lat: defaultCenter[0],
-            lng: defaultCenter[1],
-            source: 'geolocation_fallback'
-        },
+        detail: { lat: startLat, lng: startLng, source: source },
         bubbles: true,
         cancelable: true
     });
     AppState.map.getContainer().dispatchEvent(mapSelectEvent);
-    console.log("Dispatched 'location:selected' event from geolocation fallback.");
+    console.log(`Dispatched 'location:selected' event from ${source}.`);
+    // =================================================================
+    // ==== ENDE DER KORREKTUR                                        ====
+    // =================================================================
 }
 async function _handleGeolocation(defaultCenter, defaultZoom) {
     console.log('[MapManager] Starting geolocation handling at', new Date().toISOString());

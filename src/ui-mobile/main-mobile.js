@@ -659,6 +659,7 @@ async function exportComprehensiveReportAsHtml() {
         return;
     }
 
+    // --- Schritt 1: HTML-Inhalt generieren (Dieser Teil bleibt exakt gleich) ---
     const lat = AppState.lastLat;
     const lng = AppState.lastLng;
     const model = document.getElementById('modelSelect').value.toUpperCase();
@@ -742,14 +743,12 @@ async function exportComprehensiveReportAsHtml() {
         const gust = Utils.convertWind(wind_gusts_10m[i], windUnit, 'km/h');
         const windString = `${(typeof speed === 'number' ? speed.toFixed(0) : 'N/A')} G ${(typeof gust === 'number' ? gust.toFixed(0) : 'N/A')}`;
         const temp = Utils.convertTemperature(temperature_2m[i], tempUnit);
-
         const interpolatedDataForHour = weatherManager.interpolateWeatherData(
             AppState.weatherData, i, 100, Math.round(AppState.lastAltitude), heightUnit
         );
         const cloudLayerString = Utils.getCloudLayersForMetar(interpolatedDataForHour, heightUnit);
-
-        const windDirectionFormatted = Utils.formatWindDirection(wind_direction_10m[i]); // NEU
         const visibilityStr = Utils.formatVisibility(visibility?.[i]);
+        const windDirectionFormatted = Utils.formatWindDirection(wind_direction_10m[i]);
 
         html += `<tr>
             <td>${date}</td>
@@ -759,7 +758,7 @@ async function exportComprehensiveReportAsHtml() {
             <td>${visibilityStr}</td>
             <td>${Utils.translateWmoCodeToTaf(weather_code?.[i])}</td>
             <td>${cloudLayerString}</td>
-            <td>${(typeof temp === 'number' ? temp.toFixed(0) : 'N/A')}</td>
+            <td>${(typeof temp === 'number' ? temp.toFixed(1) : 'N/A')}</td>
         </tr>`;
     }
 
@@ -796,7 +795,7 @@ async function exportComprehensiveReportAsHtml() {
                 const temp = Utils.convertTemperature(data.temp, tempUnit);
                 const dew = Utils.convertTemperature(data.dew, tempUnit);
                 const spd = Utils.convertWind(data.spd, windUnit, 'km/h');
-                const dirFormatted = Utils.formatWindDirection(data.dir); // NEU
+                const dirFormatted = Utils.formatWindDirection(data.dir);
 
                 html += `<tr>
                     <td>${data.displayHeight}</td>
@@ -814,10 +813,37 @@ async function exportComprehensiveReportAsHtml() {
 
     html += `</div></div></body></html>`;
 
-    const newTab = window.open();
-    newTab.document.open();
-    newTab.document.write(html);
-    newTab.document.close();
+
+    // --- Schritt 2: HTML-Inhalt als Datei speichern (Dieser Teil ist NEU) ---
+    try {
+        const { Filesystem, isNative } = await getCapacitor();
+
+        // Nur ausführen, wenn wir in einer nativen App sind
+        if (isNative && Filesystem) {
+            const timeForFilename = DateTime.utc().toFormat('yyyy-MM-dd_HHmm');
+            const model = document.getElementById('modelSelect').value.toUpperCase();
+
+            const filename = `DZMaster_Briefing_${timeForFilename}_${model}.html`;
+
+            await Filesystem.writeFile({
+                path: `DZMaster/${filename}`,
+                data: html,
+                directory: Directory.Documents,
+                encoding: 'utf8',
+                recursive: true // Erstellt den "DZMaster"-Ordner, falls er nicht existiert
+            });
+            Utils.handleMessage(`Briefing saved in Documents/DZMaster`);
+        } else {
+            // Fallback für den Webbrowser: Öffnet wie bisher einen neuen Tab.
+            const newTab = window.open();
+            newTab.document.open();
+            newTab.document.write(html);
+            newTab.document.close();
+        }
+    } catch (error) {
+        console.error("Error saving HTML briefing:", error);
+        Utils.handleError("Could not save briefing file.");
+    }
 }
 
 /**
