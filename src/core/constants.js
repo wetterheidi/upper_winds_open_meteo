@@ -187,7 +187,7 @@ export const UI_DEFAULTS = {
     GEOLOCATION_TIMEOUT_MS: 20000,
     GEOLOCATION_ACCURACY_THRESHOLD_M: 500,
     MIN_ZOOM: 11,                          // Minimaler Zoom für die Anzeige von Overlays
-    MAX_ZOOM: 14,                          // Maximaler Zoom für die Anzeige von Overlays
+    MAX_ZOOM: 15,                          // Maximaler Zoom für die Anzeige von Overlays
     LANDING_PATTERN_MIN_ZOOM: 14           // Minimaler Zoom für die Anzeige des Landemusters
 };
 
