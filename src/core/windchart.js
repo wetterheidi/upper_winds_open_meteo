@@ -36,7 +36,7 @@ export function generateWindspinne(interpolatedData, userMaxHoehe) {
         if (aglHeight >= 0) {
             linePolarData.push({
                 r: aglHeight,
-                // HIER die Änderung vornehmen:
+                // KORREKTUR: linearInterpolateAngle verwenden
                 t: Utils.linearInterpolateAngle(hoehenVektor, ddd_vec, h),
                 speed: Utils.linearInterpolate(hoehenVektor, ff_vec_mps, h) * 1.94384
             });
@@ -50,7 +50,7 @@ export function generateWindspinne(interpolatedData, userMaxHoehe) {
         if (aglHeight >= 0) {
             pointsPolarData.push({
                 r: aglHeight,
-                // UND HIER die Änderung vornehmen:
+                // KORREKTUR: linearInterpolateAngle verwenden
                 t: Utils.linearInterpolateAngle(hoehenVektor, ddd_vec, h),
                 speed: Utils.linearInterpolate(hoehenVektor, ff_vec_mps, h) * 1.94384
             });

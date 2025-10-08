@@ -366,6 +366,62 @@ export class Utils {
     }
 
     /**
+     * Führt eine lineare Interpolation für Winkel durch und wählt dabei den kürzesten Weg. (Für Windspinne)
+     * @param {number[]} xVector - Der Vektor der Stützstellen (z.B. Höhen).
+     * @param {number[]} yVector - Der Vektor der Winkelwerte in Grad.
+     * @param {number} xValue - Der Wert, für den ein Winkel gefunden werden soll.
+     * @returns {number} Der interpolierte Winkel in Grad (0-360).
+     */
+    static linearInterpolateAngle(xVector, yVector, xValue) {
+        if (!xVector?.length || !yVector?.length || xVector.length !== yVector.length || xVector.length < 2) {
+            return NaN; // Not enough data to interpolate
+        }
+
+        const len = xVector.length;
+        const isAscending = xVector[0] < xVector[len - 1];
+
+        // Finde das korrekte Segment für die Interpolation
+        let i = 1;
+        if (isAscending) {
+            while (i < len && xValue > xVector[i]) {
+                i++;
+            }
+        } else { // Descending
+            while (i < len && xValue < xVector[i]) {
+                i++;
+            }
+        }
+
+        // Extrapolations-Logik an den Rändern
+        if (isAscending) {
+            if (xValue >= xVector[len - 1]) i = len - 1;
+            if (xValue < xVector[0]) i = 1;
+        } else {
+            if (xValue <= xVector[len - 1]) i = len - 1;
+            if (xValue > xVector[0]) i = 1;
+        }
+        
+        const x0 = xVector[i - 1];
+        const x1 = xVector[i];
+        const y0 = yVector[i - 1];
+        const y1 = yVector[i];
+
+        if (x1 === x0) return y0;
+
+        // Kernlogik der Winkelinterpolation: den kürzesten Weg finden
+        let diff = y1 - y0;
+        if (diff > 180) diff -= 360;
+        else if (diff < -180) diff += 360;
+        
+        // Standard- lineare Interpolation mit dem angepassten "diff"
+        const factor = (xValue - x0) / (x1 - x0);
+        const result = y0 + (factor * diff);
+
+        // Das Ergebnis zurück in den Bereich 0-360 normalisieren
+        return (result + 360) % 360;
+    }
+    
+    /**
      * Führt eine gewichtete Interpolation zwischen zwei Punkten durch.
      * @param {number} y1 - Wert am Punkt 1.
      * @param {number} y2 - Wert am Punkt 2.
