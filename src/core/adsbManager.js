@@ -26,15 +26,23 @@ export async function findAndSelectJumpShip() {
         return;
     }
 
-    if (!AppState.liveMarker) {
-        Utils.handleError("Bitte starte zuerst das Live-Tracking.");
+    if (!AppState.lastLat || !AppState.lastLng) {
+        Utils.handleError("Bitte zuerst einen Punkt (DIP) auf der Karte auswählen.");
         return;
     }
     
+    // Alternative: Sicherstellen, dass Live-Tracking aktiv ist
+    //if (!AppState.liveMarker) {
+    //    Utils.handleError("Bitte starte zuerst das Live-Tracking.");
+    //    return;
+    //}
+
     Utils.handleMessage("Suche nach Flugzeugen in der Nähe...");
 
     try {
-        const pos = AppState.liveMarker.getLatLng();
+        // Alternative: Live-Marker Position verwenden    
+        //const pos = AppState.liveMarker.getLatLng();
+        const pos = { lat: AppState.lastLat, lng: AppState.lastLng };
         const apiUrl = `https://api.adsb.lol/v2/lat/${pos.lat}/lon/${pos.lng}/dist/15`;
         
         const response = await fetch(CORS_PROXY + encodeURIComponent(apiUrl), { headers: apiHeaders });
