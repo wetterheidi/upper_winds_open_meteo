@@ -887,13 +887,13 @@ const LivePositionControl = L.Control.extend({
             coordString = `${center.lat.toFixed(5)}, ${center.lng.toFixed(5)}`;
         }
 
-        let altitudeText = "Altitude: N/A<br>";
+        let altitudeText = "<br>Altitude: N/A<br>";
         if (deviceAltitude !== null) {
             let displayAltitude = (refLevel === 'AGL' && AppState.lastAltitude) ? deviceAltitude - parseFloat(AppState.lastAltitude) : deviceAltitude;
             let displayRefLevel = (refLevel === 'AGL' && AppState.lastAltitude) ? 'abv DIP' : refLevel;
             const convertedAlt = Math.round(Utils.convertHeight(displayAltitude, heightUnit));
             const convertedAcc = Math.round(Utils.convertHeight(altitudeAccuracy, heightUnit));
-            altitudeText = `Altitude: ${convertedAlt} ${heightUnit} ${displayRefLevel} (±${convertedAcc || 'N/A'} ${heightUnit})<br>`;
+            altitudeText = `<br>Altitude: ${convertedAlt} ${heightUnit} ${displayRefLevel} (±${convertedAcc || 'N/A'} ${heightUnit})<br>`;
         }
 
         const accuracyText = `Accuracy: ${Math.round(Utils.convertHeight(accuracy, heightUnit))} ${heightUnit}<br>`;
