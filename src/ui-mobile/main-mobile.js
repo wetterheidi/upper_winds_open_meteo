@@ -1069,8 +1069,21 @@ function updateJumpMasterDashboard(data) {
 
     // Hauptwerte aktualisieren...
     const coords = Utils.convertCoords(latitude, longitude, coordFormat);
-    mainElements.coordsEl.textContent = (coordFormat === 'MGRS') ? coords.lat : `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
-    mainElements.altitudeEl.textContent = deviceAltitude !== null ? `${Math.round(Utils.convertHeight(deviceAltitude - (refLevel === 'AGL' ? AppState.lastAltitude || 0 : 0), heightUnit))} ${heightUnit}` : "N/A";
+    let coordText;
+    const formatDDM = (ddm) => `${ddm.deg}° ${ddm.min.toFixed(3)}' ${ddm.dir}`;
+    const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
+
+    if (coordFormat === 'MGRS') {
+        coordText = coords.lat;
+    } else if (coordFormat === 'DMS') {
+        coordText = `${formatDMS(coords.lat)}, ${formatDMS(coords.lng)}`;
+    } else if (coordFormat === 'DDM') {
+        coordText = `${formatDDM(coords.lat)}, ${formatDDM(coords.lng)}`;
+    } else {
+        coordText = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+    }
+
+    mainElements.coordsEl.textContent = coordText; mainElements.altitudeEl.textContent = deviceAltitude !== null ? `${Math.round(Utils.convertHeight(deviceAltitude - (refLevel === 'AGL' ? AppState.lastAltitude || 0 : 0), heightUnit))} ${heightUnit}` : "N/A";
     mainElements.directionEl.textContent = `${direction}°`;
     const displaySpeed = Utils.convertWind(speedMs, effectiveWindUnit, 'm/s');
     mainElements.speedEl.textContent = `${Number.isFinite(displaySpeed) ? displaySpeed.toFixed(1) : 'N/A'} ${effectiveWindUnit}`;

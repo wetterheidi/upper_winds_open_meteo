@@ -400,7 +400,7 @@ export class Utils {
             if (xValue <= xVector[len - 1]) i = len - 1;
             if (xValue > xVector[0]) i = 1;
         }
-        
+
         const x0 = xVector[i - 1];
         const x1 = xVector[i];
         const y0 = yVector[i - 1];
@@ -412,7 +412,7 @@ export class Utils {
         let diff = y1 - y0;
         if (diff > 180) diff -= 360;
         else if (diff < -180) diff += 360;
-        
+
         // Standard- lineare Interpolation mit dem angepassten "diff"
         const factor = (xValue - x0) / (x1 - x0);
         const result = y0 + (factor * diff);
@@ -420,7 +420,7 @@ export class Utils {
         // Das Ergebnis zurück in den Bereich 0-360 normalisieren
         return (result + 360) % 360;
     }
-    
+
     /**
      * Führt eine gewichtete Interpolation zwischen zwei Punkten durch.
      * @param {number} y1 - Wert am Punkt 1.
@@ -607,11 +607,11 @@ export class Utils {
      */
     static translateWmoCodeToTaf(code) {
         const wmoToTafMap = {
-            0: 'NSW', 1: 'NSW', 2: 'NSW', 3: 'NSW', 
-            45: 'FG', 48: 'FZFG', 
-            51: '-DZ', 53: 'DZ', 55: '+DZ', 56: '-FZDZ', 57: 'FZDZ', 
-            61: '-RA', 63: 'RA', 65: '+RA', 66: '-FZRA', 67: 'FZRA', 
-            71: '-SN', 73: 'SN', 75: '+SN', 77: 'SG', 
+            0: 'NSW', 1: 'NSW', 2: 'NSW', 3: 'NSW',
+            45: 'FG', 48: 'FZFG',
+            51: '-DZ', 53: 'DZ', 55: '+DZ', 56: '-FZDZ', 57: 'FZDZ',
+            61: '-RA', 63: 'RA', 65: '+RA', 66: '-FZRA', 67: 'FZRA',
+            71: '-SN', 73: 'SN', 75: '+SN', 77: 'SG',
             80: '-SHRA', 81: 'SHRA', 82: '+SHRA', 83: '-SHRASN', 85: '-SHSN', 86: 'SHSN',
             95: 'TS', 96: 'TSGR', 99: '+TSGR'
         };
@@ -646,7 +646,7 @@ export class Utils {
             if (cc <= 87) return 'BKN';
             return 'OVC';
         };
-        
+
         // Map METAR categories to a numerical order for comparison
         const categoryOrder = { 'FEW': 1, 'SCT': 2, 'BKN': 3, 'OVC': 4 };
 
@@ -678,7 +678,7 @@ export class Utils {
         // 2. Format the identified layers for output
         return reportedLayers.map(layer => {
             const height = layer.baseHeight;
-            
+
             let formattedHeight;
             if (heightUnit === 'ft') {
                 // Round to the nearest 100 feet
@@ -942,10 +942,10 @@ export class Utils {
     // ===================================================================
 
     /**
-     * Konvertiert Koordinaten zwischen Dezimalgrad, DMS (Grad, Minuten, Sekunden) und MGRS.
+     * Konvertiert Koordinaten zwischen verschiedenen Formaten.
      * @param {number} lat - Breite.
      * @param {number} lng - Länge.
-     * @param {'Decimal'|'DMS'|'MGRS'} [format='Decimal'] - Das Zielformat.
+     * @param {'Decimal'|'DDM'|'DMS'|'MGRS'} [format='Decimal'] - Das Zielformat.
      * @returns {object|string} Die konvertierten Koordinaten.
      */
     static convertCoords(lat, lng, format = 'Decimal') {
@@ -953,25 +953,38 @@ export class Utils {
             return { lat: 'N/A', lng: 'N/A' };
         }
 
-        const result = {
-            Decimal: { lat: lat.toFixed(6), lng: lng.toFixed(6) },
-            DMS: {
-                lat: Utils.decimalToDms(lat, true),
-                lng: Utils.decimalToDms(lng, false)
-            },
-            MGRS: Utils.decimalToMgrs(lat, lng)
-        };
-
         // Return based on the requested format
         switch (format) {
+            case 'DDM': // NEU: Grad Dezimalminuten
+                return {
+                    lat: Utils.decimalToDecimalMinutes(lat, true),
+                    lng: Utils.decimalToDecimalMinutes(lng, false)
+                };
             case 'DMS':
-                return result.DMS;
+                return {
+                    lat: Utils.decimalToDms(lat, true),
+                    lng: Utils.decimalToDms(lng, false)
+                };
             case 'MGRS':
-                return { lat: result.MGRS, lng: result.MGRS }; // MGRS is a single string, duplicated for consistency
+                const mgrsVal = Utils.decimalToMgrs(lat, lng);
+                return { lat: mgrsVal, lng: mgrsVal }; // MGRS is a single string
             case 'Decimal':
             default:
-                return result.Decimal;
+                return { lat: lat.toFixed(6), lng: lng.toFixed(6) };
         }
+    }
+
+    /** NEUE FUNKTION: Konvertiert Dezimalgrad in Grad Dezimalminuten. @private */
+    static decimalToDecimalMinutes(decimal, isLat) {
+        if (isNaN(decimal) || decimal === null || decimal === undefined) {
+            throw new Error('Invalid coordinate for DDM conversion');
+        }
+        const absolute = Math.abs(decimal);
+        const deg = Math.floor(absolute);
+        const min = (absolute - deg) * 60;
+        const dir = isLat ? (decimal >= 0 ? 'N' : 'S') : (decimal >= 0 ? 'E' : 'W');
+
+        return { deg, min, dir };
     }
 
     /** Konvertiert Dezimalgrad in DMS. @private */

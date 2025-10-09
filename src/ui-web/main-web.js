@@ -1011,7 +1011,7 @@ function updateJumpMasterDashboard(data) {
     const varioEl = document.getElementById('dashboard-jm-vario');
 
     // Werte formatieren und anzeigen
-    const settings = {
+     const settings = {
         heightUnit: getHeightUnit(),
         effectiveWindUnit: getWindSpeedUnit() === 'bft' ? 'kt' : getWindSpeedUnit(),
         coordFormat: getCoordinateFormat(),
@@ -1021,19 +1021,21 @@ function updateJumpMasterDashboard(data) {
     const coords = Utils.convertCoords(data.latitude, data.longitude, settings.coordFormat);
     let coordText;
 
+    const formatDDM = (ddm) => `${ddm.deg}° ${ddm.min.toFixed(3)}' ${ddm.dir}`;
+    const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
+
     if (settings.coordFormat === 'MGRS') {
-        // MGRS ist ein einzelner String
         coordText = coords.lat;
     } else if (settings.coordFormat === 'DMS') {
-        // Format für Grad, Minuten, Sekunden
-        const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
         coordText = `${formatDMS(coords.lat)}, ${formatDMS(coords.lng)}`;
+    } else if (settings.coordFormat === 'DDM') {
+        coordText = `${formatDDM(coords.lat)}, ${formatDDM(coords.lng)}`;
     } else {
-        // Standard-Dezimalformat
-        coordText = `${coords.lat}, ${coords.lng}`;
+        // KORREKTUR: Verwende die Original-Koordinaten direkt, wie in der mobilen Version.
+        coordText = `${data.latitude.toFixed(5)}, ${data.longitude.toFixed(5)}`;
     }
 
-    coordsEl.textContent = coordText; // Die korrigierte Zeile
+    coordsEl.textContent = coordText;
 
     let altText = "N/A";
     if (data.deviceAltitude !== null) {

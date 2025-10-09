@@ -613,21 +613,20 @@ export function attachCutAwayMarkerDragend(marker) {
 }
 export function updateCutAwayMarkerPopup(marker, lat, lng, open = false) {
     const coordFormat = Settings.getValue('coordFormat', 'Decimal');
-    const coords = Utils.convertCoords(lat, lng, coordFormat);
     let popupContent = `<b>Cut-Away Start</b><br>`;
 
-    if (coordFormat === 'MGRS') {
-        popupContent += `MGRS: ${coords.lat}`;
-    } else {
-        // Nutzt die korrekte Formatierung auch hier
-        const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
-        if (coordFormat === 'DMS') {
-            popupContent += `Lat: ${formatDMS(Utils.decimalToDms(lat, true))}<br>Lng: ${formatDMS(Utils.decimalToDms(lng, false))}`;
-        } else {
-            popupContent += `Lat: ${lat.toFixed(5)}<br>Lng: ${lng.toFixed(5)}`;
-        }
-    }
+    const formatDDM = (ddm) => `${ddm.deg}° ${ddm.min.toFixed(3)}' ${ddm.dir}`;
+    const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
 
+    if (coordFormat === 'MGRS') {
+        popupContent += `MGRS: ${Utils.decimalToMgrs(lat, lng)}`;
+    } else if (coordFormat === 'DMS') {
+        popupContent += `Lat: ${formatDMS(Utils.decimalToDms(lat, true))}<br>Lng: ${formatDMS(Utils.decimalToDms(lng, false))}`;
+    } else if (coordFormat === 'DDM') {
+        popupContent += `Lat: ${formatDDM(Utils.decimalToDecimalMinutes(lat, true))}<br>Lng: ${formatDDM(Utils.decimalToDecimalMinutes(lng, false))}`;
+    } else {
+        popupContent += `Lat: ${lat.toFixed(5)}<br>Lng: ${lng.toFixed(5)}`;
+    }
     // Ruft die zentrale Funktion zum Aktualisieren von Popups auf
     updatePopupContent(marker, popupContent, open);
 }
@@ -780,7 +779,7 @@ export function handleHarpPlacement(e) {
     Settings.state.userSettings.jumpRunTrackOffset = 0;
     Settings.state.userSettings.jumpRunTrackForwardOffset = 0;
     console.log('HARP placed. JRT offsets reset to 0.');
-    
+
     Settings.save();
     AppState.isPlacingHarp = false;
     AppState.map.off('click', handleHarpPlacement);
@@ -874,7 +873,19 @@ const LivePositionControl = L.Control.extend({
         } = data;
 
         const coords = Utils.convertCoords(latitude, longitude, coordFormat);
-        const coordText = (coordFormat === 'MGRS') ? `MGRS: ${coords.lat}<br>` : `Lat: ${latitude.toFixed(5)}<br>Lng: ${longitude.toFixed(5)}<br>`;
+        let coordString;
+        const formatDDM = (ddm) => `${ddm.deg}° ${ddm.min.toFixed(3)}' ${ddm.dir}`;
+        const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
+
+        if (coordFormat === 'MGRS') {
+            coordString = `MGRS: ${coords.lat}`;
+        } else if (coordFormat === 'DMS') {
+            coordString = `${formatDMS(coords.lat)}, ${formatDMS(coords.lng)}`;
+        } else if (coordFormat === 'DDM') {
+            coordString = `${formatDDM(coords.lat)}, ${formatDDM(coords.lng)}`;
+        } else {
+            coordString = `${center.lat.toFixed(5)}, ${center.lng.toFixed(5)}`;
+        }
 
         let altitudeText = "Altitude: N/A<br>";
         if (deviceAltitude !== null) {
@@ -889,7 +900,7 @@ const LivePositionControl = L.Control.extend({
         const speedText = `Speed: ${Utils.convertWind(speedMs, effectiveWindUnit, 'm/s').toFixed(1)} ${effectiveWindUnit}<br>`;
         const directionText = `Direction: ${direction}°`;
 
-        let content = `<span style="font-weight: bold;">Live Position</span><br>${coordText}${altitudeText}${accuracyText}${speedText}${directionText}`;
+        let content = `<span style="font-weight: bold;">Live Position</span><br>${coordString}${altitudeText}${accuracyText}${speedText}${directionText}`;
 
         if (showJumpMasterLine && jumpMasterLineData) {
             const distText = Math.round(Utils.convertHeight(jumpMasterLineData.distance, heightUnit));
@@ -1758,8 +1769,20 @@ function _setupCrosshairCoordinateHandler(map) {
         const center = map.getCenter();
         const coordFormat = Settings.getValue('coordFormat', 'Decimal');
         const coords = Utils.convertCoords(center.lat, center.lng, coordFormat);
-        const coordString = (coordFormat === 'MGRS') ? `MGRS: ${coords.lat}` : `${center.lat.toFixed(5)}, ${center.lng.toFixed(5)}`;
 
+        let coordString;
+        const formatDDM = (ddm) => `${ddm.deg}° ${ddm.min.toFixed(3)}' ${ddm.dir}`;
+        const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
+
+        if (coordFormat === 'MGRS') {
+            coordString = `MGRS: ${coords.lat}`;
+        } else if (coordFormat === 'DMS') {
+            coordString = `${formatDMS(coords.lat)}, ${formatDMS(coords.lng)}`;
+        } else if (coordFormat === 'DDM') {
+            coordString = `${formatDDM(coords.lat)}, ${formatDDM(coords.lng)}`;
+        } else {
+            coordString = `${center.lat.toFixed(5)}, ${center.lng.toFixed(5)}`;
+        }
         // UI sofort mit "Fetching..." aktualisieren
         AppState.coordsControl.update(`${coordString}<br>Elevation: ...<br>QFE: ...`);
 
@@ -1840,7 +1863,7 @@ async function _geolocationSuccessCallback(position, defaultZoom) {
 }
 async function _geolocationErrorCallback(error, defaultCenter, defaultZoom) {
     console.warn(`Geolocation error: ${error.message}`);
-    
+
     // =================================================================
     // ==== HIER KOMMT DIE FEHLENDE LOGIK HIN                       ====
     // =================================================================
@@ -1859,7 +1882,7 @@ async function _geolocationErrorCallback(error, defaultCenter, defaultZoom) {
         source = 'geolocation_fallback';
         message = 'Unable to retrieve your location. Using default location.';
     }
-    
+
     Utils.handleMessage(message);
 
     // Setzt den Marker auf den korrekten Startpunkt (Home DZ oder Default)

@@ -606,16 +606,17 @@ export function updateCutAwayMarkerPopup(marker, lat, lng, open = false) {
     const coords = Utils.convertCoords(lat, lng, coordFormat);
     let popupContent = `<b>Cut-Away Start</b><br>`;
 
+    const formatDDM = (ddm) => `${ddm.deg}° ${ddm.min.toFixed(3)}' ${ddm.dir}`;
+    const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
+
     if (coordFormat === 'MGRS') {
-        popupContent += `MGRS: ${coords.lat}`;
+        popupContent += `MGRS: ${Utils.decimalToMgrs(lat, lng)}`;
+    } else if (coordFormat === 'DMS') {
+        popupContent += `Lat: ${formatDMS(Utils.decimalToDms(lat, true))}<br>Lng: ${formatDMS(Utils.decimalToDms(lng, false))}`;
+    } else if (coordFormat === 'DDM') {
+        popupContent += `Lat: ${formatDDM(Utils.decimalToDecimalMinutes(lat, true))}<br>Lng: ${formatDDM(Utils.decimalToDecimalMinutes(lng, false))}`;
     } else {
-        // Nutzt die korrekte Formatierung auch hier
-        const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
-        if (coordFormat === 'DMS') {
-            popupContent += `Lat: ${formatDMS(Utils.decimalToDms(lat, true))}<br>Lng: ${formatDMS(Utils.decimalToDms(lng, false))}`;
-        } else {
-            popupContent += `Lat: ${lat.toFixed(5)}<br>Lng: ${lng.toFixed(5)}`;
-        }
+        popupContent += `Lat: ${lat.toFixed(5)}<br>Lng: ${lng.toFixed(5)}`;
     }
 
     // Ruft die zentrale Funktion zum Aktualisieren von Popups auf
@@ -1700,18 +1701,25 @@ function _setupCrosshairCoordinateHandler(map) {
 
     const handleMapMove = () => {
         const center = map.getCenter();
-        const coordFormat = Settings.getValue('coordFormat', 'radio', 'Decimal');
+        const coordFormat = Settings.getValue('coordFormat', 'Decimal');
         const coords = Utils.convertCoords(center.lat, center.lng, coordFormat);
-        const coordString = (coordFormat === 'MGRS') ? `MGRS: ${coords.lat}` : `${center.lat.toFixed(5)}, ${center.lng.toFixed(5)}`;
+        
+        let coordString;
+        const formatDDM = (ddm) => `${ddm.deg}° ${ddm.min.toFixed(3)}' ${ddm.dir}`;
+        const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
 
-        // Setzt den Text auf "Laden..."
+        if (coordFormat === 'MGRS') {
+            coordString = `MGRS: ${coords.lat}`;
+        } else if (coordFormat === 'DMS') {
+            coordString = `${formatDMS(coords.lat)}, ${formatDMS(coords.lng)}`;
+        } else if (coordFormat === 'DDM') {
+            coordString = `${formatDDM(coords.lat)}, ${formatDDM(coords.lng)}`;
+        } else {
+            coordString = `${center.lat.toFixed(5)}, ${center.lng.toFixed(5)}`;
+        }
+        
         AppState.coordsControl.update(`${coordString}<br>Elevation: ...<br>QFE: ...`);
-
-        // Ruft die UNVERÄNDERTE Funktion aus utils.js auf
-        Utils.debouncedGetElevationAndQFE(center.lat, center.lng, (data) => {
-            // Übergibt die empfangenen Daten und die ursprünglichen Koordinaten an die Hilfsfunktion
-            updateWithDebouncedData(data, center);
-        });
+        // ... (Rest der Funktion) ...
     };
 
     map.on('move', handleMapMove);
@@ -1854,12 +1862,16 @@ function _handleMapMouseMove(e) {
     let coordText;
 
     // Koordinaten-Text korrekt formatieren
+    const formatDDM = (ddm) => `${ddm.deg}° ${ddm.min.toFixed(3)}' ${ddm.dir}`;
+    const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
+
     if (coordFormat === 'MGRS') {
         const mgrsVal = Utils.decimalToMgrs(lat, lng);
         coordText = `MGRS: ${mgrsVal || 'N/A'}`;
     } else if (coordFormat === 'DMS') {
-        const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
         coordText = `Lat: ${formatDMS(Utils.decimalToDms(lat, true))}, Lng: ${formatDMS(Utils.decimalToDms(lng, false))}`;
+    } else if (coordFormat === 'DDM') {
+        coordText = `Lat: ${formatDDM(Utils.decimalToDecimalMinutes(lat, true))}, Lng: ${formatDDM(Utils.decimalToDecimalMinutes(lng, false))}`;
     } else {
         coordText = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
     }

@@ -217,19 +217,20 @@ export async function refreshMarkerPopup() {
 
     const coords = Utils.convertCoords(lat, lng, coordFormat);
 
-
+    const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
+    const formatDDM = (ddm) => `${ddm.deg}° ${ddm.min.toFixed(3)}' ${ddm.dir}`;
 
     let popupContent;
     if (coordFormat === 'MGRS') {
         popupContent = `MGRS: ${coords.lat}<br>Alt: ${displayAltitude} ${displayUnit}`;
+    } else if (coordFormat === 'DMS') {
+        popupContent = `Lat: ${formatDMS(Utils.decimalToDms(lat, true))}<br>Lng: ${formatDMS(Utils.decimalToDms(lng, false))}<br>Alt: ${displayAltitude} ${displayUnit}`;
+    } else if (coordFormat === 'DDM') {
+        popupContent = `Lat: ${formatDDM(Utils.decimalToDecimalMinutes(lat, true))}<br>Lng: ${formatDDM(Utils.decimalToDecimalMinutes(lng, false))}<br>Alt: ${displayAltitude} ${displayUnit}`;
     } else {
-        const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
-        if (coordFormat === 'DMS') {
-            popupContent = `Lat: ${formatDMS(Utils.decimalToDms(lat, true))}<br>Lng: ${formatDMS(Utils.decimalToDms(lng, false))}<br>Alt: ${displayAltitude} ${displayUnit}`;
-        } else {
-            popupContent = `Lat: ${lat.toFixed(5)}<br>Lng: ${lng.toFixed(5)}<br>Alt: ${displayAltitude} ${displayUnit}`;
-        }
+        popupContent = `Lat: ${lat.toFixed(5)}<br>Lng: ${lng.toFixed(5)}<br>Alt: ${displayAltitude} ${displayUnit}`;
     }
+
 
     if (AppState.weatherData && AppState.weatherData.surface_pressure) {
         const surfacePressure = AppState.weatherData.surface_pressure[sliderIndex];
@@ -314,7 +315,7 @@ export async function updateSliderLabels() {
                 const label = document.createElement('div');
                 label.className = 'slider-label';
                 label.textContent = dt.toFormat('MMM dd');
-                
+
                 const positionPercent = (bestIndexForNewDay / totalSteps) * 100;
 
                 if (bestIndexForNewDay === 0) {
@@ -327,7 +328,7 @@ export async function updateSliderLabels() {
                     label.style.left = `${positionPercent}%`;
                     label.style.transform = 'translateX(0)';
                 }
-                
+
                 labelsContainer.appendChild(label);
                 lastDay = currentDay;
             }
