@@ -429,17 +429,15 @@ export function drawAircraftTrack(trackPoints) {
     }
 
     const trackOptions = {
-        color: '#007bff', // Das gleiche Blau wie der Marker
+        color: '#007bff',
         weight: 3,
         opacity: 0.7,
         pmIgnore: true
     };
 
     if (AppState.aircraftTrackLayer) {
-        // Wenn die Linie schon existiert, nur die Punkte aktualisieren
         AppState.aircraftTrackLayer.setLatLngs(trackPoints);
     } else {
-        // Ansonsten eine neue Linie erstellen und zur Karte hinzufügen
         AppState.aircraftTrackLayer = L.polyline(trackPoints, trackOptions).addTo(AppState.map);
     }
 }
@@ -840,21 +838,20 @@ export function updatePoiMarkers(pois) {
  */
 export function createAircraftMarker(lat, lng, bearing) {
     const aircraftIcon = L.icon({
-        iconUrl: ICON_URLS.LIVEPLANE_MARKER, // Nutzt die bereits definierte Icon-URL
+        iconUrl: ICON_URLS.LIVEPLANE_MARKER,
         iconSize: [32, 32],
         iconAnchor: [16, 16],
-        color: 'red',
     });
 
     const marker = L.marker([lat, lng], {
         icon: aircraftIcon,
         rotationAngle: bearing,
         rotationOrigin: 'center center',
-        zIndexOffset: 1500, // Stellt sicher, dass er über den meisten anderen Dingen liegt
+        zIndexOffset: 1500,
         pmIgnore: true
     }).addTo(AppState.map);
 
-    AppState.aircraftMarker = marker; // Speichere den Marker im globalen Zustand
+    AppState.aircraftMarker = marker;
     return marker;
 }
 

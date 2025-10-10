@@ -14,6 +14,7 @@ import { getSliderValue, displayMessage, hideProgress, displayProgress, displayW
 import { updateModelSelectUI, cleanupSelectedEnsembleModels } from './ui.js';
 import 'leaflet-gpx';
 import * as LocationManager from '../core/locationManager.js';
+import * as AdsbManager from '../core/adsbManager.js';
 
 // =================================================================
 // 1. Globale Variablen & Zustand
@@ -1212,16 +1213,110 @@ function setupHarpCoordInputEvents() {
  * @private
  */
 function setupAdsbEvents() {
-    console.log('[EventManager] Trying to setup ADSB events...');
     const findShipButton = document.getElementById('findJumpShipBtn');
     if (findShipButton) {
-        console.log('[EventManager] Found "findJumpShipBtn" button.');
         findShipButton.addEventListener('click', () => {
-            console.log('[EventManager] "findJumpShipBtn" CLICKED! Dispatching ui:findJumpShip event.');
-            document.dispatchEvent(new CustomEvent('ui:findJumpShip'));
+            // Löst die Logik im adsbManager aus
+            AdsbManager.findAndSelectJumpShip();
         });
-    } else {
-        console.warn('[EventManager] ADSB "Find Jump Ship" button NOT FOUND in DOM.');
+    }
+
+    // Event-Listener für die Anzeige des Auswahl-Modals
+    document.addEventListener('adsb:showSelection', (e) => {
+        const { aircraftList } = e.detail;
+        const modal = document.getElementById('adsbSelectionModal');
+        const list = document.getElementById('aircraftList');
+        const cancelBtn = document.getElementById('adsbCancel');
+
+        if (!modal || !list || !cancelBtn) return;
+
+        list.innerHTML = '';
+        aircraftList.sort((a, b) => b.altitude - a.altitude);
+
+        aircraftList.forEach(ac => {
+            const li = document.createElement('li');
+            li.textContent = `${ac.callsign} / ${ac.altitude} ft`;
+            li.onclick = () => {
+                modal.style.display = 'none';
+                // Startet das Tracking über den adsbManager
+                AdsbManager.startAircraftTracking(ac);
+            };
+            list.appendChild(li);
+        });
+
+        cancelBtn.onclick = () => {
+            modal.style.display = 'none';
+        };
+
+        modal.style.display = 'flex';
+    });
+
+    // Event-Listener für das Erstellen/Aktualisieren des Flugzeug-Markers
+    document.addEventListener('adsb:aircraftSelected', (e) => {
+        const { aircraft, attribution } = e.detail;
+        if (AppState.aircraftMarker) AppState.map.removeLayer(AppState.aircraftMarker);
+        mapManager.clearAircraftTrack();
+        const marker = mapManager.createAircraftMarker(aircraft.lat, aircraft.lon, aircraft.track);
+        marker.bindTooltip("", { permanent: true, direction: 'top', offset: [0, -15], className: 'adsb-tooltip' });
+        
+        if (AppState.map && AppState.map.attributionControl) {
+            AppState.map.attributionControl.addAttribution(attribution);
+        }
+        
+        // Tooltip sofort aktualisieren
+        document.dispatchEvent(new CustomEvent('adsb:aircraftUpdated', { detail: { aircraft } }));
+    });
+
+    document.addEventListener('adsb:aircraftUpdated', (e) => {
+        const { aircraft } = e.detail;
+        if (AppState.aircraftMarker && aircraft.lat && aircraft.lon) {
+            AppState.aircraftMarker.setLatLng([aircraft.lat, aircraft.lon]);
+            if(aircraft.track) {
+                AppState.aircraftMarker.setRotationAngle(aircraft.track);
+            }
+            updateAircraftTooltip(aircraft);
+            mapManager.drawAircraftTrack(AppState.adsbTrackPoints);
+        }
+    });
+
+    // Event-Listener zum Beenden des Trackings
+    document.addEventListener('adsb:trackingStopped', (e) => {
+        const { attribution } = e.detail;
+        if (AppState.aircraftMarker) {
+            AppState.map.removeLayer(AppState.aircraftMarker);
+            AppState.aircraftMarker = null;
+        }
+        mapManager.clearAircraftTrack();
+        if (AppState.map && AppState.map.attributionControl) {
+            AppState.map.attributionControl.removeAttribution(attribution);
+        }
+    });
+
+    // Hilfsfunktion zum Aktualisieren des Tooltips (kann hier platziert werden)
+    function updateAircraftTooltip(aircraftData) {
+        if (!AppState.aircraftMarker) return;
+        const heightUnit = Settings.getValue('heightUnit', 'm');
+        const speedUnit = Settings.getValue('windUnit', 'kt');
+        const altitudeFt = aircraftData.altitude;
+        const altitudeText = heightUnit === 'm'
+            ? `${Math.round(altitudeFt * 0.3048)} m`
+            : `${altitudeFt} ft`;
+        const speedKt = aircraftData.velocity;
+        const speed = Utils.convertWind(speedKt, speedUnit, 'kt');
+        const speedText = `${(speedUnit === 'bft' ? Math.round(speed) : speed.toFixed(0))} ${speedUnit}`;
+        let verticalRateText = "Level";
+        if (aircraftData.vertical_rate) {
+            const rateFPM = aircraftData.vertical_rate;
+            if (rateFPM > 100) verticalRateText = `+${rateFPM} ft/min`;
+            else if (rateFPM < -100) verticalRateText = `${rateFPM} ft/min`;
+        }
+        const tooltipContent = `
+            <strong>${aircraftData.callsign || 'N/A'}</strong><br>
+            Altitude: ${altitudeText}<br>
+            Speed: ${speedText}<br>
+            V/S: ${verticalRateText}
+        `;
+        AppState.aircraftMarker.setTooltipContent(tooltipContent);
     }
 }
 
