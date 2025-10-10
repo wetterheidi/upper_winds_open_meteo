@@ -1961,89 +1961,19 @@ async function _geolocationErrorCallback(error, defaultCenter, defaultZoom) {
 }
 async function _handleGeolocation(defaultCenter, defaultZoom) {
     console.log('[MapManager] Starting geolocation handling at', new Date().toISOString());
-    try {
-        // Hole die Module über den Adapter
-        const { Geolocation, isNative } = await getCapacitor();
 
-        if (isNative && Geolocation) {
-            // Prüfe den Berechtigungsstatus
-            console.log('[MapManager] Checking geolocation permissions...');
-            let permissionStatus = await Geolocation.checkPermissions();
-            console.log('[MapManager] Permission status:', JSON.stringify(permissionStatus));
+    // Wir rufen direkt den liveTrackingManager auf. Er kümmert sich um alles Weitere.
+    // Ein erfolgreiches Update der Position wird dann das 'tracking:positionUpdated' Event auslösen.
+    await liveTrackingManager.startPositionTracking();
 
-            let hasPermission = permissionStatus.location === 'granted' || permissionStatus.location === 'provisional';
-            if (!hasPermission) {
-                console.log('[MapManager] Requesting geolocation permissions...');
-                try {
-                    const result = await Geolocation.requestPermissions({ permissions: ['location'] });
-                    hasPermission = result.location === 'granted' || result.location === 'provisional';
-                    console.log('[MapManager] Permission request result:', JSON.stringify(result));
-
-                    if (!hasPermission) {
-                        console.warn('[MapManager] Geolocation permission denied or not granted:', result);
-                        Utils.handleMessage('Please confirm the location use in your settings to use your live location.');
-                        throw new Error(`Geolocation permission not granted: ${JSON.stringify(result)}`);
-                    } else if (result.location === 'provisional') {
-                        console.log('[MapManager] Provisional permission granted. Prompting user to share location...');
-                        Utils.handleMessage('Bitte teile deinen Standort, um die Karte mit deiner Position zu laden.');
-                    }
-                } catch (permError) {
-                    console.error('[MapManager] Error requesting permissions:', permError);
-                    throw permError;
-                }
-            }
-
-            // Versuche, die aktuelle Position abzurufen
-            console.log('[MapManager] Attempting to fetch current position...');
-            let position = null;
-            let attempts = 0;
-            const maxAttempts = 3;
-            while (!position && attempts < maxAttempts) {
-                try {
-                    console.log(`[MapManager] Attempt ${attempts + 1} to fetch current position...`);
-                    position = await Geolocation.getCurrentPosition({
-                        enableHighAccuracy: true,
-                        timeout: 20000, // Erhöhtes Timeout für iOS 18.5
-                        maximumAge: 0
-                    });
-                    console.log('[MapManager] Current position retrieved:', JSON.stringify(position.coords));
-                    await _geolocationSuccessCallback(position, defaultZoom);
-                } catch (error) {
-                    console.error('[MapManager] Error fetching position on attempt', attempts + 1, ':', error.message);
-                    attempts++;
-                    if (attempts < maxAttempts && permissionStatus.location === 'provisional') {
-                        console.log('[MapManager] Retrying due to provisional permission...');
-                        Utils.handleMessage('Geolocation required. Please share your location.');
-                        await new Promise(resolve => setTimeout(resolve, 3000)); // Warte 3 Sekunden
-                    } else {
-                        throw error;
-                    }
-                }
-            }
-        } else if (navigator.geolocation) {
-            // Fallback zur Web-API
-            console.log('[MapManager] Using browser geolocation API...');
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    console.log('[MapManager] Browser position retrieved:', JSON.stringify(position.coords));
-                    _geolocationSuccessCallback(position, defaultZoom);
-                },
-                (geoError) => {
-                    console.error('[MapManager] Browser geolocation error:', geoError.message);
-                    _geolocationErrorCallback(geoError, defaultCenter, defaultZoom);
-                },
-                { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
-            );
-        } else {
-            console.warn('[MapManager] No geolocation API available.');
-            Utils.handleMessage('Geolocation not available. Using default location.');
-            await _geolocationErrorCallback({ message: 'Geolocation not available' }, defaultCenter, defaultZoom);
+    // Fallback-Logik, falls die Geolokalisierung fehlschlägt oder keine Position liefert.
+    // Wir geben dem System etwas Zeit, eine Position zu finden.
+    setTimeout(async () => {
+        if (!AppState.liveMarker) {
+            console.warn('[MapManager] Geolocation did not provide a position in time. Using fallback.');
+            await _geolocationErrorCallback({ message: 'Geolocation timeout or permission denied.' }, defaultCenter, defaultZoom);
         }
-    } catch (error) {
-        console.error('[MapManager] Error during geolocation handling:', error.message);
-        Utils.handleMessage('Fehler beim Abrufen des Standorts. Verwende Standardposition.');
-        await _geolocationErrorCallback(error, defaultCenter, defaultZoom);
-    }
+    }, 8000); // Warte 8 Sekunden auf eine erste Position
 }
 export function toggleGeoManControls(locked) {
     if (!AppState.map || !AppState.map.pm) return;

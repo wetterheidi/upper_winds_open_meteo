@@ -389,21 +389,28 @@ function updateAccuracyCircle(lat, lng, accuracy) {
  */
 async function checkAndRequestPermissions() {
     const { Geolocation } = await getCapacitor();
-    let permissions = await Geolocation.checkPermissions();
-    console.log('Initial geolocation permissions state:', permissions);
+    let permissions;
+    try {
+        permissions = await Geolocation.checkPermissions();
+        console.log('Initial geolocation permissions state:', permissions);
+    } catch (error) {
+        console.error('Error checking permissions:', error);
+        Utils.handleError('Could not check location permissions.');
+        return false;
+    }
+
 
     if (permissions.location === 'denied') {
         Utils.handleError('GPS permission was denied. Please enable "Always" in the app settings.');
         return false;
     }
 
-    if (permissions.location === 'prompt' || permissions.location === 'prompt-with-rationale') {
+    if (permissions.location !== 'granted') {
         try {
             permissions = await Geolocation.requestPermissions({ permissions: ['location', 'coarseLocation'] });
             console.log('New geolocation permissions state:', permissions);
-            // Auf iOS explizit "always" prüfen
-            if (window.Capacitor.getPlatform() === 'ios' && permissions.location !== 'granted') {
-                Utils.handleError('Please allow "Always" location access in Settings for background tracking.');
+            if (permissions.location !== 'granted') {
+                Utils.handleError('GPS permission is required for live tracking.');
                 return false;
             }
         } catch (error) {
@@ -411,11 +418,6 @@ async function checkAndRequestPermissions() {
             Utils.handleError(`Failed to request permissions: ${error.message}`);
             return false;
         }
-    }
-
-    if (permissions.location !== 'granted') {
-        Utils.handleError('GPS permission is required for live tracking.');
-        return false;
     }
 
     return true;
