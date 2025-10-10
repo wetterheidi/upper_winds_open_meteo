@@ -10,6 +10,7 @@ import { updateOfflineIndicator, isMobileDevice, displayWarning } from './ui.js'
 import { UI_DEFAULTS, ICON_URLS, ENSEMBLE_VISUALIZATION } from '../core/constants.js'; // Importiere UI-Defaults
 import { getCapacitor } from '../core/capacitor-adapter.js';
 import * as LocationManager from '../core/locationManager.js';
+import * as liveTrackingManager from '../core/liveTrackingManager.js';
 
 let lastTapTime = 0; // Add this line
 let isRotatingJRT = false;
@@ -915,7 +916,7 @@ const LivePositionControl = L.Control.extend({
         } else if (coordFormat === 'DDM') {
             coordString = `${formatDDM(coords.lat)}, ${formatDDM(coords.lng)}`;
         } else {
-            coordString = `${center.lat.toFixed(5)}, ${center.lng.toFixed(5)}`;
+            coordString = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
         }
 
         let altitudeText = "<br>Altitude: N/A<br>";
