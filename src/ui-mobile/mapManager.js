@@ -453,6 +453,28 @@ export function drawTerrainWarning(dangerousPoints) {
         { sticky: true, className: 'cutaway-tooltip' }
     ).addTo(AppState.terrainWarningLayer);
 }
+/**
+ * Zeichnet oder aktualisiert den Flugpfad des getrackten ADSB-Flugzeugs.
+ * @param {Array<[number, number]>} trackPoints - Ein Array von [lat, lng] Koordinaten.
+ */
+export function drawAircraftTrack(trackPoints) {
+    if (!AppState.map || trackPoints.length < 2) {
+        return;
+    }
+
+    const trackOptions = {
+        color: '#007bff',
+        weight: 3,
+        opacity: 0.7,
+        pmIgnore: true
+    };
+
+    if (AppState.aircraftTrackLayer) {
+        AppState.aircraftTrackLayer.setLatLngs(trackPoints);
+    } else {
+        AppState.aircraftTrackLayer = L.polyline(trackPoints, trackOptions).addTo(AppState.map);
+    }
+}
 
 // Clear Funktionen für die API
 
@@ -559,6 +581,15 @@ export function clearTerrainWarning() {
     if (AppState.terrainWarningLayer) {
         AppState.terrainWarningLayer.clearLayers();
         console.log("Terrain warning layer cleared.");
+    }
+}
+/**
+ * Entfernt den Flugpfad des ADSB-Flugzeugs von der Karte.
+ */
+export function clearAircraftTrack() {
+    if (AppState.aircraftTrackLayer) {
+        AppState.map.removeLayer(AppState.aircraftTrackLayer);
+        AppState.aircraftTrackLayer = null;
     }
 }
 
@@ -926,6 +957,31 @@ export function updateLivePositionControl(data) {
     if (AppState.livePositionControl) {
         AppState.livePositionControl.update(data);
     }
+}
+/**
+ * Erstellt einen Marker für das Absetzflugzeug mit Rotationsmöglichkeit.
+ * @param {number} lat - Breite.
+ * @param {number} lng - Länge.
+ * @param {number} bearing - Flugrichtung in Grad.
+ * @returns {L.Marker} Der erstellte Leaflet-Marker.
+ */
+export function createAircraftMarker(lat, lng, bearing) {
+    const aircraftIcon = L.icon({
+        iconUrl: ICON_URLS.LIVEPLANE_MARKER,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
+    });
+
+    const marker = L.marker([lat, lng], {
+        icon: aircraftIcon,
+        rotationAngle: bearing,
+        rotationOrigin: 'center center',
+        zIndexOffset: 1500,
+        pmIgnore: true
+    }).addTo(AppState.map);
+
+    AppState.aircraftMarker = marker;
+    return marker;
 }
 
 // ===================================================================
