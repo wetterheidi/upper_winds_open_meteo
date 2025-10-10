@@ -11,6 +11,7 @@
         "build": "npm run build:web && npm run build:mobile",
         "predeploy": "npm run build:web",
         "deploy": "gh-pages -d dist/web",
+        "deploy-cloud" : "vite build --base=/apps/dzmaster/  && (cd dist/web;     rsync -avz --delete . heidi@cloud:/var/www/heidi.mah.priv.at/apps/dzmaster/ )",
         "test": "vitest"
     },
     "devDependencies": {
