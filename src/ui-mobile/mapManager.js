@@ -1173,7 +1173,8 @@ function _setupBaseLayersAndHandling() {
             L.tileLayer.cached('https://nwy-tiles-api.prod.newaydata.com/tiles/{z}/{x}/{y}.png?path=latest/aero/latest', {
                 maxZoom: 19,
                 attribution: '© <a href="https://www.openflightmaps.org">openflightmaps.org</a>',
-                opacity: 0.5,
+                opacity: 0.8,
+                transparent: true,
                 zIndex: 2,
                 updateWhenIdle: true,
                 keepBuffer: 2,
@@ -1186,6 +1187,20 @@ function _setupBaseLayersAndHandling() {
             maxZoom: 19,
             attribution: '© <a href="https://www.openflightmaps.org">openflightmaps.org</a>'
         }),
+        "Esri Topo + SeaMarks": L.layerGroup([
+            // Diese Ebene wird weiterhin gecached
+            L.tileLayer.cached('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+                maxZoom: 19,
+                attribution: '© Esri, USGS'
+            }),
+            // DIESE ZEILE IST GEÄNDERT: .cached wurde entfernt
+            L.tileLayer('https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png', {
+                maxZoom: 18,
+                attribution: ' © <a href="http://www.openseamap.org">OpenSeaMap</a> contributors',
+                transparent: true,
+                zIndex: 3
+            })
+        ]),
     };
 
     const openMeteoAttribution = 'Weather data by <a href="https://open-meteo.com">Open-Meteo</a>';

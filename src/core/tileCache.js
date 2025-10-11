@@ -272,6 +272,8 @@ export const TileCache = {
 L.TileLayer.Cached = L.TileLayer.extend({
     createTile(coords, done) {
         const tile = document.createElement('img');
+        tile.setAttribute('crossOrigin', 'anonymous');
+
         L.DomEvent.on(tile, 'load', () => {
             console.log('Tile loaded:', this.getTileUrl(coords));
             done(null, tile);
@@ -369,13 +371,8 @@ L.tileLayer.cached = function (url, options) {
  * @param {function} options.onCancel - Callback bei Abbruch.
  */
 export async function cacheTilesForDIP({ map, lastLat, lastLng, baseMaps, onProgress, onComplete, onCancel, radiusKm: forcedRadius = null, silent = false }) {
-    if (!map) {
-        if (onComplete && !silent) onComplete('Map not initialized, cannot cache tiles.');
-        return;
-    }
-
-    if (!lastLat || !lastLng) {
-        if (onComplete && !silent) onComplete('Please select a location to cache map tiles.');
+    if (!map || !lastLat || !lastLng) {
+        if (onComplete && !silent) onComplete('Map or location not ready for caching.');
         return;
     }
 
@@ -389,29 +386,24 @@ export async function cacheTilesForDIP({ map, lastLat, lastLng, baseMaps, onProg
 
     if (layer) {
         if (layer instanceof L.LayerGroup) {
-            // Behandle LayerGroup: Iteriere durch die einzelnen Layer der Gruppe
             layer.eachLayer(subLayer => {
-                const url = subLayer.options.url || subLayer._url;
-                if (url) {
+                // Nur Layer mit 'cached'-Funktion berücksichtigen
+                if (subLayer instanceof L.TileLayer.Cached) {
+                    const url = subLayer.options.url || subLayer._url;
                     tileLayers.push({
-                        name: `${selectedLayerName} (${subLayer.options.attribution || 'sub-layer'})`,
                         url: url,
                         subdomains: subLayer.options.subdomains,
                         normalizedUrl: url.replace(/{s}\./, '')
                     });
                 }
             });
-        } else {
-            // Behandle einzelnen TileLayer
+        } else if (layer instanceof L.TileLayer.Cached) {
             const url = layer.options.url || layer._url;
-            if (url) {
-                tileLayers.push({
-                    name: selectedLayerName,
-                    url: url,
-                    subdomains: layer.options.subdomains,
-                    normalizedUrl: url.replace(/{s}\./, '')
-                });
-            }
+            tileLayers.push({
+                url: url,
+                subdomains: layer.options.subdomains,
+                normalizedUrl: url.replace(/{s}\./, '')
+            });
         }
     }
 
@@ -421,9 +413,8 @@ export async function cacheTilesForDIP({ map, lastLat, lastLng, baseMaps, onProg
         return;
     }
 
-    let cachedCount = 0;
-    let failedCount = 0;
-    const failedTiles = [];
+    let processedCount = 0;
+    let successCount = 0;
     AppState.isCachingCancelled = false;
 
     if (onProgress && !silent) {
@@ -433,128 +424,57 @@ export async function cacheTilesForDIP({ map, lastLat, lastLng, baseMaps, onProg
         });
     }
 
+    const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
     try {
+        const allTileFunctions = [];
         for (const layer of tileLayers) {
-            console.log('Processing layer:', layer.name);
-            if (AppState.isCachingCancelled) {
-                console.log('Caching cancelled by user');
-                break;
-            }
-            const fetchPromises = tiles.map(async (tile, index) => {
-                if (AppState.isCachingCancelled) {
-                    console.log('Caching cancelled during tile processing');
-                    return;
-                }
+            for (const tile of tiles) {
+                allTileFunctions.push(async () => {
+                    if (AppState.isCachingCancelled) return;
 
-                const url = layer.url
-                    .replace('{z}', tile.zoom)
-                    .replace('{x}', tile.x)
-                    .replace('{y}', tile.y)
-                    .replace('{s}', layer.subdomains ? layer.subdomains[Math.floor(Math.random() * layer.subdomains.length)] : '');
-                const normalizedUrl = layer.normalizedUrl
-                    .replace('{z}', tile.zoom)
-                    .replace('{x}', tile.x)
-                    .replace('{y}', tile.y);
+                    const url = layer.url.replace('{z}', tile.zoom).replace('{x}', tile.x).replace('{y}', tile.y).replace('{s}', layer.subdomains ? layer.subdomains[Math.floor(Math.random() * layer.subdomains.length)] : '');
+                    const normalizedUrl = layer.normalizedUrl.replace('{z}', tile.zoom).replace('{x}', tile.x).replace('{y}', tile.y);
 
-                console.log(`Processing tile ${index + 1}/${tiles.length} for layer ${layer.name}:`, { url, normalizedUrl });
-
-                const cachedBlob = await TileCache.getTile(normalizedUrl).catch(err => {
-                    console.error(`Error retrieving tile from cache: ${normalizedUrl}`, err);
-                    return null;
-                });
-                if (cachedBlob) {
-                    cachedCount++;
-                    console.log(`Tile ${index + 1} already in cache`);
-                } else {
-                    const result = await cacheTileWithRetry(url);
-                    if (result.success) {
-                        const stored = await TileCache.storeTile(normalizedUrl, result.blob).catch(err => {
-                            console.error(`Error storing tile: ${normalizedUrl}`, err);
-                            return false;
-                        });
-                        if (stored) {
-                            cachedCount++;
-                            console.log(`Tile ${index + 1} cached successfully`);
-                        } else {
-                            failedCount++;
-                            failedTiles.push(url);
-                            console.log(`Tile ${index + 1} failed to store`);
-                        }
+                    const cachedBlob = await TileCache.getTile(normalizedUrl).catch(() => null);
+                    if (cachedBlob) {
+                        successCount++;
                     } else {
-                        failedCount++;
-                        failedTiles.push(url);
-                        console.log(`Tile ${index + 1} failed to fetch:`, result.error.message);
+                        const result = await cacheTileWithRetry(url);
+                        if (result.success) {
+                            const stored = await TileCache.storeTile(normalizedUrl, result.blob).catch(() => false);
+                            if (stored) successCount++;
+                        }
                     }
-                }
-
-                const currentCount = cachedCount + failedCount;
-                if ((index + 1) % 10 === 0 || index === tiles.length - 1) {
-                    if (onProgress && !silent) {
-                        onProgress(currentCount, totalTiles, () => {
-                            AppState.isCachingCancelled = true;
-                        });
-                    }
-                }
-            });
-
-            console.log(`Processing batch of ${tiles.length} tiles for layer ${layer.name}`);
-            for (let i = 0; i < fetchPromises.length; i += 20) {
-                if (AppState.isCachingCancelled) {
-                    console.log('Caching cancelled during batch processing');
-                    break;
-                }
-                const batch = fetchPromises.slice(i, i + 20);
-                await Promise.all(batch).catch(err => {
-                    console.error('Error processing batch of tiles:', err);
+                    processedCount++;
                 });
-                console.log(`Completed batch ${i / 20 + 1} for layer ${layer.name}`);
             }
         }
+
+        for (let i = 0; i < allTileFunctions.length; i += 10) {
+            if (AppState.isCachingCancelled) break;
+
+            const batch = allTileFunctions.slice(i, i + 10).map(fn => fn());
+            await Promise.all(batch);
+
+            if (onProgress && !silent) {
+                onProgress(processedCount, totalTiles, () => { AppState.isCachingCancelled = true; });
+            }
+            await delay(250); // Eine Viertelsekunde Pause nach jedem 10er-Paket
+        }
+
     } catch (error) {
         console.error('Unexpected error in cacheTilesForDIP:', error);
-        Utils.handleError('Failed to cache map tiles: ' + error.message);
+        if (onComplete && !silent) onComplete('An error occurred during caching.');
     } finally {
-        console.log('Hiding progress bar');
-        if (onComplete) {
-            let message = '';
-            if (AppState.isCachingCancelled) {
-                message = `Caching cancelled: ${cachedCount} tiles cached, ${failedCount} failed.`;
-            } else if (failedCount > 0) {
-                message = `Cached ${cachedCount} tiles around DIP (${failedCount} failed).`;
-            } else {
-                message = `Cached ${cachedCount} tiles around DIP successfully.`;
-            }
-            onComplete(message);
+        const failedCount = processedCount - successCount;
+        let message = '';
+        if (AppState.isCachingCancelled) {
+            message = `Caching cancelled. ${successCount} tiles processed.`;
+        } else {
+            message = `Caching complete. ${successCount} tiles cached${failedCount > 0 ? `, ${failedCount} failed` : '.'}`;
         }
-    }
-
-    if (failedTiles.length > 0) {
-        console.warn(`Failed to cache ${failedTiles.length} tiles:`, failedTiles);
-    }
-
-    console.log(`DIP caching complete: ${cachedCount} tiles cached, ${failedCount} failed`);
-    let completionMessage = '';
-    if (AppState.isCachingCancelled) {
-        completionMessage = `Caching cancelled: ${cachedCount} tiles cached, ${failedCount} failed.`;
-    } else if (failedCount > 0) {
-        completionMessage = `Cached ${cachedCount} tiles around DIP (${failedCount} failed).`;
-    } else {
-        completionMessage = `Cached ${cachedCount} tiles around DIP successfully.`;
-    }
-
-    if (onComplete) {
-        onComplete(completionMessage);
-    }
-
-    try {
-        const size = await TileCache.getCacheSize();
-        console.log(`Cache size after DIP caching: ${size.toFixed(2)} MB`);
-        if (size > CACHE_DEFAULTS.SIZE_LIMIT_MB_WARNING) {
-            Utils.handleError(`Cache size large (${size.toFixed(2)} MB). Consider clearing cache to free up space.`);
-        }
-    } catch (error) {
-        console.error('Failed to check cache size after DIP caching:', error);
-        Utils.handleError('Unable to check cache size. Consider clearing cache to free up space.');
+        if (onComplete && !silent) onComplete(message);
     }
 }
 

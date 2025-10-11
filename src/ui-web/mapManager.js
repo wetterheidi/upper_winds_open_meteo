@@ -762,7 +762,7 @@ export function handleHarpPlacement(e) {
     Settings.state.userSettings.jumpRunTrackOffset = 0;
     Settings.state.userSettings.jumpRunTrackForwardOffset = 0;
     console.log('HARP placed. JRT offsets reset to 0.');
-    
+
     Settings.save();
     AppState.isPlacingHarp = false;
     AppState.map.off('click', handleHarpPlacement);
@@ -1039,7 +1039,8 @@ function _setupBaseLayersAndHandling() {
             L.tileLayer.cached('https://nwy-tiles-api.prod.newaydata.com/tiles/{z}/{x}/{y}.png?path=latest/aero/latest', {
                 maxZoom: 19,
                 attribution: '© <a href="https://www.openflightmaps.org">openflightmaps.org</a>',
-                opacity: 0.5,
+                opacity: 0.8,
+                transparent: true,
                 zIndex: 2,
                 updateWhenIdle: true,
                 keepBuffer: 2,
@@ -1052,6 +1053,20 @@ function _setupBaseLayersAndHandling() {
             maxZoom: 19,
             attribution: '© <a href="https://www.openflightmaps.org">openflightmaps.org</a>'
         }),
+        "Esri Topo + SeaMarks": L.layerGroup([
+            // Diese Ebene wird weiterhin gecached
+            L.tileLayer.cached('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+                maxZoom: 19,
+                attribution: '© Esri, USGS'
+            }),
+            // DIESE ZEILE IST GEÄNDERT: .cached wurde entfernt
+            L.tileLayer('https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png', {
+                maxZoom: 18,
+                attribution: ' © <a href="http://www.openseamap.org">OpenSeaMap</a> contributors',
+                transparent: true,
+                zIndex: 3
+            })
+        ]),
     };
 
     const openMeteoAttribution = 'Weather data by <a href="https://open-meteo.com">Open-Meteo</a>';
@@ -1700,7 +1715,7 @@ function _setupCrosshairCoordinateHandler(map) {
         const center = map.getCenter();
         const coordFormat = Settings.getValue('coordFormat', 'Decimal');
         const coords = Utils.convertCoords(center.lat, center.lng, coordFormat);
-        
+
         let coordString;
         const formatDDM = (ddm) => `${ddm.deg}° ${ddm.min.toFixed(3)}' ${ddm.dir}`;
         const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
@@ -1714,7 +1729,7 @@ function _setupCrosshairCoordinateHandler(map) {
         } else {
             coordString = `${center.lat.toFixed(5)}, ${center.lng.toFixed(5)}`;
         }
-        
+
         AppState.coordsControl.update(`${coordString}<br>Elevation: ...<br>QFE: ...`);
         // ... (Rest der Funktion) ...
     };
@@ -1763,7 +1778,7 @@ async function _geolocationSuccessCallback(position, defaultZoom) {
 }
 async function _geolocationErrorCallback(error, defaultCenter, defaultZoom) {
     console.warn(`Geolocation error: ${error.message}`);
-    
+
     // =================================================================
     // ==== HIER KOMMT DIE FEHLENDE LOGIK HIN                       ====
     // =================================================================
@@ -1782,7 +1797,7 @@ async function _geolocationErrorCallback(error, defaultCenter, defaultZoom) {
         source = 'geolocation_fallback';
         message = 'Unable to retrieve your location. Using default location.';
     }
-    
+
     Utils.handleMessage(message);
 
     // Setzt den Marker auf den korrekten Startpunkt (Home DZ oder Default)
