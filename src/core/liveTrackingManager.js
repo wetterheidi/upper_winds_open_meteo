@@ -19,6 +19,10 @@ import { showDisclosureModal } from '../ui-mobile/ui.js';
 // 1. Öffentliche Hauptfunktionen (API des Moduls)
 // ===================================================================
 
+// NEU: Initialisierungs-Flag und Promise
+let isTrackingInitializing = false;
+let trackingInitPromise = null;
+
 /**
  * Startet die kontinuierliche Abfrage der GPS-Position des Geräts.
  * Verwendet das Capacitor Geolocation-Plugin für native Plattformen und navigator.geolocation als Fallback für Web.
@@ -26,102 +30,115 @@ import { showDisclosureModal } from '../ui-mobile/ui.js';
  * @returns {void}
  */
 export async function startPositionTracking() {
-    if (AppState.watchId !== null) return;
-    console.log("[LiveTrackingManager] Attempting to start position tracking...");
+    if (AppState.watchId !== null || isTrackingInitializing) return;
+    isTrackingInitializing = true;
+    if (!trackingInitPromise) {
+        trackingInitPromise = (async () => {
+            console.log("[LiveTrackingManager] Attempting to start position tracking...");
 
-    // Prüfen, ob der Nutzer den Hinweis bereits bestätigt hat.
-    const hasAcknowledged = localStorage.getItem('hasAcknowledgedLocationDisclosure');
+            // Prüfen, ob der Nutzer den Hinweis bereits bestätigt hat.
+            const hasAcknowledged = localStorage.getItem('hasAcknowledgedLocationDisclosure');
 
-    const proceedWithTracking = async () => {
-        const { Geolocation, isNative } = await getCapacitor();
-        console.log("[LiveTrackingManager] Platform:", isNative ? window.Capacitor.getPlatform() : 'Web', "IsNative:", isNative);
+            const proceedWithTracking = async () => {
+                // FIX 1: Warte, bis Capacitor garantiert bereit ist.
+                // getCapacitor() wartet jetzt intern auf 'deviceready'.
+                const { Geolocation, isNative } = await getCapacitor();
+                console.log("[LiveTrackingManager] Platform:", isNative ? window.Capacitor.getPlatform() : 'Web', "IsNative:", isNative);
 
-        if (isNative && Geolocation) {
-            // --- Native Logik (iOS/Android) ---
-            try {
-                // Prüfe und fordere Berechtigungen an
-                const permissions = await checkAndRequestPermissions();
-                console.log("[LiveTrackingManager] Permissions result:", permissions);
-                if (!permissions) {
-                    console.warn("[LiveTrackingManager] Permissions not granted, stopping tracking.");
-                    return;
-                }
-
-                // Starte native Hintergrund-Tracking mit Capacitor Geolocation
-                const watchId = await Geolocation.watchPosition(
-                    {
-                        enableHighAccuracy: true,
-                        timeout: 10000,
-                        maximumAge: 0
-                    },
-                    (position, error) => {
-                        if (error) {
-                            console.error("[LiveTrackingManager] Geolocation error:", error);
-                            Utils.handleError(`Geolocation error: ${error.message || 'Unknown error'}`);
-                            stopPositionTracking();
+                if (isNative && Geolocation) {
+                    // --- Native Logik (iOS/Android) ---
+                    try {
+                        // Prüfe und fordere Berechtigungen an
+                        const permissions = await checkAndRequestPermissions();
+                        console.log("[LiveTrackingManager] Permissions result:", permissions);
+                        if (!permissions) {
+                            console.warn("[LiveTrackingManager] Permissions not granted, stopping tracking.");
                             return;
                         }
-                        if (position) {
-                            console.log("[LiveTrackingManager] Received position:", position.coords);
-                            debouncedPositionUpdate(position);
-                        }
-                    }
-                );
-                AppState.watchId = watchId;
-                console.log("[LiveTrackingManager] Native Geolocation watcher started:", watchId);
-                document.dispatchEvent(new CustomEvent('tracking:started'));
-            } catch (error) {
-                console.error("[LiveTrackingManager] Failed to start native tracking:", error);
-                Utils.handleError(`Failed to start tracking: ${error.message || 'Unknown error'}`);
-            }
-        } else {
-            // --- Web-Fallback-Logik ---
-            console.log("[LiveTrackingManager] Using navigator.geolocation for tracking (Web).");
-            if (!navigator.geolocation) {
-                Utils.handleError("Geolocation is not supported by your browser.");
-                document.dispatchEvent(new CustomEvent('tracking:stopped'));
-                return;
-            }
-            AppState.watchId = navigator.geolocation.watchPosition(
-                (position) => {
-                    console.log("[LiveTrackingManager] Web position:", position.coords);
-                    debouncedPositionUpdate(position);
-                },
-                (error) => {
-                    console.error("[LiveTrackingManager] Web Geolocation error:", error);
-                    Utils.handleError(`Geolocation error: ${error.message || 'Unknown error'}`);
-                    stopPositionTracking();
-                },
-                { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
-            );
-            console.log("[LiveTrackingManager] Web Geolocation watcher started:", AppState.watchId);
-            document.dispatchEvent(new CustomEvent('tracking:started'));
-        }
-    };
 
-    if (!hasAcknowledged) {
-        // Wenn der Hinweis noch nicht gezeigt wurde, zeige das Modal.
-        showDisclosureModal({
-            title: "Notice on Location Use",
-            message: "DZMaster collects location data to enable the functions <strong>'Live Tracking'</strong> and <strong>'Automatic Jump Recording'</strong>. This also happens when the app is running in the background or the screen is off in order to record your complete jump. This data is only stored locally on your device and is not shared.",
-            onConfirm: () => {
-                localStorage.setItem('hasAcknowledgedLocationDisclosure', 'true');
-                proceedWithTracking(); // Fahre mit der Berechtigungsanfrage fort
-            },
-            onCancel: () => {
-                // Nutzer hat abgebrochen -> setze die UI zurück
-                const trackCheckbox = document.getElementById('trackPositionCheckbox');
-                if (trackCheckbox) trackCheckbox.checked = false;
-                Settings.state.userSettings.trackPosition = false;
-                Settings.save();
-                Utils.handleMessage("Location access canceled.");
+                        // Starte native Hintergrund-Tracking mit Capacitor Geolocation
+                        const watchId = await Geolocation.watchPosition(
+                            {
+                                enableHighAccuracy: true,
+                                timeout: 10000,
+                                maximumAge: 0
+                            },
+                            (position, error) => {
+                                if (error) {
+                                    console.error("[LiveTrackingManager] Geolocation error:", error);
+                                    Utils.handleError(`Geolocation error: ${error.message || 'Unknown error'}`);
+                                    stopPositionTracking();
+                                    return;
+                                }
+                                if (position) {
+                                    console.log("[LiveTrackingManager] Received position:", position.coords);
+                                    debouncedPositionUpdate(position);
+                                }
+                            }
+                        );
+                        AppState.watchId = watchId;
+                        console.log("[LiveTrackingManager] Native Geolocation watcher started:", watchId);
+                        document.dispatchEvent(new CustomEvent('tracking:started'));
+                    } catch (error) {
+                        console.error("[LiveTrackingManager] Failed to start native tracking:", error);
+                        Utils.handleError(`Failed to start tracking: ${error.message || 'Unknown error'}`);
+                        stopPositionTracking();
+                    }
+                } else {
+                    // --- Web-Fallback-Logik ---
+                    console.log("[LiveTrackingManager] Using navigator.geolocation for tracking (Web).");
+                    if (!navigator.geolocation) {
+                        Utils.handleError("Geolocation is not supported by your browser.");
+                        document.dispatchEvent(new CustomEvent('tracking:stopped'));
+                        return;
+                    }
+                    AppState.watchId = navigator.geolocation.watchPosition(
+                        (position) => {
+                            console.log("[LiveTrackingManager] Web position:", position.coords);
+                            debouncedPositionUpdate(position);
+                        },
+                        (error) => {
+                            console.error("[LiveTrackingManager] Web Geolocation error:", error);
+                            Utils.handleError(`Geolocation error: ${error.message || 'Unknown error'}`);
+                            stopPositionTracking();
+                        },
+                        { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+                    );
+                    console.log("[LiveTrackingManager] Web Geolocation watcher started:", AppState.watchId);
+                    document.dispatchEvent(new CustomEvent('tracking:started'));
+                }
+            };
+
+            if (!hasAcknowledged) {
+                // Wenn der Hinweis noch nicht gezeigt wurde, zeige das Modal.
+                showDisclosureModal({
+                    title: "Notice on Location Use",
+                    message: "DZMaster collects location data to enable the functions <strong>'Live Tracking'</strong> and <strong>'Automatic Jump Recording'</strong>. This also happens when the app is running in the background or the screen is off in order to record your complete jump. This data is only stored locally on your device and is not shared.",
+                    onConfirm: () => {
+                        localStorage.setItem('hasAcknowledgedLocationDisclosure', 'true');
+                        proceedWithTracking(); // Fahre mit der Berechtigungsanfrage fort
+                    },
+                    onCancel: () => {
+                        // Nutzer hat abgebrochen -> setze die UI zurück
+                        const trackCheckbox = document.getElementById('trackPositionCheckbox');
+                        if (trackCheckbox) trackCheckbox.checked = false;
+                        Settings.state.userSettings.trackPosition = false;
+                        Settings.save();
+                        Utils.handleMessage("Location access canceled.");
+                    }
+                });
+            } else {
+                // Hinweis wurde bereits bestätigt, fahre direkt fort.
+                proceedWithTracking();
             }
-        });
-    } else {
-        // Hinweis wurde bereits bestätigt, fahre direkt fort.
-        proceedWithTracking();
+            // Am Ende:
+            isTrackingInitializing = false;
+            trackingInitPromise = null;
+        })();
     }
+    await trackingInitPromise;
 }
+
 
 /**
  * Beendet die kontinuierliche Abfrage der GPS-Position.
@@ -132,7 +149,7 @@ export async function startPositionTracking() {
  */
 export async function stopPositionTracking() {
     if (AppState.watchId !== null) {
-        const { Geolocation, isNative } = await getCapacitor(); // Korrigiert: getCapacitor
+        const { Geolocation, isNative } = await getCapacitor();
 
         if (isNative && Geolocation) {
             try {
@@ -158,47 +175,22 @@ export async function stopPositionTracking() {
     AppState.prevLat = null;
     AppState.prevLng = null;
     AppState.altitudeCorrectionOffset = 0;
+    AppState.prevTime = null;
+    AppState.prevAltitude = null;
+    AppState.lastSmoothedSpeedMs = 0;
+    AppState.lastSmoothedRateOfClimbMps = 0;
+    AppState.lastDirection = 'N/A';
+    AppState.lastDeviceAltitude = null;
+    AppState.lastAltitudeAccuracy = null;
+    AppState.lastAccuracy = null;
+
+    // --- START: DIE ENTSCHEIDENDE KORREKTUR ---
+    // Setzt die Flags zurück, die den Neustart blockiert haben.
+    isTrackingInitializing = false;
+    trackingInitPromise = null;
+    // --- ENDE: DIE ENTSCHEIDENDE KORREKTUR ---
+    
     document.dispatchEvent(new CustomEvent('tracking:stopped'));
-}
-
-/**
- * Startet oder stoppt die manuelle Aufzeichnung eines Tracks.
- * Wird durch den neuen Button im Dashboard gesteuert.
- */
-export function toggleManualRecording() {
-    if (AppState.isAutoRecording) {
-        Utils.handleMessage("Cannot start manual recording while auto-recording is active.");
-        return;
-    }
-
-    AppState.isManualRecording = !AppState.isManualRecording;
-
-    if (AppState.isManualRecording) {
-        // Manuelle Aufnahme starten
-        AppState.recordedTrackPoints = []; // Track zurücksetzen
-        AppState.altitudeCorrectionOffset = 0; // WICHTIG: Offset zurücksetzen
-        startPositionTracking(); // Tracking starten, falls es nicht läuft
-        Utils.handleMessage("Manual recording started.");
-        document.dispatchEvent(new CustomEvent('sensor:freefall_detected')); // Simuliert den Start
-    } else {
-        // Manuelle Aufnahme stoppen
-        Utils.handleMessage("Manual recording stopped. Saving track...");
-        saveRecordedTrack(); // Track speichern
-        // Das Tracking wird hier NICHT gestoppt, da es unabhängig weiterlaufen kann.
-        document.dispatchEvent(new CustomEvent('sensor:disarmed'));
-    }
-
-    // Button-Zustand in der UI aktualisieren
-    const manualButton = document.getElementById('manual-recording-button');
-    if (manualButton) {
-        if (AppState.isManualRecording) {
-            manualButton.textContent = "Stop Recording";
-            manualButton.classList.add('recording');
-        } else {
-            manualButton.textContent = "Start Recording";
-            manualButton.classList.remove('recording');
-        }
-    }
 }
 
 // ===================================================================
@@ -388,37 +380,47 @@ function updateAccuracyCircle(lat, lng, accuracy) {
  * @private
  */
 async function checkAndRequestPermissions() {
-    const { Geolocation } = await getCapacitor();
-    let permissions;
     try {
-        permissions = await Geolocation.checkPermissions();
+        const { Geolocation, isInitialized } = await getCapacitor();
+        
+        if (!isInitialized) {
+            console.error('Capacitor not fully initialized');
+            return false;
+        }
+
+        // Warte einen kurzen Moment, um sicherzustellen, dass das Plugin bereit ist
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        const permissions = await Geolocation.checkPermissions();
         console.log('Initial geolocation permissions state:', permissions);
+
+        if (permissions.location === 'denied') {
+            Utils.handleError('GPS permission was denied. Please enable "Always" in the app settings.');
+            return false;
+        }
+
+        if (permissions.location !== 'granted') {
+            try {
+                const requestResult = await Geolocation.requestPermissions({
+                    permissions: ['location', 'coarseLocation']
+                });
+                console.log('New geolocation permissions state:', requestResult);
+                
+                if (requestResult.location !== 'granted') {
+                    Utils.handleError('GPS permission is required for live tracking.');
+                    return false;
+                }
+            } catch (error) {
+                console.error('[LiveTrackingManager] Permission request error:', error);
+                Utils.handleError(`Failed to request permissions: ${error.message}`);
+                return false;
+            }
+        }
+
+        return true;
     } catch (error) {
-        console.error('Error checking permissions:', error);
+        console.error('Error in checkAndRequestPermissions:', error);
         Utils.handleError('Could not check location permissions.');
         return false;
     }
-
-
-    if (permissions.location === 'denied') {
-        Utils.handleError('GPS permission was denied. Please enable "Always" in the app settings.');
-        return false;
-    }
-
-    if (permissions.location !== 'granted') {
-        try {
-            permissions = await Geolocation.requestPermissions({ permissions: ['location', 'coarseLocation'] });
-            console.log('New geolocation permissions state:', permissions);
-            if (permissions.location !== 'granted') {
-                Utils.handleError('GPS permission is required for live tracking.');
-                return false;
-            }
-        } catch (error) {
-            console.error('[LiveTrackingManager] Permission request error:', error);
-            Utils.handleError(`Failed to request permissions: ${error.message}`);
-            return false;
-        }
-    }
-
-    return true;
 }

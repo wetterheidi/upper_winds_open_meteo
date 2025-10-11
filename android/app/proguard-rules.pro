@@ -19,3 +19,25 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Capacitor-spezifische Regeln
+-keep class com.getcapacitor.** { *; }
+-keep class com.getcapacitor.plugin.** { *; }
+-keep public class * extends com.getcapacitor.Plugin
+
+# Behalte Reflection-Informationen für Capacitor Plugins
+-keepattributes *Annotation*
+-keepclassmembers class * {
+    @com.getcapacitor.PluginMethod public <methods>;
+}
+
+# Geolocation Plugin spezifisch
+-keep class com.getcapacitor.plugin.geolocation.** { *; }
+
+# Filesystem Plugin spezifisch
+-keep class com.getcapacitor.plugin.filesystem.** { *; }
+
+# Verhindere Optimierung der Plugin-Initialisierung
+-keep class * extends com.getcapacitor.Plugin {
+    public <init>();
+}

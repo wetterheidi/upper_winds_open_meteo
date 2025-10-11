@@ -1712,7 +1712,7 @@ function _setupCoreMapEventHandlers() {
         }
     });
 
-    // Movestart (für manuelles Panning)
+    //
     AppState.map.on('movestart', (e) => {
         // Prüft, ob die Bewegung durch Ziehen der Karte ausgelöst wurde und nicht durch Ziehen eines Markers
         if (e.target === AppState.map && (!e.originalEvent || e.originalEvent.target === AppState.map.getContainer())) {
@@ -1961,20 +1961,51 @@ async function _geolocationErrorCallback(error, defaultCenter, defaultZoom) {
     // =================================================================
 }
 async function _handleGeolocation(defaultCenter, defaultZoom) {
-    console.log('[MapManager] Starting geolocation handling at', new Date().toISOString());
+    console.log('[MapManager] Getting initial geolocation...');
 
-    // Wir rufen direkt den liveTrackingManager auf. Er kümmert sich um alles Weitere.
-    // Ein erfolgreiches Update der Position wird dann das 'tracking:positionUpdated' Event auslösen.
-    await liveTrackingManager.startPositionTracking();
+    try {
+        const { Geolocation, isNative } = await getCapacitor();
 
-    // Fallback-Logik, falls die Geolokalisierung fehlschlägt oder keine Position liefert.
-    // Wir geben dem System etwas Zeit, eine Position zu finden.
-    setTimeout(async () => {
-        if (!AppState.liveMarker) {
-            console.warn('[MapManager] Geolocation did not provide a position in time. Using fallback.');
-            await _geolocationErrorCallback({ message: 'Geolocation timeout or permission denied.' }, defaultCenter, defaultZoom);
+        // Native Logik (Capacitor)
+        if (isNative && Geolocation) {
+            // Berechtigungen prüfen, bevor die Position abgefragt wird
+            const permissions = await Geolocation.checkPermissions();
+            if (permissions.location === 'denied') {
+                throw new Error('Permission for location was denied.');
+            }
+            // Wenn nicht bereits erteilt, Berechtigung anfordern
+            if (permissions.location !== 'granted') {
+                const requestResult = await Geolocation.requestPermissions({ permissions: ['location'] });
+                if (requestResult.location !== 'granted') {
+                    throw new Error('Permission for location not granted.');
+                }
+            }
+
+            // Nur die einmalige, aktuelle Position abfragen
+            const position = await Geolocation.getCurrentPosition({
+                enableHighAccuracy: true,
+                timeout: UI_DEFAULTS.GEOLOCATION_TIMEOUT_MS,
+                maximumAge: 0
+            });
+            await _geolocationSuccessCallback(position, defaultZoom);
+
+        } else if (navigator.geolocation) { // Web-Fallback
+            navigator.geolocation.getCurrentPosition(
+                (position) => _geolocationSuccessCallback(position, defaultZoom),
+                (geoError) => _geolocationErrorCallback(geoError, defaultCenter, defaultZoom),
+                {
+                    enableHighAccuracy: true,
+                    timeout: UI_DEFAULTS.GEOLOCATION_TIMEOUT_MS,
+                    maximumAge: 0
+                }
+            );
+        } else {
+            throw new Error('Geolocation is not supported on this device.');
         }
-    }, 8000); // Warte 8 Sekunden auf eine erste Position
+    } catch (error) {
+        console.warn(`[MapManager] Initial geolocation failed. Using fallback. Error: ${error.message}`);
+        await _geolocationErrorCallback(error, defaultCenter, defaultZoom);
+    }
 }
 export function toggleGeoManControls(locked) {
     if (!AppState.map || !AppState.map.pm) return;
