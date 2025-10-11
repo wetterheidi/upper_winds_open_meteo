@@ -4,18 +4,18 @@ PODS:
   - CapacitorCommunityBackgroundGeolocation (0.0.1):
     - Capacitor
   - CapacitorCordova (7.4.2)
-  - CapacitorFilesystem (7.1.2):
+  - CapacitorFilesystem (7.1.4):
     - Capacitor
-    - IONFilesystemLib (~> 1.0)
-  - CapacitorGeolocation (7.1.4):
+    - IONFilesystemLib (~> 1.0.1)
+  - CapacitorGeolocation (7.1.5):
     - Capacitor
-    - IONGeolocationLib (~> 1.0)
+    - IONGeolocationLib (= 1.0.1)
   - CapacitorSplashScreen (7.0.2):
     - Capacitor
   - CapawesomeCapacitorFilePicker (7.2.0):
     - Capacitor
   - IONFilesystemLib (1.0.1)
-  - IONGeolocationLib (1.0.0)
+  - IONGeolocationLib (1.0.1)
 
 DEPENDENCIES:
   - "Capacitor (from `../../node_modules/@capacitor/ios`)"
@@ -51,12 +51,12 @@ SPEC CHECKSUMS:
   Capacitor: 9d9e481b79ffaeacaf7a85d6a11adec32bd33b59
   CapacitorCommunityBackgroundGeolocation: 834a8f8eca8ebada8debffe1236e5674b831cead
   CapacitorCordova: 5e58d04631bc5094894ac106e2bf1da18a9e6151
-  CapacitorFilesystem: 337eeaf16a9fa5a44d2329df411523fa3a9a6ee9
-  CapacitorGeolocation: 32a1f849c38c72b5071de36a28ebc548ef3bb611
+  CapacitorFilesystem: f9bd850c41e048180e5dc0cbb90f2033ede9d2cc
+  CapacitorGeolocation: 84f868bea4c2499aebc3bb3a88fd0a508f87ab87
   CapacitorSplashScreen: 157947576b59d913792063a8d442a79e6d283ee5
   CapawesomeCapacitorFilePicker: 0f4a913a00e39dd77213449f0d917e92f35a5ca9
   IONFilesystemLib: 89258b8e3e85465da93127d25d7ce37f977e8a6f
-  IONGeolocationLib: 81f33f88d025846946de2cf63b0c7628e7c6bc9d
+  IONGeolocationLib: 20f9d0248a0b5264511fb57a37e25dd2badf797a
 
 PODFILE CHECKSUM: c09654821586a6a18511c483f82f1ffec5446b42
 
