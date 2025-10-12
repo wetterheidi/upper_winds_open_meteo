@@ -48,6 +48,7 @@ export const Settings = {
         timeZone: 'Z',
         coordFormat: 'Decimal',
         downloadFormat: 'HEIDIS',
+        maxForecastTime: 'Maximum',
         showTable: false,
         canopySpeed: 20,
         descentRate: 3.5,

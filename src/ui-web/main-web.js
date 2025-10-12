@@ -106,6 +106,7 @@ function initializeUIElements() {
     applySettingToSelect('timeZone', Settings.state.userSettings.timeZone);
     applySettingToSelect('coordFormat', Settings.state.userSettings.coordFormat);
     applySettingToSelect('downloadFormat', Settings.state.userSettings.downloadFormat);
+    applySettingToSelect('maxForecastTime', Settings.state.userSettings.maxForecastTime); // Hinzugefügt
     applySettingToRadio('landingDirection', Settings.state.userSettings.landingDirection);
     applySettingToInput('canopySpeed', Settings.state.userSettings.canopySpeed);
     applySettingToInput('descentRate', Settings.state.userSettings.descentRate);
@@ -853,20 +854,31 @@ export async function updateUIWithNewWeatherData(newWeatherData, preservedIndex 
     };
 
     const lastValidIndex = findLastValidDataIndex(newWeatherData);
-    slider.max = lastValidIndex;
+    
+    // Geänderte Logik für den Slider
+    const maxForecastTime = Settings.getValue('maxForecastTime', 'Maximum');
+    let maxSliderIndex = lastValidIndex;
+
+    if (maxForecastTime !== 'Maximum') {
+        const maxDays = parseInt(maxForecastTime, 10);
+        const maxHours = (maxDays * 24) - 1; // -1, da der Index bei 0 beginnt
+        if (lastValidIndex > maxHours) {
+            maxSliderIndex = maxHours;
+        }
+    }
+    slider.max = maxSliderIndex;
     slider.disabled = slider.max <= 0;
 
-    // Wenn ein Index übergeben wurde und dieser gültig ist, verwenden wir ihn.
-    // Ansonsten verwenden wir das Standardverhalten (aktuelle Stunde).
-    if (preservedIndex !== null && preservedIndex <= lastValidIndex) {
+    // Logik zur Positionierung des Sliders
+    if (preservedIndex !== null && preservedIndex <= maxSliderIndex) {
         slider.value = preservedIndex;
         console.log(`Slider restored to preserved index: ${preservedIndex}`);
     } else {
         const currentUtcHour = new Date().getUTCHours();
-        if (currentUtcHour <= lastValidIndex) {
+        if (currentUtcHour <= maxSliderIndex) {
             slider.value = currentUtcHour;
         } else {
-            slider.value = lastValidIndex;
+            slider.value = maxSliderIndex;
         }
         console.log(`Slider set to default (current hour or max): ${slider.value}`);
     }
@@ -1011,7 +1023,7 @@ function updateJumpMasterDashboard(data) {
     const varioEl = document.getElementById('dashboard-jm-vario');
 
     // Werte formatieren und anzeigen
-     const settings = {
+    const settings = {
         heightUnit: getHeightUnit(),
         effectiveWindUnit: getWindSpeedUnit() === 'bft' ? 'kt' : getWindSpeedUnit(),
         coordFormat: getCoordinateFormat(),
@@ -1428,6 +1440,18 @@ function setupAppEventListeners() {
             await displayManager.updateWeatherDisplay(getSliderValue(), 'weather-table-container', 'selectedTime');
         }
 
+        if (name === 'maxForecastTime') {
+            if (AppState.lastLat && AppState.lastLng) {
+                const timeIndexToPreserve = getSliderValue();
+                const currentTime = AppState.weatherData?.time?.[timeIndexToPreserve] || null;
+
+                const newWeatherData = await weatherManager.fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, currentTime);
+                if (newWeatherData) {
+                    await updateUIWithNewWeatherData(newWeatherData, timeIndexToPreserve);
+                }
+            }
+        }
+        
         // Neuberechnungen basierend auf der geänderten Einstellung anstoßen
         switch (name) {
             case 'heightUnit':

@@ -829,6 +829,7 @@ function setupSettingsPanels() {
     setupSelectControl('windUnit', 'windUnit');
     setupSelectControl('timeZone', 'timeZone');
     setupSelectControl('coordFormat', 'coordFormat');
+    setupSelectControl('maxForecastTime', 'maxForecastTime'); 
 
     // Download Panel
     setupSelectControl('downloadFormat', 'downloadFormat');

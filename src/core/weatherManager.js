@@ -57,7 +57,7 @@ export function analyzeCloudLayers(weatherData) {
             const maxCC = Math.max(...pLevels.map(p => weatherData[`cloud_cover_${p}hPa`]?.[i] || 0));
             return maxCC > 50 ? defaultHigh : defaultLow;
         };
-        
+
         thresholds.push({
             low: getThreshold(stockwerke.low, 90, 75),
             mid: getThreshold(stockwerke.mid, 85, 70),
@@ -107,7 +107,7 @@ export function interpolateWeatherData(weatherData, sliderIndex, interpStep, bas
         return [];
     }
 
- const currentThresholds = AppState.cloudThresholds[sliderIndex];
+    const currentThresholds = AppState.cloudThresholds[sliderIndex];
     if (!currentThresholds) {
         console.warn('No pre-analyzed cloud thresholds for this index. Performing on-the-fly analysis.');
         AppState.cloudThresholds = analyzeCloudLayers(weatherData);
@@ -284,7 +284,7 @@ export function interpolateWeatherData(weatherData, sliderIndex, interpStep, bas
             let rhThreshold;
 
             const groundTemp = weatherData.temperature_2m[sliderIndex];
-            
+
             // Bestimme das Stockwerk und den passenden Schwellenwert
             if (groundTemp <= 0) { // Sonderfall Kaltluft
                 if (heightAGLInMeters <= 2000) {
@@ -386,8 +386,18 @@ async function fetchWeather(lat, lon, currentTime = null) {
             let forecastStart = DateTime.fromJSDate(runDate).setZone('utc').plus({ hours: 6 });
             if (forecastStart > DateTime.utc()) forecastStart = DateTime.utc();
             startDateStr = forecastStart.toFormat('yyyy-MM-dd');
-            const forecastDays = selectedModelValue.includes('_d2') ? 2 : 7;
-            endDateStr = forecastStart.plus({ days: forecastDays }).toFormat('yyyy-MM-dd');
+
+            // Geänderte Logik für das Enddatum
+            const modelMaxDays = selectedModelValue.includes('_d2') ? 2 : 7;
+            const userMaxForecast = Settings.getValue('maxForecastTime', 'Maximum');
+            let forecastDays = modelMaxDays;
+
+            if (userMaxForecast !== 'Maximum') {
+                const userMaxDays = parseInt(userMaxForecast, 10);
+                forecastDays = Math.min(modelMaxDays, userMaxDays);
+            }
+
+            endDateStr = forecastStart.plus({ days: forecastDays - 1 }).toFormat('yyyy-MM-dd');
         }
 
         const hourlyParams = "surface_pressure,temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,visibility,weather_code,cloud_cover_low,cloud_cover_mid,cloud_cover_high,temperature_1000hPa,relative_humidity_1000hPa,wind_speed_1000hPa,wind_direction_1000hPa,geopotential_height_1000hPa,cloud_cover_1000hPa,temperature_950hPa,relative_humidity_950hPa,wind_speed_950hPa,wind_direction_950hPa,geopotential_height_950hPa,cloud_cover_950hPa,temperature_925hPa,relative_humidity_925hPa,wind_speed_925hPa,wind_direction_925hPa,geopotential_height_925hPa,cloud_cover_925hPa,temperature_900hPa,relative_humidity_900hPa,wind_speed_900hPa,wind_direction_900hPa,geopotential_height_900hPa,cloud_cover_900hPa,temperature_850hPa,relative_humidity_850hPa,wind_speed_850hPa,wind_direction_850hPa,geopotential_height_850hPa,cloud_cover_850hPa,temperature_800hPa,relative_humidity_800hPa,wind_speed_800hPa,wind_direction_800hPa,geopotential_height_800hPa,cloud_cover_800hPa,temperature_700hPa,relative_humidity_700hPa,wind_speed_700hPa,wind_direction_700hPa,geopotential_height_700hPa,cloud_cover_700hPa,temperature_600hPa,relative_humidity_600hPa,wind_speed_600hPa,wind_direction_600hPa,geopotential_height_600hPa,cloud_cover_600hPa,temperature_500hPa,relative_humidity_500hPa,wind_speed_500hPa,wind_direction_500hPa,geopotential_height_500hPa,cloud_cover_500hPa,temperature_400hPa,relative_humidity_400hPa,wind_speed_400hPa,wind_direction_400hPa,geopotential_height_400hPa,cloud_cover_400hPa,temperature_300hPa,relative_humidity_300hPa,wind_speed_300hPa,wind_direction_300hPa,geopotential_height_300hPa,cloud_cover_300hPa,temperature_250hPa,relative_humidity_250hPa,wind_speed_250hPa,wind_direction_250hPa,geopotential_height_250hPa,cloud_cover_250hPa,temperature_200hPa,relative_humidity_200hPa,wind_speed_200hPa,wind_direction_200hPa,geopotential_height_200hPa,cloud_cover_200hPa";

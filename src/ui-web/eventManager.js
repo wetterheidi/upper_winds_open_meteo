@@ -855,7 +855,7 @@ function setupRadioEvents() {
     }
 }
 function setupSelectEvents() {
-    const selectIds = ['refLevel', 'heightUnit', 'temperatureUnit', 'windUnit', 'timeZone', 'coordFormat', 'downloadFormat'];
+    const selectIds = ['refLevel', 'heightUnit', 'temperatureUnit', 'windUnit', 'timeZone', 'coordFormat', 'downloadFormat', 'maxForecastTime']; // Hinzugefügt
 
     selectIds.forEach(id => {
         const selectElement = document.getElementById(id);

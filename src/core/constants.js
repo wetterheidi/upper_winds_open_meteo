@@ -95,6 +95,7 @@ export const WEATHER_MODELS = {
         'gfs_seamless',
         'gfs_global',
         'gfs_hrrr',
+        'gfs_graphcast025',
         'arome_france',
         'gem_hrdps_continental',
         'gem_regional'
@@ -110,6 +111,7 @@ export const WEATHER_MODELS = {
         'gfs_global': 'ncep_gfs025',
         'gfs_hrrr': 'ncep_hrrr_conus',
         'arome_france': 'meteofrance_arome_france0025',
+        'gfs_graphcast025' : 'ncep_gfs_graphcast025',
         'gem_hrdps_continental': 'cmc_gem_hrdps',
         'gem_regional': 'cmc_gem_rdps'
     }
