@@ -240,7 +240,7 @@ function toggleFavorite(lat, lng, defaultName, onFinish) {
         // Sorge dafür, dass nach dem Schließen des Modals (egal wie) neu gezeichnet wird
         const modalConfirm = () => {
             const name = favoriteNameInput.value.trim() || currentFavoriteData.defaultName;
-            LocationManager.addOrUpdateFavorite(currentFavoriteData.lat, lng, name);
+            LocationManager.addOrUpdateFavorite(lat, lng, name);
             if (onFinish) onFinish();
             favoriteModal.style.display = 'none';
         };
