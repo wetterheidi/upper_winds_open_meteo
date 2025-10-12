@@ -12,6 +12,7 @@ export function generateWindspinne(interpolatedData, userMaxHoehe) {
     const canvas = document.getElementById('windspinne-chart');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
+    const style = getComputedStyle(document.body);
 
     // Data vectors from the interpolated data
     const hoehenVektor = interpolatedData.map(d => d.height);
@@ -23,11 +24,11 @@ export function generateWindspinne(interpolatedData, userMaxHoehe) {
     const maxRadius = userMaxHoehe;
 
     const getWindColor = (speedKt) => {
-        if (speedKt <= 5) return 'blue';
-        if (speedKt <= 10) return 'green';
-        if (speedKt <= 15) return 'orange';
-        if (speedKt <= 20) return 'red';
-        return 'purple';
+        if (speedKt <= 5) return style.getPropertyValue('--wind-low').trim();
+        if (speedKt <= 10) return style.getPropertyValue('--wind-moderate').trim();
+        if (speedKt <= 15) return style.getPropertyValue('--wind-high').trim();
+        if (speedKt <= 20) return style.getPropertyValue('--wind-very-high').trim();
+        return style.getPropertyValue('--wind-extreme').trim();
     };
 
     const linePolarData = [];
@@ -101,8 +102,11 @@ export function generateWindspinne(interpolatedData, userMaxHoehe) {
                 const circleStep = maxRadius <= 4000 ? 200 : 500;
                 const labelStep = 1000;
 
+                const gridColor = style.getPropertyValue('--border-color').trim();
+                const textColor = style.getPropertyValue('--text-color-subtle').trim();
+
                 // Thin helper lines
-                ctx.strokeStyle = '#eee';
+                ctx.strokeStyle = gridColor;
                 ctx.lineWidth = 0.5;
                 for (let alt = circleStep; alt <= maxRadius; alt += circleStep) {
                     if (alt % labelStep !== 0) {
@@ -115,7 +119,7 @@ export function generateWindspinne(interpolatedData, userMaxHoehe) {
                 }
 
                 // Thick main altitude lines
-                ctx.strokeStyle = '#ccc';
+                ctx.strokeStyle = gridColor;
                 ctx.lineWidth = 1.5;
                 for (let alt = labelStep; alt <= maxRadius; alt += labelStep) {
                     const radiusX = Math.abs(x.getPixelForValue(alt) - centerX);
@@ -123,14 +127,14 @@ export function generateWindspinne(interpolatedData, userMaxHoehe) {
                     ctx.beginPath();
                     ctx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, 2 * Math.PI);
                     ctx.stroke();
-                    ctx.fillStyle = '#666';
+                    ctx.fillStyle = textColor;
                     ctx.fillText(`${alt}m`, centerX + 5, centerY - radiusY - 5);
                 }
 
                 // Radial lines
                 const maxPixelRadiusX = (chart.chartArea.right - chart.chartArea.left) / 2;
                 const maxPixelRadiusY = (chart.chartArea.bottom - chart.chartArea.top) / 2;
-                ctx.strokeStyle = '#ccc';
+                ctx.strokeStyle = gridColor;
                 ctx.lineWidth = 1;
                 for (let angle = 0; angle < 360; angle += 30) {
                     const angleRad = (angle - 90) * (Math.PI / 180);

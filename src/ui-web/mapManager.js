@@ -114,10 +114,7 @@ export function drawJumpVisualization(jumpData) {
         jumpData.exitCircles.forEach(circleInfo => {
             const circleLayer = L.circle(circleInfo.center, {
                 radius: circleInfo.radius,
-                color: circleInfo.color,
-                fillColor: circleInfo.fillColor,
-                fillOpacity: circleInfo.fillOpacity,
-                weight: circleInfo.weight || 2,
+                className: 'jump-viz-exit-area',
                 pmIgnore: true
             }).addTo(AppState.jumpVisualizationLayerGroup);
 
@@ -390,7 +387,9 @@ export function drawJumpMasterLine(start, end) {
     if (AppState.jumpMasterLine) {
         AppState.jumpMasterLine.setLatLngs(line);
     } else {
-        AppState.jumpMasterLine = L.polyline(line, { color: 'blue', weight: 3, dashArray: '5, 5' }).addTo(AppState.map);
+        AppState.jumpMasterLine = L.polyline(line, {
+            className: 'jump-master-line'
+        }).addTo(AppState.map);
     }
 }
 export function drawTerrainWarning(dangerousPoints) {
@@ -778,7 +777,7 @@ export function createHarpMarker(latitude, longitude) {
     const marker = L.marker([latitude, longitude], {
         icon: L.divIcon({
             className: 'harp-marker',
-            html: '<div style="width: 14px; height: 14px; background-color: green; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 6px rgba(0,0,0,0.6);"></div>',
+            html: '<div class="harp-marker-inner"></div>',
             iconSize: [20, 20],
             iconAnchor: [10, 10],
         }),

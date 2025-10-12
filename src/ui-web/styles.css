@@ -1,17 +1,136 @@
 /* =================================================================== */
 /* 1. GLOBALE STILE & ROOT-VARIABLEN
 /* =================================================================== */
+/* Ersetzen Sie den Anfang Ihrer CSS-Datei hiermit */
 :root {
     --primary-color: #4da8da;
     --primary-hover-color: #0056b3;
+    --danger-color: #dc3545;
+    --danger-hover-color: #c82333;
+    --secondary-color: #6c757d;
+
     --text-color: #333;
+    --text-color-light: #ffffff;
+    --text-color-subtle: #666;
+    --text-color-inverted: #ffffff;
+
     --background-light: #ffffff;
     --background-medium: #f0f2f5;
+    --background-dark: #e9ecef;
+    --background-overlay: rgba(255, 255, 255, 0.9);
+    --background-hover: #007bff;
+    --background-active: #d1d5db;
+    --background-hover-darker: #5a6268;
+    --background-clear: #e3f2fd;
+    --background-few: hsl(205, 36%, 86%);
+    --background-sct: #e0e0e0;
+    --background-bkn: #b0bec5;
+    --background-ovc: #78909c;
+
+
     --border-color: #d9d9d9;
-    --font-main: 'Roboto', sans-serif;
+    --border-color-strong: #555;
+    --border-color-light: lightblue;
+    --border-color-moderate: lightgreen;
+    --border-color-high: #f5f34f;
+    --border-color-very-high: #ffcccc;
+
+    --shadow-soft: 2px 0 8px rgba(0, 0, 0, 0.05);
+    --shadow-medium: 0 4px 12px rgba(0, 0, 0, 0.15);
+    --shadow-strong: 0 0 2px rgba(255, 255, 255, 0.8);
+    --shadow-dark: 1px 1px 2px rgba(0, 0, 0, 0.6);
+
+    --notification-success-bg: #4CAF50;
+    --notification-error-bg: #f44336;
+    --notification-warning-bg: #fff3cd;
+    --notification-warning-text: #856404;
+    --notification-info-bg: #3f51b5;
+    --notification-text-light: #ffffff;
+
+    --status-success: #28a745;
+    --status-warning: #f3d131;
+    --status-danger-hover: #e74c3c;
+
+    --wind-low: blue;
+    --wind-moderate: green;
+    --wind-high: orange;
+    --wind-very-high: red;
+    --wind-extreme: purple;
+
+    --overlay-background-light: rgba(255, 255, 255, 0.7);
+    --overlay-background-light-strong: rgba(210, 251, 186, 0.9);
+    --overlay-background-light-extra: rgba(255, 255, 224, 0.9);
+    --overlay-text-dark: blue;
+
+    --shadow-text-dark: 1px 1px 2px rgba(0, 0, 0, 0.6);
+
+    --font-main: 'Roboto',
+        sans-serif;
     --label-width: 135px;
     --input-width: 70px;
     --grid-columns: var(--label-width) var(--input-width) var(--label-width) var(--input-width) minmax(0, 1fr);
+}
+
+/* Dark Mode Theme */
+body[data-theme="dark"] {
+    --primary-color: #5db9e8;
+    --primary-hover-color: #8ac9e8;
+    --danger-color: #e85d6c;
+    --danger-hover-color: #f08a96;
+    --secondary-color: #8c969d;
+
+    --text-color: #e0e0e0;
+    --text-color-light: #f5f5f5;
+    --text-color-subtle: #a0a0a0;
+    --text-color-inverted: #121212;
+    --text-color-strong: #a0a0a0;
+    --text-color-subtle: #555;
+
+
+    --background-light: #121212;
+    --background-medium: #1e1e1e;
+    --background-dark: #2c2c2c;
+    --background-overlay: rgba(30, 30, 30, 0.9);
+    --background-hover: #8ac9e8;
+    --background-active: #4a4a4a;
+    --background-hover-darker: #7a8288;
+    --background-clear: #e3f2fd;
+    --background-few: hsl(205, 36%, 86%);
+    --background-sct: #e0e0e0;
+    --background-bkn: #b0bec5;
+    --background-ovc: #78909c;
+
+
+    --border-color: #444;
+    --border-color-strong: #888;
+    --border-color-light: #5c8a9e;
+    --border-color-moderate: #5c8f5c;
+    --border-color-high: #b5b33b;
+    --border-color-very-high: #cc8c8c;
+
+    --shadow-soft: 2px 0 8px rgba(255, 255, 255, 0.05);
+    --shadow-medium: 0 4px 12px rgba(255, 255, 255, 0.08);
+    --shadow-strong: 0 0 2px rgba(255, 255, 255, 0.8);
+    --shadow-dark: 1px 1px 2px rgba(255, 255, 255, 0.6);
+
+    --notification-success-bg: #2e7d32;
+    --notification-error-bg: #c62828;
+    --notification-warning-bg: #4d442a;
+    --notification-warning-text: #ffe59e;
+    --notification-info-bg: #5c6bc0;
+    --notification-text-light: #ffffff;
+
+    --status-success: #66bb6a;
+    --status-warning: #f5dd5d;
+    --status-danger-hover: #f08a96;
+
+    --overlay-background-light: rgba(30, 30, 30, 0.7);
+    --overlay-background-light-strong: rgba(40, 50, 40, 0.9);
+    --overlay-background-light-extra: rgba(50, 50, 40, 0.9);
+    --overlay-text-dark: #87cefa;
+    /* LightSkyBlue */
+
+    --shadow-text-dark: 1px 1px 3px rgba(255, 255, 255, 0.3);
 }
 
 html {
@@ -104,7 +223,7 @@ body {
     grid-column: 2 / 3;
     background-color: var(--background-light);
     border-right: 1px solid var(--border-color);
-    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
+    box-shadow: var(--shadow-soft);
     padding: 2px;
     overflow-y: auto;
     z-index: 1500;
@@ -144,11 +263,11 @@ body {
 }
 
 .sidebar-icon:hover {
-    background-color: #007bff;
+    background-color: var(--background-hover);
 }
 
 .sidebar-icon.active {
-    background-color: #d1d5db;
+    background-color: var(--background-active);
 }
 
 .sidebar-icon .icon {
@@ -160,7 +279,7 @@ body {
     font-size: 10px;
     margin-top: 4px;
     font-weight: 500;
-    color: #555;
+    color: var(--text-color);
 }
 
 /* --- Panels & Accordion --- */
@@ -177,10 +296,10 @@ body {
 }
 
 #panel-container .accordion-item {
-    background-color: #fff;
+    background-color: var(--background-light);
     margin-bottom: 10px;
     border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-soft);
     overflow: hidden;
 }
 
@@ -188,9 +307,9 @@ body {
     width: 100%;
     padding: 15px;
     background-color: var(--primary-color);
-    color: white;
+    color: var(--text-color-light);
     border: none;
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid var(--border-color);
     cursor: pointer;
     font-size: 16px;
     font-weight: bold;
@@ -207,7 +326,7 @@ body {
 #panel-container .accordion-header::after {
     content: '▶';
     font-size: 12px;
-    color: white;
+    color: var(--text-color-light);
     transition: transform 0.3s ease;
 }
 
@@ -218,8 +337,8 @@ body {
 #panel-container .accordion-content {
     display: none;
     padding: 20px 15px;
-    border-top: 1px solid #e5e7eb;
-    background-color: #fdfdfd;
+    border-top: 1px solid var(--border-color);
+    background-color: var(--background-light);
 }
 
 #panel-container .accordion-item.active .accordion-content {
@@ -252,7 +371,7 @@ body {
 .settings-grid label,
 .settings-grid span {
     font-weight: 500;
-    color: #4b5563;
+    color: var(--text-color);
     text-align: right;
 }
 
@@ -261,7 +380,7 @@ body {
 .settings-grid select {
     width: 100%;
     padding: 8px 12px;
-    border: 1px solid #d1d5db;
+    border: 1px solid var(--border-color);
     border-radius: 6px;
     font-size: 14px;
     box-sizing: border-box;
@@ -271,7 +390,7 @@ body {
 .settings-grid input:focus,
 .settings-grid select:focus {
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 2px rgba(77, 168, 218, 0.2);
+    box-shadow: var(--shadow-soft);
     outline: none;
 }
 
@@ -285,11 +404,11 @@ body {
     display: block;
     margin-top: 5px;
     padding: 8px 12px;
-    background-color: #f8f9fa;
-    border: 1px solid #dee2e6;
+    background-color: var(--text-color-light);
+    border: 1px solid var(--border-color);
     border-radius: 6px;
     font-style: italic;
-    color: #6c757d;
+    color: var(--secondary-color);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -311,7 +430,7 @@ input[type="checkbox"] {
 }
 
 input[type="checkbox"]:not(:checked):hover {
-    background-color: #e6f0fa;
+    background-color: var(--background-medium);
 }
 
 input[type="checkbox"]:checked::after {
@@ -327,7 +446,7 @@ input[type="checkbox"]:checked::after {
 
 input[type="checkbox"]:focus {
     outline: none;
-    box-shadow: 0 0 0 2px rgba(77, 168, 218, 0.2);
+    box-shadow: var(--shadow-medium);
 }
 
 input[type="checkbox"][style*="opacity: 0.5"] {
@@ -343,7 +462,7 @@ input[type="checkbox"][style*="opacity: 0.5"] {
 
 .info-button-shared {
     background: transparent;
-    border: 1px solid #555;
+    border: 1px solid var(--border-color-strong);
     color: var(--text-color);
     width: 20px;
     height: 20px;
@@ -377,7 +496,7 @@ input[type="checkbox"][style*="opacity: 0.5"] {
     background: white;
     border: 1px solid #ccc;
     border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    box-shadow: var(--shadow-medium);
     z-index: 2000;
     font-size: 13px;
     color: var(--text-color);
@@ -393,23 +512,24 @@ input[type="checkbox"][style*="opacity: 0.5"] {
     transform: translateX(-50%);
     border-width: 6px;
     border-style: solid;
-    border-color: white transparent transparent transparent;
+    border-color: var(--background-light) transparent transparent transparent;
 }
 
 /* --- Allgemeine Buttons --- */
 #panel-container button.btn {
-    grid-column: 1 / -1; 
+    grid-column: 1 / -1;
     padding: 10px;
-    margin: 10px 0; 
+    margin: 10px 0;
     font-size: 14px;
     font-weight: bold;
-    color: white;
+    color: var(--text-color-light);
     border: none;
     border-radius: 6px;
     cursor: pointer;
     text-align: center;
     transition: background-color 0.2s ease, opacity 0.2s ease;
-    width: 100%; /* Stellt sicher, dass er die volle Breite einnimmt */
+    width: 100%;
+    /* Stellt sicher, dass er die volle Breite einnimmt */
     box-sizing: border-box;
 }
 
@@ -422,19 +542,19 @@ input[type="checkbox"][style*="opacity: 0.5"] {
 }
 
 .btn-secondary {
-    background-color: #6c757d;
+    background-color: var(--secondary-color);
 }
 
 .btn-secondary:hover {
-    background-color: #5a6268;
+    background-color: var(--background-hover-darker);
 }
 
 .btn-danger {
-    background-color: #dc3545;
+    background-color: var(--danger-color);
 }
 
 .btn-danger:hover {
-    background-color: #c82333;
+    background-color: var(--danger-hover-color);
 }
 
 /* =================================================================== */
@@ -473,25 +593,29 @@ input[type="checkbox"][style*="opacity: 0.5"] {
     width: 100%;
     margin-top: 5px;
     /* Etwas Platz für die Labels unter dem Slider schaffen */
-    margin-bottom: 20px; 
+    margin-bottom: 20px;
 }
 
 #slider-labels {
     position: absolute;
-    top: 15px; /* Positioniert die Labels unterhalb des Slider-Griffs */
+    top: 15px;
+    /* Positioniert die Labels unterhalb des Slider-Griffs */
     left: 0;
     right: 0;
     height: 20px;
-    pointer-events: none; /* Stellt sicher, dass die Labels nicht die Bedienung des Sliders stören */
+    pointer-events: none;
+    /* Stellt sicher, dass die Labels nicht die Bedienung des Sliders stören */
 }
 
 .slider-label {
     position: absolute;
     top: 0;
-    transform: translateX(-50%); /* Zentriert das Label exakt über der Markierung */
+    transform: translateX(-50%);
+    /* Zentriert das Label exakt über der Markierung */
     font-size: 10px;
-    color: #555;
-    white-space: nowrap; /* Verhindert Zeilenumbrüche */
+    color: var(--text-color);
+    white-space: nowrap;
+    /* Verhindert Zeilenumbrüche */
 }
 
 #selectedTime,
@@ -514,7 +638,7 @@ input[type="checkbox"][style*="opacity: 0.5"] {
     appearance: none;
     width: 100%;
     height: 6px;
-    background: #ddd;
+    background: var(--background-dark);
     border-radius: 3px;
     outline: none;
     transition: opacity 0.2s ease;
@@ -560,10 +684,12 @@ input[type="checkbox"][style*="opacity: 0.5"] {
     display: grid;
     /* Definiert 4 Spalten: Label | Input | Label | Input */
     grid-template-columns: auto auto auto auto;
-    gap: 5px 10px; /* 5px Zeilenabstand, 10px Spaltenabstand */
+    gap: 5px 10px;
+    /* 5px Zeilenabstand, 10px Spaltenabstand */
     align-items: center;
     margin: 10px;
-    justify-content: start; /* Richtet das Grid linksbündig aus */
+    justify-content: start;
+    /* Richtet das Grid linksbündig aus */
 }
 
 #panel-data #controls-row {
@@ -574,17 +700,22 @@ input[type="checkbox"][style*="opacity: 0.5"] {
 }
 
 #meanWindControls label {
-    text-align: right; /* Stellt sicher, dass die Labels bündig sind */
+    text-align: right;
+    /* Stellt sicher, dass die Labels bündig sind */
 }
 
 #meanWindControls input {
-    width: 80px; /* Gibt den Inputs eine feste, aber passende Breite */
+    width: 80px;
+    /* Gibt den Inputs eine feste, aber passende Breite */
 }
 
 #meanWindResult {
-    grid-column: 1 / -1; /* Sorgt dafür, dass dieses Element die volle Breite einnimmt */
-    grid-row: 2; /* Platziert es explizit in der zweiten Zeile */
-    margin-top: 10px; /* Fügt Abstand nach oben hinzu */
+    grid-column: 1 / -1;
+    /* Sorgt dafür, dass dieses Element die volle Breite einnimmt */
+    grid-row: 2;
+    /* Platziert es explizit in der zweiten Zeile */
+    margin-top: 10px;
+    /* Fügt Abstand nach oben hinzu */
     font-weight: bold;
     font-size: 16px;
     color: var(--primary-color);
@@ -599,7 +730,7 @@ input[type="checkbox"][style*="opacity: 0.5"] {
     border-collapse: collapse;
     width: 100%;
     font-size: 13px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-soft);
     table-layout: fixed;
 }
 
@@ -618,47 +749,61 @@ input[type="checkbox"][style*="opacity: 0.5"] {
     text-align: center;
 }
 
-/* === NEU: Farbkodierung für Wolkenbedeckung === */
-#weather-table-container tr.cloud-cover-clear { /* 0-10% */
-    background: #e3f2fd !important; /* Sehr helles Blau */
+#weather-table-container tr.cloud-cover-clear {
+    /* 0-10% */
+    background: var(--background-clear) !important;
+    /* Sehr helles Blau */
 }
-#weather-table-container tr.cloud-cover-few { /* 11-30% */
-    background: hsl(205, 36%, 86%) !important; /* Helles Blau */
+
+#weather-table-container tr.cloud-cover-few {
+    /* 11-30% */
+    background: var(--background-few) !important;
+    /* Helles Blau */
 }
-#weather-table-container tr.cloud-cover-scattered { /* 31-60% */
-    background: #e0e0e0 !important; /* Helles Grau */
+
+#weather-table-container tr.cloud-cover-scattered {
+    /* 31-60% */
+    background: var(--background-sct) !important;
+    /* Helles Grau */
 }
-#weather-table-container tr.cloud-cover-broken { /* 61-90% */
-    background: #b0bec5 !important; /* Mittelgrau */
+
+#weather-table-container tr.cloud-cover-broken {
+    /* 61-90% */
+    background: var(--background-bkn) !important;
+    /* Mittelgrau */
 }
-#weather-table-container tr.cloud-cover-overcast { /* 91-100% */
-    background: #78909c !important; /* Dunkelgrau */
-    color: white !important; /* Hellerer Text für besseren Kontrast */
+
+#weather-table-container tr.cloud-cover-overcast {
+    /* 91-100% */
+    background: var(--background-ovc) !important;
+    /* Dunkelgrau */
+    color: var(--text-color-light) !important;
 }
 
 #weather-table-container tr.wind-low td {
-    border: 2px solid lightblue !important;
+    border: 2px solid var(--border-color-light) !important;
 }
 
 #weather-table-container tr.wind-moderate td {
-    border: 2px solid lightgreen !important;
+    border: 2px solid var(--border-color-moderate) !important;
 }
 
 #weather-table-container tr.wind-high td {
-    border: 2px solid #f5f34f !important;
+    border: 2px solid var(--border-color-high) !important;
 }
 
 #weather-table-container tr.wind-very-high td {
-    border: 2px solid #ffcccc !important;
+    border: 2px solid var(--border-color-very-high) !important;
 }
 
-/* === Wind Spider Styles === */
 #windspinne-container {
-    position: relative; /* Wichtig für die Positionierung des Canvas */
+    position: relative;
+    /* Wichtig für die Positionierung des Canvas */
     width: 100%;
     max-width: 450px;
     margin: 20px auto;
-    aspect-ratio: 0.95 / 1; /* Erzwingt, dass der Container quadratisch ist */
+    aspect-ratio: 0.95 / 1;
+    /* Erzwingt, dass der Container quadratisch ist */
 }
 
 #windspinne-container canvas {
@@ -673,10 +818,12 @@ input[type="checkbox"][style*="opacity: 0.5"] {
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 1.5rem; /* Abstand zwischen den Elementen */
+    gap: 1.5rem;
+    /* Abstand zwischen den Elementen */
     margin-top: 1rem;
     padding: 0.5rem;
-    flex-wrap: wrap; /* Erlaubt Umbruch bei schmalen Bildschirmen */
+    flex-wrap: wrap;
+    /* Erlaubt Umbruch bei schmalen Bildschirmen */
 }
 
 .legend-item {
@@ -689,9 +836,55 @@ input[type="checkbox"][style*="opacity: 0.5"] {
     width: 16px;
     height: 16px;
     margin-right: 8px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--border-color);
     border-radius: 3px;
 }
+
+/* --- Planner Panel --- */
+/* Ergänzungen für mapManager-Klassen */
+.jump-viz-exit-area {
+    stroke: green;
+    fill: green;
+    fill-opacity: 0.2;
+    stroke-width: 2;
+}
+
+.jump-viz-canopy-full {
+    stroke: red;
+    stroke-width: 2;
+    stroke-opacity: 0.8;
+    fill-opacity: 0;
+}
+
+.jump-run-approach-line {
+    stroke: var(--wind-good);
+    stroke-opacity: 0.8;
+    stroke-width: 5;
+    stroke-dasharray: 5, 10;
+}
+
+.harp-marker-inner {
+    width: 14px;
+    height: 14px;
+    background-color: green;
+    border: 2px solid white;
+    border-radius: 50%;
+    box-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
+}
+
+.jump-master-line {
+    stroke: blue;
+    stroke-width: 3;
+    stroke-dasharray: 5, 5;
+}
+
+.landing-pattern-line {
+    color: 'red';
+    stroke-width: 3;
+    opacity: 0.8;
+    stroke-dasharray: '5, 10';
+}
+
 /* --- Jumpmaster Panel --- */
 #panel-jumpmaster ul {
     list-style: none;
@@ -721,7 +914,7 @@ input[type="checkbox"][style*="opacity: 0.5"] {
 }
 
 .dashboard-item {
-    background-color: #f7f7f7;
+    background-color: var(--background-dark);
     padding: 10px;
     border-radius: 6px;
     text-align: center;
@@ -733,7 +926,7 @@ input[type="checkbox"][style*="opacity: 0.5"] {
 
 .dashboard-label {
     font-size: 12px;
-    color: #666;
+    color: var(--text-color-subtle);
     text-transform: uppercase;
     margin-bottom: 5px;
 }
@@ -762,11 +955,13 @@ input[type="checkbox"][style*="opacity: 0.5"] {
 }
 
 .dashboard-value.vario-climb {
-    color: #28a745 !important; /* Grün für Steigen */
+    color: var(--status-success) !important;
+    /* Grün für Steigen */
 }
 
 .dashboard-value.vario-descent {
-    color: #dc3545 !important; /* Rot für Sinken */
+    color: var(--danger-color) !important;
+    /* Rot für Sinken */
 }
 
 #aircraftList li {
@@ -777,7 +972,7 @@ input[type="checkbox"][style*="opacity: 0.5"] {
 }
 
 #aircraftList li:hover {
-    background-color: #f0f2f5;
+    background-color: var(--background-medium);
 }
 
 #aircraftList li:last-child {
@@ -800,7 +995,7 @@ input[type="checkbox"][style*="opacity: 0.5"] {
     top: 50%;
     transform: translateY(-50%);
     font-size: 18px;
-    color: #888;
+    color: var(--text-color-subtle);
     pointer-events: none;
 }
 
@@ -819,7 +1014,7 @@ input[type="checkbox"][style*="opacity: 0.5"] {
     padding: 10px 15px;
     margin: 0;
     font-size: 14px;
-    background-color: #f0f0f0;
+    background-color: var(--background-medium);
     font-weight: bold;
 }
 
@@ -827,13 +1022,13 @@ input[type="checkbox"][style*="opacity: 0.5"] {
     display: flex;
     align-items: center;
     padding: 12px 15px;
-    border-bottom: 1px solid #f0f0f0;
+    border-bottom: 1px solid var(--border-color);
     cursor: pointer;
     transition: background-color 0.2s ease;
 }
 
 .search-item:hover {
-    background-color: #f9f9f9;
+    background-color: var(--background-light);
 }
 
 .search-item-text {
@@ -854,26 +1049,29 @@ input[type="checkbox"][style*="opacity: 0.5"] {
     background: none;
     border: none;
     font-size: 24px;
-    color: #ccc;
+    color: var(--background-active);
     cursor: pointer;
     padding: 5px;
 }
 
 .search-item-actions button.is-favorite {
-    color: #f3d131;
+    color: var(--status-warning);
 }
 
 .search-item-actions button.delete-btn:hover {
-    color: #e74c3c;
+    color: var(--status-danger-hover);
 }
 
 .search-item-actions button.home-toggle {
-    opacity: 0.3; /* Inaktive Haus-Icons sind blass */
-    transition: opacity 0.2s ease-in-out; /* Sanfter Übergang */
+    opacity: 0.3;
+    /* Inaktive Haus-Icons sind blass */
+    transition: opacity 0.2s ease-in-out;
+    /* Sanfter Übergang */
 }
 
 .search-item-actions button.home-toggle.is-home {
-    opacity: 1.0; /* Das aktive Home-Icon hat volle Deckkraft */
+    opacity: 1.0;
+    /* Das aktive Home-Icon hat volle Deckkraft */
 }
 
 .clear-icon {
@@ -882,7 +1080,7 @@ input[type="checkbox"][style*="opacity: 0.5"] {
     top: 50%;
     transform: translateY(-50%);
     font-size: 18px;
-    color: #888;
+    color: var(--text-color-subtle);
     cursor: pointer;
 }
 
@@ -909,8 +1107,8 @@ input[type="checkbox"][style*="opacity: 0.5"] {
 #crosshair::after {
     content: '';
     position: absolute;
-    background-color: #333;
-    box-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
+    background-color: var(--text-color);
+    box-shadow: var(--shadow-strong);
 }
 
 #crosshair::before {
@@ -940,7 +1138,7 @@ input[type="checkbox"][style*="opacity: 0.5"] {
 }
 
 .leaflet-tooltip {
-    background-color: white;
+    background-color: var(--background-light);
     padding: 2px;
     pointer-events: none;
 }
@@ -957,8 +1155,8 @@ input[type="checkbox"][style*="opacity: 0.5"] {
 }
 
 .isoline-label {
-    background: rgba(255, 255, 255, 0.7) !important;
-    color: blue !important;
+    background: var(--overlay-background-light) !important;
+    color: var(--overlay-text-dark) !important;
     font-weight: bold;
     border: none;
     border-radius: 3px;
@@ -967,30 +1165,36 @@ input[type="checkbox"][style*="opacity: 0.5"] {
 }
 
 .favorite-marker-icon {
-    color: #FFD700;
+    color: var(--status-warning);
     font-size: 16px;
     font-weight: bold;
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.6);
+    text-shadow: var(--shadow-dark);
     text-align: center;
     line-height: 24px;
 }
 
 /* === ANZEIGE FÜR GEOMAN-MESSWERKZEUG === */
 .leaflet-measure-label {
-    position: absolute; /* Wichtig für die Positionierung auf der Karte */
+    position: absolute;
+    /* Wichtig für die Positionierung auf der Karte */
     font: 9px 'Roboto', sans-serif;
     font-weight: bold;
-    background-color: rgba(210, 251, 186, 0.9); /* Heller, leicht gelblicher Hintergrund */
-    color: #333;
+    background-color: var(--overlay-background-light-strong);
+    /* Heller, leicht gelblicher Hintergrund */
+    color: var(--text-color);
     padding: 5px 8px;
     border-radius: 4px;
     border: 1px solid var(--border-color);
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-    white-space: nowrap; /* Verhindert Zeilenumbrüche */
+    box-shadow: var(--shadow-medium);
+    white-space: nowrap;
+    /* Verhindert Zeilenumbrüche */
     text-align: left;
-    pointer-events: none; /* Sorgt dafür, dass das Label keine Klicks abfängt */
-    display: none;        /* Wird per JavaScript auf 'block' gesetzt, wenn die Messung beginnt */
-    z-index: 9000;        /* Stellt sicher, dass es über fast allem anderen liegt */
+    pointer-events: none;
+    /* Sorgt dafür, dass das Label keine Klicks abfängt */
+    display: none;
+    /* Wird per JavaScript auf 'block' gesetzt, wenn die Messung beginnt */
+    z-index: 9000;
+    /* Stellt sicher, dass es über fast allem anderen liegt */
 }
 
 /* Stil für die hervorgehobene Distanz-Anzeige */
@@ -1000,11 +1204,11 @@ input[type="checkbox"][style*="opacity: 0.5"] {
 
 /* === ZUSÄTZLICHE STILE FÜR PERMANENTE GEOMAN-LABELS === */
 .geoman-permanent-label {
-    background: rgba(255, 255, 224, 0.9);
+    background: var(--overlay-background-light-extra);
     border: 1px solid var(--border-color);
     border-radius: 4px;
     padding: 5px 8px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    box-shadow: var(--shadow-medium);
     min-width: 50px;
     font-size: 9px;
     line-height: 1;
@@ -1012,15 +1216,17 @@ input[type="checkbox"][style*="opacity: 0.5"] {
 
 /* NEU: Diese Regel steuert gezielt den Text im Label */
 .geoman-permanent-label div {
-    font-size: 9px; /* Hier können Sie die Schriftgröße jetzt anpassen */
+    font-size: 9px;
+    /* Hier können Sie die Schriftgröße jetzt anpassen */
     font-weight: normal;
     text-align: left;
-    line-height: 1; /* Verbessert den Zeilenabstand */
+    line-height: 1;
+    /* Verbessert den Zeilenabstand */
     color: var(--text-color);
 }
 
 /* Leere Klasse, um Leaflet-Standardstile zu vermeiden */
-.geoman-label-container { }
+.geoman-label-container {}
 
 /* =================================================================== */
 /* 7. MODALE & NACHRICHTEN
@@ -1037,12 +1243,12 @@ input[type="checkbox"][style*="opacity: 0.5"] {
     border-radius: 10px;
     z-index: 10001;
     text-align: center;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    box-shadow: var(--shadow-medium);
 }
 
 #loading {
     display: none;
-    background: rgba(255, 255, 255, 0.9);
+    background: var(--background-overlay);
 }
 
 #loading .spinner {
@@ -1066,23 +1272,24 @@ input[type="checkbox"][style*="opacity: 0.5"] {
 }
 
 #message {
-    background-color: #ccffcc;
+    background-color: var(--notification-success-bg);
 }
 
 #error-message {
-    background-color: #ffcccc;
+    background-color: var(--notification-error-bg);
 }
 
 #message.warning {
-    background-color: #fff3cd !important;
+    background-color: var(--notification-warning-bg) !important;
 }
+
 .modal {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.5);
+    background: var(--background-hover-darker);
     z-index: 10000;
     display: flex;
     justify-content: center;
@@ -1153,14 +1360,16 @@ input[type="checkbox"][style*="opacity: 0.5"] {
     text-align: center;
     border-radius: 8px;
     padding: 16px;
-    position: fixed; /* Wichtig für Web: 'fixed' statt 'absolute' */
-    z-index: 10001;  /* Über allem anderen */
+    position: fixed;
+    /* Wichtig für Web: 'fixed' statt 'absolute' */
+    z-index: 10001;
+    /* Über allem anderen */
     bottom: 30px;
     left: 50%;
     transform: translateX(-50%) translateY(200%);
     opacity: 0;
     font-size: 1rem;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    box-shadow: var(--shadow-medium);
     transition: visibility 0s, opacity 0.5s, transform 0.5s ease-in-out;
 }
 
@@ -1170,154 +1379,200 @@ input[type="checkbox"][style*="opacity: 0.5"] {
     opacity: 1;
 }
 
-#snackbar.success { background-color: #4CAF50; }
-#snackbar.error { background-color: #f44336; }
-#snackbar.warning { background-color: #fff3cd; color: #856404; }
-
-/* === PROGRESS SNACKBAR === */
-#progress-snackbar {
-    visibility: hidden;
-    position: fixed; /* Wichtig für Web */
-    bottom: 80px; /* Etwas höher als die normale Snackbar */
-    left: 50%;
-    transform: translateX(-50%) translateY(200%);
-    background-color: #3f51b5;
-    color: white;
-    padding: 14px;
-    border-radius: 8px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
-    z-index: 10002;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    min-width: 280px;
-    box-sizing: border-box;
-    opacity: 0;
-    transition: visibility 0s, opacity 0.4s ease-in-out, transform 0.4s ease-in-out;
+#snackbar.success {
+    background-color: var(--notification-success-bg);
 }
 
-#progress-snackbar.show {
-    visibility: visible;
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
+#snackbar.error {
+    background-color: var(--notification-error-bg);
 }
 
-.progress-snackbar-content { flex-grow: 1; display: flex; flex-direction: column; gap: 5px; }
-.progress-snackbar-text { font-size: 0.95rem; text-align: center; }
-.progress-bar-container { width: 100%; height: 6px; background-color: rgba(255, 255, 255, 0.3); border-radius: 3px; overflow: hidden; }
-.progress-bar { width: 0%; height: 100%; background-color: #ffffff; border-radius: 3px; transition: width 0.3s ease-in-out; }
-#progress-snackbar .cancel-button { background: transparent; border: 1px solid white; color: white; border-radius: 5px; padding: 5px 10px; font-size: 0.9rem; cursor: pointer; }
+#snackbar.warning {
+    background-color: var(--notification-warning-bg);
+    color: var(--notification-warning-text);
 
-#offline-indicator {
-    visibility: hidden;
-    min-width: 250px;
-    background-color: #fff3cd;
-    color: #856404;
-    text-align: center;
-    border-radius: 8px;
-    padding: 16px;
-    position: fixed;
-    z-index: 2010;
-    bottom: 30px;
-    left: 50%;
-    transform: translateX(-50%) translateY(200%);
-    opacity: 0;
-    font-size: 1rem;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-    transition: visibility 0s, opacity 0.5s, transform 0.5s ease-in-out;
-}
+    /* === PROGRESS SNACKBAR === */
+    #progress-snackbar {
+        visibility: hidden;
+        position: fixed;
+        /* Wichtig für Web */
+        bottom: 80px;
+        /* Etwas höher als die normale Snackbar */
+        left: 50%;
+        transform: translateX(-50%) translateY(200%);
+        background-color: var(--notification-info-bg);
+        color: var(--text-color-light);
+        padding: 14px;
+        border-radius: 8px;
+        box-shadow: var(--shadow-medium);
+        z-index: 10002;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 280px;
+        box-sizing: border-box;
+        opacity: 0;
+        transition: visibility 0s, opacity 0.4s ease-in-out, transform 0.4s ease-in-out;
+    }
 
-#offline-indicator.show {
-    visibility: visible;
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-}
+    #progress-snackbar.show {
+        visibility: visible;
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
 
+    .progress-snackbar-content {
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .progress-snackbar-text {
+        font-size: 0.95rem;
+        text-align: center;
+    }
+
+    .progress-bar-container {
+        width: 100%;
+        height: 6px;
+        background-color: rgba(255, 255, 255, 0.3);
+        border-radius: 3px;
+        overflow: hidden;
+    }
+
+    .progress-bar {
+        width: 0%;
+        height: 100%;
+        background-color: var(--text-color-light);
+        border-radius: 3px;
+        transition: width 0.3s ease-in-out;
+    }
+
+    #progress-snackbar .cancel-button {
+        background: transparent;
+        border: 1px solid --background-light;
+        color: var(--text-color-light);
+        border-radius: 5px;
+        padding: 5px 10px;
+        font-size: 0.9rem;
+        cursor: pointer;
+    }
+
+    #offline-indicator {
+        visibility: hidden;
+        min-width: 250px;
+        background-color: var(--notification-warning-bg);
+        color: var(--notification-warning-text);
+        text-align: center;
+        border-radius: 8px;
+        padding: 16px;
+        position: fixed;
+        z-index: 2010;
+        bottom: 30px;
+        left: 50%;
+        transform: translateX(-50%) translateY(200%);
+        opacity: 0;
+        font-size: 1rem;
+        box-shadow: var(--shadow-medium);
+        transition: visibility 0s, opacity 0.5s, transform 0.5s ease-in-out;
+    }
+
+    #offline-indicator.show {
+        visibility: visible;
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+
+    /* =================================================================== */
+    /* 8. ANIMATIONEN
 /* =================================================================== */
-/* 8. ANIMATIONEN
-/* =================================================================== */
 
-@keyframes spin {
-    0% {
-        transform: rotate(0deg);
+    @keyframes spin {
+        0% {
+            transform: rotate(0deg);
+        }
+
+        100% {
+            transform: rotate(360deg);
+        }
     }
 
-    100% {
-        transform: rotate(360deg);
-    }
-}
+    @keyframes pulse {
+        0% {
+            box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7);
+        }
 
-@keyframes pulse {
-    0% {
-        box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7);
-    }
+        70% {
+            box-shadow: 0 0 10px 15px rgba(220, 53, 69, 0);
+        }
 
-    70% {
-        box-shadow: 0 0 10px 15px rgba(220, 53, 69, 0);
-    }
-
-    100% {
-        box-shadow: 0 0 0 0 rgba(220, 53, 69, 0);
-    }
-}
-
-@keyframes pulse-blue {
-    0% {
-        box-shadow: 0 0 0 0 rgba(23, 162, 184, 0.7);
+        100% {
+            box-shadow: 0 0 0 0 rgba(220, 53, 69, 0);
+        }
     }
 
-    70% {
-        box-shadow: 0 0 10px 15px rgba(23, 162, 184, 0);
+    @keyframes pulse-blue {
+        0% {
+            box-shadow: 0 0 0 0 rgba(23, 162, 184, 0.7);
+        }
+
+        70% {
+            box-shadow: 0 0 10px 15px rgba(23, 162, 184, 0);
+        }
+
+        100% {
+            box-shadow: 0 0 0 0 rgba(23, 162, 184, 0);
+        }
     }
 
-    100% {
-        box-shadow: 0 0 0 0 rgba(23, 162, 184, 0);
+    /* === GEOMAN TOOLBAR SICHTBARKEITS-FIX === */
+    /* Stellt sicher, dass die Geoman Toolbar immer sichtbar und klickbar ist */
+    .leaflet-pm-toolbar {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        z-index: 2000 !important;
+        /* Stellt sicher, dass sie über anderen Elementen liegt */
     }
-}
 
-/* === GEOMAN TOOLBAR SICHTBARKEITS-FIX === */
-/* Stellt sicher, dass die Geoman Toolbar immer sichtbar und klickbar ist */
-.leaflet-pm-toolbar {
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    z-index: 2000 !important; /* Stellt sicher, dass sie über anderen Elementen liegt */
-}
+    .pm-textarea {
+        text-align: center !important;
+        padding-left: 0 !important;
+    }
 
-.pm-textarea{
-    text-align: center !important;
-    padding-left: 0 !important;
-}
+    /* === LIVE MARKER STYLES === */
+    .live-marker-container {
+        background: transparent;
+        border: none;
+    }
 
-/* === LIVE MARKER STYLES === */
-.live-marker-container { 
-    background: transparent; 
-    border: none; 
-}
-.live-marker-wrapper { 
-    width: 24px; 
-    height: 24px; 
-    display: flex; 
-    justify-content: center; 
-    align-items: center; 
-    transition: transform 0.3s ease-out; 
-}
-.live-marker-dot { 
-    width: 14px; 
-    height: 14px; 
-    background-color: #007bff; 
-    border-radius: 50%; 
-    border: 2px solid white; 
-    box-shadow: 0 0 6px rgba(0,0,0,0.6); 
-}
-.live-marker-arrow { 
-    width: 0; 
-    height: 0; 
-    border-left: 6px solid transparent; 
-    border-right: 6px solid transparent; 
-    border-bottom: 10px solid #007bff; 
-    position: absolute; 
-    top: -1px; 
-    left: 50%; 
-    transform: translateX(-50%); 
-}
+    .live-marker-wrapper {
+        width: 24px;
+        height: 24px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        transition: transform 0.3s ease-out;
+    }
+
+    .live-marker-dot {
+        width: 14px;
+        height: 14px;
+        background-color: var(--primary-color);
+        border-radius: 50%;
+        border: 2px solid var(--text-color-inverted);
+        box-shadow: var(--shadow-text-dark);
+    }
+
+    .live-marker-arrow {
+        width: 0;
+        height: 0;
+        border-left: 6px solid transparent;
+        border-right: 6px solid transparent;
+        border-bottom: 10px solid var(--primary-color);
+        position: absolute;
+        top: -1px;
+        left: 50%;
+        transform: translateX(-50%);
+    }
