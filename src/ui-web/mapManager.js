@@ -755,6 +755,9 @@ export function handleHarpPlacement(e) {
     } else {
         AppState.harpMarker = createHarpMarker(lat, lng).addTo(AppState.map);
     }
+    // NEU: Ruft die Popup-Aktualisierung sofort auf und öffnet es
+    updateHarpMarkerPopup(AppState.harpMarker, lat, lng, true);
+
     Settings.state.userSettings.harpLat = lat;
     Settings.state.userSettings.harpLng = lng;
 
@@ -784,7 +787,65 @@ export function createHarpMarker(latitude, longitude) {
         pane: 'markerPane',
         pmIgnore: true
     });
+    // NEU: Fügt einen Klick-Handler hinzu, um das Popup zu öffnen
+    marker.on('click', () => {
+        const pos = marker.getLatLng();
+        updateHarpMarkerPopup(marker, pos.lat, pos.lng, true);
+    });
     return marker;
+}
+/**
+ * NEUE FUNKTION: Erstellt und aktualisiert das Popup für den HARP-Marker.
+ * @param {L.Marker} marker - Die Marker-Instanz.
+ * @param {number} lat - Die Breite.
+ * @param {number} lng - Die Länge.
+ * @param {boolean} [open=false] - Ob das Popup sofort geöffnet werden soll.
+ */
+export async function updateHarpMarkerPopup(marker, lat, lng, open = false) {
+    const coordFormat = Settings.getValue('coordFormat', 'radio', 'Decimal');
+    const coords = Utils.convertCoords(lat, lng, coordFormat);
+    let popupContent = `<b>HARP</b><br>`;
+
+    const formatDDM = (ddm) => `${ddm.deg}° ${ddm.min.toFixed(3)}' ${ddm.dir}`;
+    const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
+
+    if (coordFormat === 'MGRS') {
+        popupContent += `MGRS: ${Utils.decimalToMgrs(lat, lng)}`;
+    } else if (coordFormat === 'DMS') {
+        popupContent += `Lat: ${formatDMS(Utils.decimalToDms(lat, true))}<br>Lng: ${formatDMS(Utils.decimalToDms(lng, false))}`;
+    } else if (coordFormat === 'DDM') {
+        popupContent += `Lat: ${formatDDM(Utils.decimalToDecimalMinutes(lat, true))}<br>Lng: ${formatDDM(Utils.decimalToDecimalMinutes(lng, false))}`;
+    } else {
+        popupContent += `Lat: ${lat.toFixed(5)}<br>Lng: ${lng.toFixed(5)}`;
+    }
+
+    // Altitude abrufen
+    const altitude = await Utils.getAltitude(lat, lng);
+    const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
+    let displayAltitude = 'N/A';
+    if (altitude !== 'N/A') {
+        displayAltitude = Math.round(Utils.convertHeight(altitude, heightUnit));
+        popupContent += `<br>Alt: ${displayAltitude} ${heightUnit}`;
+    } else {
+        popupContent += `<br>Alt: N/A`;
+    }
+
+    // QFE berechnen
+    if (altitude !== 'N/A' && AppState.weatherData && AppState.weatherData.surface_pressure) {
+        const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
+        const surfacePressure = AppState.weatherData.surface_pressure[sliderIndex];
+        const temperature = AppState.weatherData.temperature_2m?.[sliderIndex] || 15;
+        const qfe = Utils.calculateQFE(surfacePressure, altitude, altitude, temperature);
+        if (qfe !== 'N/A') {
+            popupContent += `<br>QFE: ${qfe} hPa`;
+        } else {
+            popupContent += `<br>QFE: N/A`;
+        }
+    } else {
+        popupContent += `<br>QFE: N/A`;
+    }
+
+    updatePopupContent(marker, popupContent, open);
 }
 /**
  * Zeichnet Marker für gefundene Points of Interest (POIs) auf die Karte.
