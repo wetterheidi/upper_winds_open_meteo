@@ -98,16 +98,14 @@ body {
 #tab-bar {
     grid-row: 3;
     grid-column: 1;
-    height: calc(55px + env(safe-area-inset-bottom));
-    padding-bottom: env(safe-area-inset-bottom);
+    height: 55px; /* Feste Höhe für den Inhaltsbereich */
+    padding-bottom: env(safe-area-inset-bottom); /* Fügt nur den Sicherheitsabstand hinzu */
     display: flex;
     justify-content: space-around;
-    align-items: flex-start;
-    padding-top: 20px;
-    padding-bottom: 80px;
+    align-items: center; /* Zentriert die Icons vertikal */
     background-color: white !important;
     border-top: 1px solid var(--border-color);
-    box-sizing: border-box;
+    box-sizing: content-box; /* Stellt sicher, dass Padding zur Höhe addiert wird */
     z-index: 1001;
 }
 

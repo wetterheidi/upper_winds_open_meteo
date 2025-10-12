@@ -1,13 +1,11 @@
 PODS:
-  - Capacitor (7.4.3):
+  - Capacitor (7.4.2):
     - CapacitorCordova
-  - CapacitorCommunityBackgroundGeolocation (1.2.26):
+  - CapacitorCommunityBackgroundGeolocation (0.0.1):
     - Capacitor
   - CapacitorCordova (7.4.2)
   - CapacitorFilesystem (7.1.4):
     - Capacitor
-    - IONFilesystemLib (~> 1.0.1)
-  - CapacitorGeolocation (7.1.5):
     - IONFilesystemLib (~> 1.0.1)
   - CapacitorGeolocation (7.1.5):
     - Capacitor

@@ -14,6 +14,7 @@ import { getCapacitor } from './capacitor-adapter.js';
 import { DateTime } from 'luxon';
 import { saveRecordedTrack } from './trackManager.js';
 import { showDisclosureModal } from '../ui-mobile/ui.js';
+import { Settings } from './settings.js';
 
 // ===================================================================
 // 1. Öffentliche Hauptfunktionen (API des Moduls)
@@ -137,6 +138,48 @@ export async function startPositionTracking() {
         })();
     }
     await trackingInitPromise;
+}
+
+/**
+ * Schaltet die manuelle Aufzeichnung eines Tracks ein oder aus.
+ */
+export function toggleManualRecording() {
+    const manualButton = document.getElementById('manual-recording-button');
+
+    if (AppState.isManualRecording) {
+        // Aufzeichnung stoppen
+        AppState.isManualRecording = false;
+        if (manualButton) {
+            manualButton.textContent = "Start Recording";
+            manualButton.classList.remove('recording');
+        }
+        Utils.handleMessage("Manual recording stopped.");
+
+        if (AppState.recordedTrackPoints.length > 1) {
+            saveRecordedTrack();
+        } else {
+            AppState.recordedTrackPoints = []; // Leeren, wenn nicht genügend Punkte vorhanden sind
+        }
+
+        // Entscheiden, ob das Tracking komplett gestoppt werden soll.
+        if (!Settings.state.userSettings.trackPosition) {
+            stopPositionTracking();
+        }
+    } else {
+        // Aufzeichnung starten
+        AppState.isManualRecording = true;
+        AppState.recordedTrackPoints = []; // Eine saubere Aufzeichnung starten
+        if (manualButton) {
+            manualButton.textContent = "Stop Recording";
+            manualButton.classList.add('recording');
+        }
+        Utils.handleMessage("Manual recording started.");
+
+        // Sicherstellen, dass das Live-Tracking aktiv ist
+        if (AppState.watchId === null) {
+            startPositionTracking();
+        }
+    }
 }
 
 
