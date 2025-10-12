@@ -394,6 +394,9 @@ async function fetchWeather(lat, lon, currentTime = null) {
 
             if (userMaxForecast !== 'Maximum') {
                 const userMaxDays = parseInt(userMaxForecast, 10);
+                if (userMaxDays > modelMaxDays) {
+                    Utils.handleMessage(`The selected model '${selectedModelValue}' only provides a ${modelMaxDays}-day forecast. Displaying maximum available time.`);
+                }
                 forecastDays = Math.min(modelMaxDays, userMaxDays);
             }
 
