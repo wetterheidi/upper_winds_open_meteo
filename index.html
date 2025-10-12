@@ -20,7 +20,7 @@
     <script src="https://unpkg.com/leaflet-rotatedmarker@0.2.0/leaflet.rotatedMarker.js" defer></script>
     <script src="https://unpkg.com/@tmcw/togeojson@4.7.0/dist/togeojson.umd.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
-  <script type="module" crossorigin src="/upper_winds_open_meteo/assets/index-BU-Bmh3k.js"></script>
+  <script type="module" crossorigin src="/upper_winds_open_meteo/assets/index-KTUsd8zT.js"></script>
   <link rel="stylesheet" crossorigin href="/upper_winds_open_meteo/assets/index-BqPQv5FF.css">
 </head>
 
@@ -580,6 +580,17 @@
                                     <option value="DMS">Deg Min Sec</option>
                                     <option value="MGRS">MGRS</option>
                                 </select>
+                                <label for="maxForecastTime">Max. Forecast Time:</label>
+                                <select id="maxForecastTime">
+                                    <option value="1">1 Day</option>
+                                    <option value="2">2 Days</option>
+                                    <option value="3">3 Days</option>
+                                    <option value="4">4 Days</option>
+                                    <option value="5">5 Days</option>
+                                    <option value="6">6 Days</option>
+                                    <option value="7">7 Days</option>
+                                    <option value="Maximum">Maximum Time</option>
+                                </select>
                             </div>
                         </div>
                     </div>
@@ -594,8 +605,8 @@
                                     <option value="ATAK">ATAK</option>
                                     <option value="Windwatch">Windwatch</option>
                                     <option value="Customized">Customized</option>
-                                    <option value="SurfaceData">Surface Data</option> 
-                                    <option value="ComprehensiveReport">Weather Briefing</option> 
+                                    <option value="SurfaceData">Surface Data</option>
+                                    <option value="ComprehensiveReport">Weather Briefing</option>
                                 </select>
                                 <button id="downloadButton" class="btn btn-primary">Generate Table</button>
                             </div>
@@ -685,13 +696,13 @@
             <h3>Choose Aircraft</h3>
             <p style="text-align: left; font-size: 12px; color: #666;">Aircrafts nearby (Call Sign / Altitude):</p>
             <ul id="aircraftList" style="list-style: none; padding: 0; margin: 0; max-height: 200px; overflow-y: auto;">
-                </ul>
+            </ul>
             <div class="modal-buttons">
                 <button id="adsbCancel">Cancel</button>
             </div>
         </div>
     </div>
-    
+
 </body>
 
 </html>
