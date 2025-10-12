@@ -64,7 +64,7 @@ export const Settings = {
         upperLimit: 3000,
         baseMaps: 'Esri Street',
         calculateJump: true,
-        openingAltitude: 1200,
+        openingAltitude: 1200, 
         exitAltitude: 3000,
         showJumpRunTrack: false,
         showExitArea: false,
