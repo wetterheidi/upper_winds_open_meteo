@@ -1,172 +1,26 @@
+/**
+ * @file locationManager.js
+ * @description Verwaltet alle Aspekte der Ortssuche und -speicherung.
+ * Dies umfasst das Parsen von Benutzereingaben, die Kommunikation mit Geocoding-APIs
+ * und die Verwaltung von Favoriten und dem Suchverlauf im Local Storage.
+ */
+
 import { Utils } from './utils.js';
 import * as mgrs from 'mgrs';
 
 let searchCache = JSON.parse(localStorage.getItem('searchCache')) || {};
 let isAddingFavorite = false;
 
-/**
- * Attempts to parse user input as coordinates.
- * @param {string} query - The user's input.
- * @returns {object|null} An object with {lat, lng} or null.
- */
-export function parseQueryAsCoordinates(query) {
-    console.log('parseQueryAsCoordinates: Parsing query:', query);
-    const trimmedQuery = query.trim();
-    const cleanedForDecimal = trimmedQuery.replace(/[,;\t]+/g, ' ').trim();
-    // Flexible regex for decimal degrees: e.g., "48.1234 11.5678" or "-48.1234,11.5678"
-    const decMatch = cleanedForDecimal.match(/^(-?\d{1,3}(?:\.\d+)?)\s+(-?\d{1,3}(?:\.\d+)?)$/);
-    if (decMatch) {
-        console.log('parseQueryAsCoordinates: Regex match:', decMatch);
-        const lat = parseFloat(decMatch[1]);
-        const lng = parseFloat(decMatch[2]);
-        console.log('parseQueryAsCoordinates: Decimal degrees detected:', { lat, lng });
-        if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
-            return { lat, lng };
-        } else {
-            console.warn('parseQueryAsCoordinates: Invalid coordinate ranges:', { lat, lng });
-        }
-    }
-    const cleanedForMgrs = trimmedQuery.replace(/\s/g, '').toUpperCase();
-    const mgrsRegex = /^[0-9]{1,2}[C-HJ-NP-X][A-HJ-NP-Z]{2}(\d{2}|\d{4}|\d{6}|\d{8}|\d{10})$/;
-    if (typeof mgrs === 'undefined') {
-        console.warn('parseQueryAsCoordinates: MGRS library not loaded');
-        return null;
-    }
-    if (mgrsRegex.test(cleanedForMgrs)) {
-        try {
-            const [lng, lat] = mgrs.toPoint(cleanedForMgrs);
-            console.log('parseQueryAsCoordinates: MGRS detected:', { lat, lng });
-            if (!isNaN(lat) && !isNaN(lng)) {
-                return { lat, lng };
-            } else {
-                console.warn('parseQueryAsCoordinates: Invalid MGRS coordinates:', { lat, lng });
-            }
-        } catch (e) {
-            console.warn('parseQueryAsCoordinates: MGRS parsing failed:', e.message);
-            return null;
-        }
-    }
-    console.log('parseQueryAsCoordinates: No coordinates detected');
-    return null;
-}
+// ===================================================================
+// 1. Öffentliche API- & Suchfunktionen
+// ===================================================================
 
 /**
- * Local Storage Management
+ * Führt eine Suche nach einem Ort durch. Prüft zuerst, ob die Eingabe Koordinaten sind.
+ * Wenn nicht, wird die Open-Meteo Geocoding API abgefragt. Ergebnisse werden zwischengespeichert.
+ * @param {string} query - Die Suchanfrage des Benutzers.
+ * @returns {Promise<object[]>} Ein Array von formatierten Suchergebnissen.
  */
-export function getCoordHistory() {
-    console.log('getCoordHistory: Retrieving history');
-    try {
-        const history = JSON.parse(localStorage.getItem('coordHistory')) || [];
-        console.log('getCoordHistory: History retrieved:', history);
-        return history;
-    } catch (e) {
-        console.error('getCoordHistory: Error retrieving history:', e);
-        return [];
-    }
-}
-
-export function saveCoordHistory(history) {
-    console.log('saveCoordHistory: Saving history:', history);
-    try {
-        localStorage.setItem('coordHistory', JSON.stringify(history));
-        console.log('saveCoordHistory: History saved');
-    } catch (e) {
-        console.error('saveCoordHistory: Error saving history:', e);
-    }
-}
-
-export function addCoordToHistory(lat, lng, label, isFavorite = false) {
-    console.log('addCoordToHistory: Adding:', { lat, lng, label, isFavorite });
-    if (isNaN(lat) || isNaN(lng)) {
-        console.error('addCoordToHistory: Invalid coordinates');
-        return;
-    }
-    let history = getCoordHistory();
-    const newLat = parseFloat(lat.toFixed(5));
-    const newLng = parseFloat(lng.toFixed(5));
-    history = history.filter(entry => Math.abs(entry.lat - newLat) > 0.001 || Math.abs(entry.lng - newLng) > 0.001);
-    history.unshift({ lat: newLat, lng: newLng, label: label, isFavorite: isFavorite, timestamp: Date.now() });
-    const favorites = history.filter(e => e.isFavorite);
-    const nonFavorites = history.filter(e => !e.isFavorite).slice(0, 5);
-    saveCoordHistory([...favorites, ...nonFavorites]);
-}
-
-export function addOrUpdateFavorite(lat, lng, name, skipMessage = false) {
-    console.log('addOrUpdateFavorite: Processing:', { lat, lng, name });
-    if (isNaN(lat) || isNaN(lng)) {
-        console.error('addOrUpdateFavorite: Invalid coordinates');
-        return;
-    }
-    if (isAddingFavorite) {
-        console.log('addOrUpdateFavorite: Blocked due to ongoing operation');
-        return;
-    }
-    isAddingFavorite = true;
-    try {
-        let history = getCoordHistory();
-        const newLat = parseFloat(lat.toFixed(5));
-        const newLng = parseFloat(lng.toFixed(5));
-        const existingEntry = history.find(entry => Math.abs(entry.lat - newLat) < 0.001 && Math.abs(entry.lng - newLng) < 0.001);
-        if (existingEntry) {
-            console.log('addOrUpdateFavorite: Updating existing entry:', existingEntry);
-            existingEntry.isFavorite = true;
-            existingEntry.label = name;
-        } else {
-            const newEntry = { lat: newLat, lng: newLng, label: name, isFavorite: true, timestamp: Date.now() };
-            console.log('addOrUpdateFavorite: Adding new entry:', newEntry);
-            history.unshift(newEntry);
-        }
-        saveCoordHistory(history);
-        if (!skipMessage) {
-            Utils.handleMessage(`"${name}" saved as favorite.`);
-        }
-        _dispatchFavoritesUpdate();
-    } catch (error) {
-        console.error('addOrUpdateFavorite: Error:', error);
-    } finally {
-        isAddingFavorite = false;
-        console.log('addOrUpdateFavorite: Completed');
-    }
-}
-
-/**
- * Removes a location from history.
- * @param {number} lat - Latitude of the location.
- * @param {number} lng - Longitude of the location.
- */
-export function removeLocationFromHistory(lat, lng) {
-    console.log('removeLocationFromHistory: Removing:', { lat, lng });
-    if (isNaN(lat) || isNaN(lng)) {
-        console.error('removeLocationFromHistory: Invalid coordinates');
-        return;
-    }
-    let history = getCoordHistory();
-    const updatedHistory = history.filter(entry => {
-        const entryLat = parseFloat(entry.lat);
-        const entryLng = parseFloat(entry.lng || entry.lon);
-        return Math.abs(entryLat - lat) > 0.001 || Math.abs(entryLng - lng) > 0.001;
-    });
-    saveCoordHistory(updatedHistory);
-    Utils.handleMessage("Location deleted.");
-    _dispatchFavoritesUpdate();
-}
-
-/**
- * Dispatches an update event for favorites.
- */
-export function _dispatchFavoritesUpdate() {
-    console.log('_dispatchFavoritesUpdate: Dispatching event');
-    const history = getCoordHistory();
-    const favorites = history.filter(item => item.isFavorite);
-    const event = new CustomEvent('favorites:updated', {
-        detail: { favorites: favorites },
-        bubbles: true,
-        cancelable: true
-    });
-    document.dispatchEvent(event);
-    console.log('_dispatchFavoritesUpdate: Event dispatched');
-}
-
 export async function performSearch(query) {
     // --- Phase 1: Eingabe prüfen und Cache nutzen (Logik aus der mobilen Version) ---
     if (!query.trim()) {
@@ -186,6 +40,7 @@ export async function performSearch(query) {
     if (searchCache[query]) {
         return searchCache[query]; // Ergebnisse aus dem Cache zurückgeben
     }
+
     try {
         // 1. Die URL wird auf die Open-Meteo Geocoding API umgestellt.
         const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=10&language=de&format=json`;
@@ -231,12 +86,13 @@ export async function performSearch(query) {
 }
 
 /**
- * Finds parachuting-related POIs in a bounding box using Overpass API.
- * @param {number} minLat - Minimum latitude of the bounding box.
- * @param {number} minLon - Minimum longitude of the bounding box.
- * @param {number} maxLat - Maximum latitude of the bounding box.
- * @param {number} maxLon - Maximum longitude of the bounding box.
- * @returns {Promise<Array>} Array of POIs with {display_name, lat, lon, type}.
+ * Sucht nach Fallschirmsprung-relevanten Orten (POIs) in einem gegebenen Kartenausschnitt
+ * mithilfe der Overpass API.
+ * @param {number} minLat - Minimale Breite des Ausschnitts.
+ * @param {number} minLon - Minimale Länge des Ausschnitts.
+ * @param {number} maxLat - Maximale Breite des Ausschnitts.
+ * @param {number} maxLon - Maximale Länge des Ausschnitts.
+ * @returns {Promise<object[]>} Ein Array von gefundenen POIs.
  */
 export async function findParachutingPOIs(minLat, minLon, maxLat, maxLon) {
     console.log('findParachutingPOIs: Searching for POIs in bbox:', { minLat, minLon, maxLat, maxLon });
@@ -330,6 +186,142 @@ export async function findParachutingPOIs(minLat, minLon, maxLat, maxLon) {
     }
 }
 
+// src/core/locationManager.js
+
+/**
+ * Legt einen bestimmten Ort als "Home DZ" fest.
+ * @param {number} lat - Breite des Home DZ.
+ * @param {number} lng - Länge des Home DZ.
+ */
+export function setHomeDZ(lat, lng) {
+    let history = getCoordHistory();
+    let homeDZLabel = 'Home DZ';
+
+    // Setze alle anderen Einträge zurück
+    history.forEach(entry => entry.isHomeDZ = false);
+
+    const existingEntry = history.find(entry =>
+        Math.abs(entry.lat - lat) < 0.0001 && Math.abs(entry.lng - lng) < 0.0001
+    );
+
+    if (existingEntry) {
+        existingEntry.isHomeDZ = true;
+        homeDZLabel = existingEntry.label;
+    } else {
+        // Sollte selten passieren, aber als Fallback
+        history.unshift({ lat, lng, label: 'Home DZ', isFavorite: true, isHomeDZ: true, timestamp: Date.now() });
+    }
+
+    saveCoordHistory(history);
+    Utils.handleMessage(`"${homeDZLabel}" is now your Home DZ.`);
+    _dispatchFavoritesUpdate(); // UI neu zeichnen lassen
+}
+
+/**
+ * Entfernt die "Home DZ"-Markierung.
+ */
+export function clearHomeDZ() {
+    let history = getCoordHistory();
+    history.forEach(entry => entry.isHomeDZ = false);
+    saveCoordHistory(history);
+    Utils.handleMessage("Home DZ removed.");
+    _dispatchFavoritesUpdate();
+}
+
+/**
+ * Ruft den gespeicherten "Home DZ"-Ort ab.
+ * @returns {object|null} Das Home DZ Objekt oder null, wenn keines gesetzt ist.
+ */
+export function getHomeDZ() {
+    return getCoordHistory().find(entry => entry.isHomeDZ);
+}
+
+// ===================================================================
+// 2. Local Storage Management (Favoriten & Verlauf)
+// ===================================================================
+
+/**
+ * Fügt einen Ort zum Suchverlauf hinzu oder aktualisiert einen bestehenden Eintrag.
+ * @param {number} lat - Breite.
+ * @param {number} lng - Länge.
+ * @param {string} label - Der Anzeigename des Ortes.
+ * @param {boolean} [isFavorite=false] - Ob der Ort ein Favorit ist.
+ */
+export function addCoordToHistory(lat, lng, label, isFavorite = false) {
+    console.log('addCoordToHistory: Adding:', { lat, lng, label, isFavorite });
+    if (isNaN(lat) || isNaN(lng)) {
+        console.error('addCoordToHistory: Invalid coordinates');
+        return;
+    }
+    let history = getCoordHistory();
+    const newLat = parseFloat(lat.toFixed(5));
+    const newLng = parseFloat(lng.toFixed(5));
+
+    // Entferne alte Einträge mit denselben Koordinaten, um Duplikate zu vermeiden
+    history = history.filter(entry => Math.abs(entry.lat - newLat) > 0.001 || Math.abs(entry.lng - newLng) > 0.001);
+
+    // Füge den neuen Eintrag am Anfang hinzu
+    history.unshift({ lat: newLat, lng: newLng, label: label, isFavorite: isFavorite, timestamp: Date.now() });
+
+    // Begrenze den Verlauf auf 5 Einträge (Favoriten ausgenommen)
+    const favorites = history.filter(e => e.isFavorite);
+    const nonFavorites = history.filter(e => !e.isFavorite).slice(0, 5);
+
+    saveCoordHistory([...favorites, ...nonFavorites]);
+}
+
+/**
+ * Speichert einen Ort als Favorit oder aktualisiert einen bestehenden Favoriten.
+ * @param {number} lat - Breite.
+ * @param {number} lng - Länge.
+ * @param {string} name - Der Name des Favoriten.
+ * @param {boolean} [skipMessage=false] - Ob eine Erfolgsmeldung angezeigt werden soll.
+ */
+export function addOrUpdateFavorite(lat, lng, name, skipMessage = false) {
+    console.log('addOrUpdateFavorite: Processing:', { lat, lng, name });
+    if (isNaN(lat) || isNaN(lng)) {
+        console.error('addOrUpdateFavorite: Invalid coordinates');
+        return;
+    }
+    if (isAddingFavorite) {
+        console.log('addOrUpdateFavorite: Blocked due to ongoing operation');
+        return;
+    }
+    isAddingFavorite = true;
+    try {
+        let history = getCoordHistory();
+        const newLat = parseFloat(lat.toFixed(5));
+        const newLng = parseFloat(lng.toFixed(5));
+        const existingEntry = history.find(entry => Math.abs(entry.lat - newLat) < 0.001 && Math.abs(entry.lng - newLng) < 0.001);
+        if (existingEntry) {
+            console.log('addOrUpdateFavorite: Updating existing entry:', existingEntry);
+            existingEntry.isFavorite = true;
+            existingEntry.label = name;
+        } else {
+            const newEntry = { lat: newLat, lng: newLng, label: name, isFavorite: true, timestamp: Date.now() };
+            console.log('addOrUpdateFavorite: Adding new entry:', newEntry);
+            history.unshift(newEntry);
+        }
+        saveCoordHistory(history);
+        if (!skipMessage) {
+            Utils.handleMessage(`"${name}" saved as favorite.`);
+        }
+        _dispatchFavoritesUpdate();
+    } catch (error) {
+        console.error('addOrUpdateFavorite: Error:', error);
+    } finally {
+        isAddingFavorite = false;
+        console.log('addOrUpdateFavorite: Completed');
+    }
+}
+
+/**
+ * Ändert den Favoritenstatus eines Ortes (hinzufügen oder entfernen).
+ * @param {number} lat - Breite.
+ * @param {number} lng - Länge.
+ * @param {string} name - Der Name des Ortes.
+ * @param {boolean} isFavorite - Der neue Favoritenstatus.
+ */
 export function updateFavoriteStatus(lat, lng, name, isFavorite) {
     let history = getCoordHistory(); // getCoordHistory() ist bereits hier
     const newLat = parseFloat(lat.toFixed(5));
@@ -360,4 +352,130 @@ export function updateFavoriteStatus(lat, lng, name, isFavorite) {
     } else {
         Utils.handleMessage(`"${name}" removed from favorites.`);
     }
+}
+
+/**
+ * Entfernt einen Ort aus dem Verlauf und/oder den Favoriten.
+ * @param {number} lat - Breite.
+ * @param {number} lng - Länge.
+ */
+export function removeLocationFromHistory(lat, lng) {
+    console.log('removeLocationFromHistory: Removing:', { lat, lng });
+    if (isNaN(lat) || isNaN(lng)) {
+        console.error('removeLocationFromHistory: Invalid coordinates');
+        return;
+    }
+    let history = getCoordHistory();
+    const updatedHistory = history.filter(entry => {
+        const entryLat = parseFloat(entry.lat);
+        const entryLng = parseFloat(entry.lng || entry.lon);
+        return Math.abs(entryLat - lat) > 0.001 || Math.abs(entryLng - lng) > 0.001;
+    });
+    saveCoordHistory(updatedHistory);
+    Utils.handleMessage("Location deleted.");
+    _dispatchFavoritesUpdate();
+}
+
+/**
+ * Ruft den gesamten Verlauf (Favoriten und letzte Suchen) aus dem Local Storage ab.
+ * @returns {object[]} Der gespeicherte Verlauf.
+ */
+export function getCoordHistory() {
+    console.log('getCoordHistory: Retrieving history');
+    try {
+        const history = JSON.parse(localStorage.getItem('coordHistory')) || [];
+        console.log('getCoordHistory: History retrieved:', history);
+        return history;
+    } catch (e) {
+        console.error('getCoordHistory: Error retrieving history:', e);
+        return [];
+    }
+}
+
+/**
+ * Speichert den aktuellen Verlaufs-Array im Local Storage.
+ * @param {object[]} history - Der zu speichernde Verlauf.
+ * @private
+ */
+export function saveCoordHistory(history) {
+    console.log('saveCoordHistory: Saving history:', history);
+    try {
+        localStorage.setItem('coordHistory', JSON.stringify(history));
+        console.log('saveCoordHistory: History saved');
+    } catch (e) {
+        console.error('saveCoordHistory: Error saving history:', e);
+    }
+}
+
+// ===================================================================
+// 3. Interne Hilfsfunktionen
+// ===================================================================
+
+/**
+ * Versucht, eine Benutzereingabe als Koordinaten (Dezimalgrad oder MGRS) zu parsen.
+ * @param {string} query - Die Benutzereingabe.
+ * @returns {{lat: number, lng: number}|null} Ein Objekt mit lat/lng oder null.
+ * @private
+ */
+export function parseQueryAsCoordinates(query) {
+    console.log('parseQueryAsCoordinates: Parsing query:', query);
+    const trimmedQuery = query.trim();
+
+    // Versuch 1: Dezimalgrad (z.B. "48.1234, 11.5678" oder "48.1234 11.5678")
+    const cleanedForDecimal = trimmedQuery.replace(/[,;\t]+/g, ' ').trim();
+    // Flexible regex for decimal degrees: e.g., "48.1234 11.5678" or "-48.1234,11.5678"
+    const decMatch = cleanedForDecimal.match(/^(-?\d{1,3}(?:\.\d+)?)\s+(-?\d{1,3}(?:\.\d+)?)$/);
+    if (decMatch) {
+        console.log('parseQueryAsCoordinates: Regex match:', decMatch);
+        const lat = parseFloat(decMatch[1]);
+        const lng = parseFloat(decMatch[2]);
+        console.log('parseQueryAsCoordinates: Decimal degrees detected:', { lat, lng });
+        if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+            return { lat, lng };
+        } else {
+            console.warn('parseQueryAsCoordinates: Invalid coordinate ranges:', { lat, lng });
+        }
+    }
+
+    // Versuch 2: MGRS (z.B. "32UPU6347420615")
+    const cleanedForMgrs = trimmedQuery.replace(/\s/g, '').toUpperCase();
+    const mgrsRegex = /^[0-9]{1,2}[C-HJ-NP-X][A-HJ-NP-Z]{2}(\d{2}|\d{4}|\d{6}|\d{8}|\d{10})$/;
+    if (typeof mgrs === 'undefined') {
+        console.warn('parseQueryAsCoordinates: MGRS library not loaded');
+        return null;
+    }
+    if (mgrsRegex.test(cleanedForMgrs)) {
+        try {
+            const [lng, lat] = mgrs.toPoint(cleanedForMgrs);
+            console.log('parseQueryAsCoordinates: MGRS detected:', { lat, lng });
+            if (!isNaN(lat) && !isNaN(lng)) {
+                return { lat, lng };
+            } else {
+                console.warn('parseQueryAsCoordinates: Invalid MGRS coordinates:', { lat, lng });
+            }
+        } catch (e) {
+            console.warn('parseQueryAsCoordinates: MGRS parsing failed:', e.message);
+            return null;
+        }
+    }
+    console.log('parseQueryAsCoordinates: No coordinates detected');
+    return null;
+}
+
+/**
+ * Löst ein benutzerdefiniertes 'favorites:updated'-Event aus, um die UI zu informieren,
+ * dass die Liste der Favoriten aktualisiert wurde.
+ * @private
+ */
+export function _dispatchFavoritesUpdate() {
+    console.log('_dispatchFavoritesUpdate: Dispatching event');
+    const history = getCoordHistory();
+    const favorites = history.filter(item => item.isFavorite);
+    const event = new CustomEvent('favorites:updated', {
+        detail: { favorites: favorites },
+        bubbles: true,
+        cancelable: true
+    });
+    document.dispatchEvent(event);
+    console.log('_dispatchFavoritesUpdate: Event dispatched');
 }

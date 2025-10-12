@@ -19,6 +19,8 @@ import * as displayManager from './displayManager.js';
 import * as liveTrackingManager from '../core/liveTrackingManager.js';
 import * as EnsembleManager from '../core/ensembleManager.js';
 import * as LocationManager from '../core/locationManager.js';
+import * as AdsbManager from '../core/adsbManager.js';
+import { DateTime } from 'luxon';
 
 "use strict";
 
@@ -104,6 +106,7 @@ function initializeUIElements() {
     applySettingToSelect('timeZone', Settings.state.userSettings.timeZone);
     applySettingToSelect('coordFormat', Settings.state.userSettings.coordFormat);
     applySettingToSelect('downloadFormat', Settings.state.userSettings.downloadFormat);
+    applySettingToSelect('maxForecastTime', Settings.state.userSettings.maxForecastTime); // Hinzugefügt
     applySettingToRadio('landingDirection', Settings.state.userSettings.landingDirection);
     applySettingToInput('canopySpeed', Settings.state.userSettings.canopySpeed);
     applySettingToInput('descentRate', Settings.state.userSettings.descentRate);
@@ -128,6 +131,7 @@ function initializeUIElements() {
     applySettingToCheckbox('showCanopyAreaCheckbox', Settings.state.userSettings.showCanopyArea);
     applySettingToCheckbox('showExitAreaCheckbox', Settings.state.userSettings.showExitArea);
     applySettingToCheckbox('showCutAwayFinder', Settings.state.userSettings.showCutAwayFinder);
+    applySettingToInput('terrainClearance', Settings.state.userSettings.terrainClearance);
     Settings.state.userSettings.isCustomJumpRunDirection = Settings.state.userSettings.isCustomJumpRunDirection || false;
 
     // Ensure UI reflects the stored custom direction without overwriting
@@ -215,7 +219,7 @@ export function calculateJump() {
         if (exitResult) {
             // Der hellgrüne Kreis (gesamter möglicher Bereich)
             visualizationData.exitCircles.push({
-                center: [exitResult.greenLat, exitResult.greenLng],
+                center: [exitResult.greenLatFull, exitResult.greenLngFull],
                 radius: exitResult.greenRadius,
                 color: 'green',
                 fillColor: 'green',
@@ -232,7 +236,7 @@ export function calculateJump() {
 
             // Der dunkelgrüne Kreis (Bereich bis zum Downwind) bekommt den Tooltip
             visualizationData.exitCircles.push({
-                center: [exitResult.darkGreenLat, exitResult.darkGreenLng],
+                center: [exitResult.greenLat, exitResult.greenLng],
                 radius: exitResult.darkGreenRadius,
                 color: 'darkgreen',
                 fillColor: 'darkgreen',
@@ -568,6 +572,234 @@ export function downloadTableAsAscii(format) {
 }
 
 /**
+ * Erstellt eine Textdatei mit dem zeitlichen Verlauf der Bodendaten (TAB-getrennt) 
+ * und stößt den Download an.
+ */
+async function downloadSurfaceDataAsAscii() {
+    if (!AppState.weatherData || !AppState.weatherData.time) {
+        Utils.handleError('No weather data available to download.');
+        return;
+    }
+
+    const { time, wind_direction_10m, wind_speed_10m, wind_gusts_10m, visibility, weather_code, temperature_2m } = AppState.weatherData;
+    const windUnit = getWindSpeedUnit();
+    const tempUnit = getTemperatureUnit();
+    const heightUnit = getHeightUnit();
+    const timeZone = Settings.getValue('timeZone', 'radio', 'Z');
+    const model = document.getElementById('modelSelect').value.toUpperCase();
+    const timeForFilename = Utils.formatTime(time[0]).replace(' ', '_');
+    const filename = `${timeForFilename}_${model}_Surface.txt`;
+
+    const timeHeader = `Time (${timeZone})`;
+    let content = `Date\t${timeHeader}\tWind Dir (°)\tWind Spd/Gust (${windUnit})\tVisibility (m)\tWeather\tClouds\tTemp (${tempUnit})\n`;
+
+    for (let i = 0; i < time.length; i++) {
+        const displayTime = await Utils.getDisplayTime(time[i], AppState.lastLat, AppState.lastLng, timeZone);
+        const [date, timeStr] = displayTime.split(' ');
+        const speed = Utils.convertWind(wind_speed_10m[i], windUnit, 'km/h');
+        const gust = Utils.convertWind(wind_gusts_10m[i], windUnit, 'km/h');
+        const formattedSpeed = (typeof speed === 'number') ? speed.toFixed(0) : 'N/A';
+        const formattedGust = (typeof gust === 'number') ? gust.toFixed(0) : 'N/A';
+        const windString = `${formattedSpeed} G ${formattedGust}`;
+        const temp = Utils.convertTemperature(temperature_2m[i], tempUnit);
+        const formattedTemp = (typeof temp === 'number') ? temp.toFixed(1) : 'N/A';
+
+        // HIER IST DIE ÄNDERUNG:
+        const visibilityStr = Utils.formatVisibility(visibility?.[i]);
+        const weatherStr = Utils.translateWmoCodeToTaf(weather_code?.[i]);
+
+        const interpolatedDataForHour = weatherManager.interpolateWeatherData(
+            AppState.weatherData, i, 100, Math.round(AppState.lastAltitude), heightUnit
+        );
+        const cloudLayerString = Utils.getCloudLayersForMetar(interpolatedDataForHour, heightUnit);
+
+        content += `${date}\t${timeStr}\t${wind_direction_10m[i]}\t${windString}\t${visibilityStr}\t${weatherStr}\t${cloudLayerString}\t${formattedTemp}\n`;
+    }
+
+
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+}
+
+/**
+ * Erstellt einen vollständigen, formatierten Wetter-Tagesbericht als HTML-Seite
+ * und öffnet diesen in einem neuen Tab.
+ */
+async function exportComprehensiveReportAsHtml() {
+    if (!AppState.weatherData || !AppState.lastLat || !AppState.lastLng) {
+        Utils.handleError("No weather data available for the report.");
+        return;
+    }
+
+    const lat = AppState.lastLat;
+    const lng = AppState.lastLng;
+    const model = document.getElementById('modelSelect').value.toUpperCase();
+    const modelRun = AppState.lastModelRun || "N/A";
+    const today = DateTime.utc().toFormat('yyyy-MM-dd');
+
+    const windUnit = getWindSpeedUnit();
+    const tempUnit = getTemperatureUnit();
+    const heightUnit = getHeightUnit();
+    const timeZone = Settings.getValue('timeZone', 'radio', 'Z');
+    const upperAirLimit = Settings.getValue('upperLimit', 'number', 3000);
+
+    let locationName = `Lat ${lat.toFixed(4)}, Lon ${lng.toFixed(4)}`;
+    try {
+        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+        const data = await response.json();
+        locationName = data.display_name || locationName;
+    } catch (e) {
+        console.warn("Reverse geocoding failed, using coordinates.");
+    }
+
+    let html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>DZMaster Weather Briefing</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 1000px; margin: 20px auto; padding: 20px; }
+        h1, h2, h3 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 0.9em; }
+        th, td { padding: 8px 12px; border: 1px solid #ddd; text-align: left; }
+        th { background-color: #f2f2f2; font-weight: bold; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        .header-info { background-color: #ecf0f1; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+        .header-info p { margin: 5px 0; }
+        .section { margin-top: 40px; }
+        @media print {
+            body { font-size: 10pt; }
+            .container { margin: 0; padding: 0; max-width: 100%; }
+            h1, h2, h3 { page-break-after: avoid; }
+            table { page-break-inside: auto; }
+            tr { page-break-inside: avoid; page-break-after: auto; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>DZMaster - Weather Briefing</h1>
+    <div class="header-info">
+        <p><strong>Location:</strong> ${locationName}</p>
+        <p><strong>Model:</strong> ${model}</p>
+        <p><strong>Model Run:</strong> ${modelRun}</p>
+        <p><strong>Forecast Day:</strong> ${today}</p>
+    </div>
+
+    <div class="section">
+        <h2>Surface Data (Today)</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Time (${timeZone})</th>
+                    <th>Wind Dir (°)</th>
+                    <th>Wind (${windUnit})</th>
+                    <th>Visibility (m)</th>
+                    <th>Weather</th>
+                    <th>Clouds</th>
+                    <th>Temp (${tempUnit})</th>
+                </tr>
+            </thead>
+            <tbody>`;
+
+    const { time, wind_direction_10m, wind_speed_10m, wind_gusts_10m, visibility, weather_code, temperature_2m } = AppState.weatherData;
+    const todayIndices = time.map((t, i) => DateTime.fromISO(t).toFormat('yyyy-MM-dd') === today ? i : -1).filter(i => i !== -1);
+
+    for (const i of todayIndices) {
+        const displayTime = await Utils.getDisplayTime(time[i], lat, lng, timeZone);
+        const [date, timeStr] = displayTime.split(' ');
+        const speed = Utils.convertWind(wind_speed_10m[i], windUnit, 'km/h');
+        const gust = Utils.convertWind(wind_gusts_10m[i], windUnit, 'km/h');
+        const windString = `${(typeof speed === 'number' ? speed.toFixed(0) : 'N/A')} G ${(typeof gust === 'number' ? gust.toFixed(0) : 'N/A')}`;
+        const temp = Utils.convertTemperature(temperature_2m[i], tempUnit);
+
+        const interpolatedDataForHour = weatherManager.interpolateWeatherData(
+            AppState.weatherData, i, 100, Math.round(AppState.lastAltitude), heightUnit
+        );
+        const cloudLayerString = Utils.getCloudLayersForMetar(interpolatedDataForHour, heightUnit);
+
+        const windDirectionFormatted = Utils.formatWindDirection(wind_direction_10m[i]); // NEU
+        const visibilityStr = Utils.formatVisibility(visibility?.[i]);
+
+        html += `<tr>
+            <td>${date}</td>
+            <td>${timeStr}</td>
+            <td>${windDirectionFormatted}</td>
+            <td>${windString}</td>
+            <td>${visibilityStr}</td>
+            <td>${Utils.translateWmoCodeToTaf(weather_code?.[i])}</td>
+            <td>${cloudLayerString}</td>
+            <td>${(typeof temp === 'number' ? temp.toFixed(0) : 'N/A')}</td>
+        </tr>`;
+    }
+
+    html += `</tbody></table></div>`;
+
+    html += `<div class="section">
+                <h2>Upper Air Data (Today, hourly, up to ${upperAirLimit}${heightUnit} AGL)</h2>`;
+
+    for (const i of todayIndices) {
+        const displayTime = await Utils.getDisplayTime(time[i], lat, lng, 'Z');
+        html += `<h3>${displayTime}</h3>
+                 <table>
+                    <thead>
+                        <tr>
+                            <th>h(${heightUnit} AGL)</th>
+                            <th>p(hPa)</th>
+                            <th>T(${tempUnit})</th>
+                            <th>Dew(${tempUnit})</th>
+                            <th>Dir(°)</th>
+                            <th>Spd(${windUnit})</th>
+                            <th>RH(%)</th>
+                            <th>Clouds(%)</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+
+        const interpolatedData = weatherManager.interpolateWeatherData(
+            AppState.weatherData, i, 100, Math.round(AppState.lastAltitude), heightUnit
+        );
+
+        interpolatedData
+            .filter(data => data.displayHeight <= upperAirLimit)
+            .forEach(data => {
+                const temp = Utils.convertTemperature(data.temp, tempUnit);
+                const dew = Utils.convertTemperature(data.dew, tempUnit);
+                const spd = Utils.convertWind(data.spd, windUnit, 'km/h');
+                const dirFormatted = Utils.formatWindDirection(data.dir); // NEU
+
+                html += `<tr>
+                    <td>${data.displayHeight}</td>
+                    <td>${(typeof data.pressure === 'number' ? data.pressure.toFixed(1) : 'N/A')}</td>
+                    <td>${(typeof temp === 'number' ? temp.toFixed(1) : 'N/A')}</td>
+                    <td>${(typeof dew === 'number' ? dew.toFixed(1) : 'N/A')}</td>
+                    <td>${dirFormatted}</td>
+                    <td>${(typeof spd === 'number' ? spd.toFixed(1) : 'N/A')}</td>
+                    <td>${(typeof data.rh === 'number' ? Math.round(data.rh) : 'N/A')}</td>
+                    <td>${(typeof data.cc === 'number' ? Math.round(data.cc) : 'N/A')}</td>
+                </tr>`;
+            });
+        html += `</tbody></table>`;
+    }
+
+    html += `</div></div></body></html>`;
+
+    const newTab = window.open();
+    newTab.document.open();
+    newTab.document.write(html);
+    newTab.document.close();
+}
+
+/**
  * Setzt die manuell eingegebene Richtung für den Jump Run Track zurück
  * und löst bei Bedarf eine Neuzeichnung mit der berechneten Richtung aus.
  * @param {boolean} [triggerUpdate=true] - Wenn true, wird der Track sofort neu gezeichnet.
@@ -605,6 +837,7 @@ export function resetJumpRunDirection(triggerUpdate = true) {
  */
 export async function updateUIWithNewWeatherData(newWeatherData, preservedIndex = null) {
     AppState.weatherData = newWeatherData;
+    AppState.cloudThresholds = weatherManager.analyzeCloudLayers(newWeatherData);
     const slider = document.getElementById('timeSlider');
 
     if (!slider) return;
@@ -621,30 +854,42 @@ export async function updateUIWithNewWeatherData(newWeatherData, preservedIndex 
     };
 
     const lastValidIndex = findLastValidDataIndex(newWeatherData);
-    slider.max = lastValidIndex;
+    
+    // Geänderte Logik für den Slider
+    const maxForecastTime = Settings.getValue('maxForecastTime', 'Maximum');
+    let maxSliderIndex = lastValidIndex;
+
+    if (maxForecastTime !== 'Maximum') {
+        const maxDays = parseInt(maxForecastTime, 10);
+        const maxHours = (maxDays * 24) - 1; // -1, da der Index bei 0 beginnt
+        if (lastValidIndex > maxHours) {
+            maxSliderIndex = maxHours;
+        }
+    }
+    slider.max = maxSliderIndex;
     slider.disabled = slider.max <= 0;
 
-    // Wenn ein Index übergeben wurde und dieser gültig ist, verwenden wir ihn.
-    // Ansonsten verwenden wir das Standardverhalten (aktuelle Stunde).
-    if (preservedIndex !== null && preservedIndex <= lastValidIndex) {
+    // Logik zur Positionierung des Sliders
+    if (preservedIndex !== null && preservedIndex <= maxSliderIndex) {
         slider.value = preservedIndex;
         console.log(`Slider restored to preserved index: ${preservedIndex}`);
     } else {
         const currentUtcHour = new Date().getUTCHours();
-        if (currentUtcHour <= lastValidIndex) {
+        if (currentUtcHour <= maxSliderIndex) {
             slider.value = currentUtcHour;
         } else {
-            slider.value = lastValidIndex;
+            slider.value = maxSliderIndex;
         }
         console.log(`Slider set to default (current hour or max): ${slider.value}`);
     }
+
+    await displayManager.updateSliderLabels();
 
     await displayManager.updateWeatherDisplay(slider.value, 'weather-table-container', 'selectedTime');
     await displayManager.refreshMarkerPopup();
     if (AppState.lastAltitude !== 'N/A') {
         calculateMeanWind();
     }
-    Settings.updateModelRunInfo(AppState.lastModelRun, AppState.lastLat, AppState.lastLng);
     displayManager.updateModelInfoPopup();
     console.log("Model changed. Triggering recalculation of jump parameters.");
     displayManager.updateLandingPatternDisplay();
@@ -671,7 +916,6 @@ export function updateUIState() {
     if (customRR) customRR.disabled = Settings.state.userSettings.landingDirection !== 'RR';
     if (showJumpRunTrackCheckbox) showJumpRunTrackCheckbox.disabled = !Settings.state.userSettings.calculateJump;
     if (showExitAreaCheckbox) showExitAreaCheckbox.disabled = !Settings.state.userSettings.calculateJump; // Disable unless calculateJump is on
-    Settings.updateUnitLabels();
 }
 function updateLockStatesUI() {
     // Update Planner Icon
@@ -776,6 +1020,7 @@ function updateJumpMasterDashboard(data) {
     const directionEl = document.getElementById('dashboard-jm-direction');
     const speedEl = document.getElementById('dashboard-jm-speed');
     const accuracyEl = document.getElementById('dashboard-jm-accuracy');
+    const varioEl = document.getElementById('dashboard-jm-vario');
 
     // Werte formatieren und anzeigen
     const settings = {
@@ -788,19 +1033,21 @@ function updateJumpMasterDashboard(data) {
     const coords = Utils.convertCoords(data.latitude, data.longitude, settings.coordFormat);
     let coordText;
 
+    const formatDDM = (ddm) => `${ddm.deg}° ${ddm.min.toFixed(3)}' ${ddm.dir}`;
+    const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
+
     if (settings.coordFormat === 'MGRS') {
-        // MGRS ist ein einzelner String
         coordText = coords.lat;
     } else if (settings.coordFormat === 'DMS') {
-        // Format für Grad, Minuten, Sekunden
-        const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
         coordText = `${formatDMS(coords.lat)}, ${formatDMS(coords.lng)}`;
+    } else if (settings.coordFormat === 'DDM') {
+        coordText = `${formatDDM(coords.lat)}, ${formatDDM(coords.lng)}`;
     } else {
-        // Standard-Dezimalformat
-        coordText = `${coords.lat}, ${coords.lng}`;
+        // KORREKTUR: Verwende die Original-Koordinaten direkt, wie in der mobilen Version.
+        coordText = `${data.latitude.toFixed(5)}, ${data.longitude.toFixed(5)}`;
     }
 
-    coordsEl.textContent = coordText; // Die korrigierte Zeile
+    coordsEl.textContent = coordText;
 
     let altText = "N/A";
     if (data.deviceAltitude !== null) {
@@ -814,6 +1061,29 @@ function updateJumpMasterDashboard(data) {
     const formattedSpeed = settings.effectiveWindUnit === 'bft' ? Math.round(displaySpeed) : displaySpeed.toFixed(1);
     speedEl.textContent = `${formattedSpeed} ${settings.effectiveWindUnit}`;
     accuracyEl.textContent = `± ${Math.round(Utils.convertHeight(data.accuracy, settings.heightUnit))} ${settings.heightUnit}`;
+    if (varioEl) {
+        const { rateOfClimbMps } = data;
+        const varioUnit = settings.heightUnit === 'ft' ? 'ft/min' : 'm/s';
+        let displayVario = 'N/A';
+        varioEl.classList.remove('vario-climb', 'vario-descent');
+
+        if (rateOfClimbMps !== null && Number.isFinite(rateOfClimbMps)) {
+            if (varioUnit === 'ft/min') {
+                // Umrechnung von m/s zu ft/min ( * 3.28084 * 60)
+                displayVario = (rateOfClimbMps * 196.85).toFixed(0);
+            } else {
+                displayVario = rateOfClimbMps.toFixed(1);
+            }
+
+            // Farbliche Kennzeichnung
+            if (rateOfClimbMps > 0.5) {
+                varioEl.classList.add('vario-climb');
+            } else if (rateOfClimbMps < -0.5) {
+                varioEl.classList.add('vario-descent');
+            }
+        }
+        varioEl.textContent = `${displayVario} ${varioUnit}`;
+    }
 
     const jmlDetails = document.getElementById('jumpmaster-line-details');
     const showJML = data.showJumpMasterLine;
@@ -1161,11 +1431,27 @@ function setupAppEventListeners() {
         const { name, value } = e.detail;
         console.log(`[main-web] Setting '${name}' changed to '${value}'. Performing updates.`);
 
+        if (name === 'timeZone') {
+            await displayManager.updateSliderLabels();
+        }
+
         // Update der Wetteranzeige für alle Einheiten-Änderungen
         if (['refLevel', 'heightUnit', 'temperatureUnit', 'windUnit', 'timeZone'].includes(name)) {
             await displayManager.updateWeatherDisplay(getSliderValue(), 'weather-table-container', 'selectedTime');
         }
 
+        if (name === 'maxForecastTime') {
+            if (AppState.lastLat && AppState.lastLng) {
+                const timeIndexToPreserve = getSliderValue();
+                const currentTime = AppState.weatherData?.time?.[timeIndexToPreserve] || null;
+
+                const newWeatherData = await weatherManager.fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, currentTime);
+                if (newWeatherData) {
+                    await updateUIWithNewWeatherData(newWeatherData, timeIndexToPreserve);
+                }
+            }
+        }
+        
         // Neuberechnungen basierend auf der geänderten Einstellung anstoßen
         switch (name) {
             case 'heightUnit':
@@ -1253,6 +1539,7 @@ function setupAppEventListeners() {
             case 'landingDirection':
                 updateUIState();
                 displayManager.updateLandingPatternDisplay();
+                calculateJump(); // Exit und blaue Kreise müssen neu berechnet werden
                 break;
         }
     });
@@ -1324,6 +1611,7 @@ function setupAppEventListeners() {
             case 'customLandingDirectionRR':
                 if (AppState.weatherData) {
                     displayManager.updateLandingPatternDisplay();
+                    calculateJump(); // Exit und blaue Kreise müssen neu berechnet werden
                 }
                 break;
 
@@ -1337,6 +1625,10 @@ function setupAppEventListeners() {
                 }
                 break;
         }
+    });
+
+    document.addEventListener('ui:findJumpShip', () => {
+        AdsbManager.findAndSelectJumpShip();
     });
 
     document.addEventListener('ui:showJumpMasterLineChanged', () => {
@@ -1458,7 +1750,13 @@ function setupAppEventListeners() {
         console.log('[main-web] Download button clicked.');
 
         const downloadFormat = getDownloadFormat();
-        downloadTableAsAscii(downloadFormat);
+        if (downloadFormat === 'SurfaceData') {
+            downloadSurfaceDataAsAscii();
+        } else if (downloadFormat === 'ComprehensiveReport') { // NEUER FALL
+            exportComprehensiveReportAsHtml();
+        } else {
+            downloadTableAsAscii(downloadFormat);
+        }
     });
 
     document.addEventListener('ui:clearDateClicked', async () => {
@@ -1589,13 +1887,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     document.addEventListener('harp:updated', () => {
-        console.log('[App] HARP has been updated, triggering JRT recalculation.');
+        console.log('[App] HARP has been updated, resetting offsets and triggering JRT recalculation.');
+
+        // NEU: Setzt die sichtbaren Input-Felder auf 0 zurück.
+        setInputValueSilently('jumpRunTrackOffset', 0);
+        setInputValueSilently('jumpRunTrackForwardOffset', 0);
+
+        // Bestehende Logik zum Neuzeichnen des Tracks und der JM-Linie
         displayManager.updateJumpRunTrackDisplay();
+        // Die folgende Zeile ist nur in main-mobile.js relevant
+        if (typeof updateJumpMasterLineAndPanel === 'function') {
+            updateJumpMasterLineAndPanel();
+        }
     });
 
     document.addEventListener('location:selected', async (event) => {
         const { lat, lng, source } = event.detail;
         console.log(`App: Event 'location:selected' empfangen. Quelle: ${source}`);
+        mapManager.clearTerrainWarning(); // Alte Terrain-Analyse sofort entfernen
+        AppState.terrainAnalysisCache = null;
 
         const loadingElement = document.getElementById('loading');
         if (loadingElement) loadingElement.style.display = 'block';

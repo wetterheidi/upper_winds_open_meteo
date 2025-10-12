@@ -21,6 +21,7 @@
     <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js" defer></script>
     <script src="https://unpkg.com/leaflet-rotatedmarker@0.2.0/leaflet.rotatedMarker.js" defer></script>
     <script src="https://unpkg.com/@tmcw/togeojson@4.7.0/dist/togeojson.umd.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
 </head>
 
 <body>
@@ -37,7 +38,10 @@
                     <input type="checkbox" id="autoupdateCheckbox">
                 </div>
             </div>
-            <input type="range" id="timeSlider" min="0" max="167" value="0" disabled>
+            <div class="slider-wrapper">
+                <input type="range" id="timeSlider" min="0" max="167" value="0" disabled>
+                <div id="slider-labels"></div>
+            </div>
             <div id="model-row">
                 <label id="modelLabel" for="modelSelect" title="Model Run">Forecast Model:</label>
                 <select id="modelSelect">
@@ -66,6 +70,30 @@
                 <button id="passwordCancel">Cancel</button>
             </div>
             <p id="passwordError" style="color: red; display: none;">Incorrect password!</p>
+        </div>
+    </div>
+
+    <div id="locationDisclosureModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3 id="disclosureHeader">Notice on Location Use</h3>
+            <p id="disclosureMessage" style="text-align: left; line-height: 1.6;">
+            </p>
+            <div class="modal-buttons">
+                <button id="disclosureConfirm">Confirm</button>
+                <button id="disclosureCancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="adsbSelectionModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3>Choose Aircraft</h3>
+            <p style="text-align: left; font-size: 12px; color: #666;">Aircrafts nearby (Call Sign / Altitude):</p>
+            <ul id="aircraftList" style="list-style: none; padding: 0; margin: 0; max-height: 200px; overflow-y: auto;">
+                </ul>
+            <div class="modal-buttons">
+                <button id="adsbCancel">Cancel</button>
+            </div>
         </div>
     </div>
 
@@ -107,6 +135,12 @@
                         <tbody>
                         </tbody>
                     </table>
+                </div>
+                <div id="windspinne-container">
+                    <canvas id="windspinne-chart"></canvas>
+                </div>
+                <div id="windspinne-legend" class="windspinne-legend"></div>
+                <div id="controls-row">
                 </div>
             </div>
         </div>
@@ -284,6 +318,15 @@
                             </ul>
                         </li>
                         <li>
+                            <div class="settings-grid" style="grid-template-columns: 1fr auto; gap: 10px;">
+                                <label for="terrainClearance">Min. Clearance (m):</label>
+                                <input type="number" id="terrainClearance" min="0" max="500" step="10" value="100"
+                                    style="width: 80px;">
+                            </div>
+                            <button id="analyzeTerrainButton" class="btn btn-secondary">Analyze Terrain
+                                Clearance</button>
+                        </li>
+                        <li>
                             <button id="exportGpxButton" class="btn btn-primary">Export Jump Run as GPX</button>
                         </li>
                     </ul>
@@ -335,6 +378,8 @@
                                 Points
                             </label>
                         </li>
+                        <button id="findJumpShipBtn" class="btn btn-secondary">Find Aircraft To Track</button>
+
                     </ul>
                 </div>
             </div>
@@ -471,6 +516,10 @@
                         <div class="dashboard-label">Speed</div>
                         <div class="dashboard-value" id="dashboard-jm-speed-mobile">--</div>
                     </div>
+                    <div class="dashboard-item span-2">
+                        <div class="dashboard-label">Vario</div>
+                        <div class="dashboard-value" id="dashboard-jm-vario-mobile">--</div>
+                    </div>
                     <div class="dashboard-item span-2 accuracy-item">
                         <div class="dashboard-label">Accuracy</div>
                         <div class="dashboard-value" id="dashboard-jm-accuracy-mobile">--</div>
@@ -500,6 +549,43 @@
                             <div class="dashboard-value" id="dashboard-jm-tot-mobile">--</div>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="panel-search" class="content-panel hidden">
+            <div class="search-bar-container">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="locationSearchInput" placeholder="Look up city or coordinates...">
+                <span id="clearSearchInput" class="clear-icon" style="display: none;">×</span>
+            </div>
+
+            <button id="saveFavoriteBtn" class="btn btn-primary">Save current location as Favorite</button>
+            <button id="findPoisInViewBtn" class="btn btn-secondary">Search for Dropzones in this Area</button>
+            <div id="favoriteModal" class="favorite-modal" style="display: none;">
+                <div class="favorite-modal-content">
+                    <h3>Save Favorite</h3>
+                    <input id="favoriteNameInput" type="text" placeholder="Enter favorite name">
+                    <div class="favorite-modal-actions">
+                        <button id="submitFavoriteName" class="modal-btn">Save</button>
+                        <button id="cancelFavoriteName" class="modal-btn cancel">Cancel</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="locationResults" class="location-results-container">
+                <div id="favorites-section" class="search-section">
+                    <h5>Favorites</h5>
+                    <ul id="favorites-list"></ul>
+                </div>
+                <div id="recents-section" class="search-section">
+                    <h5>Recent Searches</h5>
+                    <ul id="recents-list"></ul>
+                </div>
+
+                <div id="search-results-section" class="search-section" style="display: none;">
+                    <h5>Results</h5>
+                    <ul id="search-results-list"></ul>
                 </div>
             </div>
         </div>
@@ -541,8 +627,20 @@
                         <label for="coordFormat">Coordinate Format:</label>
                         <select id="coordFormat">
                             <option value="Decimal">Decimal</option>
+                            <option value="DDM">Deg Decimal Min</option>
                             <option value="DMS">Deg Min Sec</option>
                             <option value="MGRS">MGRS</option>
+                        </select>
+                        <label for="maxForecastTime">Max. Forecast Time:</label>
+                        <select id="maxForecastTime">
+                            <option value="1">1 Day</option>
+                            <option value="2">2 Days</option>
+                            <option value="3">3 Days</option>
+                            <option value="4">4 Days</option>
+                            <option value="5">5 Days</option>
+                            <option value="6">6 Days</option>
+                            <option value="7">7 Days</option>
+                            <option value="Maximum">Maximum Time</option>
                         </select>
                     </div>
                 </div>
@@ -558,8 +656,10 @@
                             <option value="ATAK">ATAK</option>
                             <option value="Windwatch">Windwatch</option>
                             <option value="Customized">Customized</option>
+                            <option value="SurfaceData">Surface Data</option>
+                            <option value="ComprehensiveReport">Weather Briefing</option>
                         </select>
-                        <button id="downloadButton" class="btn btn-primary">Download Table</button>
+                        <button id="downloadButton" class="btn btn-primary">Generate Table</button>
                     </div>
                 </div>
             </div>
@@ -624,42 +724,6 @@
             </div>
         </div>
 
-        <div id="panel-search" class="content-panel hidden">
-            <div class="search-bar-container">
-                <span class="search-icon">🔍</span>
-                <input type="text" id="locationSearchInput" placeholder="Look up city or coordinates...">
-                <span id="clearSearchInput" class="clear-icon" style="display: none;">×</span>
-            </div>
-
-            <button id="saveFavoriteBtn" class="btn btn-primary">Save current location as Favorite</button>
-            <button id="findPoisInViewBtn" class="btn btn-secondary">Search for Dropzones in this Area</button>
-            <div id="favoriteModal" class="favorite-modal" style="display: none;">
-                <div class="favorite-modal-content">
-                    <h3>Save Favorite</h3>
-                    <input id="favoriteNameInput" type="text" placeholder="Enter favorite name">
-                    <div class="favorite-modal-actions">
-                        <button id="submitFavoriteName" class="modal-btn">Save</button>
-                        <button id="cancelFavoriteName" class="modal-btn cancel">Cancel</button>
-                    </div>
-                </div>
-            </div>
-
-            <div id="locationResults" class="location-results-container">
-                <div id="favorites-section" class="search-section">
-                    <h5>Favorites</h5>
-                    <ul id="favorites-list"></ul>
-                </div>
-                <div id="recents-section" class="search-section">
-                    <h5>Recent Searches</h5>
-                    <ul id="recents-list"></ul>
-                </div>
-
-                <div id="search-results-section" class="search-section" style="display: none;">
-                    <h5>Results</h5>
-                    <ul id="search-results-list"></ul>
-                </div>
-            </div>
-        </div>
     </div>
 
 
@@ -680,13 +744,13 @@
             <span class="icon">🚀</span>
             <span class="label">Dashboard</span>
         </button>
-        <button class="tab-button" data-panel="settings">
-            <span class="icon">⚙️</span>
-            <span class="label">Settings</span>
-        </button>
         <button class="tab-button" data-panel="search">
             <span class="icon">🔍</span>
             <span class="label">Search</span>
+        </button>
+        <button class="tab-button" data-panel="settings">
+            <span class="icon">⚙️</span>
+            <span class="label">Settings</span>
         </button>
     </nav>
 

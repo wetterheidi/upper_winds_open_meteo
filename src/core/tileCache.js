@@ -1,14 +1,31 @@
+/**
+ * @file tileCache.js
+ * @description Implementiert die komplette Logik für das Offline-Caching von Kartenkacheln.
+ * Nutzt IndexedDB zur Speicherung und erweitert Leaflet's TileLayer, um Kacheln
+ * automatisch aus dem Cache zu laden, wenn keine Netzwerkverbindung besteht.
+ */
+
 import { Utils } from './utils.js';
 import { Settings } from './settings.js';
 import { CACHE_DEFAULTS } from './constants.js';
 import { AppState } from './state.js';
 
+// ===================================================================
+// 1. IndexedDB Wrapper-Objekt
+// ===================================================================
 
-const TileCache = {
+/**
+ * Das TileCache-Objekt kapselt alle direkten Interaktionen mit der IndexedDB-Datenbank.
+ */
+export const TileCache = {
     dbName: 'SkydivingTileCache',
     storeName: 'tiles',
     db: null,
 
+    /**
+     * Initialisiert die IndexedDB-Datenbank und erstellt den Object Store, falls nicht vorhanden.
+     * @returns {Promise<void>}
+     */
     async init() {
         return new Promise((resolve, reject) => {
             const request = indexedDB.open(this.dbName, 1);
@@ -27,6 +44,12 @@ const TileCache = {
         });
     },
 
+    /**
+     * Speichert eine einzelne Kachel (als Blob) in der Datenbank.
+     * @param {string} url - Die normalisierte URL der Kachel (dient als Schlüssel).
+     * @param {Blob} blob - Die Kachel-Daten.
+     * @returns {Promise<boolean>}
+     */
     async storeTile(url, blob) {
         if (!this.db) await this.init();
         return new Promise((resolve, reject) => {
@@ -45,6 +68,11 @@ const TileCache = {
         });
     },
 
+    /**
+     * Ruft eine Kachel aus der Datenbank ab.
+     * @param {string} url - Die normalisierte URL der Kachel.
+     * @returns {Promise<Blob|null>} Der Blob der Kachel oder null, wenn nicht gefunden.
+     */
     async getTile(url) {
         if (!this.db) await this.init();
         return new Promise((resolve, reject) => {
@@ -95,6 +123,10 @@ const TileCache = {
         });
     },
 
+    /**
+     * Löscht alle Kacheln aus der Datenbank.
+     * @returns {Promise<void>}
+     */
     async clearCache() {
         if (!this.db) await this.init();
         return new Promise((resolve, reject) => {
@@ -112,6 +144,11 @@ const TileCache = {
         });
     },
 
+    /**
+     * Löscht Kacheln, die älter als eine bestimmte Anzahl von Tagen sind.
+     * @param {number} [maxAgeDays=CACHE_DEFAULTS.MAX_AGE_DAYS] - Das maximale Alter der Kacheln in Tagen.
+     * @returns {Promise<{deletedCount: number, deletedSizeMB: number}>}
+     */
     async clearOldTiles(maxAgeDays = CACHE_DEFAULTS.MAX_AGE_DAYS) {
         if (!this.db) await this.init();
         const maxAgeMs = maxAgeDays * 24 * 60 * 60 * 1000;
@@ -143,6 +180,10 @@ const TileCache = {
         });
     },
 
+    /**
+     * Berechnet die Gesamtgrösse des Kachel-Caches in Megabyte.
+     * @returns {Promise<number>} Die Cache-Grösse in MB.
+     */
     async getCacheSize() {
         if (!this.db) await this.init();
         return new Promise((resolve, reject) => {
@@ -180,6 +221,12 @@ const TileCache = {
         });
     },
 
+    /**
+     * Migriert Kachel-URLs, um Subdomains (z.B. a.tile.openstreetmap.org) zu entfernen.
+     * Dies stellt sicher, dass Kacheln unabhängig von der Subdomain gefunden werden.
+     * HINWEIS (ToDo): Diese Logik könnte flexibler gestaltet werden, um neue Kartenanbieter leichter zu unterstützen.
+     * @returns {Promise<void>}
+     */
     async migrateTiles() {
         if (!this.db) await this.init();
         return new Promise((resolve, reject) => {
@@ -213,9 +260,20 @@ const TileCache = {
     }
 };
 
+// ===================================================================
+// 2. Leaflet-Layer-Erweiterung
+// ===================================================================
+
+/**
+ * Erweitert den L.TileLayer von Leaflet, um eine Caching-Logik zu integrieren.
+ * `createTile` wird für jede Kachel aufgerufen und entscheidet, ob sie aus dem Netzwerk
+ * geladen oder aus dem IndexedDB-Cache geholt werden soll.
+ */
 L.TileLayer.Cached = L.TileLayer.extend({
     createTile(coords, done) {
         const tile = document.createElement('img');
+        tile.setAttribute('crossOrigin', 'anonymous');
+
         L.DomEvent.on(tile, 'load', () => {
             console.log('Tile loaded:', this.getTileUrl(coords));
             done(null, tile);
@@ -228,6 +286,7 @@ L.TileLayer.Cached = L.TileLayer.extend({
         const url = this.getTileUrl(coords);
         tile.setAttribute('role', 'presentation');
 
+        // URL normalisieren, um Subdomains zu entfernen (wichtig für den Cache-Schlüssel)
         const normalizedUrl = url.replace(/^(https?:\/\/[a-c]\.tile\.openstreetmap\.org)/, 'https://tile.openstreetmap.org')
             .replace(/^(https?:\/\/[a-d]\.basemaps\.cartocdn\.com)/, 'https://basemaps.cartocdn.com')
             .replace(/^(https?:\/\/[a-c]\.tile\.opentopomap\.org)/, 'https://tile.opentopomap.org');
@@ -240,6 +299,7 @@ L.TileLayer.Cached = L.TileLayer.extend({
         }
 
         if (!navigator.onLine) {
+            // Offline-Modus: Versuche, die Kachel aus dem Cache zu laden
             TileCache.getTile(normalizedUrl).then(blob => {
                 if (blob) {
                     tile.src = URL.createObjectURL(blob);
@@ -255,6 +315,7 @@ L.TileLayer.Cached = L.TileLayer.extend({
                 done(error, tile);
             });
         } else {
+            // Online-Modus: Lade aus dem Netzwerk und speichere im Cache
             tile.src = url;
             fetch(url, { signal: AbortSignal.timeout(CACHE_DEFAULTS.FETCH_TIMEOUT_MS) })
                 .then(response => {
@@ -284,10 +345,256 @@ L.TileLayer.Cached = L.TileLayer.extend({
     }
 });
 
+/**
+ * Factory-Funktion zur einfachen Erstellung einer L.TileLayer.Cached-Instanz.
+ * @param {string} url - Die URL-Vorlage für die Kacheln.
+ * @param {object} options - Die Leaflet-Layer-Optionen.
+ * @returns {L.TileLayer.Cached}
+ */
 L.tileLayer.cached = function (url, options) {
     return new L.TileLayer.Cached(url, options);
 };
 
+// ===================================================================
+// 3. Öffentliche Caching-Funktionen
+// ===================================================================
+
+/**
+ * Startet den Prozess, um Kacheln in einem bestimmten Radius um den DIP zu cachen.
+ * @param {object} options - Ein Objekt mit den Caching-Parametern.
+ * @param {L.Map} options.map - Die Leaflet-Karteninstanz.
+ * @param {number} options.lastLat - Breite des Mittelpunkts.
+ * @param {number} options.lastLng - Länge des Mittelpunkts.
+ * @param {object} options.baseMaps - Das Objekt mit den Basiskarten.
+ * @param {function} options.onProgress - Callback für Fortschritts-Updates.
+ * @param {function} options.onComplete - Callback nach Abschluss.
+ * @param {function} options.onCancel - Callback bei Abbruch.
+ */
+export async function cacheTilesForDIP({ map, lastLat, lastLng, baseMaps, onProgress, onComplete, onCancel, radiusKm: forcedRadius = null, silent = false }) {
+    if (!map || !lastLat || !lastLng) {
+        if (onComplete && !silent) onComplete('Map or location not ready for caching.');
+        return;
+    }
+
+    const radiusKm = forcedRadius !== null ? forcedRadius : (Settings.state.userSettings.cacheRadiusKm || Settings.defaultSettings.cacheRadiusKm);
+    const zoomLevels = Settings.state.userSettings.cacheZoomLevels || Settings.defaultSettings.cacheZoomLevels;
+    const tiles = getTilesInRadius(lastLat, lastLng, radiusKm, zoomLevels, map);
+
+    const tileLayers = [];
+    const selectedLayerName = Settings.state.userSettings.baseMaps;
+    const layer = baseMaps[selectedLayerName];
+
+    if (layer) {
+        if (layer instanceof L.LayerGroup) {
+            layer.eachLayer(subLayer => {
+                // Nur Layer mit 'cached'-Funktion berücksichtigen
+                if (subLayer instanceof L.TileLayer.Cached) {
+                    const url = subLayer.options.url || subLayer._url;
+                    tileLayers.push({
+                        url: url,
+                        subdomains: subLayer.options.subdomains,
+                        normalizedUrl: url.replace(/{s}\./, '')
+                    });
+                }
+            });
+        } else if (layer instanceof L.TileLayer.Cached) {
+            const url = layer.options.url || layer._url;
+            tileLayers.push({
+                url: url,
+                subdomains: layer.options.subdomains,
+                normalizedUrl: url.replace(/{s}\./, '')
+            });
+        }
+    }
+
+    const totalTiles = tiles.length * tileLayers.length;
+    if (totalTiles === 0) {
+        if (onComplete && !silent) onComplete('No tiles to cache for this basemap.');
+        return;
+    }
+
+    let processedCount = 0;
+    let successCount = 0;
+    AppState.isCachingCancelled = false;
+
+    if (onProgress && !silent) {
+        onProgress(0, totalTiles, () => {
+            AppState.isCachingCancelled = true;
+            if (onCancel) onCancel();
+        });
+    }
+
+    const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+    try {
+        const allTileFunctions = [];
+        for (const layer of tileLayers) {
+            for (const tile of tiles) {
+                allTileFunctions.push(async () => {
+                    if (AppState.isCachingCancelled) return;
+
+                    const url = layer.url.replace('{z}', tile.zoom).replace('{x}', tile.x).replace('{y}', tile.y).replace('{s}', layer.subdomains ? layer.subdomains[Math.floor(Math.random() * layer.subdomains.length)] : '');
+                    const normalizedUrl = layer.normalizedUrl.replace('{z}', tile.zoom).replace('{x}', tile.x).replace('{y}', tile.y);
+
+                    const cachedBlob = await TileCache.getTile(normalizedUrl).catch(() => null);
+                    if (cachedBlob) {
+                        successCount++;
+                    } else {
+                        const result = await cacheTileWithRetry(url);
+                        if (result.success) {
+                            const stored = await TileCache.storeTile(normalizedUrl, result.blob).catch(() => false);
+                            if (stored) successCount++;
+                        }
+                    }
+                    processedCount++;
+                });
+            }
+        }
+
+        for (let i = 0; i < allTileFunctions.length; i += 10) {
+            if (AppState.isCachingCancelled) break;
+
+            const batch = allTileFunctions.slice(i, i + 10).map(fn => fn());
+            await Promise.all(batch);
+
+            if (onProgress && !silent) {
+                onProgress(processedCount, totalTiles, () => { AppState.isCachingCancelled = true; });
+            }
+            await delay(250); // Eine Viertelsekunde Pause nach jedem 10er-Paket
+        }
+
+    } catch (error) {
+        console.error('Unexpected error in cacheTilesForDIP:', error);
+        if (onComplete && !silent) onComplete('An error occurred during caching.');
+    } finally {
+        const failedCount = processedCount - successCount;
+        let message = '';
+        if (AppState.isCachingCancelled) {
+            message = `Caching cancelled. ${successCount} tiles processed.`;
+        } else {
+            message = `Caching complete. ${successCount} tiles cached${failedCount > 0 ? `, ${failedCount} failed` : '.'}`;
+        }
+        if (onComplete && !silent) onComplete(message);
+    }
+}
+
+/**
+ * Startet den Prozess, um alle aktuell sichtbaren Kacheln auf der Karte zu cachen.
+ * @param {object} options - Ein Objekt mit den Caching-Parametern.
+ */
+export async function cacheVisibleTiles({ map, baseMaps, onProgress, onComplete, onCancel }) {
+    if (!map || !navigator.onLine) {
+        console.log('Skipping visible tile caching: offline or map not initialized');
+        return;
+    }
+
+    const bounds = map.getBounds();
+    const zoom = map.getZoom();
+    const zoomLevels = Settings.state.userSettings.cacheZoomLevels || Settings.defaultSettings.cacheZoomLevels;
+    if (!zoomLevels.includes(zoom)) {
+        console.log(`Skipping caching: zoom ${zoom} not in cacheZoomLevels`, zoomLevels);
+        return;
+    }
+
+    const tileSize = 256;
+    const swPoint = map.project(bounds.getSouthWest(), zoom);
+    const nePoint = map.project(bounds.getNorthEast(), zoom);
+    const minX = Math.floor(swPoint.x / tileSize);
+    const maxX = Math.floor(nePoint.x / tileSize);
+    const minY = Math.floor(nePoint.y / tileSize);
+    const maxY = Math.floor(swPoint.y / tileSize);
+
+    const tiles = [];
+    for (let x = minX; x <= maxX; x++) {
+        for (let y = minY; y <= maxY; y++) {
+            const numTiles = 2 ** zoom;
+            if (x >= 0 && x < numTiles && y >= 0 && y < numTiles) {
+                tiles.push({ zoom, x, y });
+            }
+        }
+    }
+
+    console.log(`Caching ${tiles.length} visible tiles at zoom ${zoom} for ${Settings.state.userSettings.baseMaps}`);
+
+    const tileLayers = [];
+    const selectedLayerName = Settings.state.userSettings.baseMaps;
+    const layer = baseMaps[selectedLayerName];
+
+    if (layer) {
+        if (layer instanceof L.LayerGroup) {
+            layer.eachLayer(subLayer => {
+                const url = subLayer.options.url || subLayer._url;
+                if (url) {
+                    tileLayers.push({
+                        name: `${selectedLayerName} (${subLayer.options.attribution || 'sub-layer'})`,
+                        url: url,
+                        subdomains: subLayer.options.subdomains,
+                        normalizedUrl: url.replace(/{s}\./, '')
+                    });
+                }
+            });
+        } else {
+            const url = layer.options.url || layer._url;
+            if (url) {
+                tileLayers.push({
+                    name: selectedLayerName,
+                    url: url,
+                    subdomains: layer.options.subdomains,
+                    normalizedUrl: url.replace(/{s}\./, '')
+                });
+            }
+        }
+    } else {
+        console.warn(`Base map ${selectedLayerName} not found, skipping caching`);
+        if (onComplete) onComplete('Selected base map not available for caching.');
+        return;
+    }
+
+    let cachedCount = 0;
+    let failedCount = 0;
+    const totalTiles = tiles.length * tileLayers.length;
+    const failedTiles = [];
+    AppState.isCachingCancelled = false;
+
+    if (onProgress) {
+        onProgress(0, totalTiles, () => {
+            AppState.isCachingCancelled = true;
+            if (onCancel) onCancel();
+        });
+    }
+
+    for (const layer of tileLayers) {
+        if (AppState.isCachingCancelled) break;
+        const fetchPromises = tiles.map(async (tile, index) => {
+            if (onProgress) {
+                onProgress(cachedCount + failedCount, totalTiles, () => {
+                    AppState.isCachingCancelled = true;
+                    if (onCancel) onCancel();
+                });
+            }
+        });
+        await Promise.all(fetchPromises);
+    }
+
+    if (onComplete) {
+        onComplete('Visible tiles cached.');
+    }
+}
+
+// ===================================================================
+// 4. Interne Hilfsfunktionen
+// ===================================================================
+
+/**
+ * Berechnet eine Liste von Kachel-Koordinaten (z, x, y) innerhalb eines Radius um einen Punkt.
+ * @param {number} lat - Breite des Mittelpunkts.
+ * @param {number} lng - Länge des Mittelpunkts.
+ * @param {number} radiusKm - Radius in Kilometern.
+ * @param {number[]} zoomLevels - Ein Array von Zoom-Leveln, die gecached werden sollen.
+ * @param {L.Map} map - Die Leaflet-Karteninstanz.
+ * @returns {{zoom: number, x: number, y: number}[]} Eine Liste von Kachel-Objekten.
+ * @private
+ */
 function getTilesInRadius(lat, lng, radiusKm, zoomLevels, map) {
     if (!map) {
         console.warn('Map not initialized, cannot calculate tiles');
@@ -324,6 +631,13 @@ function getTilesInRadius(lat, lng, radiusKm, zoomLevels, map) {
     });
 }
 
+/**
+ * Versucht, eine Kachel mit einer Wiederholungslogik zu fetchen.
+ * @param {string} url - Die URL der Kachel.
+ * @param {number} [maxRetries=3] - Maximale Anzahl an Versuchen.
+ * @returns {Promise<{success: boolean, blob?: Blob, error?: Error}>}
+ * @private
+ */
 async function cacheTileWithRetry(url, maxRetries = 3) {
     let lastError = null;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -349,274 +663,3 @@ async function cacheTileWithRetry(url, maxRetries = 3) {
     }
     return { success: false, error: lastError };
 }
-
-async function cacheTilesForDIP({ map, lastLat, lastLng, baseMaps, onProgress, onComplete, onCancel, radiusKm: forcedRadius = null, silent = false }) {
-    if (!map) {
-        if (onComplete && !silent) onComplete('Map not initialized, cannot cache tiles.');
-        return;
-    }
-
-    if (!lastLat || !lastLng) {
-        if (onComplete && !silent) onComplete('Please select a location to cache map tiles.');
-        return;
-    }
-
-    const radiusKm = forcedRadius !== null ? forcedRadius : (Settings.state.userSettings.cacheRadiusKm || Settings.defaultSettings.cacheRadiusKm);
-    const zoomLevels = Settings.state.userSettings.cacheZoomLevels || Settings.defaultSettings.cacheZoomLevels;
-    const tiles = getTilesInRadius(lastLat, lastLng, radiusKm, zoomLevels, map);
-
-    const tileLayers = [];
-    if (Settings.state.userSettings.baseMaps === 'Esri Satellite + OSM') {
-        tileLayers.push(
-            { name: 'Esri Satellite', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', normalizedUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' },
-            { name: 'OSM Overlay', url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', subdomains: ['a', 'b', 'c'], normalizedUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png' }
-        );
-    } else {
-        const layer = baseMaps[Settings.state.userSettings.baseMaps];
-        if (layer) {
-            tileLayers.push({
-                name: Settings.state.userSettings.baseMaps,
-                url: layer.options.url || layer._url,
-                subdomains: layer.options.subdomains,
-                normalizedUrl: (layer.options.url || layer._url).replace(/{s}\./, '')
-            });
-        }
-    }
-
-    const totalTiles = tiles.length * tileLayers.length;
-    if (totalTiles === 0) {
-        if (onComplete && !silent) onComplete('No tiles to cache for this basemap.');
-        return;
-    }
-
-    let cachedCount = 0;
-    let failedCount = 0;
-    const failedTiles = [];
-    AppState.isCachingCancelled = false;
-
-    if (onProgress && !silent) {
-        onProgress(0, totalTiles, () => {
-            AppState.isCachingCancelled = true;
-            if (onCancel) onCancel();
-        });
-    }
-
-    try {
-        for (const layer of tileLayers) {
-            console.log('Processing layer:', layer.name);
-            if (AppState.isCachingCancelled) {
-                console.log('Caching cancelled by user');
-                break;
-            }
-            const fetchPromises = tiles.map(async (tile, index) => {
-                if (AppState.isCachingCancelled) {
-                    console.log('Caching cancelled during tile processing');
-                    return;
-                }
-
-                const url = layer.url
-                    .replace('{z}', tile.zoom)
-                    .replace('{x}', tile.x)
-                    .replace('{y}', tile.y)
-                    .replace('{s}', layer.subdomains ? layer.subdomains[Math.floor(Math.random() * layer.subdomains.length)] : '');
-                const normalizedUrl = layer.normalizedUrl
-                    .replace('{z}', tile.zoom)
-                    .replace('{x}', tile.x)
-                    .replace('{y}', tile.y);
-
-                console.log(`Processing tile ${index + 1}/${tiles.length} for layer ${layer.name}:`, { url, normalizedUrl });
-
-                const cachedBlob = await TileCache.getTile(normalizedUrl).catch(err => {
-                    console.error(`Error retrieving tile from cache: ${normalizedUrl}`, err);
-                    return null;
-                });
-                if (cachedBlob) {
-                    cachedCount++;
-                    console.log(`Tile ${index + 1} already in cache`);
-                } else {
-                    const result = await cacheTileWithRetry(url);
-                    if (result.success) {
-                        const stored = await TileCache.storeTile(normalizedUrl, result.blob).catch(err => {
-                            console.error(`Error storing tile: ${normalizedUrl}`, err);
-                            return false;
-                        });
-                        if (stored) {
-                            cachedCount++;
-                            console.log(`Tile ${index + 1} cached successfully`);
-                        } else {
-                            failedCount++;
-                            failedTiles.push(url);
-                            console.log(`Tile ${index + 1} failed to store`);
-                        }
-                    } else {
-                        failedCount++;
-                        failedTiles.push(url);
-                        console.log(`Tile ${index + 1} failed to fetch:`, result.error.message);
-                    }
-                }
-
-                const currentCount = cachedCount + failedCount;
-            if ((index + 1) % 10 === 0 || index === tiles.length - 1) {
-                if (onProgress && !silent) {
-                    onProgress(currentCount, totalTiles, () => {
-                        AppState.isCachingCancelled = true;
-                    });
-                }
-            }
-            });
-
-            console.log(`Processing batch of ${tiles.length} tiles for layer ${layer.name}`);
-            for (let i = 0; i < fetchPromises.length; i += 20) {
-                if (AppState.isCachingCancelled) {
-                    console.log('Caching cancelled during batch processing');
-                    break;
-                }
-                const batch = fetchPromises.slice(i, i + 20);
-                await Promise.all(batch).catch(err => {
-                    console.error('Error processing batch of tiles:', err);
-                });
-                console.log(`Completed batch ${i / 20 + 1} for layer ${layer.name}`);
-            }
-        }
-    } catch (error) {
-        console.error('Unexpected error in cacheTilesForDIP:', error);
-        Utils.handleError('Failed to cache map tiles: ' + error.message);
-    } finally {
-        console.log('Hiding progress bar');
-        if (onComplete) {
-            let message = '';
-            if (AppState.isCachingCancelled) {
-                message = `Caching cancelled: ${cachedCount} tiles cached, ${failedCount} failed.`;
-            } else if (failedCount > 0) {
-                message = `Cached ${cachedCount} tiles around DIP (${failedCount} failed).`;
-            } else {
-                message = `Cached ${cachedCount} tiles around DIP successfully.`;
-            }
-            onComplete(message);
-        }
-    }
-
-    if (failedTiles.length > 0) {
-        console.warn(`Failed to cache ${failedTiles.length} tiles:`, failedTiles);
-    }
-
-    console.log(`DIP caching complete: ${cachedCount} tiles cached, ${failedCount} failed`);
-    let completionMessage = '';
-    if (AppState.isCachingCancelled) {
-        completionMessage = `Caching cancelled: ${cachedCount} tiles cached, ${failedCount} failed.`;
-    } else if (failedCount > 0) {
-        completionMessage = `Cached ${cachedCount} tiles around DIP (${failedCount} failed).`;
-    } else {
-        completionMessage = `Cached ${cachedCount} tiles around DIP successfully.`;
-    }
-
-    if (onComplete) {
-        onComplete(completionMessage);
-    }
-
-    try {
-        const size = await TileCache.getCacheSize();
-        console.log(`Cache size after DIP caching: ${size.toFixed(2)} MB`);
-        if (size > CACHE_DEFAULTS.SIZE_LIMIT_MB_WARNING) {
-            Utils.handleError(`Cache size large (${size.toFixed(2)} MB). Consider clearing cache to free up space.`);
-        }
-    } catch (error) {
-        console.error('Failed to check cache size after DIP caching:', error);
-        Utils.handleError('Unable to check cache size. Consider clearing cache to free up space.');
-    }
-}
-
-async function cacheVisibleTiles({ map, baseMaps, onProgress, onComplete, onCancel }) {
-    if (!map || !navigator.onLine) {
-        console.log('Skipping visible tile caching: offline or map not initialized');
-        return;
-    }
-
-    const bounds = map.getBounds();
-    const zoom = map.getZoom();
-    const zoomLevels = Settings.state.userSettings.cacheZoomLevels || Settings.defaultSettings.cacheZoomLevels;
-    if (!zoomLevels.includes(zoom)) {
-        console.log(`Skipping caching: zoom ${zoom} not in cacheZoomLevels`, zoomLevels);
-        return;
-    }
-
-    const tileSize = 256;
-    const swPoint = map.project(bounds.getSouthWest(), zoom);
-    const nePoint = map.project(bounds.getNorthEast(), zoom);
-    const minX = Math.floor(swPoint.x / tileSize);
-    const maxX = Math.floor(nePoint.x / tileSize);
-    const minY = Math.floor(nePoint.y / tileSize);
-    const maxY = Math.floor(swPoint.y / tileSize);
-
-    const tiles = [];
-    for (let x = minX; x <= maxX; x++) {
-        for (let y = minY; y <= maxY; y++) {
-            const numTiles = 2 ** zoom;
-            if (x >= 0 && x < numTiles && y >= 0 && y < numTiles) {
-                tiles.push({ zoom, x, y });
-            }
-        }
-    }
-
-    console.log(`Caching ${tiles.length} visible tiles at zoom ${zoom} for ${Settings.state.userSettings.baseMaps}`);
-
-    const tileLayers = [];
-    if (!baseMaps[Settings.state.userSettings.baseMaps]) {
-        console.warn(`Base map ${Settings.state.userSettings.baseMaps} not found, skipping caching`);
-        if (onComplete) onComplete('Selected base map not available for caching.');
-        return;
-    }
-
-    if (Settings.state.userSettings.baseMaps === 'Esri Satellite + OSM') {
-        tileLayers.push(
-            { name: 'Esri Satellite', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', normalizedUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' },
-            { name: 'OSM Overlay', url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', subdomains: ['a', 'b', 'c'], normalizedUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png' }
-        );
-    } else {
-        const layer = baseMaps[Settings.state.userSettings.baseMaps];
-        // --- KORREKTUR START ---
-        // Prüft, ob der Layer und seine URL-Eigenschaft existieren, bevor er zum Caching hinzugefügt wird.
-        if (layer && (layer.options.url || layer._url)) {
-            tileLayers.push({
-                name: Settings.state.userSettings.baseMaps,
-                url: layer.options.url || layer._url,
-                subdomains: layer.options.subdomains,
-                normalizedUrl: (layer.options.url || layer._url).replace(/{s}\./, '')
-            });
-        }
-        // --- KORREKTUR ENDE ---
-    }
-
-
-    let cachedCount = 0;
-    let failedCount = 0;
-    const totalTiles = tiles.length * tileLayers.length;
-    const failedTiles = [];
-    AppState.isCachingCancelled = false;
-
-    if (onProgress) {
-        onProgress(0, totalTiles, () => {
-            AppState.isCachingCancelled = true;
-            if (onCancel) onCancel();
-        });
-    }
-
-    for (const layer of tileLayers) {
-        if (AppState.isCachingCancelled) break;
-        const fetchPromises = tiles.map(async (tile, index) => {
-            if (onProgress) {
-                onProgress(cachedCount + failedCount, totalTiles, () => {
-                    AppState.isCachingCancelled = true;
-                    if (onCancel) onCancel();
-                });
-            }
-        });
-        await Promise.all(fetchPromises);
-    }
-
-    if (onComplete) {
-        onComplete('Visible tiles cached.');
-    }
-}
-
-export { TileCache, cacheTilesForDIP, cacheVisibleTiles };

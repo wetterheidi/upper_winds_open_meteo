@@ -20,6 +20,7 @@
     <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js" defer></script>
     <script src="https://unpkg.com/leaflet-rotatedmarker@0.2.0/leaflet.rotatedMarker.js" defer></script>
     <script src="https://unpkg.com/@tmcw/togeojson@4.7.0/dist/togeojson.umd.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
 </head>
 
 <body>
@@ -44,7 +45,10 @@
                             <input type="checkbox" id="autoupdateCheckbox">
                         </div>
                     </div>
-                    <input type="range" id="timeSlider" min="0" max="167" value="0" disabled>
+                    <div class="slider-wrapper">
+                        <input type="range" id="timeSlider" min="0" max="167" value="0" disabled>
+                        <div id="slider-labels"></div>
+                    </div>
                     <div id="model-row">
                         <label id="modelLabel" for="modelSelect" title="Model Run">Forecast Model:</label>
                         <select id="modelSelect">
@@ -128,6 +132,12 @@
                                 <tbody>
                                 </tbody>
                             </table>
+                        </div>
+                        <div id="windspinne-container">
+                            <canvas id="windspinne-chart"></canvas>
+                        </div>
+                        <div id="windspinne-legend" class="windspinne-legend"></div>
+                        <div id="controls-row">
                         </div>
                     </div>
                 </div>
@@ -315,6 +325,15 @@
                                     </ul>
                                 </li>
                                 <li>
+                                    <div class="settings-grid" style="grid-template-columns: 1fr auto; gap: 10px;">
+                                        <label for="terrainClearance">Min. Clearance (m):</label>
+                                        <input type="number" id="terrainClearance" min="0" max="500" step="10"
+                                            value="100" style="width: 80px;">
+                                    </div>
+                                    <button id="analyzeTerrainButton" class="btn btn-secondary">Analyze Terrain
+                                        Clearance</button>
+                                </li>
+                                <li>
                                     <button id="exportGpxButton" class="btn btn-primary">Export Jump Run as GPX</button>
                                 </li>
                             </ul>
@@ -394,6 +413,7 @@
 
                 <div id="panel-jumpmaster" class="panel hidden">
                     <ul style="padding: 15px;">
+                        <button id="findJumpShipBtn" class="btn btn-secondary">Find Aircraft To Track</button>
                         <li>
                             <label class="radio-label">
                                 <input type="checkbox" id="trackPositionCheckbox" name="trackPosition"> Start Live
@@ -421,7 +441,8 @@
                         </li>
                         <li>
                             <label class="radio-label">
-                                <input type="checkbox" id="lockInteractionCheckbox" name="lockInteraction"> Lock all Points
+                                <input type="checkbox" id="lockInteractionCheckbox" name="lockInteraction"> Lock all
+                                Points
                             </label>
                         </li>
                     </ul>
@@ -445,6 +466,11 @@
                             <div class="dashboard-item">
                                 <div class="dashboard-label">Speed</div>
                                 <div class="dashboard-value" id="dashboard-jm-speed">--</div>
+                            </div>
+
+                            <div class="dashboard-item span-2">
+                                <div class="dashboard-label">Vario</div>
+                                <div class="dashboard-value" id="dashboard-jm-vario">--</div>
                             </div>
 
                             <div class="dashboard-item span-2 accuracy-item">
@@ -549,8 +575,20 @@
                                 <label for="coordFormat">Coordinate Format:</label>
                                 <select id="coordFormat">
                                     <option value="Decimal">Decimal</option>
+                                    <option value="DDM">Deg Decimal Min</option>
                                     <option value="DMS">Deg Min Sec</option>
                                     <option value="MGRS">MGRS</option>
+                                </select>
+                                <label for="maxForecastTime">Max. Forecast Time:</label>
+                                <select id="maxForecastTime">
+                                    <option value="1">1 Day</option>
+                                    <option value="2">2 Days</option>
+                                    <option value="3">3 Days</option>
+                                    <option value="4">4 Days</option>
+                                    <option value="5">5 Days</option>
+                                    <option value="6">6 Days</option>
+                                    <option value="7">7 Days</option>
+                                    <option value="Maximum">Maximum Time</option>
                                 </select>
                             </div>
                         </div>
@@ -566,8 +604,10 @@
                                     <option value="ATAK">ATAK</option>
                                     <option value="Windwatch">Windwatch</option>
                                     <option value="Customized">Customized</option>
+                                    <option value="SurfaceData">Surface Data</option>
+                                    <option value="ComprehensiveReport">Weather Briefing</option>
                                 </select>
-                                <button id="downloadButton" class="btn btn-primary">Download Table</button>
+                                <button id="downloadButton" class="btn btn-primary">Generate Table</button>
                             </div>
                         </div>
                     </div>
@@ -609,7 +649,8 @@
 
                                 <div
                                     style="position: relative; display: flex; align-items: center; justify-content: flex-end;">
-                                    <span class="info-icon info-button-shared" data-info="GPX, KML or FlySight-CSV">i</span>
+                                    <span class="info-icon info-button-shared"
+                                        data-info="GPX, KML or FlySight-CSV">i</span>
                                     <div id="trackInfoPopup" class="info-popup"></div>
                                 </div>
 
@@ -646,6 +687,18 @@
                 <button id="passwordCancel">Cancel</button>
             </div>
             <p id="passwordError" style="color: red; display: none;">Incorrect password!</p>
+        </div>
+    </div>
+
+    <div id="adsbSelectionModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3>Choose Aircraft</h3>
+            <p style="text-align: left; font-size: 12px; color: #666;">Aircrafts nearby (Call Sign / Altitude):</p>
+            <ul id="aircraftList" style="list-style: none; padding: 0; margin: 0; max-height: 200px; overflow-y: auto;">
+            </ul>
+            <div class="modal-buttons">
+                <button id="adsbCancel">Cancel</button>
+            </div>
         </div>
     </div>
 

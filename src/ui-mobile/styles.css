@@ -120,7 +120,11 @@ body {
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     padding: 15px;
+    /* Ersetzt das spezifische padding-top und fügt alle Seiten hinzu */
     padding-top: calc(15px + env(safe-area-inset-top));
+    padding-bottom: calc(15px + env(safe-area-inset-bottom));
+    padding-left: calc(15px + env(safe-area-inset-left));
+    padding-right: calc(15px + env(safe-area-inset-right));
     overflow-y: auto;
     box-sizing: border-box;
 }
@@ -402,6 +406,32 @@ input[type="checkbox"][style*="opacity: 1"] {
     margin-bottom: 5px;
 }
 
+.slider-wrapper {
+    position: relative;
+    width: 100%;
+    margin-top: 5px;
+    /* Etwas Platz für die Labels unter dem Slider schaffen */
+    margin-bottom: 20px; 
+}
+
+#slider-labels {
+    position: absolute;
+    top: 15px; /* Positioniert die Labels unterhalb des Slider-Griffs */
+    left: 0;
+    right: 0;
+    height: 20px;
+    pointer-events: none; /* Stellt sicher, dass die Labels nicht die Bedienung des Sliders stören */
+}
+
+.slider-label {
+    position: absolute;
+    top: 0;
+    transform: translateX(-50%); /* Zentriert das Label exakt über der Markierung */
+    font-size: 10px;
+    color: #555;
+    white-space: nowrap; /* Verhindert Zeilenumbrüche */
+}
+
 #timeSlider {
     -webkit-appearance: none;
     appearance: none;
@@ -561,39 +591,80 @@ input[type="checkbox"][style*="opacity: 1"] {
     background: none !important;
 }
 
-#weather-table-container tr.humidity-low {
-    background: var(--background-light) !important;
+/* === NEU: Farbkodierung für Wolkenbedeckung === */
+#weather-table-container tr.cloud-cover-clear { /* 0-10% */
+    background: #e3f2fd !important; /* Sehr helles Blau */
+}
+#weather-table-container tr.cloud-cover-few { /* 11-30% */
+    background: hsl(205, 36%, 86%)!important; /* Helles Blau */
+}
+#weather-table-container tr.cloud-cover-scattered { /* 31-60% */
+    background: #e0e0e0 !important; /* Helles Grau */
+}
+#weather-table-container tr.cloud-cover-broken { /* 61-90% */
+    background: #b0bec5 !important; /* Mittelgrau */
+}
+#weather-table-container tr.cloud-cover-overcast { /* 91-100% */
+    background: #78909c !important; /* Dunkelgrau */
+    color: white !important; /* Hellerer Text für besseren Kontrast */
 }
 
-#weather-table-container tr.humidity-moderate {
-    background: #F4F4F4 !important;
-}
-
-#weather-table-container tr.humidity-high {
-    background: #cdcdcd !important;
-}
-
-#weather-table-container tr.humidity-saturated {
-    background: #B9B9B9 !important;
-    color: var(--background-light) !important;
-}
-
-#weather-table-container tr.wind-low {
+#weather-table-container tr.wind-low td {
     border: 2px solid lightblue !important;
 }
 
-#weather-table-container tr.wind-moderate {
+#weather-table-container tr.wind-moderate td {
     border: 2px solid lightgreen !important;
 }
 
-#weather-table-container tr.wind-high {
+#weather-table-container tr.wind-high td {
     border: 2px solid #f5f34f !important;
 }
 
-#weather-table-container tr.wind-very-high {
+#weather-table-container tr.wind-very-high td {
     border: 2px solid #ffcccc !important;
 }
 
+/* === Wind Spider Styles === */
+#windspinne-container {
+    position: relative; /* Wichtig für die Positionierung des Canvas */
+    width: 100%;
+    max-width: 350px; /* Etwas kleiner für mobile Ansicht */
+    margin: 20px auto;
+    aspect-ratio: 0.9 / 1; /* Erzwingt, dass der Container quadratisch ist */
+}
+
+#windspinne-container canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.windspinne-legend {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem; /* Kleinerer Abstand für mobile Ansicht */
+    margin-top: 1rem;
+    padding: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    font-size: 0.8rem; /* Kleinere Schrift für mobile Ansicht */
+}
+
+.legend-color-box {
+    width: 14px;
+    height: 14px;
+    margin-right: 6px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+}
 
 /* --- Search Panel --- */
 .search-bar-container {
@@ -731,6 +802,15 @@ input[type="checkbox"][style*="opacity: 1"] {
 
 .search-item-actions button.delete-btn:hover {
     color: #e74c3c;
+}
+
+.search-item-actions button.home-toggle {
+    opacity: 0.3; /* Inaktive Haus-Icons sind blass */
+    transition: opacity 0.2s ease-in-out; /* Sanfter Übergang */
+}
+
+.search-item-actions button.home-toggle.is-home {
+    opacity: 1.0; /* Das aktive Home-Icon hat volle Deckkraft */
 }
 
 .clear-icon {
@@ -957,6 +1037,14 @@ input[type="checkbox"][style*="opacity: 1"] {
     font-weight: normal;
 }
 
+.vario-climb {
+    color: #28a745 !important; /* Grün für Steigen */
+}
+
+.vario-descent {
+    color: #dc3545 !important; /* Rot für Sinken */
+}
+
 .jml-target-toggle {
     margin-top: 15px;
 }
@@ -1030,11 +1118,13 @@ input[type="checkbox"][style*="opacity: 1"] {
 }
 
 .leaflet-control-container .leaflet-top {
-    top: 10px;
+    /* Fügt den oberen Sicherheitsabstand hinzu */
+    top: calc(10px + env(safe-area-inset-top));
 }
 
 .leaflet-control-container .leaflet-bottom {
-    bottom: 5px;
+    /* Fügt den unteren Sicherheitsabstand hinzu */
+    bottom: calc(10px + env(safe-area-inset-bottom));
 }
 
 .leaflet-control-coordinates,

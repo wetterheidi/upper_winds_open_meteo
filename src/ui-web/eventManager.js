@@ -3,16 +3,18 @@
 import { AppState } from '../core/state.js';
 import { Settings, getInterpolationStep } from '../core/settings.js';
 import { Utils } from '../core/utils.js';
+import * as JumpPlanner from '../core/jumpPlanner.js';
 import * as displayManager from './displayManager.js';
 import * as mapManager from './mapManager.js';
 import * as Coordinates from '../ui-web/coordinates.js';
 import { TileCache, cacheTilesForDIP, cacheVisibleTiles } from '../core/tileCache.js';
-import { loadKmlTrack,loadGpxTrack, loadCsvTrackUTC, exportToGpx, exportLandingPatternToGpx } from '../core/trackManager.js';
+import { loadKmlTrack, loadGpxTrack, loadCsvTrackUTC, exportToGpx, exportLandingPatternToGpx } from '../core/trackManager.js';
 import { fetchEnsembleWeatherData, processAndVisualizeEnsemble, clearEnsembleVisualizations } from '../core/ensembleManager.js';
 import { getSliderValue, displayMessage, hideProgress, displayProgress, displayWarning, toggleLoading } from './ui.js';
 import { updateModelSelectUI, cleanupSelectedEnsembleModels } from './ui.js';
 import 'leaflet-gpx';
 import * as LocationManager from '../core/locationManager.js';
+import * as AdsbManager from '../core/adsbManager.js';
 
 // =================================================================
 // 1. Globale Variablen & Zustand
@@ -120,6 +122,11 @@ function setupInput(id, eventType, debounceTime, validationCallback) {
 // =================================================================
 
 // --- Haupt-Layout & Navigation ---
+
+/**
+ * Richtet die Klick-Handler für die Sidebar-Navigation ein, um Panels zu öffnen/schliessen.
+ * @private
+ */
 function setupSidebarEvents() {
     const mainLayout = document.querySelector('.main-layout');
     const icons = document.querySelectorAll('.sidebar-icon');
@@ -130,7 +137,7 @@ function setupSidebarEvents() {
         console.error("Layout-Elemente für Sidebar-Logik nicht gefunden.");
         return;
     }
-    
+
     // Die alten setPlannerLockState und setDataLockState Funktionen werden komplett entfernt.
 
     icons.forEach(icon => {
@@ -176,6 +183,11 @@ function setupSidebarEvents() {
         });
     });
 }
+
+/**
+ * Richtet die Klick-Handler für alle Akkordeon-Elemente ein.
+ * @private
+ */
 function setupAccordionEvents() {
     const accordionHeaders = document.querySelectorAll('.accordion-header');
 
@@ -190,6 +202,11 @@ function setupAccordionEvents() {
 }
 
 // --- Globale Steuerelemente (Slider, Modellauswahl) ---
+
+/**
+ * Richtet die Event-Listener für den Zeit-Slider ein.
+ * @private
+ */
 function setupSliderEvents() {
     const slider = document.getElementById('timeSlider');
     if (!slider) { /*...*/ return; }
@@ -477,6 +494,40 @@ function setupDeselectAllEnsembleButton() {
 
         Utils.handleMessage('All ensemble models deselected.');
     });
+}
+/**
+ * Richtet den Event-Listener für den Terrain-Analyse-Button ein.
+ * @private
+ */
+function setupTerrainAnalysisEvents() {
+    const analyzeTerrainBtn = document.getElementById('analyzeTerrainButton');
+    if (analyzeTerrainBtn) {
+        analyzeTerrainBtn.addEventListener('click', async () => {
+            if (!AppState.weatherData || !AppState.lastLat || !AppState.lastLng) {
+                Utils.handleError("Please select a location and fetch weather data first.");
+                return;
+            }
+
+            toggleLoading(true, 'Analyzing terrain, this may take a moment...');
+
+            try {
+                const dangerousPoints = await JumpPlanner.analyzeTerrainClearance();
+                mapManager.drawTerrainWarning(dangerousPoints);
+
+                if (dangerousPoints.length > 0) {
+                    Utils.handleMessage("Warning: Low clearance areas detected and marked in red.");
+                } else {
+                    Utils.handleMessage("Terrain analysis complete. No low clearance areas found.");
+                }
+
+            } catch (error) {
+                console.error("Terrain analysis failed:", error);
+                Utils.handleError("An error occurred during terrain analysis.");
+            } finally {
+                toggleLoading(false);
+            }
+        });
+    }
 }
 
 // --- Track & Datei-Management ---
@@ -804,7 +855,7 @@ function setupRadioEvents() {
     }
 }
 function setupSelectEvents() {
-    const selectIds = ['refLevel', 'heightUnit', 'temperatureUnit', 'windUnit', 'timeZone', 'coordFormat', 'downloadFormat'];
+    const selectIds = ['refLevel', 'heightUnit', 'temperatureUnit', 'windUnit', 'timeZone', 'coordFormat', 'downloadFormat', 'maxForecastTime']; // Hinzugefügt
 
     selectIds.forEach(id => {
         const selectElement = document.getElementById(id);
@@ -917,6 +968,8 @@ function setupInputEvents() {
     setupInput('jumperSeparation', 'change', 300);
 
     setupInput('cutAwayAltitude', 'change', 300);
+    setupInput('terrainClearance', 'change', 300);
+
     setupInput('historicalDatePicker', 'change', 300);
 }
 function setupDownloadEvents() {
@@ -1126,6 +1179,11 @@ function setupHarpCoordInputEvents() {
             AppState.map.panTo([parsedCoords.lat, parsedCoords.lng]);
             Settings.state.userSettings.harpLat = parsedCoords.lat;
             Settings.state.userSettings.harpLng = parsedCoords.lng;
+
+            Settings.state.userSettings.jumpRunTrackOffset = 0;
+            Settings.state.userSettings.jumpRunTrackForwardOffset = 0;
+            console.log('HARP placed via coords. JRT offsets reset to 0.');
+
             Settings.save();
             Utils.handleMessage('HARP marker placed successfully.');
             harpRadio.disabled = false;
@@ -1149,6 +1207,117 @@ function setupHarpCoordInputEvents() {
             Utils.handleError('Invalid coordinates. Please enter a valid MGRS or Decimal Degree format.');
         }
     });
+}
+/**
+ * Richtet den Event-Listener für den ADSB "Find Jump Ship" Button ein.
+ * @private
+ */
+function setupAdsbEvents() {
+    const findShipButton = document.getElementById('findJumpShipBtn');
+    if (findShipButton) {
+        findShipButton.addEventListener('click', () => {
+            // Löst die Logik im adsbManager aus
+            AdsbManager.findAndSelectJumpShip();
+        });
+    }
+
+    // Event-Listener für die Anzeige des Auswahl-Modals
+    document.addEventListener('adsb:showSelection', (e) => {
+        const { aircraftList } = e.detail;
+        const modal = document.getElementById('adsbSelectionModal');
+        const list = document.getElementById('aircraftList');
+        const cancelBtn = document.getElementById('adsbCancel');
+
+        if (!modal || !list || !cancelBtn) return;
+
+        list.innerHTML = '';
+        aircraftList.sort((a, b) => b.altitude - a.altitude);
+
+        aircraftList.forEach(ac => {
+            const li = document.createElement('li');
+            li.textContent = `${ac.callsign} / ${ac.altitude} ft`;
+            li.onclick = () => {
+                modal.style.display = 'none';
+                // Startet das Tracking über den adsbManager
+                AdsbManager.startAircraftTracking(ac);
+            };
+            list.appendChild(li);
+        });
+
+        cancelBtn.onclick = () => {
+            modal.style.display = 'none';
+        };
+
+        modal.style.display = 'flex';
+    });
+
+    // Event-Listener für das Erstellen/Aktualisieren des Flugzeug-Markers
+    document.addEventListener('adsb:aircraftSelected', (e) => {
+        const { aircraft, attribution } = e.detail;
+        if (AppState.aircraftMarker) AppState.map.removeLayer(AppState.aircraftMarker);
+        mapManager.clearAircraftTrack();
+        const marker = mapManager.createAircraftMarker(aircraft.lat, aircraft.lon, aircraft.track);
+        marker.bindTooltip("", { permanent: true, direction: 'top', offset: [0, -15], className: 'adsb-tooltip' });
+        
+        if (AppState.map && AppState.map.attributionControl) {
+            AppState.map.attributionControl.addAttribution(attribution);
+        }
+        
+        // Tooltip sofort aktualisieren
+        document.dispatchEvent(new CustomEvent('adsb:aircraftUpdated', { detail: { aircraft } }));
+    });
+
+    document.addEventListener('adsb:aircraftUpdated', (e) => {
+        const { aircraft } = e.detail;
+        if (AppState.aircraftMarker && aircraft.lat && aircraft.lon) {
+            AppState.aircraftMarker.setLatLng([aircraft.lat, aircraft.lon]);
+            if(aircraft.track) {
+                AppState.aircraftMarker.setRotationAngle(aircraft.track);
+            }
+            updateAircraftTooltip(aircraft);
+            mapManager.drawAircraftTrack(AppState.adsbTrackPoints);
+        }
+    });
+
+    // Event-Listener zum Beenden des Trackings
+    document.addEventListener('adsb:trackingStopped', (e) => {
+        const { attribution } = e.detail;
+        if (AppState.aircraftMarker) {
+            AppState.map.removeLayer(AppState.aircraftMarker);
+            AppState.aircraftMarker = null;
+        }
+        mapManager.clearAircraftTrack();
+        if (AppState.map && AppState.map.attributionControl) {
+            AppState.map.attributionControl.removeAttribution(attribution);
+        }
+    });
+
+    // Hilfsfunktion zum Aktualisieren des Tooltips (kann hier platziert werden)
+    function updateAircraftTooltip(aircraftData) {
+        if (!AppState.aircraftMarker) return;
+        const heightUnit = Settings.getValue('heightUnit', 'm');
+        const speedUnit = Settings.getValue('windUnit', 'kt');
+        const altitudeFt = aircraftData.altitude;
+        const altitudeText = heightUnit === 'm'
+            ? `${Math.round(altitudeFt * 0.3048)} m`
+            : `${altitudeFt} ft`;
+        const speedKt = aircraftData.velocity;
+        const speed = Utils.convertWind(speedKt, speedUnit, 'kt');
+        const speedText = `${(speedUnit === 'bft' ? Math.round(speed) : speed.toFixed(0))} ${speedUnit}`;
+        let verticalRateText = "Level";
+        if (aircraftData.vertical_rate) {
+            const rateFPM = aircraftData.vertical_rate;
+            if (rateFPM > 100) verticalRateText = `+${rateFPM} ft/min`;
+            else if (rateFPM < -100) verticalRateText = `${rateFPM} ft/min`;
+        }
+        const tooltipContent = `
+            <strong>${aircraftData.callsign || 'N/A'}</strong><br>
+            Altitude: ${altitudeText}<br>
+            Speed: ${speedText}<br>
+            V/S: ${verticalRateText}
+        `;
+        AppState.aircraftMarker.setTooltipContent(tooltipContent);
+    }
 }
 
 // --- Ensemble-spezifische UI-Updates ---
@@ -1244,6 +1413,10 @@ function setupPoiSearchButton() {
 // 4. Haupt-Initialisierungsfunktion
 // =================================================================
 
+/**
+ * Initialisiert alle Event-Listener für die Web-Anwendung.
+ * Diese Funktion sollte nur einmal aufgerufen werden, wenn das DOM geladen ist.
+ */
 export function initializeEventListeners() {
     if (listenersInitialized) {
         return; // Bricht die Funktion sofort ab, wenn sie schon einmal lief
@@ -1275,6 +1448,7 @@ export function initializeEventListeners() {
     setupCutawayRadioButtons();
     setupResetCutAwayMarkerButton();
     setupDeselectAllEnsembleButton();
+    setupTerrainAnalysisEvents();
 
     // 5. Datei- & Track-Management
     setupTrackEvents();
@@ -1286,6 +1460,7 @@ export function initializeEventListeners() {
 
     // 7. Live-Funktionen
     setupHarpCoordInputEvents();
+    setupAdsbEvents();
 
     // 8. Search
     setupPoiSearchButton();

@@ -1,9 +1,23 @@
-// ui.js
+/**
+ * @file ui.js
+ * @description Enthält allgemeine Hilfsfunktionen zur Steuerung der Benutzeroberfläche (UI).
+ * Dies umfasst das Anzeigen von Nachrichten, Ladeindikatoren, die Aktualisierung von
+ * UI-Elementen und die Erkennung des Gerätetyps.
+ */
+
 import { Utils } from '../core/utils.js';
 import { Settings } from '../core/settings.js';
 import { fetchEnsembleWeatherData, processAndVisualizeEnsemble } from '../core/ensembleManager.js';
-import { UI_DEFAULTS } from '../core/constants.js';
+import { UI_DEFAULTS, WEATHER_MODELS } from '../core/constants.js';
 
+// ===================================================================
+// 1. Geräte- & Style-Helfer
+// ===================================================================
+
+/**
+ * Prüft, ob die Anwendung auf einem Touch-Gerät oder in einer nativen Capacitor-App läuft.
+ * @returns {boolean} True, wenn es sich um ein mobiles Gerät handelt.
+ */
 export function isMobileDevice() {
     /**
      * Diese Prüfung ist deutlich zuverlässiger als die alte Methode.
@@ -20,195 +34,36 @@ export function isMobileDevice() {
     return hasTouchSupport || isCapacitorApp;
 }
 
+/**
+ * Fügt dem `<body>`-Tag eine CSS-Klasse hinzu, wenn ein Touch-Gerät erkannt wird.
+ * Dies ermöglicht gerätespezifisches Styling (z.B. für das Fadenkreuz).
+ */
 export function applyDeviceSpecificStyles() {
     if (isMobileDevice()) {
         document.body.classList.add('touch-device');
     }
 }
 
-export function displayMessage(message) {
-    console.log('displayMessage called with:', message);
-    let messageElement = document.getElementById('message');
-    if (!messageElement) {
-        messageElement = document.createElement('div');
-        messageElement.id = 'message';
-        messageElement.style.position = 'fixed';
-        messageElement.style.top = '5px';
-        messageElement.style.right = '5px';
-        messageElement.style.width = isMobileDevice() ? '70%' : '30%';
-        messageElement.style.backgroundColor = '#ccffcc';
-        messageElement.style.borderRadius = '5px 5px 5px 5px';
-        messageElement.style.color = '#000000';
-        messageElement.style.padding = '6px';
-        messageElement.style.zIndex = '9998';
-        messageElement.style.textAlign = 'center';
-        document.body.appendChild(messageElement);
-        window.addEventListener('resize', () => {
-            messageElement.style.width = isMobileDevice() ? '70%' : '30%';
-        });
-    }
-    messageElement.textContent = message;
-    messageElement.style.display = 'block';
-    clearTimeout(window.messageTimeout);
-    window.messageTimeout = setTimeout(() => {
-        messageElement.style.display = 'none';
-    }, UI_DEFAULTS.MESSAGE_TIMEOUT_MS);
-}
+// ===================================================================
+// 2. UI-Zustand abfragen
+// ===================================================================
 
-export function displayProgress(current, total, cancelCallback) {
-    const percentage = Math.round((current / total) * 100);
-    let progressElement = document.getElementById('progress');
-    if (!progressElement) {
-        progressElement = document.createElement('div');
-        progressElement.id = 'progress';
-        progressElement.style.position = 'fixed';
-        progressElement.style.top = '5px';
-        progressElement.style.right = '5px';
-        progressElement.style.width = isMobileDevice() ? '70%' : '30%';
-        progressElement.style.backgroundColor = '#ccffcc';
-        progressElement.style.borderRadius = '5px 5px 5px 5px';
-        progressElement.style.color = '#000000';
-        progressElement.style.padding = '6px';
-        progressElement.style.zIndex = '9998';
-        progressElement.style.display = 'flex';
-        progressElement.style.alignItems = 'center';
-        progressElement.style.gap = '10px';
-        document.body.appendChild(progressElement);
-        window.addEventListener('resize', () => {
-            progressElement.style.width = isMobileDevice() ? '70%' : '30%';
-        });
-    }
-    const progressContainer = document.createElement('div');
-    progressContainer.style.flex = '1';
-    progressContainer.style.display = 'flex';
-    progressContainer.style.flexDirection = 'column';
-    progressContainer.style.gap = '3px';
-    const progressText = document.createElement('div');
-    progressText.textContent = `Caching (${current}/${total}, ${percentage}%)`;
-    progressText.style.fontSize = '12px';
-    progressText.style.textAlign = 'center';
-    const progressBarContainer = document.createElement('div');
-    progressBarContainer.style.width = '100%';
-    progressBarContainer.style.height = '8px';
-    progressBarContainer.style.backgroundColor = '#e0e0e0';
-    progressBarContainer.style.borderRadius = '3px';
-    progressBarContainer.style.overflow = 'hidden';
-    const progressBar = document.createElement('div');
-    progressBar.style.width = `${percentage}%`;
-    progressBar.style.height = '100%';
-    progressBar.style.backgroundColor = '#4caf50';
-    progressBar.style.transition = 'width 0.3s ease-in-out';
-    progressBarContainer.appendChild(progressBar);
-    progressContainer.appendChild(progressText);
-    progressContainer.appendChild(progressBarContainer);
-    let cancelButton = document.getElementById('cancel-caching');
-    if (!cancelButton) {
-        cancelButton = document.createElement('button');
-        cancelButton.id = 'cancel-caching';
-        cancelButton.textContent = 'Cancel';
-        cancelButton.style.backgroundColor = '#ff4444';
-        cancelButton.style.color = '#ffffff';
-        cancelButton.style.border = 'none';
-        cancelButton.style.borderRadius = '3px';
-        cancelButton.style.padding = '5px 3px';
-        cancelButton.style.cursor = 'pointer';
-        cancelButton.style.fontSize = '12px';
-        cancelButton.addEventListener('click', () => {
-            cancelCallback();
-            progressElement.style.display = 'none';
-            Utils.handleMessage('Caching cancelled.');
-        });
-    }
-    progressElement.innerHTML = '';
-    progressElement.appendChild(progressContainer);
-    progressElement.appendChild(cancelButton);
-    progressElement.style.display = 'flex';
-}
-
-export function hideProgress() {
-    const progressElement = document.getElementById('progress');
-    if (progressElement) {
-        progressElement.style.display = 'none';
-    }
-}
-
-export function updateOfflineIndicator() {
-    console.log('updateOfflineIndicator called, navigator.onLine:', navigator.onLine);
-    let offlineIndicator = document.getElementById('offline-indicator');
-    if (!offlineIndicator) {
-        offlineIndicator = document.createElement('div');
-        offlineIndicator.id = 'offline-indicator';
-        document.body.appendChild(offlineIndicator);
-        console.log('Offline indicator created and appended');
-    }
-    offlineIndicator.style.display = navigator.onLine ? 'none' : 'block';
-    offlineIndicator.textContent = 'Offline Mode';
-}
-
-export function displayError(message) {
-    console.log('displayError called with:', message);
-    let errorElement = document.getElementById('error-message');
-    if (!errorElement) {
-        errorElement = document.createElement('div');
-        errorElement.id = 'error-message';
-        document.body.appendChild(errorElement);
-        window.addEventListener('resize', () => {
-            errorElement.style.width = isMobileDevice() ? '70%' : '30%';
-        });
-    }
-    errorElement.textContent = message;
-    errorElement.style.display = 'block';
-    console.log('Error element state:', {
-        display: errorElement.style.display,
-        text: errorElement.textContent,
-        position: errorElement.style.position,
-        zIndex: errorElement.style.zIndex
-    });
-    clearTimeout(window.errorTimeout);
-    window.errorTimeout = setTimeout(() => {
-        errorElement.style.display = 'none';
-        console.log('Error hidden after 3s');
-    }, UI_DEFAULTS.MESSAGE_TIMEOUT_MS);
-}
-
-export function displayWarning(message) {
-    console.log('displayWarning called with:', message);
-    let messageElement = document.getElementById('message');
-    if (!messageElement) {
-        messageElement = document.createElement('div');
-        messageElement.id = 'message';
-        // ... (der restliche Code zum Erstellen des Elements bleibt gleich)
-        messageElement.style.position = 'fixed';
-        messageElement.style.top = '5px';
-        messageElement.style.right = '5px';
-        messageElement.style.width = isMobileDevice() ? '70%' : '30%';
-        messageElement.style.borderRadius = '5px 5px 5px 5px';
-        messageElement.style.color = '#000000';
-        messageElement.style.padding = '6px';
-        messageElement.style.zIndex = '9998';
-        messageElement.style.textAlign = 'center';
-        document.body.appendChild(messageElement);
-        window.addEventListener('resize', () => {
-            messageElement.style.width = isMobileDevice() ? '70%' : '30%';
-        });
-    }
-    
-    // Setze den Text und die neue CSS-Klasse
-    messageElement.textContent = message;
-    messageElement.className = 'warning'; // Wendet unseren neuen Stil an
-    messageElement.style.display = 'block';
-
-    clearTimeout(window.messageTimeout);
-    window.messageTimeout = setTimeout(() => {
-        messageElement.style.display = 'none';
-        messageElement.className = ''; // Klasse wieder entfernen
-    }, UI_DEFAULTS.MESSAGE_TIMEOUT_MS);
-}
-
+/**
+ * Ruft den aktuellen numerischen Wert des Zeitschiebereglers ab.
+ * @returns {number} Der Wert des Sliders, oder 0 als Fallback.
+ */
 export function getSliderValue() {
     return parseInt(document.getElementById('timeSlider')?.value) || 0;
 }
 
+// ===================================================================
+// 3. Dynamische UI-Updates
+// ===================================================================
+
+/**
+ * Aktualisiert die Optionen im Dropdown-Menü für die Wettermodelle.
+ * @param {string[]} availableModels - Eine Liste der verfügbaren Modellnamen.
+ */
 export function updateModelSelectUI(availableModels) {
     const modelSelect = document.getElementById('modelSelect');
     if (!modelSelect) return;
@@ -229,6 +84,10 @@ export function updateModelSelectUI(availableModels) {
     }
 }
 
+/**
+ * Aktualisiert die Liste der Checkboxen für die Ensemble-Modelle.
+ * @param {string[]} availableModels - Eine Liste der verfügbaren Modellnamen.
+ */
 export function updateEnsembleModelUI(availableModels) {
     const submenu = document.getElementById('ensembleModelsSubmenu');
     if (!submenu) return;
@@ -266,6 +125,10 @@ export function updateEnsembleModelUI(availableModels) {
     });
 }
 
+/**
+ * Bereinigt die Liste der ausgewählten Ensemble-Modelle, falls einige nicht mehr verfügbar sind.
+ * @param {string[]} availableModels - Eine Liste der verfügbaren Modellnamen.
+ */
 export function cleanupSelectedEnsembleModels(availableModels) {
     let selected = Settings.state.userSettings.selectedEnsembleModels || [];
     let updated = selected.filter(m => availableModels.includes(m));
@@ -275,6 +138,156 @@ export function cleanupSelectedEnsembleModels(availableModels) {
     }
 }
 
+// ===================================================================
+// 4. Benachrichtigungen & Overlays
+// ===================================================================
+
+
+/**
+ * Zeigt eine Snackbar-Benachrichtigung am unteren Bildschirmrand an.
+ * @param {string} message - Die anzuzeigende Nachricht.
+ * @param {'default'|'success'|'error'|'warning'} [type='default'] - Der Typ der Nachricht, der das Aussehen steuert.
+ * @private
+ */
+function showSnackbar(message, type = 'default') {
+    let snackbar = document.getElementById('snackbar');
+    if (!snackbar) {
+        snackbar = document.createElement('div');
+        snackbar.id = 'snackbar';
+        document.body.appendChild(snackbar);
+    }
+
+    snackbar.textContent = message;
+    // Setze die Klassen basierend auf dem Typ
+    snackbar.className = 'show'; // Startet immer mit 'show'
+    if (type === 'success') {
+        snackbar.classList.add('success');
+    } else if (type === 'error') {
+        snackbar.classList.add('error');
+    } else if (type === 'warning') { // NEUE Bedingung
+        snackbar.classList.add('warning');
+    }
+
+    if (window.snackbarTimeout) {
+        clearTimeout(window.snackbarTimeout);
+    }
+
+    window.snackbarTimeout = setTimeout(() => {
+        snackbar.className = snackbar.className.replace('show', '');
+    }, 3000);
+}
+
+/** Zeigt eine Erfolgsmeldung an. */
+export function displayMessage(message) {
+    console.log('displayMessage called with:', message);
+    // Die neue Funktion mit dem Typ 'success' aufrufen
+    showSnackbar(message, 'success');
+}
+
+/** Zeigt eine Fehlermeldung an. */
+export function displayError(message) {
+    console.log('displayError called with:', message);
+    // Die neue Funktion mit dem Typ 'error' aufrufen
+    showSnackbar(message, 'error');
+}
+
+/** Zeigt eine Warnung an. */
+export function displayWarning(message) {
+    console.log('displayWarning called with:', message);
+    showSnackbar(message, 'warning');
+}
+
+
+/**
+ * Zeigt eine Fortschritts-Snackbar am unteren Bildschirmrand an.
+ * @param {number} current - Der aktuelle Fortschrittswert.
+ * @param {number} total - Der Gesamtwert für die Prozentberechnung.
+ * @param {function} cancelCallback - Funktion, die bei Klick auf "Abbrechen" aufgerufen wird.
+ */
+export function displayProgress(current, total, cancelCallback) {
+    let progressSnackbar = document.getElementById('progress-snackbar');
+
+    // Erstellt die Snackbar, falls sie noch nicht existiert
+    if (!progressSnackbar) {
+        progressSnackbar = document.createElement('div');
+        progressSnackbar.id = 'progress-snackbar';
+        
+        const content = document.createElement('div');
+        content.className = 'progress-snackbar-content';
+        
+        const text = document.createElement('div');
+        text.className = 'progress-snackbar-text';
+        
+        const barContainer = document.createElement('div');
+        barContainer.className = 'progress-bar-container';
+        const bar = document.createElement('div');
+        bar.className = 'progress-bar';
+        barContainer.appendChild(bar);
+
+        content.appendChild(text);
+        content.appendChild(barContainer);
+
+        const cancelButton = document.createElement('button');
+        cancelButton.className = 'cancel-button';
+        cancelButton.textContent = 'Cancel';
+        cancelButton.onclick = () => {
+            if (cancelCallback) cancelCallback();
+            hideProgress(); // Versteckt die Snackbar beim Abbrechen
+        };
+
+        progressSnackbar.appendChild(content);
+        progressSnackbar.appendChild(cancelButton);
+        document.body.appendChild(progressSnackbar);
+    }
+
+    // Aktualisiert den Inhalt der Snackbar
+    const percentage = total > 0 ? Math.round((current / total) * 100) : 0;
+    progressSnackbar.querySelector('.progress-snackbar-text').textContent = `Caching (${current}/${total})... ${percentage}%`;
+    progressSnackbar.querySelector('.progress-bar').style.width = `${percentage}%`;
+
+    // Zeigt die Snackbar an (löst die CSS-Animation aus)
+    if (!progressSnackbar.classList.contains('show')) {
+        progressSnackbar.classList.add('show');
+    }
+}
+
+/** Versteckt die Fortschritts-Snackbar. */
+export function hideProgress() {
+    const progressSnackbar = document.getElementById('progress-snackbar');
+    if (progressSnackbar) {
+        progressSnackbar.classList.remove('show');
+    }
+}
+
+/**
+ * Zeigt einen Offline-Indikator an oder versteckt ihn.
+ */
+export function updateOfflineIndicator() {
+    console.log('updateOfflineIndicator called, navigator.onLine:', navigator.onLine);
+    let offlineIndicator = document.getElementById('offline-indicator');
+    
+    // Erstellt den Indikator, falls er noch nicht existiert
+    if (!offlineIndicator) {
+        offlineIndicator = document.createElement('div');
+        offlineIndicator.id = 'offline-indicator';
+        offlineIndicator.textContent = 'Offline Mode'; // Text muss nur einmal gesetzt werden
+        document.body.appendChild(offlineIndicator);
+        console.log('Offline indicator created and appended');
+    }
+
+    // Steuert die Sichtbarkeit über die CSS-Klasse 'show'
+    if (navigator.onLine) {
+        offlineIndicator.classList.remove('show');
+    } else {
+        offlineIndicator.classList.add('show');
+    }
+}
+
+/**
+ * Zeigt den globalen Lade-Spinner an oder versteckt ihn.
+ * @param {boolean} show - True, um den Spinner anzuzeigen.
+ * @param {string} [message='Loading...'] - Die anzuzeigende Nachricht.
+ */
 export function toggleLoading(show, message = 'Loading...') {
     const loadingElement = document.getElementById('loading');
     if (!loadingElement) return;

@@ -1,3 +1,10 @@
+/**
+ * @file displayManager.js
+ * @description Dieses Modul ist verantwortlich für die Aktualisierung der Benutzeroberfläche (UI).
+ * Es nimmt verarbeitete Daten entgegen und sorgt für die korrekte Darstellung in den
+ * UI-Panels (z.B. Wettertabelle) und auf der Karte (z.B. Landemuster, JRT).
+ */
+
 import { AppState } from '../core/state.js';
 import { Settings, getInterpolationStep } from '../core/settings.js';
 import { Utils } from '../core/utils.js';
@@ -6,7 +13,171 @@ import * as mapManager from './mapManager.js';
 import * as weatherManager from '../core/weatherManager.js';
 import { UI_DEFAULTS } from '../core/constants.js'; // UI_DEFAULTS für LANDING_PATTERN_MIN_ZOOM
 import * as JumpPlanner from '../core/jumpPlanner.js';
+import { generateWindspinne } from '../core/windchart.js';
+import { DateTime } from 'luxon';
 
+// ===================================================================
+// 1. Wetter- und Info-Anzeigen
+// ===================================================================
+
+/**
+ * Rendert die detaillierte Wettertabelle basierend auf dem ausgewählten Zeitindex.
+ * Die Funktion interpoliert die Roh-Wetterdaten, erstellt die komplette HTML-Tabelle 
+ * mit allen Höhenstufen, Werten und Styling-Klassen und fügt sie in das Info-Element ein.
+ * @param {number} index - Der Index des Zeitschiebereglers, für den die Daten angezeigt werden sollen.
+ * @param {string|null} [originalTime=null] - Ein optionaler Zeitstempel, der für die Anzeige verwendet werden kann.
+ * @returns {Promise<void>}
+ */
+export async function updateWeatherDisplay(index, tableContainerId, timeContainerId, originalTime = null) {
+    console.log(`updateWeatherDisplay called for index: ${index} -> into ${tableContainerId}`);
+
+    const tableContainer = document.getElementById(tableContainerId);
+    const timeContainer = document.getElementById(timeContainerId);
+
+    // Sicherheitsprüfung: Stellen sicher, dass die Container existieren
+    if (!tableContainer || !timeContainer) {
+        console.error('Target container(s) for weather display not found!', { tableContainerId, timeContainerId });
+        return;
+    }
+
+    if (!AppState.weatherData || !AppState.weatherData.time || index < 0 || index >= AppState.weatherData.time.length) {
+        console.error('No weather data available or index out of bounds:', index);
+        tableContainer.innerHTML = '<p style="padding: 20px; text-align: center;">No weather data available</p>';
+        timeContainer.innerHTML = 'Selected Time: ';
+        const slider = document.getElementById('timeSlider');
+        if (slider) slider.value = 0;
+        return;
+    }
+
+    // START: NEUER CODEBLOCK FÜR KONSOLENAUSGABE
+    const visibility = AppState.weatherData.visibility?.[index];
+    const weatherCode = AppState.weatherData.weather_code?.[index];
+    const significantWeather = Utils.translateWmoCodeToTaf(weatherCode); // Übersetzen
+
+    console.log(`--- Bodenwetter für Index ${index} ---`);
+    console.log(`Sichtweite (Visibility): ${visibility ?? 'N/A'} m`);
+    console.log(`Wetter-Code (WMO 4677): ${weatherCode ?? 'N/A'} (${significantWeather})`);
+    console.log(`---------------------------------`);
+    // ENDE: NEUER CODEBLOCK
+
+    AppState.landingWindDir = AppState.weatherData.wind_direction_10m[index] || null;
+    console.log('landingWindDir updated to:', AppState.landingWindDir);
+
+    const customLandingDirectionLLInput = document.getElementById('customLandingDirectionLL');
+    const customLandingDirectionRRInput = document.getElementById('customLandingDirectionRR');
+    if (customLandingDirectionLLInput && customLandingDirectionRRInput && AppState.landingWindDir !== null) {
+        customLandingDirectionLLInput.value = Math.round(AppState.landingWindDir);
+        customLandingDirectionRRInput.value = Math.round(AppState.landingWindDir);
+    }
+
+    const refLevel = document.getElementById('refLevel')?.value || 'AGL';
+    const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
+    const windSpeedUnit = Settings.getValue('windUnit', 'radio', 'kt');
+    const temperatureUnit = Settings.getValue('temperatureUnit', 'radio', 'C');
+    // Pass lat and lng to getDisplayTime
+    const timeZone = Settings.getValue('timeZone', 'radio', 'Z');
+    const time = await Utils.getDisplayTime(AppState.weatherData.time[index], AppState.lastLat, AppState.lastLng, timeZone);
+    const interpStep = getInterpolationStep();
+    const interpolatedData = weatherManager.interpolateWeatherData(
+        AppState.weatherData,
+        index,
+        interpStep,
+        Math.round(AppState.lastAltitude),
+        heightUnit
+    );
+    const surfaceHeight = refLevel === 'AMSL' && AppState.lastAltitude !== 'N/A' ? Math.round(AppState.lastAltitude) : 0;
+
+    // NEU: Das obere Limit aus dem UI-Element auslesen
+    const upperLimit = parseInt(document.getElementById('upperLimit')?.value) || 3000;
+
+    // NEU: Die interpolierten Daten basierend auf dem Limit filtern
+    const filteredData = interpolatedData.filter(data => data.displayHeight <= upperLimit);
+
+    // NEU: Zuerst alle Zeilen als HTML-Strings generieren
+    const tableRowsHtml = filteredData.map(data => {
+        // ... (Die gesamte Logik zur Berechnung von windClass, humidityClass, displayHeight, etc. bleibt hier drin) ...
+        const spd = parseFloat(data.spd);
+        let windClass = '';
+        if (windSpeedUnit === 'bft') {
+            const spdInKt = Utils.convertWind(spd, 'kt', 'km/h');
+            const bft = Utils.knotsToBeaufort(spdInKt);
+            if (bft <= 1) windClass = 'wind-low';
+            else if (bft <= 3) windClass = 'wind-moderate';
+            else if (bft <= 4) windClass = 'wind-high';
+            else windClass = 'wind-very-high';
+        } else {
+            const spdInKt = Utils.convertWind(spd, 'kt', 'km/h');
+            if (spdInKt <= 3) windClass = 'wind-low';
+            else if (spdInKt <= 10) windClass = 'wind-moderate';
+            else if (spdInKt <= 16) windClass = 'wind-high';
+            else windClass = 'wind-very-high';
+        }
+
+        const cloudCover = data.cc;
+        let cloudCoverClass = '';
+        if (cloudCover !== 'N/A' && Number.isFinite(cloudCover)) {
+            if (cloudCover <= 10) cloudCoverClass = 'cloud-cover-clear';
+            else if (cloudCover <= 25) cloudCoverClass = 'cloud-cover-few';
+            else if (cloudCover <= 50) cloudCoverClass = 'cloud-cover-scattered';
+            else if (cloudCover <= 87) cloudCoverClass = 'cloud-cover-broken';
+            else cloudCoverClass = 'cloud-cover-overcast';
+        }
+
+        const displayHeight = refLevel === 'AMSL' ? data.displayHeight + (heightUnit === 'ft' ? Math.round(surfaceHeight * 3.28084) : surfaceHeight) : data.displayHeight;
+        const displayTemp = Utils.convertTemperature(data.temp, temperatureUnit === 'C' ? '°C' : '°F');
+        const formattedTemp = displayTemp === 'N/A' ? 'N/A' : displayTemp.toFixed(0);
+        const convertedSpd = Utils.convertWind(spd, windSpeedUnit, 'km/h');
+        let formattedWind;
+        const surfaceDisplayHeight = refLevel === 'AMSL' ? (heightUnit === 'ft' ? Math.round(surfaceHeight * 3.28084) : surfaceHeight) : 0;
+        if (Math.round(displayHeight) === surfaceDisplayHeight && AppState.weatherData.wind_gusts_10m[index] !== undefined && Number.isFinite(AppState.weatherData.wind_gusts_10m[index])) {
+            const gustSpd = AppState.weatherData.wind_gusts_10m[index];
+            const convertedGust = Utils.convertWind(gustSpd, windSpeedUnit, 'km/h');
+            const spdValue = windSpeedUnit === 'bft' ? Math.round(convertedSpd) : convertedSpd.toFixed(0);
+            const gustValue = windSpeedUnit === 'bft' ? Math.round(convertedGust) : convertedGust.toFixed(0);
+            formattedWind = `${spdValue} G ${gustValue}`;
+        } else {
+            formattedWind = convertedSpd === 'N/A' ? 'N/A' : (windSpeedUnit === 'bft' ? Math.round(convertedSpd) : convertedSpd.toFixed(0));
+        }
+        const speedKt = Math.round(Utils.convertWind(spd, 'kt', 'km/h') / 5) * 5;
+        const windBarbSvg = data.dir === 'N/A' || isNaN(speedKt) ? 'N/A' : Utils.generateWindBarb(data.dir, speedKt);
+
+        return `<tr class="${windClass} ${cloudCoverClass}">
+                    <td>${Math.round(displayHeight)}</td>
+                    <td>${Utils.roundToTens(data.dir)}</td>
+                    <td>${formattedWind}</td>
+                    <td>${windBarbSvg}</td>
+                    <td>${formattedTemp}</td>
+                    <td>${Math.round(data.rh)}</td>
+                    <td>${data.cc}</td> <!-- NEUE SPALTE für Wolkenbedeckung -->
+                </tr>`;
+    }).join(''); // .join('') fügt alle Zeilen zu einem einzigen String zusammen
+
+    // NEU: Die gesamte Tabelle in einer einzigen, lesbaren Vorlage erstellen
+    const output = `
+        <table id="weatherTable">
+            <thead>
+                <tr>
+                    <th>Height (${heightUnit} ${refLevel})</th>
+                    <th>Dir (deg)</th>
+                    <th>Spd (${windSpeedUnit})</th>
+                    <th>Wind</th>
+                    <th>T (${temperatureUnit === 'C' ? '°C' : '°F'})</th>
+                    <th>RH (%)</th>
+                    <th>CC (%)</th> <!-- NEUE SPALTE für Wolkenbedeckung -->
+                </tr>
+            </thead>
+            <tbody>
+                ${tableRowsHtml}
+            </tbody>
+        </table>`;
+
+    tableContainer.innerHTML = output; // <-- Nutzt den Parameter
+    timeContainer.innerHTML = `Selected Time: ${time}`; // <-- Nutzt den Parameter
+    if (interpolatedData.length > 0) {
+        const userMaxHoehe = parseInt(document.getElementById('upperLimit')?.value) || 3000;
+        generateWindspinne(interpolatedData, userMaxHoehe);
+    }
+}
 
 /**
  * Aktualisiert den Inhalt des Popups für den Hauptmarker (`currentMarker`).
@@ -42,21 +213,23 @@ export async function refreshMarkerPopup() {
 
     const coordFormat = Settings.getValue('coordFormat', 'radio', 'Decimal');
     const sliderIndex = getSliderValue();
+    const weatherCode = AppState.weatherData.weather_code?.[sliderIndex]; // Wettercode holen
+    const significantWeather = Utils.translateWmoCodeToTaf(weatherCode); // Übersetzen
 
     const coords = Utils.convertCoords(lat, lng, coordFormat);
 
-
+    const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
+    const formatDDM = (ddm) => `${ddm.deg}° ${ddm.min.toFixed(3)}' ${ddm.dir}`;
 
     let popupContent;
     if (coordFormat === 'MGRS') {
         popupContent = `MGRS: ${coords.lat}<br>Alt: ${displayAltitude} ${displayUnit}`;
+    } else if (coordFormat === 'DMS') {
+        popupContent = `Lat: ${formatDMS(Utils.decimalToDms(lat, true))}<br>Lng: ${formatDMS(Utils.decimalToDms(lng, false))}<br>Alt: ${displayAltitude} ${displayUnit}`;
+    } else if (coordFormat === 'DDM') {
+        popupContent = `Lat: ${formatDDM(Utils.decimalToDecimalMinutes(lat, true))}<br>Lng: ${formatDDM(Utils.decimalToDecimalMinutes(lng, false))}<br>Alt: ${displayAltitude} ${displayUnit}`;
     } else {
-        const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
-        if (coordFormat === 'DMS') {
-            popupContent = `Lat: ${formatDMS(Utils.decimalToDms(lat, true))}<br>Lng: ${formatDMS(Utils.decimalToDms(lng, false))}<br>Alt: ${displayAltitude} ${displayUnit}`;
-        } else {
-            popupContent = `Lat: ${lat.toFixed(5)}<br>Lng: ${lng.toFixed(5)}<br>Alt: ${displayAltitude} ${displayUnit}`;
-        }
+        popupContent = `Lat: ${lat.toFixed(5)}<br>Lng: ${lng.toFixed(5)}<br>Alt: ${displayAltitude} ${displayUnit}`;
     }
 
     if (AppState.weatherData && AppState.weatherData.surface_pressure) {
@@ -66,6 +239,10 @@ export async function refreshMarkerPopup() {
         } else {
             popupContent += ` QFE: N/A`;
         }
+        // NEU: Signifikantes Wetter zum Popup hinzufügen, falls relevant
+        if (significantWeather && significantWeather !== 'N/A' && significantWeather !== 'SKC') {
+            popupContent += `<br>Weather: ${significantWeather}`;
+        }
     } else {
         popupContent += ` QFE: N/A`;
     }
@@ -74,136 +251,98 @@ export async function refreshMarkerPopup() {
 }
 
 /**
- * Rendert die detaillierte Wettertabelle basierend auf dem ausgewählten Zeitindex.
- * Die Funktion interpoliert die Roh-Wetterdaten, erstellt die komplette HTML-Tabelle 
- * mit allen Höhenstufen, Werten und Styling-Klassen und fügt sie in das Info-Element ein.
- * @param {number} index - Der Index des Zeitschiebereglers, für den die Daten angezeigt werden sollen.
- * @param {string|null} [originalTime=null] - Ein optionaler Zeitstempel, der für die Anzeige verwendet werden kann.
- * @returns {Promise<void>}
+ * Aktualisiert den Inhalt des Popups für die Modell-Informationen.
  */
-export async function updateWeatherDisplay(index, tableContainerId, timeContainerId, originalTime = null) {
-    console.log(`updateWeatherDisplay called for index: ${index} -> into ${tableContainerId}`);
+export function updateModelInfoPopup() {
+    const modelInfoPopup = document.getElementById('modelInfoPopup');
+    const modelSelect = document.getElementById('modelSelect');
+    if (!modelInfoPopup || !modelSelect) return;
 
-    const tableContainer = document.getElementById(tableContainerId);
-    const timeContainer = document.getElementById(timeContainerId);
+    const model = modelSelect.value;
+    const modelRun = AppState.lastModelRun || "N/A"; // Holt den Model-Run aus dem AppState
 
-    // Sicherheitsprüfung: Stellen sicher, dass die Container existieren
-    if (!tableContainer || !timeContainer) {
-        console.error('Target container(s) for weather display not found!', { tableContainerId, timeContainerId });
-        return;
-    }
+    const titleContent = `Model: ${model.replace(/_/g, ' ').toUpperCase()}\\nRun: ${modelRun}`;
 
-    if (!AppState.weatherData || !AppState.weatherData.time || index < 0 || index >= AppState.weatherData.time.length) {
-        console.error('No weather data available or index out of bounds:', index);
-        tableContainer.innerHTML = '<p style="padding: 20px; text-align: center;">No weather data available</p>';
-        timeContainer.innerHTML = 'Selected Time: ';
-        const slider = document.getElementById('timeSlider');
-        if (slider) slider.value = 0;
-        return;
-    }
-
-    AppState.landingWindDir = AppState.weatherData.wind_direction_10m[index] || null;
-    console.log('landingWindDir updated to:', AppState.landingWindDir);
-
-    const customLandingDirectionLLInput = document.getElementById('customLandingDirectionLL');
-    const customLandingDirectionRRInput = document.getElementById('customLandingDirectionRR');
-    if (customLandingDirectionLLInput && customLandingDirectionRRInput && AppState.landingWindDir !== null) {
-        customLandingDirectionLLInput.value = Math.round(AppState.landingWindDir);
-        customLandingDirectionRRInput.value = Math.round(AppState.landingWindDir);
-    }
-
-    const refLevel = document.getElementById('refLevel')?.value || 'AGL';
-    const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
-    const windSpeedUnit = Settings.getValue('windUnit', 'radio', 'kt');
-    const temperatureUnit = Settings.getValue('temperatureUnit', 'radio', 'C');
-    // Pass lat and lng to getDisplayTime
-    const timeZone = Settings.getValue('timeZone', 'radio', 'Z');
-    const time = await Utils.getDisplayTime(AppState.weatherData.time[index], AppState.lastLat, AppState.lastLng, timeZone);
-    const interpStep = getInterpolationStep(); // Wert in der UI-Schicht holen
-    const interpolatedData = weatherManager.interpolateWeatherData(
-        AppState.weatherData, // Das Haupt-Wetterdatenobjekt
-        index,
-        interpStep,
-        Math.round(AppState.lastAltitude),
-        heightUnit
-    ); // Und an die Core-Funktion übergeben
-    const surfaceHeight = refLevel === 'AMSL' && AppState.lastAltitude !== 'N/A' ? Math.round(AppState.lastAltitude) : 0;
-
-    // NEU: Zuerst alle Zeilen als HTML-Strings generieren
-    const tableRowsHtml = interpolatedData.map(data => {
-        // ... (Die gesamte Logik zur Berechnung von windClass, humidityClass, displayHeight, etc. bleibt hier drin) ...
-        const spd = parseFloat(data.spd);
-        let windClass = '';
-        if (windSpeedUnit === 'bft') {
-            const spdInKt = Utils.convertWind(spd, 'kt', 'km/h');
-            const bft = Utils.knotsToBeaufort(spdInKt);
-            if (bft <= 1) windClass = 'wind-low';
-            else if (bft <= 3) windClass = 'wind-moderate';
-            else if (bft <= 4) windClass = 'wind-high';
-            else windClass = 'wind-very-high';
-        } else {
-            const spdInKt = Utils.convertWind(spd, 'kt', 'km/h');
-            if (spdInKt <= 3) windClass = 'wind-low';
-            else if (spdInKt <= 10) windClass = 'wind-moderate';
-            else if (spdInKt <= 16) windClass = 'wind-high';
-            else windClass = 'wind-very-high';
-        }
-        const humidity = data.rh;
-        let humidityClass = '';
-        if (humidity !== 'N/A' && Number.isFinite(humidity)) {
-            if (humidity < 65) humidityClass = 'humidity-low';
-            else if (humidity >= 65 && humidity <= 85) humidityClass = 'humidity-moderate';
-            else if (humidity > 85 && humidity < 100) humidityClass = 'humidity-high';
-            else if (humidity === 100) humidityClass = 'humidity-saturated';
-        }
-        const displayHeight = refLevel === 'AMSL' ? data.displayHeight + (heightUnit === 'ft' ? Math.round(surfaceHeight * 3.28084) : surfaceHeight) : data.displayHeight;
-        const displayTemp = Utils.convertTemperature(data.temp, temperatureUnit === 'C' ? '°C' : '°F');
-        const formattedTemp = displayTemp === 'N/A' ? 'N/A' : displayTemp.toFixed(0);
-        const convertedSpd = Utils.convertWind(spd, windSpeedUnit, 'km/h');
-        let formattedWind;
-        const surfaceDisplayHeight = refLevel === 'AMSL' ? (heightUnit === 'ft' ? Math.round(surfaceHeight * 3.28084) : surfaceHeight) : 0;
-        if (Math.round(displayHeight) === surfaceDisplayHeight && AppState.weatherData.wind_gusts_10m[index] !== undefined && Number.isFinite(AppState.weatherData.wind_gusts_10m[index])) {
-            const gustSpd = AppState.weatherData.wind_gusts_10m[index];
-            const convertedGust = Utils.convertWind(gustSpd, windSpeedUnit, 'km/h');
-            const spdValue = windSpeedUnit === 'bft' ? Math.round(convertedSpd) : convertedSpd.toFixed(0);
-            const gustValue = windSpeedUnit === 'bft' ? Math.round(convertedGust) : convertedGust.toFixed(0);
-            formattedWind = `${spdValue} G ${gustValue}`;
-        } else {
-            formattedWind = convertedSpd === 'N/A' ? 'N/A' : (windSpeedUnit === 'bft' ? Math.round(convertedSpd) : convertedSpd.toFixed(0));
-        }
-        const speedKt = Math.round(Utils.convertWind(spd, 'kt', 'km/h') / 5) * 5;
-        const windBarbSvg = data.dir === 'N/A' || isNaN(speedKt) ? 'N/A' : Utils.generateWindBarb(data.dir, speedKt);
-
-        // Gibt den fertigen HTML-String für eine Zeile zurück
-        return `<tr class="${windClass} ${humidityClass}">
-                    <td>${Math.round(displayHeight)}</td>
-                    <td>${Utils.roundToTens(data.dir)}</td>
-                    <td>${formattedWind}</td>
-                    <td>${windBarbSvg}</td>
-                    <td>${formattedTemp}</td>
-                </tr>`;
-    }).join(''); // .join('') fügt alle Zeilen zu einem einzigen String zusammen
-
-    // NEU: Die gesamte Tabelle in einer einzigen, lesbaren Vorlage erstellen
-    const output = `
-        <table id="weatherTable">
-            <thead>
-                <tr>
-                    <th>Height (${heightUnit} ${refLevel})</th>
-                    <th>Dir (deg)</th>
-                    <th>Spd (${windSpeedUnit})</th>
-                    <th>Wind</th>
-                    <th>T (${temperatureUnit === 'C' ? '°C' : '°F'})</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${tableRowsHtml}
-            </tbody>
-        </table>`;
-
-    tableContainer.innerHTML = output; // <-- Nutzt den Parameter
-    timeContainer.innerHTML = `Selected Time: ${time}`; // <-- Nutzt den Parameter
+    // Ersetzt Zeilenumbrüche durch <br> für die HTML-Anzeige
+    modelInfoPopup.innerHTML = titleContent.replace(/\\n/g, '<br>');
 }
+
+/**
+ * Erstellt und positioniert Datums-Labels unterhalb des Time-Sliders.
+ * Die Funktion erkennt den Tageswechsel intelligent basierend auf der
+ * ausgewählten Zeitzone und positioniert die Rand-Labels korrekt.
+ */
+export async function updateSliderLabels() {
+    const slider = document.getElementById('timeSlider');
+    const labelsContainer = document.getElementById('slider-labels');
+    if (!slider || !labelsContainer || !AppState.weatherData || !AppState.weatherData.time) {
+        if (labelsContainer) labelsContainer.innerHTML = '';
+        return;
+    }
+
+    labelsContainer.innerHTML = '';
+    const timeArray = AppState.weatherData.time;
+    const totalSteps = parseInt(slider.max, 10);
+    if (totalSteps <= 0) return;
+
+    const timeZoneSetting = Settings.getValue('timeZone', 'radio', 'Z');
+    let locationTimezone = 'utc';
+    if (timeZoneSetting === 'loc' && AppState.lastLat) {
+        const locData = await Utils.getLocationData(AppState.lastLat, AppState.lastLng);
+        locationTimezone = locData.timezone || 'utc';
+    }
+
+    let lastDay = null;
+
+    for (let index = 0; index < timeArray.length; index++) {
+        const timeStr = timeArray[index];
+        const dt = DateTime.fromISO(timeStr, { zone: 'utc' }).setZone(locationTimezone);
+        const currentDay = dt.day;
+
+        if (currentDay !== lastDay) {
+            let bestIndexForNewDay = index;
+            let minHourDiff = Math.abs(dt.hour);
+
+            for (let j = 1; j < 4 && (index + j) < timeArray.length; j++) {
+                const nextDt = DateTime.fromISO(timeArray[index + j], { zone: 'utc' }).setZone(locationTimezone);
+                if (nextDt.day === currentDay) {
+                    if (Math.abs(nextDt.hour) < minHourDiff) {
+                        minHourDiff = Math.abs(nextDt.hour);
+                        bestIndexForNewDay = index + j;
+                    }
+                } else {
+                    break;
+                }
+            }
+
+            if (currentDay !== lastDay) {
+                const label = document.createElement('div');
+                label.className = 'slider-label';
+                label.textContent = dt.toFormat('MMM dd');
+
+                const positionPercent = (bestIndexForNewDay / totalSteps) * 100;
+
+                if (bestIndexForNewDay === 0) {
+                    label.style.left = '0';
+                    label.style.transform = 'translateX(0)';
+                } else if (positionPercent > 98) {
+                    label.style.left = '100%';
+                    label.style.transform = 'translateX(-100%)';
+                } else {
+                    label.style.left = `${positionPercent}%`;
+                    label.style.transform = 'translateX(0)';
+                }
+
+                labelsContainer.appendChild(label);
+                lastDay = currentDay;
+            }
+        }
+    }
+}
+
+// ===================================================================
+// 2. Sprung-Visualisierungen
+// ===================================================================
 
 /**
  * Zeichnet oder entfernt das Landemuster auf der Karte.
@@ -410,21 +549,4 @@ export function updateJumpRunTrackDisplay() {
             directionInput.value = '';
         }
     }
-}
-
-/**
- * Aktualisiert den Inhalt des Popups für die Modell-Informationen.
- */
-export function updateModelInfoPopup() {
-    const modelInfoPopup = document.getElementById('modelInfoPopup');
-    const modelSelect = document.getElementById('modelSelect');
-    if (!modelInfoPopup || !modelSelect) return;
-
-    const model = modelSelect.value;
-    const modelRun = AppState.lastModelRun || "N/A"; // Holt den Model-Run aus dem AppState
-
-    const titleContent = `Model: ${model.replace(/_/g, ' ').toUpperCase()}\\nRun: ${modelRun}`;
-
-    // Ersetzt Zeilenumbrüche durch <br> für die HTML-Anzeige
-    modelInfoPopup.innerHTML = titleContent.replace(/\\n/g, '<br>');
 }

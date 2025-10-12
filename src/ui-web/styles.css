@@ -468,6 +468,32 @@ input[type="checkbox"][style*="opacity: 0.5"] {
     gap: 15px;
 }
 
+.slider-wrapper {
+    position: relative;
+    width: 100%;
+    margin-top: 5px;
+    /* Etwas Platz für die Labels unter dem Slider schaffen */
+    margin-bottom: 20px; 
+}
+
+#slider-labels {
+    position: absolute;
+    top: 15px; /* Positioniert die Labels unterhalb des Slider-Griffs */
+    left: 0;
+    right: 0;
+    height: 20px;
+    pointer-events: none; /* Stellt sicher, dass die Labels nicht die Bedienung des Sliders stören */
+}
+
+.slider-label {
+    position: absolute;
+    top: 0;
+    transform: translateX(-50%); /* Zentriert das Label exakt über der Markierung */
+    font-size: 10px;
+    color: #555;
+    white-space: nowrap; /* Verhindert Zeilenumbrüche */
+}
+
 #selectedTime,
 #modelLabel {
     font-size: 14px;
@@ -592,40 +618,80 @@ input[type="checkbox"][style*="opacity: 0.5"] {
     text-align: center;
 }
 
-#weather-table-container tr.humidity-low {
-    background: var(--background-light) !important;
+/* === NEU: Farbkodierung für Wolkenbedeckung === */
+#weather-table-container tr.cloud-cover-clear { /* 0-10% */
+    background: #e3f2fd !important; /* Sehr helles Blau */
+}
+#weather-table-container tr.cloud-cover-few { /* 11-30% */
+    background: hsl(205, 36%, 86%) !important; /* Helles Blau */
+}
+#weather-table-container tr.cloud-cover-scattered { /* 31-60% */
+    background: #e0e0e0 !important; /* Helles Grau */
+}
+#weather-table-container tr.cloud-cover-broken { /* 61-90% */
+    background: #b0bec5 !important; /* Mittelgrau */
+}
+#weather-table-container tr.cloud-cover-overcast { /* 91-100% */
+    background: #78909c !important; /* Dunkelgrau */
+    color: white !important; /* Hellerer Text für besseren Kontrast */
 }
 
-#weather-table-container tr.humidity-moderate {
-    background: #F4F4F4 !important;
-}
-
-#weather-table-container tr.humidity-high {
-    background: #cdcdcd !important;
-}
-
-#weather-table-container tr.humidity-saturated {
-    background: #B9B9B9 !important;
-    color: white !important;
-}
-
-#weather-table-container tr.wind-low {
+#weather-table-container tr.wind-low td {
     border: 2px solid lightblue !important;
 }
 
-#weather-table-container tr.wind-moderate {
+#weather-table-container tr.wind-moderate td {
     border: 2px solid lightgreen !important;
 }
 
-#weather-table-container tr.wind-high {
+#weather-table-container tr.wind-high td {
     border: 2px solid #f5f34f !important;
 }
 
-#weather-table-container tr.wind-very-high {
+#weather-table-container tr.wind-very-high td {
     border: 2px solid #ffcccc !important;
 }
 
+/* === Wind Spider Styles === */
+#windspinne-container {
+    position: relative; /* Wichtig für die Positionierung des Canvas */
+    width: 100%;
+    max-width: 450px;
+    margin: 20px auto;
+    aspect-ratio: 0.95 / 1; /* Erzwingt, dass der Container quadratisch ist */
+}
 
+#windspinne-container canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.windspinne-legend {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1.5rem; /* Abstand zwischen den Elementen */
+    margin-top: 1rem;
+    padding: 0.5rem;
+    flex-wrap: wrap; /* Erlaubt Umbruch bei schmalen Bildschirmen */
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    font-size: 0.85rem;
+}
+
+.legend-color-box {
+    width: 16px;
+    height: 16px;
+    margin-right: 8px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+}
 /* --- Jumpmaster Panel --- */
 #panel-jumpmaster ul {
     list-style: none;
@@ -693,6 +759,29 @@ input[type="checkbox"][style*="opacity: 0.5"] {
     border: none;
     border-top: 1px solid #eee;
     margin: 15px 0;
+}
+
+.dashboard-value.vario-climb {
+    color: #28a745 !important; /* Grün für Steigen */
+}
+
+.dashboard-value.vario-descent {
+    color: #dc3545 !important; /* Rot für Sinken */
+}
+
+#aircraftList li {
+    padding: 12px 8px;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+    text-align: left;
+}
+
+#aircraftList li:hover {
+    background-color: #f0f2f5;
+}
+
+#aircraftList li:last-child {
+    border-bottom: none;
 }
 
 /* --- Search Panel --- */
@@ -776,6 +865,15 @@ input[type="checkbox"][style*="opacity: 0.5"] {
 
 .search-item-actions button.delete-btn:hover {
     color: #e74c3c;
+}
+
+.search-item-actions button.home-toggle {
+    opacity: 0.3; /* Inaktive Haus-Icons sind blass */
+    transition: opacity 0.2s ease-in-out; /* Sanfter Übergang */
+}
+
+.search-item-actions button.home-toggle.is-home {
+    opacity: 1.0; /* Das aktive Home-Icon hat volle Deckkraft */
 }
 
 .clear-icon {
@@ -930,8 +1028,7 @@ input[type="checkbox"][style*="opacity: 0.5"] {
 #loading,
 #message,
 #error-message,
-#progress,
-#offline-indicator {
+#progress {
     position: fixed;
     top: 50%;
     left: 50%;
@@ -1045,6 +1142,95 @@ input[type="checkbox"][style*="opacity: 0.5"] {
 
 .modal-btn.cancel {
     background-color: #ccc;
+}
+
+/* === SNACKBAR NOTIFICATIONS (aus mobiler Version übernommen) === */
+#snackbar {
+    visibility: hidden;
+    min-width: 250px;
+    background-color: var(--text-color);
+    color: var(--background-light);
+    text-align: center;
+    border-radius: 8px;
+    padding: 16px;
+    position: fixed; /* Wichtig für Web: 'fixed' statt 'absolute' */
+    z-index: 10001;  /* Über allem anderen */
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%) translateY(200%);
+    opacity: 0;
+    font-size: 1rem;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    transition: visibility 0s, opacity 0.5s, transform 0.5s ease-in-out;
+}
+
+#snackbar.show {
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+}
+
+#snackbar.success { background-color: #4CAF50; }
+#snackbar.error { background-color: #f44336; }
+#snackbar.warning { background-color: #fff3cd; color: #856404; }
+
+/* === PROGRESS SNACKBAR === */
+#progress-snackbar {
+    visibility: hidden;
+    position: fixed; /* Wichtig für Web */
+    bottom: 80px; /* Etwas höher als die normale Snackbar */
+    left: 50%;
+    transform: translateX(-50%) translateY(200%);
+    background-color: #3f51b5;
+    color: white;
+    padding: 14px;
+    border-radius: 8px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+    z-index: 10002;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 280px;
+    box-sizing: border-box;
+    opacity: 0;
+    transition: visibility 0s, opacity 0.4s ease-in-out, transform 0.4s ease-in-out;
+}
+
+#progress-snackbar.show {
+    visibility: visible;
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+.progress-snackbar-content { flex-grow: 1; display: flex; flex-direction: column; gap: 5px; }
+.progress-snackbar-text { font-size: 0.95rem; text-align: center; }
+.progress-bar-container { width: 100%; height: 6px; background-color: rgba(255, 255, 255, 0.3); border-radius: 3px; overflow: hidden; }
+.progress-bar { width: 0%; height: 100%; background-color: #ffffff; border-radius: 3px; transition: width 0.3s ease-in-out; }
+#progress-snackbar .cancel-button { background: transparent; border: 1px solid white; color: white; border-radius: 5px; padding: 5px 10px; font-size: 0.9rem; cursor: pointer; }
+
+#offline-indicator {
+    visibility: hidden;
+    min-width: 250px;
+    background-color: #fff3cd;
+    color: #856404;
+    text-align: center;
+    border-radius: 8px;
+    padding: 16px;
+    position: fixed;
+    z-index: 2010;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%) translateY(200%);
+    opacity: 0;
+    font-size: 1rem;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    transition: visibility 0s, opacity 0.5s, transform 0.5s ease-in-out;
+}
+
+#offline-indicator.show {
+    visibility: visible;
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
 }
 
 /* =================================================================== */
