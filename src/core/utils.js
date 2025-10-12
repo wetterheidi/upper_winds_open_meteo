@@ -1467,7 +1467,22 @@ export class Utils {
         const heightUnit = Settings.getValue('heightUnit', 'm');
 
         const coords = Utils.convertCoords(point.lat, point.lng, currentCoordFormat);
-        let tooltipContent = currentCoordFormat === 'MGRS' ? `MGRS: ${coords.lat}` : `Lat: ${coords.lat}<br>Lng: ${coords.lng}`;
+        let tooltipContent;
+
+        // NEUE, ERWEITERTE FORMATIERUNG
+        const formatDDM = (ddm) => `${ddm.deg}° ${ddm.min.toFixed(3)}' ${ddm.dir}`;
+        const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
+
+        if (currentCoordFormat === 'MGRS') {
+            tooltipContent = `MGRS: ${coords.lat}`;
+        } else if (currentCoordFormat === 'DMS') {
+            tooltipContent = `Lat: ${formatDMS(Utils.decimalToDms(point.lat, true))}<br>Lng: ${formatDMS(Utils.decimalToDms(point.lng, false))}`;
+        } else if (currentCoordFormat === 'DDM') {
+            tooltipContent = `Lat: ${formatDDM(Utils.decimalToDecimalMinutes(point.lat, true))}<br>Lng: ${formatDDM(Utils.decimalToDecimalMinutes(point.lng, false))}`;
+        } else {
+            tooltipContent = `Lat: ${point.lat.toFixed(5)}<br>Lng: ${point.lng.toFixed(5)}`;
+        }
+
 
         const elevation = point.ele;
         let aglHeight = (elevation !== null && groundAltitude !== null) ? (elevation - groundAltitude) : null;

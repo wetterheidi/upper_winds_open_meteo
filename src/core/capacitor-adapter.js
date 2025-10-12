@@ -16,22 +16,25 @@ let isInitialized = false;
 function waitForDeviceReady() {
     if (!deviceReadyPromise) {
         deviceReadyPromise = new Promise((resolve) => {
-            if (document.readyState === 'complete' && window.Capacitor) {
+            // **NEU:** Prüfe, ob wir uns überhaupt in einer nativen Umgebung befinden.
+            // Wenn nicht (d.h. im Web), müssen wir nicht auf 'deviceready' warten.
+            if (!window.Capacitor || !window.Capacitor.isNativePlatform()) {
+                console.log('Web environment detected, resolving deviceReady immediately.');
                 resolve();
-            } else {
-                document.addEventListener('deviceready', () => {
-                    console.log('Device is ready');
-                    resolve();
-                }, { once: true });
-                
-                // Fallback falls deviceready nicht kommt
-                setTimeout(() => {
-                    if (window.Capacitor) {
-                        console.log('Fallback: Device seems ready');
-                        resolve();
-                    }
-                }, 2000);
+                return; // Wichtig: Die Funktion hier beenden.
             }
+
+            // Die ursprüngliche Logik, die nur noch für native Plattformen ausgeführt wird.
+            document.addEventListener('deviceready', () => {
+                console.log('Native device is ready');
+                resolve();
+            }, { once: true });
+
+            // Ein Fallback, falls 'deviceready' aus irgendeinem Grund nicht feuert
+            setTimeout(() => {
+                console.log('Fallback: Assuming native device is ready after 2s.');
+                resolve();
+            }, 2000);
         });
     }
     return deviceReadyPromise;
