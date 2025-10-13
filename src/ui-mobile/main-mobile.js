@@ -903,7 +903,7 @@ export async function updateUIWithNewWeatherData(newWeatherData, preservedIndex 
     };
 
     const lastValidIndex = findLastValidDataIndex(newWeatherData);
-    
+
     // Geänderte Logik für den Slider
     const maxForecastTime = Settings.getValue('maxForecastTime', 'Maximum');
     let maxSliderIndex = lastValidIndex;
@@ -1447,9 +1447,8 @@ function setupAppEventListeners() {
         const loadingElement = document.getElementById('loading');
         try {
             if (!event || !event.detail) {
-                console.error('[main-mobile] "track:loaded" event fired without detail object.', event);
                 Utils.handleError('Received invalid track data. Please try again.');
-                return; // Beendet die Funktion sicher, um einen Absturz zu verhindern.
+                return;
             }
 
             const { lat, lng, timestamp, historicalDate, summary } = event.detail;
@@ -1469,14 +1468,19 @@ function setupAppEventListeners() {
                 Utils.handleMessage("Autoupdate disabled for historical track viewing.");
             }
 
+            // Schritt 1: Marker auf der Karte erstellen ODER aktualisieren.
+            // Diese Funktion setzt auch die Geländehöhe (lastAltitude), worauf wir warten.
             await mapManager.createOrUpdateMarker(lat, lng);
-            const newWeatherData = await weatherManager.fetchWeatherForLocation(lat, lng, timestamp);
-            if (newWeatherData) {
-                AppState.weatherData = newWeatherData; // Daten im AppState speichern
 
-                // 2. Den Slider auf den richtigen Zeitpunkt setzen
+            // Schritt 2: Wetterdaten für den spezifischen Zeitstempel des Tracks abrufen.
+            const newWeatherData = await weatherManager.fetchWeatherForLocation(lat, lng, timestamp);
+
+            if (newWeatherData) {
+                AppState.weatherData = newWeatherData;
+
+                // Schritt 3: Den korrekten Index für den Slider finden.
                 const slider = document.getElementById('timeSlider');
-                if (slider && AppState.weatherData.time) {
+                if (slider && AppState.weatherData.time && timestamp) {
                     slider.max = AppState.weatherData.time.length - 1;
                     slider.disabled = slider.max <= 0;
 
@@ -1491,16 +1495,21 @@ function setupAppEventListeners() {
                             bestIndex = idx;
                         }
                     });
-                    slider.value = bestIndex; // Slider positionieren!
+                    slider.value = bestIndex;
                 }
             }
             console.log("Performing specific updates after track load...");
-            await displayManager.updateWeatherDisplay(getSliderValue(), 'weather-table-container', 'selectedTime');
-            await displayManager.refreshMarkerPopup();
+        // Schritt 4: Alle UI-Elemente mit den neuen, zeitlich korrekten Daten aktualisieren.
+        await displayManager.updateWeatherDisplay(getSliderValue(), 'weather-table-container', 'selectedTime');
+        await displayManager.refreshMarkerPopup();
+        if (AppState.lastAltitude !== 'N/A') {
             calculateMeanWind();
-            calculateJump(); // Diese Funktion beinhaltet bereits die nötigen Checks und ruft auch calculateCutAway auf
+            if(Settings.state.userSettings.calculateJump) {
+                calculateJump();
+            }
             displayManager.updateLandingPatternDisplay();
-            updateJumpMasterLineAndPanel();
+        }
+//            updateJumpMasterLineAndPanel();
 
             const infoEl = document.getElementById('info');
             if (infoEl && summary) {
@@ -1515,8 +1524,8 @@ function setupAppEventListeners() {
             }
 
         } catch (error) {
-            console.error('Fehler bei der Verarbeitung von track:loaded:', error);
-            Utils.handleError('Konnte Track-Daten nicht vollständig verarbeiten.');
+            console.error('Erroro processing track:loaded:', error);
+            Utils.handleError('Could not load track data completely.');
         } finally {
             if (loadingElement) {
                 loadingElement.style.display = 'none';

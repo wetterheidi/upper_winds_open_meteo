@@ -73,7 +73,7 @@ export async function loadKmlTrack(file) {
             throw new Error('KML file contains no valid track with at least two points.');
         }
 
-        const trackMetaData = await renderTrack(points, file.name);
+        const trackMetaData = await renderTrack(points, file.name, null);
         return trackMetaData;
 
     } catch (error) {
@@ -100,6 +100,22 @@ export async function loadGpxTrack(file) {
 
         const parser = new DOMParser();
         const xml = parser.parseFromString(gpxData, 'text/xml');
+
+        const waypoints = xml.getElementsByTagName('wpt');
+        let dipWaypoint = null;
+        for (let i = 0; i < waypoints.length; i++) {
+            const name = waypoints[i].getElementsByTagName('name')[0]?.textContent;
+            if (name && name.toUpperCase() === 'DIP') {
+                const lat = parseFloat(waypoints[i].getAttribute('lat'));
+                const lng = parseFloat(waypoints[i].getAttribute('lon'));
+                if (!isNaN(lat) && !isNaN(lng)) {
+                    dipWaypoint = { lat, lng };
+                    console.log(`[trackManager] DIP waypoint found in GPX file at: ${lat}, ${lng}`);
+                    break; // Ersten gefundenen DIP verwenden
+                }
+            }
+        }
+
         const trackpoints = xml.getElementsByTagName('trkpt');
         const points = [];
         for (let i = 0; i < trackpoints.length; i++) {
@@ -190,7 +206,7 @@ export async function loadCsvTrackUTC(file) {
                         reject(new Error('CSV track has insufficient points.'));
                         return;
                     }
-                    const trackMetaData = await renderTrack(points, file.name);
+                    const trackMetaData = await renderTrack(points, file.name, null);
                     resolve(trackMetaData);
                 },
                 error: function (error) {
@@ -220,10 +236,17 @@ export async function saveRecordedTrack() {
     }
 
     try {
+        // NEU: DIP-Wegpunkt erstellen, falls vorhanden
+        let dipWaypoint = '';
+        if (AppState.lastLat !== null && AppState.lastLng !== null) {
+            const dipElevation = AppState.lastAltitude !== 'N/A' ? AppState.lastAltitude.toFixed(2) : '0';
+            dipWaypoint = `  <wpt lat="${AppState.lastLat}" lon="${AppState.lastLng}">\n    <name>DIP</name>\n    <ele>${dipElevation}</ele>\n    <sym>Flag, Blue</sym>\n  </wpt>\n`;
+        }
+
         const header = `<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="DZMaster" xmlns="http://www.topografix.com/GPX/1/1">
 <metadata><name>Skydive Track - ${new Date().toLocaleString()}</name></metadata>
-<trk><name>Recorded Skydive</name><trkseg>`;
+${dipWaypoint}<trk><name>Recorded Skydive</name><trkseg>`;
 
         const footer = `</trkseg></trk></gpx>`;
 
@@ -245,11 +268,9 @@ export async function saveRecordedTrack() {
         const gpxContent = `${header}\n${trackpointStrings.join('\n')}\n${footer}`;
         const fileName = `Skydive_Track_${DateTime.utc().toFormat('yyyy-MM-dd_HHmm')}.gpx`;
 
-        // HINZUGEFÜGT: "await", um auf das Laden der Module zu warten
         const { Filesystem, Directory, isNative } = await getCapacitor();
 
         if (isNative && Filesystem) {
-            // HINZUGEFÜGT: "await", um auf das Speichern der Datei zu warten
             await Filesystem.writeFile({
                 path: `DZMaster/${fileName}`,
                 data: gpxContent,
@@ -257,14 +278,11 @@ export async function saveRecordedTrack() {
                 encoding: 'utf8',
                 recursive: true
             });
-            // Diese Nachricht wird jetzt erst NACH dem erfolgreichen Speichern angezeigt
             Utils.handleMessage(`Track saved in Documents/DZMaster`);
         } else {
-            // Web-Fallback oder Fehlerfall, wenn Filesystem nicht geladen werden konnte
             if (isNative) {
                 Utils.handleError("Could not save track: Filesystem module not available.");
             } else {
-                // Der Web-Fallback bleibt unverändert
                 const blob = new Blob([gpxContent], { type: "application/gpx+xml;charset=utf-8" });
                 const a = document.createElement('a');
                 a.href = URL.createObjectURL(blob);
@@ -525,10 +543,11 @@ export async function exportLandingPatternToGpx() {
  * Löst nach dem Rendern ein 'track:loaded'-Event aus.
  * @param {object[]} points - Ein Array von Punkt-Objekten, die den Track definieren.
  * @param {string} fileName - Der Name der geladenen Datei.
+ * @param {object|null} [dipWaypoint=null] - Ein optionaler DIP-Wegpunkt aus einer GPX-Datei.
  * @returns {Promise<object|null>} Ein Promise, das zu den Metadaten des Tracks auflöst.
  * @private
  */
-async function renderTrack(points, fileName) {
+async function renderTrack(points, fileName, dipWaypoint = null) {
     try {
         console.log(`[trackManager] renderTrack called for ${fileName} with ${points.length} points.`);
         if (!AppState.map) {
@@ -553,10 +572,23 @@ async function renderTrack(points, fileName) {
         };
 
         if (points.length > 0) {
-            const finalPoint = points[points.length - 1];
-            AppState.lastLat = finalPoint.lat;
-            AppState.lastLng = finalPoint.lng;
-            AppState.lastAltitude = await Utils.getAltitude(AppState.lastLat, AppState.lastLng);
+
+            // --- KORRIGIERTE DIP-LOGIK ---
+            if (dipWaypoint) {
+                // Wenn ein DIP-Wegpunkt in der GPX-Datei gefunden wurde, wird dieser verwendet.
+                console.log("[trackManager] DIP waypoint found in GPX. Setting DIP to waypoint position.");
+                AppState.lastLat = dipWaypoint.lat;
+                AppState.lastLng = dipWaypoint.lng;
+                AppState.lastAltitude = await Utils.getAltitude(AppState.lastLat, AppState.lastLng);
+            } else {
+                // Andernfalls wird IMMER der letzte Punkt des Tracks als neuer DIP gesetzt.
+                console.log("[trackManager] No DIP waypoint in file. Setting DIP to the last point of the track.");
+                const finalPoint = points[points.length - 1];
+                AppState.lastLat = finalPoint.lat;
+                AppState.lastLng = finalPoint.lng;
+                AppState.lastAltitude = await Utils.getAltitude(AppState.lastLat, AppState.lastLng);
+            }
+
             trackMetaData.finalPointData = { lat: AppState.lastLat, lng: AppState.lastLng, altitude: AppState.lastAltitude };
 
             if (points[0].time && points[0].time.isValid) {
@@ -573,7 +605,6 @@ async function renderTrack(points, fileName) {
                 trackMetaData.timestampToUseForWeather = roundedTimestamp.toISO();
             }
 
-            // KORREKTUR: Berechnungen VOR die Verwendung verschieben
             const distance = (points.reduce((dist, p, i) => {
                 if (i === 0 || !AppState.map) return 0; const prev = points[i - 1];
                 return dist + AppState.map.distance([prev.lat, prev.lng], [p.lat, p.lng]);
@@ -582,7 +613,6 @@ async function renderTrack(points, fileName) {
             const elevationMin = elevations.length ? Math.min(...elevations).toFixed(0) : 'N/A';
             const elevationMax = elevations.length ? Math.max(...elevations).toFixed(0) : 'N/A';
 
-            // Event erstellen, NACHDEM alle Werte berechnet wurden
             const trackLoadedEvent = new CustomEvent('track:loaded', {
                 detail: {
                     lat: AppState.lastLat,

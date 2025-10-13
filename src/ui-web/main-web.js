@@ -854,7 +854,7 @@ export async function updateUIWithNewWeatherData(newWeatherData, preservedIndex 
     };
 
     const lastValidIndex = findLastValidDataIndex(newWeatherData);
-    
+
     // Geänderte Logik für den Slider
     const maxForecastTime = Settings.getValue('maxForecastTime', 'Maximum');
     let maxSliderIndex = lastValidIndex;
@@ -1310,6 +1310,13 @@ function setupAppEventListeners() {
     document.addEventListener('track:loaded', async (event) => {
         const loadingElement = document.getElementById('loading');
         try {
+
+            if (!event || !event.detail) {
+                console.error('[main-web] "track:loaded" event fired without detail object.', event);
+                Utils.handleError('Received invalid track data. Please try again.');
+                return;
+            }
+
             const { lat, lng, timestamp, historicalDate, summary } = event.detail;
             console.log('[main-web] Event "track:loaded" empfangen, starte korrigierte Aktionen.');
 
@@ -1340,27 +1347,32 @@ function setupAppEventListeners() {
                     slider.max = AppState.weatherData.time.length - 1;
                     slider.disabled = slider.max <= 0;
 
-                    // Finde den Index im neuen Wetterdaten-Array, der am besten zum Track-Zeitstempel passt.
-                    const targetTimestamp = new Date(timestamp).getTime();
-                    let bestIndex = 0;
-                    let minDiff = Infinity;
-                    AppState.weatherData.time.forEach((time, idx) => {
-                        const diff = Math.abs(new Date(time).getTime() - targetTimestamp);
-                        if (diff < minDiff) {
-                            minDiff = diff;
-                            bestIndex = idx;
-                        }
-                    });
-                    // Setze den Slider genau auf diesen Zeitpunkt!
-                    slider.value = bestIndex;
+                    if (timestamp) { // <--- DIESE PRÜFUNG WURDE HINZUGEFÜGT
+                        const targetTimestamp = new Date(timestamp).getTime();
+                        let bestIndex = 0;
+                        let minDiff = Infinity;
+                        AppState.weatherData.time.forEach((time, idx) => {
+                            const diff = Math.abs(new Date(time).getTime() - targetTimestamp);
+                            if (diff < minDiff) {
+                                minDiff = diff;
+                                bestIndex = idx;
+                            }
+                        });
+                        // Setze den Slider genau auf diesen Zeitpunkt!
+                        slider.value = bestIndex;
+                    }
                 }
             }
 
             // Schritt 4: Alle UI-Elemente mit den neuen, zeitlich korrekten Daten aktualisieren.
             await displayManager.updateWeatherDisplay(getSliderValue(), 'weather-table-container', 'selectedTime');
             await displayManager.refreshMarkerPopup();
-            calculateMeanWind();
-            calculateJump();
+            if (AppState.lastAltitude !== 'N/A') {
+                calculateMeanWind();
+            }
+            if (Settings.state.userSettings.calculateJump) {
+                calculateJump();
+            }
             displayManager.updateLandingPatternDisplay();
 
             // Zeige die Track-Zusammenfassung an
@@ -1377,8 +1389,8 @@ function setupAppEventListeners() {
             }
 
         } catch (error) {
-            console.error('Fehler bei der Verarbeitung von track:loaded:', error);
-            Utils.handleError('Konnte Track-Daten nicht vollständig verarbeiten.');
+            console.error('Erroro processing track:loaded:', error);
+            Utils.handleError('Could not load track data completely.');
         } finally {
             if (loadingElement) {
                 loadingElement.style.display = 'none';
@@ -1451,7 +1463,7 @@ function setupAppEventListeners() {
                 }
             }
         }
-        
+
         // Neuberechnungen basierend auf der geänderten Einstellung anstoßen
         switch (name) {
             case 'heightUnit':
