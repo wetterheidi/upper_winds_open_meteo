@@ -186,7 +186,7 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
  * und rendert den Inhalt neu. Forciert das Öffnen des Popups.
  * @returns {Promise<void>}
  */
-export async function refreshMarkerPopup() {
+export async function refreshMarkerPopup(expanded = false, open = false) { // <--- PARAMETER HINZUGEFÜGT
     if (!AppState.currentMarker || AppState.lastLat === null) {
         return;
     }
@@ -194,56 +194,69 @@ export async function refreshMarkerPopup() {
     const lat = AppState.lastLat;
     const lng = AppState.lastLng;
     const altitude = AppState.lastAltitude;
-
-    // NEU: Die aktuell ausgewählte Höheneinheit abfragen
-    const heightUnit = getHeightUnit();
-    const coordFormat = getCoordinateFormat();
-
-    // NEU: Höhe und Einheit für die Anzeige vorbereiten
+    const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
     let displayAltitude = 'N/A';
-    let displayUnit = '';
+    let displayUnit = heightUnit;
+    let qfeText = 'N/A';
 
     if (altitude !== 'N/A') {
-        if (heightUnit === 'ft') {
-            displayAltitude = Math.round(Utils.convertHeight(altitude, 'ft'));
-            displayUnit = 'ft';
-        } else {
-            displayAltitude = altitude; // bleibt in Metern
-            displayUnit = 'm';
-        }
+        displayAltitude = Math.round(Utils.convertHeight(altitude, heightUnit));
     }
 
-    const sliderIndex = getSliderValue();
-
-    const coords = Utils.convertCoords(lat, lng, coordFormat);
-
-    const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
-    const formatDDM = (ddm) => `${ddm.deg}° ${ddm.min.toFixed(3)}' ${ddm.dir}`;
-
-    let popupContent;
-    if (coordFormat === 'MGRS') {
-        popupContent = `MGRS: ${coords.lat}<br>Alt: ${displayAltitude} ${displayUnit}`;
-    } else if (coordFormat === 'DMS') {
-        popupContent = `Lat: ${formatDMS(Utils.decimalToDms(lat, true))}<br>Lng: ${formatDMS(Utils.decimalToDms(lng, false))}<br>Alt: ${displayAltitude} ${displayUnit}`;
-    } else if (coordFormat === 'DDM') {
-        popupContent = `Lat: ${formatDDM(Utils.decimalToDecimalMinutes(lat, true))}<br>Lng: ${formatDDM(Utils.decimalToDecimalMinutes(lng, false))}<br>Alt: ${displayAltitude} ${displayUnit}`;
-    } else {
-        popupContent = `Lat: ${lat.toFixed(5)}<br>Lng: ${lng.toFixed(5)}<br>Alt: ${displayAltitude} ${displayUnit}`;
-    }
-
-
-    if (AppState.weatherData && AppState.weatherData.surface_pressure) {
+    if (altitude !== 'N/A' && AppState.weatherData && AppState.weatherData.surface_pressure) {
+        const sliderIndex = getSliderValue();
         const surfacePressure = AppState.weatherData.surface_pressure[sliderIndex];
-        if (surfacePressure) {
-            popupContent += ` QFE: ${surfacePressure.toFixed(0)} hPa`;
-        } else {
-            popupContent += ` QFE: N/A`;
+        const temperature = AppState.weatherData.temperature_2m?.[sliderIndex] || 15;
+        const qfe = Utils.calculateQFE(surfacePressure, altitude, altitude, temperature);
+        if (qfe !== 'N/A') {
+            qfeText = `${qfe} hPa`;
         }
-    } else {
-        popupContent += ` QFE: N/A`;
     }
 
-    mapManager.updatePopupContent(AppState.currentMarker, popupContent);
+    const altitudeContent = `<br>Alt: ${displayAltitude} ${displayUnit}<br>QFE: ${qfeText}`;
+    let popupContent = '';
+
+    if (expanded) {
+        const dms = Utils.decimalToDms(lat, true);
+        const ddm = Utils.decimalToDecimalMinutes(lat, true);
+        const dmsLng = Utils.decimalToDms(lng, false);
+        const ddmLng = Utils.decimalToDecimalMinutes(lng, false);
+
+        popupContent = `
+            <div style="font-size: 11px; line-height: 1.4;">
+                Decimal: ${lat.toFixed(5)}, ${lng.toFixed(5)}<br>
+                DDM: ${ddm.deg}° ${ddm.min.toFixed(3)}' ${ddm.dir}, ${ddmLng.deg}° ${ddmLng.min.toFixed(3)}' ${ddmLng.dir}<br>
+                DMS: ${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}, ${dmsLng.deg}°${dmsLng.min}'${dmsLng.sec.toFixed(0)}" ${dmsLng.dir}<br>
+                MGRS: ${Utils.decimalToMgrs(lat, lng)}
+            </div>
+            ${altitudeContent}<br>
+            <a href="#" class="toggle-coords-format" data-marker-type="dip" data-expanded="true" style="font-size: 11px;">Show less</a>
+        `;
+    } else {
+        const coordFormat = Settings.getValue('coordFormat', 'radio', 'Decimal');
+        const coords = Utils.convertCoords(lat, lng, coordFormat);
+        const formatDDM = (ddm) => `${ddm.deg}° ${ddm.min.toFixed(3)}' ${ddm.dir}`;
+        const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
+        let coordDisplay = '';
+
+        if (coordFormat === 'MGRS') {
+            coordDisplay = `MGRS: ${coords.lat}`;
+        } else if (coordFormat === 'DMS') {
+            coordDisplay = `Lat: ${formatDMS(coords.lat)}<br>Lng: ${formatDMS(coords.lng)}`;
+        } else if (coordFormat === 'DDM') {
+            coordDisplay = `Lat: ${formatDDM(coords.lat)}<br>Lng: ${formatDDM(coords.lng)}`;
+        } else {
+            coordDisplay = `Lat: ${coords.lat}<br>Lng: ${coords.lng}`;
+        }
+        
+        popupContent = `
+            ${coordDisplay}
+            ${altitudeContent}<br>
+            <a href="#" class="toggle-coords-format" data-marker-type="dip" data-expanded="false" style="font-size: 11px;">Show more</a>
+        `;
+    }
+
+    mapManager.updatePopupContent(AppState.currentMarker, popupContent, open); // <--- HIER WIRD 'open' VERWENDET
 }
 
 /**

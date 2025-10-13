@@ -1137,6 +1137,11 @@ input[type="checkbox"][style*="opacity: 0.5"] {
     line-height: 1.2;
 }
 
+.leaflet-popup-content b,
+.leaflet-popup-content strong {
+    font-weight: bold;
+}
+
 .leaflet-tooltip {
     background-color: var(--background-light);
     padding: 2px;

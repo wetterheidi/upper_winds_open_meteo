@@ -649,6 +649,11 @@ export async function createOrUpdateMarker(lat, lng) {
         console.log("MapManager: Kein Marker vorhanden, erstelle einen neuen.");
         const newMarker = createCustomMarker(lat, lng);
         attachMarkerDragend(newMarker);
+        newMarker.on('click', () => {
+            import('../ui-web/displayManager.js').then(displayManager => {
+                 displayManager.refreshMarkerPopup(false, true);
+            });
+        });
         AppState.currentMarker = newMarker;
         AppState.currentMarker.addTo(AppState.map);
     }
@@ -693,8 +698,17 @@ export function attachMarkerDragend(marker) {
 }
 export function updatePopupContent(marker, content, open = false) {
     if (!marker) return;
-    const wasOpen = marker.getPopup()?.isOpen() || open;
-    marker.unbindPopup().bindPopup(content);
+
+    const popup = marker.getPopup();
+    // 'wasOpen' prüft jetzt, ob das Popup schon offen war ODER ob 'open' explizit true ist.
+    const wasOpen = (popup && popup.isOpen()) || open;
+
+    if (popup) {
+        popup.setContent(content);
+    } else {
+        marker.bindPopup(content);
+    }
+
     if (wasOpen) {
         marker.openPopup();
     }
@@ -801,50 +815,73 @@ export function createHarpMarker(latitude, longitude) {
  * @param {number} lng - Die Länge.
  * @param {boolean} [open=false] - Ob das Popup sofort geöffnet werden soll.
  */
-export async function updateHarpMarkerPopup(marker, lat, lng, open = false) {
-    const coordFormat = Settings.getValue('coordFormat', 'radio', 'Decimal');
-    const coords = Utils.convertCoords(lat, lng, coordFormat);
-    let popupContent = `<b>HARP</b><br>`;
-
-    const formatDDM = (ddm) => `${ddm.deg}° ${ddm.min.toFixed(3)}' ${ddm.dir}`;
-    const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
-
-    if (coordFormat === 'MGRS') {
-        popupContent += `MGRS: ${Utils.decimalToMgrs(lat, lng)}`;
-    } else if (coordFormat === 'DMS') {
-        popupContent += `Lat: ${formatDMS(Utils.decimalToDms(lat, true))}<br>Lng: ${formatDMS(Utils.decimalToDms(lng, false))}`;
-    } else if (coordFormat === 'DDM') {
-        popupContent += `Lat: ${formatDDM(Utils.decimalToDecimalMinutes(lat, true))}<br>Lng: ${formatDDM(Utils.decimalToDecimalMinutes(lng, false))}`;
-    } else {
-        popupContent += `Lat: ${lat.toFixed(5)}<br>Lng: ${lng.toFixed(5)}`;
-    }
-
-    // Altitude abrufen
+export async function updateHarpMarkerPopup(marker, lat, lng, open = false, expanded = false) {
+    // --- Schritt 1: Alle Daten sammeln (wie in deiner alten Version) ---
     const altitude = await Utils.getAltitude(lat, lng);
     const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
     let displayAltitude = 'N/A';
+    let displayUnit = heightUnit;
     if (altitude !== 'N/A') {
         displayAltitude = Math.round(Utils.convertHeight(altitude, heightUnit));
-        popupContent += `<br>Alt: ${displayAltitude} ${heightUnit}`;
-    } else {
-        popupContent += `<br>Alt: N/A`;
     }
 
-    // QFE berechnen
+    let qfeText = 'N/A';
     if (altitude !== 'N/A' && AppState.weatherData && AppState.weatherData.surface_pressure) {
         const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
         const surfacePressure = AppState.weatherData.surface_pressure[sliderIndex];
         const temperature = AppState.weatherData.temperature_2m?.[sliderIndex] || 15;
         const qfe = Utils.calculateQFE(surfacePressure, altitude, altitude, temperature);
         if (qfe !== 'N/A') {
-            popupContent += `<br>QFE: ${qfe} hPa`;
-        } else {
-            popupContent += `<br>QFE: N/A`;
+            qfeText = `${qfe} hPa`;
         }
+    }
+    
+    // Ein wiederverwendbarer Block für Höhe und QFE
+    const altitudeContent = `<br>Alt: ${displayAltitude} ${displayUnit}<br>QFE: ${qfeText}`;
+
+    // --- Schritt 2: Den Popup-Inhalt basierend auf dem 'expanded'-Status erstellen ---
+    let popupContent = `<b>HARP</b><br>`;
+
+    if (expanded) {
+        // Erweiterte Ansicht mit allen Formaten
+        const dms = Utils.decimalToDms(lat, true);
+        const ddm = Utils.decimalToDecimalMinutes(lat, true);
+        const dmsLng = Utils.decimalToDms(lng, false);
+        const ddmLng = Utils.decimalToDecimalMinutes(lng, false);
+
+        popupContent += `
+            <div style="font-size: 11px; line-height: 1.4;">
+                Decimal: ${lat.toFixed(5)}, ${lng.toFixed(5)}<br>
+                DDM: ${ddm.deg}° ${ddm.min.toFixed(3)}' ${ddm.dir}, ${ddmLng.deg}° ${ddmLng.min.toFixed(3)}' ${ddmLng.dir}<br>
+                DMS: ${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}, ${dmsLng.deg}°${dmsLng.min}'${dmsLng.sec.toFixed(0)}" ${dmsLng.dir}<br>
+                MGRS: ${Utils.decimalToMgrs(lat, lng)}
+            </div>
+            ${altitudeContent}<br>
+            <a href="#" class="toggle-coords-format" data-marker-type="harp" data-lat="${lat}" data-lng="${lng}" data-expanded="true" style="font-size: 11px;">Show less</a>
+        `;
     } else {
-        popupContent += `<br>QFE: N/A`;
+        // Standardansicht mit dem vom Benutzer ausgewählten Format
+        const coordFormat = Settings.getValue('coordFormat', 'radio', 'Decimal');
+        const coords = Utils.convertCoords(lat, lng, coordFormat);
+        const formatDDM = (ddm) => `${ddm.deg}° ${ddm.min.toFixed(3)}' ${ddm.dir}`;
+        const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
+
+        if (coordFormat === 'MGRS') {
+            popupContent += `MGRS: ${coords.lat}`;
+        } else if (coordFormat === 'DMS') {
+            popupContent += `Lat: ${formatDMS(coords.lat)}<br>Lng: ${formatDMS(coords.lng)}`;
+        } else if (coordFormat === 'DDM') {
+            popupContent += `Lat: ${formatDDM(coords.lat)}<br>Lng: ${formatDDM(coords.lng)}`;
+        } else {
+            popupContent += `Lat: ${coords.lat}<br>Lng: ${coords.lng}`;
+        }
+        
+        popupContent += `${altitudeContent}<br>
+            <a href="#" class="toggle-coords-format" data-marker-type="harp" data-lat="${lat}" data-lng="${lng}" data-expanded="false" style="font-size: 11px;">Show more</a>
+        `;
     }
 
+    // --- Schritt 3: Das Popup aktualisieren ---
     updatePopupContent(marker, popupContent, open);
 }
 /**

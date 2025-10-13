@@ -352,6 +352,38 @@ function setupInfoIcons() {
         }
     });
 }
+/**
+ * Richtet den Event-Listener für die "Alle Formate anzeigen" / "Weniger anzeigen" Links
+ * in den DIP- und HARP-Popups ein.
+ * @private
+ */
+function setupPopupFormatToggle() {
+    if (!AppState.map) {
+        console.warn('Map not initialized, skipping setup for popup format toggle.');
+        return;
+    }
+
+    AppState.map.getContainer().addEventListener('click', (e) => {
+        // Prüfen, ob auf einen unserer Links geklickt wurde
+        if (e.target.classList.contains('toggle-coords-format')) {
+            e.preventDefault(); // Verhindert, dass der Link die Seite neu lädt
+            const target = e.target;
+            const markerType = target.dataset.markerType;
+            const isCurrentlyExpanded = target.dataset.expanded === 'true';
+
+            if (markerType === 'dip') {
+                // Ruft die Funktion auf, die das DIP-Popup neu rendert, mit dem umgekehrten Status
+                displayManager.refreshMarkerPopup(!isCurrentlyExpanded, true); // Erzwingt das Öffnen
+            } else if (markerType === 'harp' && AppState.harpMarker) {
+                // Liest die im Link gespeicherten Koordinaten
+                const lat = parseFloat(target.dataset.lat);
+                const lng = parseFloat(target.dataset.lng);
+                // Ruft die Funktion auf, die das HARP-Popup neu rendert, mit dem umgekehrten Status
+                mapManager.updateHarpMarkerPopup(AppState.harpMarker, lat, lng, true, !isCurrentlyExpanded);
+            }
+        }
+    });
+}
 
 // --- Planner- & Berechnungs-spezifische Events ---
 function setupJumpRunTrackEvents() {
@@ -1258,11 +1290,11 @@ function setupAdsbEvents() {
         mapManager.clearAircraftTrack();
         const marker = mapManager.createAircraftMarker(aircraft.lat, aircraft.lon, aircraft.track);
         marker.bindTooltip("", { permanent: true, direction: 'top', offset: [0, -15], className: 'adsb-tooltip' });
-        
+
         if (AppState.map && AppState.map.attributionControl) {
             AppState.map.attributionControl.addAttribution(attribution);
         }
-        
+
         // Tooltip sofort aktualisieren
         document.dispatchEvent(new CustomEvent('adsb:aircraftUpdated', { detail: { aircraft } }));
     });
@@ -1271,7 +1303,7 @@ function setupAdsbEvents() {
         const { aircraft } = e.detail;
         if (AppState.aircraftMarker && aircraft.lat && aircraft.lon) {
             AppState.aircraftMarker.setLatLng([aircraft.lat, aircraft.lon]);
-            if(aircraft.track) {
+            if (aircraft.track) {
                 AppState.aircraftMarker.setRotationAngle(aircraft.track);
             }
             updateAircraftTooltip(aircraft);
@@ -1434,6 +1466,7 @@ export function initializeEventListeners() {
     setupCoordinateEvents();
     setupModelInfoButtonEvents();
     setupInfoIcons();
+    setupPopupFormatToggle();
 
     // 3. Einstellungen & Features
     setupCheckboxEvents();
