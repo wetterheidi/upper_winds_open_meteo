@@ -3,6 +3,11 @@
   "appName": "Wetterheidi",
   "webDir": "dist/mobile",
   "loggingBehavior": "debug",
+  "assets": {
+    "splash": {
+      "src": "assets/splash.png"
+    }
+  },
   "plugins": {
     "SplashScreen": {
       "launchShowDuration": 3000,
