@@ -12,7 +12,13 @@
     --label-width: 135px;
     --input-width: 70px;
     --grid-columns: var(--label-width) var(--input-width) var(--label-width) var(--input-width) minmax(0, 1fr);
-}
+
+    /* Wind Spider Colors */
+    --wind-low: blue;
+    --wind-moderate: green;
+    --wind-high: orange;
+    --wind-very-high: red;
+    --wind-extreme: purple;}
 
 html {
     height: 100%;
