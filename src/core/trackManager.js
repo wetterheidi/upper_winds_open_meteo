@@ -18,9 +18,10 @@ import { getCapacitor } from './capacitor-adapter.js';
 // ===================================================================
 
 /**
- * Lädt und verarbeitet eine KML-Datei. Nutzt die togeojson-Bibliothek zur Konvertierung.
+ * Lädt und verarbeitet eine KML-Datei. Stellt einzelne Tracks oder mehrere Polygone dar
+ * und übernimmt dabei die in der KML definierten Stil-Informationen.
  * @param {File} file - Das vom Benutzer ausgewählte KML-Datei-Objekt.
- * @returns {Promise<object|null>} Ein Promise, das zu den Metadaten des Tracks auflöst.
+ * @returns {Promise<object|null>} Ein Promise, das zu einem Erfolgsstatus auflöst.
  */
 export async function loadKmlTrack(file) {
     if (!AppState.map) {
@@ -33,48 +34,53 @@ export async function loadKmlTrack(file) {
         const kmlData = await readFileContent(file);
         const parser = new DOMParser();
         const xml = parser.parseFromString(kmlData, 'text/xml');
-
-        // togeojson umwandeln
         const geojson = toGeoJSON.kml(xml);
 
-        const points = [];
-        // Durch alle Features im GeoJSON iterieren
-        L.geoJSON(geojson, {
+        if (AppState.gpxLayer && AppState.map.hasLayer(AppState.gpxLayer)) {
+            AppState.map.removeLayer(AppState.gpxLayer);
+        }
+
+        // --- START DER KORREKTUR ---
+        const kmlLayer = L.geoJSON(geojson, {
+            // Die "style"-Funktion wird für jedes Feature (Polygon, Linie) aufgerufen
+            style: function (feature) {
+                // togeojson wandelt KML-Styles in diese Properties um.
+                // Wir erstellen ein leeres Stil-Objekt und füllen es.
+                const style = {};
+                if (feature.properties.stroke) {
+                    style.color = feature.properties.stroke;
+                }
+                if (feature.properties['stroke-width']) {
+                    style.weight = feature.properties['stroke-width'];
+                }
+                if (feature.properties['stroke-opacity']) {
+                    style.opacity = feature.properties['stroke-opacity'];
+                }
+                if (feature.properties.fill) {
+                    style.fillColor = feature.properties.fill;
+                }
+                if (feature.properties['fill-opacity']) {
+                    style.fillOpacity = feature.properties['fill-opacity'];
+                }
+                return style;
+            },
             onEachFeature: function (feature, layer) {
-                // Prüfen, ob Zeitstempel für den gesamten Track vorhanden sind
-                const times = feature.properties.coordTimes || feature.properties.times;
-
-                if (feature.geometry && feature.geometry.type === 'LineString') {
-                    feature.geometry.coordinates.forEach((coord, index) => {
-                        const [lng, lat, ele] = coord;
-                        let time = null;
-
-                        // Zeitstempel zuordnen, falls vorhanden
-                        if (times && times[index]) {
-                            const timeStr = times[index];
-                            let normalizedTime = null;
-                            if (timeStr) {
-                                if (timeStr.includes('.')) {
-                                    normalizedTime = timeStr.split('.')[0] + 'Z';
-                                } else {
-                                    normalizedTime = timeStr;
-                                }
-                            }
-                            time = normalizedTime ? DateTime.fromISO(normalizedTime, { zone: 'utc' }) : null;
-                        }
-
-                        points.push({ lat, lng, ele: ele || null, time: time });
-                    });
+                if (feature.properties && feature.properties.name) {
+                    layer.bindTooltip(feature.properties.name);
                 }
             }
         });
+        // --- ENDE DER KORREKTUR ---
 
-        if (points.length < 2) {
-            throw new Error('KML file contains no valid track with at least two points.');
+        if (kmlLayer.getLayers().length === 0) {
+            throw new Error('KML file contains no valid geometries to display.');
         }
 
-        const trackMetaData = await renderTrack(points, file.name, null);
-        return trackMetaData;
+        AppState.gpxLayer = kmlLayer;
+        AppState.gpxLayer.addTo(AppState.map);
+        AppState.map.fitBounds(kmlLayer.getBounds());
+        
+        return { success: true, finalPointData: null };
 
     } catch (error) {
         console.error('[trackManager] Error in loadKmlTrack:', error);
