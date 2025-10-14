@@ -602,11 +602,11 @@ async function downloadSurfaceDataAsAscii() {
         return;
     }
 
-    // NEU: temperature_2m aus den Wetterdaten extrahieren
+    // Datenvorbereitung (unverändert)
     const { time, wind_direction_10m, wind_speed_10m, wind_gusts_10m, visibility, weather_code, temperature_2m } = AppState.weatherData;
     const windUnit = getWindSpeedUnit();
-    const tempUnit = getTemperatureUnit(); // Temperatureinheit abrufen
-    const timeZone = Settings.getValue('timeZone', 'radio', 'Z'); // Holt die aktuelle Zeitzonen-Einstellung
+    const tempUnit = getTemperatureUnit();
+    const timeZone = Settings.getValue('timeZone', 'radio', 'Z');
     const model = document.getElementById('modelSelect').value.toUpperCase();
     const timeForFilename = Utils.formatTime(time[0]).replace(' ', '_');
     const filename = `${timeForFilename}_${model}_Surface.txt`;
@@ -616,11 +616,9 @@ async function downloadSurfaceDataAsAscii() {
 
     for (let i = 0; i < time.length; i++) {
         const displayTime = await Utils.getDisplayTime(time[i], AppState.lastLat, AppState.lastLng, timeZone);
-
-        // NEU: Trennt Datum und Zeit korrekt, behält die Zeitzonen-Abkürzung bei
         const timeParts = displayTime.split(' ');
         const date = timeParts[0];
-        const timeStr = timeParts.length > 1 ? timeParts[1] : ''; // z.B. "1200CEST" oder "1000Z"
+        const timeStr = timeParts.length > 1 ? timeParts[1] : '';
 
         const speed = Utils.convertWind(wind_speed_10m[i], windUnit, 'km/h');
         const gust = Utils.convertWind(wind_gusts_10m[i], windUnit, 'km/h');
@@ -634,20 +632,37 @@ async function downloadSurfaceDataAsAscii() {
         const visibilityStr = visibility?.[i] ?? 'N/A';
         const weatherStr = Utils.translateWmoCodeToTaf(weather_code?.[i]);
 
-        // NEU: formatierte Temperatur zur Zeile hinzufügen
         content += `${date}\t${timeStr}\t${wind_direction_10m[i]}\t${windString}\t${visibilityStr}\t${weatherStr}\t${formattedTemp}\n`;
     }
 
-    // Die Logik zum Speichern der Datei bleibt unverändert
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    // --- KORRIGIERTE SPEICHERLOGIK ---
+    try {
+        const { Filesystem, isNative, Directory } = await getCapacitor();
+        if (isNative && Filesystem) {
+            // Native mobile App: Verwende die Filesystem API
+            await Filesystem.writeFile({
+                path: filename,
+                data: content,
+                directory: Directory.Documents, // Speichert im "Dokumente"-Ordner
+                encoding: 'utf8'
+            });
+            Utils.handleMessage(`File saved: ${filename}`);
+        } else {
+            // Fallback für Webbrowser
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }
+    } catch (error) {
+        console.error("Error saving surface data file:", error);
+        Utils.handleError("Could not save file.");
+    }
 }
 
 /**
