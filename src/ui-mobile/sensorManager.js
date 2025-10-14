@@ -282,7 +282,9 @@ const handleDeviceMotionEvent = (event) => {
  * @private
  */
 function updateDescentRate(event) {
-    if (event.detail && typeof event.detail.descentRateMps === 'number') {
-        lastDescentRate = event.detail.descentRateMps;
+    if (event.detail && typeof event.detail.rateOfClimbMps === 'number') {
+        const { rateOfClimbMps } = event.detail;
+        // Convert negative climb rate into a positive descent rate; reset to 0 otherwise
+        lastDescentRate = rateOfClimbMps < 0 ? -rateOfClimbMps : 0;
     }
 }
