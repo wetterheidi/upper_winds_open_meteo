@@ -1126,10 +1126,10 @@ input[type="checkbox"][style*="opacity: 1"] {
     top: calc(10px + env(safe-area-inset-top));
 }
 
+/*
 .leaflet-control-container .leaflet-bottom {
-    /* Fügt den unteren Sicherheitsabstand hinzu */
     bottom: calc(10px + env(safe-area-inset-bottom));
-}
+}*/
 
 .leaflet-control-coordinates,
 .leaflet-control-scale-line,
