@@ -207,7 +207,7 @@ export function calculateJump() {
         return;
     }
 
-    if (!AppState.weatherData || !AppState.lastLat || !AppState.lastLng) {
+    if (!AppState.weatherData || AppState.lastLat == null || AppState.lastLng == null) {
         mapManager.drawJumpVisualization(null);
         return;
     }
@@ -313,7 +313,7 @@ export function calculateJump() {
     mapManager.drawCutAwayVisualization(cutawayDrawData);
 }
 export function calculateJumpRunTrack() {
-    if (!Settings.state.userSettings.showJumpRunTrack || !Settings.state.userSettings.calculateJump || !AppState.weatherData || !AppState.lastLat || !AppState.lastLng) {
+    if (!Settings.state.userSettings.showJumpRunTrack || !Settings.state.userSettings.calculateJump || !AppState.weatherData || AppState.lastLat == null || AppState.lastLng == null) {
         console.log('Skipping calculateJumpRunTrack: conditions not met');
         return null;
     }
@@ -670,7 +670,7 @@ async function downloadSurfaceDataAsAscii() {
  * und öffnet diesen in einem neuen Tab.
  */
 async function exportComprehensiveReportAsHtml() {
-    if (!AppState.weatherData || !AppState.lastLat || !AppState.lastLng) {
+    if (!AppState.weatherData || AppState.lastLat == null || AppState.lastLng == null) {
         Utils.handleError("No weather data available for the report.");
         return;
     }
@@ -1514,17 +1514,17 @@ function setupAppEventListeners() {
                 }
             }
             console.log("Performing specific updates after track load...");
-        // Schritt 4: Alle UI-Elemente mit den neuen, zeitlich korrekten Daten aktualisieren.
-        await displayManager.updateWeatherDisplay(getSliderValue(), 'weather-table-container', 'selectedTime');
-        await displayManager.refreshMarkerPopup();
-        if (AppState.lastAltitude !== 'N/A') {
-            calculateMeanWind();
-            if(Settings.state.userSettings.calculateJump) {
-                calculateJump();
+            // Schritt 4: Alle UI-Elemente mit den neuen, zeitlich korrekten Daten aktualisieren.
+            await displayManager.updateWeatherDisplay(getSliderValue(), 'weather-table-container', 'selectedTime');
+            await displayManager.refreshMarkerPopup();
+            if (AppState.lastAltitude !== 'N/A') {
+                calculateMeanWind();
+                if (Settings.state.userSettings.calculateJump) {
+                    calculateJump();
+                }
+                displayManager.updateLandingPatternDisplay();
             }
-            displayManager.updateLandingPatternDisplay();
-        }
-//            updateJumpMasterLineAndPanel();
+            //            updateJumpMasterLineAndPanel();
 
             const infoEl = document.getElementById('info');
             if (infoEl && summary) {

@@ -192,7 +192,7 @@ export function calculateJump() {
         return;
     }
 
-    if (!AppState.weatherData || !AppState.lastLat || !AppState.lastLng) {
+    if (!AppState.weatherData || AppState.lastLat == null || AppState.lastLng == null) {
         mapManager.drawJumpVisualization(null);
         return;
     }
@@ -298,7 +298,7 @@ export function calculateJump() {
     mapManager.drawCutAwayVisualization(cutawayDrawData);
 }
 export function calculateJumpRunTrack() {
-    if (!Settings.state.userSettings.showJumpRunTrack || !Settings.state.userSettings.calculateJump || !AppState.weatherData || !AppState.lastLat || !AppState.lastLng) {
+    if (!Settings.state.userSettings.showJumpRunTrack || !Settings.state.userSettings.calculateJump || !AppState.weatherData || AppState.lastLat == null || AppState.lastLng == null) {
         console.log('Skipping calculateJumpRunTrack: conditions not met');
         return null;
     }
@@ -633,7 +633,7 @@ async function downloadSurfaceDataAsAscii() {
  * und öffnet diesen in einem neuen Tab.
  */
 async function exportComprehensiveReportAsHtml() {
-    if (!AppState.weatherData || !AppState.lastLat || !AppState.lastLng) {
+    if (!AppState.weatherData || AppState.lastLat == null || AppState.lastLng == null) {
         Utils.handleError("No weather data available for the report.");
         return;
     }

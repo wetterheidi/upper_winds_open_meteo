@@ -139,7 +139,7 @@ export function calculateExitCircle(interpolatedData) {
         lastAltitude: AppState.lastAltitude,
         interpolatedData: !!interpolatedData && interpolatedData.length > 0
     });
-    if (!Settings.state.userSettings.showExitArea || !Settings.state.userSettings.calculateJump || !AppState.weatherData || !AppState.lastLat || !AppState.lastLng) {
+    if (!Settings.state.userSettings.showExitArea || !Settings.state.userSettings.calculateJump || !AppState.weatherData || AppState.lastLat==null || AppState.lastLng==null) {
         console.log('Debug calculateExitCircle: Frühe Rückgabe wegen Einstellungen');
         return null;
     }
@@ -237,7 +237,7 @@ export function calculateExitCircle(interpolatedData) {
  * @returns {object|null} Ein Objekt mit allen notwendigen Daten für die Visualisierung der Schirmfahrtbereiche oder null.
  */
 export function calculateCanopyCircles(interpolatedData) {
-    if (!Settings.state.userSettings.showCanopyArea || !Settings.state.userSettings.calculateJump || !AppState.weatherData || !AppState.lastLat || !AppState.lastLng) return null;
+    if (!Settings.state.userSettings.showCanopyArea || !Settings.state.userSettings.calculateJump || !AppState.weatherData || AppState.lastLat==null || AppState.lastLng==null) return null;
     if (!interpolatedData || interpolatedData.length === 0) return null;
 
     const exitAltitude = parseInt(document.getElementById('exitAltitude')?.value) || 3000;

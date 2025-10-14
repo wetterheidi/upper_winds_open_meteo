@@ -354,7 +354,7 @@ function calculateCanopyCirclesForEnsemble(profileIdentifier, specificProfileDat
         return null;
     }
 
-    if (!weatherDataForProfile.hourly || !AppState.lastLat || !AppState.lastLng) {
+    if (!weatherDataForProfile.hourly || AppState.lastLat == null || AppState.lastLng == null) {
         console.warn(`Unvollständige Daten für calculateCanopyCirclesForEnsemble: ${profileIdentifier}`);
         return null;
     }
@@ -439,7 +439,7 @@ function calculateExitCircleForEnsemble(profileIdentifier, sliderIndex, specific
         return null;
     }
 
-    if (!weatherDataForProfile.hourly || !AppState.lastLat || !AppState.lastLng || AppState.lastAltitude === 'N/A') {
+    if (!weatherDataForProfile.hourly || AppState.lastLat == null || AppState.lastLng == null || AppState.lastAltitude === 'N/A') {
         console.warn(`Incomplete data for calculateExitCircleForEnsemble: ${profileIdentifier}`);
         return null;
     }

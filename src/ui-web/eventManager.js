@@ -535,7 +535,7 @@ function setupTerrainAnalysisEvents() {
     const analyzeTerrainBtn = document.getElementById('analyzeTerrainButton');
     if (analyzeTerrainBtn) {
         analyzeTerrainBtn.addEventListener('click', async () => {
-            if (!AppState.weatherData || !AppState.lastLat || !AppState.lastLng) {
+            if (!AppState.weatherData || AppState.lastLat==null || AppState.lastLng==null) {
                 Utils.handleError("Please select a location and fetch weather data first.");
                 return;
             }

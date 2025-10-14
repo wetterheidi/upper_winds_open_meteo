@@ -320,7 +320,7 @@ export async function exportToGpx(sliderIndex, interpStep, heightUnit) {
         return;
     }
 
-    if (!AppState.weatherData || !AppState.lastLat || !AppState.lastLng || AppState.lastAltitude === 'N/A') {
+    if (!AppState.weatherData || AppState.lastLat == null || AppState.lastLng == null || AppState.lastAltitude === 'N/A') {
         Utils.handleError("Wetterdaten oder DIP-Position nicht verfügbar. GPX-Export nicht möglich.");
         return;
     }
@@ -434,7 +434,7 @@ export async function exportLandingPatternToGpx() {
         return;
     }
 
-    if (!AppState.weatherData || !AppState.lastLat || !AppState.lastLng || AppState.lastAltitude === 'N/A') {
+    if (!AppState.weatherData || AppState.lastLat == null || AppState.lastLng == null || AppState.lastAltitude === 'N/A') {
         Utils.handleError("Wetterdaten oder DIP-Position für GPX-Export nicht verfügbar.");
         return;
     }
