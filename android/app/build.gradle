@@ -10,7 +10,7 @@ android {
         applicationId "com.wetterheidi.dzmaster"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 24
+        versionCode 27
         versionName "1.0.2"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
@@ -21,7 +21,7 @@ android {
     }
     signingConfigs {
         release {
-            storeFile file(keystoreProperties.storeFile)
+            storeFile rootProject.file(keystoreProperties.storeFile)
             storePassword keystoreProperties.storePassword
             keyAlias keystoreProperties.keyAlias
             keyPassword keystoreProperties.keyPassword
@@ -31,6 +31,14 @@ android {
         debug {
             applicationIdSuffix ".debug"
             debuggable true
+            packagingOptions {
+                jniLibs {
+                    useLegacyPackaging true
+                }
+                resources {
+                    excludes.add("META-INF/androidx.baselineprofile.xml")
+                }
+            }
         }
         release {
          // Enables code-related app optimization.
