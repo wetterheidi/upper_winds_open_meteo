@@ -247,7 +247,7 @@ export async function refreshMarkerPopup(expanded = false, open = false) { // <-
         } else {
             coordDisplay = `Lat: ${coords.lat}<br>Lng: ${coords.lng}`;
         }
-        
+
         popupContent = `
             ${coordDisplay}
             ${altitudeContent}<br>
@@ -295,7 +295,11 @@ export async function updateSliderLabels() {
 
     const timeZoneSetting = Settings.getValue('timeZone', 'radio', 'Z');
     let locationTimezone = 'utc';
-    if (timeZoneSetting === 'loc' && AppState.lastLat) {
+    if (
+        timeZoneSetting === 'loc' &&
+        Number.isFinite(AppState.lastLat) &&
+        Number.isFinite(AppState.lastLng)
+    ) {
         const locData = await Utils.getLocationData(AppState.lastLat, AppState.lastLng);
         locationTimezone = locData.timezone || 'utc';
     }
