@@ -25,7 +25,7 @@ import { ENSEMBLE_VISUALIZATION, API_URLS } from './constants.js';
  */
 export async function fetchEnsembleWeatherData() {
     // Vorbedingung: Eine Position muss ausgewählt sein.
-    if (!AppState.lastLat || !AppState.lastLng) {
+    if (AppState.lastLat == null || AppState.lastLng == null) {
         Utils.handleMessage("Please select a location first.");
         return false;
     }

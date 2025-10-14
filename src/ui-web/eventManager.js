@@ -1335,7 +1335,10 @@ function setupAdsbEvents() {
             : `${altitudeFt} ft`;
         const speedKt = aircraftData.velocity;
         const speed = Utils.convertWind(speedKt, speedUnit, 'kt');
-        const speedText = `${(speedUnit === 'bft' ? Math.round(speed) : speed.toFixed(0))} ${speedUnit}`;
+        const hasNumericSpeed = Number.isFinite(speed);
+        const speedText = hasNumericSpeed
+            ? `${speedUnit === 'bft' ? Math.round(speed) : speed.toFixed(0)} ${speedUnit}`
+            : 'N/A';
         let verticalRateText = "Level";
         if (aircraftData.vertical_rate) {
             const rateFPM = aircraftData.vertical_rate;

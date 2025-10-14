@@ -51,7 +51,7 @@ export function jumpRunTrack(interpolatedData, harpAnchor = null) {
     const anchorLat = harpAnchor ? harpAnchor.lat : AppState.lastLat;
     const anchorLng = harpAnchor ? harpAnchor.lng : AppState.lastLng;
 
-    if (!AppState.weatherData || !anchorLat || !anchorLng || AppState.lastAltitude === 'N/A' || !interpolatedData || !interpolatedData.length) {
+    if (!AppState.weatherData || anchorLat == null || anchorLng == null || AppState.lastAltitude === 'N/A' || !interpolatedData || !interpolatedData.length) {
         return null;
     }
 

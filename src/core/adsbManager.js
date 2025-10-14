@@ -30,7 +30,7 @@ export async function findAndSelectJumpShip() {
         return;
     }
 
-    if (!AppState.lastLat || !AppState.lastLng) {
+    if (AppState.lastLat == null || AppState.lastLng == null) {
         Utils.handleError("Bitte zuerst einen Punkt (DIP) auf der Karte auswählen.");
         return;
     }

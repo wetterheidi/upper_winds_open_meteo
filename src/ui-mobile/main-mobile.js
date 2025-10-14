@@ -436,7 +436,7 @@ export function calculateMeanWind() {
  * aktiv ist. Stößt danach alle notwendigen UI-Updates und Neuberechnungen an.
  */
 export async function updateToCurrentHour() {
-    if (!AppState.lastLat || !AppState.lastLng) {
+    if (AppState.lastLat == null || AppState.lastLng == null) {
         console.warn('No location selected, cannot update weather data');
         Utils.handleError('Please select a location to enable autoupdate.');
         stopAutoupdate();
