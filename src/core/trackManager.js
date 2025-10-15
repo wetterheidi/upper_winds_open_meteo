@@ -101,7 +101,6 @@ export async function loadGpxTrack(file) {
     AppState.isLoadingGpx = true;
 
     try {
-        // **ÄNDERUNG**: Nutze die neue Hilfsfunktion
         const gpxData = await readFileContent(file);
 
         const parser = new DOMParser();
@@ -130,17 +129,12 @@ export async function loadGpxTrack(file) {
             if (isNaN(lat) || isNaN(lng)) continue;
             const ele = trackpoints[i].getElementsByTagName('ele')[0]?.textContent;
             const time = trackpoints[i].getElementsByTagName('time')[0]?.textContent;
-            //console.log(`[trackManager] GPX Point ${i}: lat=${lat}, lng=${lng}, ele=${ele}, time=${time}`);
             let normalizedTime = null;
             if (time) {
-
-                // Nur wenn Millisekunden vorhanden sind, schneide sie ab.
                 if (time.includes('.')) {
                     normalizedTime = time.split('.')[0] + 'Z';
-                    //console.log(`[trackManager] Normalized Time changed: ${normalizedTime}`);
                 } else {
-                    normalizedTime = time; // Ansonsten den String unverändert lassen
-                    //console.log(`[trackManager] Normalized Time unchanged: ${normalizedTime}`);
+                    normalizedTime = time;
                 }
             }
             points.push({
@@ -152,8 +146,10 @@ export async function loadGpxTrack(file) {
         }
         if (points.length < 2) throw new Error('GPX track has insufficient points.');
 
-        const trackMetaData = await renderTrack(points, file.name);
+        // --- KORREKTUR: Der gefundene dipWaypoint wird hier übergeben ---
+        const trackMetaData = await renderTrack(points, file.name, dipWaypoint);
         return trackMetaData;
+
     } catch (error) {
         console.error('[trackManager] Error in loadGpxTrack:', error);
         Utils.handleError('Error parsing GPX file: ' + error.message);
@@ -173,7 +169,6 @@ export async function loadCsvTrackUTC(file) {
     AppState.isLoadingGpx = true;
 
     try {
-        // **ÄNDERUNG**: Nutze die neue Hilfsfunktion
         const csvData = await readFileContent(file);
 
         return new Promise(async (resolve, reject) => {
@@ -198,7 +193,6 @@ export async function loadCsvTrackUTC(file) {
                         }
                         let time = null;
                         try {
-                            // Verwenden Sie hier die normalisierte Zeit
                             time = DateTime.fromISO(normalizedTimeStr, { setZone: true }).toUTC();
                             if (!time.isValid) time = null;
                         } catch (parseError) {
@@ -212,6 +206,7 @@ export async function loadCsvTrackUTC(file) {
                         reject(new Error('CSV track has insufficient points.'));
                         return;
                     }
+                    // --- KORREKTUR: Explizit 'null' für den DIP übergeben, da CSVs keinen DIP unterstützen ---
                     const trackMetaData = await renderTrack(points, file.name, null);
                     resolve(trackMetaData);
                 },
