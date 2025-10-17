@@ -226,12 +226,11 @@ export async function stopPositionTracking() {
     AppState.lastDeviceAltitude = null;
     AppState.lastAltitudeAccuracy = null;
     AppState.lastAccuracy = null;
+    AppState.altitudeCorrectionPerformed = false; // <-- ZURÜCKSETZEN: Flag für die nächste Sitzung vorbereiten.
 
-    // --- START: DIE ENTSCHEIDENDE KORREKTUR ---
     // Setzt die Flags zurück, die den Neustart blockiert haben.
     isTrackingInitializing = false;
     trackingInitPromise = null;
-    // --- ENDE: DIE ENTSCHEIDENDE KORREKTUR ---
     
     document.dispatchEvent(new CustomEvent('tracking:stopped'));
 }
@@ -262,18 +261,18 @@ const debouncedPositionUpdate = Utils.debounce(async (position) => {
 
     const { latitude, longitude, accuracy, altitude: deviceAltitude, altitudeAccuracy } = position.coords;
 
-    // Offset-Berechnung nur beim allerersten validen Punkt einer Aufzeichnung
-    if (AppState.recordedTrackPoints.length === 0 && AppState.altitudeCorrectionOffset === 0 && deviceAltitude !== null && AppState.lastAltitude !== 'N/A') {
+    // Offset-Berechnung wird jetzt nur noch EINMAL pro Sitzung ausgeführt.
+    if (!AppState.altitudeCorrectionPerformed && deviceAltitude !== null && AppState.lastAltitude !== 'N/A') {
+        // Flag sofort setzen, um wiederholte Ausführung zu blockieren.
+        AppState.altitudeCorrectionPerformed = true; 
+
         const heightDifference = Math.abs(deviceAltitude - AppState.lastAltitude);
 
-        // Plausibilitätscheck: Ist der Unterschied < 150m?
-        // Das deutet auf einen Start am Boden hin.
         if (heightDifference < 150) {
             AppState.altitudeCorrectionOffset = deviceAltitude - AppState.lastAltitude;
             console.log(`Bodenstart erkannt. Korrektur-Offset berechnet: ${AppState.altitudeCorrectionOffset.toFixed(2)}m`);
         } else {
-            // Start in der Luft erkannt. Keine Korrektur anwenden.
-            AppState.altitudeCorrectionOffset = 0; // Explizit auf 0 setzen
+            AppState.altitudeCorrectionOffset = 0;
             console.warn(`Start in der Luft erkannt (Höhendifferenz: ${heightDifference.toFixed(0)}m). Es wird keine Höhenkorrektur angewendet.`);
             Utils.handleMessage("Airborne start: Altitudes are uncorrected (Ellipsoid).");
         }

@@ -70,6 +70,7 @@ export const AppState = {
     adsbTrackPoints: [],               // @type {Array[]} - NEU: Die gesammelten Koordinaten des Pfades.
     isArmed: false,                    // @type {boolean} - True, wenn die automatische Sprungerkennung "scharf" ist.
     isAutoRecording: false,            // @type {boolean} - True, wenn ein Sprung automatisch aufgezeichnet wird.
+    altitudeCorrectionPerformed: false, // @type {boolean} - NEU: True, wenn die Höhenkorrektur-Prüfung durchgeführt wurde.
     isManualRecording: false,          // @type {boolean} - True, wenn ein Sprung manuell aufgezeichnet wird.
     recordedTrackPoints: [],           // @type {object[]} - Die Punkte des aktuell aufgezeichneten Tracks.
     recordedTrackLayer: null,          // @type {L.Polyline|null} - Der Layer für den live aufgezeichneten Track.
