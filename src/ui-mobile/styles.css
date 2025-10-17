@@ -2,23 +2,82 @@
 /* 1. GLOBALE STILE & VARIABLEN
 /* =================================================================== */
 :root {
-    --primary-color: #4da8da;
-    --primary-hover-color: #0056b3;
-    --text-color: #333;
-    --background-light: #ffffff;
-    --background-medium: #f0f2f5;
-    --border-color: #d9d9d9;
-    --font-main: 'Roboto', sans-serif;
-    --label-width: 135px;
-    --input-width: 70px;
-    --grid-columns: var(--label-width) var(--input-width) var(--label-width) var(--input-width) minmax(0, 1fr);
+    /* 1. Farbpalette (Die Grundfarben) */
+    --palette-blue-500: #4da8da;
+    --palette-blue-700: #0056b3;
+    --palette-red-500: #dc3545;
+    --palette-red-700: #c82333;
+    --palette-grey-100: #f0f2f5;
+    --palette-grey-200: #e9ecef;
+    --palette-grey-300: #d9d9d9;
+    --palette-grey-700: #6c757d;
+    /*secondary color*/
+    --palette-grey-800: #5a6268;
+    --palette-grey-900: #333;
+    --palette-white: #ffffff;
+    --palette-yellow-400: #ffecb3;
+    --palette-yellow-500: #f3d131;
+    --palette-green-500: #28a745;
 
-    /* Wind Spider Colors */
+    /* 2. Semantische Farben (Funktion der Farben) */
+    --color-primary: var(--palette-blue-500);
+    --color-primary-hover: var(--palette-blue-700);
+    --color-secondary: var(--palette-grey-700);
+    --color-secondary-hover: var(--palette-grey-800);
+    --color-danger: var(--palette-red-500);
+    --color-danger-hover: var(--palette-red-700);
+    --color-success: var(--palette-green-500);
+    --color-warning: var(--palette-yellow-500);
+
+    /* 3. Textfarben */
+    --text-primary: var(--palette-grey-900);
+    --text-secondary: var(--palette-grey-700);
+    --text-inverted: var(--palette-white);
+    --text-link: var(--color-primary);
+
+    /* 4. Hintergrundfarben */
+    --background-white: 255, 255, 255;
+    --background-surface: rgba(var(--background-white));
+    /* Haupt-Hintergrund von Panels, Popups */
+    --background-body: var(--palette-grey-100);
+    /* Hintergrund der gesamten Seite */
+    --background-interactive: var(--palette-grey-200);
+    /* Hover-Zustände, aktive Elemente */
+    --background-hover: var(--palette-blue-500);
+    /* Hover-Zustand für interaktive Elemente */
+
+
+    /* 5. Rahmen & Linien */
+    --border-color: var(--palette-grey-300);
+    --border-color-strong: #555;
+    /* Beibehalten für spezifische Fälle */
+
+    /* 6. Schatten */
+    --shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+
+    /* 7. Wind- & Wetterfarben (bleiben wie sie sind, da sie spezifisch sind) */
     --wind-low: blue;
     --wind-moderate: green;
     --wind-high: orange;
     --wind-very-high: red;
-    --wind-extreme: purple;}
+    --wind-extreme: purple;
+
+    --cc-clear: #e3f2fd;
+    --cc-few: hsl(205, 36%, 86%);
+    --cc-sct: #e0e0e0;
+    --cc-bkn: #b0bec5;
+    --cc-ovc: #78909c;
+
+    --border-wind-light: lightblue;
+    --border-wind-moderate: lightgreen;
+    --border-wind-high: #f5f34f;
+    --border-wind-very-high: #ffcccc;
+
+    --font-main: 'Roboto', sans-serif;
+    --label-width: 135px;
+    --input-width: 70px;
+    --grid-columns: var(--label-width) var(--input-width) var(--label-width) var(--input-width) minmax(0, 1fr);
+}
 
 html {
     height: 100%;
@@ -90,7 +149,7 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    background: rgba(255, 255, 255, 0.9);
+    background: rgba(var(--background-white), 0.9);
     backdrop-filter: blur(5px);
     -webkit-backdrop-filter: blur(5px);
     border-bottom: 1px solid var(--border-color);
@@ -104,14 +163,18 @@ body {
 #tab-bar {
     grid-row: 3;
     grid-column: 1;
-    height: 55px; /* Feste Höhe für den Inhaltsbereich */
-    padding-bottom: env(safe-area-inset-bottom); /* Fügt nur den Sicherheitsabstand hinzu */
+    height: 55px;
+    /* Feste Höhe für den Inhaltsbereich */
+    padding-bottom: env(safe-area-inset-bottom);
+    /* Fügt nur den Sicherheitsabstand hinzu */
     display: flex;
     justify-content: space-around;
-    align-items: center; /* Zentriert die Icons vertikal */
-    background-color: white !important;
+    align-items: center;
+    /* Zentriert die Icons vertikal */
+    background-color: var(--background-white) !important;
     border-top: 1px solid var(--border-color);
-    box-sizing: content-box; /* Stellt sicher, dass Padding zur Höhe addiert wird */
+    box-sizing: content-box;
+    /* Stellt sicher, dass Padding zur Höhe addiert wird */
     z-index: 1001;
 }
 
@@ -120,7 +183,7 @@ body {
     grid-column: 1;
     display: none;
     /* Controlled by JS */
-    background-color: rgba(249, 249, 249, 0.95);
+    background-color: rgba(var(--background-white), 0.9);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     padding: 15px;
@@ -153,9 +216,9 @@ body {
     align-items: center;
     justify-content: center;
     /* Zentriert den Inhalt (Icon & Label) */
-    background: white !important;
+    background: var(--background-surface) !important;
     border: none;
-    color: #888888;
+    color: var(--text-primary);
     flex-grow: 1;
     transition: color 0.2s ease;
     padding: 4px 0;
@@ -172,7 +235,7 @@ body {
     /* Verhindert zusätzlichen Zeilenabstand */
     margin-bottom: 2px;
     /* Kleiner Abstand zum Label */
-    background: white !important;
+    background: var(--background-surface) !important;
 }
 
 .tab-button .label {
@@ -181,11 +244,11 @@ body {
 }
 
 .tab-button:hover {
-    background: white;
+    background: var(--background-surface);
 }
 
 .tab-button.active {
-    color: var(--text-color);
+    color: var(--text-primary);
 }
 
 .btn {
@@ -194,7 +257,7 @@ body {
     margin: 5px 0;
     font-size: 14px;
     font-weight: bold;
-    color: white;
+    color: var(--text-inverted);
     border: none;
     border-radius: 8px;
     cursor: pointer;
@@ -203,43 +266,43 @@ body {
 }
 
 .btn-primary {
-    background-color: #4da8da;
+    background-color: var(--color-primary);
 }
 
 .btn-primary:hover {
-    background-color: #0056b3;
+    background-color: var(--color-primary-hover);
 }
 
 .btn-secondary {
-    background-color: #6c757d;
+    background-color: var(--color-secondary);
 }
 
 .btn-secondary:hover {
-    background-color: #5a6268;
+    background-color: var(--color-secondary-hover);
 }
 
 .btn-danger {
-    background-color: #dc3545;
+    background-color: var(--color-danger);
 }
 
 .btn-danger:hover {
-    background-color: #c82333;
+    background-color: var(--color-danger-hover);
 }
 
 /* --- Accordion --- */
 .accordion-item {
-    background-color: var(--background-light);
+    background-color: var(--background-surface);
     margin-bottom: 10px;
     border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow);
     overflow: hidden;
 }
 
 .accordion-header {
     width: 100%;
     padding: 15px;
-    background-color: var(--primary-color);
-    color: white;
+    background-color: var(--color-primary);
+    color: var(--text-inverted);
     border: none;
     border-bottom: 1px solid var(--border-color);
     cursor: pointer;
@@ -249,13 +312,13 @@ body {
 }
 
 .accordion-header:hover {
-    background-color: var(--primary-hover-color);
+    background-color: var(--color-primary-hover);
 }
 
 .accordion-header::after {
     content: '▼';
     font-size: 12px;
-    color: #888;
+    color: var(--palette-grey-800);
     transition: transform 0.3s ease;
 }
 
@@ -313,8 +376,8 @@ body {
 }
 
 .settings-grid button {
-    background-color: var(--primary-color);
-    color: white;
+    background-color: var(--color-primary);
+    color: var(--text-inverted);
     font-weight: bold;
     border: none;
     cursor: pointer;
@@ -332,11 +395,11 @@ body {
     display: block;
     margin-top: 5px;
     padding: 8px 12px;
-    background-color: #f8f9fa;
-    border: 1px solid #dee2e6;
+    background-color: var(--background-body);
+    border: 1px solid var(--border-color);
     border-radius: 6px;
     font-style: italic;
-    color: #6c757d;
+    color: var(--color-secondary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -348,9 +411,9 @@ input[type="checkbox"] {
     -moz-appearance: none;
     width: 18px;
     height: 18px;
-    border: 2px solid var(--primary-color);
+    border: 2px solid var(--color-primary);
     border-radius: 4px;
-    background-color: var(--background-light);
+    background-color: var(--background-surface);
     cursor: pointer;
     position: relative;
     vertical-align: middle;
@@ -358,7 +421,7 @@ input[type="checkbox"] {
 }
 
 input[type="checkbox"]:not(:checked):hover {
-    background-color: #e6f0fa;
+    background-color: var(--background-body);
 }
 
 input[type="checkbox"]:checked::after {
@@ -369,12 +432,12 @@ input[type="checkbox"]:checked::after {
     transform: translate(-50%, -50%);
     font-size: 14px;
     font-weight: bold;
-    color: var(--primary-color);
+    color: var(--color-primary);
 }
 
 input[type="checkbox"]:focus {
     outline: none;
-    box-shadow: 0 0 0 2px rgba(77, 168, 218, 0.2);
+    box-shadow: var(--shadow);
 }
 
 input[type="checkbox"][style*="opacity: 0.5"] {
@@ -415,25 +478,29 @@ input[type="checkbox"][style*="opacity: 1"] {
     width: 100%;
     margin-top: 5px;
     /* Etwas Platz für die Labels unter dem Slider schaffen */
-    margin-bottom: 20px; 
+    margin-bottom: 20px;
 }
 
 #slider-labels {
     position: absolute;
-    top: 15px; /* Positioniert die Labels unterhalb des Slider-Griffs */
+    top: 15px;
+    /* Positioniert die Labels unterhalb des Slider-Griffs */
     left: 0;
     right: 0;
     height: 20px;
-    pointer-events: none; /* Stellt sicher, dass die Labels nicht die Bedienung des Sliders stören */
+    pointer-events: none;
+    /* Stellt sicher, dass die Labels nicht die Bedienung des Sliders stören */
 }
 
 .slider-label {
     position: absolute;
     top: 0;
-    transform: translateX(-50%); /* Zentriert das Label exakt über der Markierung */
+    transform: translateX(-50%);
+    /* Zentriert das Label exakt über der Markierung */
     font-size: 10px;
-    color: #555;
-    white-space: nowrap; /* Verhindert Zeilenumbrüche */
+    color: var(--text-primary);
+    white-space: nowrap;
+    /* Verhindert Zeilenumbrüche */
 }
 
 #timeSlider {
@@ -441,7 +508,7 @@ input[type="checkbox"][style*="opacity: 1"] {
     appearance: none;
     width: 100%;
     height: 6px;
-    background: #ddd;
+    background: var(--background-interactive);
     border-radius: 3px;
     outline: none;
     margin: 5px 0;
@@ -452,31 +519,31 @@ input[type="checkbox"][style*="opacity: 1"] {
     appearance: none;
     width: 16px;
     height: 16px;
-    background: var(--primary-color);
+    background: var(--color-primary);
     border-radius: 50%;
     cursor: pointer;
-    box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--shadow);
 }
 
 #timeSlider::-moz-range-thumb {
     width: 16px;
     height: 16px;
-    background: var(--primary-color);
+    background: var(--color-primary);
     border-radius: 50%;
     cursor: pointer;
     border: none;
-    box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--shadow);
 }
 
 #timeSlider::-webkit-slider-runnable-track,
 #timeSlider::-moz-range-track {
-    background: #ddd;
+    background: var(--background-interactive);
     border-radius: 3px;
 }
 
 #autoupdateToggle label {
     font-size: 24px;
-    color: var(--primary-color);
+    color: var(--color-primary);
     font-weight: bold;
     cursor: pointer;
     line-height: 1;
@@ -486,7 +553,7 @@ input[type="checkbox"][style*="opacity: 1"] {
 #selectedTime,
 #modelLabel {
     font-size: 14px;
-    color: var(--text-color);
+    color: var(--text-primary);
 }
 
 #modelSelect {
@@ -500,8 +567,8 @@ input[type="checkbox"][style*="opacity: 1"] {
     padding: 0 !important;
     min-width: 0 !important;
     background: transparent;
-    border: 1px solid #555;
-    color: var(--text-color);
+    border: 1px solid var(--border-color-strong);
+    color: var(--text-primary);
     width: 20px;
     height: 20px;
     border-radius: 50%;
@@ -518,7 +585,7 @@ input[type="checkbox"][style*="opacity: 1"] {
 }
 
 #modelInfoButton:hover {
-    background: #f0f0f0;
+    background: var(--background-interactive);
 }
 
 #model-row {
@@ -535,13 +602,13 @@ input[type="checkbox"][style*="opacity: 1"] {
     gap: 10px 15px;
     align-items: center;
     padding: 10px 0;
-    border-top: 1px solid #eee;
+    border-top: 1px solid var(--border-color);
 }
 
 #meanWindControls label,
 #controls-row label {
     font-weight: 500;
-    color: #4b5563;
+    color: var(--text-primary);
     text-align: left;
     white-space: nowrap;
 }
@@ -551,7 +618,7 @@ input[type="checkbox"][style*="opacity: 1"] {
 #controls-row input {
     width: 90%;
     padding: 8px;
-    border: 1px solid #d1d5db;
+    border: 1px solid var(--border-color);
     border-radius: 6px;
 }
 
@@ -559,7 +626,7 @@ input[type="checkbox"][style*="opacity: 1"] {
     grid-column: 1 / -1;
     font-size: 16px !important;
     font-weight: bold;
-    color: var(--primary-color);
+    color: var(--color-primary);
     text-align: center;
     padding-top: 5px;
 }
@@ -568,23 +635,23 @@ input[type="checkbox"][style*="opacity: 1"] {
     border-collapse: collapse;
     width: 100%;
     font-size: 13px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow);
     table-layout: fixed;
 }
 
 #weather-table-container th {
     background: linear-gradient(to bottom, #f0f4f8, #d9e2ec);
-    color: var(--text-color);
+    color: var(--text-primary);
     font-weight: bold;
     padding: 6px 8px;
-    border: 1px solid var(--text-color);
+    border: 1px solid var(--text-primary);
     text-align: center;
     vertical-align: middle;
 }
 
 #weather-table-container td {
     padding: 2px;
-    border: 1px solid var(--text-color);
+    border: 1px solid var(--text-primary);
     text-align: center;
     vertical-align: middle;
 }
@@ -596,46 +663,63 @@ input[type="checkbox"][style*="opacity: 1"] {
 }
 
 /* === NEU: Farbkodierung für Wolkenbedeckung === */
-#weather-table-container tr.cloud-cover-clear { /* 0-10% */
-    background: #e3f2fd !important; /* Sehr helles Blau */
+#weather-table-container tr.cloud-cover-clear {
+    /* 0-10% */
+    background: var(--cc-clear) !important;
+    /* Sehr helles Blau */
 }
-#weather-table-container tr.cloud-cover-few { /* 11-30% */
-    background: hsl(205, 36%, 86%)!important; /* Helles Blau */
+
+#weather-table-container tr.cloud-cover-few {
+    /* 11-30% */
+    background: var(--cc-few) !important;
+    /* Helles Blau */
 }
-#weather-table-container tr.cloud-cover-scattered { /* 31-60% */
-    background: #e0e0e0 !important; /* Helles Grau */
+
+#weather-table-container tr.cloud-cover-scattered {
+    /* 31-60% */
+    background: var(--cc-sct) !important;
+    /* Helles Grau */
 }
-#weather-table-container tr.cloud-cover-broken { /* 61-90% */
-    background: #b0bec5 !important; /* Mittelgrau */
+
+#weather-table-container tr.cloud-cover-broken {
+    /* 61-90% */
+    background: var(--cc-bkn) !important;
+    /* Mittelgrau */
 }
-#weather-table-container tr.cloud-cover-overcast { /* 91-100% */
-    background: #78909c !important; /* Dunkelgrau */
-    color: white !important; /* Hellerer Text für besseren Kontrast */
+
+#weather-table-container tr.cloud-cover-overcast {
+    /* 91-100% */
+    background: var(--cc-ovc) !important;
+    /* Dunkelgrau */
+    color: var(--text-inverted) !important;
 }
 
 #weather-table-container tr.wind-low td {
-    border: 2px solid lightblue !important;
+    border: 2px solid var(--border-wind-light) !important;
 }
 
 #weather-table-container tr.wind-moderate td {
-    border: 2px solid lightgreen !important;
+    border: 2px solid var(--border-wind-moderate) !important;
 }
 
 #weather-table-container tr.wind-high td {
-    border: 2px solid #f5f34f !important;
+    border: 2px solid var(--border-wind-high) !important;
 }
 
 #weather-table-container tr.wind-very-high td {
-    border: 2px solid #ffcccc !important;
+    border: 2px solid var(--border-wind-very-high) !important;
 }
 
 /* === Wind Spider Styles === */
 #windspinne-container {
-    position: relative; /* Wichtig für die Positionierung des Canvas */
+    position: relative;
+    /* Wichtig für die Positionierung des Canvas */
     width: 100%;
-    max-width: 350px; /* Etwas kleiner für mobile Ansicht */
+    max-width: 350px;
+    /* Etwas kleiner für mobile Ansicht */
     margin: 20px auto;
-    aspect-ratio: 0.9 / 1; /* Erzwingt, dass der Container quadratisch ist */
+    aspect-ratio: 0.9 / 1;
+    /* Erzwingt, dass der Container quadratisch ist */
 }
 
 #windspinne-container canvas {
@@ -650,7 +734,8 @@ input[type="checkbox"][style*="opacity: 1"] {
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 1rem; /* Kleinerer Abstand für mobile Ansicht */
+    gap: 1rem;
+    /* Kleinerer Abstand für mobile Ansicht */
     margin-top: 1rem;
     padding: 0.5rem;
     flex-wrap: wrap;
@@ -659,14 +744,15 @@ input[type="checkbox"][style*="opacity: 1"] {
 .legend-item {
     display: flex;
     align-items: center;
-    font-size: 0.8rem; /* Kleinere Schrift für mobile Ansicht */
+    font-size: 0.8rem;
+    /* Kleinere Schrift für mobile Ansicht */
 }
 
 .legend-color-box {
     width: 14px;
     height: 14px;
     margin-right: 6px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--border-color);
     border-radius: 3px;
 }
 
@@ -682,7 +768,7 @@ input[type="checkbox"][style*="opacity: 1"] {
     top: 50%;
     transform: translateY(-50%);
     font-size: 18px;
-    color: #888;
+    color: var(--text-primary);
     pointer-events: none;
 }
 
@@ -696,8 +782,8 @@ input[type="checkbox"][style*="opacity: 1"] {
 }
 
 #locationSearchInput:focus {
-    border-color: var(--primary-color);
-    box-shadow: 0 0 5px rgba(77, 168, 218, 0.5);
+    border-color: var(--color-primary);
+    box-shadow: var(--shadow);
     outline: none;
 }
 
@@ -720,9 +806,9 @@ input[type="checkbox"][style*="opacity: 1"] {
 }
 
 .search-section {
-    background: white;
+    background: var(--background-surface);
     border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    box-shadow: var(--shadow);
     margin-bottom: 15px;
     overflow: hidden;
 }
@@ -731,9 +817,9 @@ input[type="checkbox"][style*="opacity: 1"] {
 .results-heading {
     padding: 10px 15px;
     margin: 0;
-    color: var(--primary-color);
-    background-color: #f7f7f7;
-    border-bottom: 1px solid #f0f0f0;
+    color: var(--color-primary);
+    background-color: var(--background-body);
+    border-bottom: 1px solid var(--border-color);
     font-size: 14px;
     font-weight: bold;
     list-style-type: none;
@@ -760,13 +846,13 @@ input[type="checkbox"][style*="opacity: 1"] {
 }
 
 .search-item:hover {
-    background-color: #f9f9f9;
+    background-color: var(--background-surface);
 }
 
 .search-item-icon {
     font-size: 20px;
     margin-right: 15px;
-    color: #888;
+    color: var(--text-primary);
     width: 24px;
     text-align: center;
 }
@@ -777,12 +863,12 @@ input[type="checkbox"][style*="opacity: 1"] {
 
 .search-item-text .name {
     font-weight: bold;
-    color: var(--text-color);
+    color: var(--text-primary);
 }
 
 .search-item-text .details {
     font-size: 12px;
-    color: #777;
+    color: var(--text-primary);
 }
 
 .search-item-actions {
@@ -795,26 +881,29 @@ input[type="checkbox"][style*="opacity: 1"] {
     background: none;
     border: none;
     font-size: 24px;
-    color: #ccc;
+    color: var(--palette-grey-300);
     cursor: pointer;
     padding: 5px;
 }
 
 .search-item-actions button.is-favorite {
-    color: #f3d131;
+    color: var(--palette-yellow-500);
 }
 
 .search-item-actions button.delete-btn:hover {
-    color: #e74c3c;
+    color: var(--palette-red-500);
 }
 
 .search-item-actions button.home-toggle {
-    opacity: 0.3; /* Inaktive Haus-Icons sind blass */
-    transition: opacity 0.2s ease-in-out; /* Sanfter Übergang */
+    opacity: 0.3;
+    /* Inaktive Haus-Icons sind blass */
+    transition: opacity 0.2s ease-in-out;
+    /* Sanfter Übergang */
 }
 
 .search-item-actions button.home-toggle.is-home {
-    opacity: 1.0; /* Das aktive Home-Icon hat volle Deckkraft */
+    opacity: 1.0;
+    /* Das aktive Home-Icon hat volle Deckkraft */
 }
 
 .clear-icon {
@@ -823,7 +912,7 @@ input[type="checkbox"][style*="opacity: 1"] {
     top: 50%;
     transform: translateY(-50%);
     font-size: 18px;
-    color: #888;
+    color: var(--text-primary);
     cursor: pointer;
     width: 24px;
     height: 24px;
@@ -835,7 +924,7 @@ input[type="checkbox"][style*="opacity: 1"] {
 }
 
 .clear-icon:hover {
-    background: #f0f0f0;
+    background: var(--background-body);
 }
 
 /* --- Dashboard --- */
@@ -922,8 +1011,8 @@ input[type="checkbox"][style*="opacity: 1"] {
 
 #auto-record-card,
 #manual-record-card {
-    background-color: var(--text-color);
-    border: 2px solid #555;
+    background-color: var(--text-primary);
+    border: 2px solid var(--border-color-strong);
     box-shadow: none;
     justify-content: center;
 }
@@ -949,14 +1038,14 @@ input[type="checkbox"][style*="opacity: 1"] {
 .arm-button.armed {
     border-color: #28a745;
     background-color: #28a745;
-    color: white;
+    color: var(--text-inverted);
     cursor: default;
 }
 
 .arm-button.recording {
     border-color: #dc3545;
     background-color: #dc3545;
-    color: white;
+    color: var(--text-inverted);
     animation: pulse 1.5s infinite;
 }
 
@@ -967,13 +1056,13 @@ input[type="checkbox"][style*="opacity: 1"] {
 
 #manual-recording-button:hover {
     background-color: #007bff;
-    color: white;
+    color: var(--text-inverted);
 }
 
 #manual-recording-button.recording {
     border-color: #17a2b8;
     background-color: #17a2b8;
-    color: white;
+    color: var(--text-inverted);
     animation: pulse-blue 1.5s infinite;
 }
 
@@ -982,7 +1071,7 @@ input[type="checkbox"][style*="opacity: 1"] {
     display: flex;
     justify-content: center;
     margin-bottom: 15px;
-    background-color: #e9ecef;
+    background-color: var(--background-interactive);
     border-radius: 8px;
     padding: 4px;
 }
@@ -1001,9 +1090,9 @@ input[type="checkbox"][style*="opacity: 1"] {
 }
 
 .toggle-btn.active {
-    background-color: var(--primary-color);
-    color: white;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    background-color: var(--color-primary);
+    color: var(--text-inverted);
+    box-shadow: var(--shadow);
 }
 
 .dashboard-grid-jm {
@@ -1013,7 +1102,7 @@ input[type="checkbox"][style*="opacity: 1"] {
 }
 
 .dashboard-grid-jm .dashboard-item {
-    background-color: var(--background-medium);
+    background-color: var(--background-body);
     padding: 10px;
     border-radius: 6px;
     text-align: center;
@@ -1033,7 +1122,7 @@ input[type="checkbox"][style*="opacity: 1"] {
 .dashboard-grid-jm .dashboard-value {
     font-size: 18px;
     font-weight: bold;
-    color: var(--text-color);
+    color: var(--text-primary);
 }
 
 .dashboard-grid-jm .accuracy-item .dashboard-value {
@@ -1042,11 +1131,13 @@ input[type="checkbox"][style*="opacity: 1"] {
 }
 
 .vario-climb {
-    color: #28a745 !important; /* Grün für Steigen */
+    color: var(--palette-green-500) !important;
+    /* Grün für Steigen */
 }
 
 .vario-descent {
-    color: #dc3545 !important; /* Rot für Sinken */
+    color: var(--color-danger) !important;
+    /* Rot für Sinken */
 }
 
 .jml-target-toggle {
@@ -1068,8 +1159,8 @@ input[type="checkbox"][style*="opacity: 1"] {
 
 .info-icon {
     background: transparent;
-    border: 1px solid #555;
-    color: var(--text-color);
+    border: 1px solid var(--border-color-strong);
+    color: var(--text-primary);
     width: 20px;
     height: 20px;
     border-radius: 50%;
@@ -1087,7 +1178,7 @@ input[type="checkbox"][style*="opacity: 1"] {
 }
 
 .info-icon:hover {
-    background: #f0f0f0;
+    background: var(--background-interactive);
 }
 
 
@@ -1126,17 +1217,12 @@ input[type="checkbox"][style*="opacity: 1"] {
     top: calc(10px + env(safe-area-inset-top));
 }
 
-/*
-.leaflet-control-container .leaflet-bottom {
-    bottom: calc(10px + env(safe-area-inset-bottom));
-}*/
-
 .leaflet-control-coordinates,
 .leaflet-control-scale-line,
 .leaflet-control-attribution a,
 .leaflet-control-attribution {
-    color: var(--text-color);
-    text-shadow: 0 0 5px white, 0 0 3px white;
+    color: var(--text-primary);
+    text-shadow: var(--shadow);
     font-weight: bold;
 }
 
@@ -1159,7 +1245,7 @@ input[type="checkbox"][style*="opacity: 1"] {
 
 .leaflet-tooltip {
     z-index: 800 !important;
-    background-color: white;
+    background-color: var(--background-surface);
     padding: 2px;
     pointer-events: none;
 }
@@ -1168,7 +1254,7 @@ input[type="checkbox"][style*="opacity: 1"] {
     margin-bottom: 5px !important;
     margin-left: 5px;
     z-index: 1000 !important;
-    background-color: rgba(255, 255, 255, 0.8);
+    background-color: rgba(var(--background-white), 0.8);
     padding: 2px 5px;
     border-radius: 4px;
 }
@@ -1176,7 +1262,7 @@ input[type="checkbox"][style*="opacity: 1"] {
 .leaflet-bottom .leaflet-control-attribution {
     margin-bottom: 5px !important;
     margin-right: 5px;
-    background-color: rgba(255, 255, 255, 0.8);
+    background-color: rgba(var(--background-white), 0.8);
     padding: 2px 5px;
     font-size: 11px;
     z-index: 900 !important;
@@ -1192,11 +1278,11 @@ input[type="checkbox"][style*="opacity: 1"] {
     z-index: 1000 !important;
     font-size: 12px;
     line-height: 1.4;
-    background: rgba(255, 255, 255, 0.8) !important;
+    background: rgba(var(--background-white), 0.8) !important;
     padding: 10px;
-    border: 1px solid rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--border-color);
     border-radius: 4px;
-    box-shadow: rgba(0, 0, 0, 0.2);
+    box-shadow: var(--shadow);
     max-width: 300px;
     pointer-events: none;
 }
@@ -1219,10 +1305,10 @@ input[type="checkbox"][style*="opacity: 1"] {
 .live-marker-dot {
     width: 14px;
     height: 14px;
-    background-color: #007bff;
+    background-color: var(--color-primary);
     border-radius: 50%;
-    border: 2px solid white;
-    box-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
+    border: 2px solid var(--palette-white);
+    box-shadow: 0 0 6px var(--palette-grey-800);
 }
 
 .live-marker-arrow {
@@ -1230,7 +1316,7 @@ input[type="checkbox"][style*="opacity: 1"] {
     height: 0;
     border-left: 6px solid transparent;
     border-right: 6px solid transparent;
-    border-bottom: 10px solid #007bff;
+    border-bottom: 10px solid var(--color-primary);
     position: absolute;
     top: -1px;
     left: 50%;
@@ -1294,8 +1380,8 @@ input[type="checkbox"][style*="opacity: 1"] {
 #crosshair::after {
     content: '';
     position: absolute;
-    background-color: var(--text-color);
-    box-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
+    background-color: var(--text-primary);
+    box-shadow: var(--shadow);
 }
 
 #crosshair::before {
@@ -1316,7 +1402,7 @@ input[type="checkbox"][style*="opacity: 1"] {
 
 /* --- Tooltips & Labels --- */
 .wind-tooltip {
-    background: rgba(255, 255, 255, 0.8);
+    background: rgba(var(--background-white), 0.8);
     border: none;
     border-radius: 3px;
     padding: 2px;
@@ -1325,8 +1411,8 @@ input[type="checkbox"][style*="opacity: 1"] {
 }
 
 .cutaway-tooltip {
-    background-color: rgba(255, 255, 255, 0.8);
-    border: 1px solid red;
+    background-color: rgba(var(--background-white), 0.8);
+    border: 1px solid var(--palette-red-500);
     border-radius: 3px;
     padding: 5px;
     font-size: 12px;
@@ -1334,19 +1420,19 @@ input[type="checkbox"][style*="opacity: 1"] {
 }
 
 .ensemble-tooltip {
-    background-color: rgba(255, 255, 255, 0.9);
-    color: var(--text-color);
+    background-color: rgba(var(--background-white), 0.9);
+    color: var(--text-primary);
     border: 1px solid var(--border-color);
     border-radius: 3px;
     padding: 5px 8px;
     font-size: 12px;
     white-space: nowrap;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    box-shadow: var(--shadow);
 }
 
 .isoline-label {
-    background: rgba(255, 255, 255, 0.7) !important;
-    color: blue !important;
+    background: rgba(var(--background-white), 0.7) !important;
+    color: var(--palette-blue-700) !important;
     font-weight: bold;
     border: none;
     border-radius: 3px;
@@ -1374,31 +1460,16 @@ input[type="checkbox"][style*="opacity: 1"] {
     height: 14px !important;
 }
 
-.leaflet-measure-label {
-    position: absolute;
-    font: 10px Arial, Helvetica, sans-serif;
-    background-color: rgba(255, 255, 170, 0.7);
-    color: black;
-    padding: 2px;
-    border-radius: 3px;
-    box-shadow: 1px 1px 4px #888;
-    white-space: nowrap;
-    text-align: right;
-    pointer-events: none;
-    display: none;
-    z-index: 9000;
-}
-
 .bold-distance {
     font-weight: bold !important;
 }
 
 /* --- Favorite Marker --- */
 .favorite-marker-icon {
-    color: #FFD700;
+    color: var(--palette-yellow-500);
     font-size: 16px;
     font-weight: bold;
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.6);
+    text-shadow: var(--shadow);
     text-align: center;
     line-height: 24px;
 }
@@ -1410,10 +1481,10 @@ input[type="checkbox"][style*="opacity: 1"] {
     padding: 10px 15px;
     margin: 0 -15px 10px -15px;
     /* Hebt den seitlichen Abstand des Eltern-Containers auf */
-    color: var(--primary-color);
-    background-color: #f7f7f7;
-    border-bottom: 1px solid #f0f0f0;
-    border-top: 1px solid #f0f0f0;
+    color: var(--color-primary);
+    background-color: var(--background-body);
+    border-bottom: 1px solid var(--border-color);
+    border-top: 1px solid var(--border-color);
     /* Fügt eine obere Linie für bessere Abgrenzung hinzu */
     font-size: 14px;
     font-weight: bold;
@@ -1425,13 +1496,12 @@ input[type="checkbox"][style*="opacity: 1"] {
     /* Wichtig für die Positionierung auf der Karte */
     font: 9px 'Roboto', sans-serif;
     font-weight: bold;
-    background-color: rgba(210, 251, 186, 0.9);
-    /* Heller, leicht gelblicher Hintergrund */
-    color: #333;
+    background-color: rgba(var(--background-white), 0.9);
+    color: var(--text-primary);
     padding: 5px 8px;
     border-radius: 4px;
-    border: 1px solid var(--border-color);
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    border: 2px solid var(--palette-red-500);
+    box-shadow: var(--shadow);
     white-space: nowrap;
     /* Verhindert Zeilenumbrüche */
     text-align: left;
@@ -1450,11 +1520,11 @@ input[type="checkbox"][style*="opacity: 1"] {
 
 /* === ZUSÄTZLICHE STILE FÜR PERMANENTE GEOMAN-LABELS === */
 .geoman-permanent-label {
-    background: rgba(255, 255, 224, 0.9);
+    background: rgba(var(--background-white),0.9);
     border: 1px solid var(--border-color);
     border-radius: 4px;
     padding: 5px 8px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    box-shadow: var(--shadow);
     min-width: 50px;
     font-size: 9px;
     line-height: 1;
@@ -1468,7 +1538,7 @@ input[type="checkbox"][style*="opacity: 1"] {
     text-align: left;
     line-height: 1;
     /* Verbessert den Zeilenabstand */
-    color: var(--text-color);
+    color: var(--text-primary);
 }
 
 /* Leere Klasse, um Leaflet-Standardstile zu vermeiden */
@@ -1485,7 +1555,7 @@ input[type="checkbox"][style*="opacity: 1"] {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.5);
+    background: var(--background-body);
     z-index: 10000;
     display: flex;
     justify-content: center;
@@ -1493,10 +1563,10 @@ input[type="checkbox"][style*="opacity: 1"] {
 }
 
 .modal-content {
-    background: white;
+    background: var(--background-surface);
     padding: 20px;
     border-radius: 5px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--shadow);
     text-align: center;
     width: 300px;
 }
@@ -1515,8 +1585,8 @@ input[type="checkbox"][style*="opacity: 1"] {
     max-width: 400px;
     padding: 10px;
     margin: 10px 0;
-    background-color: var(--primary-color);
-    color: white;
+    background-color: var(--color-primary);
+    color: var(--text-inverted);
     font-size: 14px;
     font-weight: bold;
     border: none;
@@ -1526,7 +1596,7 @@ input[type="checkbox"][style*="opacity: 1"] {
 }
 
 .save-favorite-btn:hover {
-    background-color: var(--primary-hover-color);
+    background-color: var(--color-primary-hover);
 }
 
 .favorite-modal {
@@ -1535,7 +1605,7 @@ input[type="checkbox"][style*="opacity: 1"] {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
+    background: var(--background-body);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1543,18 +1613,18 @@ input[type="checkbox"][style*="opacity: 1"] {
 }
 
 .favorite-modal-content {
-    background: white;
+    background: var(--text-inverted);
     padding: 20px;
     border-radius: 8px;
     width: 80%;
     max-width: 400px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    box-shadow: var(--shadow);
 }
 
 .favorite-modal-content h3 {
     margin: 0 0 10px;
     font-size: 16px;
-    color: var(--text-color);
+    color: var(--text-primary);
 }
 
 #favoriteNameInput {
@@ -1582,13 +1652,13 @@ input[type="checkbox"][style*="opacity: 1"] {
 }
 
 .modal-btn:not(.cancel) {
-    background-color: var(--primary-color);
-    color: white;
+    background-color: var(--color-primary);
+    color: var(--text-inverted);
 }
 
 .modal-btn.cancel {
-    background-color: #ccc;
-    color: var(--text-color);
+    background-color: var(--color-primary);
+    color: var(--text-primary);
 }
 
 .modal-btn:hover {
@@ -1605,13 +1675,13 @@ input[type="checkbox"][style*="opacity: 1"] {
     height: auto;
     text-align: center;
     padding: 10px;
-    background: white;
+    background: var(--background-surface);
     border: 1px solid var(--border-color);
     border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    box-shadow: var(--shadow);
     z-index: 2000;
     font-size: 13px;
-    color: var(--text-color);
+    color: var(--text-primary);
     line-height: 1.4;
     min-height: 40px;
     max-height: 300px;
@@ -1625,14 +1695,14 @@ input[type="checkbox"][style*="opacity: 1"] {
     transform: translateX(-50%);
     border-width: 6px;
     border-style: solid;
-    border-color: white transparent transparent transparent;
+    border-color: var(--text-inverted) transparent transparent transparent;
 }
 
 #snackbar {
     visibility: hidden;
     min-width: 250px;
-    background-color: var(--text-color);
-    color: var(--background-light);
+    background-color: var(--text-primary);
+    color: var(--background-surface);
     text-align: center;
     border-radius: 8px;
     padding: 16px;
@@ -1643,7 +1713,7 @@ input[type="checkbox"][style*="opacity: 1"] {
     transform: translateX(-50%) translateY(200%);
     opacity: 0;
     font-size: 1rem;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    box-shadow: var(--shadow);
     transition: visibility 0s, opacity 0.5s, transform 0.5s ease-in-out;
 }
 
@@ -1654,16 +1724,16 @@ input[type="checkbox"][style*="opacity: 1"] {
 }
 
 #snackbar.success {
-    background-color: #4CAF50;
+    background-color: var(--palette-green-500);
 }
 
 #snackbar.error {
-    background-color: #f44336;
+    background-color: var(--palette-red-500);
 }
 
 #snackbar.warning {
-    background-color: #fff3cd;
-    color: #856404;
+    background-color: var(--color-warning);
+    color: var(--text-primary);
 }
 
 #progress-snackbar {
@@ -1672,11 +1742,11 @@ input[type="checkbox"][style*="opacity: 1"] {
     bottom: calc(55px + env(safe-area-inset-bottom) + 80px);
     left: 50%;
     transform: translateX(-50%) translateY(200%);
-    background-color: #3f51b5;
-    color: white;
+    background-color: var(--palette-blue-700);
+    color: var(--text-inverted);
     padding: 14px;
     border-radius: 8px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+    box-shadow: var(--shadow);
     z-index: 2011;
     display: flex;
     align-items: center;
@@ -1708,7 +1778,7 @@ input[type="checkbox"][style*="opacity: 1"] {
 .progress-bar-container {
     width: 100%;
     height: 6px;
-    background-color: rgba(255, 255, 255, 0.3);
+    background-color: rgba(var(--background-white), 0.3);
     border-radius: 3px;
     overflow: hidden;
 }
@@ -1716,15 +1786,15 @@ input[type="checkbox"][style*="opacity: 1"] {
 .progress-bar {
     width: 0%;
     height: 100%;
-    background-color: var(--background-light);
+    background-color: var(--background-surface);
     border-radius: 3px;
     transition: width 0.3s ease-in-out;
 }
 
 #progress-snackbar .cancel-button {
     background: transparent;
-    border: 1px solid white;
-    color: white;
+    border: 1px solid var(--palette-white);
+    color: var(--text-inverted);
     border-radius: 5px;
     padding: 5px 10px;
     font-size: 0.9rem;
@@ -1739,14 +1809,14 @@ input[type="checkbox"][style*="opacity: 1"] {
     top: 100px;
     left: 0;
     right: 0;
-    background-color: #fff3cd;
-    color: #856404;
+    background-color: var(--color-warning);
+    color: var(--text-primary);
     text-align: center;
     padding: 8px;
     font-size: 0.9rem;
     font-weight: 500;
     z-index: 2010;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow);
     transition: visibility 0s, opacity 0.3s ease-out, transform 0.3s ease-out;
 }
 
@@ -1765,18 +1835,18 @@ input[type="checkbox"][style*="opacity: 1"] {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    background: rgba(255, 255, 255, 0.9);
+    background: rgba(var(--background-white), 0.9);
     padding: 20px;
     border-radius: 10px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow);
     z-index: 1000;
 }
 
 #loading .spinner {
     width: 40px;
     height: 40px;
-    border: 4px solid #f3f3f3;
-    border-top: 4px solid #3498db;
+    border: 4px solid var(--border-color);
+    border-top: 4px solid var(--color-primary);
     border-radius: 50%;
     animation: spin 1s linear infinite, pulse 1.5s ease-in-out infinite;
 }
@@ -1784,7 +1854,7 @@ input[type="checkbox"][style*="opacity: 1"] {
 #loading p {
     margin-top: 10px;
     font-size: 13px;
-    color: var(--text-color);
+    color: var(--text-primary);
     font-family: Roboto, sans-serif;
 }
 
@@ -1843,8 +1913,8 @@ input[type="checkbox"][style*="opacity: 1"] {
     padding: 12px;
     margin-top: 5px;
     font-size: 14px;
-    color: var(--text-color);
-    background-color: #f0f2f5;
+    color: var(--text-primary);
+    background-color: var(--background-body);
     /* Leichter Hintergrund zur Abhebung */
     border: 1px solid var(--border-color);
     border-radius: 8px;
@@ -1854,7 +1924,7 @@ input[type="checkbox"][style*="opacity: 1"] {
 }
 
 #track-upload input[type="file"]:hover {
-    background-color: #e6e8eb;
+    background-color: var(--background-interactive);
     /* Leichte Farbänderung beim Darüberfahren */
 }
 
@@ -1868,7 +1938,7 @@ input[type="checkbox"][style*="opacity: 1"] {
     /* Stellt sicher, dass sie über anderen Elementen liegt */
 }
 
-.pm-textarea{
+.pm-textarea {
     text-align: center !important;
     padding-left: 0 !important;
 }

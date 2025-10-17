@@ -363,7 +363,7 @@ input[type="checkbox"] {
     height: 18px;
     border: 2px solid var(--color-primary);
     border-radius: 4px;
-    background-color: vrgba(var(--background-white));
+    background-color: rgba(var(--background-white));
     cursor: pointer;
     position: relative;
     vertical-align: middle;
@@ -423,7 +423,7 @@ input[type="checkbox"][style*="opacity: 0.5"] {
 }
 
 .info-button-shared:hover {
-    background: #f0f0f0;
+    background: var(--background-interactive);
 }
 
 .info-popup {
@@ -968,7 +968,7 @@ input[type="checkbox"][style*="opacity: 0.5"] {
 }
 
 .search-item:hover {
-    background-color: rgba(var(--background-white));
+    background-color: var(--background-surface);
 }
 
 .search-item-text {
@@ -1332,7 +1332,7 @@ input[type="checkbox"][style*="opacity: 0.5"] {
 
 #snackbar.warning {
     background-color: var(--color-warning);
-    color: var(--notification-warning-text);
+    color: var(--text-primary);
 }
 
 /* === PROGRESS SNACKBAR === */
