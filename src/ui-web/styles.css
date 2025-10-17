@@ -989,7 +989,7 @@ input[type="checkbox"][style*="opacity: 0.5"] {
     background: none;
     border: none;
     font-size: 24px;
-    color: var(--background-active);
+    color: var(--palette-grey-300);
     cursor: pointer;
     padding: 5px;
 }
@@ -1101,12 +1101,14 @@ input[type="checkbox"][style*="opacity: 0.5"] {
 
 .isoline-label {
     background: rgba(var(--background-white), 0.7) !important;
-    color: var(----palette-blue-700) !important;
+    color: var(--overlay-text-dark) !important; /* Ich habe die Farbvariable korrigiert */
     font-weight: bold;
     border: none;
     border-radius: 3px;
-    text-align: center;
     pointer-events: none !important;
+    display: flex;
+    justify-content: center; /* Zentriert horizontal */
+    align-items: center;     /* Zentriert vertikal */
 }
 
 .favorite-marker-icon {
@@ -1234,7 +1236,7 @@ input[type="checkbox"][style*="opacity: 0.5"] {
     left: 0;
     width: 100%;
     height: 100%;
-    background: var(--background-hover-darker);
+    background: var(--background-body);
     z-index: 10000;
     display: flex;
     justify-content: center;
@@ -1242,7 +1244,7 @@ input[type="checkbox"][style*="opacity: 0.5"] {
 }
 
 .modal-content {
-    background: white;
+    background: var(--background-surface);
     padding: 20px;
     border-radius: 5px;
     width: 300px;
@@ -1259,7 +1261,7 @@ input[type="checkbox"][style*="opacity: 0.5"] {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.5);
+    background: var(--background-body);
     z-index: 10000;
     display: flex;
     justify-content: center;
@@ -1267,7 +1269,7 @@ input[type="checkbox"][style*="opacity: 0.5"] {
 }
 
 .favorite-modal-content {
-    background: white;
+    background: var(--background-surface);
     padding: 20px;
     border-radius: 8px;
     width: 80%;
