@@ -831,34 +831,49 @@ async function exportComprehensiveReportAsHtml() {
 
 
     // --- Schritt 2: HTML-Inhalt als Datei speichern (Dieser Teil ist NEU) ---
-    try {
-        const { Filesystem, isNative } = await getCapacitor();
+try {
+        // Holen Sie sich die Capacitor-Module über den Adapter
+        const { Filesystem, Directory, Browser, isNative } = await getCapacitor();
 
-        // Nur ausführen, wenn wir in einer nativen App sind
-        if (isNative && Filesystem) {
+        if (isNative && Filesystem && Browser) {
             const timeForFilename = DateTime.utc().toFormat('yyyy-MM-dd_HHmm');
             const model = document.getElementById('modelSelect').value.toUpperCase();
-
-            const filename = `DZMaster_Briefing_${timeForFilename}_${model}.html`;
-
+            
+            // 1. Datei für den Benutzer speichern (wie bisher)
+            const permanentFilename = `DZMaster/DZMaster_Briefing_${timeForFilename}_${model}.html`;
             await Filesystem.writeFile({
-                path: `DZMaster/${filename}`,
+                path: permanentFilename,
                 data: html,
                 directory: Directory.Documents,
                 encoding: 'utf8',
-                recursive: true // Erstellt den "DZMaster"-Ordner, falls er nicht existiert
+                recursive: true
             });
             Utils.handleMessage(`Briefing saved in Documents/DZMaster`);
+
+            // 2. Dieselbe Datei temporär speichern, um sie anzeigen zu können (NEU)
+            const tempFilename = 'briefing_temp.html';
+            const writeResult = await Filesystem.writeFile({
+                path: tempFilename,
+                data: html,
+                directory: Directory.Cache, // Das Cache-Verzeichnis ist perfekt für temporäre Dateien
+                encoding: 'utf8',
+                recursive: true
+            });
+
+            // 3. Den nativen Pfad der temporären Datei an den Browser übergeben (NEU)
+            // writeResult.uri enthält den benötigten 'file:///...' Pfad
+            await Browser.open({ url: writeResult.uri });
+
         } else {
-            // Fallback für den Webbrowser: Öffnet wie bisher einen neuen Tab.
+            // Web-Fallback (bleibt unverändert)
             const newTab = window.open();
             newTab.document.open();
             newTab.document.write(html);
             newTab.document.close();
         }
     } catch (error) {
-        console.error("Error saving HTML briefing:", error);
-        Utils.handleError("Could not save briefing file.");
+        console.error("Error saving or showing HTML briefing:", error);
+        Utils.handleError("Could not save or show briefing file.");
     }
 }
 

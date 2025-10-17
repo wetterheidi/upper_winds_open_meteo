@@ -1,6 +1,8 @@
 PODS:
   - Capacitor (7.4.2):
     - CapacitorCordova
+  - CapacitorBrowser (7.0.2):
+    - Capacitor
   - CapacitorCommunityBackgroundGeolocation (0.0.1):
     - Capacitor
   - CapacitorCordova (7.4.2)
@@ -19,6 +21,7 @@ PODS:
 
 DEPENDENCIES:
   - "Capacitor (from `../../node_modules/@capacitor/ios`)"
+  - "CapacitorBrowser (from `../../node_modules/@capacitor/browser`)"
   - "CapacitorCommunityBackgroundGeolocation (from `../../node_modules/@capacitor-community/background-geolocation`)"
   - "CapacitorCordova (from `../../node_modules/@capacitor/ios`)"
   - "CapacitorFilesystem (from `../../node_modules/@capacitor/filesystem`)"
@@ -34,6 +37,8 @@ SPEC REPOS:
 EXTERNAL SOURCES:
   Capacitor:
     :path: "../../node_modules/@capacitor/ios"
+  CapacitorBrowser:
+    :path: "../../node_modules/@capacitor/browser"
   CapacitorCommunityBackgroundGeolocation:
     :path: "../../node_modules/@capacitor-community/background-geolocation"
   CapacitorCordova:
@@ -49,6 +54,7 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   Capacitor: 9d9e481b79ffaeacaf7a85d6a11adec32bd33b59
+  CapacitorBrowser: 22541e48442de44dc629c214388290d6eecc6ae9
   CapacitorCommunityBackgroundGeolocation: 834a8f8eca8ebada8debffe1236e5674b831cead
   CapacitorCordova: 5e58d04631bc5094894ac106e2bf1da18a9e6151
   CapacitorFilesystem: 337eeaf16a9fa5a44d2329df411523fa3a9a6ee9
@@ -58,6 +64,6 @@ SPEC CHECKSUMS:
   IONFilesystemLib: 89258b8e3e85465da93127d25d7ce37f977e8a6f
   IONGeolocationLib: adbb2a739b0ccda686d4a66f9bc05f8c4fd3d3c0
 
-PODFILE CHECKSUM: c09654821586a6a18511c483f82f1ffec5446b42
+PODFILE CHECKSUM: d393e7d86f719f7a3239e3266f0a1a79228456cd
 
 COCOAPODS: 1.16.2
