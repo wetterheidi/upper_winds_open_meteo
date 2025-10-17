@@ -676,7 +676,7 @@ input[type="checkbox"][style*="opacity: 0.5"] {
 }
 
 #weather-table-container th {
-    background: linear-gradient(to bottom, #f0f4f8, #d9e2ec);
+    background: linear-gradient(to bottom, var(--palette-grey-100), var(--palette-grey-300));
     color: var(--text-primary);
     font-weight: bold;
     padding: 6px 8px;
