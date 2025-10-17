@@ -1298,8 +1298,8 @@ input[type="checkbox"][style*="opacity: 0.5"] {
 #snackbar {
     visibility: hidden;
     min-width: 250px;
-    background-color: var(--text-primary);
-    color: var(rgba(var(--background-white)));
+    background-color: var(--background-surface);
+    color: var(--text-inverted);
     text-align: center;
     border-radius: 8px;
     padding: 16px;
