@@ -701,8 +701,8 @@ async function exportComprehensiveReportAsHtml() {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DZMaster Weather Briefing</title>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=0.5, maximum-scale=3, user-scalable=yes">    <title>DZMaster Weather Briefing</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 10px; }
         .container { width: 100%; margin: 0 auto; padding: 0; }
@@ -736,6 +736,23 @@ async function exportComprehensiveReportAsHtml() {
         .header-info { background-color: #ecf0f1; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
         .header-info p { margin: 5px 0; }
         .section { margin-top: 30px; }
+
+        @media (max-width: 768px) {
+            body {
+                -webkit-text-size-adjust: 100%; /* Verhindert, dass iOS die Schrift automatisch vergrößert */
+            }
+            table {
+                font-size: 8px; /* Kleinere Schrift in der Tabelle auf mobilen Geräten */
+            }
+            th, td {
+                padding: 3px 4px; /* Kompakteres Padding */
+            }
+
+            h1, h2, h3 { padding-bottom: 3 px; margin-top: 10px; font-size: 13px;}
+
+            .header-info { padding: 8px; margin-bottom: 10px; font-size: 10px;}
+
+        }
     </style>
 </head>
 <body>
