@@ -831,16 +831,16 @@ async function exportComprehensiveReportAsHtml() {
 
 
     // --- Schritt 2: HTML-Inhalt als Datei speichern (Dieser Teil ist NEU) ---
-try {
-        // Holen Sie sich die Capacitor-Module über den Adapter
-        const { Filesystem, Directory, Browser, isNative } = await getCapacitor();
+    try {
+        // Hole die Capacitor-Module über den Adapter
+        const { Filesystem, Directory, Browser, Capacitor, isNative } = await getCapacitor();
 
-        if (isNative && Filesystem && Browser) {
+        if (isNative && Filesystem && Browser && Capacitor) {
             const timeForFilename = DateTime.utc().toFormat('yyyy-MM-dd_HHmm');
             const model = document.getElementById('modelSelect').value.toUpperCase();
-            
-            // 1. Datei für den Benutzer speichern (wie bisher)
             const permanentFilename = `DZMaster/DZMaster_Briefing_${timeForFilename}_${model}.html`;
+
+            // Datei für den Benutzer speichern
             await Filesystem.writeFile({
                 path: permanentFilename,
                 data: html,
@@ -850,19 +850,32 @@ try {
             });
             Utils.handleMessage(`Briefing saved in Documents/DZMaster`);
 
-            // 2. Dieselbe Datei temporär speichern, um sie anzeigen zu können (NEU)
+            // Temporäre Datei für die Anzeige speichern
             const tempFilename = 'briefing_temp.html';
             const writeResult = await Filesystem.writeFile({
                 path: tempFilename,
                 data: html,
-                directory: Directory.Cache, // Das Cache-Verzeichnis ist perfekt für temporäre Dateien
+                directory: Directory.Cache,
                 encoding: 'utf8',
                 recursive: true
             });
 
-            // 3. Den nativen Pfad der temporären Datei an den Browser übergeben (NEU)
-            // writeResult.uri enthält den benötigten 'file:///...' Pfad
-            await Browser.open({ url: writeResult.uri });
+            // *** START DER NEUEN LOGIK ***
+            // Konvertiere den nativen Pfad in eine vom lokalen Webserver lesbare URL
+            const serverUrl = Capacitor.convertFileSrc(writeResult.uri);
+
+            // Finde das Modal und das Iframe und zeige sie an
+            const modal = document.getElementById('htmlReportModal');
+            const iframe = document.getElementById('reportIframe');
+
+            if (modal && iframe) {
+                iframe.src = serverUrl;
+                modal.style.display = 'flex';
+            } else {
+                // Fallback, falls die UI-Elemente nicht gefunden werden
+                throw new Error("HTML report modal components not found in the DOM.");
+            }
+            // *** ENDE DER NEUEN LOGIK ***
 
         } else {
             // Web-Fallback (bleibt unverändert)

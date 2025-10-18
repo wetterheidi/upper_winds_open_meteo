@@ -1245,6 +1245,21 @@ function setupDashboardToggleEvents() {
         jumperView.classList.add('hidden');
     });
 }
+function setupHtmlReportModalEvents() {
+    const closeReportBtn = document.getElementById('closeReportBtn');
+    const htmlReportModal = document.getElementById('htmlReportModal');
+
+    if (closeReportBtn && htmlReportModal) {
+        closeReportBtn.addEventListener('click', () => {
+            htmlReportModal.style.display = 'none';
+            const iframe = document.getElementById('reportIframe');
+            if (iframe) {
+                // Iframe leeren, um Ressourcen freizugeben und ggf. Töne zu stoppen
+                iframe.src = 'about:blank';
+            }
+        });
+    }
+}
 
 // --- Cache Management ---
 
@@ -1736,6 +1751,7 @@ export function initializeEventListeners() {
     setupInputEvents();
     setupDownloadEvents();
     setupClearHistoricalDate();
+    setupHtmlReportModalEvents();
 
     // 4. Spezifische Planner-Funktionen
     setupJumpRunTrackEvents();
@@ -1764,7 +1780,6 @@ export function initializeEventListeners() {
 
     // 9. Event Listener für Karten-Interaktionen
     setupMapEventListeners();
-
 
     document.addEventListener('loading:start', (e) => toggleLoading(true, e.detail.message));
     document.addEventListener('loading:stop', () => toggleLoading(false));

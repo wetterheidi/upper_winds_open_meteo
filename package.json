@@ -25,6 +25,7 @@
     },
     "dependencies": {
         "@capacitor-community/background-geolocation": "^1.2.25",
+        "@capacitor-community/http": "^1.4.1",
         "@capacitor/android": "^7.4.0",
         "@capacitor/browser": "^7.0.2",
         "@capacitor/cli": "^7.3.0",
