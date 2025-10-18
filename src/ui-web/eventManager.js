@@ -535,7 +535,7 @@ function setupTerrainAnalysisEvents() {
     const analyzeTerrainBtn = document.getElementById('analyzeTerrainButton');
     if (analyzeTerrainBtn) {
         analyzeTerrainBtn.addEventListener('click', async () => {
-            if (!AppState.weatherData || AppState.lastLat==null || AppState.lastLng==null) {
+            if (!AppState.weatherData || AppState.lastLat == null || AppState.lastLng == null) {
                 Utils.handleError("Please select a location and fetch weather data first.");
                 return;
             }
@@ -1020,6 +1020,33 @@ function setupClearHistoricalDate() {
         });
     }
 }
+function setupThemeToggle() {
+    const toggleButton = document.getElementById('theme-toggle');
+    const body = document.body;
+
+    // Gespeichertes Theme beim Laden anwenden
+    const currentTheme = localStorage.getItem('theme');
+    if (currentTheme) {
+        body.setAttribute('data-theme', currentTheme);
+        if (toggleButton) {
+            toggleButton.textContent = currentTheme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode';
+        }
+    }
+
+    if (toggleButton) {
+        toggleButton.addEventListener('click', () => {
+            if (body.getAttribute('data-theme') === 'dark') {
+                body.removeAttribute('data-theme');
+                localStorage.removeItem('theme');
+                toggleButton.textContent = 'Switch to Dark Mode';
+            } else {
+                body.setAttribute('data-theme', 'dark');
+                localStorage.setItem('theme', 'dark');
+                toggleButton.textContent = 'Switch to Light Mode';
+            }
+        });
+    }
+}
 
 // --- Cache Management ---
 function setupCacheManagement() {
@@ -1478,6 +1505,7 @@ export function initializeEventListeners() {
     setupInputEvents();
     setupDownloadEvents();
     setupClearHistoricalDate();
+    setupThemeToggle();
 
     // 4. Spezifische Planner-Funktionen
     setupJumpRunTrackEvents();

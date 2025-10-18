@@ -10,7 +10,8 @@
     --palette-grey-100: #f0f2f5;
     --palette-grey-200: #e9ecef;
     --palette-grey-300: #d9d9d9;
-    --palette-grey-700: #6c757d; /*secondary color*/
+    --palette-grey-700: #6c757d;
+    /*secondary color*/
     --palette-grey-800: #5a6268;
     --palette-grey-900: #333;
     --palette-white: #ffffff;
@@ -21,7 +22,7 @@
     /* 2. Semantische Farben (Funktion der Farben) */
     --color-primary: var(--palette-blue-500);
     --color-primary-hover: var(--palette-blue-700);
-    --color-secondary: var(--palette-grey-700); 
+    --color-secondary: var(--palette-grey-700);
     --color-secondary-hover: var(--palette-grey-800);
     --color-danger: var(--palette-red-500);
     --color-danger-hover: var(--palette-red-700);
@@ -36,15 +37,20 @@
 
     /* 4. Hintergrundfarben */
     --background-white: 255, 255, 255;
-    --background-surface: rgba(var(--background-white)); /* Haupt-Hintergrund von Panels, Popups */
-    --background-body: var(--palette-grey-100); /* Hintergrund der gesamten Seite */
-    --background-interactive: var(--palette-grey-200); /* Hover-Zustände, aktive Elemente */
-    --background-hover: var(--palette-blue-500); /* Hover-Zustand für interaktive Elemente */
- 
+    --background-surface: rgba(var(--background-white));
+    /* Haupt-Hintergrund von Panels, Popups */
+    --background-body: var(--palette-grey-100);
+    /* Hintergrund der gesamten Seite */
+    --background-interactive: var(--palette-grey-200);
+    /* Hover-Zustände, aktive Elemente */
+    --background-hover: var(--palette-blue-500);
+    /* Hover-Zustand für interaktive Elemente */
+
 
     /* 5. Rahmen & Linien */
     --border-color: var(--palette-grey-300);
-    --border-color-strong: #555; /* Beibehalten für spezifische Fälle */
+    --border-color-strong: #555;
+    /* Beibehalten für spezifische Fälle */
 
     /* 6. Schatten */
     --shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -67,11 +73,69 @@
     --border-wind-high: #f5f34f;
     --border-wind-very-high: #ffcccc;
 
-    --font-main: 'Roboto',
-        sans-serif;
-    --label-width: 135px;
-    --input-width: 70px;
-    --grid-columns: var(--label-width) var(--input-width) var(--label-width) var(--input-width) minmax(0, 1fr);
+    [data-theme="dark"] {
+        /* 1. Semantische Farben überschreiben */
+        --color-primary: #5cb8e4;
+        --color-primary-hover: #74c3e9;
+        --color-secondary: var(--palette-grey-300);
+        --color-secondary-hover: var(--palette-grey-100);
+
+        /* 2. Textfarben anpassen */
+        --text-primary: #E0E0E0;
+        --text-inverted: var(--palette-grey-900);
+
+        /* 3. Hintergrundfarben komplett umkehren (WICHTIGSTE ÄNDERUNG) */
+        --background-white: 30, 30, 46;
+        /* Dunkelviolett/Grau als RGB-Basis */
+        --background-surface: #282a36;
+        /* Dunkler Panel-Hintergrund */
+        --background-body: #1e1e2e;
+        /* Sehr dunkler Seiten-Hintergrund */
+        --background-interactive: #44475a;
+        /* Etwas helleres Grau für Hover/Sidebar */
+
+        /* 4. Rahmen und Linien anpassen */
+        --border-color: #44475a;
+        --border-color-strong: var(--palette-grey-300);
+
+        /* 5. Dashboard-Theme (bleibt wie es ist) */
+        --dashboard-background: #1e1e1e;
+        --dashboard-text: #50fa7b;
+        --dashboard-border: #50fa7b;
+        --dashboard-glow: rgba(80, 250, 123, 0.4);
+
+        /* --- FINALE, KORRIGIERTE Stile für ALLE Formular-Elemente --- */ 
+        input[type="text"],
+        input[type="number"],
+        input[type="date"],
+        input[type="password"],
+        select {
+            background-color: var(--background-surface) !important;
+            color: var(--text-primary) !important;
+            border-color: var(--border-color) !important;
+        }
+
+        input::placeholder {
+            color: var(--text-secondary);
+            opacity: 0.8;
+        }
+
+        input[type="text"]:focus,
+        input[type="number"]:focus,
+        input[type="date"]:focus,
+        input[type="password"]:focus,
+        select:focus {
+            border-color: var(--color-primary) !important;
+            box-shadow: 0 0 5px rgba(92, 184, 228, 0.5) !important;
+        }
+    }
+}
+
+--font-main: 'Roboto',
+sans-serif;
+--label-width: 135px;
+--input-width: 70px;
+--grid-columns: var(--label-width) var(--input-width) var(--label-width) var(--input-width) minmax(0, 1fr);
 }
 
 html {
@@ -612,7 +676,7 @@ input[type="checkbox"][style*="opacity: 0.5"] {
     font-size: 14px;
     padding: 4px;
     border-radius: 4px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--background-body);
 }
 
 
@@ -677,7 +741,7 @@ input[type="checkbox"][style*="opacity: 0.5"] {
 
 #weather-table-container th {
     background: linear-gradient(to bottom, var(--palette-grey-100), var(--palette-grey-300));
-    color: var(--text-primary);
+    color: var(--palette-grey-900);
     font-weight: bold;
     padding: 6px 8px;
     border: 1px solid var(--text-primary);
@@ -1101,14 +1165,17 @@ input[type="checkbox"][style*="opacity: 0.5"] {
 
 .isoline-label {
     background: rgba(var(--background-white), 0.7) !important;
-    color: var(--overlay-text-dark) !important; /* Ich habe die Farbvariable korrigiert */
+    color: var(--overlay-text-dark) !important;
+    /* Ich habe die Farbvariable korrigiert */
     font-weight: bold;
     border: none;
     border-radius: 3px;
     pointer-events: none !important;
     display: flex;
-    justify-content: center; /* Zentriert horizontal */
-    align-items: center;     /* Zentriert vertikal */
+    justify-content: center;
+    /* Zentriert horizontal */
+    align-items: center;
+    /* Zentriert vertikal */
 }
 
 .favorite-marker-icon {
@@ -1126,7 +1193,7 @@ input[type="checkbox"][style*="opacity: 0.5"] {
     /* Wichtig für die Positionierung auf der Karte */
     font: 9px 'Roboto', sans-serif;
     font-weight: bold;
-    background-color: rgba(var(--background-white),0.9);
+    background-color: rgba(var(--background-white), 0.9);
     /* Heller, leicht gelblicher Hintergrund */
     color: var(--text-primary);
     padding: 5px 8px;
@@ -1151,7 +1218,7 @@ input[type="checkbox"][style*="opacity: 0.5"] {
 
 /* === ZUSÄTZLICHE STILE FÜR PERMANENTE GEOMAN-LABELS === */
 .geoman-permanent-label {
-    background: rgba(var(--background-white),0.9);
+    background: rgba(var(--background-white), 0.9);
     border: 1px solid var(--border-color);
     border-radius: 4px;
     padding: 5px 8px;
