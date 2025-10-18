@@ -674,6 +674,12 @@ function setupTerrainAnalysisEvents() {
                 return;
             }
 
+            // Prüfen, ob die Schirmfahrt-Anzeige aktiviert ist.
+            if (!Settings.state.userSettings.showCanopyArea) {
+                Utils.handleError("Please activate 'Show Canopy Flight Area' to analyze terrain.");
+                return; // Analyse abbrechen und die verständliche Meldung anzeigen.
+            }
+
             toggleLoading(true, 'Analyzing terrain, this may take a moment...');
 
             try {
@@ -681,7 +687,7 @@ function setupTerrainAnalysisEvents() {
                 mapManager.drawTerrainWarning(dangerousPoints);
 
                 if (dangerousPoints.length > 0) {
-                    Utils.handleMessage("Warning: Low clearance areas detected and marked in red.");
+                    displayWarning("Warning: Low clearance areas detected and marked in red.");
                 } else {
                     Utils.handleMessage("Terrain analysis complete. No low clearance areas found.");
                 }
