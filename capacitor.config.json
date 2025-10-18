@@ -22,8 +22,8 @@
     }
   },
   "server": {
-    "hostname": "app.local",
-    "androidScheme": "https",
+    "hostname": "localhost",
+    "androidScheme": "http",
     "iosScheme": "https",
     "allowNavigation": [
       "api.open-meteo.com",
