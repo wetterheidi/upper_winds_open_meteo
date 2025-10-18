@@ -12,6 +12,7 @@ import { DateTime } from 'luxon';
 import * as JumpPlanner from './jumpPlanner.js';
 import { interpolateWeatherData } from './weatherManager.js';
 import { getCapacitor } from './capacitor-adapter.js';
+import { Settings } from './settings.js';
 
 // ===================================================================
 // 1. Öffentliche Lade- & Speicherfunktionen
@@ -441,7 +442,7 @@ export async function exportLandingPatternToGpx() {
     }
     console.log("Schritt 1: Vorbedingungen erfüllt. Wetterdaten und Position vorhanden.");
 
-    const interpolatedData = weatherManager.interpolateWeatherData(
+    const interpolatedData = interpolateWeatherData(
         AppState.weatherData, sliderIndex, interpStep, Math.round(AppState.lastAltitude), heightUnit
     );
 
