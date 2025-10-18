@@ -701,25 +701,41 @@ async function exportComprehensiveReportAsHtml() {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DZMaster Weather Briefing</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 1000px; margin: 20px auto; padding: 20px; }
-        h1, h2, h3 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 0.9em; }
-        th, td { padding: 8px 12px; border: 1px solid #ddd; text-align: left; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 10px; }
+        .container { width: 100%; margin: 0 auto; padding: 0; }
+        h1, h2, h3 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; margin-top: 20px; }
+        
+        /* *** START DER ÄNDERUNGEN *** */
+
+        .table-wrapper { 
+            overflow-x: auto; 
+            -webkit-overflow-scrolling: touch; /* Flüssiges Scrollen auf iOS */
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            font-size: 0.9em; 
+        }
+        th, td { 
+            padding: 8px 12px; 
+            border: 1px solid #ddd; 
+            text-align: center; /* Zentriert für bessere Lesbarkeit */
+            white-space: nowrap; /* Verhindert Zeilenumbrüche in Zellen */
+        }
+
+        /* *** ENDE DER ÄNDERUNGEN *** */
+        
         th { background-color: #f2f2f2; font-weight: bold; }
         tr:nth-child(even) { background-color: #f9f9f9; }
         .header-info { background-color: #ecf0f1; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
         .header-info p { margin: 5px 0; }
-        .section { margin-top: 40px; }
-        @media print {
-            body { font-size: 10pt; }
-            .container { margin: 0; padding: 0; max-width: 100%; }
-            h1, h2, h3 { page-break-after: avoid; }
-            table { page-break-inside: auto; }
-            tr { page-break-inside: avoid; page-break-after: auto; }
-        }
+        .section { margin-top: 30px; }
     </style>
 </head>
 <body>
@@ -734,6 +750,7 @@ async function exportComprehensiveReportAsHtml() {
 
     <div class="section">
         <h2>Surface Data (Today)</h2>
+        <div class="table-wrapper">
         <table>
             <thead>
                 <tr>
@@ -778,7 +795,7 @@ async function exportComprehensiveReportAsHtml() {
         </tr>`;
     }
 
-    html += `</tbody></table></div>`;
+    html += `</tbody></table></div></div>`; // Die Tabelle wird im Wrapper geschlossen
 
     html += `<div class="section">
                 <h2>Upper Air Data (Today, hourly, up to ${upperAirLimit}${heightUnit} AGL)</h2>`;
@@ -786,6 +803,7 @@ async function exportComprehensiveReportAsHtml() {
     for (const i of todayIndices) {
         const displayTime = await Utils.getDisplayTime(time[i], lat, lng, 'Z');
         html += `<h3>${displayTime}</h3>
+                 <div class="table-wrapper">
                  <table>
                     <thead>
                         <tr>
@@ -824,7 +842,7 @@ async function exportComprehensiveReportAsHtml() {
                     <td>${(typeof data.cc === 'number' ? Math.round(data.cc) : 'N/A')}</td>
                 </tr>`;
             });
-        html += `</tbody></table>`;
+        html += `</tbody></table></div>`;
     }
 
     html += `</div></div></body></html>`;
