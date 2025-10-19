@@ -2,6 +2,13 @@
 /* 1. GLOBALE STILE & ROOT-VARIABLEN
 /* =================================================================== */
 :root {
+
+    --font-main: 'Roboto', sans-serif;
+    --label-width: 135px;
+    --input-width: 70px;
+    --grid-columns: var(--label-width) var(--input-width) var(--label-width) var(--input-width) minmax(0, 1fr);
+
+
     /* 1. Farbpalette (Die Grundfarben) */
     --palette-blue-500: #4da8da;
     --palette-blue-700: #0056b3;
@@ -79,63 +86,136 @@
         --color-primary-hover: #74c3e9;
         --color-secondary: var(--palette-grey-300);
         --color-secondary-hover: var(--palette-grey-100);
+        --color-danger: #ff6b6b;
+        /* Helleres Rot für besseren Kontrast */
+        --color-danger-hover: #ff8787;
+        --color-success: #28a745;
+        --color-warning: #f3d131;
 
         /* 2. Textfarben anpassen */
         --text-primary: #E0E0E0;
-        --text-inverted: var(--palette-grey-900);
+        /* Helle Schrift für Dark Mode */
+        --text-secondary: #B0B0B0;
+        /* Etwas dunkler für weniger wichtigen Text */
+        --text-inverted: #1e1e2e;
+        /* Dunkler Hintergrund für invertierte Texte */
+        --text-link: #74c3e9;
+        /* Hellerer Link-Farbton */
 
-        /* 3. Hintergrundfarben komplett umkehren (WICHTIGSTE ÄNDERUNG) */
+        /* 3. Hintergrundfarben */
         --background-white: 30, 30, 46;
-        /* Dunkelviolett/Grau als RGB-Basis */
         --background-surface: #282a36;
-        /* Dunkler Panel-Hintergrund */
         --background-body: #1e1e2e;
-        /* Sehr dunkler Seiten-Hintergrund */
         --background-interactive: #44475a;
-        /* Etwas helleres Grau für Hover/Sidebar */
+        --background-hover: #5cb8e4;
+        /* Hellerer Hover-Effekt */
 
-        /* 4. Rahmen und Linien anpassen */
+        /* 4. Rahmen und Linien */
         --border-color: #44475a;
         --border-color-strong: var(--palette-grey-300);
 
-        /* 5. Dashboard-Theme (bleibt wie es ist) */
+        /* 5. Dashboard-Theme */
         --dashboard-background: #1e1e1e;
         --dashboard-text: #50fa7b;
         --dashboard-border: #50fa7b;
         --dashboard-glow: rgba(80, 250, 123, 0.4);
 
-        /* --- FINALE, KORRIGIERTE Stile für ALLE Formular-Elemente --- */ 
-        input[type="text"],
-        input[type="number"],
-        input[type="date"],
-        input[type="password"],
-        select {
-            background-color: var(--background-surface) !important;
-            color: var(--text-primary) !important;
-            border-color: var(--border-color) !important;
-        }
+        /* 6. Wind- und Wetterfarben anpassen (für besseren Kontrast) */
+        --wind-low: #66b3ff;
+        /* Helleres Blau */
+        --wind-moderate: #50fa7b;
+        /* Helleres Grün */
+        --wind-high: #ffb347;
+        /* Helleres Orange */
+        --wind-very-high: #ff6b6b;
+        /* Helleres Rot */
+        --wind-extreme: #d670d6;
+        /* Helleres Lila */
 
-        input::placeholder {
-            color: var(--text-secondary);
-            opacity: 0.8;
-        }
+        --cc-clear: #2a3b57;
+        /* Dunklere Version von Hellblau */
+        --cc-few: #3a4b67;
+        --cc-sct: #4a5b77;
+        --cc-bkn: #5a6b87;
+        --cc-ovc: #6a7b97;
 
-        input[type="text"]:focus,
-        input[type="number"]:focus,
-        input[type="date"]:focus,
-        input[type="password"]:focus,
-        select:focus {
-            border-color: var(--color-primary) !important;
-            box-shadow: 0 0 5px rgba(92, 184, 228, 0.5) !important;
-        }
+        --border-wind-light: #99ccff;
+        /* Helleres Blau */
+        --border-wind-moderate: #80ff80;
+        /* Helleres Grün */
+        --border-wind-high: #ffcc66;
+        /* Helleres Gelb */
+        --border-wind-very-high: #ff9999;
+        /* Helleres Rot */
+
+        /* 7. Schatten anpassen */
+        --shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        /* Stärkerer Schatten für Dark Mode */
     }
-}
 
---font-main: 'Roboto',
-sans-serif;
---label-width: 135px;
---input-width: 70px;
---grid-columns: var(--label-width) var(--input-width) var(--label-width) var(--input-width) minmax(0, 1fr);
+    [data-theme="dark"] input[type="text"],
+    [data-theme="dark"] input[type="number"],
+    [data-theme="dark"] input[type="date"],
+    [data-theme="dark"] input[type="password"],
+    [data-theme="dark"] select {
+        background-color: var(--background-surface) !important;
+        color: var(--text-primary) !important;
+        border-color: var(--border-color) !important;
+    }
+
+    [data-theme="dark"] *,
+    [data-theme="dark"] *::before,
+    [data-theme="dark"] *::after {
+        color: var(--text-primary) !important;
+        /* Erzwingt helle Schrift */
+    }
+
+    [data-theme="dark"] a {
+        color: var(--text-link) !important;
+        /* Links in heller Farbe */
+    }
+
+    [data-theme="dark"] input::placeholder {
+        color: var(--text-secondary) !important;
+        /* Placeholder im Dark Mode */
+    }
+
+    [data-theme="dark"] #weather-table-container th,
+    [data-theme="dark"] #weather-table-container td {
+        color: var(--text-primary) !important;
+        /* Helle Schrift für Tabellen */
+        border-color: var(--border-color) !important;
+        /* Dunklere Rahmen */
+    }
+
+    [data-theme="dark"] #weather-table-container tr.cloud-cover-overcast {
+        color: var(--text-primary) !important;
+        /* Helle Schrift für dunkle Zeilen */
+    }
+
+    [data-theme="dark"] .btn-primary,
+    [data-theme="dark"] .btn-secondary,
+    [data-theme="dark"] .btn-danger {
+        color: var(--text-inverted) !important;
+        /* Buttons behalten invertierten Text */
+    }
+
+    [data-theme="dark"] .sidebar-icon .label {
+        color: var(--text-primary) !important;
+        /* Sidebar-Labels hell */
+    }
+
+    [data-theme="dark"] .leaflet-popup-content {
+        color: var(--text-primary) !important;
+        /* Popups mit heller Schrift */
+        background-color: var(--background-surface) !important;
+    }
+
+    /* Favorite-Toggle-Stern im Dark Mode */
+    .search-item-actions button.is-favorite {
+        color: var(--palette-yellow-500) !important;
+        /* Gelber Stern im Dark Mode */
+    }
 }
 
 html {
@@ -991,20 +1071,26 @@ input[type="checkbox"][style*="opacity: 0.5"] {
 
 .search-bar-container {
     position: relative;
-    margin-bottom: 15px;
+    margin-bottom: 20px; 
+    padding: 15px;
 }
 
 .search-bar-container .search-icon {
     position: absolute;
-    left: 12px;
+    left: 25px; /* Passt zum neuen Padding */
     top: 50%;
     transform: translateY(-50%);
-    font-size: 18px;
+    font-size: 22px; /* Größer */
     pointer-events: none;
 }
 
 #locationSearchInput {
-    padding-left: 40px;
+    padding: 16px 20px 16px 55px; /* Deutlich vergrößert, inklusive Platz für Icon */
+    font-size: 16px; /* Größere Schrift */
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .location-results-container {
@@ -1080,10 +1166,10 @@ input[type="checkbox"][style*="opacity: 0.5"] {
 
 .clear-icon {
     position: absolute;
-    right: 12px;
+    right: 25px; /* Passt zum neuen Padding */
     top: 50%;
     transform: translateY(-50%);
-    font-size: 18px;
+    font-size: 24px; /* Größer */
     color: var(--text-primary);
     cursor: pointer;
 }
@@ -1303,7 +1389,7 @@ input[type="checkbox"][style*="opacity: 0.5"] {
     left: 0;
     width: 100%;
     height: 100%;
-    background: var(--background-body);
+    background: rgba(var(--background-surface), 0.3);
     z-index: 10000;
     display: flex;
     justify-content: center;
@@ -1328,7 +1414,7 @@ input[type="checkbox"][style*="opacity: 0.5"] {
     left: 0;
     width: 100%;
     height: 100%;
-    background: var(--background-body);
+    background: rgba(var(--background-surface), 0.3);
     z-index: 10000;
     display: flex;
     justify-content: center;
@@ -1358,7 +1444,7 @@ input[type="checkbox"][style*="opacity: 0.5"] {
 
 .modal-btn:not(.cancel) {
     background-color: var(--color-primary);
-    color: white;
+    color: var(--text-inverted);
 }
 
 /* === SNACKBAR NOTIFICATIONS (aus mobiler Version übernommen) === */
