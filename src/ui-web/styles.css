@@ -132,12 +132,12 @@
         --wind-extreme: #d670d6;
         /* Helleres Lila */
 
-        --cc-clear: #2a3b57;
-        /* Dunklere Version von Hellblau */
-        --cc-few: #3a4b67;
-        --cc-sct: #4a5b77;
-        --cc-bkn: #5a6b87;
-        --cc-ovc: #6a7b97;
+        --cc-clear: #e3f2fd;
+        --cc-few: hsl(205, 36%, 86%);
+        --cc-sct: #e0e0e0;
+        --cc-bkn: #b0bec5;
+        --cc-ovc: #78909c;
+
 
         --border-wind-light: #99ccff;
         /* Helleres Blau */
@@ -216,6 +216,21 @@
         color: var(--palette-yellow-500) !important;
         /* Gelber Stern im Dark Mode */
     }
+
+/* Cancel-Button im Dark Mode (für .modal-btn.cancel und #adsbCancel) */
+        .modal .modal-btn.cancel,
+        .favorite-modal .modal-btn.cancel,
+        #adsbSelectionModal #adsbCancel {
+            background-color: var(--palette-grey-800) !important; /* Dunkler Hintergrund */
+            color: var(--text-primary) !important; /* Helle Schrift */
+            border: 1px solid var(--border-color) !important; /* Dunkler Rahmen */
+        }
+
+        .modal .modal-btn.cancel:hover,
+        .favorite-modal .modal-btn.cancel:hover,
+        #adsbSelectionModal #adsbCancel:hover {
+            background-color: var(--palette-grey-700) !important; /* Etwas heller bei Hover */
+        }
 }
 
 html {
@@ -1071,22 +1086,26 @@ input[type="checkbox"][style*="opacity: 0.5"] {
 
 .search-bar-container {
     position: relative;
-    margin-bottom: 20px; 
+    margin-bottom: 20px;
     padding: 15px;
 }
 
 .search-bar-container .search-icon {
     position: absolute;
-    left: 25px; /* Passt zum neuen Padding */
+    left: 25px;
+    /* Passt zum neuen Padding */
     top: 50%;
     transform: translateY(-50%);
-    font-size: 22px; /* Größer */
+    font-size: 22px;
+    /* Größer */
     pointer-events: none;
 }
 
 #locationSearchInput {
-    padding: 16px 20px 16px 55px; /* Deutlich vergrößert, inklusive Platz für Icon */
-    font-size: 16px; /* Größere Schrift */
+    padding: 16px 20px 16px 55px;
+    /* Deutlich vergrößert, inklusive Platz für Icon */
+    font-size: 16px;
+    /* Größere Schrift */
     border-radius: 10px;
     border: 1px solid var(--border-color);
     width: 100%;
@@ -1166,10 +1185,12 @@ input[type="checkbox"][style*="opacity: 0.5"] {
 
 .clear-icon {
     position: absolute;
-    right: 25px; /* Passt zum neuen Padding */
+    right: 25px;
+    /* Passt zum neuen Padding */
     top: 50%;
     transform: translateY(-50%);
-    font-size: 24px; /* Größer */
+    font-size: 24px;
+    /* Größer */
     color: var(--text-primary);
     cursor: pointer;
 }
