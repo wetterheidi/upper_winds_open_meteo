@@ -68,6 +68,7 @@
     --wind-high: orange;
     --wind-very-high: red;
     --wind-extreme: purple;
+    --wind-exceeding: #ffcccc;
 
     --cc-clear: #e3f2fd;
     --cc-few: hsl(205, 36%, 86%);
@@ -122,11 +123,16 @@
         --wind-extreme: #d670d6;
 
         /* Neue Wolkenbedeckungs-Farben im Dark Mode */
-        --cc-clear: #5c7cfa; /* Helles Blau für klaren Himmel */
-        --cc-few: #778beb; /* Etwas dunkleres Blau-Grau */
-        --cc-sct: #a4b0be; /* Hellgrau für verstreute Wolken */
-        --cc-bkn: #747d8c; /* Mittelgrau für überwiegend bewölkt */
-        --cc-ovc: #57606f; /* Dunkelgrau für bedeckt */
+        --cc-clear: #5c7cfa;
+        /* Helles Blau für klaren Himmel */
+        --cc-few: #778beb;
+        /* Etwas dunkleres Blau-Grau */
+        --cc-sct: #a4b0be;
+        /* Hellgrau für verstreute Wolken */
+        --cc-bkn: #747d8c;
+        /* Mittelgrau für überwiegend bewölkt */
+        --cc-ovc: #57606f;
+        /* Dunkelgrau für bedeckt */
 
         --border-wind-light: #99ccff;
         --border-wind-moderate: #80ff80;
@@ -307,8 +313,10 @@
         .leaflet-pm-toolbar,
         .leaflet-pm-icon,
         .leaflet-pm-action {
-            background-color: var(--palette-grey-800) !important; /* Dunkler Hintergrund */
-            border-color: var(--border-color) !important; /* Dunkler Rahmen */
+            background-color: var(--palette-grey-800) !important;
+            /* Dunkler Hintergrund */
+            border-color: var(--border-color) !important;
+            /* Dunkler Rahmen */
         }
 
         .leaflet-pm-toolbar a,
@@ -320,13 +328,16 @@
         .leaflet-pm-toolbar a:hover,
         .leaflet-pm-icon:hover,
         .leaflet-pm-action:hover {
-            background-color: var(--palette-grey-700) !important; /* Etwas heller bei Hover */
+            background-color: var(--palette-grey-700) !important;
+            /* Etwas heller bei Hover */
         }
 
         /* Geoman-Symbole im Dark Mode (SVG-Hintergrundbilder) */
         [data-theme="dark"] .leaflet-pm-toolbar .control-icon {
-            background-color: var(--palette-grey-800) !important; /* Dunkler Button-Hintergrund */
-            border: 1px solid red !important; /* Temporärer Rahmen zum Debuggen */
+            background-color: var(--palette-grey-800) !important;
+            /* Dunkler Button-Hintergrund */
+            border: 1px solid red !important;
+            /* Temporärer Rahmen zum Debuggen */
         }
 
         /* Spezifische SVG-Icons für Geoman-Controls im Dark Mode */
@@ -1026,6 +1037,16 @@ input[type="checkbox"][style*="opacity: 0.5"] {
 
 #weather-table-container tr.wind-very-high td {
     border: 2px solid var(--border-wind-very-high) !important;
+}
+
+#weather-table-container td.wind-speed-exceeds-threshold {
+    background-color: var(--wind-exceeding) !important;
+}
+
+/* Diese Klasse bleibt unverändert */
+.gust-exceeds-threshold {
+    color: var(--color-danger);
+    font-weight: bold;
 }
 
 #windspinne-container {

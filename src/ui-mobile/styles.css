@@ -61,6 +61,7 @@
     --wind-high: orange;
     --wind-very-high: red;
     --wind-extreme: purple;
+    --wind-exceeding: #ffcccc;
 
     --cc-clear: #e3f2fd;
     --cc-few: hsl(205, 36%, 86%);
@@ -715,6 +716,17 @@ input[type="checkbox"][style*="opacity: 1"] {
 
 #weather-table-container tr.wind-very-high td {
     border: 2px solid var(--border-wind-very-high) !important;
+}
+
+
+#weather-table-container td.wind-speed-exceeds-threshold {
+    background-color: var(--wind-exceeding) !important;
+}
+
+/* Diese Klasse bleibt unverändert */
+.gust-exceeds-threshold {
+    color: var(--color-danger);
+    font-weight: bold;
 }
 
 /* === Wind Spider Styles === */

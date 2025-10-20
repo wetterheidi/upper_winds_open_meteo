@@ -73,6 +73,13 @@ export const JUMP_RUN_DEFAULTS = {
     APPROACH_TIME_SECONDS: 120 // 2 Minuten für den Anflug
 };
 
+/**
+ * Schwellenwerte für Windwarnungen in der UI.
+ */
+export const WIND_THRESHOLDS = {
+    SURFACE_WIND_WARNING_KT: 16,
+    GUST_WARNING_KT: 25,
+};
 
 // ===================================================================
 // API & Externe Dienste

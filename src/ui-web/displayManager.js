@@ -11,7 +11,7 @@ import { Utils } from '../core/utils.js';
 import { getSliderValue } from '../ui-mobile/ui.js';
 import * as mapManager from './mapManager.js';
 import * as weatherManager from '../core/weatherManager.js';
-import { UI_DEFAULTS } from '../core/constants.js'; // UI_DEFAULTS für LANDING_PATTERN_MIN_ZOOM
+import { UI_DEFAULTS, WIND_THRESHOLDS } from '../core/constants.js'; // UI_DEFAULTS für LANDING_PATTERN_MIN_ZOOM
 import * as JumpPlanner from '../core/jumpPlanner.js';
 import { generateWindspinne } from '../core/windchart.js';
 import { DateTime } from 'luxon';
@@ -128,29 +128,53 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
         const formattedTemp = displayTemp === 'N/A' ? 'N/A' : displayTemp.toFixed(0);
         const convertedSpd = Utils.convertWind(spd, windSpeedUnit, 'km/h');
         let formattedWind;
+        let groundWindExceedsThreshold = false;
         const surfaceDisplayHeight = refLevel === 'AMSL' ? (heightUnit === 'ft' ? Math.round(surfaceHeight * 3.28084) : surfaceHeight) : 0;
-        if (Math.round(displayHeight) === surfaceDisplayHeight && AppState.weatherData.wind_gusts_10m[index] !== undefined && Number.isFinite(AppState.weatherData.wind_gusts_10m[index])) {
-            const gustSpd = AppState.weatherData.wind_gusts_10m[index];
-            const convertedGust = Utils.convertWind(gustSpd, windSpeedUnit, 'km/h');
-            const spdValue = windSpeedUnit === 'bft' ? Math.round(convertedSpd) : convertedSpd.toFixed(0);
-            const gustValue = windSpeedUnit === 'bft' ? Math.round(convertedGust) : convertedGust.toFixed(0);
-            formattedWind = `${spdValue} G ${gustValue}`;
+
+        console.log('[Windtest] '+ WIND_THRESHOLDS.SURFACE_WIND_WARNING_KT);
+        
+        if (Math.round(data.displayHeight) === surfaceDisplayHeight) {
+            const spdInKt = Utils.convertWind(spd, 'kt', 'km/h');
+            if (spdInKt > WIND_THRESHOLDS.SURFACE_WIND_WARNING_KT) {
+                groundWindExceedsThreshold = true;
+            }
+
+            if (AppState.weatherData.wind_gusts_10m[index] !== undefined && Number.isFinite(AppState.weatherData.wind_gusts_10m[index])) {
+                const gustSpd_kmh = AppState.weatherData.wind_gusts_10m[index];
+                const convertedGust = Utils.convertWind(gustSpd_kmh, windSpeedUnit, 'km/h');
+                const gustInKt = Utils.convertWind(gustSpd_kmh, 'kt', 'km/h');
+
+                const spdValue = windSpeedUnit === 'bft' ? Math.round(convertedSpd) : convertedSpd.toFixed(0);
+                let gustValue = windSpeedUnit === 'bft' ? Math.round(convertedGust) : convertedGust.toFixed(0);
+
+                // KORRIGIERTE LOGIK: Prüft die Böe unabhängig und wendet die Klasse nur auf den Wert an
+                if (gustInKt > WIND_THRESHOLDS.GUST_WARNING_KT) {
+                    gustValue = `<span class="gust-exceeds-threshold">${gustValue}</span>`;
+                }
+
+                formattedWind = `${spdValue} G ${gustValue}`;
+
+            } else {
+                formattedWind = convertedSpd === 'N/A' ? 'N/A' : (windSpeedUnit === 'bft' ? Math.round(convertedSpd) : convertedSpd.toFixed(0));
+            }
         } else {
             formattedWind = convertedSpd === 'N/A' ? 'N/A' : (windSpeedUnit === 'bft' ? Math.round(convertedSpd) : convertedSpd.toFixed(0));
         }
+
         const speedKt = Math.round(Utils.convertWind(spd, 'kt', 'km/h') / 5) * 5;
         const windBarbSvg = data.dir === 'N/A' || isNaN(speedKt) ? 'N/A' : Utils.generateWindBarb(data.dir, speedKt);
 
+        // Die Klasse wird nur noch auf die <td> angewendet, `formattedWind` enthält potenziell das Span-Element
         return `<tr class="${windClass} ${cloudCoverClass}">
                     <td>${Math.round(displayHeight)}</td>
                     <td>${Utils.roundToTens(data.dir)}</td>
-                    <td>${formattedWind}</td>
+                    <td class="${groundWindExceedsThreshold ? 'wind-speed-exceeds-threshold' : ''}">${formattedWind}</td>
                     <td>${windBarbSvg}</td>
                     <td>${formattedTemp}</td>
                     <td>${Math.round(data.rh)}</td>
-                    <td>${data.cc}</td> <!-- NEUE SPALTE für Wolkenbedeckung -->
+                    <td>${data.cc}</td>
                 </tr>`;
-    }).join(''); // .join('') fügt alle Zeilen zu einem einzigen String zusammen
+    }).join('');
 
     // NEU: Die gesamte Tabelle in einer einzigen, lesbaren Vorlage erstellen
     const output = `
