@@ -374,6 +374,36 @@ export async function updateSliderLabels() {
     }
 }
 
+/**
+ * Aktualisiert den Hintergrund des Zeitschiebereglers, um Stunden mit Warnungen hervorzuheben.
+ * @param {number[]} alertIndices - Ein Array der Stunden-Indizes mit Warnungen.
+ */
+export function updateAlertSliderBackground(alertIndices) {
+    const highlightTrack = document.getElementById('slider-track-highlight');
+    const slider = document.getElementById('timeSlider');
+    if (!highlightTrack || !slider) return;
+
+    const totalHours = parseInt(slider.max) + 1;
+    if (totalHours <= 0 || alertIndices.length === 0) {
+        highlightTrack.style.background = 'var(--background-interactive)';
+        return;
+    }
+
+    const stops = [];
+    const alertColor = 'var(--color-danger)';
+    const defaultColor = 'var(--background-interactive)';
+
+    for (let i = 0; i < totalHours; i++) {
+        const color = alertIndices.includes(i) ? alertColor : defaultColor;
+        const startPercent = (i / totalHours) * 100;
+        const endPercent = ((i + 1) / totalHours) * 100;
+        stops.push(`${color} ${startPercent}%`);
+        stops.push(`${color} ${endPercent}%`);
+    }
+
+    highlightTrack.style.background = `linear-gradient(to right, ${stops.join(', ')})`;
+}
+
 // ===================================================================
 // 2. Sprung-Visualisierungen
 // ===================================================================

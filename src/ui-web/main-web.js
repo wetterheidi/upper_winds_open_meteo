@@ -132,6 +132,12 @@ function initializeUIElements() {
     applySettingToCheckbox('showExitAreaCheckbox', Settings.state.userSettings.showExitArea);
     applySettingToCheckbox('showCutAwayFinder', Settings.state.userSettings.showCutAwayFinder);
     applySettingToInput('terrainClearance', Settings.state.userSettings.terrainClearance);
+
+    applySettingToCheckbox('alertWindEnabled', Settings.state.userSettings.alerts.wind.enabled);
+    applySettingToInput('alertWindThreshold', Settings.state.userSettings.alerts.wind.threshold);
+    applySettingToCheckbox('alertGustEnabled', Settings.state.userSettings.alerts.gust.enabled);
+    applySettingToInput('alertGustThreshold', Settings.state.userSettings.alerts.gust.threshold);
+
     Settings.state.userSettings.isCustomJumpRunDirection = Settings.state.userSettings.isCustomJumpRunDirection || false;
 
     // Ensure UI reflects the stored custom direction without overwriting
@@ -883,7 +889,21 @@ export async function updateUIWithNewWeatherData(newWeatherData, preservedIndex 
         console.log(`Slider set to default (current hour or max): ${slider.value}`);
     }
 
+    const { highWinds, highGusts } = weatherManager.checkWindAlerts(newWeatherData);
+    const alertIndices = [...new Set([...highWinds, ...highGusts])];
+
+    // Steuert die Sichtbarkeit des Alarm-Icons auf der Karte
+    const alertIcon = document.getElementById('map-alert-icon');
+    if (alertIcon) {
+        alertIcon.classList.toggle('hidden', alertIndices.length === 0);
+    }
+
+    // Aktualisiert den eingefärbten Slider-Hintergrund
+    displayManager.updateAlertSliderBackground(alertIndices);
+
+    // Aktualisiert die Datums-Labels (diese Funktion muss jetzt ohne Parameter aufgerufen werden)
     await displayManager.updateSliderLabels();
+
 
     await displayManager.updateWeatherDisplay(slider.value, 'weather-table-container', 'selectedTime');
     await displayManager.refreshMarkerPopup();
@@ -1817,6 +1837,19 @@ function setupAppEventListeners() {
 
         // Hier wird die Funktion aufgerufen, die vorher im eventManager stand
         applySettingToInput(id, defaultValue);
+    });
+
+    document.addEventListener('ui:recalculateAlerts', () => {
+        if (AppState.weatherData) {
+            const { highWinds, highGusts } = weatherManager.checkWindAlerts(AppState.weatherData);
+            const alertIndices = [...new Set([...highWinds, ...highGusts])];
+            displayManager.updateAlertSliderBackground(alertIndices);
+
+            const alertIcon = document.getElementById('map-alert-icon');
+            if (alertIcon) {
+                alertIcon.classList.toggle('hidden', alertIndices.length === 0);
+            }
+        }
     });
 }
 

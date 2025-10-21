@@ -91,6 +91,18 @@ export const Settings = {
         selectedEnsembleModels: [],
         currentEnsembleScenario: 'all_models',
         isInteractionLocked: false,
+        enableWindAlert: true, 
+
+        alerts: {
+            wind: {
+                enabled: true,
+                threshold: 16
+            },
+            gust: {
+                enabled: true,
+                threshold: 25
+            }
+        }
     },
 
     /**

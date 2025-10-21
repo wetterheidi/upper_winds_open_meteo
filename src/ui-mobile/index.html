@@ -28,6 +28,7 @@
     <div id="map-container">
         <div id="map"></div>
         <div id="crosshair"></div>
+        <div id="map-alert-icon" class="hidden">⚠️</div>
     </div>
     <div id="slider-container">
         <div class="slider-content-wrapper">
@@ -39,6 +40,7 @@
                 </div>
             </div>
             <div class="slider-wrapper">
+                <div id="slider-track-highlight"></div>
                 <input type="range" id="timeSlider" min="0" max="167" value="0" disabled>
                 <div id="slider-labels"></div>
             </div>
@@ -106,6 +108,14 @@
                     style="background: none; border: none; font-size: 24px; cursor: pointer;">&times;</button>
             </div>
             <iframe id="reportIframe" style="width: 100%; height: 100%; border: none;"></iframe>
+        </div>
+    </div>
+    
+    <div id="info-popup-container" class="modal hidden">
+        <div class="modal-content">
+            <h3 id="info-popup-title"></h3>
+            <ul id="info-popup-list"></ul>
+            <button id="info-popup-close" class="btn btn-primary">Acknowledge</button>
         </div>
     </div>
 
@@ -732,6 +742,25 @@
             <div class="accordion-item">
                 <button class="accordion-header">App Management</button>
                 <div class="accordion-content" id="app-management-settings">
+                </div>
+            </div>
+
+            <div class="accordion-item">
+                <button class="accordion-header">Alerts</button>
+                <div class="accordion-content">
+                    <div class="settings-grid">
+                        <label for="alertWindEnabled">High Wind Alert:</label>
+                        <input type="checkbox" id="alertWindEnabled">
+
+                        <label for="alertWindThreshold">Threshold (kt):</label>
+                        <input type="number" id="alertWindThreshold" min="5" max="50" step="1">
+
+                        <label for="alertGustEnabled">High Gust Alert:</label>
+                        <input type="checkbox" id="alertGustEnabled">
+
+                        <label for="alertGustThreshold">Threshold (kt):</label>
+                        <input type="number" id="alertGustThreshold" min="10" max="60" step="1">
+                    </div>
                 </div>
             </div>
         </div>

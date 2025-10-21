@@ -18,6 +18,8 @@ import 'leaflet-gpx';
 import { FilePicker } from '@capawesome/capacitor-file-picker';
 import * as LocationManager from '../core/locationManager.js';
 import * as AdsbManager from '../core/adsbManager.js';
+import * as weatherManager from '../core/weatherManager.js'; // NEUER IMPORT
+import { DateTime } from 'luxon';                         // NEUER IMPORT
 
 // =================================================================
 // 1. Globale Variablen & Zustand
@@ -950,6 +952,20 @@ function setupCheckboxEvents() {
             });
         }
 
+        // NEUE CHECKBOXEN FÜR ALERTS
+        setupCheckbox('alertWindEnabled', 'alerts.wind.enabled', (checkbox) => {
+            Settings.state.userSettings.alerts.wind.enabled = checkbox.checked;
+            Settings.save();
+            // Löst eine Neuberechnung der Alarme aus
+            document.dispatchEvent(new CustomEvent('ui:recalculateAlerts'));
+        });
+
+        setupCheckbox('alertGustEnabled', 'alerts.gust.enabled', (checkbox) => {
+            Settings.state.userSettings.alerts.gust.enabled = checkbox.checked;
+            Settings.save();
+            document.dispatchEvent(new CustomEvent('ui:recalculateAlerts'));
+        });
+
         // --- NEUER, KORRIGIERTER CODEBLOCK ---
         // Aktualisiert den Draggable-Status für die anderen Marker
 
@@ -1211,6 +1227,20 @@ function setupInputEvents() {
     setupInput('terrainClearance', 'change', 300);
 
     setupInput('historicalDatePicker', 'change', 300);
+
+        setupInput('alertWindThreshold', 'change', 300, (value) => {
+        Settings.state.userSettings.alerts.wind.threshold = value;
+        Settings.save();
+        document.dispatchEvent(new CustomEvent('ui:recalculateAlerts'));
+        return true;
+    });
+
+    setupInput('alertGustThreshold', 'change', 300, (value) => {
+        Settings.state.userSettings.alerts.gust.threshold = value;
+        Settings.save();
+        document.dispatchEvent(new CustomEvent('ui:recalculateAlerts'));
+        return true;
+    });
 }
 function setupDownloadEvents() {
     const downloadButton = document.getElementById('downloadButton');
@@ -1263,6 +1293,55 @@ function setupHtmlReportModalEvents() {
                 // Iframe leeren, um Ressourcen freizugeben und ggf. Töne zu stoppen
                 iframe.src = 'about:blank';
             }
+        });
+    }
+}
+/**
+ * Richtet den Klick-Event-Listener für das Wetter-Alarm-Icon auf der Karte ein.
+ * @private
+ */
+async function setupAlertIconEvents() { // Die Funktion ist jetzt async
+    const alertIcon = document.getElementById('map-alert-icon');
+    if (alertIcon) {
+        alertIcon.addEventListener('click', async () => { // Der Callback ist ebenfalls async
+            const { highWinds, highGusts } = weatherManager.checkWindAlerts(AppState.weatherData);
+            
+            const popupContainer = document.getElementById('info-popup-container');
+            const popupTitle = document.getElementById('info-popup-title');
+            const popupList = document.getElementById('info-popup-list');
+            const popupClose = document.getElementById('info-popup-close');
+
+            if (!popupContainer || !popupTitle || !popupList || !popupClose) return;
+
+            popupTitle.textContent = 'Active Weather Alerts';
+            popupList.innerHTML = '';
+
+            const createListItem = (text) => {
+                const li = document.createElement('li');
+                li.textContent = text;
+                return li;
+            };
+
+            const timeZoneSetting = Settings.getValue('timeZone', 'Z');
+
+            if (highWinds.length > 0) {
+                const windThreshold = Settings.state.userSettings.alerts.wind.threshold;
+                // KORREKTUR: Nutzt getDisplayTime für die korrekte Zeitzone
+                const firstTime = await Utils.getDisplayTime(AppState.weatherData.time[highWinds[0]], AppState.lastLat, AppState.lastLng, timeZoneSetting);
+                popupList.appendChild(createListItem(`High Winds (> ${windThreshold} kt) detected at ${firstTime} and other times.`));
+            }
+            if (highGusts.length > 0) {
+                const gustThreshold = Settings.state.userSettings.alerts.gust.threshold;
+                // KORREKTUR: Nutzt getDisplayTime für die korrekte Zeitzone
+                const firstTime = await Utils.getDisplayTime(AppState.weatherData.time[highGusts[0]], AppState.lastLat, AppState.lastLng, timeZoneSetting);
+                popupList.appendChild(createListItem(`High Gusts (> ${gustThreshold} kt) detected at ${firstTime} and other times.`));
+            }
+            
+            popupContainer.classList.remove('hidden');
+
+            popupClose.onclick = () => {
+                popupContainer.classList.add('hidden');
+            };
         });
     }
 }
@@ -1758,6 +1837,7 @@ export function initializeEventListeners() {
     setupDownloadEvents();
     setupClearHistoricalDate();
     setupHtmlReportModalEvents();
+    setupAlertIconEvents();
 
     // 4. Spezifische Planner-Funktionen
     setupJumpRunTrackEvents();

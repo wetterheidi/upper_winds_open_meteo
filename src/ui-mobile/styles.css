@@ -1208,6 +1208,82 @@ input[type="checkbox"][style*="opacity: 1"] {
 }
 
 
+/* === ALERT STILE === */
+#map-alert-icon {
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    z-index: 1000;
+    font-size: 28px;
+    padding: 5px;
+    background-color: rgba(var(--background-white), 0.7);;
+    border-radius: 50%;
+    cursor: pointer;
+    text-shadow: var(--shadow);
+    animation: pulse-alert 2s infinite ease-in-out;
+}
+
+#map-alert-icon.hidden {
+    display: none;
+}
+
+@keyframes pulse-alert {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.1); opacity: 0.8; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+/* Stil für den Slider-Hintergrund */
+.slider-wrapper {
+    position: relative;
+    width: 100%;
+    margin-bottom: 20px;
+    /* Etwas Platz für die Labels */
+    display: flex;
+    align-items: center;
+}
+
+#slider-track-highlight {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    transform: translateY(-50%);
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    pointer-events: none;
+    background: var(--background-interactive); /* Standardfarbe */
+}
+
+#timeSlider {
+    position: relative; /* Muss über dem Highlight-Layer liegen */
+    z-index: 2;
+    background: transparent; /* Macht den originalen Track durchsichtig */
+}
+
+#info-popup-container ul {
+    list-style: none;
+    padding: 0;
+    margin: 15px 0;
+    text-align: left;
+}
+
+#info-popup-container li {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+#info-popup-container li:last-child {
+    border-bottom: none;
+}
+
+/* NEUER, HINZUGEFÜGTER STIL-BLOCK */
+#info-popup-container h3 {
+    font-size: 1.2rem; /* Macht die Schrift etwas größer */
+    font-weight: bold; /* Macht die Schrift fett */
+    margin-bottom: 15px; /* Fügt etwas Abstand nach unten hinzu */
+}
+
 /* =================================================================== */
 /* 5. LEAFLET & KARTEN-STILE
 /* =================================================================== */

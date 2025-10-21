@@ -488,3 +488,42 @@ export const debouncedGetElevationAndQFE = Utils.debounce(async (lat, lng) => {
         console.error('Error fetching elevation and QFE:', error);
     }
 }, 500);
+
+/**
+ * Überprüft die stündlichen Wetterdaten auf Überschreitungen der Wind-Grenzwerte.
+ * @param {object} weatherData - Das 'hourly' Objekt aus der API-Antwort.
+ * @returns {{highWinds: number[], highGusts: number[]}} Ein Objekt mit Arrays von Indizes, an denen die Grenzwerte überschritten wurden.
+ */
+export function checkWindAlerts(weatherData) {
+    // Holen der Schwellenwerte aus den Settings
+    const windConfig = Settings.state.userSettings.alerts.wind;
+    const gustConfig = Settings.state.userSettings.alerts.gust;
+
+    if (!weatherData || !weatherData.time || (!windConfig.enabled && !gustConfig.enabled)) {
+        return { highWinds: [], highGusts: [] };
+    }
+
+    const highWinds = [];
+    const highGusts = [];
+
+    for (let i = 0; i < weatherData.time.length; i++) {
+        // KORREKTUR: Variablen hier definieren, bevor sie verwendet werden.
+        const windSpeed_kmh = weatherData.wind_speed_10m[i];
+        const gustSpeed_kmh = weatherData.wind_gusts_10m[i];
+
+        if (windConfig.enabled && windSpeed_kmh !== null) {
+            const windSpeed_kt = Utils.convertWind(windSpeed_kmh, 'kt', 'km/h');
+            if (windSpeed_kt > windConfig.threshold) {
+                highWinds.push(i);
+            }
+        }
+
+        if (gustConfig.enabled && gustSpeed_kmh !== null) {
+            const gustSpeed_kt = Utils.convertWind(gustSpeed_kmh, 'kt', 'km/h');
+            if (gustSpeed_kt > gustConfig.threshold) {
+                highGusts.push(i);
+            }
+        }
+    }
+    return { highWinds, highGusts };
+}

@@ -46,6 +46,7 @@
                         </div>
                     </div>
                     <div class="slider-wrapper">
+                        <div id="slider-track-highlight"></div>
                         <input type="range" id="timeSlider" min="0" max="167" value="0" disabled>
                         <div id="slider-labels"></div>
                     </div>
@@ -68,6 +69,7 @@
             <div id="map-content">
                 <div id="map"></div>
                 <div id="crosshair"></div>
+                <div id="map-alert-icon" class="hidden">⚠️</div>
             </div>
 
             <aside id="sidebar">
@@ -672,6 +674,25 @@
                             <button id="theme-toggle" class="btn btn-secondary">Switch to Dark Mode</button>
                         </div>
                     </div>
+
+                    <div class="accordion-item">
+                        <button class="accordion-header">Alerts</button>
+                        <div class="accordion-content">
+                            <div class="settings-grid">
+                                <label for="alertWindEnabled">High Wind Alert:</label>
+                                <input type="checkbox" id="alertWindEnabled">
+
+                                <label for="alertWindThreshold">Threshold (kt):</label>
+                                <input type="number" id="alertWindThreshold" min="5" max="50" step="1">
+
+                                <label for="alertGustEnabled">High Gust Alert:</label>
+                                <input type="checkbox" id="alertGustEnabled">
+
+                                <label for="alertGustThreshold">Threshold (kt):</label>
+                                <input type="number" id="alertGustThreshold" min="10" max="60" step="1">
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -700,6 +721,14 @@
             <div class="modal-buttons">
                 <button id="adsbCancel">Cancel</button>
             </div>
+        </div>
+    </div>
+
+    <div id="info-popup-container" class="modal hidden">
+        <div class="modal-content">
+            <h3 id="info-popup-title"></h3>
+            <ul id="info-popup-list"></ul>
+            <button id="info-popup-close" class="btn btn-primary">Acknowledge</button>
         </div>
     </div>
 
