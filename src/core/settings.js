@@ -104,6 +104,11 @@ export const Settings = {
             },
             thunderstorm: {
                 enabled: true
+            },
+            clouds: {
+                enabled: true,
+                cover: 'BKN',
+                base: 1000 // in Metern
             }
         }
     },
@@ -186,7 +191,12 @@ export const Settings = {
                 thunderstorm: {
                     ...this.defaultSettings.alerts.thunderstorm,
                     ...(storedSettings.alerts?.thunderstorm || {})
+                },
+                clouds: {
+                    ...this.defaultSettings.alerts.clouds,
+                    ...(storedSettings.alerts?.clouds || {})
                 }
+
             }
         };
         // Nicht-persistente Einstellungen zurücksetzen

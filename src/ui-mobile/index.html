@@ -755,14 +755,29 @@
                         <label for="alertWindThreshold">Threshold (kt):</label>
                         <input type="number" id="alertWindThreshold" min="5" max="50" step="1">
 
-                        <label for="alertGustEnabled">High Gust Alert:</label>
+                        <div class="grid-separator"></div> <label for="alertGustEnabled">High Gust Alert:</label>
                         <input type="checkbox" id="alertGustEnabled">
 
                         <label for="alertGustThreshold">Threshold (kt):</label>
                         <input type="number" id="alertGustThreshold" min="10" max="60" step="1">
-                        
-                        <label for="alertThunderstormEnabled">Thunderstorm Alert:</label>
+
+                        <div class="grid-separator"></div> <label for="alertThunderstormEnabled">Thunderstorm
+                            Alert:</label>
                         <input type="checkbox" id="alertThunderstormEnabled">
+
+                        <div class="grid-separator"></div> <label for="alertCloudsEnabled">Cloud Base Alert:</label>
+                        <input type="checkbox" id="alertCloudsEnabled">
+
+                        <label for="alertCloudCover">Min. Cloud Cover:</label>
+                        <select id="alertCloudCover">
+                            <option value="FEW">FEW (1/8 - 2/8)</option>
+                            <option value="SCT">SCT (3/8 - 4/8)</option>
+                            <option value="BKN" selected>BKN (5/8 - 7/8)</option>
+                            <option value="OVC">OVC (8/8)</option>
+                        </select>
+
+                        <label for="alertCloudBase">Max. Cloud Base (m):</label>
+                        <input type="number" id="alertCloudBase" min="100" max="10000" step="100">
                     </div>
                 </div>
             </div>

@@ -1007,12 +1007,6 @@ function setupCheckboxEvents() {
         }
     });
 
-    setupCheckbox('alertThunderstormEnabled', 'alerts.thunderstorm.enabled', (checkbox) => {
-        Settings.state.userSettings.alerts.thunderstorm.enabled = checkbox.checked;
-        Settings.save();
-        document.dispatchEvent(new CustomEvent('ui:recalculateAlerts'));
-    });
-
     const showJumpMasterLineCheckbox = document.getElementById('showJumpMasterLine');
     if (showJumpMasterLineCheckbox) {
         showJumpMasterLineCheckbox.disabled = !Settings.state.userSettings.trackPosition;
@@ -1233,20 +1227,6 @@ function setupInputEvents() {
     setupInput('terrainClearance', 'change', 300);
 
     setupInput('historicalDatePicker', 'change', 300);
-
-    setupInput('alertWindThreshold', 'change', 300, (value) => {
-        Settings.state.userSettings.alerts.wind.threshold = value;
-        Settings.save();
-        document.dispatchEvent(new CustomEvent('ui:recalculateAlerts'));
-        return true;
-    });
-
-    setupInput('alertGustThreshold', 'change', 300, (value) => {
-        Settings.state.userSettings.alerts.gust.threshold = value;
-        Settings.save();
-        document.dispatchEvent(new CustomEvent('ui:recalculateAlerts'));
-        return true;
-    });
 }
 function setupDownloadEvents() {
     const downloadButton = document.getElementById('downloadButton');
@@ -1302,6 +1282,68 @@ function setupHtmlReportModalEvents() {
         });
     }
 }
+function setupAlertSelectEvents() {
+    const cloudCoverSelect = document.getElementById('alertCloudCover');
+    if (cloudCoverSelect) {
+        cloudCoverSelect.addEventListener('change', () => {
+            Settings.state.userSettings.alerts.clouds.cover = cloudCoverSelect.value;
+            Settings.save();
+            document.dispatchEvent(new CustomEvent('ui:recalculateAlerts'));
+        });
+    }
+}
+
+function setupAlertEventListeners() {
+    // --- Checkboxen (waren bereits korrekt) ---
+    setupCheckbox('alertWindEnabled', 'alerts.wind.enabled', (checkbox) => {
+        Settings.state.userSettings.alerts.wind.enabled = checkbox.checked;
+        Settings.save();
+        document.dispatchEvent(new CustomEvent('ui:recalculateAlerts'));
+    });
+    // ... (andere Checkboxen bleiben unverändert) ...
+    setupCheckbox('alertCloudsEnabled', 'alerts.clouds.enabled', (checkbox) => {
+        Settings.state.userSettings.alerts.clouds.enabled = checkbox.checked;
+        Settings.save();
+        document.dispatchEvent(new CustomEvent('ui:recalculateAlerts'));
+    });
+
+    // --- Select-Menü (war bereits korrekt) ---
+    const cloudCoverSelect = document.getElementById('alertCloudCover');
+    if (cloudCoverSelect) {
+        cloudCoverSelect.addEventListener('change', () => {
+            Settings.state.userSettings.alerts.clouds.cover = cloudCoverSelect.value;
+            Settings.save();
+            document.dispatchEvent(new CustomEvent('ui:recalculateAlerts'));
+        });
+    }
+
+    // --- KORREKTUR DER INPUT-FELDER ---
+    const setupAlertInput = (id, settingPath) => {
+        const input = document.getElementById(id);
+        if (input) {
+            input.addEventListener('change', Utils.debounce(() => {
+                const value = parseFloat(input.value);
+                if (!isNaN(value)) {
+                    // Setzt den Wert am korrekten, verschachtelten Pfad
+                    const keys = settingPath.split('.');
+                    let current = Settings.state.userSettings;
+                    for (let i = 0; i < keys.length - 1; i++) {
+                        current = current[keys[i]];
+                    }
+                    current[keys[keys.length - 1]] = value;
+                    
+                    Settings.save();
+                    document.dispatchEvent(new CustomEvent('ui:recalculateAlerts'));
+                }
+            }, 300));
+        }
+    };
+
+    setupAlertInput('alertWindThreshold', 'alerts.wind.threshold');
+    setupAlertInput('alertGustThreshold', 'alerts.gust.threshold');
+    setupAlertInput('alertCloudBase', 'alerts.clouds.base');
+}
+
 /**
  * Richtet den Klick-Event-Listener für das Wetter-Alarm-Icon auf der Karte ein.
  * @private
@@ -1310,7 +1352,7 @@ async function setupAlertIconEvents() { // Die Funktion ist jetzt async
     const alertIcon = document.getElementById('map-alert-icon');
     if (alertIcon) {
         alertIcon.addEventListener('click', async () => { // Der Callback ist ebenfalls async
-            const { highWinds, highGusts, thunderstorms} = weatherManager.checkWeatherAlerts(AppState.weatherData);
+            const { highWinds, highGusts, thunderstorms, cloudAlerts } = weatherManager.checkWeatherAlerts(AppState.weatherData);
 
             const popupContainer = document.getElementById('info-popup-container');
             const popupTitle = document.getElementById('info-popup-title');
@@ -1346,6 +1388,12 @@ async function setupAlertIconEvents() { // Die Funktion ist jetzt async
             if (thunderstorms.length > 0) {
                 const firstTime = await Utils.getDisplayTime(AppState.weatherData.time[thunderstorms[0]], AppState.lastLat, AppState.lastLng, timeZoneSetting);
                 popupList.appendChild(createListItem(`Thunderstorm forecast at ${firstTime} and other times.`));
+            }
+
+            if (cloudAlerts.length > 0) {
+                const cloudConfig = Settings.state.userSettings.alerts.clouds;
+                const firstTime = await Utils.getDisplayTime(AppState.weatherData.time[cloudAlerts[0]], AppState.lastLat, AppState.lastLng, timeZoneSetting);
+                popupList.appendChild(createListItem(`Cloud base below ${cloudConfig.base}m with at least ${cloudConfig.cover} cover detected at ${firstTime} and other times.`));
             }
 
             popupContainer.classList.remove('hidden');
@@ -1848,7 +1896,9 @@ export function initializeEventListeners() {
     setupDownloadEvents();
     setupClearHistoricalDate();
     setupHtmlReportModalEvents();
+    setupAlertSelectEvents();
     setupAlertIconEvents();
+    setupAlertEventListeners();
 
     // 4. Spezifische Planner-Funktionen
     setupJumpRunTrackEvents();

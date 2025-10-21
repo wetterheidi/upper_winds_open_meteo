@@ -498,14 +498,23 @@ export function checkWeatherAlerts(weatherData) {
     const windConfig = Settings.state.userSettings.alerts.wind;
     const gustConfig = Settings.state.userSettings.alerts.gust;
     const thunderstormConfig = Settings.state.userSettings.alerts.thunderstorm;
+    const cloudsConfig = Settings.state.userSettings.alerts.clouds;
 
     if (!weatherData || !weatherData.time) {
-        return { highWinds: [], highGusts: [], thunderstorms: [] };
+        return { highWinds: [], highGusts: [], thunderstorms: [], cloudAlerts: [] };
     }
 
-    const highWinds = [];
-    const highGusts = [];
-    const thunderstorms = [];
+    const highWinds = [], highGusts = [], thunderstorms = [], cloudAlerts = [];
+    const categoryOrder = { 'FEW': 1, 'SCT': 2, 'BKN': 3, 'OVC': 4 };
+
+    // Diese Hilfsfunktion ist lokal hier definiert, um Abhängigkeiten zu reduzieren.
+    const getMetarCategory = (cc) => {
+        if (cc <= 5) return null;
+        if (cc <= 25) return 'FEW';
+        if (cc <= 50) return 'SCT';
+        if (cc <= 87) return 'BKN';
+        return 'OVC';
+    };
 
     for (let i = 0; i < weatherData.time.length; i++) {
         const windSpeed_kmh = weatherData.wind_speed_10m[i];
@@ -531,6 +540,25 @@ export function checkWeatherAlerts(weatherData) {
                 thunderstorms.push(i);
             }
         }
+
+        if (cloudsConfig.enabled) {
+            const interpolatedData = interpolateWeatherData(weatherData, i, 500, Math.round(AppState.lastAltitude), 'm');
+            const alertCoverThreshold = categoryOrder[cloudsConfig.cover];
+
+            // Iteriert direkt durch die Rohdaten jeder einzelnen Höhenstufe.
+            for (const point of interpolatedData) {
+                const pointCategory = getMetarCategory(point.cc);
+                if (!pointCategory) continue; // Überspringt, wenn keine signifikante Bewölkung vorhanden ist.
+
+                const pointCover = categoryOrder[pointCategory];
+                
+                // Prüft die Kriterien direkt für diesen Datenpunkt.
+                if (pointCover >= alertCoverThreshold && point.displayHeight < cloudsConfig.base) {
+                    cloudAlerts.push(i);
+                    break; // Ein Treffer pro Stunde genügt, wir können zur nächsten Stunde springen.
+                }
+            }
+        }
     }
-    return { highWinds, highGusts, thunderstorms };
+    return { highWinds, highGusts, thunderstorms, cloudAlerts }; // NEU
 }

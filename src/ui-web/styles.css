@@ -1424,6 +1424,13 @@ button.btn {
     margin-bottom: 15px; /* Fügt etwas Abstand nach unten hinzu */
 }
 
+.settings-grid .grid-separator {
+    grid-column: 1 / -1; /* Erstreckt sich über alle Spalten des Grids */
+    height: 1px;
+    background-color: var(--border-color);
+    margin: 8px 0; /* Vertikaler Abstand */
+}
+
 /* =================================================================== */
 /* 6. KARTEN- & LEAFLET-STILE
 /* =================================================================== */

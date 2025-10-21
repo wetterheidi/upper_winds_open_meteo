@@ -115,11 +115,16 @@ function initializeUIElements() {
     applySettingToCheckbox('showCutAwayFinder', Settings.state.userSettings.showCutAwayFinder);
     applySettingToInput('terrainClearance', Settings.state.userSettings.terrainClearance);
 
-    applySettingToCheckbox('alertWindEnabled', Settings.state.userSettings.alerts.wind.enabled);
-    applySettingToInput('alertWindThreshold', Settings.state.userSettings.alerts.wind.threshold);
-    applySettingToCheckbox('alertGustEnabled', Settings.state.userSettings.alerts.gust.enabled);
-    applySettingToInput('alertGustThreshold', Settings.state.userSettings.alerts.gust.threshold);
-    applySettingToCheckbox('alertThunderstormEnabled', Settings.state.userSettings.alerts.thunderstorm.enabled);
+    if (Settings.state.userSettings.alerts) {
+        applySettingToCheckbox('alertWindEnabled', Settings.state.userSettings.alerts.wind.enabled);
+        applySettingToInput('alertWindThreshold', Settings.state.userSettings.alerts.wind.threshold);
+        applySettingToCheckbox('alertGustEnabled', Settings.state.userSettings.alerts.gust.enabled);
+        applySettingToInput('alertGustThreshold', Settings.state.userSettings.alerts.gust.threshold);
+        applySettingToCheckbox('alertThunderstormEnabled', Settings.state.userSettings.alerts.thunderstorm.enabled);
+        applySettingToCheckbox('alertCloudsEnabled', Settings.state.userSettings.alerts.clouds.enabled);
+        applySettingToSelect('alertCloudCover', Settings.state.userSettings.alerts.clouds.cover);
+        applySettingToInput('alertCloudBase', Settings.state.userSettings.alerts.clouds.base);
+    }
 
     Settings.state.userSettings.isCustomJumpRunDirection = Settings.state.userSettings.isCustomJumpRunDirection || false;
 
@@ -1017,8 +1022,8 @@ export async function updateUIWithNewWeatherData(newWeatherData, preservedIndex 
         console.log(`Slider set to default (current hour or max): ${slider.value}`);
     }
 
-    const { highWinds, highGusts, thunderstorms } = weatherManager.checkWeatherAlerts(newWeatherData);
-    const alertIndices = [...new Set([...highWinds, ...highGusts, ...thunderstorms])];
+    const { highWinds, highGusts, thunderstorms, cloudAlerts } = weatherManager.checkWeatherAlerts(newWeatherData);
+    const alertIndices = [...new Set([...highWinds, ...highGusts, ...thunderstorms, ...cloudAlerts])];
 
     // Steuert die Sichtbarkeit des Alarm-Icons auf der Karte
     const alertIcon = document.getElementById('map-alert-icon');
@@ -2157,18 +2162,21 @@ function setupAppEventListeners() {
         }
     });
 
-    document.addEventListener('ui:recalculateAlerts', () => {
-        if (AppState.weatherData) {
-            const { highWinds, highGusts, thunderstorms } = weatherManager.checkWeatherAlerts(AppState.weatherData);
-            const alertIndices = [...new Set([...highWinds, ...highGusts, ...thunderstorms])];
-            displayManager.updateAlertSliderBackground(alertIndices);
+document.addEventListener('ui:recalculateAlerts', () => {
+    if (AppState.weatherData) {
+        // KORREKTUR: "cloudAlerts" hinzugefügt
+        const { highWinds, highGusts, thunderstorms, cloudAlerts } = weatherManager.checkWeatherAlerts(AppState.weatherData);
+        // KORREKTUR: "cloudAlerts" zum Array hinzugefügt
+        const alertIndices = [...new Set([...highWinds, ...highGusts, ...thunderstorms, ...cloudAlerts])];
+        
+        displayManager.updateAlertSliderBackground(alertIndices);
 
-            const alertIcon = document.getElementById('map-alert-icon');
-            if (alertIcon) {
-                alertIcon.classList.toggle('hidden', alertIndices.length === 0);
-            }
+        const alertIcon = document.getElementById('map-alert-icon');
+        if (alertIcon) {
+            alertIcon.classList.toggle('hidden', alertIndices.length === 0);
         }
-    });
+    }
+});
 }
 
 // =================================================================

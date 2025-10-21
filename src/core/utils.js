@@ -623,22 +623,20 @@ export class Utils {
     }
 
     /**
-     * Finds and formats up to three significant cloud layers based on METAR rules,
-     * identifying layers by changes in cloud cover density (FEW, SCT, BKN, OVC).
-     * The output is made unambiguous by including the unit.
-     * @param {object[]} interpolatedData - The array of interpolated weather data for a single time step.
-     * @param {string} heightUnit - The user's selected height unit ('m' or 'ft').
-     * @returns {string} The formatted cloud layer string (e.g., "SCT 100m, BKN 700m, OVC 800m").
-     */
-    static getCloudLayersForMetar(interpolatedData, heightUnit) {
+         * NEUE FUNKTION: Findet signifikante Wolkenschichten und gibt sie als strukturiertes Array zurück.
+         * @param {object[]} interpolatedData - Die interpolierten Wetterdaten.
+         * @returns {Array<{cover: string, base: number}>} Ein Array von Wolkenschicht-Objekten.
+         * @private
+         */
+    static findCloudLayers(interpolatedData) {
         if (!interpolatedData || interpolatedData.length === 0) {
-            return 'N/A';
+            return [];
         }
 
         const reportedLayers = [];
         let lastReportedCategory = null;
+        const categoryOrder = { 'FEW': 1, 'SCT': 2, 'BKN': 3, 'OVC': 4 };
 
-        // Helper to convert percentage to METAR category
         const getMetarCategory = (cc) => {
             if (cc <= 5) return null;
             if (cc <= 25) return 'FEW';
@@ -647,48 +645,47 @@ export class Utils {
             return 'OVC';
         };
 
-        // Map METAR categories to a numerical order for comparison
-        const categoryOrder = { 'FEW': 1, 'SCT': 2, 'BKN': 3, 'OVC': 4 };
-
-        // 1. Iterate upwards through all interpolated data points
         for (const point of interpolatedData) {
             const currentCategory = getMetarCategory(point.cc);
-
-            // Skip if there's no cloud or we already have 3 layers
             if (!currentCategory || reportedLayers.length >= 3) {
                 continue;
             }
 
-            // Check if the current category is denser than the last one we reported
             const isNewLayer = !lastReportedCategory || categoryOrder[currentCategory] > categoryOrder[lastReportedCategory];
-
             if (isNewLayer) {
                 reportedLayers.push({
-                    baseHeight: point.displayHeight,
-                    coverCode: currentCategory
+                    cover: currentCategory,
+                    base: point.displayHeight // Höhe AGL in Metern
                 });
                 lastReportedCategory = currentCategory;
             }
         }
+        return reportedLayers;
+    }
 
-        if (reportedLayers.length === 0) {
+    /**
+     * KORRIGIERTE FUNKTION: Nutzt nun findCloudLayers und kümmert sich nur noch um die Formatierung.
+     */
+    static getCloudLayersForMetar(interpolatedData, heightUnit) {
+        const layers = Utils.findCloudLayers(interpolatedData);
+
+        if (layers.length === 0) {
             return 'SKC'; // Sky Clear
         }
 
-        // 2. Format the identified layers for output
-        return reportedLayers.map(layer => {
-            const height = layer.baseHeight;
-
+        return layers.map(layer => {
+            const heightInMeters = layer.base;
             let formattedHeight;
+            let displayUnit;
+
             if (heightUnit === 'ft') {
-                // Round to the nearest 100 feet
-                formattedHeight = Math.round(height / 100) * 100;
-                return `${layer.coverCode} ${formattedHeight}ft`;
+                formattedHeight = Math.round(Utils.convertHeight(heightInMeters, 'ft') / 100) * 100;
+                displayUnit = 'ft';
             } else {
-                // Round to the nearest 50 meters
-                formattedHeight = Math.round(height / 50) * 50;
-                return `${layer.coverCode} ${formattedHeight}m`;
+                formattedHeight = Math.round(heightInMeters / 50) * 50;
+                displayUnit = 'm';
             }
+            return `${layer.cover} ${formattedHeight}${displayUnit}`;
         }).join(', ');
     }
 
