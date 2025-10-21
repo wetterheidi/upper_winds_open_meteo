@@ -1007,6 +1007,12 @@ function setupCheckboxEvents() {
         }
     });
 
+    setupCheckbox('alertThunderstormEnabled', 'alerts.thunderstorm.enabled', (checkbox) => {
+        Settings.state.userSettings.alerts.thunderstorm.enabled = checkbox.checked;
+        Settings.save();
+        document.dispatchEvent(new CustomEvent('ui:recalculateAlerts'));
+    });
+
     const showJumpMasterLineCheckbox = document.getElementById('showJumpMasterLine');
     if (showJumpMasterLineCheckbox) {
         showJumpMasterLineCheckbox.disabled = !Settings.state.userSettings.trackPosition;
@@ -1228,7 +1234,7 @@ function setupInputEvents() {
 
     setupInput('historicalDatePicker', 'change', 300);
 
-        setupInput('alertWindThreshold', 'change', 300, (value) => {
+    setupInput('alertWindThreshold', 'change', 300, (value) => {
         Settings.state.userSettings.alerts.wind.threshold = value;
         Settings.save();
         document.dispatchEvent(new CustomEvent('ui:recalculateAlerts'));
@@ -1304,8 +1310,8 @@ async function setupAlertIconEvents() { // Die Funktion ist jetzt async
     const alertIcon = document.getElementById('map-alert-icon');
     if (alertIcon) {
         alertIcon.addEventListener('click', async () => { // Der Callback ist ebenfalls async
-            const { highWinds, highGusts } = weatherManager.checkWindAlerts(AppState.weatherData);
-            
+            const { highWinds, highGusts, thunderstorms} = weatherManager.checkWeatherAlerts(AppState.weatherData);
+
             const popupContainer = document.getElementById('info-popup-container');
             const popupTitle = document.getElementById('info-popup-title');
             const popupList = document.getElementById('info-popup-list');
@@ -1336,7 +1342,12 @@ async function setupAlertIconEvents() { // Die Funktion ist jetzt async
                 const firstTime = await Utils.getDisplayTime(AppState.weatherData.time[highGusts[0]], AppState.lastLat, AppState.lastLng, timeZoneSetting);
                 popupList.appendChild(createListItem(`High Gusts (> ${gustThreshold} kt) detected at ${firstTime} and other times.`));
             }
-            
+
+            if (thunderstorms.length > 0) {
+                const firstTime = await Utils.getDisplayTime(AppState.weatherData.time[thunderstorms[0]], AppState.lastLat, AppState.lastLng, timeZoneSetting);
+                popupList.appendChild(createListItem(`Thunderstorm forecast at ${firstTime} and other times.`));
+            }
+
             popupContainer.classList.remove('hidden');
 
             popupClose.onclick = () => {

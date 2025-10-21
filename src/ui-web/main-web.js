@@ -137,6 +137,7 @@ function initializeUIElements() {
     applySettingToInput('alertWindThreshold', Settings.state.userSettings.alerts.wind.threshold);
     applySettingToCheckbox('alertGustEnabled', Settings.state.userSettings.alerts.gust.enabled);
     applySettingToInput('alertGustThreshold', Settings.state.userSettings.alerts.gust.threshold);
+    applySettingToCheckbox('alertThunderstormEnabled', Settings.state.userSettings.alerts.thunderstorm.enabled);
 
     Settings.state.userSettings.isCustomJumpRunDirection = Settings.state.userSettings.isCustomJumpRunDirection || false;
 
@@ -889,8 +890,8 @@ export async function updateUIWithNewWeatherData(newWeatherData, preservedIndex 
         console.log(`Slider set to default (current hour or max): ${slider.value}`);
     }
 
-    const { highWinds, highGusts } = weatherManager.checkWindAlerts(newWeatherData);
-    const alertIndices = [...new Set([...highWinds, ...highGusts])];
+    const { highWinds, highGusts, thunderstorms } = weatherManager.checkWeatherAlerts(newWeatherData);
+    const alertIndices = [...new Set([...highWinds, ...highGusts, ...thunderstorms])];
 
     // Steuert die Sichtbarkeit des Alarm-Icons auf der Karte
     const alertIcon = document.getElementById('map-alert-icon');
@@ -1841,8 +1842,8 @@ function setupAppEventListeners() {
 
     document.addEventListener('ui:recalculateAlerts', () => {
         if (AppState.weatherData) {
-            const { highWinds, highGusts } = weatherManager.checkWindAlerts(AppState.weatherData);
-            const alertIndices = [...new Set([...highWinds, ...highGusts])];
+            const { highWinds, highGusts, thunderstorms } = weatherManager.checkWeatherAlerts(AppState.weatherData);
+            const alertIndices = [...new Set([...highWinds, ...highGusts, ...thunderstorms])];
             displayManager.updateAlertSliderBackground(alertIndices);
 
             const alertIcon = document.getElementById('map-alert-icon');

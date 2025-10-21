@@ -81,6 +81,11 @@ export const WIND_THRESHOLDS = {
     GUST_WARNING_KT: 25,
 };
 
+/**
+ * WMO Weather codes for thunderstorms.
+ */
+export const THUNDERSTORM_CODES = [95, 96, 99];
+
 // ===================================================================
 // API & Externe Dienste
 // ===================================================================

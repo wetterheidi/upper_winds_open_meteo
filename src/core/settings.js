@@ -91,7 +91,7 @@ export const Settings = {
         selectedEnsembleModels: [],
         currentEnsembleScenario: 'all_models',
         isInteractionLocked: false,
-        enableWindAlert: true, 
+        enableWindAlert: true,
 
         alerts: {
             wind: {
@@ -101,6 +101,9 @@ export const Settings = {
             gust: {
                 enabled: true,
                 threshold: 25
+            },
+            thunderstorm: {
+                enabled: true
             }
         }
     },
@@ -166,8 +169,26 @@ export const Settings = {
         } catch (error) {
             this.handleError(error, 'Failed to load settings.');
         }
-        this.state.userSettings = { ...this.defaultSettings, ...storedSettings };
-
+        this.state.userSettings = {
+            ...this.defaultSettings,
+            ...storedSettings,
+            alerts: {
+                ...this.defaultSettings.alerts,
+                ...(storedSettings.alerts || {}),
+                wind: {
+                    ...this.defaultSettings.alerts.wind,
+                    ...(storedSettings.alerts?.wind || {})
+                },
+                gust: {
+                    ...this.defaultSettings.alerts.gust,
+                    ...(storedSettings.alerts?.gust || {})
+                },
+                thunderstorm: {
+                    ...this.defaultSettings.alerts.thunderstorm,
+                    ...(storedSettings.alerts?.thunderstorm || {})
+                }
+            }
+        };
         // Nicht-persistente Einstellungen zurücksetzen
         this.state.userSettings.isInteractionLocked = false;
         this.state.userSettings.harpLat = null;

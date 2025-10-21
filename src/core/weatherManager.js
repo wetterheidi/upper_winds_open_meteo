@@ -8,7 +8,7 @@
 import { AppState } from './state.js';
 import { Utils } from './utils.js';
 import { Settings } from './settings.js';
-import { WEATHER_MODELS, API_URLS, STANDARD_PRESSURE_LEVELS } from './constants.js';
+import { WEATHER_MODELS, API_URLS, STANDARD_PRESSURE_LEVELS, THUNDERSTORM_CODES } from './constants.js';
 import { DateTime } from 'luxon';
 
 // ===================================================================
@@ -494,22 +494,23 @@ export const debouncedGetElevationAndQFE = Utils.debounce(async (lat, lng) => {
  * @param {object} weatherData - Das 'hourly' Objekt aus der API-Antwort.
  * @returns {{highWinds: number[], highGusts: number[]}} Ein Objekt mit Arrays von Indizes, an denen die Grenzwerte überschritten wurden.
  */
-export function checkWindAlerts(weatherData) {
-    // Holen der Schwellenwerte aus den Settings
+export function checkWeatherAlerts(weatherData) {
     const windConfig = Settings.state.userSettings.alerts.wind;
     const gustConfig = Settings.state.userSettings.alerts.gust;
+    const thunderstormConfig = Settings.state.userSettings.alerts.thunderstorm;
 
-    if (!weatherData || !weatherData.time || (!windConfig.enabled && !gustConfig.enabled)) {
-        return { highWinds: [], highGusts: [] };
+    if (!weatherData || !weatherData.time) {
+        return { highWinds: [], highGusts: [], thunderstorms: [] };
     }
 
     const highWinds = [];
     const highGusts = [];
+    const thunderstorms = [];
 
     for (let i = 0; i < weatherData.time.length; i++) {
-        // KORREKTUR: Variablen hier definieren, bevor sie verwendet werden.
         const windSpeed_kmh = weatherData.wind_speed_10m[i];
         const gustSpeed_kmh = weatherData.wind_gusts_10m[i];
+        const weatherCode = weatherData.weather_code[i];
 
         if (windConfig.enabled && windSpeed_kmh !== null) {
             const windSpeed_kt = Utils.convertWind(windSpeed_kmh, 'kt', 'km/h');
@@ -524,6 +525,12 @@ export function checkWindAlerts(weatherData) {
                 highGusts.push(i);
             }
         }
+
+        if (thunderstormConfig.enabled && weatherCode !== null) {
+            if (THUNDERSTORM_CODES.includes(weatherCode)) {
+                thunderstorms.push(i);
+            }
+        }
     }
-    return { highWinds, highGusts };
+    return { highWinds, highGusts, thunderstorms };
 }
