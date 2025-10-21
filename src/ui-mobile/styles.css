@@ -244,6 +244,7 @@ body {
     margin-bottom: 2px;
     /* Kleiner Abstand zum Label */
     background: var(--background-surface) !important;
+    text-shadow: 0 0 2px var(--palette-grey-900);
 }
 
 .tab-button .label {
@@ -965,7 +966,8 @@ input[type="checkbox"][style*="opacity: 1"] {
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    font-family: var(--font-monospace); /* Neue Font-Variable */
+    font-family: var(--font-monospace);
+    /* Neue Font-Variable */
     text-align: center;
     border: 2px solid var(--dashboard-border);
     box-shadow: 0 0 10px var(--dashboard-glow);
@@ -1051,7 +1053,7 @@ input[type="checkbox"][style*="opacity: 1"] {
 
 .arm-button:hover {
     background-color: var(--color-warning);
-    color: var(--dashboard-background); 
+    color: var(--dashboard-background);
 }
 
 .arm-button.armed {
@@ -1062,7 +1064,7 @@ input[type="checkbox"][style*="opacity: 1"] {
 }
 
 .arm-button.recording {
-   border-color: var(--color-success);
+    border-color: var(--color-success);
     background-color: var(--color-success);
     color: var(--text-inverted);
     animation: pulse 1.5s infinite;
@@ -1079,7 +1081,7 @@ input[type="checkbox"][style*="opacity: 1"] {
 }
 
 #manual-recording-button.recording {
-    border-color: var(--color-secondary); 
+    border-color: var(--color-secondary);
     background-color: var(--color-secondary);
     color: var(--text-inverted);
     animation: pulse-blue 1.5s infinite;
@@ -1216,7 +1218,8 @@ input[type="checkbox"][style*="opacity: 1"] {
     z-index: 1000;
     font-size: 28px;
     padding: 5px;
-    background-color: rgba(var(--background-white), 0.7);;
+    background-color: rgba(var(--background-white), 0.7);
+    ;
     border-radius: 50%;
     cursor: pointer;
     text-shadow: var(--shadow);
@@ -1228,9 +1231,20 @@ input[type="checkbox"][style*="opacity: 1"] {
 }
 
 @keyframes pulse-alert {
-    0% { transform: scale(1); opacity: 1; }
-    50% { transform: scale(1.1); opacity: 0.8; }
-    100% { transform: scale(1); opacity: 1; }
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+
+    50% {
+        transform: scale(1.1);
+        opacity: 0.8;
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
 }
 
 /* Stil für den Slider-Hintergrund */
@@ -1252,13 +1266,16 @@ input[type="checkbox"][style*="opacity: 1"] {
     height: 6px;
     border-radius: 3px;
     pointer-events: none;
-    background: var(--background-interactive); /* Standardfarbe */
+    background: var(--background-interactive);
+    /* Standardfarbe */
 }
 
 #timeSlider {
-    position: relative; /* Muss über dem Highlight-Layer liegen */
+    position: relative;
+    /* Muss über dem Highlight-Layer liegen */
     z-index: 2;
-    background: transparent; /* Macht den originalen Track durchsichtig */
+    background: transparent;
+    /* Macht den originalen Track durchsichtig */
 }
 
 #info-popup-container ul {
@@ -1279,16 +1296,21 @@ input[type="checkbox"][style*="opacity: 1"] {
 
 /* NEUER, HINZUGEFÜGTER STIL-BLOCK */
 #info-popup-container h3 {
-    font-size: 1.2rem; /* Macht die Schrift etwas größer */
-    font-weight: bold; /* Macht die Schrift fett */
-    margin-bottom: 15px; /* Fügt etwas Abstand nach unten hinzu */
+    font-size: 1.2rem;
+    /* Macht die Schrift etwas größer */
+    font-weight: bold;
+    /* Macht die Schrift fett */
+    margin-bottom: 15px;
+    /* Fügt etwas Abstand nach unten hinzu */
 }
 
 .settings-grid .grid-separator {
-    grid-column: 1 / -1; /* Erstreckt sich über alle Spalten des Grids */
+    grid-column: 1 / -1;
+    /* Erstreckt sich über alle Spalten des Grids */
     height: 1px;
     background-color: var(--border-color);
-    margin: 8px 0; /* Vertikaler Abstand */
+    margin: 8px 0;
+    /* Vertikaler Abstand */
 }
 
 /* =================================================================== */
@@ -1622,7 +1644,7 @@ input[type="checkbox"][style*="opacity: 1"] {
 
 /* === ZUSÄTZLICHE STILE FÜR PERMANENTE GEOMAN-LABELS === */
 .geoman-permanent-label {
-    background: rgba(var(--background-white),0.9);
+    background: rgba(var(--background-white), 0.9);
     border: 1px solid var(--border-color);
     border-radius: 4px;
     padding: 5px 8px;
@@ -1770,7 +1792,8 @@ input[type="checkbox"][style*="opacity: 1"] {
 /* Spezifische Stile für das HTML-Report-Modal */
 #htmlReportModal {
     align-items: stretch;
-    padding: 0; /* Entfernt das alte Padding, da wir es jetzt im Inhalt steuern */
+    padding: 0;
+    /* Entfernt das alte Padding, da wir es jetzt im Inhalt steuern */
 }
 
 #htmlReportModal .modal-content {
@@ -1778,8 +1801,9 @@ input[type="checkbox"][style*="opacity: 1"] {
     height: 100%;
     display: flex;
     flex-direction: column;
-    box-sizing: border-box; /* Stellt sicher, dass Padding korrekt berechnet wird */
-    
+    box-sizing: border-box;
+    /* Stellt sicher, dass Padding korrekt berechnet wird */
+
     /* Fügt den notwendigen Abstand für die iOS-Statusleiste hinzu */
     padding-top: env(safe-area-inset-top);
     padding-left: env(safe-area-inset-left);
@@ -1789,9 +1813,12 @@ input[type="checkbox"][style*="opacity: 1"] {
 
 /* Vergrößert den Klickbereich des "Schließen"-Buttons */
 #closeReportBtn {
-    font-size: 32px; /* Größeres "x" */
-    padding: 10px;   /* Mehr Klickfläche um das "x" */
-    line-height: 1;  /* Verhindert zusätzlichen vertikalen Abstand */
+    font-size: 32px;
+    /* Größeres "x" */
+    padding: 10px;
+    /* Mehr Klickfläche um das "x" */
+    line-height: 1;
+    /* Verhindert zusätzlichen vertikalen Abstand */
 }
 
 .info-popup {
