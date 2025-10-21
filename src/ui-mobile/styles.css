@@ -1789,6 +1789,21 @@ input[type="checkbox"][style*="opacity: 1"] {
     opacity: 0.9;
 }
 
+#aircraftList li {
+    padding: 12px 8px;
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+    text-align: left;
+}
+
+#aircraftList li:hover {
+    background-color: var(--background-body);
+}
+
+#aircraftList li:last-child {
+    border-bottom: none;
+}
+
 /* Spezifische Stile für das HTML-Report-Modal */
 #htmlReportModal {
     align-items: stretch;
