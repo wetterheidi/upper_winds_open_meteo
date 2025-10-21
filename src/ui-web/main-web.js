@@ -1447,6 +1447,17 @@ function setupAppEventListeners() {
             await displayManager.updateSliderLabels();
         }
 
+        if (name === 'heightUnit') {
+            const lowerLimitLabel = document.querySelector('label[for="lowerLimit"]');
+            const upperLimitLabel = document.querySelector('label[for="upperLimit"]');
+            if (lowerLimitLabel) {
+                lowerLimitLabel.textContent = `Lower Limit (${value}):`;
+            }
+            if (upperLimitLabel) {
+                upperLimitLabel.textContent = `Upper Limit (${value}):`;
+            }
+        }
+
         // Update der Wetteranzeige für alle Einheiten-Änderungen
         if (['refLevel', 'heightUnit', 'temperatureUnit', 'windUnit', 'timeZone'].includes(name)) {
             await displayManager.updateWeatherDisplay(getSliderValue(), 'weather-table-container', 'selectedTime');

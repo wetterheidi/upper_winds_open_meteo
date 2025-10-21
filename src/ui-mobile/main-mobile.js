@@ -2008,11 +2008,22 @@ function setupAppEventListeners() {
     });
 
     document.addEventListener('setting:changed', async (e) => {
-        const { key } = e.detail;
+        const { key, value } = e.detail;
         console.log(`[main-mobile] Setting '${key}' changed. Triggering UI updates.`);
 
         if (key === 'timeZone') {
             await displayManager.updateSliderLabels();
+        }
+
+        if (key === 'heightUnit') {
+            const lowerLimitLabel = document.querySelector('label[for="lowerLimit"]');
+            const upperLimitLabel = document.querySelector('label[for="upperLimit"]');
+            if (lowerLimitLabel) {
+                lowerLimitLabel.textContent = `Lower Limit (${value}):`;
+            }
+            if (upperLimitLabel) {
+                upperLimitLabel.textContent = `Upper Limit (${value}):`;
+            }
         }
 
         // Hinzugefügte Logik

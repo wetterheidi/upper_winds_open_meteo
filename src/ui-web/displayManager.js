@@ -130,8 +130,6 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
         let formattedWind;
         let groundWindExceedsThreshold = false;
         const surfaceDisplayHeight = refLevel === 'AMSL' ? (heightUnit === 'ft' ? Math.round(surfaceHeight * 3.28084) : surfaceHeight) : 0;
-
-        console.log('[Windtest] '+ WIND_THRESHOLDS.SURFACE_WIND_WARNING_KT);
         
         if (Math.round(data.displayHeight) === surfaceDisplayHeight) {
             const spdInKt = Utils.convertWind(spd, 'kt', 'km/h');
