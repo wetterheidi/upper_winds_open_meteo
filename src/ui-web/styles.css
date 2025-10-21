@@ -178,14 +178,38 @@
         }
 
         /* Spezifische Overrides für Tabellen */
-        #weather-table-container th,
-        #weather-table-container td {
+        #weather-table-container th {
+            background: var(--background-interactive) !important;
+            /* Dunkler Header */
             color: var(--text-primary) !important;
             border-color: var(--border-color) !important;
         }
 
+        #weather-table-container td {
+            color: var(--text-primary) !important;
+            border: 1px solid var(--border-color) !important;
+        }
+
         #weather-table-container tr.cloud-cover-overcast {
             color: var(--text-primary) !important;
+        }
+
+        /* KORREKTUR: Spezifische Regeln für die Wind-Rahmenfarben im Dark Mode.
+           Diese sind spezifischer als die allgemeine td-Regel und überschreiben sie korrekt. */
+        #weather-table-container tr.wind-low td {
+            border: 2px solid var(--border-wind-light) !important;
+        }
+
+        #weather-table-container tr.wind-moderate td {
+            border: 2px solid var(--border-wind-moderate) !important;
+        }
+
+        #weather-table-container tr.wind-high td {
+            border: 2px solid var(--border-wind-high) !important;
+        }
+
+        #weather-table-container tr.wind-very-high td {
+            border: 2px solid var(--border-wind-very-high) !important;
         }
 
         /* Buttons */
@@ -332,46 +356,52 @@
             /* Etwas heller bei Hover */
         }
 
-        /* Geoman-Symbole im Dark Mode (SVG-Hintergrundbilder) */
-        [data-theme="dark"] .leaflet-pm-toolbar .control-icon {
-            background-color: var(--palette-grey-800) !important;
-            /* Dunkler Button-Hintergrund */
-            border: 1px solid red !important;
-            /* Temporärer Rahmen zum Debuggen */
+        #timeSlider {
+            background: transparent !important;
         }
 
-        /* Spezifische SVG-Icons für Geoman-Controls im Dark Mode */
-        [data-theme="dark"] .leaflet-pm-toolbar .control-icon.leaflet-pm-icon-polyline {
-            background-image: url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="24" height="24" viewBox="0 0 24 24"%3E%3Cdefs%3E%3Cpath id="line-a" d="M9.16509725,19.4206892 L18.4206892,10.1650973 C18.1523681,9.66992914 18,9.10275831 18,8.5 C18,6.56700338 19.5670034,5 21.5,5 C23.4329966,5 25,6.56700338 25,8.5 C25,10.4329966 23.4329966,12 21.5,12 C20.8972417,12 20.3300709,11.8476319 19.8349027,11.5793108 L10.5793108,20.8349027 C10.8476319,21.3300709 11,21.8972417 11,22.5 C11,24.4329966 9.43299662,26 7.5,26 C5.56700338,26 4,24.4329966 4,22.5 C4,20.5670034 5.56700338,19 7.5,19 C8.10275831,19 8.66992914,19.1523681 9.16509725,19.4206892 Z M21.5,10 C22.3284271,10 23,9.32842712 23,8.5 C23,7.67157288 22.3284271,7 21.5,7 C20.6715729,7 20,7.67157288 20,8.5 C20,9.32842712 20.6715729,10 21.5,10 Z M7.5,24 C8.32842712,24 9,23.3284271 9,22.5 C9,21.6715729 8.32842712,21 7.5,21 C6.67157288,21 6,21.6715729 6,22.5 C6,23.3284271 6.67157288,24 7.5,24 Z"/%3E%3C/defs%3E%3Cg fill="none" fill-rule="evenodd" transform="translate(-3 -3)"%3E%3Cmask id="line-b" fill="%23fff"%3E%3Cuse xlink:href="%23line-a"/%3E%3C/mask%3E%3Cuse fill="%23E0E0E0" fill-rule="nonzero" xlink:href="%23line-a"/%3E%3Cg fill="%23E0E0E0" mask="url(%23line-b)"%3E%3Crect width="30" height="30"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E') !important;
+        /* Die Original-SVGs werden kopiert und die 'fill'-Farbe auf die helle Textfarbe geändert. */
+        .leaflet-pm-toolbar .control-icon.leaflet-pm-icon-polyline {
+            background-image: url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="24" height="24" viewBox="0 0 24 24"%3E%3Cdefs%3E%3Cpath id="line-a" d="M9.165,19.421 L18.421,10.165 C18.152,9.67 18,9.103 18,8.5 C18,6.567 19.567,5 21.5,5 C23.433,5 25,6.567 25,8.5 C25,10.433 23.433,12 21.5,12 C20.897,12 20.33,11.848 19.835,11.579 L10.579,20.835 C10.848,21.33 11,21.897 11,22.5 C11,24.433 9.433,26 7.5,26 C5.567,26 4,24.433 4,22.5 C4,20.567 5.567,19 7.5,19 C8.103,19 8.67,19.152 9.165,19.421 z M21.5,10 C22.328,10 23,9.328 23,8.5 C23,7.672 22.328,7 21.5,7 C20.672,7 20,7.672 20,8.5 C20,9.328 20.672,10 21.5,10 z M7.5,24 C8.328,24 9,23.328 9,22.5 C9,21.672 8.328,21 7.5,21 C6.672,21 6,21.672 6,22.5 C6,23.328 6.672,24 7.5,24 z"/%3E%3C/defs%3E%3Cg fill="none" fill-rule="evenodd" transform="translate(-3 -3)"%3E%3Cmask id="line-b" fill="%23fff"%3E%3Cuse xlink:href="%23line-a"/%3E%3C/mask%3E%3Cuse fill="%23E0E0E0" fill-rule="nonzero" xlink:href="%23line-a"/%3E%3Cg fill="%23E0E0E0" mask="url(%23line-b)"%3E%3Crect width="30" height="30"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E') !important;
         }
 
-        /* Weitere Geoman-Icons (Beispiele, anpassen mit korrekten <path>-Daten) */
-        [data-theme="dark"] .leaflet-pm-toolbar .control-icon.leaflet-pm-icon-marker {
+        .leaflet-pm-toolbar .control-icon.leaflet-pm-icon-marker {
             background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23E0E0E0'%3E%3Cpath d='M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5S10.62 6.5 12 6.5s2.5 1.12 2.5 2.5S13.38 11.5 12 11.5z'/%3E%3C/svg%3E") !important;
         }
 
-        [data-theme="dark"] .leaflet-pm-toolbar .control-icon.leaflet-pm-icon-draw {
+        .leaflet-pm-toolbar .control-icon.leaflet-pm-icon-circle {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23E0E0E0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3C/svg%3E") !important;
+        }
+
+        .leaflet-pm-toolbar .control-icon.leaflet-pm-icon-text {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23E0E0E0'%3E%3Cpath d='M5 4v3h5.5v12h3V7H19V4z'/%3E%3C/svg%3E") !important;
+        }
+
+        .leaflet-pm-toolbar .control-icon.leaflet-pm-icon-edit {
             background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23E0E0E0'%3E%3Cpath d='M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z'/%3E%3C/svg%3E") !important;
         }
 
-        [data-theme="dark"] .leaflet-pm-toolbar .control-icon.leaflet-pm-icon-edit {
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23E0E0E0'%3E%3Cpath d='M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z'/%3E%3C/svg%3E") !important;
-        }
-
-        [data-theme="dark"] .leaflet-pm-toolbar .control-icon.leaflet-pm-icon-delete {
+        .leaflet-pm-toolbar .control-icon.leaflet-pm-icon-delete {
             background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23E0E0E0'%3E%3Cpath d='M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z'/%3E%3C/svg%3E") !important;
         }
 
-        [data-theme="dark"] .leaflet-pm-toolbar .control-icon.leaflet-pm-icon-cut {
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23E0E0E0'%3E%3Cpath d='M9.64 7.64c.23-.5.36-1.05.36-1.64 0-2.21-1.79-4-4-4S2 3.79 2 6s1.79 4 4 4c.59 0 1.14-.13 1.64-.36L12 14l-4.36 4.36C7.14 18.13 6.59 18 6 18c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4c0-.59-.13-1.14-.36-1.64L12 14l4.36-4.36c.5.23 1.05.36 1.64.36 2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4c0 .59.13 1.14.36 1.64L12 14l-2.36-2.36zM6 8c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-2 2-2 2zm0 12c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-2 2-2 2zm12-12c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-2 2-2 2z'/%3E%3C/svg%3E") !important;
+        .leaflet-pm-toolbar .control-icon.leaflet-pm-icon-drag {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23E0E0E0'%3E%3Cpath d='M10 9h4V6h3l-5-5-5 5h3v3zm-1 1H6V7l-5 5 5 5v-3h3v-4zm14 2l-5-5v3h-3v4h3v3l5-5zm-9 3h-4v3H7l5 5 5-5h-3v-3z'/%3E%3C/svg%3E") !important;
         }
 
-        [data-theme="dark"] .leaflet-pm-toolbar .control-icon.leaflet-pm-icon-drag {
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23E0E0E0'%3E%3Cpath d='M11 18c0 1.1-.9 2-2 2s-2-.9-2-2 2-2 2-2 2 .9 2 2zm-2-8c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0-6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm6 4c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z'/%3E%3C/svg%3E") !important;
+        #weather-table-container td.wind-speed-exceeds-threshold {
+            background-color: rgba(255, 107, 107, 0.4) !important;
+            /* Ein durchscheinendes Rot für den Hintergrund */
         }
 
-        [data-theme="dark"] .leaflet-pm-toolbar .control-icon.leaflet-pm-icon-rotate {
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23E0E0E0'%3E%3Cpath d='M15.55 5.55L11 1v3.07C7.06 4.56 4 7.92 4 12s3.06 7.44 7 7.93v-2.02c-2.84-.48-5-2.94-5-5.91s2.16-5.43 5-5.91V10l4.55-4.45zM19.93 11c-.17-1.39-.72-2.73-1.62-3.89l-1.42 1.42c.54.75.88 1.6 1.02 2.47h2.02zM13 17.9v2.02c1.39-.17 2.74-.71 3.9-1.61l-1.44-1.44c-.75.54-1.59.89-2.46 1.03zm3.89-2.42l1.42 1.41c.9-1.16 1.45-2.5 1.62-3.89h-2.02c-.14.87-.48 1.72-1.02 2.48z'/%3E%3C/svg%3E") !important;
+        #weather-table-container .gust-exceeds-threshold {
+            color: var(--color-danger) !important;
+            /* Nutzt die helle rote Textfarbe aus dem Dark Theme */
+            font-weight: bold;
+        }
+
+        .favorite-marker-icon {
+            color: var(--palette-yellow-500) !important;
         }
     }
 }
@@ -910,6 +940,16 @@ button.btn {
     border: none;
 }
 
+/* Stellt sicher, dass der Slider-Track selbst immer durchsichtig ist, 
+   damit das dahinterliegende Highlight-Element sichtbar ist. */
+#timeSlider::-webkit-slider-runnable-track {
+    background: transparent;
+}
+
+#timeSlider::-moz-range-track {
+    background: transparent;
+}
+
 #modelSelect {
     font-size: 14px;
     padding: 4px;
@@ -1356,7 +1396,8 @@ button.btn {
     z-index: 1000;
     font-size: 28px;
     padding: 5px;
-    background-color: rgba(var(--background-white), 0.7);;
+    background-color: rgba(var(--background-white), 0.7);
+    ;
     border-radius: 50%;
     cursor: pointer;
     text-shadow: var(--shadow);
@@ -1368,9 +1409,20 @@ button.btn {
 }
 
 @keyframes pulse-alert {
-    0% { transform: scale(1); opacity: 1; }
-    50% { transform: scale(1.1); opacity: 0.8; }
-    100% { transform: scale(1); opacity: 1; }
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+
+    50% {
+        transform: scale(1.1);
+        opacity: 0.8;
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
 }
 
 /* Stil für den Slider-Hintergrund */
@@ -1392,13 +1444,16 @@ button.btn {
     height: 6px;
     border-radius: 3px;
     pointer-events: none;
-    background: var(--background-interactive); /* Standardfarbe */
+    background: var(--background-interactive);
+    /* Standardfarbe */
 }
 
 #timeSlider {
-    position: relative; /* Muss über dem Highlight-Layer liegen */
+    position: relative;
+    /* Muss über dem Highlight-Layer liegen */
     z-index: 2;
-    background: transparent; /* Macht den originalen Track durchsichtig */
+    background: transparent;
+    /* Macht den originalen Track durchsichtig */
 }
 
 #info-popup-container ul {
@@ -1419,16 +1474,21 @@ button.btn {
 
 /* NEUER, HINZUGEFÜGTER STIL-BLOCK */
 #info-popup-container h3 {
-    font-size: 1.2rem; /* Macht die Schrift etwas größer */
-    font-weight: bold; /* Macht die Schrift fett */
-    margin-bottom: 15px; /* Fügt etwas Abstand nach unten hinzu */
+    font-size: 1.2rem;
+    /* Macht die Schrift etwas größer */
+    font-weight: bold;
+    /* Macht die Schrift fett */
+    margin-bottom: 15px;
+    /* Fügt etwas Abstand nach unten hinzu */
 }
 
 .settings-grid .grid-separator {
-    grid-column: 1 / -1; /* Erstreckt sich über alle Spalten des Grids */
+    grid-column: 1 / -1;
+    /* Erstreckt sich über alle Spalten des Grids */
     height: 1px;
     background-color: var(--border-color);
-    margin: 8px 0; /* Vertikaler Abstand */
+    margin: 8px 0;
+    /* Vertikaler Abstand */
 }
 
 /* =================================================================== */

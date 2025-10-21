@@ -86,7 +86,9 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
         heightUnit
     );
     const surfaceHeight = refLevel === 'AMSL' && AppState.lastAltitude !== 'N/A' ? Math.round(AppState.lastAltitude) : 0;
-
+    const style = getComputedStyle(document.body);
+    const barbColor = style.getPropertyValue('--text-primary').trim();
+    
     // NEU: Das obere Limit aus dem UI-Element auslesen
     const upperLimit = parseInt(document.getElementById('upperLimit')?.value) || 3000;
 
@@ -130,7 +132,7 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
         let formattedWind;
         let groundWindExceedsThreshold = false;
         const surfaceDisplayHeight = refLevel === 'AMSL' ? (heightUnit === 'ft' ? Math.round(surfaceHeight * 3.28084) : surfaceHeight) : 0;
-        
+
         if (Math.round(data.displayHeight) === surfaceDisplayHeight) {
             const spdInKt = Utils.convertWind(spd, 'kt', 'km/h');
             if (spdInKt > WIND_THRESHOLDS.SURFACE_WIND_WARNING_KT) {
@@ -160,7 +162,7 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
         }
 
         const speedKt = Math.round(Utils.convertWind(spd, 'kt', 'km/h') / 5) * 5;
-        const windBarbSvg = data.dir === 'N/A' || isNaN(speedKt) ? 'N/A' : Utils.generateWindBarb(data.dir, speedKt);
+        const windBarbSvg = data.dir === 'N/A' || isNaN(speedKt) ? 'N/A' : Utils.generateWindBarb(data.dir, speedKt, null, barbColor);
 
         // Die Klasse wird nur noch auf die <td> angewendet, `formattedWind` enthält potenziell das Span-Element
         return `<tr class="${windClass} ${cloudCoverClass}">

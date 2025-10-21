@@ -1349,8 +1349,8 @@ export class Utils {
      * @param {number|null} [latitude=null] - Die geographische Breite zur Bestimmung der Hemisphäre.
      * @returns {string} Der SVG-Code als String.
      */
-    static generateWindBarb(direction, speedKt, latitude = null) {
-        // Convert speed to knots if not already (assuming speedKt is in knots)
+    static generateWindBarb(direction, speedKt, latitude = null, color = 'black') {
+        // ... (der Rest der Funktion bleibt unverändert) ...
         const speed = Math.round(speedKt);
 
         // SVG dimensions
@@ -1360,58 +1360,47 @@ export class Utils {
         const centerY = height / 2;
         const staffLength = 20;
 
-        // Determine hemisphere based on latitude (default to Northern if undefined)
         const isNorthernHemisphere = typeof latitude === 'number' && !isNaN(latitude) ? latitude >= 0 : true;
-        const barbSide = isNorthernHemisphere ? -1 : 1; // -1 for left (Northern), 1 for right (Southern)
+        const barbSide = isNorthernHemisphere ? -1 : 1; 
 
-        // Calculate barb components
-        let flags = Math.floor(speed / 50); // 50 kt flags
+        let flags = Math.floor(speed / 50);
         let remaining = speed % 50;
-        let fullBarbs = Math.floor(remaining / 10); // 10 kt full barbs
-        let halfBarbs = Math.floor((remaining % 10) / 5); // 5 kt half barbs
+        let fullBarbs = Math.floor(remaining / 10);
+        let halfBarbs = Math.floor((remaining % 10) / 5);
 
-        // Adjust for small speeds
         if (speed < 5) {
             fullBarbs = 0;
             halfBarbs = 0;
         } else if (speed < 10 && halfBarbs > 0) {
-            halfBarbs = 1; // Ensure at least one half barb for 5-9 kt
+            halfBarbs = 1;
         }
 
-        // Start SVG
         let svg = `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`;
-
-        // Rotate based on wind direction (wind *from* direction)
-        const rotation = direction + 180; // Staff points toward wind source (tip at origin)
+        const rotation = direction + 180;
         svg += `<g transform="translate(${centerX}, ${centerY}) rotate(${rotation})">`;
 
-        // Draw the staff (vertical line, base at bottom, tip at top toward the source)
-        svg += `<line x1="0" y1="${staffLength / 2}" x2="0" y2="${-staffLength / 2}" stroke="black" stroke-width="1"/>`;
+        // KORREKTUR: "black" durch die Farbvariable ersetzen
+        svg += `<line x1="0" y1="${staffLength / 2}" x2="0" y2="${-staffLength / 2}" stroke="${color}" stroke-width="1"/>`;
 
-        // Draw barbs on the appropriate side, at the base of the staff
-        let yPos = staffLength / 2; // Start at the base (wind blowing toward this end)
+        let yPos = staffLength / 2;
         const barbSpacing = 4;
 
-        // Flags (50 kt) - Triangle with side attached to staff, pointing to the correct side
         for (let i = 0; i < flags; i++) {
-            svg += `<polygon points="0,${yPos - 5} 0,${yPos + 5} ${10 * barbSide},${yPos}" fill="black"/>`;
-            yPos -= barbSpacing + 5; // Move up the staff (toward the tip)
+            svg += `<polygon points="0,${yPos - 5} 0,${yPos + 5} ${10 * barbSide},${yPos}" fill="${color}"/>`;
+            yPos -= barbSpacing + 5;
         }
 
-        // Full barbs (10 kt) - Straight to the correct side (perpendicular)
         for (let i = 0; i < fullBarbs; i++) {
-            svg += `<line x1="0" y1="${yPos}" x2="${10 * barbSide}" y2="${yPos}" stroke="black" stroke-width="1"/>`;
+            svg += `<line x1="0" y1="${yPos}" x2="${10 * barbSide}" y2="${yPos}" stroke="${color}" stroke-width="1"/>`;
             yPos -= barbSpacing;
         }
 
-        // Half barbs (5 kt) - Straight to the correct side (perpendicular)
         if (halfBarbs > 0) {
-            svg += `<line x1="0" y1="${yPos}" x2="${5 * barbSide}" y2="${yPos}" stroke="black" stroke-width="1"/>`;
+            svg += `<line x1="0" y1="${yPos}" x2="${5 * barbSide}" y2="${yPos}" stroke="${color}" stroke-width="1"/>`;
         }
 
-        // Circle for calm winds (< 5 kt)
         if (speed < 5) {
-            svg += `<circle cx="0" cy="0" r="3" fill="none" stroke="black" stroke-width="1"/>`;
+            svg += `<circle cx="0" cy="0" r="3" fill="none" stroke="${color}" stroke-width="1"/>`;
         }
 
         svg += `</g></svg>`;

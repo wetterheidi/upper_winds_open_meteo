@@ -85,6 +85,8 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
         heightUnit
     );
     const surfaceHeight = refLevel === 'AMSL' && AppState.lastAltitude !== 'N/A' ? Math.round(AppState.lastAltitude) : 0;
+    const style = getComputedStyle(document.body);
+    const barbColor = style.getPropertyValue('--text-primary').trim();
 
     // NEU: Das obere Limit aus dem UI-Element auslesen
     const upperLimit = parseInt(document.getElementById('upperLimit')?.value) || 3000;
@@ -164,7 +166,7 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
         }
 
         const speedKt = Math.round(Utils.convertWind(spd, 'kt', 'km/h') / 5) * 5;
-        const windBarbSvg = data.dir === 'N/A' || isNaN(speedKt) ? 'N/A' : Utils.generateWindBarb(data.dir, speedKt);
+        const windBarbSvg = data.dir === 'N/A' || isNaN(speedKt) ? 'N/A' : Utils.generateWindBarb(data.dir, speedKt, null, barbColor);
 
         // Gibt den fertigen HTML-String für eine Zeile zurück
         return `<tr class="${windClass} ${cloudCoverClass}">

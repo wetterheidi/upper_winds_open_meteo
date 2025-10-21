@@ -79,7 +79,13 @@ export function generateWindspinne(interpolatedData, userMaxHoehe) {
             layout: { padding: { bottom: 25, left: 25, right: 25 } },
             scales: { x: { display: false, min: -maxRadius, max: maxRadius }, y: { display: false, min: -maxRadius, max: maxRadius } },
             plugins: {
-                title: { display: true, text: `Wind chart for current location`, font: { size: 16 }, padding: { top: 5, bottom: 35 } },
+                title: { 
+                    display: true, 
+                    text: `Wind chart for current location`, 
+                    font: { size: 16 }, 
+                    padding: { top: 5, bottom: 35 },
+                    color: style.getPropertyValue('--text-primary').trim() 
+                },
                 legend: { display: false },
                 tooltip: {
                     filter: item => item.datasetIndex === 1,
@@ -103,7 +109,7 @@ export function generateWindspinne(interpolatedData, userMaxHoehe) {
                 const labelStep = 1000;
 
                 const gridColor = style.getPropertyValue('--border-color').trim();
-                const textColor = style.getPropertyValue('--text-color-subtle').trim();
+                const textColor = style.getPropertyValue('--text-secondary').trim();
 
                 // Thin helper lines
                 ctx.strokeStyle = gridColor;
@@ -155,12 +161,17 @@ export function generateWindspinne(interpolatedData, userMaxHoehe) {
     });
 
     // Update legend
-    const legendContainer = document.getElementById('windspinne-legend');
+     const legendContainer = document.getElementById('windspinne-legend');
     legendContainer.innerHTML = '';
+    // KORREKTUR: Farben dynamisch aus den CSS-Variablen auslesen
     const legendData = [
-        { speed: '0-5 kt', color: 'blue' }, { speed: '6-10 kt', color: 'green' }, { speed: '11-15 kt', color: 'orange' },
-        { speed: '16-20 kt', color: 'red' }, { speed: '> 20 kt', color: 'purple' }
+        { speed: '0-5 kt', color: style.getPropertyValue('--wind-low').trim() },
+        { speed: '6-10 kt', color: style.getPropertyValue('--wind-moderate').trim() },
+        { speed: '11-15 kt', color: style.getPropertyValue('--wind-high').trim() },
+        { speed: '16-20 kt', color: style.getPropertyValue('--wind-very-high').trim() },
+        { speed: '> 20 kt', color: style.getPropertyValue('--wind-extreme').trim() }
     ];
+
     legendData.forEach(item => {
         const legendItem = document.createElement('div');
         legendItem.className = 'legend-item';

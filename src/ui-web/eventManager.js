@@ -1032,7 +1032,7 @@ function setupThemeToggle() {
     const toggleButton = document.getElementById('theme-toggle');
     const body = document.body;
 
-    // Gespeichertes Theme beim Laden anwenden
+    // Gespeichertes Theme beim Laden anwenden (unverändert)
     const currentTheme = localStorage.getItem('theme');
     if (currentTheme) {
         body.setAttribute('data-theme', currentTheme);
@@ -1043,15 +1043,45 @@ function setupThemeToggle() {
 
     if (toggleButton) {
         toggleButton.addEventListener('click', () => {
-            if (body.getAttribute('data-theme') === 'dark') {
+            const isDarkMode = body.getAttribute('data-theme') === 'dark';
+            let newTheme, newBaseMapName;
+
+            // Logik zum Umschalten des Themes und der Basiskarte
+            if (isDarkMode) {
+                // Von Dark zu Light wechseln
                 body.removeAttribute('data-theme');
                 localStorage.removeItem('theme');
                 toggleButton.textContent = 'Switch to Dark Mode';
+                newTheme = 'light';
+                newBaseMapName = 'Esri Street'; // Dein Standard für den Light Mode
             } else {
+                // Von Light zu Dark wechseln
                 body.setAttribute('data-theme', 'dark');
                 localStorage.setItem('theme', 'dark');
                 toggleButton.textContent = 'Switch to Light Mode';
+                newTheme = 'dark';
+                newBaseMapName = 'CARTO Dark Matter'; // Deine neue dunkle Karte
             }
+
+            // --- START DER NEUEN LOGIK ZUM KARTENWECHSEL ---
+            if (AppState.map && AppState.baseMaps[newBaseMapName]) {
+                // 1. Alle aktuell aktiven Basiskarten von der Karte entfernen
+                for (const layerName in AppState.baseMaps) {
+                    if (AppState.map.hasLayer(AppState.baseMaps[layerName])) {
+                        AppState.map.removeLayer(AppState.baseMaps[layerName]);
+                    }
+                }
+
+                // 2. Die neue, passende Basiskarte hinzufügen
+                AppState.map.addLayer(AppState.baseMaps[newBaseMapName]);
+
+                // 3. Die Einstellung speichern, damit sie beim Neuladen erhalten bleibt
+                Settings.state.userSettings.baseMaps = newBaseMapName;
+                Settings.save();
+                
+                console.log(`Theme switched to ${newTheme}, basemap set to ${newBaseMapName}.`);
+            }
+            // --- ENDE DER NEUEN LOGIK ---
         });
     }
 }
@@ -1165,7 +1195,7 @@ function setupAlertEventListeners() {
                         current = current[keys[i]];
                     }
                     current[keys[keys.length - 1]] = value;
-                    
+
                     Settings.save();
                     document.dispatchEvent(new CustomEvent('ui:recalculateAlerts'));
                 }

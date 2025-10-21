@@ -2162,21 +2162,19 @@ function setupAppEventListeners() {
         }
     });
 
-document.addEventListener('ui:recalculateAlerts', () => {
-    if (AppState.weatherData) {
-        // KORREKTUR: "cloudAlerts" hinzugefügt
-        const { highWinds, highGusts, thunderstorms, cloudAlerts } = weatherManager.checkWeatherAlerts(AppState.weatherData);
-        // KORREKTUR: "cloudAlerts" zum Array hinzugefügt
-        const alertIndices = [...new Set([...highWinds, ...highGusts, ...thunderstorms, ...cloudAlerts])];
-        
-        displayManager.updateAlertSliderBackground(alertIndices);
+    document.addEventListener('ui:recalculateAlerts', () => {
+        if (AppState.weatherData) {
+            const { highWinds, highGusts, thunderstorms, cloudAlerts } = weatherManager.checkWeatherAlerts(AppState.weatherData);
+            const alertIndices = [...new Set([...highWinds, ...highGusts, ...thunderstorms, ...cloudAlerts])];
 
-        const alertIcon = document.getElementById('map-alert-icon');
-        if (alertIcon) {
-            alertIcon.classList.toggle('hidden', alertIndices.length === 0);
+            displayManager.updateAlertSliderBackground(alertIndices);
+
+            const alertIcon = document.getElementById('map-alert-icon');
+            if (alertIcon) {
+                alertIcon.classList.toggle('hidden', alertIndices.length === 0);
+            }
         }
-    }
-});
+    });
 }
 
 // =================================================================
