@@ -1078,7 +1078,7 @@ function setupThemeToggle() {
                 // 3. Die Einstellung speichern, damit sie beim Neuladen erhalten bleibt
                 Settings.state.userSettings.baseMaps = newBaseMapName;
                 Settings.save();
-                
+
                 console.log(`Theme switched to ${newTheme}, basemap set to ${newBaseMapName}.`);
             }
             // --- ENDE DER NEUEN LOGIK ---
@@ -1162,9 +1162,22 @@ function setupAlertEventListeners() {
     setupCheckbox('alertWindEnabled', 'alerts.wind.enabled', (checkbox) => {
         Settings.state.userSettings.alerts.wind.enabled = checkbox.checked;
         Settings.save();
+        console.log('[EventManager] Alert setting changed:', 'alertWindEnabled', checkbox.checked, '- Dispatching ui:recalculateAlerts'); // NEU
         document.dispatchEvent(new CustomEvent('ui:recalculateAlerts'));
     });
-    // ... (andere Checkboxen bleiben unverändert) ...
+
+    setupCheckbox('alertGustEnabled', 'alerts.gust.enabled', (checkbox) => {
+        Settings.state.userSettings.alerts.gust.enabled = checkbox.checked;
+        Settings.save();
+        document.dispatchEvent(new CustomEvent('ui:recalculateAlerts'));
+    });
+
+    setupCheckbox('alertThunderstormEnabled', 'alerts.thunderstorm.enabled', (checkbox) => {
+        Settings.state.userSettings.alerts.thunderstorm.enabled = checkbox.checked;
+        Settings.save();
+        document.dispatchEvent(new CustomEvent('ui:recalculateAlerts'));
+    });
+
     setupCheckbox('alertCloudsEnabled', 'alerts.clouds.enabled', (checkbox) => {
         Settings.state.userSettings.alerts.clouds.enabled = checkbox.checked;
         Settings.save();
@@ -1177,6 +1190,7 @@ function setupAlertEventListeners() {
         cloudCoverSelect.addEventListener('change', () => {
             Settings.state.userSettings.alerts.clouds.cover = cloudCoverSelect.value;
             Settings.save();
+            console.log('[EventManager] Alert setting changed:', 'alertCloudCover', cloudCoverSelect.value, '- Dispatching ui:recalculateAlerts'); // NEU
             document.dispatchEvent(new CustomEvent('ui:recalculateAlerts'));
         });
     }
@@ -1197,6 +1211,7 @@ function setupAlertEventListeners() {
                     current[keys[keys.length - 1]] = value;
 
                     Settings.save();
+                    console.log('[EventManager] Alert setting changed:', id, value, '- Dispatching ui:recalculateAlerts'); // NEU
                     document.dispatchEvent(new CustomEvent('ui:recalculateAlerts'));
                 }
             }, 300));

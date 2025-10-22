@@ -490,9 +490,9 @@ export const debouncedGetElevationAndQFE = Utils.debounce(async (lat, lng) => {
 }, 500);
 
 /**
- * Überprüft die stündlichen Wetterdaten auf Überschreitungen der Wind-Grenzwerte.
+ * Überprüft die stündlichen Wetterdaten auf Überschreitungen der Alarm-Grenzwerte.
  * @param {object} weatherData - Das 'hourly' Objekt aus der API-Antwort.
- * @returns {{highWinds: number[], highGusts: number[]}} Ein Objekt mit Arrays von Indizes, an denen die Grenzwerte überschritten wurden.
+ * @returns {{highWinds: number[], highGusts: number[], thunderstorms: number[], cloudAlerts: number[]}} Ein Objekt mit Arrays von Indizes, an denen die Grenzwerte überschritten wurden.
  */
 export function checkWeatherAlerts(weatherData) {
     const windConfig = Settings.state.userSettings.alerts.wind;
@@ -500,15 +500,21 @@ export function checkWeatherAlerts(weatherData) {
     const thunderstormConfig = Settings.state.userSettings.alerts.thunderstorm;
     const cloudsConfig = Settings.state.userSettings.alerts.clouds;
 
+    // Detailliertes Logging der aktuellen Alert-Einstellungen
+    console.log('[checkWeatherAlerts] Current Alert Settings:', { windConfig, gustConfig, thunderstormConfig, cloudsConfig });
+
     if (!weatherData || !weatherData.time) {
+        console.log('[checkWeatherAlerts] No weather data or time array found.');
         return { highWinds: [], highGusts: [], thunderstorms: [], cloudAlerts: [] };
     }
 
     const highWinds = [], highGusts = [], thunderstorms = [], cloudAlerts = [];
     const categoryOrder = { 'FEW': 1, 'SCT': 2, 'BKN': 3, 'OVC': 4 };
+    const alertCoverThreshold = categoryOrder[cloudsConfig.cover] || 3; // Fallback auf BKN
 
-    // Diese Hilfsfunktion ist lokal hier definiert, um Abhängigkeiten zu reduzieren.
+    // Hilfsfunktion
     const getMetarCategory = (cc) => {
+        if (cc === null || cc === undefined || isNaN(cc)) return null;
         if (cc <= 5) return null;
         if (cc <= 25) return 'FEW';
         if (cc <= 50) return 'SCT';
@@ -516,49 +522,64 @@ export function checkWeatherAlerts(weatherData) {
         return 'OVC';
     };
 
+    console.log(`[checkWeatherAlerts] Checking ${weatherData.time.length} time steps...`);
+
     for (let i = 0; i < weatherData.time.length; i++) {
+        const timeStr = weatherData.time[i];
         const windSpeed_kmh = weatherData.wind_speed_10m[i];
         const gustSpeed_kmh = weatherData.wind_gusts_10m[i];
         const weatherCode = weatherData.weather_code[i];
 
-        if (windConfig.enabled && windSpeed_kmh !== null) {
+        // --- Wind Alert Logging ---
+        if (windConfig.enabled && windSpeed_kmh !== null && !isNaN(windSpeed_kmh)) {
             const windSpeed_kt = Utils.convertWind(windSpeed_kmh, 'kt', 'km/h');
             if (windSpeed_kt > windConfig.threshold) {
                 highWinds.push(i);
+                console.log(`[checkWeatherAlerts] Wind Alert triggered at index ${i} (${timeStr}): Speed ${windSpeed_kt.toFixed(1)} kt > Threshold ${windConfig.threshold} kt`);
             }
         }
 
-        if (gustConfig.enabled && gustSpeed_kmh !== null) {
+        // --- Gust Alert Logging ---
+        if (gustConfig.enabled && gustSpeed_kmh !== null && !isNaN(gustSpeed_kmh)) {
             const gustSpeed_kt = Utils.convertWind(gustSpeed_kmh, 'kt', 'km/h');
             if (gustSpeed_kt > gustConfig.threshold) {
                 highGusts.push(i);
+                console.log(`[checkWeatherAlerts] Gust Alert triggered at index ${i} (${timeStr}): Gust ${gustSpeed_kt.toFixed(1)} kt > Threshold ${gustConfig.threshold} kt`);
             }
         }
 
-        if (thunderstormConfig.enabled && weatherCode !== null) {
+        // --- Thunderstorm Alert Logging ---
+        if (thunderstormConfig.enabled && weatherCode !== null && !isNaN(weatherCode)) {
             if (THUNDERSTORM_CODES.includes(weatherCode)) {
                 thunderstorms.push(i);
+                console.log(`[checkWeatherAlerts] Thunderstorm Alert triggered at index ${i} (${timeStr}): Code ${weatherCode}`);
             }
         }
 
+        // --- Cloud Alert Logging ---
         if (cloudsConfig.enabled) {
-            const interpolatedData = interpolateWeatherData(weatherData, i, 500, Math.round(AppState.lastAltitude), 'm');
-            const alertCoverThreshold = categoryOrder[cloudsConfig.cover];
+            // Hole interpolierte Daten NUR für diese Stunde, um Performance zu sparen
+            const interpolatedHourData = interpolateWeatherData(weatherData, i, 500, Math.round(AppState.lastAltitude), 'm');
+            let cloudAlertTriggeredForHour = false; // Flag für diese Stunde
 
-            // Iteriert direkt durch die Rohdaten jeder einzelnen Höhenstufe.
-            for (const point of interpolatedData) {
+            for (const point of interpolatedHourData) {
                 const pointCategory = getMetarCategory(point.cc);
-                if (!pointCategory) continue; // Überspringt, wenn keine signifikante Bewölkung vorhanden ist.
+                if (!pointCategory) continue; // Überspringen, wenn keine signifikante Bewölkung
 
-                const pointCover = categoryOrder[pointCategory];
-                
-                // Prüft die Kriterien direkt für diesen Datenpunkt.
-                if (pointCover >= alertCoverThreshold && point.displayHeight < cloudsConfig.base) {
-                    cloudAlerts.push(i);
-                    break; // Ein Treffer pro Stunde genügt, wir können zur nächsten Stunde springen.
+                const pointCoverLevel = categoryOrder[pointCategory];
+                const pointBaseAGL = point.displayHeight; // Ist bereits AGL in Metern
+
+                if (pointCoverLevel >= alertCoverThreshold && pointBaseAGL < cloudsConfig.base) {
+                    if (!cloudAlertTriggeredForHour) { // Nur einmal pro Stunde loggen und pushen
+                        cloudAlerts.push(i);
+                        console.log(`[checkWeatherAlerts] Cloud Alert triggered at index ${i} (${timeStr}): Layer ${pointCategory} at ${pointBaseAGL}m < Threshold ${cloudsConfig.base}m (Min Cover: ${cloudsConfig.cover})`);
+                        cloudAlertTriggeredForHour = true;
+                    }
+                    // Optional: break; // Wenn du nur den *ersten* auslösenden Layer pro Stunde sehen willst
                 }
             }
         }
     }
-    return { highWinds, highGusts, thunderstorms, cloudAlerts }; // NEU
+    console.log('[checkWeatherAlerts] Finished check. Results:', { highWinds, highGusts, thunderstorms, cloudAlerts });
+    return { highWinds, highGusts, thunderstorms, cloudAlerts };
 }

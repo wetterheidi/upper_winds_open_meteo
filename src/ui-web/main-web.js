@@ -1844,21 +1844,85 @@ function setupAppEventListeners() {
         applySettingToInput(id, defaultValue);
     });
 
-document.addEventListener('ui:recalculateAlerts', () => {
-    if (AppState.weatherData) {
-        // KORREKTUR: "cloudAlerts" hinzugefügt
-        const { highWinds, highGusts, thunderstorms, cloudAlerts } = weatherManager.checkWeatherAlerts(AppState.weatherData);
-        // KORREKTUR: "cloudAlerts" zum Array hinzugefügt
-        const alertIndices = [...new Set([...highWinds, ...highGusts, ...thunderstorms, ...cloudAlerts])];
-        
-        displayManager.updateAlertSliderBackground(alertIndices);
+    document.addEventListener('ui:recalculateAlerts', () => {
+        console.log('[Main] Received ui:recalculateAlerts event.'); // NEU
+        if (AppState.weatherData) {
+            const alertResults = weatherManager.checkWeatherAlerts(AppState.weatherData); // Ergebnis in Variable speichern
+            console.log('[Main] checkWeatherAlerts result:', alertResults); // NEU: Ergebnis loggen
+            const { highWinds, highGusts, thunderstorms, cloudAlerts } = alertResults;
+            const alertIndices = [...new Set([...highWinds, ...highGusts, ...thunderstorms, ...cloudAlerts])];
+            console.log('[Main] Combined alert indices:', alertIndices); // NEU: Kombinierte Indizes loggen
 
-        const alertIcon = document.getElementById('map-alert-icon');
-        if (alertIcon) {
-            alertIcon.classList.toggle('hidden', alertIndices.length === 0);
+            displayManager.updateAlertSliderBackground(alertIndices);
+
+            const alertIcon = document.getElementById('map-alert-icon');
+            if (alertIcon) {
+                alertIcon.classList.toggle('hidden', alertIndices.length === 0);
+                console.log('[Main] Alert icon visibility updated:', alertIndices.length === 0 ? 'hidden' : 'visible'); // NEU
+            }
+        } else {
+            console.log('[Main] No weather data available to recalculate alerts.'); // NEU
         }
-    }
-});
+    });
+
+    // Listener, um veraltete Daten beim Reaktivieren der App zu aktualisieren
+    document.addEventListener('visibilitychange', async () => {
+        // Nur handeln, wenn der Tab/die App sichtbar wird
+        if (document.visibilityState === 'visible') {
+            console.log('[App Visibility] Tab/App became visible.');
+
+            // Prüfen, ob Wetterdaten vorhanden sind und eine Zeitachse existiert
+            if (AppState.weatherData && AppState.weatherData.time && AppState.weatherData.time.length > 0) {
+                // Datum des ersten Zeitstempels der aktuellen Daten holen
+                const firstDataTime = DateTime.fromISO(AppState.weatherData.time[0], { zone: 'utc' }).startOf('day');
+                // Aktuelles UTC-Datum holen
+                const currentUtcDay = DateTime.utc().startOf('day');
+
+                // Prüfen, ob ein historisches Datum aktiv ausgewählt ist
+                const historicalPicker = document.getElementById('historicalDatePicker');
+                const isHistoricalDateSelected = historicalPicker && historicalPicker.value !== '';
+
+                console.log(`[App Visibility] First data date: ${firstDataTime.toISO()}, Current UTC date: ${currentUtcDay.toISO()}, Historical selected: ${isHistoricalDateSelected}`);
+
+                // WENN: Die Daten von einem vergangenen Tag sind UND kein historisches Datum explizit gewählt wurde
+                if (firstDataTime < currentUtcDay && !isHistoricalDateSelected) {
+                    console.log('[App Visibility] Weather data is outdated and no historical date is selected. Refreshing to current forecast...');
+                    Utils.handleMessage("Refreshing forecast to the current day..."); // Info für den Nutzer
+
+                    // Sicherstellen, dass der Date Picker geleert wird (falls er doch irgendwie befüllt war)
+                    if (historicalPicker) {
+                        historicalPicker.value = '';
+                    }
+                    Settings.state.userSettings.historicalDatePicker = ''; // Auch in Settings leeren
+                    Settings.save();
+
+                    // Prüfen, ob eine Position vorhanden ist
+                    if (AppState.lastLat != null && AppState.lastLng != null) {
+                        try {
+                            // Wetterdaten für den aktuellen Tag neu laden (null als Zeitstempel übergeben)
+                            const newWeatherData = await weatherManager.fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, null);
+                            if (newWeatherData) {
+                                // UI komplett mit den neuesten Daten aktualisieren (lässt Slider auf aktueller Stunde starten)
+                                await updateUIWithNewWeatherData(newWeatherData);
+                                Utils.handleMessage("Forecast updated to the current day.");
+                            } else {
+                                Utils.handleError("Failed to refresh forecast.");
+                            }
+                        } catch (error) {
+                            console.error("[App Visibility] Error refreshing weather data:", error);
+                            Utils.handleError("Failed to refresh forecast.");
+                        }
+                    } else {
+                        console.warn("[App Visibility] Cannot refresh weather, no location selected.");
+                    }
+                } else {
+                    console.log('[App Visibility] Weather data is current or historical date selected. No automatic refresh needed.');
+                }
+            } else {
+                console.log('[App Visibility] No weather data available to check for outdatedness.');
+            }
+        }
+    });
 }
 
 // =================================================================

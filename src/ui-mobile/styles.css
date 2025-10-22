@@ -1826,6 +1826,12 @@ input[type="checkbox"][style*="opacity: 1"] {
     padding-bottom: env(safe-area-inset-bottom);
 }
 
+#reportIframe {
+    width: 100%;
+    flex-grow: 1; /* Füllt den restlichen vertikalen Platz aus */
+    border: none;
+}
+
 /* Vergrößert den Klickbereich des "Schließen"-Buttons */
 #closeReportBtn {
     font-size: 32px;
