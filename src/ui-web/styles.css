@@ -651,6 +651,7 @@ body {
 
 .settings-grid input[type="text"],
 .settings-grid input[type="number"],
+.settings-grid input[type="date"],
 .settings-grid select {
     width: 100%;
     padding: 8px 12px;

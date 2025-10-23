@@ -376,6 +376,7 @@ body {
 
 .settings-grid select,
 .settings-grid input,
+.settings-grid date,
 .settings-grid button {
     width: 100%;
     box-sizing: border-box;
