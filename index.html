@@ -20,8 +20,8 @@
     <script src="https://unpkg.com/leaflet-rotatedmarker@0.2.0/leaflet.rotatedMarker.js" defer></script>
     <script src="https://unpkg.com/@tmcw/togeojson@4.7.0/dist/togeojson.umd.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
-  <script type="module" crossorigin src="/upper_winds_open_meteo/assets/index-N1f4yaDs.js"></script>
-  <link rel="stylesheet" crossorigin href="/upper_winds_open_meteo/assets/index-BUgvwZCE.css">
+  <script type="module" crossorigin src="/upper_winds_open_meteo/assets/index-CjSoetQD.js"></script>
+  <link rel="stylesheet" crossorigin href="/upper_winds_open_meteo/assets/index-BmGaMxIL.css">
 </head>
 
 <body>
@@ -47,6 +47,7 @@
                         </div>
                     </div>
                     <div class="slider-wrapper">
+                        <div id="slider-track-highlight"></div>
                         <input type="range" id="timeSlider" min="0" max="167" value="0" disabled>
                         <div id="slider-labels"></div>
                     </div>
@@ -69,12 +70,13 @@
             <div id="map-content">
                 <div id="map"></div>
                 <div id="crosshair"></div>
+                <div id="map-alert-icon" class="hidden">⚠️</div>
             </div>
 
             <aside id="sidebar">
-                <div class="sidebar-icon" data-panel-id="panel-data" title="Data">
-                    <span class="icon">📊</span>
-                    <span class="label">Data</span>
+                <div class="sidebar-icon" data-panel-id="panel-data" title="Weather">
+                    <span class="icon">⛅️</span>
+                    <span class="label">Weather</span>
                 </div>
                 <div class="sidebar-icon" data-panel-id="panel-planner" title="Planner">
                     <span class="icon">🪂</span>
@@ -670,6 +672,46 @@
                     <div class="accordion-item">
                         <button class="accordion-header">App Management</button>
                         <div class="accordion-content" id="app-management-settings">
+                            <button id="theme-toggle" class="btn btn-secondary">Switch to Dark Mode</button>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item">
+                        <button class="accordion-header">Alerts</button>
+                        <div class="accordion-content">
+                            <div class="settings-grid">
+                                <label for="alertWindEnabled">High Wind Alert:</label>
+                                <input type="checkbox" id="alertWindEnabled">
+
+                                <label for="alertWindThreshold">Threshold (kt):</label>
+                                <input type="number" id="alertWindThreshold" min="5" max="50" step="1">
+
+                                <div class="grid-separator"></div> <label for="alertGustEnabled">High Gust
+                                    Alert:</label>
+                                <input type="checkbox" id="alertGustEnabled">
+
+                                <label for="alertGustThreshold">Threshold (kt):</label>
+                                <input type="number" id="alertGustThreshold" min="10" max="60" step="1">
+
+                                <div class="grid-separator"></div> <label for="alertThunderstormEnabled">Thunderstorm
+                                    Alert:</label>
+                                <input type="checkbox" id="alertThunderstormEnabled">
+
+                                <div class="grid-separator"></div> <label for="alertCloudsEnabled">Cloud Base
+                                    Alert:</label>
+                                <input type="checkbox" id="alertCloudsEnabled">
+
+                                <label for="alertCloudCover">Min. Cloud Cover:</label>
+                                <select id="alertCloudCover">
+                                    <option value="FEW">FEW (1/8 - 2/8)</option>
+                                    <option value="SCT">SCT (3/8 - 4/8)</option>
+                                    <option value="BKN" selected>BKN (5/8 - 7/8)</option>
+                                    <option value="OVC">OVC (8/8)</option>
+                                </select>
+
+                                <label for="alertCloudBase">Max. Cloud Base (m):</label>
+                                <input type="number" id="alertCloudBase" min="100" max="10000" step="100">
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -694,12 +736,20 @@
     <div id="adsbSelectionModal" class="modal" style="display: none;">
         <div class="modal-content">
             <h3>Choose Aircraft</h3>
-            <p style="text-align: left; font-size: 12px; color: #666;">Aircrafts nearby (Call Sign / Altitude):</p>
-            <ul id="aircraftList" style="list-style: none; padding: 0; margin: 0; max-height: 200px; overflow-y: auto;">
+            <p>Aircrafts nearby (Call Sign / Altitude):</p>
+            <ul id="aircraftList">
             </ul>
             <div class="modal-buttons">
-                <button id="adsbCancel">Cancel</button>
+                <button id="adsbCancel" class="modal-btn cancel">Cancel</button>
             </div>
+        </div>
+    </div>
+
+    <div id="info-popup-container" class="modal hidden">
+        <div class="modal-content">
+            <h3 id="info-popup-title"></h3>
+            <ul id="info-popup-list"></ul>
+            <button id="info-popup-close" class="btn btn-primary">Acknowledge</button>
         </div>
     </div>
 
