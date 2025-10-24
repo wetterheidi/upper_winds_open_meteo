@@ -16,11 +16,11 @@ let meteogramSurfaceInstance = null; // Instanz für Bodenwetter
 
 // Hilfsfunktion: Gibt die passende Farbe für den Bedeckungsgrad zurück
 function getCloudColor(cloudCoverPercent, style) {
-    if (cloudCoverPercent <= 5) return 'transparent';
-    if (cloudCoverPercent <= 25) return style.getPropertyValue('--cc-few').trim() + '99';
-    if (cloudCoverPercent <= 50) return style.getPropertyValue('--cc-sct').trim() + '99';
-    if (cloudCoverPercent <= 87) return style.getPropertyValue('--cc-bkn').trim() + '99';
-    return style.getPropertyValue('--cc-ovc').trim() + '99';
+    if (cloudCoverPercent <= 5) return style.getPropertyValue('--cc-clear').trim();
+    if (cloudCoverPercent <= 25) return style.getPropertyValue('--cc-few').trim();
+    if (cloudCoverPercent <= 50) return style.getPropertyValue('--cc-sct').trim();
+    if (cloudCoverPercent <= 87) return style.getPropertyValue('--cc-bkn').trim();
+    return style.getPropertyValue('--cc-ovc').trim();
 }
 
 /**
@@ -65,11 +65,11 @@ export async function generateMeteogram() {
 
     const upperChartMaxHeightAGL = 4500;
     const windBarbAltitudesAGL = [500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500];
-    const cloudHeightStep = 250;
+    const cloudHeightStep = 100;
 
     // Farben
-    const tempColor = 'rgb(255, 99, 132)';
-    const dewPointColor = 'rgb(100, 180, 255)';
+    const tempColor = style.getPropertyValue('--wind-exceeding').trim(); 
+    const dewPointColor = style.getPropertyValue('--cc-few').trim();
     const surfaceWindColor = 'rgb(200, 200, 200)';
     const surfaceGustColor = 'rgb(200, 0, 0)';
 
@@ -131,25 +131,29 @@ export async function generateMeteogram() {
         }
 
         // Windfiedern-Rohdaten sammeln
-        windBarbAltitudesAGL.forEach(altAGL => {
-            if (altAGL > upperChartMaxHeightAGL) return;
-            const altMSL = baseHeight + altAGL;
-            let closestPoint = null;
-            let minDiff = Infinity;
-            interpolatedHourData.forEach(p => {
-                const diff = Math.abs(p.height - altMSL);
-                if (diff < minDiff) { minDiff = diff; closestPoint = p; }
-            });
-
-            if (closestPoint && closestPoint.spd !== 'N/A' && closestPoint.dir !== 'N/A') {
-                const speedKt = parseFloat(Utils.convertWind(closestPoint.spd, 'kt', 'km/h').toFixed(1));
-                windBarbDataPoints.push({ // In temporäres Array pushen
-                    x: labelTime, y: altAGL,
-                    speedKt: speedKt,
-                    direction: Math.round(closestPoint.dir)
+        if (i % 2 === 0) { // <-- ADD THIS CHECK
+            windBarbAltitudesAGL.forEach(altAGL => {
+                if (altAGL > upperChartMaxHeightAGL) return;
+                // ... (rest of the logic to find closestPoint remains the same) ...
+                const altMSL = baseHeight + altAGL;
+                let closestPoint = null;
+                let minDiff = Infinity;
+                interpolatedHourData.forEach(p => {
+                    const diff = Math.abs(p.height - altMSL);
+                    if (diff < minDiff) { minDiff = diff; closestPoint = p; }
                 });
-            }
-        });
+
+
+                if (closestPoint && closestPoint.spd !== 'N/A' && closestPoint.dir !== 'N/A') {
+                    const speedKt = parseFloat(Utils.convertWind(closestPoint.spd, 'kt', 'km/h').toFixed(1));
+                    windBarbDataPoints.push({
+                        x: labelTime, y: altAGL,
+                        speedKt: speedKt,
+                        direction: Math.round(closestPoint.dir)
+                    });
+                }
+            });
+        }
 
         // Wolkenbalken sammeln (bleibt gleich)
         for (let h = 0; h < upperChartMaxHeightAGL; h += cloudHeightStep) {
@@ -163,12 +167,19 @@ export async function generateMeteogram() {
                 const diff = Math.abs(p.height - bandMidMSL);
                 if (diff < minDiff) { minDiff = diff; closestPoint = p; }
             });
+            let cover = 0; // Standardwert für klaren Himmel (<= 5%)
             if (closestPoint && closestPoint.cc !== 'N/A' && !isNaN(closestPoint.cc)) {
-                const cover = Number(closestPoint.cc);
-                if (cover > 5) {
-                    cloudBarData.push({ x: labelTime, y: [bandStartAGL, bandEndAGL], cover: cover });
-                }
+                // Nur wenn ein gültiger Wert gefunden wird, überschreibe den Standardwert
+                cover = Number(closestPoint.cc);
             }
+
+            // Füge den Datenpunkt IMMER hinzu.
+            // getCloudColor wird die Farbe basierend auf dem 'cover'-Wert bestimmen.
+            cloudBarData.push({
+                x: labelTime,
+                y: [bandStartAGL, bandEndAGL], // Y ist der Höhenbereich
+                cover: cover // Speichere den tatsächlichen Bedeckungsgrad
+            });
         }
     } // Ende der for-Schleife
     console.log(`[Meteogram] Data processing loop finished. ${timeLabels.length} time labels generated.`);
@@ -206,8 +217,8 @@ export async function generateMeteogram() {
                 };
 
             } catch (generationError) {
-                 console.error(`[Meteogram] Error generating SVG or setting src for point:`, p, generationError);
-                 resolve(null);
+                console.error(`[Meteogram] Error generating SVG or setting src for point:`, p, generationError);
+                resolve(null);
             }
         });
     });
@@ -286,10 +297,53 @@ export async function generateMeteogram() {
     console.log('[Meteogram] Surface Chart Data:', { labels: timeLabels, datasets: [ /* ... */] });
     try {
         const surfaceDatasets = [
-            { label: `Temp (${tempUnit})`, data: surfaceTempData, borderColor: tempColor, backgroundColor: tempColor + '33', tension: 0.1, yAxisID: 'yTempSurface', order: 1 },
-            { label: `Dew Point (${tempUnit})`, data: surfaceDewPointData, borderColor: dewPointColor, backgroundColor: dewPointColor + '33', tension: 0.1, yAxisID: 'yTempSurface', order: 1 },
-            { label: `Wind (${windUnit})`, data: surfaceWindSpeedData, borderColor: surfaceWindColor, borderDash: [5, 5], tension: 0.1, yAxisID: 'yWindSurface', order: 0 },
-            { label: `Gusts (${windUnit})`, data: surfaceWindGustData.map((gust, i) => (gust !== null && surfaceWindSpeedData[i] !== null && gust > surfaceWindSpeedData[i]) ? gust : null), type: 'scatter', pointStyle: 'triangle', pointRadius: 5, pointBackgroundColor: surfaceGustColor, showLine: false, yAxisID: 'yWindSurface', order: -1 }
+            { // Temperature
+                label: `Temp (${tempUnit})`,
+                data: surfaceTempData,
+                borderColor: tempColor,
+                // === Change: Fill removed, line slightly thinner ===
+                backgroundColor: 'transparent', // NO FILL
+                borderWidth: 1.25, // Even thinner
+                // === End Change ===
+                tension: 0.1,
+                yAxisID: 'yTempSurface',
+                order: 1 // Draw behind wind
+            },
+            { // Dew Point
+                label: `Dew Point (${tempUnit})`,
+                data: surfaceDewPointData,
+                borderColor: dewPointColor,
+                // === Change: Fill removed, line slightly thinner ===
+                backgroundColor: 'transparent', // NO FILL
+                borderWidth: 1.25, // Even thinner
+                // === End Change ===
+                tension: 0.1,
+                yAxisID: 'yTempSurface',
+                order: 1 // Draw behind wind
+            },
+            { // Wind Speed
+                label: `Wind (${windUnit})`,
+                data: surfaceWindSpeedData,
+                // === Change: Slightly thicker, solid, maybe darker grey ===
+                borderColor: style.getPropertyValue('--text-secondary').trim() || 'grey', // Use secondary text color (often grey)
+                borderWidth: 3, // Make it more prominent
+                borderDash: [], // Solid line
+                // === End Change ===
+                tension: 0.1,
+                yAxisID: 'yWindSurface',
+                order: 0 // Draw in front of Temp/Dew
+            },
+            { // Gusts (No change needed)
+                label: `Gusts (${windUnit})`,
+                data: surfaceWindGustData.map((gust, i) => (gust !== null && surfaceWindSpeedData[i] !== null && gust > surfaceWindSpeedData[i]) ? gust : null),
+                type: 'scatter',
+                pointStyle: 'triangle',
+                pointRadius: 5,
+                pointBackgroundColor: surfaceGustColor, // Keep gusts prominent red
+                showLine: false,
+                yAxisID: 'yWindSurface',
+                order: -1 // Draw on top
+            }
         ];
 
         meteogramSurfaceInstance = new Chart(surfaceCtx, {
@@ -299,8 +353,8 @@ export async function generateMeteogram() {
                 responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
                 scales: {
                     x: { title: { display: true, text: `Time (${timeZone})`, color: textColor }, ticks: { color: textColor, maxRotation: 0, autoSkipPadding: 20 }, grid: { color: gridColor } },
-                    yTempSurface: { type: 'linear', position: 'left', title: { display: true, text: `Temperature (${tempUnit})`, color: textColor }, ticks: { color: textColor }, grid: { color: gridColor } },
-                    yWindSurface: { type: 'linear', position: 'right', title: { display: true, text: `Wind Speed (${windUnit})`, color: textColor }, ticks: { color: textColor }, grid: { drawOnChartArea: false }, min: 0 }
+                    yTempSurface: { type: 'linear', position: 'right', title: { display: true, text: `Temperature (${tempUnit})`, color: textColor }, ticks: { color: textColor }, grid: { color: gridColor } },
+                    yWindSurface: { type: 'linear', position: 'left', title: { display: true, text: `Wind Speed (${windUnit})`, color: textColor }, ticks: { color: textColor }, grid: { drawOnChartArea: false }, min: 0 }
                 },
                 plugins: {
                     legend: { labels: { color: textColor } },
