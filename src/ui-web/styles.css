@@ -1121,6 +1121,43 @@ button.btn {
     /* Erlaubt Umbruch bei schmalen Bildschirmen */
 }
 
+#meteogram-container {
+    width: 100%;
+    margin-top: 20px;
+    display: flex; /* Oder grid */
+    flex-direction: column;
+    gap: 20px; /* Abstand zwischen den Charts */
+}
+
+.meteogram-chart-wrapper {
+    width: 100%;
+    height: 350px; /* Höhe pro Chart - anpassen nach Bedarf */
+    padding: 10px;
+    background-color: var(--background-surface);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    display: flex; /* Für Titel-Platzierung */
+    flex-direction: column;
+}
+
+.meteogram-title {
+    text-align: center;
+    margin-bottom: 10px; /* Abstand zum Chart */
+    color: var(--text-primary);
+    font-size: 1.1em; /* Etwas kleiner als h3 */
+    font-weight: bold;
+    flex-shrink: 0; /* Verhindert Schrumpfen des Titels */
+}
+
+/* Sicherstellen, dass Canvas den Rest des Platzes einnimmt */
+#meteogramUpperChart,
+#meteogramSurfaceChart {
+    display: block;
+    width: 100% !important;
+    flex-grow: 1; /* Wichtig für Flexbox */
+    min-height: 0; /* Wichtig für Flexbox */
+}
+
 .legend-item {
     display: flex;
     align-items: center;

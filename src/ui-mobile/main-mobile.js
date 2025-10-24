@@ -23,6 +23,7 @@ import * as liveTrackingManager from '../core/liveTrackingManager.js';
 import * as EnsembleManager from '../core/ensembleManager.js';
 import * as LocationManager from '../core/locationManager.js';
 import { getCapacitor } from '../core/capacitor-adapter.js';
+import { generateMeteogram } from '../core/meteogramChart.js';
 import { Directory } from '@capacitor/filesystem';
 
 "use strict";
@@ -1039,6 +1040,9 @@ export async function updateUIWithNewWeatherData(newWeatherData, preservedIndex 
 
 
     await displayManager.updateWeatherDisplay(slider.value, 'weather-table-container', 'selectedTime');
+    
+    generateMeteogram();
+
     await displayManager.refreshMarkerPopup();
     if (AppState.lastAltitude !== 'N/A') {
         calculateMeanWind();
@@ -1673,6 +1677,7 @@ function setupAppEventListeners() {
             if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
                 // 1. Die Haupt-Wettertabelle anzeigen lassen
                 await displayManager.updateWeatherDisplay(sliderIndex, 'weather-table-container', 'selectedTime');
+                generateMeteogram();
                 // 2. Das Popup des Markers aktualisieren lassen
                 await displayManager.refreshMarkerPopup();
                 // 3. Die Mittelwind-Berechnung UND Anzeige durchführen
@@ -1756,6 +1761,7 @@ function setupAppEventListeners() {
                 calculateJump();
                 displayManager.updateLandingPatternDisplay();
                 updateJumpMasterLineAndPanel();
+                generateMeteogram();
                 await displayManager.refreshMarkerPopup(); // Das Popup muss auch die neuen Einheiten zeigen
                 break;
 
@@ -2086,6 +2092,7 @@ function setupAppEventListeners() {
 
             displayManager.updateLandingPatternDisplay();
             updateJumpMasterLineAndPanel();
+            generateMeteogram();
             await displayManager.refreshMarkerPopup();
 
             // Wichtig: explizites Update des Fadenkreuz-Displays

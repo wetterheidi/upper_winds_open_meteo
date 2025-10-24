@@ -20,6 +20,7 @@ import * as liveTrackingManager from '../core/liveTrackingManager.js';
 import * as EnsembleManager from '../core/ensembleManager.js';
 import * as LocationManager from '../core/locationManager.js';
 import * as AdsbManager from '../core/adsbManager.js';
+import { generateMeteogram } from '../core/meteogramChart.js';
 import { DateTime } from 'luxon';
 
 "use strict";
@@ -911,6 +912,9 @@ export async function updateUIWithNewWeatherData(newWeatherData, preservedIndex 
 
 
     await displayManager.updateWeatherDisplay(slider.value, 'weather-table-container', 'selectedTime');
+
+    generateMeteogram();
+
     await displayManager.refreshMarkerPopup();
     if (AppState.lastAltitude !== 'N/A') {
         calculateMeanWind();
@@ -1439,6 +1443,7 @@ function setupAppEventListeners() {
             if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
                 // 1. Die Haupt-Wettertabelle anzeigen lassen
                 await displayManager.updateWeatherDisplay(sliderIndex, 'weather-table-container', 'selectedTime'); // NEU
+                generateMeteogram();
                 // 2. Das Popup des Markers aktualisieren lassen
                 await displayManager.refreshMarkerPopup();
                 // 3. Die Mittelwind-Berechnung UND Anzeige durchführen
@@ -1486,6 +1491,7 @@ function setupAppEventListeners() {
         // Update der Wetteranzeige für alle Einheiten-Änderungen
         if (['refLevel', 'heightUnit', 'temperatureUnit', 'windUnit', 'timeZone'].includes(name)) {
             await displayManager.updateWeatherDisplay(getSliderValue(), 'weather-table-container', 'selectedTime');
+            generateMeteogram();
         }
 
         if (name === 'maxForecastTime') {
@@ -1576,6 +1582,7 @@ function setupAppEventListeners() {
                 }
                 displayManager.updateLandingPatternDisplay();
                 updateJumpMasterLineAndPanel();
+                generateMeteogram();
                 await displayManager.refreshMarkerPopup(); // Das Popup muss auch die neuen Einheiten zeigen
                 break;
 
