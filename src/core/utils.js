@@ -1342,65 +1342,88 @@ export class Utils {
         }
     }
 
-    /**
-     * Erzeugt ein SVG-Icon für eine Windfahne (Wind Barb).
+/**
+     * Erzeugt ein SVG-Icon für eine Windfahne (Wind Barb) - KORRIGIERTE VERSION MIT ORIGINAL-LOGIK.
      * @param {number} direction - Die Windrichtung in Grad.
      * @param {number} speedKt - Die Windgeschwindigkeit in Knoten.
      * @param {number|null} [latitude=null] - Die geographische Breite zur Bestimmung der Hemisphäre.
+     * @param {string} [color='black'] - Die Farbe für die Fieder.
      * @returns {string} Der SVG-Code als String.
      */
     static generateWindBarb(direction, speedKt, latitude = null, color = 'black') {
-        // ... (der Rest der Funktion bleibt unverändert) ...
-        const speed = Math.round(speedKt);
+        const speed = Math.max(0, Math.round(speedKt)); // Ensure speed is not negative
 
         // SVG dimensions
         const width = 40;
         const height = 40;
         const centerX = width / 2;
         const centerY = height / 2;
-        const staffLength = 20;
+        const staffLength = 20; // Original staff length
 
+        // Determine hemisphere based on latitude (default to Northern if undefined)
         const isNorthernHemisphere = typeof latitude === 'number' && !isNaN(latitude) ? latitude >= 0 : true;
-        const barbSide = isNorthernHemisphere ? -1 : 1; 
+        const barbSide = isNorthernHemisphere ? -1 : 1; // -1 for left (Northern), 1 for right (Southern)
 
+        // Calculate barb components (original logic)
         let flags = Math.floor(speed / 50);
         let remaining = speed % 50;
         let fullBarbs = Math.floor(remaining / 10);
         let halfBarbs = Math.floor((remaining % 10) / 5);
 
-        if (speed < 5) {
-            fullBarbs = 0;
-            halfBarbs = 0;
-        } else if (speed < 10 && halfBarbs > 0) {
+        // Adjust for small speeds (original logic)
+        if (speed < 3) { // Use original threshold
+             halfBarbs = 0;
+             fullBarbs = 0;
+             flags = 0;
+        } else if (speed >= 3 && speed < 8) { // Original range for just half barb
             halfBarbs = 1;
+            fullBarbs = 0;
+            flags = 0;
         }
+        // No else needed, default calculation handles >= 8 kt
 
-        let svg = `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`;
-        const rotation = direction + 180;
+        // Start SVG - Added xmlns attribute
+        let svg = `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">`;
+
+        // Rotation group
+        const rotation = direction + 180; // Wind from direction
         svg += `<g transform="translate(${centerX}, ${centerY}) rotate(${rotation})">`;
 
-        // KORREKTUR: "black" durch die Farbvariable ersetzen
-        svg += `<line x1="0" y1="${staffLength / 2}" x2="0" y2="${-staffLength / 2}" stroke="${color}" stroke-width="1"/>`;
+        // Draw the staff (Tip points towards wind source, upwards after rotation)
+        const staffY1 = -staffLength / 2; // Tip
+        const staffY2 = staffLength / 2; // Base
+        svg += `<line x1="0" y1="${staffY1}" x2="0" y2="${staffY2}" stroke="${color}" stroke-width="1.5"/>`; // Slightly thicker line
 
-        let yPos = staffLength / 2;
-        const barbSpacing = 4;
+        // Draw barbs starting near the base (staffY2) and going inwards/upwards
+        let yPos = staffY2; // Start at the base
+        const barbLength = 10; // Original barb length
+        const halfBarbLength = 5;
+        const barbSpacing = 4; // Original spacing
 
+        // Flags (50 kt) - Drawn nearest the base, pointing inwards
         for (let i = 0; i < flags; i++) {
-            svg += `<polygon points="0,${yPos - 5} 0,${yPos + 5} ${10 * barbSide},${yPos}" fill="${color}"/>`;
-            yPos -= barbSpacing + 5;
+             // Original polygon logic: triangle at the base, pointing inwards along staff
+             svg += `<polygon points="0,${yPos} 0,${yPos - barbSpacing * 1.5} ${barbLength * barbSide},${yPos}" fill="${color}"/>`; // Flag points inwards
+             yPos -= barbSpacing * 2; // Move inwards along staff for next element
         }
 
+        // Full barbs (10 kt) - Drawn inwards from the base
         for (let i = 0; i < fullBarbs; i++) {
-            svg += `<line x1="0" y1="${yPos}" x2="${10 * barbSide}" y2="${yPos}" stroke="${color}" stroke-width="1"/>`;
-            yPos -= barbSpacing;
-        }
+            // Original line logic: straight line perpendicular to staff
+             svg += `<line x1="0" y1="${yPos}" x2="${barbLength * barbSide}" y2="${yPos}" stroke="${color}" stroke-width="1.5"/>`;
+             yPos -= barbSpacing; // Move inwards along staff
+         }
 
+        // Half barbs (5 kt) - Drawn inwards
         if (halfBarbs > 0) {
-            svg += `<line x1="0" y1="${yPos}" x2="${5 * barbSide}" y2="${yPos}" stroke="${color}" stroke-width="1"/>`;
-        }
+             // Place half barb slightly further inwards if needed
+             if (flags > 0 || fullBarbs > 0) yPos -= barbSpacing * 0.5;
+             svg += `<line x1="0" y1="${yPos}" x2="${halfBarbLength * barbSide}" y2="${yPos}" stroke="${color}" stroke-width="1.5"/>`;
+         }
 
-        if (speed < 5) {
-            svg += `<circle cx="0" cy="0" r="3" fill="none" stroke="${color}" stroke-width="1"/>`;
+        // Circle for calm winds (0-2 kt)
+        if (speed < 3) { // Use original threshold
+            svg += `<circle cx="0" cy="0" r="3" fill="none" stroke="${color}" stroke-width="1.5"/>`;
         }
 
         svg += `</g></svg>`;

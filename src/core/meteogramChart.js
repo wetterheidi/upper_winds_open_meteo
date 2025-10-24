@@ -180,18 +180,35 @@ export async function generateMeteogram() {
     console.log(`[Meteogram] Creating ${windBarbDataPoints.length} wind barb images...`);
     const imageLoadPromises = windBarbDataPoints.map(p => {
         return new Promise((resolve, reject) => {
-            const img = new Image(40, 40);
-            const svgString = Utils.generateWindBarb(p.direction, p.speedKt, null, barbColor);
-            img.src = `data:image/svg+xml;base64,${btoa(svgString)}`;
-            img.rawData = p; // Speichere Rohdaten für Tooltip
+            const img = new Image(40, 40); // Match SVG size
+            let svgString = '';
 
-            // Warte auf 'load' oder 'error'
-            img.onload = () => resolve(img);
-            img.onerror = (err) => {
-                console.error(`[Meteogram] Failed to load wind barb image for point:`, p, err);
-                // Optional: resolve mit einem Platzhalterbild oder null
-                resolve(null); // Oder reject(err), wenn der Chart nicht angezeigt werden soll
-            };
+            try {
+                // Generate the SVG string using the reverted function
+                svgString = Utils.generateWindBarb(p.direction, p.speedKt, null, barbColor);
+
+                // Basic validation
+                if (!svgString || !svgString.startsWith('<svg') || !svgString.endsWith('</svg>')) {
+                    throw new Error('Generated SVG string seems invalid');
+                }
+
+                // === Ensure BASE64 ENCODING is used ===
+                img.src = `data:image/svg+xml;base64,${btoa(svgString)}`;
+                // === END BASE64 ENCODING ===
+
+                img.rawData = p; // Store raw data
+
+                img.onload = () => resolve(img);
+                img.onerror = (err) => {
+                    console.error(`[Meteogram] Failed to load wind barb image for point:`, p, 'Error Event:', err);
+                    console.error(`[Meteogram] Failing SVG string (first 200 chars):`, svgString.substring(0, 200));
+                    resolve(null); // Resolve with null on error
+                };
+
+            } catch (generationError) {
+                 console.error(`[Meteogram] Error generating SVG or setting src for point:`, p, generationError);
+                 resolve(null);
+            }
         });
     });
 
