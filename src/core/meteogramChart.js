@@ -31,15 +31,19 @@ export async function generateMeteogram() {
 
     const upperCanvas = document.getElementById('meteogramUpperChart');
     const surfaceCanvas = document.getElementById('meteogramSurfaceChart');
+    const upperTitleElement = upperCanvas?.previousElementSibling; // Annahme: <h4> ist direkt davor
+    const surfaceTitleElement = surfaceCanvas?.previousElementSibling; // Annahme: <h4> ist direkt davor
 
-    if (!upperCanvas || !surfaceCanvas) {
-        console.warn("[Meteogram] Canvas Elemente nicht gefunden.");
+    if (!upperCanvas || !surfaceCanvas || !upperTitleElement || !surfaceTitleElement) {
+        console.warn("[Meteogram] Canvas oder Titel Elemente nicht gefunden.");
         destroyCharts();
         return;
     }
     if (!AppState.weatherData || !AppState.weatherData.time || AppState.weatherData.time.length === 0) {
         console.warn("[Meteogram] Keine Wetterdaten verfügbar.");
         destroyCharts();
+        upperTitleElement.textContent = "Upper Air (Wind & Clouds)";
+        surfaceTitleElement.textContent = "Surface Conditions";
         displayChartPlaceholder(upperCanvas, "No weather data loaded.");
         displayChartPlaceholder(surfaceCanvas, "No weather data loaded.");
         return;
@@ -68,7 +72,7 @@ export async function generateMeteogram() {
     const cloudHeightStep = 100;
 
     // Farben
-    const tempColor = style.getPropertyValue('--wind-exceeding').trim(); 
+    const tempColor = style.getPropertyValue('--wind-exceeding').trim();
     const dewPointColor = style.getPropertyValue('--cc-few').trim();
     const surfaceWindColor = 'rgb(200, 200, 200)';
     const surfaceGustColor = 'rgb(200, 0, 0)';
@@ -81,6 +85,8 @@ export async function generateMeteogram() {
     const surfaceWindSpeedData = [];
     const surfaceWindGustData = [];
 
+    let displayDateStr = '';
+
     // --- Datenverarbeitungsschleife ---
     console.log('[Meteogram] Starting data processing loop...');
     let firstDay = null;
@@ -92,19 +98,25 @@ export async function generateMeteogram() {
         const dt = DateTime.fromISO(timeStr, { zone: 'utc' });
         let currentDay;
         let labelTime;
+        let currentFullDate;
 
         if (timeZone.toLowerCase() === 'loc' && AppState.lastLat != null && AppState.lastLng != null) {
             const locData = await Utils.getLocationData(AppState.lastLat, AppState.lastLng);
             const localDt = dt.setZone(locData.timezone || 'utc');
             currentDay = localDt.day;
             labelTime = localDt.toFormat('HH');
+            currentFullDate = localDt; // NEU
         } else {
             currentDay = dt.day;
             labelTime = dt.toFormat('HH\'Z\'');
+            currentFullDate = dt; // NEU
         }
 
-        if (firstDay === null) firstDay = currentDay;
-        if (currentDay !== firstDay && i > 0) {
+        if (firstDay === null) {
+            firstDay = currentDay;
+            // NEU: Datum formatieren (nur beim ersten Punkt)
+            displayDateStr = currentFullDate.toFormat('yyyy-MM-dd'); // z.B. "2025-10-24"
+        } if (currentDay !== firstDay && i > 0) {
             console.log(`[Meteogram] End of first day reached at index ${i}. Processed ${dataPointsProcessed} points.`);
             break;
         }
@@ -182,10 +194,15 @@ export async function generateMeteogram() {
             });
         }
     } // Ende der for-Schleife
-    console.log(`[Meteogram] Data processing loop finished. ${timeLabels.length} time labels generated.`);
+    console.log(`[Meteogram] Data processing loop finished. ${timeLabels.length} time labels generated for date: ${displayDateStr}`);
 
     // --- Alte Charts zerstören ---
     destroyCharts();
+
+    if (upperTitleElement && surfaceTitleElement) {
+        upperTitleElement.textContent = `Upper Air - ${displayDateStr}`;
+        surfaceTitleElement.textContent = `Surface - ${displayDateStr}`;
+    }
 
     // --- NEU: Erstelle Image-Objekte für Wind Barbs und warte, bis sie geladen sind ---
     console.log(`[Meteogram] Creating ${windBarbDataPoints.length} wind barb images...`);
@@ -294,7 +311,7 @@ export async function generateMeteogram() {
     }
 
     // --- Chart.js Konfiguration für Bodenwetter (bleibt unverändert) ---
-    console.log('[Meteogram] Surface Chart Data:', { labels: timeLabels, datasets: [ /* ... */] });
+    console.log('[Meteogram] Surface Chart Data:', { /* ... */ });
     try {
         const surfaceDatasets = [
             { // Temperature
