@@ -94,9 +94,8 @@ export async function generateMeteogram(sliderIndex) {
     // Farben
     const tempColor = style.getPropertyValue('--wind-exceeding').trim();
     const dewPointColor = style.getPropertyValue('--cc-few').trim();
-    const surfaceWindColor = 'rgb(200, 200, 200)';
-    const surfaceGustColor = 'rgb(200, 0, 0)';
-
+    const surfaceWindColor = style.getPropertyValue('--palette-grey-700').trim();
+    const surfaceGustColor = style.getPropertyValue('--color-danger').trim();
 
     // === START MODIFICATION: Determine target date and filter indices ===
     let locationTimezone = 'utc';
@@ -319,6 +318,12 @@ export async function generateMeteogram(sliderIndex) {
             data: { labels: timeLabels, datasets: upperDatasets },
             options: {
                 responsive: true, maintainAspectRatio: false, indexAxis: 'x', interaction: { mode: 'nearest', axis: 'xy', intersect: false },
+                layout: { // <<< Add or modify this
+                    padding: {
+                        bottom: 10,
+                        right: 10 // <<< Add this line (adjust value if needed)
+                    }
+                },
                 scales: {
                     x: {
                         stacked: true,
@@ -405,6 +410,12 @@ export async function generateMeteogram(sliderIndex) {
             data: { labels: timeLabels, datasets: surfaceDatasets },
             options: {
                 responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+                layout: { // <<< Add or modify this
+                    padding: {
+                        bottom: 10,
+                        right: 10 // <<< Add this line (adjust value if needed)
+                    }
+                },
                 scales: {
                     x: { title: { display: true, text: `Time (${timeZone})`, color: textColor }, ticks: { color: textColor, maxRotation: 0, autoSkipPadding: 20 }, grid: { color: gridColor } },
                     // === KORREKTUR 9: Y-Achsen-Titel für Temperatur dynamisch anpassen ===
