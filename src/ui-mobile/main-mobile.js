@@ -28,6 +28,9 @@ import { Directory } from '@capacitor/filesystem';
 
 "use strict";
 
+// Eine debounced-Version von generateMeteogram
+const debouncedGenerateMeteogram = Utils.debounce(generateMeteogram, 250); // 250ms delay
+
 // Eine debounced-Version der Sprungberechnung, um bei schnellen UI-Änderungen
 // die Performance zu schonen.
 export const debouncedCalculateJump = Utils.debounce(calculateJump, 300);
@@ -1040,7 +1043,7 @@ export async function updateUIWithNewWeatherData(newWeatherData, preservedIndex 
 
 
     await displayManager.updateWeatherDisplay(slider.value, 'weather-table-container', 'selectedTime');
-    
+
     generateMeteogram();
 
     await displayManager.refreshMarkerPopup();
@@ -1677,7 +1680,7 @@ function setupAppEventListeners() {
             if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
                 // 1. Die Haupt-Wettertabelle anzeigen lassen
                 await displayManager.updateWeatherDisplay(sliderIndex, 'weather-table-container', 'selectedTime');
-                generateMeteogram();
+                debouncedGenerateMeteogram();
                 // 2. Das Popup des Markers aktualisieren lassen
                 await displayManager.refreshMarkerPopup();
                 // 3. Die Mittelwind-Berechnung UND Anzeige durchführen
@@ -1765,6 +1768,8 @@ function setupAppEventListeners() {
                 await displayManager.refreshMarkerPopup(); // Das Popup muss auch die neuen Einheiten zeigen
                 break;
 
+            case 'temperatureUnit':
+                generateMeteogram();
             case 'coordFormat':
                 // Beeinflusst nur das Marker-Popup und das Live-Tracking Panel
                 await displayManager.refreshMarkerPopup();
@@ -2092,6 +2097,7 @@ function setupAppEventListeners() {
 
             displayManager.updateLandingPatternDisplay();
             updateJumpMasterLineAndPanel();
+            console.log(`[Main] Triggering generateMeteogram due to change in '${key}'`); // <-- ADD THIS
             generateMeteogram();
             await displayManager.refreshMarkerPopup();
 

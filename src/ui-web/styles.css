@@ -70,11 +70,16 @@
     --wind-extreme: purple;
     --wind-exceeding: #ffcccc;
 
-    --cc-clear: #e3f2fd;
-    --cc-few: hsl(205, 36%, 86%);
-    --cc-sct: #e0e0e0;
-    --cc-bkn: #b0bec5;
-    --cc-ovc: #78909c;
+    --cc-clear: #e0f2fe;
+    /* Very Light Sky Blue (Tailwind sky-100) */
+    --cc-few: #bae6fd;
+    /* Light Sky Blue (Tailwind sky-200) */
+    --cc-sct: #e2e8f0;
+    /* Very Light Neutral Grey (Tailwind slate-200) */
+    --cc-bkn: #cbd5e1;
+    /* Light Neutral Grey (Tailwind slate-300) */
+    --cc-ovc: #94a3b8;
+    /* Medium Neutral Grey (Tailwind slate-400) */
 
     --border-wind-light: lightblue;
     --border-wind-moderate: lightgreen;
@@ -123,16 +128,16 @@
         --wind-extreme: #d670d6;
 
         /* Neue Wolkenbedeckungs-Farben im Dark Mode */
-        --cc-clear: #5c7cfa;
-        /* Helles Blau für klaren Himmel */
-        --cc-few: #778beb;
-        /* Etwas dunkleres Blau-Grau */
-        --cc-sct: #a4b0be;
-        /* Hellgrau für verstreute Wolken */
-        --cc-bkn: #747d8c;
-        /* Mittelgrau für überwiegend bewölkt */
-        --cc-ovc: #57606f;
-        /* Dunkelgrau für bedeckt */
+        --cc-clear: #38bdf8;
+        /* Brighter Sky Blue (Tailwind sky-400) */
+        --cc-few: #0ea5e9;
+        /* Medium Sky Blue (Tailwind sky-500) */
+        --cc-sct: #475569;
+        /* Medium Dark Grey (Tailwind slate-600) */
+        --cc-bkn: #334155;
+        /* Dark Grey (Tailwind slate-700) */
+        --cc-ovc: #1e293b;
+        /* Very Dark Grey (Tailwind slate-800) */
 
         --border-wind-light: #99ccff;
         --border-wind-moderate: #80ff80;
@@ -1124,29 +1129,36 @@ button.btn {
 #meteogram-container {
     width: 100%;
     margin-top: 20px;
-    display: flex; /* Oder grid */
+    display: flex;
+    /* Oder grid */
     flex-direction: column;
-    gap: 20px; /* Abstand zwischen den Charts */
+    gap: 20px;
+    /* Abstand zwischen den Charts */
 }
 
 .meteogram-chart-wrapper {
     width: 100%;
-    height: 350px; /* Höhe pro Chart - anpassen nach Bedarf */
+    height: 350px;
+    /* Höhe pro Chart - anpassen nach Bedarf */
     padding: 10px;
     background-color: var(--background-surface);
     border-radius: 8px;
     box-shadow: var(--shadow);
-    display: flex; /* Für Titel-Platzierung */
+    display: flex;
+    /* Für Titel-Platzierung */
     flex-direction: column;
 }
 
 .meteogram-title {
     text-align: center;
-    margin-bottom: 10px; /* Abstand zum Chart */
+    margin-bottom: 10px;
+    /* Abstand zum Chart */
     color: var(--text-primary);
-    font-size: 1.1em; /* Etwas kleiner als h3 */
+    font-size: 1.1em;
+    /* Etwas kleiner als h3 */
     font-weight: bold;
-    flex-shrink: 0; /* Verhindert Schrumpfen des Titels */
+    flex-shrink: 0;
+    /* Verhindert Schrumpfen des Titels */
 }
 
 /* Sicherstellen, dass Canvas den Rest des Platzes einnimmt */
@@ -1154,8 +1166,10 @@ button.btn {
 #meteogramSurfaceChart {
     display: block;
     width: 100% !important;
-    flex-grow: 1; /* Wichtig für Flexbox */
-    min-height: 0; /* Wichtig für Flexbox */
+    flex-grow: 1;
+    /* Wichtig für Flexbox */
+    min-height: 0;
+    /* Wichtig für Flexbox */
 }
 
 .legend-item {

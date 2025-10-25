@@ -63,11 +63,16 @@
     --wind-extreme: purple;
     --wind-exceeding: #ffcccc;
 
-    --cc-clear: #e3f2fd;
-    --cc-few: hsl(205, 36%, 86%);
-    --cc-sct: #e0e0e0;
-    --cc-bkn: #b0bec5;
-    --cc-ovc: #78909c;
+    --cc-clear: #e0f2fe;
+    /* Very Light Sky Blue (Tailwind sky-100) */
+    --cc-few: #bae6fd;
+    /* Light Sky Blue (Tailwind sky-200) */
+    --cc-sct: #e2e8f0;
+    /* Very Light Neutral Grey (Tailwind slate-200) */
+    --cc-bkn: #cbd5e1;
+    /* Light Neutral Grey (Tailwind slate-300) */
+    --cc-ovc: #94a3b8;
+    /* Medium Neutral Grey (Tailwind slate-400) */
 
     --border-wind-light: lightblue;
     --border-wind-moderate: lightgreen;
