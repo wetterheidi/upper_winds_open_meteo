@@ -20,8 +20,8 @@
     <script src="https://unpkg.com/leaflet-rotatedmarker@0.2.0/leaflet.rotatedMarker.js" defer></script>
     <script src="https://unpkg.com/@tmcw/togeojson@4.7.0/dist/togeojson.umd.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
-  <script type="module" crossorigin src="/upper_winds_open_meteo/assets/index-CjSoetQD.js"></script>
-  <link rel="stylesheet" crossorigin href="/upper_winds_open_meteo/assets/index-BmGaMxIL.css">
+  <script type="module" crossorigin src="/upper_winds_open_meteo/assets/index-CxVg0zBN.js"></script>
+  <link rel="stylesheet" crossorigin href="/upper_winds_open_meteo/assets/index-DGo2n1P4.css">
 </head>
 
 <body>
@@ -136,11 +136,23 @@
                                 </tbody>
                             </table>
                         </div>
+
                         <div id="windspinne-container">
                             <canvas id="windspinne-chart"></canvas>
                         </div>
                         <div id="windspinne-legend" class="windspinne-legend"></div>
                         <div id="controls-row">
+                        </div>
+
+                        <div id="meteogram-container">
+                            <div class="meteogram-chart-wrapper">
+                                <h4 class="meteogram-title">Upper Air (Wind & Clouds)</h4>
+                                <canvas id="meteogramUpperChart"></canvas>
+                            </div>
+                            <div class="meteogram-chart-wrapper">
+                                <h4 class="meteogram-title">Surface Conditions</h4>
+                                <canvas id="meteogramSurfaceChart"></canvas>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -331,7 +343,7 @@
                                     <div class="settings-grid" style="grid-template-columns: 1fr auto; gap: 10px;">
                                         <label for="terrainClearance">Min. Clearance (m):</label>
                                         <input type="number" id="terrainClearance" min="0" max="500" step="10"
-                                            value="100" style="width: 80px;">
+                                            value="100" style="width: 80px; padding: 1px 2px;">
                                     </div>
                                     <button id="analyzeTerrainButton" class="btn btn-secondary">Analyze Terrain
                                         Clearance</button>
