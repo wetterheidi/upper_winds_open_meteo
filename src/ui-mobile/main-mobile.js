@@ -1013,17 +1013,21 @@ export async function updateUIWithNewWeatherData(newWeatherData, preservedIndex 
     slider.disabled = slider.max <= 0;
 
     // Logik zur Positionierung des Sliders
+    let currentIndex;
     if (preservedIndex !== null && preservedIndex <= maxSliderIndex) {
         slider.value = preservedIndex;
-        console.log(`Slider restored to preserved index: ${preservedIndex}`);
+        currentIndex = preservedIndex; // Den beizubehaltenden Index verwenden
+        console.log(`Slider restored to preserved index: ${currentIndex}`);
     } else {
         const currentUtcHour = new Date().getUTCHours();
         if (currentUtcHour <= maxSliderIndex) {
             slider.value = currentUtcHour;
+            currentIndex = currentUtcHour; // Aktuelle Stunde verwenden
         } else {
             slider.value = maxSliderIndex;
+            currentIndex = maxSliderIndex; // Maximalen Index verwenden
         }
-        console.log(`Slider set to default (current hour or max): ${slider.value}`);
+        console.log(`Slider set to default (current hour or max): ${currentIndex}`);
     }
 
     const { highWinds, highGusts, thunderstorms, cloudAlerts } = weatherManager.checkWeatherAlerts(newWeatherData);
@@ -1042,9 +1046,8 @@ export async function updateUIWithNewWeatherData(newWeatherData, preservedIndex 
     await displayManager.updateSliderLabels();
 
 
-    await displayManager.updateWeatherDisplay(slider.value, 'weather-table-container', 'selectedTime');
-
-    generateMeteogram();
+    await displayManager.updateWeatherDisplay(currentIndex, 'weather-table-container', 'selectedTime');
+    generateMeteogram(currentIndex); // Den bestimmten Index übergeben
 
     await displayManager.refreshMarkerPopup();
     if (AppState.lastAltitude !== 'N/A') {
@@ -1680,7 +1683,7 @@ function setupAppEventListeners() {
             if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
                 // 1. Die Haupt-Wettertabelle anzeigen lassen
                 await displayManager.updateWeatherDisplay(sliderIndex, 'weather-table-container', 'selectedTime');
-                debouncedGenerateMeteogram();
+                debouncedGenerateMeteogram(sliderIndex);
                 // 2. Das Popup des Markers aktualisieren lassen
                 await displayManager.refreshMarkerPopup();
                 // 3. Die Mittelwind-Berechnung UND Anzeige durchführen
@@ -1764,12 +1767,12 @@ function setupAppEventListeners() {
                 calculateJump();
                 displayManager.updateLandingPatternDisplay();
                 updateJumpMasterLineAndPanel();
-                generateMeteogram();
+                generateMeteogram(sliderIndex);
                 await displayManager.refreshMarkerPopup(); // Das Popup muss auch die neuen Einheiten zeigen
                 break;
 
             case 'temperatureUnit':
-                generateMeteogram();
+                generateMeteogram(sliderIndex);
             case 'coordFormat':
                 // Beeinflusst nur das Marker-Popup und das Live-Tracking Panel
                 await displayManager.refreshMarkerPopup();
@@ -2098,7 +2101,7 @@ function setupAppEventListeners() {
             displayManager.updateLandingPatternDisplay();
             updateJumpMasterLineAndPanel();
             console.log(`[Main] Triggering generateMeteogram due to change in '${key}'`); // <-- ADD THIS
-            generateMeteogram();
+            generateMeteogram(sliderIndex);
             await displayManager.refreshMarkerPopup();
 
             // Wichtig: explizites Update des Fadenkreuz-Displays
@@ -2299,6 +2302,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             AppState.lastLat = lat;
             AppState.lastLng = lng;
 
+            const sliderIndex = getSliderValue();
             const isInitialLoad = (source === 'geolocation' || source === 'geolocation_fallback');
             const currentTimeToPreserve = isInitialLoad ? null : (AppState.weatherData?.time?.[getSliderValue()] || null);
 

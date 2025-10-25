@@ -885,17 +885,21 @@ export async function updateUIWithNewWeatherData(newWeatherData, preservedIndex 
     slider.disabled = slider.max <= 0;
 
     // Logik zur Positionierung des Sliders
+    let currentIndex;
     if (preservedIndex !== null && preservedIndex <= maxSliderIndex) {
         slider.value = preservedIndex;
-        console.log(`Slider restored to preserved index: ${preservedIndex}`);
+        currentIndex = preservedIndex; // Den beizubehaltenden Index verwenden
+        console.log(`Slider restored to preserved index: ${currentIndex}`);
     } else {
         const currentUtcHour = new Date().getUTCHours();
         if (currentUtcHour <= maxSliderIndex) {
             slider.value = currentUtcHour;
+            currentIndex = currentUtcHour; // Aktuelle Stunde verwenden
         } else {
             slider.value = maxSliderIndex;
+            currentIndex = maxSliderIndex; // Maximalen Index verwenden
         }
-        console.log(`Slider set to default (current hour or max): ${slider.value}`);
+        console.log(`Slider set to default (current hour or max): ${currentIndex}`);
     }
 
     const { highWinds, highGusts, thunderstorms, cloudAlerts } = weatherManager.checkWeatherAlerts(newWeatherData);
@@ -914,9 +918,8 @@ export async function updateUIWithNewWeatherData(newWeatherData, preservedIndex 
     await displayManager.updateSliderLabels();
 
 
-    await displayManager.updateWeatherDisplay(slider.value, 'weather-table-container', 'selectedTime');
-
-    generateMeteogram();
+    await displayManager.updateWeatherDisplay(currentIndex, 'weather-table-container', 'selectedTime');
+    generateMeteogram(currentIndex); // Den bestimmten Index übergeben
 
     await displayManager.refreshMarkerPopup();
     if (AppState.lastAltitude !== 'N/A') {
@@ -1446,7 +1449,7 @@ function setupAppEventListeners() {
             if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
                 // 1. Die Haupt-Wettertabelle anzeigen lassen
                 await displayManager.updateWeatherDisplay(sliderIndex, 'weather-table-container', 'selectedTime'); // NEU
-                debouncedGenerateMeteogram();
+                debouncedGenerateMeteogram(sliderIndex);
                 // 2. Das Popup des Markers aktualisieren lassen
                 await displayManager.refreshMarkerPopup();
                 // 3. Die Mittelwind-Berechnung UND Anzeige durchführen
@@ -1494,7 +1497,7 @@ function setupAppEventListeners() {
         // Update der Wetteranzeige für alle Einheiten-Änderungen
         if (['refLevel', 'heightUnit', 'temperatureUnit', 'windUnit', 'timeZone'].includes(name)) {
             await displayManager.updateWeatherDisplay(getSliderValue(), 'weather-table-container', 'selectedTime');
-            generateMeteogram();
+            generateMeteogram(sliderIndex);
         }
 
         if (name === 'maxForecastTime') {
@@ -1522,7 +1525,7 @@ function setupAppEventListeners() {
                 displayManager.updateLandingPatternDisplay();
                 updateJumpMasterLineAndPanel();
                 await displayManager.refreshMarkerPopup();
-                generateMeteogram();
+                generateMeteogram(sliderIndex);
                 break;
 
             case 'coordFormat':
@@ -1587,12 +1590,12 @@ function setupAppEventListeners() {
                 }
                 displayManager.updateLandingPatternDisplay();
                 updateJumpMasterLineAndPanel();
-                generateMeteogram();
+                generateMeteogram(sliderIndex);
                 await displayManager.refreshMarkerPopup(); // Das Popup muss auch die neuen Einheiten zeigen
                 break;
 
             case 'temperatureUnit':
-                generateMeteogram();
+                generateMeteogram(sliderIndex);
             case 'coordFormat':
                 await displayManager.refreshMarkerPopup();
                 updateJumpMasterLineAndPanel();
@@ -2063,12 +2066,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const isInitialLoad = (source === 'geolocation' || source === 'geolocation_fallback');
 
                 if (isInitialLoad) {
-                    // Beim initialen Laden den Zeit-Index NICHT übergeben, 
+                    // Beim initialen Laden den Zeit-Index NICHT übergeben (null),
                     // damit die Funktion die aktuelle Stunde verwendet.
-                    await updateUIWithNewWeatherData(newWeatherData);
+                    await updateUIWithNewWeatherData(newWeatherData, null);
                 } else {
-                    // Bei allen anderen Aktionen (Marker ziehen, Suche, etc.)
-                    // den eingestellten Zeit-Index beibehalten.
+                    // Bei allen anderen Aktionen den zuvor geholten sliderIndex beibehalten.
                     await updateUIWithNewWeatherData(newWeatherData, sliderIndex);
                 }
             } else {
@@ -2121,7 +2123,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 console.log("DIP moved, triggering ensemble recalculation...");
                 const ensembleSuccess = await EnsembleManager.fetchEnsembleWeatherData();
                 if (ensembleSuccess) {
-                    EnsembleManager.processAndVisualizeEnsemble(getSliderValue());
+                    const currentSliderIndex = getSliderValue();
+                    EnsembleManager.processAndVisualizeEnsemble(currentSliderIndex);
                 }
             }
         } catch (error) {

@@ -26,27 +26,27 @@ function getCloudColor(cloudCoverPercent, style) {
 /**
  * Generiert und zeigt die Skydiver-Meteogramme (Boden & Höhe) an.
  */
-export async function generateMeteogram() {
-    console.log('[Meteogram] Starting generateMeteogram...');
+export async function generateMeteogram(sliderIndex) {
+    console.log(`[Meteogram] Starting generateMeteogram for slider index: ${sliderIndex}...`);
 
     // === KORREKTUR 1: Lese die Temperatureinheit FRÜHER aus ===
-    const tempUnit = Settings.getValue('temperatureUnit', 'C'); // 'C' oder 'F'
-    console.log(`[Meteogram] Starting generateMeteogram. Current tempUnit setting: ${tempUnit}`);
+    const tempUnit = Settings.getValue('temperatureUnit', 'C');
+    console.log(`[Meteogram] Current tempUnit setting: ${tempUnit}`);
 
 
     const upperCanvas = document.getElementById('meteogramUpperChart');
     const surfaceCanvas = document.getElementById('meteogramSurfaceChart');
-    const upperTitleElement = upperCanvas?.previousElementSibling; // Annahme: <h4> ist direkt davor
-    const surfaceTitleElement = surfaceCanvas?.previousElementSibling; // Annahme: <h4> ist direkt davor
+    const upperTitleElement = upperCanvas?.previousElementSibling;
+    const surfaceTitleElement = surfaceCanvas?.previousElementSibling;
+
+    destroyCharts(); // Vorhandene Charts zuerst zerstören
 
     if (!upperCanvas || !surfaceCanvas || !upperTitleElement || !surfaceTitleElement) {
         console.warn("[Meteogram] Canvas oder Titel Elemente nicht gefunden.");
-        destroyCharts();
         return;
     }
-    if (!AppState.weatherData || !AppState.weatherData.time || AppState.weatherData.time.length === 0) {
+    if (!AppState.weatherData || !AppState.weatherData.time || AppState.weatherData.time.length === 0 || sliderIndex < 0 || sliderIndex >= AppState.weatherData.time.length) {
         console.warn("[Meteogram] Keine Wetterdaten verfügbar.");
-        destroyCharts();
         upperTitleElement.textContent = "Upper Air (Wind & Clouds)";
         surfaceTitleElement.textContent = "Surface Conditions";
         displayChartPlaceholder(upperCanvas, "No weather data loaded.");
@@ -61,10 +61,8 @@ export async function generateMeteogram() {
     const weatherData = AppState.weatherData;
 
     // --- Gemeinsame Daten und Einstellungen ---
-    const timeLabels = [];
     const heightUnit = Settings.getValue('heightUnit', 'm'); // 'm' oder 'ft'
     const windUnit = Settings.getValue('windUnit', 'kt');
-    // const tempUnit = Settings.getValue('temperatureUnit', 'C'); // Wird jetzt früher gelesen
     const timeZone = Settings.getValue('timeZone', 'Z');
     const baseHeight = Math.round(AppState.lastAltitude) || 0;
     const style = getComputedStyle(document.body);
@@ -99,6 +97,42 @@ export async function generateMeteogram() {
     const surfaceWindColor = 'rgb(200, 200, 200)';
     const surfaceGustColor = 'rgb(200, 0, 0)';
 
+
+    // === START MODIFICATION: Determine target date and filter indices ===
+    let locationTimezone = 'utc';
+    if (timeZone.toLowerCase() === 'loc' && AppState.lastLat != null && AppState.lastLng != null) {
+        const locData = await Utils.getLocationData(AppState.lastLat, AppState.lastLng);
+        locationTimezone = locData.timezone || 'utc';
+    }
+
+    const sliderTime = DateTime.fromISO(weatherData.time[sliderIndex], { zone: 'utc' }).setZone(locationTimezone);
+    const targetDate = sliderTime.startOf('day'); // Der Tag, der angezeigt werden soll
+    const displayDateStr = targetDate.toFormat('yyyy-MM-dd'); // Datum für den Titel
+
+    // Finde alle Indizes, die zum targetDate gehören
+    const timeIndicesForDay = [];
+    const timeLabels = []; // Labels nur für diesen Tag
+    for (let i = 0; i < weatherData.time.length; i++) {
+        const dt = DateTime.fromISO(weatherData.time[i], { zone: 'utc' }).setZone(locationTimezone);
+        if (dt.hasSame(targetDate, 'day')) {
+            timeIndicesForDay.push(i);
+            // Erstelle das Zeitlabel für die X-Achse
+            timeLabels.push(dt.toFormat(timeZone.toLowerCase() === 'loc' ? 'HH' : 'HH\'Z\''));
+        }
+    }
+
+    if (timeIndicesForDay.length === 0) {
+        console.warn(`[Meteogram] No data found for the selected date: ${displayDateStr}`);
+        // Zeige Platzhalter an, wenn für den ausgewählten Tag keine Daten vorhanden sind (sollte selten passieren)
+        upperTitleElement.textContent = `Upper Air - ${displayDateStr}`;
+        surfaceTitleElement.textContent = `Surface - ${displayDateStr}`;
+        displayChartPlaceholder(upperCanvas, "No data for selected day.");
+        displayChartPlaceholder(surfaceCanvas, "No data for selected day.");
+        return;
+    }
+    console.log(`[Meteogram] Processing data for date: ${displayDateStr}. Indices: ${timeIndicesForDay[0]} to ${timeIndicesForDay[timeIndicesForDay.length - 1]}. Found ${timeIndicesForDay.length} data points.`);
+    // === END MODIFICATION ===
+
     // --- Datenarrays vorbereiten ---
     const windBarbDataPoints = []; // Temporäres Array für Rohdaten der Fiedern
     const cloudBarData = [];
@@ -108,43 +142,17 @@ export async function generateMeteogram() {
     const surfaceWindSpeedData = [];
     const surfaceWindGustData = [];
 
-    let displayDateStr = '';
+    // --- Datenverarbeitungsschleife (jetzt über die gefilterten Indizes) ---
+    console.log('[Meteogram] Starting data processing loop for selected day...');
+    let pointsProcessedThisDay = 0;
 
-    // --- Datenverarbeitungsschleife ---
-    console.log('[Meteogram] Starting data processing loop...');
-    let firstDay = null;
-    let dataPointsProcessed = 0;
-
-    for (let i = 0; i < weatherData.time.length; i++) {
-        // ... (Zeit-Label Logik, Tages-Check - bleibt gleich) ...
-        const timeStr = weatherData.time[i];
-        const dt = DateTime.fromISO(timeStr, { zone: 'utc' });
-        let currentDay;
-        let labelTime;
-        let currentFullDate;
-
-        if (timeZone.toLowerCase() === 'loc' && AppState.lastLat != null && AppState.lastLng != null) {
-            const locData = await Utils.getLocationData(AppState.lastLat, AppState.lastLng);
-            const localDt = dt.setZone(locData.timezone || 'utc');
-            currentDay = localDt.day;
-            labelTime = localDt.toFormat('HH');
-            currentFullDate = localDt;
-        } else {
-            currentDay = dt.day;
-            labelTime = dt.toFormat('HH\'Z\'');
-            currentFullDate = dt;
-        }
-
-        if (firstDay === null) {
-            firstDay = currentDay;
-            displayDateStr = currentFullDate.toFormat('yyyy-MM-dd');
-        } if (currentDay !== firstDay && i > 0) {
-            console.log(`[Meteogram] End of first day reached at index ${i}. Processed ${dataPointsProcessed} points.`);
-            break;
-        }
-
-        timeLabels.push(labelTime);
-        dataPointsProcessed++;
+    // === START MODIFICATION: Iterate over filtered indices ===
+    for (const i of timeIndicesForDay) {
+        // Der Rest der Schleife bleibt logisch gleich,
+        // verwendet aber nur den Index 'i' aus timeIndicesForDay
+        // und das timeLabel aus dem neu erstellten timeLabels-Array
+        const currentLabel = timeLabels[pointsProcessedThisDay]; // Korrektes Label für die X-Achse
+        pointsProcessedThisDay++;
 
         // -- Bodendaten sammeln --
         const tempC = weatherData.temperature_2m[i];
@@ -155,9 +163,7 @@ export async function generateMeteogram() {
         if (tempC !== null && !isNaN(tempC)) {
             // Benutze die globale 'tempUnit'-Variable
             convertedTemp = tempUnit === 'F' ? Utils.convertTemperature(tempC, '°F') : tempC;
-            if (typeof convertedTemp !== 'number' || isNaN(convertedTemp)) {
-                convertedTemp = null;
-            }
+            if (typeof convertedTemp !== 'number' || isNaN(convertedTemp)) { convertedTemp = null; }
         }
         surfaceTempData.push(convertedTemp);
 
@@ -166,17 +172,14 @@ export async function generateMeteogram() {
         if (dewPointC !== null && !isNaN(dewPointC)) {
             // Benutze die globale 'tempUnit'-Variable
             convertedDewPoint = tempUnit === 'F' ? Utils.convertTemperature(dewPointC, '°F') : dewPointC;
-            if (typeof convertedDewPoint !== 'number' || isNaN(convertedDewPoint)) {
-                convertedDewPoint = null;
-            }
+            if (typeof convertedDewPoint !== 'number' || isNaN(convertedDewPoint)) { convertedDewPoint = null; }
         }
         surfaceDewPointData.push(convertedDewPoint);
-        // ================== ENDE KORREKTUR 3 ==================
 
-        // --- Angepasstes Logging ---
-        if (i < 5) { // Log first few points only
-            const displayUnitLabel = tempUnit === 'F' ? '°F' : '°C'; // Label für Logging
-            console.log(`[Meteogram Loop i=${i}] TempC: ${tempC}, RH: ${rh}, DewC: ${dewPointC?.toFixed(1)}, PushedTemp(${displayUnitLabel}): ${convertedTemp}, PushedDew(${displayUnitLabel}): ${convertedDewPoint}`);
+        // Logging (optional, kann reduziert werden)
+        if (pointsProcessedThisDay <= 5) {
+            const displayUnitLabel = tempUnit === 'F' ? '°F' : '°C';
+            console.log(`[Meteogram DayLoop i=${i}] TempC: ${tempC}, PushedTemp(${displayUnitLabel}): ${convertedTemp}`);
         }
 
         const surfGust_kmh = weatherData.wind_gusts_10m[i];
@@ -184,12 +187,12 @@ export async function generateMeteogram() {
         surfaceWindSpeedData.push(surfSpeed_kmh !== null ? parseFloat(Utils.convertWind(surfSpeed_kmh, windUnit, 'km/h').toFixed(1)) : null);
         surfaceWindGustData.push(surfGust_kmh !== null ? parseFloat(Utils.convertWind(surfGust_kmh, windUnit, 'km/h').toFixed(1)) : null);
 
-        // Höhendaten
-        const interpolatedHourData = weatherManager.interpolateWeatherData(weatherData, i, 100, baseHeight, 'm'); // Interpolation *immer* in Metern
+        // Höhendaten interpolieren (wie zuvor, aber nur für den aktuellen Index i)
+        const interpolatedHourData = weatherManager.interpolateWeatherData(weatherData, i, 100, baseHeight, 'm');
         if (!interpolatedHourData || interpolatedHourData.length === 0) {
             console.warn(`[Meteogram] Interpolation failed for index ${i}. Skipping upper air data for this hour.`);
             freezingLevelData.push(null);
-            continue;
+            continue; // Fahre mit dem nächsten Index im timeIndicesForDay fort
         }
 
         // --- Freezing Level (bleibt gleich, Ergebnis ist Meter AGL) ---
@@ -216,28 +219,25 @@ export async function generateMeteogram() {
         freezingLevelData.push(zeroDegAltitudeAGL_Meters !== null ? Math.round(Utils.convertHeight(zeroDegAltitudeAGL_Meters, heightUnit)) : null);
         // ================== ENDE KORREKTUR 4 ==================
 
-        // --- Windfiedern-Rohdaten sammeln ---
-        if (i % 2 === 0) { // Jeden zweiten Zeitschritt für Performance
-            // === KORREKTUR 5: Iteriere über die korrekten Höhenschritte (windBarbAltitudesAGL_CurrentUnit) ===
+        // --- Windfiedern ---
+        // (Logik bleibt gleich, aber push verwendet currentLabel)
+        // Reduziere Frequenz, wenn mehr als 24h angezeigt werden (optional)
+        const windBarbFrequency = timeIndicesForDay.length > 24 ? 4 : 2; // Every 4h if > 24h, else every 2h
+        if (pointsProcessedThisDay % windBarbFrequency === 1) { // Check against pointsProcessedThisDay
             windBarbAltitudesAGL_CurrentUnit.forEach(altAGL_Display => {
-                // Konvertiere die Anzeigehöhe (m oder ft) zurück in Meter AGL für die Interpolation
+                // ... (Interpolationslogik wie gehabt) ...
                 const altAGL_m = heightUnit === 'ft' ? Utils.convertFeetToMeters(altAGL_Display) : altAGL_Display;
-
-                // Stelle sicher, dass wir nicht über das absolute Maximum hinaus interpolieren
                 if (altAGL_m > upperChartMaxHeightAGL_Meters) return;
-
                 const altMSL = baseHeight + altAGL_m;
-                let closestPoint = null;
-                let minDiff = Infinity;
+                let closestPoint = null; let minDiff = Infinity;
                 interpolatedHourData.forEach(p => {
                     const diff = Math.abs(p.height - altMSL);
                     if (diff < minDiff) { minDiff = diff; closestPoint = p; }
                 });
-
                 if (closestPoint && closestPoint.spd !== 'N/A' && closestPoint.dir !== 'N/A') {
                     const speedKt = parseFloat(Utils.convertWind(closestPoint.spd, 'kt', 'km/h').toFixed(1));
                     // Speichere die Y-Koordinate in der ANZEIGEEINHEIT (altAGL_Display)
-                    windBarbDataPoints.push({ x: labelTime, y: altAGL_Display, speedKt: speedKt, direction: Math.round(closestPoint.dir) });
+                    windBarbDataPoints.push({ x: currentLabel, y: altAGL_Display, speedKt: speedKt, direction: Math.round(closestPoint.dir) });
                 }
             });
             // ================== ENDE KORREKTUR 5 ==================
@@ -266,7 +266,7 @@ export async function generateMeteogram() {
             }
 
             // Speichere die Y-Koordinaten in der ANZEIGEEINHEIT
-            cloudBarData.push({ x: labelTime, y: [bandStartAGL_Display, bandEndAGL_Display], cover: cover });
+            cloudBarData.push({ x: currentLabel, y: [bandStartAGL_Display, bandEndAGL_Display], cover: cover });
         }
         // ================== ENDE KORREKTUR 6 ==================
 
@@ -305,27 +305,34 @@ export async function generateMeteogram() {
         ];
 
         if (meteogramUpperInstance) {
-             console.log('[Meteogram] Destroying existing Upper Chart instance before recreation.');
+            console.log('[Meteogram] Destroying existing Upper Chart instance before recreation.');
             meteogramUpperInstance.destroy();
             meteogramUpperInstance = null;
-             // Optional: Clear canvas just in case, though destroy should handle it
-             const ctx = upperCanvas.getContext('2d');
-             ctx.clearRect(0, 0, upperCanvas.width, upperCanvas.height);
+            // Optional: Clear canvas just in case, though destroy should handle it
+            const ctx = upperCanvas.getContext('2d');
+            ctx.clearRect(0, 0, upperCanvas.width, upperCanvas.height);
         }
 
         meteogramUpperInstance = new Chart(upperCtx, {
             type: 'bar',
+            // === START MODIFICATION: Verwende gefilterte timeLabels ===
             data: { labels: timeLabels, datasets: upperDatasets },
             options: {
                 responsive: true, maintainAspectRatio: false, indexAxis: 'x', interaction: { mode: 'nearest', axis: 'xy', intersect: false },
                 scales: {
-                    x: { stacked: true, ticks: { display: false }, grid: { color: gridColor } },
+                    x: {
+                        stacked: true,
+                        // === START MODIFICATION: Ticks anzeigen, wenn nur ein Tag ===
+                        ticks: { display: true, color: textColor, maxRotation: 0, autoSkipPadding: 20 }, // Ticks anzeigen
+                        // === END MODIFICATION ===
+                        grid: { color: gridColor }
+                    },
                     // === KORREKTUR 7: Y-Achsen-Konfiguration angepasst ===
                     y: {
                         title: { display: true, text: `Altitude AGL (${heightUnit})`, color: textColor },
                         min: 0,
-                        max: upperChartMaxHeightDisplay, // Max Höhe in Anzeigeeinheit
-                        ticks: { color: textColor, stepSize: yAxisStepSize }, // Korrekte Schrittweite
+                        max: upperChartMaxHeightDisplay,
+                        ticks: { color: textColor, stepSize: yAxisStepSize },
                         grid: { color: gridColor },
                         stacked: true
                     }
@@ -339,9 +346,9 @@ export async function generateMeteogram() {
                             title: function (tooltipItems) {
                                 const item = tooltipItems[0]; if (!item || !item.raw) return item.label || '';
                                 const rawData = item.raw.image ? item.raw.image.rawData : item.raw; if (!rawData) return item.label || '';
-                                if (item.dataset.label.startsWith('Wind')) { return `Alt: ${rawData.y} ${heightUnit} AGL at ${rawData.x}`; } // Einheit hier einfügen
+                                if (item.dataset.label.startsWith('Wind')) { return `Alt: ${rawData.y} ${heightUnit} AGL at ${rawData.x}`; }
                                 else if (item.dataset.label === 'Freezing Level') { return `Time: ${item.label}`; }
-                                else if (item.dataset.label === 'Cloud Cover') { return `Alt: ${rawData.y[0]}-${rawData.y[1]} ${heightUnit} AGL at ${rawData.x}`; } // Einheit hier einfügen
+                                else if (item.dataset.label === 'Cloud Cover') { return `Alt: ${rawData.y[0]}-${rawData.y[1]} ${heightUnit} AGL at ${rawData.x}`; }
                                 return item.label || rawData.x;
                             },
                             label: function (context) {
@@ -354,9 +361,9 @@ export async function generateMeteogram() {
                                 } else if (context.dataset.label === 'Cloud Cover') {
                                     return ` Cover: ${rawData.cover.toFixed(0)}%`;
                                 } else if (context.dataset.label === 'Freezing Level') {
-                                    const flValue = typeof context.raw === 'number' ? context.raw : null; // Hier ist context.raw die Höhe
-                                    const displayFL = flValue !== null ? flValue : 'Above Max'; // Wert ist bereits in Anzeigeeinheit
-                                    return ` ${context.dataset.label}: ${displayFL}${flValue !== null ? ' ' + heightUnit + ' AGL' : ''}`; // Einheit hier einfügen
+                                    const flValue = typeof context.raw === 'number' ? context.raw : null;
+                                    const displayFL = flValue !== null ? flValue : 'Above Max';
+                                    return ` ${context.dataset.label}: ${displayFL}${flValue !== null ? ' ' + heightUnit + ' AGL' : ''}`;
                                 }
                                 return '';
                             }
@@ -377,26 +384,8 @@ export async function generateMeteogram() {
     try {
         const surfaceDatasets = [
             // === KORREKTUR 8: Tooltips für Bodentemperatur anpassen ===
-            {
-                label: `Temp (${tempUnit === 'F' ? '°F' : '°C'})`, // Label dynamisch anpassen
-                data: surfaceTempData,
-                borderColor: tempColor,
-                backgroundColor: 'transparent',
-                borderWidth: 1.25,
-                tension: 0.1,
-                yAxisID: 'yTempSurface',
-                order: 1
-            },
-            {
-                label: `Dew Point (${tempUnit === 'F' ? '°F' : '°C'})`, // Label dynamisch anpassen
-                data: surfaceDewPointData,
-                borderColor: dewPointColor,
-                backgroundColor: 'transparent',
-                borderWidth: 1.25,
-                tension: 0.1,
-                yAxisID: 'yTempSurface',
-                order: 1
-            },
+            { label: `Temp (${tempUnit === 'F' ? '°F' : '°C'})`, data: surfaceTempData, borderColor: tempColor, backgroundColor: 'transparent', borderWidth: 1.25, tension: 0.1, yAxisID: 'yTempSurface', order: 1 },
+            { label: `Dew Point (${tempUnit === 'F' ? '°F' : '°C'})`, data: surfaceDewPointData, borderColor: dewPointColor, backgroundColor: 'transparent', borderWidth: 1.25, tension: 0.1, yAxisID: 'yTempSurface', order: 1 },
             // ================== ENDE KORREKTUR 8 ==================
             { label: `Wind (${windUnit})`, data: surfaceWindSpeedData, borderColor: surfaceWindColor, borderWidth: 3, borderDash: [], tension: 0.1, yAxisID: 'yWindSurface', order: 0 },
             { label: `Gusts (${windUnit})`, data: surfaceWindGustData.map((gust, i) => (gust !== null && surfaceWindSpeedData[i] !== null && gust > surfaceWindSpeedData[i]) ? gust : null), type: 'scatter', pointStyle: 'triangle', pointRadius: 5, pointBackgroundColor: surfaceGustColor, showLine: false, yAxisID: 'yWindSurface', order: -1 }
@@ -406,9 +395,9 @@ export async function generateMeteogram() {
             console.log('[Meteogram] Destroying existing Surface Chart instance before recreation.');
             meteogramSurfaceInstance.destroy();
             meteogramSurfaceInstance = null;
-             // Optional: Clear canvas
-             const ctx = surfaceCanvas.getContext('2d');
-             ctx.clearRect(0, 0, surfaceCanvas.width, surfaceCanvas.height);
+            // Optional: Clear canvas
+            const ctx = surfaceCanvas.getContext('2d');
+            ctx.clearRect(0, 0, surfaceCanvas.width, surfaceCanvas.height);
         }
 
         meteogramSurfaceInstance = new Chart(surfaceCtx, {
@@ -419,13 +408,7 @@ export async function generateMeteogram() {
                 scales: {
                     x: { title: { display: true, text: `Time (${timeZone})`, color: textColor }, ticks: { color: textColor, maxRotation: 0, autoSkipPadding: 20 }, grid: { color: gridColor } },
                     // === KORREKTUR 9: Y-Achsen-Titel für Temperatur dynamisch anpassen ===
-                    yTempSurface: {
-                        type: 'linear',
-                        position: 'right',
-                        title: { display: true, text: `Temperature (${tempUnit === 'F' ? '°F' : '°C'})`, color: textColor }, // Dynamisches Label
-                        ticks: { color: textColor },
-                        grid: { color: gridColor }
-                    },
+                    yTempSurface: { type: 'linear', position: 'right', title: { display: true, text: `Temperature (${tempUnit === 'F' ? '°F' : '°C'})`, color: textColor }, ticks: { color: textColor }, grid: { color: gridColor } },
                     // ================== ENDE KORREKTUR 9 ==================
                     yWindSurface: { type: 'linear', position: 'left', title: { display: true, text: `Wind Speed (${windUnit})`, color: textColor }, ticks: { color: textColor }, grid: { drawOnChartArea: false }, min: 0 }
                 },
@@ -445,14 +428,11 @@ export async function generateMeteogram() {
 }
 
 
-// --- Hilfsfunktionen (destroyCharts, displayChartPlaceholder) bleiben unverändert ---
 /**
  * Zerstört die Chart-Instanzen, falls vorhanden, UND leert die Canvas-Elemente.
  * @private
  */
 function destroyCharts() {
-    // === START MODIFICATION ===
-    // Check if instance exists before destroying
     if (meteogramUpperInstance) {
         console.log('[Meteogram] Destroying existing Upper Chart instance.');
         meteogramUpperInstance.destroy();
@@ -478,9 +458,8 @@ function destroyCharts() {
             console.log('[Meteogram] Cleared Surface Chart canvas.');
         }
     } else {
-         console.log('[Meteogram] No existing Surface Chart instance to destroy.');
+        console.log('[Meteogram] No existing Surface Chart instance to destroy.');
     }
-    // === END MODIFICATION ===
 }
 
 /**
