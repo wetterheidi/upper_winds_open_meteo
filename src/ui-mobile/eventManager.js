@@ -1313,7 +1313,7 @@ function setupAlertEventListeners() {
         Settings.save();
         document.dispatchEvent(new CustomEvent('ui:recalculateAlerts'));
     });
-    
+
     setupCheckbox('alertCloudsEnabled', 'alerts.clouds.enabled', (checkbox) => {
         Settings.state.userSettings.alerts.clouds.enabled = checkbox.checked;
         Settings.save();
@@ -1424,53 +1424,47 @@ async function setupAlertIconEvents() { // Die Funktion ist jetzt async
 
 function setupCacheManagement() {
     const targetContainer = document.getElementById('app-management-settings');
+
     if (!targetContainer) {
         console.error('Ziel-Container für App-Management-Buttons nicht gefunden.');
         return;
     }
 
-    // 1. Erstelle den gemeinsamen Container für die Buttons
-    const buttonWrapper = document.createElement('div');
-    buttonWrapper.id = 'settings-cache-buttons';
-    buttonWrapper.className = 'button-wrapper';
-
-    // 2. Erstelle den "Reset Settings" Button (Logik von eventManager hierher verschoben)
+    // --- Reset Settings Button ---
     const resetButton = document.createElement('button');
     resetButton.id = 'resetButton';
-    resetButton.className = 'btn btn-danger';
     resetButton.textContent = 'Reset Settings';
     resetButton.title = 'Resets all settings to their default values and locks all features';
+    resetButton.className = 'btn btn-danger'; // Behält die Button-Klasse bei
     resetButton.addEventListener('click', () => {
         if (confirm("Are you sure you want to reset all settings and lock all features?")) {
             localStorage.removeItem('unlockedFeatures');
             localStorage.removeItem('upperWindsSettings');
-
-            // Führe einen Reload der Seite durch, um alles sauber neu zu initialisieren
             window.location.reload();
         }
     });
-    buttonWrapper.appendChild(resetButton); // Füge den Reset-Button zum Wrapper hinzu
+    // *** ÄNDERUNG: Direkt an den Container anhängen ***
+    targetContainer.appendChild(resetButton);
 
-    // 3. Erstelle den "Clear Tile Cache" Button
+    // --- Clear Tile Cache Button ---
     const clearCacheButton = document.createElement('button');
     clearCacheButton.id = 'clearCacheButton';
     clearCacheButton.textContent = 'Clear Tile Cache';
-    clearCacheButton.className = 'btn btn-danger';
     clearCacheButton.title = 'Clears cached map tiles. Pan/zoom to cache more tiles for offline use.';
+    clearCacheButton.className = 'btn btn-danger'; // Behält die Button-Klasse bei
     clearCacheButton.addEventListener('click', async () => {
         try {
-            const size = await TileCache.getCacheSize();
-            await TileCache.clearCache();
-            Utils.handleMessage(`Tile cache cleared successfully (freed ${size.toFixed(2)} MB).`);
-            console.log('Tile cache cleared');
+            const size = await TileCache.getCacheSize(); //
+            await TileCache.clearCache(); //
+            Utils.handleMessage(`Tile cache cleared successfully (freed ${size.toFixed(2)} MB).`); //
         } catch (error) {
-            Utils.handleError('Failed to clear tile cache: ' + error.message);
+            Utils.handleError('Failed to clear tile cache: ' + error.message); //
         }
     });
-    buttonWrapper.appendChild(clearCacheButton); // Füge den Clear-Cache-Button zum Wrapper hinzu
+    // *** ÄNDERUNG: Direkt an den Container anhängen ***
+    targetContainer.appendChild(clearCacheButton);
 
-    // 4. Füge den fertigen Wrapper zum DOM hinzu
-    targetContainer.appendChild(buttonWrapper);
+    // Der alte Code zum Erstellen und Anhängen von buttonWrapper wird entfernt.
 }
 function setupCacheSettings() {
     const cacheRadiusInput = document.getElementById('cacheRadiusSelect');
@@ -1581,6 +1575,76 @@ function setupCacheSettings() {
     } else {
         console.warn('recacheNowButton not found in DOM');
     }
+}
+function setupThemeToggle() {
+    const toggleButton = document.getElementById('theme-toggle');
+    const body = document.body;
+
+    // Gespeichertes Theme beim Laden anwenden
+    const currentTheme = localStorage.getItem('theme');
+    if (currentTheme) {
+        body.setAttribute('data-theme', currentTheme);
+        if (toggleButton) {
+            toggleButton.textContent = currentTheme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode';
+        }
+    }
+
+    if (toggleButton) {
+        toggleButton.addEventListener('click', () => {
+            const isDarkMode = body.getAttribute('data-theme') === 'dark';
+            let newTheme, newBaseMapName;
+
+            // Logik zum Umschalten des Themes und der Basiskarte
+            if (isDarkMode) {
+                // Von Dark zu Light wechseln
+                body.removeAttribute('data-theme');
+                localStorage.removeItem('theme');
+                toggleButton.textContent = 'Switch to Dark Mode';
+                newTheme = 'light';
+                newBaseMapName = 'Esri Street'; // Dein Standard für den Light Mode
+            } else {
+                // Von Light zu Dark wechseln
+                body.setAttribute('data-theme', 'dark');
+                localStorage.setItem('theme', 'dark');
+                toggleButton.textContent = 'Switch to Light Mode';
+                newTheme = 'dark';
+                newBaseMapName = 'CARTO Dark Matter'; // Deine dunkle Karte
+            }
+
+            // Basiskarte wechseln
+            if (AppState.map && AppState.baseMaps[newBaseMapName]) {
+                // Alle aktiven Basiskarten entfernen
+                for (const layerName in AppState.baseMaps) {
+                    if (AppState.map.hasLayer(AppState.baseMaps[layerName])) {
+                        AppState.map.removeLayer(AppState.baseMaps[layerName]);
+                    }
+                }
+                // Neue Basiskarte hinzufügen
+                AppState.map.addLayer(AppState.baseMaps[newBaseMapName]);
+                // Einstellung speichern
+                Settings.state.userSettings.baseMaps = newBaseMapName;
+                Settings.save();
+                console.log(`Theme switched to ${newTheme}, basemap set to ${newBaseMapName}.`);
+            }
+            if (AppState.map && AppState.baseMaps[newBaseMapName]) { //
+                // 1. Alle aktuell aktiven Basiskarten von der Karte entfernen
+                for (const layerName in AppState.baseMaps) { //
+                    if (AppState.map.hasLayer(AppState.baseMaps[layerName])) { //
+                        AppState.map.removeLayer(AppState.baseMaps[layerName]); //
+                    }
+                }
+
+                // 2. Die neue, passende Basiskarte hinzufügen
+                AppState.map.addLayer(AppState.baseMaps[newBaseMapName]); //
+
+                // 3. Die Einstellung speichern, damit sie beim Neuladen erhalten bleibt
+                Settings.state.userSettings.baseMaps = newBaseMapName; //
+                Settings.save(); //
+
+                console.log(`Theme switched to ${newTheme}, basemap set to ${newBaseMapName}.`);
+            }
+        });
+    }   
 }
 
 // --- Live Tracking & Dashboard ---
@@ -1931,6 +1995,7 @@ export function initializeEventListeners() {
     setupJmlTargetToggleEvents();
     setupCacheManagement();
     setupCacheSettings();
+    setupThemeToggle();
 
     // 7. Live-Funktionen
     setupTrackRecordingEvents();

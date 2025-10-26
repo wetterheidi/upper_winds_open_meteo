@@ -31,6 +31,13 @@ import { Directory } from '@capacitor/filesystem';
 // Eine debounced-Version von generateMeteogram
 const debouncedGenerateMeteogram = Utils.debounce(generateMeteogram, 250); // 250ms delay
 
+// Gespeichertes Theme beim Laden anwenden
+const currentTheme = localStorage.getItem('theme');
+if (currentTheme) {
+    document.body.setAttribute('data-theme', currentTheme);
+    // Der Button-Text wird in initializeUIElements/setupThemeToggle gesetzt
+}
+
 // Eine debounced-Version der Sprungberechnung, um bei schnellen UI-Änderungen
 // die Performance zu schonen.
 export const debouncedCalculateJump = Utils.debounce(calculateJump, 300);

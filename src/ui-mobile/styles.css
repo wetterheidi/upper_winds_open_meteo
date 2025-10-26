@@ -90,6 +90,412 @@
     --dashboard-text: #00FF00;
     --dashboard-border: #00FF00;
     --dashboard-glow: rgba(0, 255, 0, 0.5);
+
+    [data-theme="dark"] {
+        /* Semantische Farben */
+        --color-primary: #5cb8e4;
+        --color-primary-hover: #74c3e9;
+        --color-secondary: var(--palette-grey-300);
+        --color-secondary-hover: var(--palette-grey-100);
+        --color-danger: #ff6b6b;
+        --color-danger-hover: #ff8787;
+        --color-success: #28a745;
+        --color-warning: #f3d131;
+
+        /* Textfarben */
+        --text-primary: #E0E0E0;
+        --text-secondary: #B0B0B0;
+        --text-inverted: #1e1e2e;
+        --text-link: #74c3e9;
+
+        /* Hintergrundfarben */
+        --background-white: 30, 30, 46;
+        --background-surface: #282a36;
+        --background-body: #1e1e2e;
+        --background-interactive: #44475a;
+        --background-hover: #5cb8e4;
+
+        /* Rahmen und Linien */
+        --border-color: #44475a;
+        --border-color-strong: var(--palette-grey-300);
+
+        /* Dashboard-Theme */
+        --dashboard-background: #1e1e1e;
+        --dashboard-text: #50fa7b;
+        --dashboard-border: #50fa7b;
+        --dashboard-glow: rgba(80, 250, 123, 0.4);
+
+        /* Wind- und Wetterfarben */
+        --wind-low: #66b3ff;
+        --wind-moderate: #50fa7b;
+        --wind-high: #ffb347;
+        --wind-very-high: #ff6b6b;
+        --wind-extreme: #d670d6;
+
+        /* Neue Wolkenbedeckungs-Farben im Dark Mode */
+        --cc-clear: #38bdf8;
+        /* Brighter Sky Blue (Tailwind sky-400) */
+        --cc-few: #0ea5e9;
+        /* Medium Sky Blue (Tailwind sky-500) */
+        --cc-sct: #475569;
+        /* Medium Dark Grey (Tailwind slate-600) */
+        --cc-bkn: #334155;
+        /* Dark Grey (Tailwind slate-700) */
+        --cc-ovc: #1e293b;
+        /* Very Dark Grey (Tailwind slate-800) */
+
+        --border-wind-light: #99ccff;
+        --border-wind-moderate: #80ff80;
+        --border-wind-high: #ffcc66;
+        --border-wind-very-high: #ff9999;
+
+        /* Schatten */
+        --shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+
+        /* Formularelemente: Inputfelder, Dropdowns, Textareas */
+        input,
+        select,
+        textarea {
+            background-color: var(--background-surface) !important;
+            color: var(--text-primary) !important;
+            border-color: var(--border-color) !important;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        input:focus,
+        select:focus,
+        textarea:focus {
+            border-color: var(--color-primary) !important;
+            box-shadow: 0 0 5px rgba(92, 184, 228, 0.5) !important;
+            outline: none;
+        }
+
+        input::placeholder,
+        textarea::placeholder {
+            color: var(--text-secondary) !important;
+            opacity: 0.8;
+        }
+
+        /* Globale Textfarbe für Dark Mode */
+        *,
+        *::before,
+        *::after {
+            color: var(--text-primary) !important;
+        }
+
+        a {
+            color: var(--text-link) !important;
+        }
+
+        /* Spezifische Overrides für Tabellen */
+        #weather-table-container th {
+            background: var(--background-interactive) !important;
+            /* Dunkler Header */
+            color: var(--text-primary) !important;
+            border-color: var(--border-color) !important;
+        }
+
+        #weather-table-container td {
+            color: var(--text-primary) !important;
+            border: 1px solid var(--border-color) !important;
+        }
+
+        #weather-table-container tr.cloud-cover-overcast {
+            color: var(--text-primary) !important;
+        }
+
+        /* KORREKTUR: Spezifische Regeln für die Wind-Rahmenfarben im Dark Mode.
+           Diese sind spezifischer als die allgemeine td-Regel und überschreiben sie korrekt. */
+        #weather-table-container tr.wind-low td {
+            border: 2px solid var(--border-wind-light) !important;
+        }
+
+        #weather-table-container tr.wind-moderate td {
+            border: 2px solid var(--border-wind-moderate) !important;
+        }
+
+        #weather-table-container tr.wind-high td {
+            border: 2px solid var(--border-wind-high) !important;
+        }
+
+        #weather-table-container tr.wind-very-high td {
+            border: 2px solid var(--border-wind-very-high) !important;
+        }
+
+        /* Buttons */
+        .btn-primary,
+        .btn-secondary,
+        .btn-danger {
+            color: var(--text-inverted) !important;
+        }
+
+        /* Sidebar-Labels */
+        .sidebar-icon .label {
+            color: var(--text-primary) !important;
+        }
+
+        /* Leaflet-Popups */
+        .leaflet-popup-content {
+            color: var(--text-primary) !important;
+            background-color: var(--background-surface) !important;
+        }
+
+        /* Favorite-Toggle-Stern im Dark Mode */
+        .search-item-actions button.is-favorite {
+            color: var(--palette-yellow-500) !important;
+        }
+
+        /* Cancel-Button im Dark Mode (für .modal-btn.cancel und #adsbCancel) */
+        .modal .modal-btn.cancel,
+        .favorite-modal .modal-btn.cancel,
+        #adsbSelectionModal #adsbCancel {
+            background-color: var(--palette-grey-800) !important;
+            color: var(--text-primary) !important;
+            border: 1px solid var(--border-color) !important;
+        }
+
+        .modal .modal-btn.cancel:hover,
+        .favorite-modal .modal-btn.cancel:hover,
+        #adsbSelectionModal #adsbCancel:hover {
+            background-color: var(--palette-grey-700) !important;
+        }
+
+        /* Leaflet-Controls im Dark Mode */
+        .leaflet-control,
+        .leaflet-bar,
+        .leaflet-control-layers,
+        .leaflet-control-zoom,
+        .leaflet-control-attribution,
+        .leaflet-control-scale {
+            background-color: var(--palette-grey-800) !important;
+            border-color: var(--border-color) !important;
+            color: var(--text-primary) !important;
+        }
+
+        .leaflet-control a,
+        .leaflet-bar a,
+        .leaflet-control-layers a,
+        .leaflet-control-zoom-in,
+        .leaflet-control-zoom-out {
+            color: var(--text-primary) !important;
+            background-color: var(--palette-grey-800) !important;
+        }
+
+        .leaflet-control a:hover,
+        .leaflet-bar a:hover,
+        .leaflet-control-layers a:hover,
+        .leaflet-control-zoom-in:hover,
+        .leaflet-control-zoom-out:hover {
+            background-color: var(--palette-grey-700) !important;
+        }
+
+        /* Layer-Control spezifisch (z.B. Dropdown oder Radio-Buttons) */
+        .leaflet-control-layers-expanded {
+            background-color: var(--palette-grey-800) !important;
+            color: var(--text-primary) !important;
+        }
+
+        /* Scale-Control spezifisch */
+        .leaflet-control-scale-line {
+            background-color: var(--palette-grey-800) !important;
+            color: var(--text-primary) !important;
+            border: 2px solid var(--border-color) !important;
+            border-top: none !important;
+            text-shadow: none !important;
+        }
+
+        /* Sicherstellen, dass Tooltips und Beschriftungen lesbar sind */
+        .leaflet-tooltip,
+        .leaflet-control-attribution a {
+            color: var(--text-primary) !important;
+            background-color: var(--palette-grey-800) !important;
+        }
+
+        /* Zoom-Button-Symbole (Fallback für textbasierte Symbole) */
+        .leaflet-control-zoom-in::before,
+        .leaflet-control-zoom-out::before {
+            color: var(--text-primary) !important;
+        }
+
+        /* Panel-Menüs im Dark Mode (generische Klassen) */
+        .menu,
+        .dropdown,
+        .sidebar,
+        .panel-menu,
+        .dropdown-menu {
+            color: var(--text-primary) !important;
+            background-color: var(--background-surface) !important;
+        }
+
+        .menu a,
+        .dropdown a,
+        .sidebar a,
+        .panel-menu a,
+        .dropdown-menu a {
+            color: var(--text-link) !important;
+        }
+
+        .menu li,
+        .dropdown li,
+        .sidebar li,
+        .panel-menu li,
+        .dropdown-menu li {
+            color: var(--text-primary) !important;
+        }
+
+        /* Geoman-Steuerungselemente im Dark Mode */
+        .leaflet-pm-toolbar,
+        .leaflet-pm-icon,
+        .leaflet-pm-action {
+            background-color: var(--palette-grey-800) !important;
+            /* Dunkler Hintergrund */
+            border-color: var(--border-color) !important;
+            /* Dunkler Rahmen */
+        }
+
+        .leaflet-pm-toolbar a,
+        .leaflet-pm-icon,
+        .leaflet-pm-action {
+            background-color: var(--palette-grey-800) !important;
+        }
+
+        .leaflet-pm-toolbar a:hover,
+        .leaflet-pm-icon:hover,
+        .leaflet-pm-action:hover {
+            background-color: var(--palette-grey-700) !important;
+            /* Etwas heller bei Hover */
+        }
+
+        #timeSlider {
+            background: transparent !important;
+        }
+
+        /* Die Original-SVGs werden kopiert und die 'fill'-Farbe auf die helle Textfarbe geändert. */
+        .leaflet-pm-toolbar .control-icon.leaflet-pm-icon-polyline {
+            background-image: url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="24" height="24" viewBox="0 0 24 24"%3E%3Cdefs%3E%3Cpath id="line-a" d="M9.165,19.421 L18.421,10.165 C18.152,9.67 18,9.103 18,8.5 C18,6.567 19.567,5 21.5,5 C23.433,5 25,6.567 25,8.5 C25,10.433 23.433,12 21.5,12 C20.897,12 20.33,11.848 19.835,11.579 L10.579,20.835 C10.848,21.33 11,21.897 11,22.5 C11,24.433 9.433,26 7.5,26 C5.567,26 4,24.433 4,22.5 C4,20.567 5.567,19 7.5,19 C8.103,19 8.67,19.152 9.165,19.421 z M21.5,10 C22.328,10 23,9.328 23,8.5 C23,7.672 22.328,7 21.5,7 C20.672,7 20,7.672 20,8.5 C20,9.328 20.672,10 21.5,10 z M7.5,24 C8.328,24 9,23.328 9,22.5 C9,21.672 8.328,21 7.5,21 C6.672,21 6,21.672 6,22.5 C6,23.328 6.672,24 7.5,24 z"/%3E%3C/defs%3E%3Cg fill="none" fill-rule="evenodd" transform="translate(-3 -3)"%3E%3Cmask id="line-b" fill="%23fff"%3E%3Cuse xlink:href="%23line-a"/%3E%3C/mask%3E%3Cuse fill="%23E0E0E0" fill-rule="nonzero" xlink:href="%23line-a"/%3E%3Cg fill="%23E0E0E0" mask="url(%23line-b)"%3E%3Crect width="30" height="30"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E') !important;
+        }
+
+        .leaflet-pm-toolbar .control-icon.leaflet-pm-icon-marker {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23E0E0E0'%3E%3Cpath d='M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5S10.62 6.5 12 6.5s2.5 1.12 2.5 2.5S13.38 11.5 12 11.5z'/%3E%3C/svg%3E") !important;
+        }
+
+        .leaflet-pm-toolbar .control-icon.leaflet-pm-icon-circle {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23E0E0E0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3C/svg%3E") !important;
+        }
+
+        .leaflet-pm-toolbar .control-icon.leaflet-pm-icon-text {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23E0E0E0'%3E%3Cpath d='M5 4v3h5.5v12h3V7H19V4z'/%3E%3C/svg%3E") !important;
+        }
+
+        .leaflet-pm-toolbar .control-icon.leaflet-pm-icon-edit {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23E0E0E0'%3E%3Cpath d='M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z'/%3E%3C/svg%3E") !important;
+        }
+
+        .leaflet-pm-toolbar .control-icon.leaflet-pm-icon-delete {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23E0E0E0'%3E%3Cpath d='M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z'/%3E%3C/svg%3E") !important;
+        }
+
+        .leaflet-pm-toolbar .control-icon.leaflet-pm-icon-drag {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23E0E0E0'%3E%3Cpath d='M10 9h4V6h3l-5-5-5 5h3v3zm-1 1H6V7l-5 5 5 5v-3h3v-4zm14 2l-5-5v3h-3v4h3v3l5-5zm-9 3h-4v3H7l5 5 5-5h-3v-3z'/%3E%3C/svg%3E") !important;
+        }
+
+        #weather-table-container td.wind-speed-exceeds-threshold {
+            background-color: rgba(255, 107, 107, 0.4) !important;
+            /* Ein durchscheinendes Rot für den Hintergrund */
+        }
+
+        #weather-table-container .gust-exceeds-threshold {
+            color: var(--color-danger) !important;
+            /* Nutzt die helle rote Textfarbe aus dem Dark Theme */
+            font-weight: bold;
+        }
+
+        .favorite-marker-icon {
+            color: var(--palette-yellow-500) !important;
+        }
+
+        /* Dashboard-Karten anpassen */
+        .dashboard-card {
+            background-color: var(--dashboard-background); /* Dunkler Dashboard-Hintergrund */
+            color: var(--dashboard-text); /* Helle Dashboard-Textfarbe */
+            border-color: var(--dashboard-border); /* Heller Dashboard-Rahmen */
+            box-shadow: 0 0 8px var(--dashboard-glow); /* Heller Glow-Effekt */
+        }
+
+        /* Labels und Einheiten anpassen */
+        .card-label,
+        .card-unit {
+            color: var(--dashboard-text); /* Helle Dashboard-Textfarbe */
+            opacity: 0.7; /* Etwas transparenter machen */
+        }
+
+        /* Hauptwerte (Zahlen) anpassen */
+        .card-value {
+            color: var(--dashboard-text); /* Helle Dashboard-Textfarbe */
+        }
+
+        /* Spezifische Glide-Ratio Farben im Dark Mode */
+        #dashboard-glide-current.glide-good {
+            color: #50fa7b !important; /* Helleres Grün */
+        }
+        #dashboard-glide-current.glide-ok {
+            color: #f1fa8c !important; /* Helleres Gelb */
+        }
+        #dashboard-glide-current.glide-bad {
+            color: #ff5555 !important; /* Helleres Rot */
+        }
+
+        /* Buttons im Dark Mode anpassen */
+        #auto-record-card,
+        #manual-record-card {
+             background-color: transparent; /* Kein eigener Hintergrund für die Karte */
+             border: none;
+             box-shadow: none;
+        }
+
+        .arm-button {
+            border-color: var(--color-warning); /* Helleres Gelb für Rahmen */
+            color: var(--color-warning); /* Helleres Gelb für Text */
+            background-color: transparent;
+        }
+
+        .arm-button:hover,
+        .arm-button:active {
+            background-color: var(--color-warning);
+            color: var(--dashboard-background); /* Dunkler Text bei Hover */
+        }
+
+        .arm-button.armed {
+            border-color: #50fa7b; /* Helleres Grün */
+            background-color: #50fa7b;
+            color: var(--dashboard-background); /* Dunkler Text */
+        }
+
+        .arm-button.recording {
+            border-color: #ff5555; /* Helleres Rot */
+            background-color: #ff5555;
+            color: var(--dashboard-background); /* Dunkler Text */
+            /* Animation bleibt gleich */
+        }
+
+        #manual-recording-button {
+            border-color: var(--color-primary); /* Helles Blau */
+            color: var(--color-primary);
+        }
+
+        #manual-recording-button:hover,
+        #manual-recording-button:active {
+            background-color: var(--color-primary);
+            color: var(--dashboard-background); /* Dunkler Text */
+        }
+
+        #manual-recording-button.recording {
+            border-color: var(--color-secondary); /* Helleres Grau */
+            background-color: var(--color-secondary);
+            color: var(--dashboard-background); /* Dunkler Text */
+            /* Animation bleibt gleich */
+        }
+    }
 }
 
 html {
@@ -769,29 +1175,36 @@ input[type="checkbox"][style*="opacity: 1"] {
 #meteogram-container {
     width: 100%;
     margin-top: 20px;
-    display: flex; /* Oder grid */
+    display: flex;
+    /* Oder grid */
     flex-direction: column;
-    gap: 20px; /* Abstand zwischen den Charts */
+    gap: 20px;
+    /* Abstand zwischen den Charts */
 }
 
 .meteogram-chart-wrapper {
     width: 100%;
-    height: 350px; /* Höhe pro Chart - anpassen nach Bedarf */
+    height: 350px;
+    /* Höhe pro Chart - anpassen nach Bedarf */
     padding: 10px;
     background-color: var(--background-surface);
     border-radius: 8px;
     box-shadow: var(--shadow);
-    display: flex; /* Für Titel-Platzierung */
+    display: flex;
+    /* Für Titel-Platzierung */
     flex-direction: column;
 }
 
 .meteogram-title {
     text-align: center;
-    margin-bottom: 10px; /* Abstand zum Chart */
+    margin-bottom: 10px;
+    /* Abstand zum Chart */
     color: var(--text-primary);
-    font-size: 1.1em; /* Etwas kleiner als h3 */
+    font-size: 1.1em;
+    /* Etwas kleiner als h3 */
     font-weight: bold;
-    flex-shrink: 0; /* Verhindert Schrumpfen des Titels */
+    flex-shrink: 0;
+    /* Verhindert Schrumpfen des Titels */
 }
 
 /* Sicherstellen, dass Canvas den Rest des Platzes einnimmt */
@@ -799,8 +1212,10 @@ input[type="checkbox"][style*="opacity: 1"] {
 #meteogramSurfaceChart {
     display: block;
     width: 100% !important;
-    flex-grow: 1; /* Wichtig für Flexbox */
-    min-height: 0; /* Wichtig für Flexbox */
+    flex-grow: 1;
+    /* Wichtig für Flexbox */
+    min-height: 0;
+    /* Wichtig für Flexbox */
 }
 
 .legend-item {
@@ -1251,6 +1666,23 @@ input[type="checkbox"][style*="opacity: 1"] {
     padding: 2px;
 }
 
+/* === APP MANAGEMENT === */
+
+#app-management-settings {
+    display: flex;
+    /* Macht den Container zu einem Flex-Container */
+    flex-direction: column;
+    /* Stapelt die Elemente vertikal */
+    gap: 10px;
+    /* Fügt Abstand zwischen den Buttons hinzu */
+}
+
+/* Sicherstellen, dass die Buttons immer noch die volle Breite haben */
+#app-management-settings .btn {
+    width: 100%;
+    margin: 0;
+    /* Entfernt den Standard-Margin der .btn-Klasse */
+}
 
 /* === ALERT STILE === */
 #map-alert-icon {
@@ -1870,7 +2302,8 @@ input[type="checkbox"][style*="opacity: 1"] {
 
 #reportIframe {
     width: 100%;
-    flex-grow: 1; /* Füllt den restlichen vertikalen Platz aus */
+    flex-grow: 1;
+    /* Füllt den restlichen vertikalen Platz aus */
     border: none;
 }
 

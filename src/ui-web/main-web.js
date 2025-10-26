@@ -1497,6 +1497,7 @@ function setupAppEventListeners() {
         // Update der Wetteranzeige für alle Einheiten-Änderungen
         if (['refLevel', 'heightUnit', 'temperatureUnit', 'windUnit', 'timeZone'].includes(name)) {
             await displayManager.updateWeatherDisplay(getSliderValue(), 'weather-table-container', 'selectedTime');
+            const sliderIndex = getSliderValue();
             generateMeteogram(sliderIndex);
         }
 

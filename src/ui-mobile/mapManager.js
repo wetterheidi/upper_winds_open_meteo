@@ -689,7 +689,7 @@ export async function createOrUpdateMarker(lat, lng) {
         attachMarkerDragend(newMarker);
         newMarker.on('click', () => {
             import('../ui-web/displayManager.js').then(displayManager => {
-                 displayManager.refreshMarkerPopup(false, true);
+                displayManager.refreshMarkerPopup(false, true);
             });
         });
         AppState.currentMarker = newMarker;
@@ -875,7 +875,7 @@ export async function updateHarpMarkerPopup(marker, lat, lng, open = false, expa
             qfeText = `${qfe} hPa`;
         }
     }
-    
+
     // Ein wiederverwendbarer Block für Höhe und QFE
     const altitudeContent = `<br>Alt: ${displayAltitude} ${displayUnit}<br>QFE: ${qfeText}`;
 
@@ -915,7 +915,7 @@ export async function updateHarpMarkerPopup(marker, lat, lng, open = false, expa
         } else {
             popupContent += `Lat: ${coords.lat}<br>Lng: ${coords.lng}`;
         }
-        
+
         popupContent += `${altitudeContent}<br>
             <a href="#" class="toggle-coords-format" data-marker-type="harp" data-lat="${lat}" data-lng="${lng}" data-expanded="false" style="font-size: 11px;">Show more</a>
         `;
@@ -1289,6 +1289,11 @@ function _setupBaseLayersAndHandling() {
                 zIndex: 3
             })
         ]),
+        "CARTO Dark Matter": L.tileLayer.cached('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 19
+        }),
     };
 
     const openMeteoAttribution = 'Weather data by <a href="https://open-meteo.com">Open-Meteo</a>';
