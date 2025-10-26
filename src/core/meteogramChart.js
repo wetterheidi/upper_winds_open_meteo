@@ -419,9 +419,21 @@ export async function generateMeteogram(sliderIndex) {
                 scales: {
                     x: { title: { display: true, text: `Time (${timeZone})`, color: textColor }, ticks: { color: textColor, maxRotation: 0, autoSkipPadding: 20 }, grid: { color: gridColor } },
                     // === KORREKTUR 9: Y-Achsen-Titel für Temperatur dynamisch anpassen ===
-                    yTempSurface: { type: 'linear', position: 'right', title: { display: true, text: `Temperature (${tempUnit === 'F' ? '°F' : '°C'})`, color: textColor }, ticks: { color: textColor }, grid: { color: gridColor } },
-                    // ================== ENDE KORREKTUR 9 ==================
-                    yWindSurface: { type: 'linear', position: 'left', title: { display: true, text: `Wind Speed (${windUnit})`, color: textColor }, ticks: { color: textColor }, grid: { drawOnChartArea: false }, min: 0 }
+                    yTempSurface: { // Temperature Axis (Right)
+                        type: 'linear',
+                        position: 'right',
+                        title: { display: true, text: `Temperature (${tempUnit === 'F' ? '°F' : '°C'})`, color: textColor },
+                        ticks: { color: textColor },
+                        grid: { drawOnChartArea: false } // Hides temp grid lines
+                    },
+                    yWindSurface: { // Wind Speed Axis (Left)
+                        type: 'linear',
+                        position: 'left',
+                        title: { display: true, text: `Wind Speed (${windUnit})`, color: textColor },
+                        ticks: { color: textColor },
+                        grid: { color: gridColor }, // Shows wind grid lines using the theme color
+                        min: 0
+                    }
                 },
                 plugins: {
                     legend: { labels: { color: textColor } },

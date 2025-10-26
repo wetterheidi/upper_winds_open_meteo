@@ -17,6 +17,7 @@ import * as LocationManager from '../core/locationManager.js';
 import * as AdsbManager from '../core/adsbManager.js';
 import * as weatherManager from '../core/weatherManager.js'; // NEUER IMPORT
 import { DateTime } from 'luxon';                         // NEUER IMPORT
+import { generateMeteogram } from '../core/meteogramChart.js';
 
 // =================================================================
 // 1. Globale Variablen & Zustand
@@ -1361,7 +1362,6 @@ function setupThemeToggle() {
                 newBaseMapName = 'CARTO Dark Matter'; // Deine neue dunkle Karte
             }
 
-            // --- START DER NEUEN LOGIK ZUM KARTENWECHSEL ---
             if (AppState.map && AppState.baseMaps[newBaseMapName]) {
                 // 1. Alle aktuell aktiven Basiskarten von der Karte entfernen
                 for (const layerName in AppState.baseMaps) {
@@ -1379,7 +1379,12 @@ function setupThemeToggle() {
 
                 console.log(`Theme switched to ${newTheme}, basemap set to ${newBaseMapName}.`);
             }
-            // --- ENDE DER NEUEN LOGIK ---
+            if (AppState.weatherData) { // Nur neu zeichnen, wenn Wetterdaten vorhanden sind
+                const sliderIndex = getSliderValue(); // Aktuellen Slider-Wert holen
+                // Rufe die Funktion auf (kann direkt aufgerufen werden, da sie bereits importiert ist)
+                generateMeteogram(sliderIndex); //
+                console.log(`[Theme Toggle] Regenerated meteograms for ${newTheme} theme.`);
+            }
         });
     }
 }

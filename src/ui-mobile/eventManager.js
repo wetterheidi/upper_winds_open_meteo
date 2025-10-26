@@ -20,6 +20,8 @@ import * as LocationManager from '../core/locationManager.js';
 import * as AdsbManager from '../core/adsbManager.js';
 import * as weatherManager from '../core/weatherManager.js'; // NEUER IMPORT
 import { DateTime } from 'luxon';                         // NEUER IMPORT
+import { generateMeteogram } from '../core/meteogramChart.js';
+
 
 // =================================================================
 // 1. Globale Variablen & Zustand
@@ -1642,6 +1644,12 @@ function setupThemeToggle() {
                 Settings.save(); //
 
                 console.log(`Theme switched to ${newTheme}, basemap set to ${newBaseMapName}.`);
+            }
+            if (AppState.weatherData) { // Nur neu zeichnen, wenn Wetterdaten vorhanden sind
+                const sliderIndex = getSliderValue(); // Aktuellen Slider-Wert holen
+                // Rufe die Funktion auf (kann direkt aufgerufen werden, da sie bereits importiert ist)
+                generateMeteogram(sliderIndex); //
+                console.log(`[Theme Toggle] Regenerated meteograms for ${newTheme} theme.`);
             }
         });
     }   
