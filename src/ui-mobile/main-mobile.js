@@ -2289,18 +2289,38 @@ document.addEventListener('DOMContentLoaded', async () => {
                 console.log('App opened with URL:', event.url);
                 const fileUrl = event.url;
 
-                // Prüfe, ob es eine Datei ist, die auf .gpx endet (Groß-/Kleinschreibung ignorieren)
-                // ODER ob es eine Android content URI ist (die durch den Intent-Filter kommen sollte)
-                const isGpxFileExtension = fileUrl && fileUrl.toLowerCase().endsWith('.gpx');
+                const lowerCaseUrl = fileUrl ? fileUrl.toLowerCase() : '';
+                const isGpxFileExtension = lowerCaseUrl.endsWith('.gpx');
+                const isKmlFileExtension = lowerCaseUrl.endsWith('.kml'); // NEU
+                // Prüfe auch auf MIME-Typen, die in der URL vorkommen könnten (Android)
+                const isGpxMime = lowerCaseUrl.includes(encodeURIComponent('application/gpx+xml'));
+                const isKmlMime = lowerCaseUrl.includes(encodeURIComponent('application/vnd.google-earth.kml+xml')); // NEU
+                const isXmlMime = lowerCaseUrl.includes(encodeURIComponent('application/xml')) || lowerCaseUrl.includes(encodeURIComponent('text/xml')); // Fallback
                 const isAndroidContentUri = fileUrl && fileUrl.startsWith('content://');
 
-                // Akzeptiere die URL, wenn eine der Bedingungen zutrifft
-                if (fileUrl && (isGpxFileExtension || isAndroidContentUri)) {
-                    console.log(`GPX file or content URI detected (${isGpxFileExtension ? 'ends with .gpx' : isAndroidContentUri ? 'content URI' : 'unknown'}), attempting to handle:`, fileUrl);
-                    await handleOpenFileUrl(fileUrl); // Rufe die Hilfsfunktion auf
-                } else {
-                    console.log('Opened URL is not a GPX file or recognized content URI, ignoring.');
+                let fileType = null;
+                if (isGpxFileExtension || isGpxMime) {
+                    fileType = 'gpx';
+                } else if (isKmlFileExtension || isKmlMime) { // NEU
+                    fileType = 'kml';
+                } else if (isAndroidContentUri && isXmlMime) {
+                    // Bei content URI mit XML-Typ wissen wir es nicht sicher,
+                    // wir übergeben den Typ an handleOpenFileUrl zur weiteren Prüfung
+                    fileType = 'unknown_xml';
+                } else if (isAndroidContentUri) {
+                    // Vermutung basierend auf häufiger Nutzung, aber unsicher
+                    fileType = 'gpx'; // Oder 'unknown' und in handleOpenFileUrl entscheiden
+                    console.warn("Detected content URI without clear type, assuming GPX. May need refinement.");
                 }
+
+
+                if (fileType) {
+                    console.log(`Detected type: ${fileType}, attempting to handle:`, fileUrl);
+                    await handleOpenFileUrl(fileUrl, fileType); // Übergebe den erkannten Typ
+                } else {
+                    console.log('Opened URL is not a recognized track file (GPX/KML) or content URI, ignoring.');
+                }
+                // === ENDE ÄNDERUNG ===
             });
             console.log('appUrlOpen listener added successfully.');
         } else if (!isNative) {
@@ -2312,68 +2332,96 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error('Error setting up appUrlOpen listener:', error);
     }
 
-    // Hilfsfunktion zum Verarbeiten der geöffneten Datei
-    async function handleOpenFileUrl(fileUrl) {
+    // Hilfsfunktion zum Verarbeiten der geöffneten Datei       
+    async function handleOpenFileUrl(fileUrl, detectedType) { // Behalte detectedType für den ersten Hinweis
         const loadingElement = document.getElementById('loading');
-        if (loadingElement) loadingElement.style.display = 'block';
-        Utils.handleMessage("Opening GPX file..."); //
+        if (loadingElement) loadingElement.style.display = 'block'; //
+        Utils.handleMessage("Opening track file..."); //
 
         try {
-            const { Filesystem, Directory } = await getCapacitor(); //
+            const { Filesystem } = await getCapacitor(); //
             if (!Filesystem) throw new Error('Filesystem plugin not available'); //
 
-            const result = await Filesystem.readFile({ //
-                path: fileUrl
-            });
+            console.log(`Reading file content for URL: ${fileUrl}`);
+            const result = await Filesystem.readFile({ path: fileUrl }); //
 
             if (!result.data) {
-                throw new Error('Could not read file data.');
+                throw new Error('Could not read file data.'); //
             }
 
-            const gpxContent = atob(result.data);
+            const fileContent = atob(result.data); //
+            console.log(`File content read successfully (length: ${fileContent.length}). First 100 chars: ${fileContent.substring(0, 100)}`);
 
-            // === START ÄNDERUNG: Verbesserte Dateinamenserkennung ===
-            let fileName = 'track.gpx'; // Standardname
-            try {
-                const decodedUrl = decodeURIComponent(fileUrl);
-                // Nimmt den Teil nach dem letzten '/'
-                const namePart = decodedUrl.substring(decodedUrl.lastIndexOf('/') + 1);
-                // Wenn der Teil nicht nur aus Zahlen besteht UND einen Punkt enthält,
-                // nehmen wir an, es ist ein brauchbarer Dateiname.
-                if (namePart && !/^\d+$/.test(namePart) && namePart.includes('.')) {
-                    fileName = namePart;
+            // --- Finale Typ-Entscheidung basierend auf INHALT (robustere Prüfung) ---
+            let finalFileType = null;
+            const trimmedContent = fileContent.trim(); // Kein toLowerCase nötig für includes
+            // Prüfe auf <kml...> Tag, auch wenn <?xml...> davor steht
+            if (trimmedContent.includes('<kml')) { // <<< KORRIGIERTE PRÜFUNG: includes statt startsWith
+                finalFileType = 'kml';
+            } else if (trimmedContent.includes('<gpx')) { // Prüfe auf <gpx...> Tag
+                finalFileType = 'gpx';
+            } else {
+                // Wenn der Inhalt nicht eindeutig ist, vertraue dem ursprünglich erkannten Typ (falls gpx/kml)
+                if (detectedType === 'kml' || detectedType === 'gpx') {
+                    finalFileType = detectedType;
+                    console.warn("Content check inconclusive, relying on initially detected type from URL/MIME:", detectedType);
+                } else {
+                    throw new Error('Cannot determine file type from content (not valid KML or GPX).');
                 }
-                // Sicherstellen, dass die Endung .gpx ist
-                if (!fileName.toLowerCase().endsWith('.gpx')) {
-                    // Versuche, die vorhandene Endung zu ersetzen, oder füge .gpx hinzu
-                    const dotIndex = fileName.lastIndexOf('.');
+            }
+            console.log(`Final file type determined from content: ${finalFileType}`);
+
+            // --- Dateinamen-Erkennung und Korrektur basierend auf finalFileType ---
+            let fileName = 'track.' + finalFileType; // Standardname basiert jetzt auf dem erkannten Typ
+            try {
+                const decodedUrl = decodeURIComponent(fileUrl); //
+                const namePart = decodedUrl.substring(decodedUrl.lastIndexOf('/') + 1); //
+                if (namePart && !/^\d+$/.test(namePart) && namePart.includes('.')) { //
+                    const dotIndex = namePart.lastIndexOf('.');
                     if (dotIndex > 0) {
-                        fileName = fileName.substring(0, dotIndex) + '.gpx';
+                        const baseName = namePart.substring(0, dotIndex);
+                        fileName = baseName + '.' + finalFileType; // Setze die korrekte Endung
                     } else {
-                        fileName += '.gpx';
+                        fileName = namePart + '.' + finalFileType; // Füge korrekte Endung hinzu
                     }
                 }
             } catch (e) {
-                console.warn("Could not reliably determine filename from URL, using default 'track.gpx'.");
-                fileName = 'track.gpx'; // Fallback
+                console.warn("Could not reliably determine filename from URL, using default name based on content type.");
             }
-            // === ENDE ÄNDERUNG ===
+            console.log(`Final filename: ${fileName}`);
 
-            const blob = new Blob([gpxContent], { type: 'application/gpx+xml' });
-            const gpxFile = new File([blob], fileName, { type: 'application/gpx+xml' });
 
-            console.log('Created File object from opened URL:', gpxFile.name, gpxFile.size);
+            // --- Blob/File erstellen und Ladefunktion aufrufen ---
+            let blob;
+            let fileToLoad;
+            let successMessage;
 
-            await trackManager.loadGpxTrack(gpxFile); //
-            Utils.handleMessage("GPX file loaded successfully."); //
+            if (finalFileType === 'kml') {
+                blob = new Blob([fileContent], { type: 'application/vnd.google-earth.kml+xml' }); //
+                fileToLoad = new File([blob], fileName, { type: blob.type }); //
+                console.log('Creating KML File object:', fileToLoad.name, fileToLoad.size); //
+                await trackManager.loadKmlTrack(fileToLoad); //
+                successMessage = "KML file loaded successfully."; // <<< Korrekte Nachricht
+
+            } else { // Annahme: GPX
+                blob = new Blob([fileContent], { type: 'application/gpx+xml' }); //
+                fileToLoad = new File([blob], fileName, { type: blob.type }); //
+                console.log('Creating GPX File object:', fileToLoad.name, fileToLoad.size); //
+                await trackManager.loadGpxTrack(fileToLoad); //
+                successMessage = "GPX file loaded successfully."; // <<< Korrekte Nachricht
+            }
+
+            Utils.handleMessage(successMessage); //
 
         } catch (error) {
-            console.error('Error handling opened GPX file:', error);
-            let userMessage = 'Could not open the selected GPX file.'; //
+            console.error('Error handling opened file:', error); //
+            let userMessage = `Could not open file: ${error.message}`; //
             if (error.message && error.message.includes('permission')) { //
-                userMessage = 'Could not open GPX: Permission denied. Please check app permissions.'; //
+                userMessage = 'Could not open file: Permission denied.'; //
             } else if (error.message && error.message.includes('Could not read file')) { //
-                userMessage = 'Could not read the GPX file content.'; //
+                userMessage = 'Could not read the file content.'; //
+            } else if (error.message && error.message.includes('Cannot determine file type')) { //
+                userMessage = 'Could not determine if file is GPX or KML.'; //
             } //
             Utils.handleError(userMessage); //
         } finally {

@@ -15,7 +15,17 @@
 			<string>Alternate</string>
 			<key>LSItemContentTypes</key>
 			<array>
-				<string>com.yourcompany.dzmaster.gpx</string>
+				<string>com.wetterheidi.dzmaster.gpx</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>KML File</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>com.wetterheidi.dzmaster.kml</string>
 			</array>
 		</dict>
 	</array>
@@ -32,7 +42,7 @@
 	<key>CFBundleShortVersionString</key>
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
-	<string>202510270855</string>
+	<string>202510271042</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
@@ -84,7 +94,7 @@
 			<key>UTTypeDescription</key>
 			<string>GPX Track File</string>
 			<key>UTTypeIdentifier</key>
-			<string>com.yourcompany.dzmaster.gpx</string>
+			<string>com.wetterheidi.dzmaster.gpx</string>
 			<key>UTTypeTagSpecification</key>
 			<dict>
 				<key>public.filename-extension</key>
@@ -93,6 +103,26 @@
 				</array>
 				<key>public.mime-type</key>
 				<string>application/gpx+xml</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+				<string>public.xml</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>KML Geographic Data</string>
+			<key>UTTypeIdentifier</key>
+			<string>com.wetterheidi.dzmaster.kml</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>kml</string>
+				</array>
+				<key>public.mime-type</key>
+				<string>application/vnd.google-earth.kml+xml</string>
 			</dict>
 		</dict>
 	</array>

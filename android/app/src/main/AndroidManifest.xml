@@ -26,6 +26,7 @@
                 <data android:scheme="content" />
                 <data android:scheme="file" />
                 <data android:mimeType="application/gpx+xml" />
+                <data android:mimeType="application/vnd.google-earth.kml+xml" />
                 <data android:mimeType="application/xml" />
                 <data android:mimeType="text/xml" />
                 <data android:mimeType="application/octet-stream" />
@@ -34,12 +35,12 @@
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="application/gpx+xml" />
+                <data android:mimeType="application/vnd.google-earth.kml+xml" />
                 <data android:mimeType="application/xml" />
                 <data android:mimeType="text/xml" />
                 <data android:mimeType="application/octet-stream" />
             </intent-filter>
         </activity>
-
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
