@@ -1,93 +1,103 @@
 # DZMaster - OpenMeteo & Skydive Planner
 
-A web and mobile application for visualizing upper-level winds and atmospheric data on interactive maps, powered by the Open-Meteo API. The application includes advanced features for skydive planning, including landing pattern visualization, jump trajectory calculation, and live tracking.
+A web and mobile application for visualizing upper-level winds and atmospheric data on interactive maps, powered by the Open-Meteo API. The application includes advanced features for skydive planning, including landing pattern visualization, jump trajectory calculation, live tracking, weather alerts, and more.
 
 ## Features
 
 ### Interactive Map & UI
-- **Map Engine:** Built with Leaflet.js, featuring various selectable map layers (OpenStreetMap, OpenTopoMap, OpenFlightMap, Esri maps).
-- **Location Selection:** Easily select a location by double-clicking/long-pressing the map or dragging the marker. Coordinates are displayed in multiple formats (Decimal Degrees, DMS, MGRS).
-- **Location Search & Favorites:** A search bar allows finding locations by name or coordinates. Any location can be saved as a favorite with a custom name.
+- **Map Engine:** Built with Leaflet.js, featuring various selectable map layers (OpenStreetMap, OpenTopoMap, OpenFlightMap, Esri maps, CARTO Dark Matter).
+- **Location Selection:** Easily select a location by right-clicking/long-pressing the map or dragging the marker. Coordinates are displayed in multiple formats (Decimal Degrees, DDM, DMS, MGRS).
+- **Location Search & Favorites:** Search locations by name (Open-Meteo Geocoding) or coordinates. Save locations as favorites with custom names, and set a "Home DZ".
+- **POI Search:** Search for nearby dropzones and parachuting-related points of interest using the Overpass API.
 - **Map Tools:** Includes controls for zoom, a scale bar, and a full measurement suite (leaflet-geoman) for distances, radii, and bearings.
-- **Offline Capability:** Map tiles can be cached for offline use. Cache settings (radius, zoom levels) are customizable.
-- **Responsive Design:** The application is available in two variants – an optimized web app and a mobile-dedicated version that leverages native device capabilities.
+- **Offline Capability:** Map tiles are cached using IndexedDB for offline use. Cache settings (radius, zoom levels) are customizable. Improved offline indicators and messages.
+- **Responsive Design:** Available as an optimized web app and a mobile-dedicated version leveraging native capabilities via Capacitor.
+- **Dark Mode:** Includes a theme toggle for switching between light and dark modes, automatically adjusting base maps.
 
-### Weather Data & Models
-- **Comprehensive Data:** Hourly upper-level data from Open-Meteo, including wind, temperature, humidity, cloud cover, and geopotential height from the surface up to 200 hPa.
-- **Model Selection:** Choose between global and regional weather models (e.g., ICON, GFS, ECMWF). The latest model run time is displayed.
-- **Timeline Slider:** A slider allows browsing through the hourly forecast (up to 7 days).
-- **Historical Data:** A date picker allows fetching weather data from the past.
-- **Autoupdate:** An optional feature automatically updates the forecast to the current hour.
+### Weather Data & Visualization
+- **Comprehensive Data:** Hourly upper-level data from Open-Meteo, including wind, temperature, humidity, cloud cover, visibility, weather codes, and geopotential height up to 200 hPa.
+- **Model Selection:** Choose between various global and regional weather models (e.g., ICON, GFS, ECMWF). The latest model run time is displayed.
+- **Timeline Slider:** Browse through the hourly forecast (up to 7 days, configurable). Slider background highlights hours with active weather alerts. Date labels adjust to selected timezone.
+- **Historical Data:** Fetch past weather data using a date picker.
+- **Autoupdate:** Optional feature to automatically update the forecast to the current hour.
 - **Unit Customization:** Full control over displayed units (AGL/AMSL, m/ft, °C/°F, kt/km/h/m/s/mph/bft, UTC/Local).
 - **Mean Wind Calculation:** Calculates the average wind for a user-defined altitude layer.
+- **Windspinne Chart:** Visualizes wind speed and direction across different altitudes in a polar chart.
+- **Meteogram Charts:** Displays separate time-series charts for surface conditions (temp, dew point, wind, gusts) and upper air (wind barbs, cloud cover, freezing level) generated using Chart.js.
+- **Weather Alerts:** Configurable alerts for high winds, gusts, thunderstorms, and low cloud bases. Active alerts are indicated on the map and slider.
 
 ### Skydiving & Flight Planning
-- **Landing Pattern Visualization:** Displays a configurable landing pattern (downwind, base, final). Parameters like canopy speed, descent rate, and leg altitudes are adjustable.
+- **Landing Pattern Visualization:** Displays a configurable landing pattern (downwind, base, final) with wind details for each leg. Parameters like canopy speed, descent rate, and leg altitudes are adjustable.
 - **Jump Trajectory Calculation:** Visualizes the entire jump from exit to landing.
-  - **Exit Area (Green Circles):** The probable area where the skydiver can reach the DIP or entry of the landing pattern.
-  - **Canopy Area (Blue Circles):** The reachable area under the open canopy.
-  - **Freefall Trajectory:** Accounts for wind drift and aircraft throw.
-- **Jump Run Track (JRT):** Visualizes the aircraft's approach path, including a 2-minute approach and dynamic jumper separation based on True Airspeed (TAS).
-- **Cut-Away Finder:** A tool to visualize the potential landing spot after a main canopy cut-away at a specific altitude.
-- **Track Upload:** Import and visualize GPX, KML, and FlySight CSV files. The track is color-coded based on the altitude above ground level (AGL).
-- **Live Tracking & Jump Master Line:**
-  - Starts live tracking of your own position.
-  - Displays a "Jump Master Line" from the current location to the designated landing point (DIP) or a manually placed High Altitude Release Point (HARP).
+  - **Exit Area (Green Circles):** Probable area to reach the DIP or landing pattern entry after freefall. Tooltip shows calculated drift and freefall time.
+  - **Canopy Area (Blue Circles):** Reachable area under canopy, including isolines for different altitudes.
+  - **Freefall Trajectory:** Accounts for wind drift and aircraft throw based on calculated TAS and ground speed.
+- **Jump Run Track (JRT):** Visualizes the aircraft's approach path (2-min approach) and the Jump Run Track. Jumper separation is dynamically calculated based on TAS. The track can be dragged or manually offset relative to DIP or HARP.
+- **HARP (High Altitude Release Point):** Manually place a HARP marker on the map or via coordinates to anchor the JRT.
+- **Cut-Away Finder:** Visualizes the potential landing spot after a main canopy cut-away, considering different malfunction scenarios (open, partial, collapsed).
+- **Terrain Analysis:** Analyzes potential ground clearance within the canopy flight area based on user-defined minimum clearance.
+- **Track Upload & Management:** Import and visualize GPX, KML, and FlySight CSV files. Tracks are color-coded by AGL altitude. Files can be opened directly from the OS in the mobile app.
+- **GPX Export:** Export calculated Jump Run Tracks and Landing Patterns as GPX files.
+- **Data Download & Reports:** Download weather data tables in various formats (HEIDIS, ATAK, Windwatch, Custom ASCII) or generate a comprehensive HTML weather briefing.
 
-### Ensemble Forecasts
-- **Multi-Model Analysis:** Allows for the simultaneous query and display of multiple weather models.
-- **Scenarios:** Visualizes different landing point scenarios based on the ensemble data:
-  - **All Models:** Shows the landing circle for each selected model individually.
-  - **Min/Mean/Max Wind:** Displays the landing circle for the scenario with the weakest, average, or strongest winds.
-  - **Heatmap:** Creates a probability map of potential landing areas.
+### Live Tracking & Native Features (Mobile App)
+- **Live GPS Tracking:** Real-time tracking of the device's position using Capacitor Geolocation.
+- **Jump Master Line:** Displays a line from the current live position to the DIP or HARP, showing bearing, distance, and time-to-target.
+- **Automatic Jump Recording:** Uses device accelerometer (via SensorManager) to detect freefall (based on jerk and acceleration) and landing (based on sustained low descent rate) to automatically record the jump track.
+- **Manual Recording:** Option to manually start and stop track recording.
+- **Track Saving:** Automatically saves recorded jump tracks locally as GPX files using the Capacitor Filesystem API.
+- **ADSB Aircraft Tracking:** Find nearby aircraft via ADSBexchange API and track the selected jump ship's position, altitude, speed, and track live on the map.
 
 ### Code Architecture
 
-The project has been refactored into a modular architecture for web and mobile to ensure high maintainability and a clear separation of concerns. The main responsibilities are distributed as follows:
+The project utilizes a modular architecture optimized for web and mobile platforms, separating core logic from platform-specific UI management.
 
 **src/core - Core Logic & Data Model (Model)**
-* **`state.js`**: Defines the global AppState object as the single source of truth for the application's runtime state.
-* **`settings.js`**: Manages all user settings, their persistence, and feature unlocking logic.
-* **`constants.js`**: Contains all global, static constants, such as physical conversion factors, API URLs, and default configuration values.
-
-**View & UI Management**
-* **`mapManager.js`**: Manages the Leaflet map instance, including the creation of base layers, controls, and primitive drawing functions for markers, circles, and polylines.
-* **`displayManager.js`**: A dedicated **View Logic** module responsible for updating the UI based on the current application state. It renders the weather table, updates marker popups, and draws complex visualizations like the landing pattern.
-* **`ui.js`**: Provides generic UI functions for user feedback, such as displaying messages, errors, and progress indicators.
-* **`coordinates.js`**: A self-contained component that manages the location search input, fetches geocoding data, and handles the favorites/history list UI.
-* **`eventManager.js`**: Centralizes the setup of all DOM event listeners for UI elements like buttons, checkboxes, and sliders.
-
-**Data Services & Logic (Model)**
-* **`weatherManager.js`**: Exclusively handles fetching and preparing weather data from the Open-Meteo API for a given location and time.
-* **`jumpPlanner.js`**: Contains the pure calculation logic ("business logic") for all skydiving-related aspects, such as freefall trajectory, canopy drift, and exit point calculation.
-* **`locationManager.js`**: Encapsulates the logic for location search (geocoding) and the management of favorites and history.
-* **`ensembleManager.js`**: Manages fetching, processing, and preparing data for ensemble forecast visualizations.
-* **`trackManager.js`**: Handles the loading and parsing of GPX and CSV track files.
-* **`liveTrackingManager.js`**: Encapsulates the logic for watching the user's live GPS position.
-* **`autoupdateManager.js`**: Manages the timer and logic for the forecast autoupdate feature.
-* **`tileCache.js`**: Contains all logic for interacting with IndexedDB to cache and retrieve map tiles for offline use.
-* **`capacitor-adapter.js`**: Dynamically loads native Capacitor modules, ensuring compatibility between web and mobile builds.
-
-**Utilities**
-* **`utils.js`**: A collection of pure, stateless helper functions for mathematical calculations, unit conversions, coordinate transformations, etc.
+* **`state.js`**: Defines the global `AppState` object.
+* **`settings.js`**: Manages user settings, persistence (localStorage), and feature access. *(Note: Password protection is currently disabled via config)*.
+* **`constants.js`**: Contains global static constants (physics, conversions, API URLs, UI defaults).
+* **`weatherManager.js`**: Handles fetching and interpolation of weather data from Open-Meteo. Includes cloud layer analysis.
+* **`jumpPlanner.js`**: Contains pure calculation logic for skydiving aspects (freefall, canopy, JRT, landing pattern, cutaway, terrain analysis).
+* **`locationManager.js`**: Logic for location search (Open-Meteo Geocoding, Overpass API for POIs) and management of favorites/history.
+* **`ensembleManager.js`**: Manages fetching, processing, and preparing data for ensemble forecasts.
+* **`trackManager.js`**: Handles loading, parsing, saving, and exporting GPX, KML, and CSV tracks.
+* **`liveTrackingManager.js`**: Manages watching the live GPS position using Capacitor/Web Geolocation.
+* **`autoupdateManager.js`**: Manages the forecast autoupdate timer.
+* **`tileCache.js`**: Logic for IndexedDB map tile caching.
+* **`adsbManager.js`**: Handles fetching and managing ADSB aircraft data.
+* **`sensorManager.js`** (Mobile Only): Manages device sensors (accelerometer) for automatic jump detection.
+* **`windchart.js`**: Logic for generating the Windspinne chart.
+* **`meteogramChart.js`**: Logic for generating Meteogram charts using Chart.js.
+* **`capacitor-adapter.js`**: Dynamically loads native Capacitor modules or mocks for web builds.
+* **`native-imports.js` / `capacitor-mocks.js`**: Platform-specific imports for Capacitor.
+* **`utils.js`**: Stateless helper functions (math, conversions, coordinates, etc.).
+* **`config.js`**: Configuration like feature flags.
 
 **src/ui-web & src/ui-mobile - View & Controller**
-* **`main-*.js`**: The central Controller and entry point for each respective platform. It initializes all modules and orchestrates the application logic.
-* **`mapManager.js`**: Manages the Leaflet map instance, including the creation of layers, controls, and primitive drawing functions.
-* **`displayManager.js`**: A dedicated View Logic module responsible for updating the UI based on the AppState.
-* **`ui.js`**: Provides generic UI functions for user feedback (messages, loaders, etc.).
-* **`coordinates.js`**: A self-contained component that manages the location search UI and favorites list.
-* **`eventManager.js`**: Centralizes the setup of all DOM event listeners for UI elements like buttons and sliders.
+* **`main-*.js`**: Central Controller/entry point for each platform, initializes modules, orchestrates logic.
+* **`mapManager.js`**: Manages the Leaflet map instance, layers, controls, and primitive drawing functions.
+* **`displayManager.js`**: View Logic module, updates UI components (weather table, popups, complex visualizations) based on AppState.
+* **`ui.js`**: Generic UI feedback functions (messages, loaders, device detection).
+* **`coordinates.js`**: Manages the location search UI and favorites/history list.
+* **`eventManager.js`**: Centralizes DOM event listener setup.
+* **`index.html` / `styles.css`**: Platform-specific structure and styling.
 
 ## Setup & Dependencies
 
 1.  **Clone the Repository**
-2.  **Install Dependencies:** `npm install` (installs `live-server`)
-3.  **Start the Application:** `npm start`
-4.  **No API Key Required**: Uses OpenMeteo’s free API and Leaflet with various base map tiles, no additional keys needed.
+2.  **Install Dependencies:** `npm install` (installs `live-server` for development)
+3.  **Start the Application:** `npm start` (runs the web version using `live-server`)
+4.  **No API Key Required**: Uses OpenMeteo’s free API, OpenStreetMap Nominatim/Overpass, ADSBexchange API, and Leaflet with various base map tiles. No keys needed.
 
 ## Warning
-Data is sourced from OpenMeteo and may contain inaccuracies. Always verify with official meteorological sources for critical applications, especially skydiving or aviation.
+Weather data is sourced from OpenMeteo and may contain inaccuracies. ADS-B data is from ADSBexchange and might be delayed or incomplete. **Always verify with official meteorological and aviation sources for critical applications like skydiving or flight planning.** This tool is for informational purposes only.
 
 ## Technologies Used
-The application uses libraries like Leaflet.js, Luxon, and MGRS.js, which are loaded via CDN. No authentication is needed for the weather data.
+-   **Core:** Vanilla JavaScript (ES Modules)
+-   **Mapping:** Leaflet.js, Leaflet.heat, Leaflet-rotatedMarker, @geoman-io/leaflet-geoman-free
+-   **Charting:** Chart.js
+-   **Data Parsing:** PapaParse (CSV), @tmcw/togeojson (KML)
+-   **Date/Time:** Luxon
+-   **Coordinates:** MGRS.js
+-   **Mobile:** Capacitor (Geolocation, Filesystem, App, Browser)
+-   **Development Server:** live-server
