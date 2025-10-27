@@ -12,7 +12,7 @@ import * as EventManager from './eventManager.js';
 import * as Coordinates from './coordinates.js';
 import * as JumpPlanner from '../core/jumpPlanner.js';
 import * as mapManager from './mapManager.js';
-import { saveRecordedTrack } from '../core/trackManager.js';
+import * as trackManager from '../core/trackManager.js';
 import * as weatherManager from '../core/weatherManager.js';
 import { cacheVisibleTiles, cacheTilesForDIP } from '../core/tileCache.js';
 import { getSliderValue, displayError, displayMessage, displayProgress, hideProgress, applyDeviceSpecificStyles } from './ui.js';
@@ -2174,7 +2174,7 @@ function setupAppEventListeners() {
     });
 
     document.addEventListener('sensor:landing_detected', () => {
-        saveRecordedTrack();
+        trackManager.saveRecordedTrack();
         AppState.isAutoRecording = false;
 
         // Button-Zustände zurücksetzen
@@ -2279,6 +2279,108 @@ document.addEventListener('DOMContentLoaded', async () => {
     // In der mobilen App soll die Tabelle im Data-Panel immer angezeigt werden.
     Settings.state.userSettings.showTable = true;
     applyDeviceSpecificStyles();
+
+    // === START: Code für GPX-Öffnen ===
+    try {
+        const { App, Filesystem, isNative } = await getCapacitor(); // Hole Plugins über den Adapter
+
+        if (isNative && App) {
+            App.addListener('appUrlOpen', async (event) => { // Behalte async bei
+                console.log('App opened with URL:', event.url);
+                const fileUrl = event.url;
+
+                // Prüfe, ob es eine Datei ist, die auf .gpx endet (Groß-/Kleinschreibung ignorieren)
+                // ODER ob es eine Android content URI ist (die durch den Intent-Filter kommen sollte)
+                const isGpxFileExtension = fileUrl && fileUrl.toLowerCase().endsWith('.gpx');
+                const isAndroidContentUri = fileUrl && fileUrl.startsWith('content://');
+
+                // Akzeptiere die URL, wenn eine der Bedingungen zutrifft
+                if (fileUrl && (isGpxFileExtension || isAndroidContentUri)) {
+                    console.log(`GPX file or content URI detected (${isGpxFileExtension ? 'ends with .gpx' : isAndroidContentUri ? 'content URI' : 'unknown'}), attempting to handle:`, fileUrl);
+                    await handleOpenFileUrl(fileUrl); // Rufe die Hilfsfunktion auf
+                } else {
+                    console.log('Opened URL is not a GPX file or recognized content URI, ignoring.');
+                }
+            });
+            console.log('appUrlOpen listener added successfully.');
+        } else if (!isNative) {
+            console.log('Not a native app, appUrlOpen listener skipped.');
+        } else {
+            console.warn('Capacitor App plugin not available, cannot add appUrlOpen listener.');
+        }
+    } catch (error) {
+        console.error('Error setting up appUrlOpen listener:', error);
+    }
+
+    // Hilfsfunktion zum Verarbeiten der geöffneten Datei
+    async function handleOpenFileUrl(fileUrl) {
+        const loadingElement = document.getElementById('loading');
+        if (loadingElement) loadingElement.style.display = 'block';
+        Utils.handleMessage("Opening GPX file..."); //
+
+        try {
+            const { Filesystem, Directory } = await getCapacitor(); //
+            if (!Filesystem) throw new Error('Filesystem plugin not available'); //
+
+            const result = await Filesystem.readFile({ //
+                path: fileUrl
+            });
+
+            if (!result.data) {
+                throw new Error('Could not read file data.');
+            }
+
+            const gpxContent = atob(result.data);
+
+            // === START ÄNDERUNG: Verbesserte Dateinamenserkennung ===
+            let fileName = 'track.gpx'; // Standardname
+            try {
+                const decodedUrl = decodeURIComponent(fileUrl);
+                // Nimmt den Teil nach dem letzten '/'
+                const namePart = decodedUrl.substring(decodedUrl.lastIndexOf('/') + 1);
+                // Wenn der Teil nicht nur aus Zahlen besteht UND einen Punkt enthält,
+                // nehmen wir an, es ist ein brauchbarer Dateiname.
+                if (namePart && !/^\d+$/.test(namePart) && namePart.includes('.')) {
+                    fileName = namePart;
+                }
+                // Sicherstellen, dass die Endung .gpx ist
+                if (!fileName.toLowerCase().endsWith('.gpx')) {
+                    // Versuche, die vorhandene Endung zu ersetzen, oder füge .gpx hinzu
+                    const dotIndex = fileName.lastIndexOf('.');
+                    if (dotIndex > 0) {
+                        fileName = fileName.substring(0, dotIndex) + '.gpx';
+                    } else {
+                        fileName += '.gpx';
+                    }
+                }
+            } catch (e) {
+                console.warn("Could not reliably determine filename from URL, using default 'track.gpx'.");
+                fileName = 'track.gpx'; // Fallback
+            }
+            // === ENDE ÄNDERUNG ===
+
+            const blob = new Blob([gpxContent], { type: 'application/gpx+xml' });
+            const gpxFile = new File([blob], fileName, { type: 'application/gpx+xml' });
+
+            console.log('Created File object from opened URL:', gpxFile.name, gpxFile.size);
+
+            await trackManager.loadGpxTrack(gpxFile); //
+            Utils.handleMessage("GPX file loaded successfully."); //
+
+        } catch (error) {
+            console.error('Error handling opened GPX file:', error);
+            let userMessage = 'Could not open the selected GPX file.'; //
+            if (error.message && error.message.includes('permission')) { //
+                userMessage = 'Could not open GPX: Permission denied. Please check app permissions.'; //
+            } else if (error.message && error.message.includes('Could not read file')) { //
+                userMessage = 'Could not read the GPX file content.'; //
+            } //
+            Utils.handleError(userMessage); //
+        } finally {
+            if (loadingElement) loadingElement.style.display = 'none'; //
+        }
+    }
+    // === ENDE: Code für GPX-Öffnen ===
 
     // Explizit den Slider auf die aktuelle Stunde setzen
     const slider = document.getElementById('timeSlider');

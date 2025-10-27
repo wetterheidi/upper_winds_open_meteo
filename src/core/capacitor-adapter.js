@@ -7,6 +7,7 @@ import { Geolocation } from '@capacitor/geolocation';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Browser } from '@capacitor/browser';
 import { Capacitor } from '@capacitor/core';
+import { App } from '@capacitor/app'; // <<< NEUER IMPORT
 
 let capacitorModulesPromise = null;
 let deviceReadyPromise = null;
@@ -64,6 +65,7 @@ async function loadModules() {
                 Directory,
                 Browser,
                 Capacitor,
+                App,
                 isNative: true,
                 isInitialized: true
             };
@@ -80,6 +82,7 @@ async function loadModules() {
         Directory: null,
         Browser: null,
         Capacitor: null,
+        App: null,
         isNative: false,
         isInitialized: false
     };
@@ -95,6 +98,7 @@ export async function getCapacitor() {
                 Directory: null,
                 Browser: null,
                 Capacitor: null,
+                App: null,
                 isNative: false,
                 isInitialized: false
             };
