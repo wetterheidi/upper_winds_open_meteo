@@ -1669,8 +1669,6 @@ input[type="checkbox"][style*="opacity: 1"] {
 /* === APP MANAGEMENT === */
 
 #app-management-settings {
-    display: flex;
-    /* Macht den Container zu einem Flex-Container */
     flex-direction: column;
     /* Stapelt die Elemente vertikal */
     gap: 10px;

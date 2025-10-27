@@ -332,18 +332,17 @@ function setupAccordionEvents() {
     accordionHeaders.forEach(header => {
         header.addEventListener('click', () => {
             const currentItem = header.parentElement;
-            const isOpen = currentItem.classList.contains('active');
+            const isOpen = currentItem.classList.contains('active'); // Prüfen, ob das Element BEREITS offen ist
 
-            // Zuerst alle Elemente schließen
+            // Zuerst alle ANDEREN Elemente schließen
             allAccordionItems.forEach(item => {
-                item.classList.remove('active');
+                if (item !== currentItem) { // Nur andere Elemente schließen
+                    item.classList.remove('active');
+                }
             });
 
-            // Das geklickte Element nur dann öffnen, wenn es vorher geschlossen war.
-            // Dies ermöglicht das Schließen des aktuell offenen Elements durch erneutes Klicken.
-            if (!isOpen) {
-                currentItem.classList.add('active');
-            }
+            // Das geklickte Element umschalten (öffnen, wenn geschlossen; schließen, wenn offen)
+            currentItem.classList.toggle('active');
         });
     });
 }
