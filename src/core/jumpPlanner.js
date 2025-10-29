@@ -64,11 +64,41 @@ export function jumpRunTrack(interpolatedData, harpAnchor = null) {
     const meanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, elevation, elevation + openingAltitude);
     if (!meanWind) return null;
 
-    let jumpRunTrackDirection = Math.round(meanWind[0]);
-    const customDirection = parseFloat(Settings.state.userSettings.customJumpRunDirection);
-    if (Number.isFinite(customDirection) && customDirection >= 0 && customDirection <= 360) {
-        jumpRunTrackDirection = customDirection;
+    const meanWindDirection = meanWind[0]; // Die berechnete mittlere Windrichtung
+
+    let jumpRunTrackDirection;
+    const customDirectionInput = Settings.state.userSettings.customJumpRunDirection; // Den String oder die Zahl aus den Settings holen
+
+    if (typeof customDirectionInput === 'string') {
+        const inputUpper = customDirectionInput.toUpperCase().trim();
+        if (inputUpper === 'IN') {
+            jumpRunTrackDirection = (meanWindDirection + 180 + 360) % 360; // Mit dem Wind
+        } else if (inputUpper === 'CR+') {
+            jumpRunTrackDirection = (meanWindDirection + 90 + 360) % 360; // Querwind +90°
+        } else if (inputUpper === 'CR-') {
+            jumpRunTrackDirection = (meanWindDirection - 90 + 360) % 360; // Querwind -90°
+        } else {
+            // Versuche, den String als Zahl zu parsen
+            const parsedNumber = parseFloat(customDirectionInput);
+            if (Number.isFinite(parsedNumber) && parsedNumber >= 0 && parsedNumber <= 360) {
+                jumpRunTrackDirection = parsedNumber; // Gültige Zahl eingegeben
+            } else {
+                // Ungültiger String ODER ungültige Zahl -> Standard verwenden
+                jumpRunTrackDirection = Math.round(meanWindDirection); // Standard: Gegen den Wind
+                // Optional: Fehlermeldung oder Hinweis an den Nutzer
+                console.warn(`Ungültige Eingabe '${customDirectionInput}' für Jump Run Richtung. Verwende Standardwert (gegen den Wind).`);
+            }
+        }
+    } else if (Number.isFinite(customDirectionInput) && customDirectionInput >= 0 && customDirectionInput <= 360) {
+        // Direkte Zahleneingabe (wie bisher)
+        jumpRunTrackDirection = customDirectionInput;
+    } else {
+        // Kein oder ungültiger Input -> Standard verwenden
+        jumpRunTrackDirection = Math.round(meanWindDirection); // Standard: Gegen den Wind
     }
+
+    jumpRunTrackDirection = Math.round(jumpRunTrackDirection); // Sicherstellen, dass es eine ganze Zahl ist
+
 
     const exitAltitude = parseInt(document.getElementById('exitAltitude')?.value) || 3000;
     const exitHeightM = elevation + exitAltitude;
@@ -139,7 +169,7 @@ export function calculateExitCircle(interpolatedData) {
         lastAltitude: AppState.lastAltitude,
         interpolatedData: !!interpolatedData && interpolatedData.length > 0
     });
-    if (!Settings.state.userSettings.showExitArea || !Settings.state.userSettings.calculateJump || !AppState.weatherData || AppState.lastLat==null || AppState.lastLng==null) {
+    if (!Settings.state.userSettings.showExitArea || !Settings.state.userSettings.calculateJump || !AppState.weatherData || AppState.lastLat == null || AppState.lastLng == null) {
         console.log('Debug calculateExitCircle: Frühe Rückgabe wegen Einstellungen');
         return null;
     }
@@ -237,7 +267,7 @@ export function calculateExitCircle(interpolatedData) {
  * @returns {object|null} Ein Objekt mit allen notwendigen Daten für die Visualisierung der Schirmfahrtbereiche oder null.
  */
 export function calculateCanopyCircles(interpolatedData) {
-    if (!Settings.state.userSettings.showCanopyArea || !Settings.state.userSettings.calculateJump || !AppState.weatherData || AppState.lastLat==null || AppState.lastLng==null) return null;
+    if (!Settings.state.userSettings.showCanopyArea || !Settings.state.userSettings.calculateJump || !AppState.weatherData || AppState.lastLat == null || AppState.lastLng == null) return null;
     if (!interpolatedData || interpolatedData.length === 0) return null;
 
     const exitAltitude = parseInt(document.getElementById('exitAltitude')?.value) || 3000;

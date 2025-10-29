@@ -1231,6 +1231,13 @@ button.btn {
     stroke-dasharray: '5, 10';
 }
 
+/* --- Anpassung Breite Jump Run Direction Input --- */
+#jumpRunTrackDirection {
+    width: 80px; /* Etwas breiter als die Offset-Felder für Text wie 'CR+' */
+    text-align: left;
+    box-sizing: border-box;
+}
+
 /* --- Jumpmaster Panel --- */
 #panel-jumpmaster ul {
     list-style: none;

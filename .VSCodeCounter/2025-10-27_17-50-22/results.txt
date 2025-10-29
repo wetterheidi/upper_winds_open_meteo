@@ -1,0 +1,69 @@
+Date : 2025-10-27 17:50:22
+Directory : /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src
+Total : 40 files,  23723 codes, 3902 comments, 3801 blanks, all 31426 lines
+
+Languages
++------------+------------+------------+------------+------------+------------+
+| language   | files      | code       | comment    | blank      | total      |
++------------+------------+------------+------------+------------+------------+
+| JavaScript |         36 |     18,587 |      3,495 |      3,050 |     25,132 |
+| PostCSS    |          2 |      3,644 |        407 |        643 |      4,694 |
+| HTML       |          2 |      1,492 |          0 |        108 |      1,600 |
++------------+------------+------------+------------+------------+------------+
+
+Directories
++-------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| path                                                                                            | files      | code       | comment    | blank      | total      |
++-------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| .                                                                                               |         40 |     23,723 |      3,902 |      3,801 |     31,426 |
+| core                                                                                            |         23 |      6,805 |      1,639 |      1,100 |      9,544 |
+| ui-mobile                                                                                       |          9 |      9,179 |      1,235 |      1,448 |     11,862 |
+| ui-web                                                                                          |          8 |      7,739 |      1,028 |      1,253 |     10,020 |
++-------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+
+Files
++-------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| filename                                                                                        | language   | code       | comment    | blank      | total      |
++-------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/core/adsbManager.js                 | JavaScript |        109 |         18 |         29 |        156 |
+| /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/core/autoupdateManager.js           | JavaScript |         61 |         21 |         12 |         94 |
+| /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/core/capacitor-adapter.js           | JavaScript |         87 |         12 |          9 |        108 |
+| /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/core/capacitor-mocks.js             | JavaScript |          5 |          3 |          2 |         10 |
+| /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/core/constants.js                   | JavaScript |        146 |         69 |         28 |        243 |
+| /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/core/ensembleManager.js             | JavaScript |        521 |        134 |         87 |        742 |
+| /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/core/jumpPlanner.js                 | JavaScript |        496 |         98 |        107 |        701 |
+| /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/core/jumpPlanner.test.js            | JavaScript |        882 |         48 |         95 |      1,025 |
+| /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/core/jumpPlannerExitCircles.test.js | JavaScript |        109 |          9 |          9 |        127 |
+| /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/core/liveTrackingManager.js         | JavaScript |        318 |         92 |         58 |        468 |
+| /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/core/locationManager.js             | JavaScript |        317 |        110 |         54 |        481 |
+| /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/core/locationManager.test.js        | JavaScript |         85 |         11 |         20 |        116 |
+| /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/core/meteogramChart.js              | JavaScript |        381 |         70 |         53 |        504 |
+| /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/core/native-imports.js              | JavaScript |         10 |          3 |          2 |         15 |
+| /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/core/settings.js                    | JavaScript |        254 |         79 |         31 |        364 |
+| /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/core/state.js                       | JavaScript |         74 |         31 |          9 |        114 |
+| /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/core/tileCache.js                   | JavaScript |        509 |        102 |         54 |        665 |
+| /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/core/trackManager.js                | JavaScript |        552 |         93 |         88 |        733 |
+| /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/core/trackManager.test.js           | JavaScript |        127 |          8 |         20 |        155 |
+| /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/core/utils.js                       | JavaScript |        907 |        475 |        171 |      1,553 |
+| /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/core/utils.test.js                  | JavaScript |        287 |         50 |         66 |        403 |
+| /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/core/weatherManager.js              | JavaScript |        419 |         90 |         76 |        585 |
+| /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/core/windchart.js                   | JavaScript |        149 |         13 |         20 |        182 |
+| /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/ui-mobile/coordinates.js            | JavaScript |        194 |         46 |         32 |        272 |
+| /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/ui-mobile/displayManager.js         | JavaScript |        459 |         74 |         81 |        614 |
+| /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/ui-mobile/eventManager.js           | JavaScript |      1,533 |        205 |        285 |      2,023 |
+| /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/ui-mobile/index.html                | HTML       |        774 |          0 |         56 |        830 |
+| /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/ui-mobile/main-mobile.js            | JavaScript |      2,060 |        284 |        334 |      2,678 |
+| /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/ui-mobile/mapManager.js             | JavaScript |      1,749 |        236 |        222 |      2,207 |
+| /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/ui-mobile/sensorManager.js          | JavaScript |        191 |         72 |         33 |        296 |
+| /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/ui-mobile/styles.css                | PostCSS    |      2,016 |        223 |        355 |      2,594 |
+| /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/ui-mobile/ui.js                     | JavaScript |        203 |         95 |         50 |        348 |
+| /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/ui-web/coordinates.js               | JavaScript |        178 |         40 |         37 |        255 |
+| /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/ui-web/displayManager.js            | JavaScript |        458 |         77 |         83 |        618 |
+| /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/ui-web/eventManager.js              | JavaScript |      1,294 |        180 |        248 |      1,722 |
+| /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/ui-web/index.html                   | HTML       |        718 |          0 |         52 |        770 |
+| /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/ui-web/main-web.js                  | JavaScript |      1,655 |        245 |        294 |      2,194 |
+| /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/ui-web/mapManager.js                | JavaScript |      1,632 |        216 |        208 |      2,056 |
+| /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/ui-web/styles.css                   | PostCSS    |      1,628 |        184 |        288 |      2,100 |
+| /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/ui-web/ui.js                        | JavaScript |        176 |         86 |         43 |        305 |
+| Total                                                                                           |            |     23,723 |      3,902 |      3,801 |     31,426 |
++-------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
