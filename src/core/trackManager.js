@@ -47,6 +47,10 @@ export async function loadKmlTrack(file) {
             style: function (feature) {
                 // togeojson wandelt KML-Styles in diese Properties um.
                 // Wir erstellen ein leeres Stil-Objekt und füllen es.
+                const styles = getComputedStyle(document.body);
+                // .trim() ist wichtig, da getPropertyValue manchmal Leerzeichen zurückgibt
+                const dangerColor = styles.getPropertyValue('--color-danger').trim() || '#ff0000'; // Fallback auf Rot
+                // 2. Versuche, die konvertierten Inline-Stile zu lesen (wie bisher)
                 const style = {};
                 if (feature.properties.stroke) {
                     style.color = feature.properties.stroke;
@@ -62,6 +66,19 @@ export async function loadKmlTrack(file) {
                 }
                 if (feature.properties['fill-opacity']) {
                     style.fillOpacity = feature.properties['fill-opacity'];
+                }
+                // 2. FALLBACK: Wenn keine Farben gefunden wurden (wegen <styleUrl>),
+                //    prüfe manuell auf bekannte Stil-IDs aus der KML.
+                if (!style.color && !style.fillColor) {
+                    if (feature.properties.styleUrl === '#StyleDANGER') {
+                        // **ÄNDERUNG:** Verwende die ausgelesene CSS-Variable
+                        style.color = dangerColor; 
+                        style.weight = 1.5;
+                        style.opacity = 1.0;
+                        style.fillColor = dangerColor; // Verwende dieselbe Farbe für die Füllung
+                        style.fillOpacity = 0.2; // 80 (Hex) ist ca. 128 (Dez), also 128/255 ≈ 0.5
+                    }
+                    // Hier könnten Sie bei Bedarf weitere "else if" für andere Stil-IDs hinzufügen.
                 }
                 return style;
             },
@@ -80,7 +97,7 @@ export async function loadKmlTrack(file) {
         AppState.gpxLayer = kmlLayer;
         AppState.gpxLayer.addTo(AppState.map);
         AppState.map.fitBounds(kmlLayer.getBounds());
-        
+
         return { success: true, finalPointData: null };
 
     } catch (error) {
