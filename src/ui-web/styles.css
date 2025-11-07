@@ -1231,6 +1231,16 @@ button.btn {
     stroke-dasharray: '5, 10';
 }
 
+#lockLandingDirection {
+    margin-right: 8px; /* Abstand zwischen Checkbox und "Lock" Text */
+    vertical-align: middle;
+}
+
+.radio-label[for="lockLandingDirection"] {
+    /* Stellt sicher, dass die Klickfläche die ganze Zeile einnimmt */
+    display: block;
+    width: 100%;
+}
 /* --- Anpassung Breite Jump Run Direction Input --- */
 #jumpRunTrackDirection {
     width: 80px; /* Etwas breiter als die Offset-Felder für Text wie 'CR+' */

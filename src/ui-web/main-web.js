@@ -13,7 +13,7 @@ import * as JumpPlanner from '../core/jumpPlanner.js';
 import * as mapManager from './mapManager.js';
 import * as weatherManager from '../core/weatherManager.js';
 import { cacheVisibleTiles, cacheTilesForDIP } from '../core/tileCache.js';
-import { getSliderValue, displayError, displayMessage, displayProgress, hideProgress, applyDeviceSpecificStyles } from './ui.js';
+import { getSliderValue, displayError, displayMessage, displayWarning, displayProgress, hideProgress, applyDeviceSpecificStyles } from './ui.js';
 import * as AutoupdateManager from '../core/autoupdateManager.js';
 import * as displayManager from './displayManager.js';
 import * as liveTrackingManager from '../core/liveTrackingManager.js';
@@ -1444,6 +1444,10 @@ function setupAppEventListeners() {
     document.addEventListener('ui:sliderChanged', async (e) => {
         console.log("[main-web] Event 'ui:sliderChanged' empfangen, spezifische Updates werden ausgeführt.");
 
+        if (AppState.isLandingDirectionLocked) {
+            displayWarning("Warning! Landing direction locked");
+        }
+
         try {
             const sliderIndex = getSliderValue();
             if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
@@ -1472,6 +1476,16 @@ function setupAppEventListeners() {
         } catch (error) {
             console.error('Error during slider update:', error);
             displayError(error.message);
+        }
+    });
+
+    document.addEventListener('ui:sliderChangeFinished', (e) => {
+        console.log("[main-mobile] Event 'ui:sliderChangeFinished' empfangen.");
+
+        // HIER kommt die Warn-Logik hin.
+        // Sie wird jetzt nur einmal ausgelöst, wenn der Benutzer den Slider loslässt.
+        if (AppState.isLandingDirectionLocked) {
+            displayWarning("Warning! Landing direction locked");
         }
     });
 

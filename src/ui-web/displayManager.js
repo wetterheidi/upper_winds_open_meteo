@@ -63,11 +63,15 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
     AppState.landingWindDir = AppState.weatherData.wind_direction_10m[index] || null;
     console.log('landingWindDir updated to:', AppState.landingWindDir);
 
-    const customLandingDirectionLLInput = document.getElementById('customLandingDirectionLL');
-    const customLandingDirectionRRInput = document.getElementById('customLandingDirectionRR');
-    if (customLandingDirectionLLInput && customLandingDirectionRRInput && AppState.landingWindDir !== null) {
-        customLandingDirectionLLInput.value = Math.round(AppState.landingWindDir);
-        customLandingDirectionRRInput.value = Math.round(AppState.landingWindDir);
+    if (!AppState.isLandingDirectionLocked) {
+        const customLandingDirectionLLInput = document.getElementById('customLandingDirectionLL');
+        const customLandingDirectionRRInput = document.getElementById('customLandingDirectionRR');
+        if (customLandingDirectionLLInput && customLandingDirectionRRInput && AppState.landingWindDir !== null) {
+            customLandingDirectionLLInput.value = Math.round(AppState.landingWindDir);
+            customLandingDirectionRRInput.value = Math.round(AppState.landingWindDir);
+        }
+    } else {
+        console.log('Landing direction is locked. Skipping input field update.');
     }
 
     const refLevel = document.getElementById('refLevel')?.value || 'AGL';

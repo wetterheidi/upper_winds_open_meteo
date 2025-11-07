@@ -1673,6 +1673,16 @@ input[type="checkbox"][style*="opacity: 1"] {
     padding: 2px;
 }
 
+#lockLandingDirection {
+    margin-right: 8px; /* Abstand zwischen Checkbox und "Lock" Text */
+    vertical-align: middle;
+}
+
+.radio-label[for="lockLandingDirection"] {
+    /* Stellt sicher, dass die Klickfläche die ganze Zeile einnimmt */
+    display: block;
+    width: 100%;
+}
 /* === APP MANAGEMENT === */
 
 #app-management-settings {

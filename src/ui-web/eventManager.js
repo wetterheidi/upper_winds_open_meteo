@@ -71,20 +71,28 @@ function setupRadioGroup(name, callback) {
                 const customLL = document.getElementById('customLandingDirectionLL');
                 const customRR = document.getElementById('customLandingDirectionRR');
 
-                if (customLL) customLL.disabled = newValue !== 'LL';
-                if (customRR) customRR.disabled = newValue !== 'RR';
+                if (AppState.isLandingDirectionLocked) {
+                    // Wenn gesperrt, bleiben beide Inputs deaktiviert
+                    if (customLL) customLL.disabled = true;
+                    if (customRR) customRR.disabled = true;
+                } else {
+                    // Original-Logik: Aktiviere/deaktiviere basierend auf Radio-Button
+                    if (customLL) customLL.disabled = newValue !== 'LL';
+                    if (customRR) customRR.disabled = newValue !== 'RR';
 
-                if (newValue === 'LL' && customLL && !customLL.value && Settings.state.userSettings.customLandingDirectionLL === '') {
-                    customLL.value = Math.round(AppState.landingWindDir || 0);
-                    Settings.state.userSettings.customLandingDirectionLL = parseInt(customLL.value);
-                    Settings.save();
-                    console.log(`Set customLandingDirectionLL to ${customLL.value}`);
-                }
-                if (newValue === 'RR' && customRR && !customRR.value && Settings.state.userSettings.customLandingDirectionRR === '') {
-                    customRR.value = Math.round(AppState.landingWindDir || 0);
-                    Settings.state.userSettings.customLandingDirectionRR = parseInt(customRR.value);
-                    Settings.save();
-                    console.log(`Set customLandingDirectionRR to ${customRR.value}`);
+                    // Original-Logik: Auto-Fill nur, wenn nicht gesperrt
+                    if (newValue === 'LL' && customLL && !customLL.value && Settings.state.userSettings.customLandingDirectionLL === '') { 
+                        customLL.value = Math.round(AppState.landingWindDir || 0);
+                        Settings.state.userSettings.customLandingDirectionLL = parseInt(customLL.value);
+                        Settings.save();
+                        console.log(`Set customLandingDirectionLL to ${customLL.value}`);
+                    }
+                    if (newValue === 'RR' && customRR && !customRR.value && Settings.state.userSettings.customLandingDirectionRR === '') { 
+                        customRR.value = Math.round(AppState.landingWindDir || 0);
+                        Settings.state.userSettings.customLandingDirectionRR = parseInt(customRR.value);
+                        Settings.save();
+                        console.log(`Set customLandingDirectionRR to ${customRR.value}`);
+                    }
                 }
             }
             // Event auslösen, um die Anwendung über die Änderung zu informieren
@@ -713,6 +721,49 @@ function setupCheckboxEvents() {
         document.dispatchEvent(new CustomEvent('ui:landingPatternEnabled'));
     });
 
+        setupCheckbox('lockLandingDirection', null, (checkbox) => {
+        const isLocked = checkbox.checked;
+        AppState.isLandingDirectionLocked = isLocked;
+
+        const customLL = document.getElementById('customLandingDirectionLL');
+        const customRR = document.getElementById('customLandingDirectionRR');
+        const activeRadio = document.querySelector('input[name="landingDirection"]:checked');
+        const activeInput = (activeRadio && activeRadio.value === 'RR') ? customRR : customLL;
+
+        if (isLocked) {
+            const direction = parseInt(activeInput.value, 10);
+            
+            if (activeInput && !isNaN(direction) && direction >= 0 && direction <= 360) {
+                AppState.lockedLandingDirection = direction;
+                console.log(`Landing direction locked to: ${direction}°`);
+                Utils.handleMessage(`Landing direction locked to ${direction}°`);
+                
+                // Deaktiviere beide Eingabefelder
+                if (customLL) customLL.disabled = true;
+                if (customRR) customRR.disabled = true;
+            } else {
+                console.warn('Invalid landing direction to lock. Unchecking.');
+                Utils.handleError('Please enter a valid 0-360° direction before locking.');
+                checkbox.checked = false;
+                AppState.isLandingDirectionLocked = false;
+                AppState.lockedLandingDirection = null;
+            }
+        } else {
+            console.log('Landing direction unlocked.');
+            AppState.lockedLandingDirection = null;
+            
+            // Aktiviere das relevante Eingabefeld wieder
+            if (activeRadio) {
+                if (customLL) customLL.disabled = (activeRadio.value !== 'LL');
+                if (customRR) customRR.disabled = (activeRadio.value !== 'RR');
+            }
+            
+            // Triggere ein 'ui:sliderChanged'-Event, um die Felder mit der aktuellen
+            // Windrichtung des Sliders zu aktualisieren.
+            dispatchAppEvent('ui:sliderChanged', { sliderValue: getSliderValue() });
+        }
+    });
+    
     setupCheckbox('trackPositionCheckbox', 'trackPosition', (checkbox) => {
         Settings.state.userSettings.trackPosition = checkbox.checked;
         Settings.save();

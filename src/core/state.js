@@ -47,6 +47,8 @@ export const AppState = {
     // ===================================================================
     jumpVisualizationLayerGroup: null, // @type {L.LayerGroup|null} - Gruppe für Exit- & Canopy-Kreise.
     landingPatternLayerGroup: null,    // @type {L.LayerGroup|null} - Gruppe für das Landemuster.
+    isLandingDirectionLocked: false,   // @type {boolean} - NEU: True, wenn die Landerichtung manuell gesperrt ist.
+    lockedLandingDirection: null,      // @type {number|null} - NEU: Die gesperrte Landerichtung in Grad.
     jumpRunTrackLayerGroup: null,      // @type {L.LayerGroup|null} - Gruppe für den Jump Run Track.
     lastTrackData: null,               // @type {object|null} - Speichert die letzten JRT-Daten, um Drag&Drop zu ermöglichen.
     isPlacingHarp: false,              // @type {boolean} - True, wenn der Benutzer gerade einen HARP platziert.
