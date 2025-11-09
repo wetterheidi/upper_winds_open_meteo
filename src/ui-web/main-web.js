@@ -149,6 +149,13 @@ function initializeUIElements() {
     }
     Settings.state.userSettings.isCustomJumpRunDirection = Settings.state.userSettings.isCustomJumpRunDirection || false;
 
+    const defaultLandingDirection = Settings.state.userSettings.landingDirection; // z.B. "LL"
+    if (defaultLandingDirection === 'LL') {
+        document.getElementById('lock-container-LL')?.classList.remove('hidden');
+    } else if (defaultLandingDirection === 'RR') {
+        document.getElementById('lock-container-RR')?.classList.remove('hidden');
+    }
+
     // Ensure UI reflects the stored custom direction without overwriting
     const customLL = document.getElementById('customLandingDirectionLL');
     const customRR = document.getElementById('customLandingDirectionRR');

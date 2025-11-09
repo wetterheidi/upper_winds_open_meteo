@@ -169,24 +169,29 @@
                                     </label>
                                 </li>
                                 <li>
-                                    <label class="radio-label">
-                                        <input type="radio" name="landingDirection" value="LL" checked> LL
-                                        <input type="number" id="customLandingDirectionLL" min="0" max="360"
-                                            placeholder="0-360°">
-                                        <label>°</label>
+                                    <label class="radio-label landing-direction-row">
+                                        <span>
+                                            <input type="radio" name="landingDirection" value="LL" checked> LL
+                                            <input type="number" id="customLandingDirectionLL" min="0" max="360"
+                                                placeholder="0-360°"> °
+                                        </span>
+                                        <span id="lock-container-LL" class="lock-landing-container hidden">
+                                            <input type="checkbox" id="lockLandingDirectionLL" class="lock-landing-cb">
+                                            <label for="lockLandingDirectionLL" class="lock-label">Lock</label>
+                                        </span>
                                     </label>
                                 </li>
                                 <li>
-                                    <label class="radio-label">
-                                        <input type="radio" name="landingDirection" value="RR"> RR
-                                        <input type="number" id="customLandingDirectionRR" min="0" max="360"
-                                            placeholder="0-360°">
-                                        <label>°</label>
-                                    </label>
-                                </li>
-                                <li>
-                                    <label class="radio-label" for="lockLandingDirection">
-                                        <input type="checkbox" id="lockLandingDirection"> Lock Landing Direction
+                                    <label class="radio-label landing-direction-row">
+                                        <span>
+                                            <input type="radio" name="landingDirection" value="RR"> RR
+                                            <input type="number" id="customLandingDirectionRR" min="0" max="360"
+                                                placeholder="0-360°"> °
+                                        </span>
+                                        <span id="lock-container-RR" class="lock-landing-container hidden">
+                                            <input type="checkbox" id="lockLandingDirectionRR" class="lock-landing-cb">
+                                            <label for="lockLandingDirectionRR" class="lock-label">Lock</label>
+                                        </span>
                                     </label>
                                 </li>
                                 <li>

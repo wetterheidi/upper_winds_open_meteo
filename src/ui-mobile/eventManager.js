@@ -77,24 +77,33 @@ function setupRadioGroup(name, callback) {
             if (name === 'landingDirection') {
                 const customLL = document.getElementById('customLandingDirectionLL');
                 const customRR = document.getElementById('customLandingDirectionRR');
+                // NEU: Container für die Checkboxen holen
+                const lockContainerLL = document.getElementById('lock-container-LL');
+                const lockContainerRR = document.getElementById('lock-container-RR');
 
                 if (AppState.isLandingDirectionLocked) {
-                    // Wenn gesperrt, bleiben beide Inputs deaktiviert
+                    // Wenn gesperrt, bleiben Inputs deaktiviert UND Boxen unsichtbar
                     if (customLL) customLL.disabled = true;
                     if (customRR) customRR.disabled = true;
+                    if (lockContainerLL) lockContainerLL.classList.add('hidden');
+                    if (lockContainerRR) lockContainerRR.classList.add('hidden');
                 } else {
                     // Original-Logik: Aktiviere/deaktiviere basierend auf Radio-Button
                     if (customLL) customLL.disabled = newValue !== 'LL';
                     if (customRR) customRR.disabled = newValue !== 'RR';
 
-                    // Original-Logik: Auto-Fill nur, wenn nicht gesperrt
-                    if (newValue === 'LL' && customLL && !customLL.value && Settings.state.userSettings.customLandingDirectionLL === '') { 
+                    // NEU: Sichtbarkeit der Lock-Boxen steuern
+                    if (lockContainerLL) lockContainerLL.classList.toggle('hidden', newValue !== 'LL');
+                    if (lockContainerRR) lockContainerRR.classList.toggle('hidden', newValue !== 'RR');
+
+                    // Auto-Fill-Logik (bleibt gleich)
+                    if (newValue === 'LL' && customLL && !customLL.value && Settings.state.userSettings.customLandingDirectionLL === '') {
                         customLL.value = Math.round(AppState.landingWindDir || 0);
                         Settings.state.userSettings.customLandingDirectionLL = parseInt(customLL.value);
                         Settings.save();
                         console.log(`Set customLandingDirectionLL to ${customLL.value}`);
                     }
-                    if (newValue === 'RR' && customRR && !customRR.value && Settings.state.userSettings.customLandingDirectionRR === '') { 
+                    if (newValue === 'RR' && customRR && !customRR.value && Settings.state.userSettings.customLandingDirectionRR === '') {
                         customRR.value = Math.round(AppState.landingWindDir || 0);
                         Settings.state.userSettings.customLandingDirectionRR = parseInt(customRR.value);
                         Settings.save();
@@ -716,6 +725,71 @@ function setupTerrainAnalysisEvents() {
         });
     }
 }
+/**
+ * NEUE HILFSFUNKTION: Verarbeitet die Logik, wenn eine der "Lock Landing Direction" Checkboxen
+ * (entweder LL oder RR) geändert wird.
+ * @param {HTMLInputElement} checkbox - Die Checkbox, die das Event ausgelöst hat.
+ * @param {'LL'|'RR'} type - Der Typ der Checkbox (LL oder RR).
+ */
+function handleLockCheckboxChange(checkbox, type) {
+    const isLocked = checkbox.checked;
+
+    // Alle relevanten UI-Elemente holen
+    const customLL = document.getElementById('customLandingDirectionLL');
+    const customRR = document.getElementById('customLandingDirectionRR');
+    const radioLL = document.querySelector('input[name="landingDirection"][value="LL"]');
+    const radioRR = document.querySelector('input[name="landingDirection"][value="RR"]');
+    const lockCheckboxLL = document.getElementById('lockLandingDirectionLL');
+    const lockCheckboxRR = document.getElementById('lockLandingDirectionRR');
+
+    const activeInput = (type === 'LL') ? customLL : customRR;
+    const otherCheckbox = (type === 'LL') ? lockCheckboxRR : lockCheckboxLL;
+
+    if (isLocked) {
+        // --- SPERREN ---
+        const direction = parseInt(activeInput.value, 10);
+
+        if (activeInput && !isNaN(direction) && direction >= 0 && direction <= 360) {
+            AppState.isLandingDirectionLocked = true;
+            AppState.lockedLandingDirection = direction;
+            console.log(`Landing direction locked to: ${direction}°`);
+            Utils.handleMessage(`Landing direction locked to ${direction}°`);
+
+            // Alle Eingaben deaktivieren
+            if (customLL) customLL.disabled = true;
+            if (customRR) customRR.disabled = true;
+            if (radioLL) radioLL.disabled = true;
+            if (radioRR) radioRR.disabled = true;
+
+        } else {
+            // Sperren fehlgeschlagen (ungültiger Wert)
+            console.warn('Invalid landing direction to lock. Unchecking.');
+            Utils.handleError('Please enter a valid 0-360° direction before locking.');
+            checkbox.checked = false; // Checkbox zurücksetzen
+            AppState.isLandingDirectionLocked = false;
+            AppState.lockedLandingDirection = null;
+        }
+    } else {
+        // --- ENTSPERREN ---
+        console.log('Landing direction unlocked.');
+        AppState.isLandingDirectionLocked = false;
+        AppState.lockedLandingDirection = null;
+
+        // Radio-Buttons wieder aktivieren
+        if (radioLL) radioLL.disabled = false;
+        if (radioRR) radioRR.disabled = false;
+
+        // Nur das aktive Input-Feld wieder aktivieren
+        if (customLL) customLL.disabled = (type !== 'LL');
+        if (customRR) customRR.disabled = (type !== 'RR');
+
+        // Sicherstellen, dass die andere Checkbox (falls sie existiert) auch "unlocked" ist
+        if (otherCheckbox) otherCheckbox.checked = false;
+
+        // Event auslösen, um die Felder ggf. mit der Windrichtung zu aktualisieren
+        dispatchAppEvent('ui:sliderChanged', { sliderValue: getSliderValue() });
+    }
+}
 
 // --- Track & Datei-Management ---
 
@@ -935,49 +1009,14 @@ function setupCheckboxEvents() {
         }
     });
 
-        setupCheckbox('lockLandingDirection', null, (checkbox) => {
-        const isLocked = checkbox.checked;
-        AppState.isLandingDirectionLocked = isLocked;
-
-        const customLL = document.getElementById('customLandingDirectionLL');
-        const customRR = document.getElementById('customLandingDirectionRR');
-        const activeRadio = document.querySelector('input[name="landingDirection"]:checked');
-        const activeInput = (activeRadio && activeRadio.value === 'RR') ? customRR : customLL;
-
-        if (isLocked) {
-            const direction = parseInt(activeInput.value, 10);
-            
-            if (activeInput && !isNaN(direction) && direction >= 0 && direction <= 360) {
-                AppState.lockedLandingDirection = direction;
-                console.log(`Landing direction locked to: ${direction}°`);
-                Utils.handleMessage(`Landing direction locked to ${direction}°`);
-                
-                // Deaktiviere beide Eingabefelder
-                if (customLL) customLL.disabled = true;
-                if (customRR) customRR.disabled = true;
-            } else {
-                console.warn('Invalid landing direction to lock. Unchecking.');
-                Utils.handleError('Please enter a valid 0-360° direction before locking.');
-                checkbox.checked = false;
-                AppState.isLandingDirectionLocked = false;
-                AppState.lockedLandingDirection = null;
-            }
-        } else {
-            console.log('Landing direction unlocked.');
-            AppState.lockedLandingDirection = null;
-            
-            // Aktiviere das relevante Eingabefeld wieder
-            if (activeRadio) {
-                if (customLL) customLL.disabled = (activeRadio.value !== 'LL');
-                if (customRR) customRR.disabled = (activeRadio.value !== 'RR');
-            }
-            
-            // Triggere ein 'ui:sliderChanged'-Event, um die Felder mit der aktuellen
-            // Windrichtung des Sliders zu aktualisieren.
-            dispatchAppEvent('ui:sliderChanged', { sliderValue: getSliderValue() });
-        }
+    setupCheckbox('lockLandingDirectionLL', null, (checkbox) => {
+        handleLockCheckboxChange(checkbox, 'LL');
     });
-    
+
+    setupCheckbox('lockLandingDirectionRR', null, (checkbox) => {
+        handleLockCheckboxChange(checkbox, 'RR');
+    });
+
     setupCheckbox('trackPositionCheckbox', 'trackPosition', (checkbox) => {
         Settings.state.userSettings.trackPosition = checkbox.checked;
         Settings.save();

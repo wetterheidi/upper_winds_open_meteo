@@ -1683,6 +1683,33 @@ input[type="checkbox"][style*="opacity: 1"] {
     display: block;
     width: 100%;
 }
+
+/* Stile für die neue Landing-Direction-Zeile */
+.landing-direction-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.landing-direction-row > span {
+    display: flex;
+    align-items: center;
+}
+
+/* Container für die Lock-Checkbox */
+.lock-landing-container {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px; /* Abstand zwischen Checkbox und "Lock"-Label */
+}
+
+/* Label für die "Lock"-Checkbox */
+.lock-label {
+    text-align: left !important; /* Stellt sicher, dass das Label linksbündig ist */
+    font-weight: normal !important; /* Standard-Schriftstärke */
+}
+
 /* === APP MANAGEMENT === */
 
 #app-management-settings {
