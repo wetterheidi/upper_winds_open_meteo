@@ -13,7 +13,7 @@ import * as JumpPlanner from '../core/jumpPlanner.js';
 import * as mapManager from './mapManager.js';
 import * as weatherManager from '../core/weatherManager.js';
 import { cacheVisibleTiles, cacheTilesForDIP } from '../core/tileCache.js';
-import { getSliderValue, displayError, displayMessage, displayWarning, displayProgress, hideProgress, applyDeviceSpecificStyles } from './ui.js';
+import { getSliderValue, displayError, displayMessage, displayWarning, displayProgress, hideProgress, applyDeviceSpecificStyles, updatePlannerUnits } from './ui.js';
 import * as AutoupdateManager from '../core/autoupdateManager.js';
 import * as displayManager from './displayManager.js';
 import * as liveTrackingManager from '../core/liveTrackingManager.js';
@@ -148,6 +148,8 @@ function initializeUIElements() {
         applySettingToInput('alertCloudBase', Settings.state.userSettings.alerts.clouds.base);
     }
     Settings.state.userSettings.isCustomJumpRunDirection = Settings.state.userSettings.isCustomJumpRunDirection || false;
+
+    updatePlannerUnits(Settings.state.userSettings.heightUnit, false);
 
     const defaultLandingDirection = Settings.state.userSettings.landingDirection; // z.B. "LL"
     if (defaultLandingDirection === 'LL') {
@@ -1497,73 +1499,75 @@ function setupAppEventListeners() {
     });
 
     document.addEventListener('ui:settingChanged', async (e) => {
-        const { name, value } = e.detail;
-        console.log(`[main-web] Setting '${name}' changed to '${value}'. Performing updates.`);
+        const { key, value } = e.detail;
+        console.log(`[main-web] Setting '${key}' changed to '${value}'. Performing updates.`);
 
-        if (name === 'timeZone') {
+        // 1. Zentral den Slider-Wert holen (löst das "not defined" Problem)
+        const sliderIndex = getSliderValue();
+
+        // 2. Spezifische Logik für Einheiten-Labels
+        if (key === 'heightUnit') {
+            updatePlannerUnits(value);
+            
+            const lowerLimitLabel = document.querySelector('label[for="lowerLimit"]');
+            const upperLimitLabel = document.querySelector('label[for="upperLimit"]');
+            if (lowerLimitLabel) lowerLimitLabel.textContent = `Lower Limit (${value}):`;
+            if (upperLimitLabel) upperLimitLabel.textContent = `Upper Limit (${value}):`;
+        }
+
+        if (key === 'timeZone') {
             await displayManager.updateSliderLabels();
         }
 
-        if (name === 'heightUnit') {
-            const lowerLimitLabel = document.querySelector('label[for="lowerLimit"]');
-            const upperLimitLabel = document.querySelector('label[for="upperLimit"]');
-            if (lowerLimitLabel) {
-                lowerLimitLabel.textContent = `Lower Limit (${value}):`;
-            }
-            if (upperLimitLabel) {
-                upperLimitLabel.textContent = `Upper Limit (${value}):`;
-            }
-        }
-
-        // Update der Wetteranzeige für alle Einheiten-Änderungen
-        if (['refLevel', 'heightUnit', 'temperatureUnit', 'windUnit', 'timeZone'].includes(name)) {
-            await displayManager.updateWeatherDisplay(getSliderValue(), 'weather-table-container', 'selectedTime');
-            const sliderIndex = getSliderValue();
-            generateMeteogram(sliderIndex);
-        }
-
-        if (name === 'maxForecastTime') {
-            if (AppState.lastLat && AppState.lastLng) {
-                const timeIndexToPreserve = getSliderValue();
-                const currentTime = AppState.weatherData?.time?.[timeIndexToPreserve] || null;
-
+        if (key === 'maxForecastTime') {
+             if (AppState.lastLat && AppState.lastLng) {
+                const currentTime = AppState.weatherData?.time?.[sliderIndex] || null;
                 const newWeatherData = await weatherManager.fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, currentTime);
                 if (newWeatherData) {
-                    await updateUIWithNewWeatherData(newWeatherData, timeIndexToPreserve);
+                    await updateUIWithNewWeatherData(newWeatherData, sliderIndex);
                 }
             }
         }
 
-        // Neuberechnungen basierend auf der geänderten Einstellung anstoßen
-        switch (name) {
-            case 'heightUnit':
-            case 'windUnit':
-            case 'temperatureUnit':
-            case 'refLevel':
-                calculateMeanWind();
-                if (Settings.getValue('calculateJump', 'checkbox', false)) {
-                    calculateJump();
-                }
-                displayManager.updateLandingPatternDisplay();
-                updateJumpMasterLineAndPanel();
-                await displayManager.refreshMarkerPopup();
-                generateMeteogram(sliderIndex);
-                break;
+        // 3. Großes Update für alle visualisierungs-relevanten Änderungen
+        // (Ersetzt den alten Switch-Block für heightUnit, windUnit etc.)
+        const settingsThatTriggerFullUpdate = [
+            'refLevel', 'heightUnit', 'windUnit', 'temperatureUnit', 'timeZone', 'coordFormat'
+        ];
 
-            case 'coordFormat':
-                await displayManager.refreshMarkerPopup();
-                updateJumpMasterLineAndPanel();
-                // Aktualisiert auch die Koordinatenanzeige unten links
-                if (AppState.map && AppState.lastMouseLatLng) {
-                    const mouseMoveEvent = new MouseEvent('mousemove', {
-                        bubbles: true,
-                        cancelable: true,
-                        clientX: AppState.lastMouseLatLng.x,
-                        clientY: AppState.lastMouseLatLng.y
-                    });
-                    AppState.map.getContainer().dispatchEvent(mouseMoveEvent);
-                }
-                break;
+        if (settingsThatTriggerFullUpdate.includes(key)) {
+            await displayManager.updateWeatherDisplay(sliderIndex, 'weather-table-container', 'selectedTime');
+
+            if (AppState.lastAltitude !== 'N/A') {
+                calculateMeanWind();
+            }
+            
+            if (Settings.state.userSettings.calculateJump) {
+                calculateJump();
+            }
+
+            displayManager.updateLandingPatternDisplay();
+            updateJumpMasterLineAndPanel();
+            
+            // Hier wird sliderIndex nun sicher gefunden
+            generateMeteogram(sliderIndex);
+            
+            await displayManager.refreshMarkerPopup();
+            
+            // Koordinatenanzeige aktualisieren (falls Maus gerade über Karte)
+            if (AppState.map && AppState.lastMouseLatLng) {
+                 const mouseMoveEvent = new CustomEvent('map:mousemove', {
+                    detail: AppState.lastMouseLatLng
+                });
+                document.dispatchEvent(mouseMoveEvent);
+            }
+        }
+
+        // 4. Spezifische Logik für Landing Direction (war früher im Switch)
+        if (key === 'landingDirection') {
+             updateUIState();
+             displayManager.updateLandingPatternDisplay();
+             calculateJump(); 
         }
     });
 

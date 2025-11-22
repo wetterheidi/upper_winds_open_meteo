@@ -15,7 +15,7 @@ import * as mapManager from './mapManager.js';
 import * as trackManager from '../core/trackManager.js';
 import * as weatherManager from '../core/weatherManager.js';
 import { cacheVisibleTiles, cacheTilesForDIP } from '../core/tileCache.js';
-import { getSliderValue, displayError, displayMessage, displayWarning, displayProgress, hideProgress, applyDeviceSpecificStyles } from './ui.js';
+import { getSliderValue, displayError, displayMessage, displayWarning, displayProgress, hideProgress, applyDeviceSpecificStyles, updatePlannerUnits } from './ui.js';
 import * as AutoupdateManager from '../core/autoupdateManager.js';
 import { DateTime } from 'luxon';
 import * as displayManager from './displayManager.js';
@@ -137,6 +137,8 @@ function initializeUIElements() {
         applySettingToInput('alertCloudBase', Settings.state.userSettings.alerts.clouds.base);
     }
 
+    updatePlannerUnits(Settings.state.userSettings.heightUnit, false);
+    
     Settings.state.userSettings.isCustomJumpRunDirection = Settings.state.userSettings.isCustomJumpRunDirection || false;
 
     const defaultLandingDirection = Settings.state.userSettings.landingDirection; // z.B. "LL"
@@ -2081,9 +2083,11 @@ function setupAppEventListeners() {
 
         if (key === 'timeZone') {
             await displayManager.updateSliderLabels();
+            updatePlannerUnits(value);
         }
 
         if (key === 'heightUnit') {
+            updatePlannerUnits(value);
             const lowerLimitLabel = document.querySelector('label[for="lowerLimit"]');
             const upperLimitLabel = document.querySelector('label[for="upperLimit"]');
             if (lowerLimitLabel) {

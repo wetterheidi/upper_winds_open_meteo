@@ -55,7 +55,23 @@ export function jumpRunTrack(interpolatedData, harpAnchor = null) {
         return null;
     }
 
-    const openingAltitude = parseInt(document.getElementById('openingAltitude')?.value) || 1000;
+    const heightUnit = Settings.getValue('heightUnit', 'm');
+
+    // 2. Rohwerte aus Input lesen
+    let exitAltRaw = parseInt(document.getElementById('exitAltitude')?.value) || 3000;
+    let openAltRaw = parseInt(document.getElementById('openingAltitude')?.value) || 1200;
+
+    // 3. Werte normalisieren (ALLES in Meter umrechnen für die Physik)
+    let exitAltitude, openingAltitude;
+
+    if (heightUnit === 'ft') {
+        exitAltitude = Utils.convertFeetToMeters(exitAltRaw);
+        openingAltitude = Utils.convertFeetToMeters(openAltRaw);
+    } else {
+        exitAltitude = exitAltRaw;
+        openingAltitude = openAltRaw;
+    }
+
     const elevation = Math.round(AppState.lastAltitude);
 
     const heights = interpolatedData.map(d => d.height);
@@ -100,7 +116,6 @@ export function jumpRunTrack(interpolatedData, harpAnchor = null) {
     jumpRunTrackDirection = Math.round(jumpRunTrackDirection); // Sicherstellen, dass es eine ganze Zahl ist
 
 
-    const exitAltitude = parseInt(document.getElementById('exitAltitude')?.value) || 3000;
     const exitHeightM = elevation + exitAltitude;
     const aircraftSpeedKt = Settings.state.userSettings.aircraftSpeedKt || 90;
     const tasKt = Utils.calculateTAS(aircraftSpeedKt, exitHeightM / 0.3048);
@@ -127,8 +142,18 @@ export function jumpRunTrack(interpolatedData, harpAnchor = null) {
     const trackLength = Math.max(JUMP_RUN_DEFAULTS.MIN_TRACK_LENGTH_M, Math.min(JUMP_RUN_DEFAULTS.MAX_TRACK_LENGTH_M, Math.round((Settings.state.userSettings.numberOfJumpers || 10) * (Settings.state.userSettings.jumperSeparation || 5) * groundSpeedMps)));
     const approachLength = Math.max(JUMP_RUN_DEFAULTS.MIN_APPROACH_LENGTH_M, Math.min(JUMP_RUN_DEFAULTS.MAX_APPROACH_LENGTH_M, Math.round(groundSpeedMps * JUMP_RUN_DEFAULTS.APPROACH_TIME_SECONDS)));
 
-    const lateralOffset = Settings.state.userSettings.jumpRunTrackOffset || 0;
-    const forwardOffset = Settings.state.userSettings.jumpRunTrackForwardOffset || 0;
+    let lateralOffsetRaw = parseInt(document.getElementById('jumpRunTrackOffset')?.value) || 0;
+    let forwardOffsetRaw = parseInt(document.getElementById('jumpRunTrackForwardOffset')?.value) || 0;
+
+    let lateralOffset, forwardOffset;
+
+    if (heightUnit === 'ft') {
+        lateralOffset = Utils.convertFeetToMeters(lateralOffsetRaw);
+        forwardOffset = Utils.convertFeetToMeters(forwardOffsetRaw);
+    } else {
+        lateralOffset = lateralOffsetRaw;
+        forwardOffset = forwardOffsetRaw;
+    }
 
     const initialStartPoint = [anchorLat, anchorLng];
     const initialEndPoint = Utils.calculateNewCenter(initialStartPoint[0], initialStartPoint[1], trackLength, jumpRunTrackDirection);
@@ -177,13 +202,33 @@ export function calculateExitCircle(interpolatedData) {
         console.log('Debug calculateExitCircle: Frühe Rückgabe wegen interpolatedData');
         return null;
     }
-    const exitAltitude = parseInt(document.getElementById('exitAltitude')?.value) || 3000;
-    const openingAltitude = parseInt(document.getElementById('openingAltitude')?.value) || 1200;
-    const legHeightDownwind = parseInt(document.getElementById('legHeightDownwind')?.value) || 300;
+
+    const heightUnit = Settings.getValue('heightUnit', 'm');
+
+    // 2. Rohwerte aus Input lesen
+    let exitAltRaw = parseInt(document.getElementById('exitAltitude')?.value) || 3000;
+    let openAltRaw = parseInt(document.getElementById('openingAltitude')?.value) || 1200;
+    let safetyRaw = parseInt(document.getElementById('safetyHeight')?.value) || 0;
+    let legDownRaw = parseInt(document.getElementById('legHeightDownwind')?.value) || 300;
+
+    // 3. Werte normalisieren (ALLES in Meter umrechnen für die Physik)
+    let exitAltitude, openingAltitude, safetyHeight, legHeightDownwind;
+
+    if (heightUnit === 'ft') {
+        exitAltitude = Utils.convertFeetToMeters(exitAltRaw);
+        openingAltitude = Utils.convertFeetToMeters(openAltRaw);
+        safetyHeight = Utils.convertFeetToMeters(safetyRaw);
+        legHeightDownwind = Utils.convertFeetToMeters(legDownRaw);
+    } else {
+        exitAltitude = exitAltRaw;
+        openingAltitude = openAltRaw;
+        safetyHeight = safetyRaw;
+        legHeightDownwind = legDownRaw;
+    }
+
     const descentRate = parseFloat(document.getElementById('descentRate')?.value) || 3.5;
     const canopySpeedKt = parseFloat(document.getElementById('canopySpeed')?.value) || 20;
     const canopySpeedMps = canopySpeedKt * CONVERSIONS.KNOTS_TO_MPS;
-    const safetyHeight = Settings.state.userSettings.safetyHeight || 0;
 
     console.log('Debug calculateExitCircle: Eingabewerte', {
         exitAltitude, openingAltitude, legHeightDownwind, descentRate, canopySpeedKt, safetyHeight
@@ -270,12 +315,31 @@ export function calculateCanopyCircles(interpolatedData) {
     if (!Settings.state.userSettings.showCanopyArea || !Settings.state.userSettings.calculateJump || !AppState.weatherData || AppState.lastLat == null || AppState.lastLng == null) return null;
     if (!interpolatedData || interpolatedData.length === 0) return null;
 
-    const exitAltitude = parseInt(document.getElementById('exitAltitude')?.value) || 3000;
-    const openingAltitude = parseInt(document.getElementById('openingAltitude')?.value) || 1200;
-    const legHeightDownwind = parseInt(document.getElementById('legHeightDownwind')?.value) || 300;
+    const heightUnit = Settings.getValue('heightUnit', 'm');
+
+    // 2. Rohwerte aus Input lesen
+    let exitAltRaw = parseInt(document.getElementById('exitAltitude')?.value) || 3000;
+    let openAltRaw = parseInt(document.getElementById('openingAltitude')?.value) || 1200;
+    let safetyRaw = parseInt(document.getElementById('safetyHeight')?.value) || 0;
+    let legDownRaw = parseInt(document.getElementById('legHeightDownwind')?.value) || 300;
+
+    // 3. Werte normalisieren (ALLES in Meter umrechnen für die Physik)
+    let exitAltitude, openingAltitude, safetyHeight, legHeightDownwind;
+
+    if (heightUnit === 'ft') {
+        exitAltitude = Utils.convertFeetToMeters(exitAltRaw);
+        openingAltitude = Utils.convertFeetToMeters(openAltRaw);
+        safetyHeight = Utils.convertFeetToMeters(safetyRaw);
+        legHeightDownwind = Utils.convertFeetToMeters(legDownRaw);
+    } else {
+        exitAltitude = exitAltRaw;
+        openingAltitude = openAltRaw;
+        safetyHeight = safetyRaw;
+        legHeightDownwind = legDownRaw;
+    }
+
     const descentRate = parseFloat(document.getElementById('descentRate')?.value) || 3.5;
     const canopySpeedMps = (parseFloat(document.getElementById('canopySpeed')?.value) || 20) * CONVERSIONS.KNOTS_TO_MPS;
-    const safetyHeight = Settings.state.userSettings.safetyHeight || 0; // NEU
 
     const reductionDistance = (safetyHeight / descentRate) * canopySpeedMps;
 
@@ -363,11 +427,28 @@ export function calculateCanopyCircles(interpolatedData) {
 export function calculateLandingPatternCoords(lat, lng, interpolatedData) {
     if (!interpolatedData || interpolatedData.length === 0 || AppState.lastAltitude === 'N/A') return null;
 
+    const heightUnit = Settings.getValue('heightUnit', 'm');
+
+    // 2. Rohwerte aus Input lesen
+    let legFinalRaw = parseInt(document.getElementById('legHeightFinal')?.value) || 100;
+    let legBaseRaw = parseInt(document.getElementById('legHeightBase')?.value) || 200;
+    let legDownRaw = parseInt(document.getElementById('legHeightDownwind')?.value) || 300;
+
+    // 3. Werte normalisieren (ALLES in Meter umrechnen für die Physik)
+    let LEG_HEIGHT_DOWNWIND, LEG_HEIGHT_BASE, LEG_HEIGHT_FINAL;
+
+    if (heightUnit === 'ft') {
+        LEG_HEIGHT_FINAL = Utils.convertFeetToMeters(legFinalRaw);
+        LEG_HEIGHT_BASE = Utils.convertFeetToMeters(legBaseRaw);
+        LEG_HEIGHT_DOWNWIND = Utils.convertFeetToMeters(legDownRaw);
+    } else {
+        LEG_HEIGHT_FINAL = legFinalRaw;
+        LEG_HEIGHT_BASE = legBaseRaw;
+        LEG_HEIGHT_DOWNWIND = legDownRaw;
+    }
+
     const CANOPY_SPEED_KT = parseInt(document.getElementById('canopySpeed').value) || 20;
     const DESCENT_RATE_MPS = parseFloat(document.getElementById('descentRate').value) || 3.5;
-    const LEG_HEIGHT_FINAL = parseInt(document.getElementById('legHeightFinal').value) || 100;
-    const LEG_HEIGHT_BASE = parseInt(document.getElementById('legHeightBase').value) || 200;
-    const LEG_HEIGHT_DOWNWIND = parseInt(document.getElementById('legHeightDownwind').value) || 300;
     const baseHeight = Math.round(AppState.lastAltitude);
 
     const heights = interpolatedData.map(d => d.height);
@@ -461,8 +542,22 @@ export function calculateCutAway(interpolatedData) {
         return null;
     }
 
+    // 1. Einheit abrufen
+    const heightUnit = Settings.getValue('heightUnit', 'm');
+
+    // 2. Rohwerte aus Input lesen
+    let cutAwayRaw = parseInt(document.getElementById('cutAwayAltitude')?.value) || 3000;
+
+    // 3. Werte normalisieren (ALLES in Meter umrechnen für die Physik)
+    let cutAwayAltitude;
+
+    if (heightUnit === 'ft') {
+        cutAwayAltitude = Utils.convertFeetToMeters(cutAwayRaw);
+    } else {
+        cutAwayAltitude = cutAwayRaw;
+    }
+
     const elevation = Math.round(AppState.lastAltitude);
-    const cutAwayAltitude = Settings.state.userSettings.cutAwayAltitude;
     const lowerLimit = elevation;
     const upperLimit = elevation + cutAwayAltitude;
 
@@ -577,8 +672,15 @@ export async function analyzeTerrainClearance() {
 
     // 5. Gefahrenpunkte identifizieren (Logik bleibt gleich, nutzt jetzt aber ggf. die gecachten Daten)
     const dangerousPoints = [];
-    const requiredClearance = Settings.getValue('terrainClearance', 100);
+    
+    let clearanceRaw = parseInt(document.getElementById('terrainClearance')?.value) || 100;
+    let requiredClearance;
 
+    if (heightUnit === 'ft') {
+        requiredClearance = Utils.convertFeetToMeters(clearanceRaw);
+    } else {
+        requiredClearance = clearanceRaw;
+    }
     for (const point of pointsWithGroundEle) {
         // Variable explizit deklarieren, um Minifier zu helfen
         const groundElevation = point.groundEle;

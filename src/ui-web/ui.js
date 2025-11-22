@@ -126,6 +126,68 @@ export function updateEnsembleModelUI(availableModels) {
 }
 
 /**
+ * Aktualisiert Labels, Limits und Werte im Planner basierend auf der gewählten Einheit.
+ * @param {string} unit - Die neue Einheit ('m' oder 'ft').
+ * @param {boolean} convertValues - Ob die aktuellen Werte umgerechnet werden sollen (false beim Initialisieren).
+*/
+export function updatePlannerUnits(unit, convertValues = true) {
+    const isFeet = unit === 'ft';
+    const suffix = isFeet ? '(ft AGL):' : '(m AGL):';
+    const suffixSimple = isFeet ? '(ft):' : '(m):';
+
+    // Definition der Felder: ID des Labels => ID des Inputs
+    const fields = [
+        { labelId: 'labelExitAltitude', inputId: 'exitAltitude', min: 500, max: 15000, step: 100, text: 'Exit Altitude' },
+        { labelId: 'labelOpeningAltitude', inputId: 'openingAltitude', min: 500, max: 10000, step: 100, text: 'Opening Altitude' },
+        { labelId: 'labelSafetyHeight', inputId: 'safetyHeight', min: 0, max: 1000, step: 10, text: 'Safety Height', simpleSuffix: true },
+        { labelId: 'labelLegHeightDownwind', inputId: 'legHeightDownwind', min: 50, max: 1000, step: 50, text: "Downwind Height" },
+        { labelId: 'labelLegHeightBase', inputId: 'legHeightBase', min: 50, max: 1000, step: 50, text: "Base Height" },
+        { labelId: 'labelLegHeightFinal', inputId: 'legHeightFinal', min: 50, max: 1000, step: 50, text: "Final Height" },
+        { labelId: 'labelCutAwayAltitude', inputId: 'cutAwayAltitude', min: 0, max: 10000, step: 10, text: "Cut Away Height", simpleSuffix: true },
+        { labelId: 'labelJumpRunTrackOffset', inputId: 'jumpRunTrackOffset', min: 50, max: 100000, step: 10, text: "Jump Run Track Offset", simpleSuffix: true },
+        { labelId: 'labelJumpRunTrackForwardOffset', inputId: 'jumpRunTrackForwardOffset', min: 50, max: 100000, step: 10, text: "Jump Run Track Forward Offset", simpleSuffix: true },
+        { labelId: 'labelTerrainClearance', inputId: 'terrainClearance', min: 0, max: 10000, step: 10, text: "Terrain Clearance", simpleSuffix: true },
+    ];
+
+    fields.forEach(field => {
+        const labelEl = document.getElementById(field.labelId);
+        const inputEl = document.getElementById(field.inputId);
+
+        if (labelEl && inputEl) {
+            // 1. Label Text aktualisieren
+            const textSuffix = field.simpleSuffix ? suffixSimple : suffix;
+            if (labelEl.firstChild && labelEl.firstChild.nodeType === Node.TEXT_NODE) {
+                labelEl.firstChild.textContent = `${field.text} ${textSuffix} `;
+            }
+
+            // 2. Limits (min/max/step) anpassen
+            // Das muss immer passieren, damit die Slider korrekt funktionieren
+            if (isFeet) {
+                inputEl.min = Math.round(field.min * 3.28084);
+                inputEl.max = Math.round(field.max * 3.28084);
+                inputEl.step = field.step * 5; 
+            } else {
+                inputEl.min = field.min;
+                inputEl.max = field.max;
+                inputEl.step = field.step;
+            }
+
+            // 3. Werte umrechnen (NUR wenn convertValues === true)
+            if (convertValues) {
+                const currentValue = parseFloat(inputEl.value);
+                if (!isNaN(currentValue)) {
+                    if (isFeet) {
+                        inputEl.value = Math.round(currentValue * 3.28084);
+                    } else {
+                        inputEl.value = Math.round(currentValue / 3.28084);
+                    }
+                }
+            }
+        }
+    });
+}
+
+/**
  * Bereinigt die Liste der ausgewählten Ensemble-Modelle, falls einige nicht mehr verfügbar sind.
  * @param {string[]} availableModels - Eine Liste der verfügbaren Modellnamen.
  */
@@ -211,13 +273,13 @@ export function displayProgress(current, total, cancelCallback) {
     if (!progressSnackbar) {
         progressSnackbar = document.createElement('div');
         progressSnackbar.id = 'progress-snackbar';
-        
+
         const content = document.createElement('div');
         content.className = 'progress-snackbar-content';
-        
+
         const text = document.createElement('div');
         text.className = 'progress-snackbar-text';
-        
+
         const barContainer = document.createElement('div');
         barContainer.className = 'progress-bar-container';
         const bar = document.createElement('div');
@@ -265,7 +327,7 @@ export function hideProgress() {
 export function updateOfflineIndicator() {
     console.log('updateOfflineIndicator called, navigator.onLine:', navigator.onLine);
     let offlineIndicator = document.getElementById('offline-indicator');
-    
+
     // Erstellt den Indikator, falls er noch nicht existiert
     if (!offlineIndicator) {
         offlineIndicator = document.createElement('div');

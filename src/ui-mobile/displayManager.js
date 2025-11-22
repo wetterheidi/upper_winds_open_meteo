@@ -464,14 +464,33 @@ export function updateLandingPatternDisplay() {
     const uComponents = interpolatedData.map(d => -Utils.convertWind(d.spd, 'kt', 'km/h') * Math.sin(d.dir * Math.PI / 180));
     const vComponents = interpolatedData.map(d => -Utils.convertWind(d.spd, 'kt', 'km/h') * Math.cos(d.dir * Math.PI / 180));
 
-    const LEG_HEIGHT_FINAL = parseInt(document.getElementById('legHeightFinal').value) || 100;
-    const LEG_HEIGHT_BASE = parseInt(document.getElementById('legHeightBase').value) || 200;
-    const LEG_HEIGHT_DOWNWIND = parseInt(document.getElementById('legHeightDownwind').value) || 300;
+    // 1. Rohwerte aus dem DOM lesen
+    const legFinalRaw = parseInt(document.getElementById('legHeightFinal').value) || 100;
+    const legBaseRaw = parseInt(document.getElementById('legHeightBase').value) || 200;
+    const legDownRaw = parseInt(document.getElementById('legHeightDownwind').value) || 300;
 
-    // Mittelwind für jeden Leg berechnen
-    const finalMeanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, baseHeight, baseHeight + LEG_HEIGHT_FINAL);
-    const baseMeanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, baseHeight + LEG_HEIGHT_FINAL, baseHeight + LEG_HEIGHT_BASE);
-    const downwindMeanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, baseHeight + LEG_HEIGHT_BASE, baseHeight + LEG_HEIGHT_DOWNWIND);
+    // 2. Einheit prüfen und Werte in Meter konvertieren
+    let legFinalM, legBaseM, legDownM;
+
+    if (heightUnit === 'ft') {
+        legFinalM = Utils.convertFeetToMeters(legFinalRaw);
+        legBaseM = Utils.convertFeetToMeters(legBaseRaw);
+        legDownM = Utils.convertFeetToMeters(legDownRaw);
+    } else {
+        legFinalM = legFinalRaw;
+        legBaseM = legBaseRaw;
+        legDownM = legDownRaw;
+    }
+
+    // 3. Mittelwind für jeden Leg berechnen (jetzt mit korrekten Meter-Werten)
+    // Final: Boden bis Final-Höhe
+    const finalMeanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, baseHeight, baseHeight + legFinalM);
+    
+    // Base: Final-Höhe bis Base-Höhe
+    const baseMeanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, baseHeight + legFinalM, baseHeight + legBaseM);
+    
+    // Downwind: Base-Höhe bis Downwind-Höhe
+    const downwindMeanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, baseHeight + legBaseM, baseHeight + legDownM);
 
     // Helferfunktion zur Farbcodierung der Pfeile
     const getArrowColor = (windSpeedKt) => {

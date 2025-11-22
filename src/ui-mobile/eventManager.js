@@ -12,7 +12,7 @@ import { loadKmlTrack, loadGpxTrack, loadCsvTrackUTC, exportToGpx, exportLanding
 import { SensorManager } from './sensorManager.js';
 import * as liveTrackingManager from '../core/liveTrackingManager.js';
 import { fetchEnsembleWeatherData, processAndVisualizeEnsemble, clearEnsembleVisualizations } from '../core/ensembleManager.js';
-import { getSliderValue, displayMessage, hideProgress, displayProgress, displayWarning, toggleLoading } from './ui.js';
+import { getSliderValue, displayMessage, hideProgress, displayProgress, displayWarning, toggleLoading, updatePlannerUnits } from './ui.js';
 import { updateModelSelectUI, cleanupSelectedEnsembleModels } from './ui.js';
 import 'leaflet-gpx';
 import { FilePicker } from '@capawesome/capacitor-file-picker';
