@@ -569,13 +569,14 @@ function setupJumpRunTrackEvents() {
 
     const directionInput = document.getElementById('jumpRunTrackDirection');
     if (directionInput) {
-        // Initialwert setzen (kann jetzt auch ein String sein)
+        // Initialwert setzen
         directionInput.value = Settings.state.userSettings.customJumpRunDirection !== null ? Settings.state.userSettings.customJumpRunDirection : '';
 
-        directionInput.addEventListener('change', () => { // 'change' Event verwenden
-            const value = directionInput.value.trim(); // Eingegebenen Wert holen und trimmen
+        // ÄNDERUNG: Zurück zum 'change' Event
+        directionInput.addEventListener('change', () => { 
+            const value = directionInput.value.trim(); 
 
-            // --- Offsets zurücksetzen (wie gehabt) ---
+            // --- Offsets zurücksetzen ---
             Settings.state.userSettings.jumpRunTrackOffset = 0;
             Settings.state.userSettings.jumpRunTrackForwardOffset = 0;
             const offsetInput = document.getElementById('jumpRunTrackOffset');
@@ -583,20 +584,19 @@ function setupJumpRunTrackEvents() {
             if (offsetInput) offsetInput.value = 0;
             if (forwardOffsetInput) forwardOffsetInput.value = 0;
             console.log('Manuelle JRT-Richtungsänderung: Offsets auf 0 zurückgesetzt.');
-            // --- Ende Offset-Reset ---
 
-            // --- START DER KORREKTUR: Nur Speichern und Event auslösen ---
-            // Speichere den rohen String (oder null, wenn leer) direkt. Keine weitere Prüfung hier.
+            // Speichern
             Settings.state.userSettings.customJumpRunDirection = value || null;
             Settings.save();
             console.log(`Gespeicherter customJumpRunDirection Wert: ${Settings.state.userSettings.customJumpRunDirection}`);
 
-            // Event auslösen, um die Neuberechnung anzustoßen.
-            // Wichtig: Wir übergeben den gerade gespeicherten Wert.
+            // 1. UI Input Event auslösen
             document.dispatchEvent(new CustomEvent('ui:inputChanged', {
                 detail: { name: 'jumpRunTrackDirection', value: Settings.state.userSettings.customJumpRunDirection }
             }));
-            // --- ENDE DER KORREKTUR ---
+
+            // 2. WICHTIG: Explizit Neuberechnung anfordern.
+            document.dispatchEvent(new CustomEvent('ui:recalculateJump'));
         });
     }
 
