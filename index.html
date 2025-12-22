@@ -20,8 +20,8 @@
     <script src="https://unpkg.com/leaflet-rotatedmarker@0.2.0/leaflet.rotatedMarker.js" defer></script>
     <script src="https://unpkg.com/@tmcw/togeojson@4.7.0/dist/togeojson.umd.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
-  <script type="module" crossorigin src="/upper_winds_open_meteo/assets/index-D04PhZeh.js"></script>
-  <link rel="stylesheet" crossorigin href="/upper_winds_open_meteo/assets/index-CYHi-6eL.css">
+  <script type="module" crossorigin src="/upper_winds_open_meteo/assets/index-BW7tJ8Xr.js"></script>
+  <link rel="stylesheet" crossorigin href="/upper_winds_open_meteo/assets/index-XcKul45H.css">
 </head>
 
 <body>
@@ -170,38 +170,48 @@
                                     </label>
                                 </li>
                                 <li>
-                                    <label class="radio-label">
-                                        <input type="radio" name="landingDirection" value="LL" checked> LL
-                                        <input type="number" id="customLandingDirectionLL" min="0" max="360"
-                                            placeholder="0-360°">
-                                        <label>°</label>
+                                    <label class="radio-label landing-direction-row">
+                                        <span>
+                                            <input type="radio" name="landingDirection" value="LL" checked> LL
+                                            <input type="number" id="customLandingDirectionLL" min="0" max="360"
+                                                placeholder="0-360°"> °
+                                        </span>
+                                        <span id="lock-container-LL" class="lock-landing-container hidden">
+                                            <input type="checkbox" id="lockLandingDirectionLL" class="lock-landing-cb">
+                                            <label for="lockLandingDirectionLL" class="lock-label">Lock</label>
+                                        </span>
                                     </label>
                                 </li>
                                 <li>
-                                    <label class="radio-label">
-                                        <input type="radio" name="landingDirection" value="RR"> RR
-                                        <input type="number" id="customLandingDirectionRR" min="0" max="360"
-                                            placeholder="0-360°">
-                                        <label>°</label>
+                                    <label class="radio-label landing-direction-row">
+                                        <span>
+                                            <input type="radio" name="landingDirection" value="RR"> RR
+                                            <input type="number" id="customLandingDirectionRR" min="0" max="360"
+                                                placeholder="0-360°"> °
+                                        </span>
+                                        <span id="lock-container-RR" class="lock-landing-container hidden">
+                                            <input type="checkbox" id="lockLandingDirectionRR" class="lock-landing-cb">
+                                            <label for="lockLandingDirectionRR" class="lock-label">Lock</label>
+                                        </span>
                                     </label>
                                 </li>
                                 <li>
-                                    <label class="radio-label">
-                                        Start Downwind Leg at m AGL:
+                                    <label class="radio-label" id="labelLegHeightDownwind">
+                                        Start Downwind Leg (m AGL):
                                         <input type="number" id="legHeightDownwind" min="50" max="1000" step="50"
                                             value="300">
                                     </label>
                                 </li>
                                 <li>
-                                    <label class="radio-label">
-                                        Start Base Leg at m AGL:
+                                    <label class="radio-label" id="labelLegHeightBase">
+                                        Start Base Leg (m AGL):
                                         <input type="number" id="legHeightBase" min="50" max="1000" step="50"
                                             value="200">
                                     </label>
                                 </li>
                                 <li>
-                                    <label class="radio-label">
-                                        Start Final Leg at m AGL:
+                                    <label class="radio-label" id="labelLegHeightFinal">
+                                        Start Final Leg (m AGL):
                                         <input type="number" id="legHeightFinal" min="50" max="1000" step="50"
                                             value="100">
                                     </label>
@@ -231,24 +241,25 @@
                         <div class="accordion-content">
                             <ul>
                                 <li>
-                                    <label class="radio-label">
+                                    <label class="radio-label" id="labelExitAltitude">
                                         Exit Altitude (m AGL):
                                         <input type="number" id="exitAltitude" min="500" max="15000" step="100"
                                             value="3000">
                                     </label>
                                 </li>
                                 <li>
-                                    <label class="radio-label" title="Canopy open 200 m below opening altitude!">
+                                    <label class="radio-label" id="labelOpeningAltitude"
+                                        title="Canopy open 200 m below opening altitude!">
                                         Opening Altitude (m AGL):
                                         <input type="number" id="openingAltitude" min="500" max="10000" step="100"
                                             value="1200">
                                     </label>
                                 </li>
                                 <li>
-                                    <label class="radio-label"
+                                    <label class="radio-label" id="labelSafetyHeight"
                                         title="Reduces the calculated radius to account for a safety buffer.">
                                         Safety Height (m):
-                                        <input type="number" id="safetyHeight" min="0" max="1000" step="10" value="0">
+                                        <input type="number" id="safetyHeight" min="0" max="600" step="10" value="0">
                                     </label>
                                 </li>
                                 <li>
@@ -279,14 +290,14 @@
                                     </label>
                                 </li>
                                 <li>
-                                    <label class="radio-label">
+                                    <label class="radio-label" id="labelJumpRunTrackOffset">
                                         Jump Run Offset (m):
                                         <input type="number" id="jumpRunTrackOffset" min="-50000" max="50000" step="100"
                                             value="0" style="width: 80px;">
                                     </label>
                                 </li>
                                 <li>
-                                    <label class="radio-label">
+                                    <label class="radio-label" id="labelJumpRunTrackForwardOffset">
                                         Jump Run Forward Offset (m):
                                         <input type="number" id="jumpRunTrackForwardOffset" min="-50000" max="50000"
                                             step="100" value="0" style="width: 80px;">
@@ -309,7 +320,7 @@
                                     </label>
                                     <ul class="submenu hidden">
                                         <li>
-                                            <label class="radio-label">
+                                            <label class="radio-label" id="labelCutAwayAltitude">
                                                 Cut Away Altitude (m):
                                                 <input type="number" id="cutAwayAltitude" min="400" max="15000"
                                                     step="100" value="1000">
@@ -341,9 +352,11 @@
                                 </li>
                                 <li>
                                     <div class="settings-grid" style="grid-template-columns: 1fr auto; gap: 10px;">
-                                        <label for="terrainClearance">Min. Clearance (m):</label>
-                                        <input type="number" id="terrainClearance" min="0" max="500" step="10"
-                                            value="100" style="width: 80px; padding: 1px 2px;">
+                                        <label class="radio-label" id="labelTerrainClearance">
+                                            Min. Clearance (m):
+                                            <input type="number" id="terrainClearance" min="0" max="500" step="10"
+                                                value="100" style="width: 80px; padding: 1px 2px;">
+                                        </label>
                                     </div>
                                     <button id="analyzeTerrainButton" class="btn btn-secondary">Analyze Terrain
                                         Clearance</button>
