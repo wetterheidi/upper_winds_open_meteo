@@ -7,7 +7,7 @@
 import { AppState } from '../core/state.js';
 import { Settings, getInterpolationStep } from '../core/settings.js';
 import { Utils } from '../core/utils.js';
-import { getSliderValue } from './ui.js';
+import { getSliderValue, displayWarning } from './ui.js';
 import * as mapManager from './mapManager.js';
 import * as weatherManager from '../core/weatherManager.js';
 import { UI_DEFAULTS, WIND_THRESHOLDS } from '../core/constants.js'; // UI_DEFAULTS für LANDING_PATTERN_MIN_ZOOM
@@ -410,6 +410,43 @@ export function updateAlertSliderBackground(alertIndices) {
     highlightTrack.style.background = `linear-gradient(to right, ${stops.join(', ')})`;
 }
 
+/**
+ * Überprüft unabhängig von der visuellen Darstellung (Kreise an/aus),
+ * ob der Wind in der Safety Height kritisch ist.
+ */
+export function checkSafetyHeightWindWarning() {
+    if (!AppState.weatherData || !Settings.state.userSettings.calculateJump) return;
+
+    const safetyHeight = Settings.state.userSettings.safetyHeight || 0;
+    const downwindStart = Settings.state.userSettings.legHeightDownwind || 0;
+    const safetyHeightAGL = safetyHeight + downwindStart;
+    if (safetyHeight <= 0) return;
+
+    const sliderIndex = getSliderValue();
+    const interpStep = getInterpolationStep();
+    const heightUnit = getHeightUnit(); // Mobile-spezifische Funktion
+
+    const interpolatedData = weatherManager.interpolateWeatherData(
+        AppState.weatherData,
+        sliderIndex,
+        interpStep,
+        Math.round(AppState.lastAltitude),
+        heightUnit
+    );
+
+    const calcResult = JumpPlanner.calculateExitCircle(interpolatedData);
+
+    // NEU: Prüfen auf Error-Objekt aus dem Hierarchy-Check
+    if (calcResult && calcResult.error) {
+        displayWarning(calcResult.error); // Snackbar anzeigen!
+        return;
+    }
+
+    if (calcResult && calcResult.safetyWindWarning) {
+        displayWarning(`CAUTION: Windspeed between ${safetyHeightAGL} m and ${downwindStart} m > Canopy Speed!`);
+    }
+}
+
 // ===================================================================
 // 2. Sprung-Visualisierungen
 // ===================================================================
@@ -485,10 +522,10 @@ export function updateLandingPatternDisplay() {
     // 3. Mittelwind für jeden Leg berechnen (jetzt mit korrekten Meter-Werten)
     // Final: Boden bis Final-Höhe
     const finalMeanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, baseHeight, baseHeight + legFinalM);
-    
+
     // Base: Final-Höhe bis Base-Höhe
     const baseMeanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, baseHeight + legFinalM, baseHeight + legBaseM);
-    
+
     // Downwind: Base-Höhe bis Downwind-Höhe
     const downwindMeanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, baseHeight + legBaseM, baseHeight + legDownM);
 

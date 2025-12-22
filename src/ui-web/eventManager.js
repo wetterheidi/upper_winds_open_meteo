@@ -18,6 +18,8 @@ import * as AdsbManager from '../core/adsbManager.js';
 import * as weatherManager from '../core/weatherManager.js'; // NEUER IMPORT
 import { DateTime } from 'luxon';                         // NEUER IMPORT
 import { generateMeteogram } from '../core/meteogramChart.js';
+import { CANOPY_OPENING_BUFFER_METERS, CONVERSIONS } from '../core/constants.js';
+
 
 // =================================================================
 // 1. Globale Variablen & Zustand
@@ -485,6 +487,62 @@ function setupJumpRunTrackEvents() {
             displayManager.updateJumpRunTrackDisplay();
         });
     }
+}
+function setupSafetyHeightValidation() {
+    const input = document.getElementById('safetyHeight');
+    if (!input) return;
+
+    input.addEventListener('change', () => {
+        const value = parseFloat(input.value);
+        if (isNaN(value)) return;
+
+        const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
+        
+        // 1. Relevante Werte aus der UI lesen (um den aktuellen Editier-Stand zu haben)
+        const openingAlt = parseFloat(document.getElementById('openingAltitude')?.value) || 0;
+        const legDown = parseFloat(document.getElementById('legHeightDownwind')?.value) || 0;
+
+        // 2. Puffer in die aktuelle Einheit umrechnen
+        // CANOPY_OPENING_BUFFER_METERS ist meist 200m
+        const buffer = heightUnit === 'ft' 
+            ? CANOPY_OPENING_BUFFER_METERS * CONVERSIONS.METERS_TO_FEET 
+            : CANOPY_OPENING_BUFFER_METERS;
+
+        // 3. Verfügbare Höhe berechnen (Öffnung - Puffer - Pattern Entry)
+        const availableHeight = openingAlt - buffer - legDown;
+
+        // 4. Festes Limit (600m)
+        const limit600 = heightUnit === 'ft' ? 1968 : 600;
+
+        // 5. Das tatsächliche Limit ist das Minimum aus beiden
+        // Wir runden ab (floor), um "krumme" Kommazahlen beim Reset zu vermeiden
+        const maxAllowed = Math.floor(Math.max(0, Math.min(availableHeight, limit600)));
+
+        if (value > maxAllowed) {
+            // Grund für die Warnmeldung ermitteln
+            let reasonText = "";
+            if (availableHeight < limit600) {
+                reasonText = "exceeds available canopy altitude"; // Zu wenig Höhe insgesamt
+            } else {
+                reasonText = "limited to max 600m"; // Generelles Limit
+            }
+
+            // 1. Warnung anzeigen
+            displayWarning(`Safety Height ${reasonText}. Resetting to ${maxAllowed} ${heightUnit}.`);
+            
+            // 2. Wert im Input korrigieren
+            input.value = maxAllowed;
+            
+            // 3. Settings speichern
+            Settings.state.userSettings.safetyHeight = maxAllowed;
+            Settings.save();
+
+            // 4. Neuberechnung auslösen
+            document.dispatchEvent(new CustomEvent('ui:inputChanged', {
+                detail: { name: 'safetyHeight', value: maxAllowed }
+            }));
+        }
+    });
 }
 function setupCutawayRadioButtons() {
     const cutAwayRadios = document.querySelectorAll('input[name="cutAwayState"]');
@@ -1795,6 +1853,7 @@ export function initializeEventListeners() {
 
     // 4. Spezifische Planner-Funktionen
     setupJumpRunTrackEvents();
+    setupSafetyHeightValidation();
     setupCutawayRadioButtons();
     setupResetCutAwayMarkerButton();
     setupDeselectAllEnsembleButton();

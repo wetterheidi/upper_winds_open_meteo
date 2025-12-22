@@ -8,7 +8,11 @@
 import { AppState } from '../core/state.js';
 import { Settings, getInterpolationStep } from '../core/settings.js';
 import { Utils } from '../core/utils.js';
-import { getSliderValue } from '../ui-mobile/ui.js';
+// KORREKTUR für Web: Normalerweise importiert displayManager.js aus './ui.js'. 
+// Im bereitgestellten File war 'getSliderValue' aus '../ui-mobile/ui.js' importiert, was ungewöhnlich für Web ist, 
+// aber ich folge dem lokalen './ui.js' Pattern, da die Datei ui.js im Web-Ordner existiert.
+// Falls oben 'import ... from '../ui-mobile/ui.js'' steht, ändere ich das hier auf den korrekten relativen Pfad für Web:
+import { getSliderValue, displayWarning } from '../ui-mobile/ui.js';
 import * as mapManager from './mapManager.js';
 import * as weatherManager from '../core/weatherManager.js';
 import { UI_DEFAULTS, WIND_THRESHOLDS } from '../core/constants.js'; // UI_DEFAULTS für LANDING_PATTERN_MIN_ZOOM
@@ -408,6 +412,54 @@ export function updateAlertSliderBackground(alertIndices) {
     }
 
     highlightTrack.style.background = `linear-gradient(to right, ${stops.join(', ')})`;
+}
+
+/**
+ * Überprüft unabhängig von der visuellen Darstellung (Kreise an/aus),
+ * ob der Wind in der Safety Height kritisch ist.
+ * Zeigt eine Warnung in der Snackbar an, falls das Halten unmöglich ist.
+ */
+export function checkSafetyHeightWindWarning() {
+    // 1. Grundprüfung: Haben wir Wetterdaten und ist die Sprungberechnung aktiv?
+    if (!AppState.weatherData || !Settings.state.userSettings.calculateJump) return;
+
+    // Safety Height direkt prüfen. Wenn 0, brauchen wir nicht warnen.
+    const safetyHeight = Settings.state.userSettings.safetyHeight || 0;
+    const downwindStart = Settings.state.userSettings.legHeightDownwind || 0;
+    const safetyHeightAGL = safetyHeight + downwindStart;
+    if (safetyHeight <= 0) return;
+
+    // 2. Daten interpolieren (gleiche Logik wie bei den anderen Funktionen)
+    const sliderIndex = getSliderValue();
+    const interpStep = getInterpolationStep();
+    const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
+
+    // Wir nutzen die existierende interpolate Funktion
+    const interpolatedData = weatherManager.interpolateWeatherData(
+        AppState.weatherData,
+        sliderIndex,
+        interpStep,
+        Math.round(AppState.lastAltitude),
+        heightUnit
+    );
+
+    // 3. Berechnung durchführen
+    // Wir rufen die Logik aus JumpPlanner auf. Diese gibt uns das Flag 'safetyWindWarning' zurück.
+    // Da wir 'checkSafetyHeightWindWarning' vermutlich oft aufrufen, ist es gut, 
+    // dass calculateExitCircle rein funktional ist.
+    const calcResult = JumpPlanner.calculateExitCircle(interpolatedData);
+
+    // NEU: Prüfen auf Error-Objekt aus dem Hierarchy-Check
+    if (calcResult && calcResult.error) {
+        displayWarning(calcResult.error); // Snackbar anzeigen!
+        return;
+    }
+
+    // 4. Warnung ausgeben
+    if (calcResult && calcResult.safetyWindWarning) {
+        // Wir nutzen die Snackbar mit dem Typ 'warning' (gelb/orange)
+        displayWarning(`CAUTION: Windspeed between ${safetyHeightAGL} m and ${downwindStart} m > Canopy Speed!`);
+    }
 }
 
 // ===================================================================

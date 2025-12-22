@@ -194,7 +194,10 @@ export function calculateExitCircle(interpolatedData) {
         lastAltitude: AppState.lastAltitude,
         interpolatedData: !!interpolatedData && interpolatedData.length > 0
     });
-    if (!Settings.state.userSettings.showExitArea || !Settings.state.userSettings.calculateJump || !AppState.weatherData || AppState.lastLat == null || AppState.lastLng == null) {
+
+    // ÄNDERUNG 1: showExitArea aus der Bedingung entfernt, damit die Warnung auch berechnet wird, 
+    // wenn die Visualisierung ausgeschaltet ist.
+    if (!Settings.state.userSettings.calculateJump || !AppState.weatherData || AppState.lastLat == null || AppState.lastLng == null) {
         console.log('Debug calculateExitCircle: Frühe Rückgabe wegen Einstellungen');
         return null;
     }
@@ -226,6 +229,30 @@ export function calculateExitCircle(interpolatedData) {
         legHeightDownwind = legDownRaw;
     }
 
+    // =================================================================================
+    // HIERARCHIE-CHECK (Der "Airbag" gegen Abstürze)
+    // Wir erzwingen: Exit > Opening > (Safety + Downwind + Buffer)
+    // =================================================================================
+
+    // Die absolute Untergrenze für die Öffnung: Downwind-Höhe + Safety Height + Puffer
+    const minOpeningAltitude = legHeightDownwind + safetyHeight + CANOPY_OPENING_BUFFER_METERS;
+
+    // Check 1: Zu wenig Platz für Schirmfahrt
+    if (openingAltitude <= minOpeningAltitude) {
+        const msg = `Invalid Heights! Opening (${Math.round(openingAltitude)}m) <= Downwind+Safety+Buffer (${Math.round(minOpeningAltitude)}m).`;
+        console.warn(msg);
+        return { error: msg }; // <--- HIER: Error Objekt statt null
+    }
+
+    // Check 2: Exit unter Öffnung
+    if (exitAltitude <= openingAltitude) {
+        const msg = `Invalid Heights! Exit (${Math.round(exitAltitude)}m) <= Opening (${Math.round(openingAltitude)}m).`;
+        console.warn(msg);
+        return { error: msg }; // <--- HIER: Error Objekt statt null
+    }
+
+    // =================================================================================
+
     const descentRate = parseFloat(document.getElementById('descentRate')?.value) || 3.5;
     const canopySpeedKt = parseFloat(document.getElementById('canopySpeed')?.value) || 20;
     const canopySpeedMps = canopySpeedKt * CONVERSIONS.KNOTS_TO_MPS;
@@ -250,8 +277,43 @@ export function calculateExitCircle(interpolatedData) {
         flyTime, horizontalCanopyDistance, flyTimeFull, horizontalCanopyDistanceFull, reductionDistance
     });
 
+    // Original Logik für die Drift (wie in deiner Datei)
     const meanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, elevation + safetyHeight + legHeightDownwind, elevation + openingAltitude - CANOPY_OPENING_BUFFER_METERS);
     const meanWindFull = Utils.calculateMeanWind(heights, uComponents, vComponents, elevation + safetyHeight, elevation + openingAltitude - CANOPY_OPENING_BUFFER_METERS);
+
+    // --- ÄNDERUNG 2: SAFETY CHECK ---
+    let safetyWindWarning = false;
+    let windSpeedInSafetyLayer = 0;
+
+    if (safetyHeight > 0) {
+        // Wir prüfen den Wind NUR in der Schicht [Pattern Entry ... Pattern Entry + Safety Height]
+        const meanWindSafetyLayer = Utils.calculateMeanWind(
+            heights,
+            uComponents,
+            vComponents,
+            elevation + legHeightDownwind,
+            elevation + legHeightDownwind + safetyHeight
+        );
+
+        if (meanWindSafetyLayer) {
+            windSpeedInSafetyLayer = meanWindSafetyLayer[1]; // Index 1 ist Speed in m/s
+
+            // Warnung, wenn mittlerer Wind dort stärker ist als die Schirmfahrt
+            if (windSpeedInSafetyLayer > canopySpeedMps) {
+                safetyWindWarning = true;
+                console.warn(`WARNUNG: Wind in Safety Height (${windSpeedInSafetyLayer.toFixed(1)} m/s) > Schirmfahrt (${canopySpeedMps.toFixed(1)} m/s)!`);
+            }
+        }
+    }
+
+    // Wenn für die berechneten Höhen kein Wind gefunden wurde, brechen wir ab, 
+    // statt abzustürzen.
+    if (!meanWind || !meanWindFull) {
+        console.warn('calculateExitCircle: Kein Wind für den angegebenen Höhenbereich gefunden (meanWind ist null).');
+        return null;
+    }
+
+    // --------------------------------
 
     console.log('Debug calculateExitCircle: meanWind', meanWind);
     console.log('Debug calculateExitCircle: meanWindFull', meanWindFull);
@@ -298,7 +360,11 @@ export function calculateExitCircle(interpolatedData) {
         darkGreenRadius: Math.max(0, horizontalCanopyDistance - reductionDistance),
         freeFallDirection: freeFallResult.directionDeg,
         freeFallDistance: freeFallResult.distance,
-        freeFallTime: freeFallResult.time
+        freeFallTime: freeFallResult.time,
+        // ÄNDERUNG 3: Warn-Daten zurückgeben
+        safetyWindWarning: safetyWindWarning,
+        windSpeedSafety: windSpeedInSafetyLayer,
+        canopySpeed: canopySpeedMps
     };
     console.log('Debug calculateExitCircle: Ergebnis', result);
     return result;
@@ -672,7 +738,7 @@ export async function analyzeTerrainClearance() {
 
     // 5. Gefahrenpunkte identifizieren (Logik bleibt gleich, nutzt jetzt aber ggf. die gecachten Daten)
     const dangerousPoints = [];
-    
+
     let clearanceRaw = parseInt(document.getElementById('terrainClearance')?.value) || 100;
     let requiredClearance;
 

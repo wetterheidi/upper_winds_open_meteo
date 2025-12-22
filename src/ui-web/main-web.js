@@ -230,6 +230,10 @@ export function calculateJump() {
         heightUnit
     );
 
+    // NEU: Hier rufen wir den Safety Check auf!
+    // Er prüft unabhängig von den Visualisierungs-Einstellungen (Exit/Canopy Area an/aus),
+    // ob der Wind in der Safety Height kritisch ist.
+    displayManager.checkSafetyHeightWindWarning();
 
     const visualizationData = {
         exitCircles: [],
@@ -240,7 +244,7 @@ export function calculateJump() {
     // --- EXIT AREA ---
     if (Settings.state.userSettings.showExitArea) {
         const exitResult = JumpPlanner.calculateExitCircle(interpolatedData); // Korrekt
-        if (exitResult) {
+        if (exitResult && !exitResult.error) {
             // Der hellgrüne Kreis (gesamter möglicher Bereich)
             visualizationData.exitCircles.push({
                 center: [exitResult.greenLatFull, exitResult.greenLngFull],
@@ -1508,7 +1512,7 @@ function setupAppEventListeners() {
         // 2. Spezifische Logik für Einheiten-Labels
         if (key === 'heightUnit') {
             updatePlannerUnits(value);
-            
+
             const lowerLimitLabel = document.querySelector('label[for="lowerLimit"]');
             const upperLimitLabel = document.querySelector('label[for="upperLimit"]');
             if (lowerLimitLabel) lowerLimitLabel.textContent = `Lower Limit (${value}):`;
@@ -1520,7 +1524,7 @@ function setupAppEventListeners() {
         }
 
         if (key === 'maxForecastTime') {
-             if (AppState.lastLat && AppState.lastLng) {
+            if (AppState.lastLat && AppState.lastLng) {
                 const currentTime = AppState.weatherData?.time?.[sliderIndex] || null;
                 const newWeatherData = await weatherManager.fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, currentTime);
                 if (newWeatherData) {
@@ -1541,22 +1545,22 @@ function setupAppEventListeners() {
             if (AppState.lastAltitude !== 'N/A') {
                 calculateMeanWind();
             }
-            
+
             if (Settings.state.userSettings.calculateJump) {
                 calculateJump();
             }
 
             displayManager.updateLandingPatternDisplay();
             updateJumpMasterLineAndPanel();
-            
+
             // Hier wird sliderIndex nun sicher gefunden
             generateMeteogram(sliderIndex);
-            
+
             await displayManager.refreshMarkerPopup();
-            
+
             // Koordinatenanzeige aktualisieren (falls Maus gerade über Karte)
             if (AppState.map && AppState.lastMouseLatLng) {
-                 const mouseMoveEvent = new CustomEvent('map:mousemove', {
+                const mouseMoveEvent = new CustomEvent('map:mousemove', {
                     detail: AppState.lastMouseLatLng
                 });
                 document.dispatchEvent(mouseMoveEvent);
@@ -1565,9 +1569,9 @@ function setupAppEventListeners() {
 
         // 4. Spezifische Logik für Landing Direction (war früher im Switch)
         if (key === 'landingDirection') {
-             updateUIState();
-             displayManager.updateLandingPatternDisplay();
-             calculateJump(); 
+            updateUIState();
+            displayManager.updateLandingPatternDisplay();
+            calculateJump();
         }
     });
 

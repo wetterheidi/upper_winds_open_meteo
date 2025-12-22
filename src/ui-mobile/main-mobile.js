@@ -138,7 +138,7 @@ function initializeUIElements() {
     }
 
     updatePlannerUnits(Settings.state.userSettings.heightUnit, false);
-    
+
     Settings.state.userSettings.isCustomJumpRunDirection = Settings.state.userSettings.isCustomJumpRunDirection || false;
 
     const defaultLandingDirection = Settings.state.userSettings.landingDirection; // z.B. "LL"
@@ -253,7 +253,11 @@ export function calculateJump() {
         heightUnit
     );
 
-
+    // NEU: Hier rufen wir den Safety Check auf!
+    // Er prüft unabhängig von den Visualisierungs-Einstellungen (Exit/Canopy Area an/aus),
+    // ob der Wind in der Safety Height kritisch ist.
+    displayManager.checkSafetyHeightWindWarning();
+    
     const visualizationData = {
         exitCircles: [],
         canopyCircles: [],
@@ -263,7 +267,7 @@ export function calculateJump() {
     // --- EXIT AREA ---
     if (Settings.state.userSettings.showExitArea) {
         const exitResult = JumpPlanner.calculateExitCircle(interpolatedData); // Korrekt
-        if (exitResult) {
+        if (exitResult && !exitResult.error) {
             // Der hellgrüne Kreis (gesamter möglicher Bereich)
             visualizationData.exitCircles.push({
                 center: [exitResult.greenLatFull, exitResult.greenLngFull],
