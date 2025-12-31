@@ -754,19 +754,19 @@ async function readFileContent(file) {
 // =================================================================
 
 /**
- * Generiert einen GPX-Track, der einen Kreis simuliert.
+ * Generiert einen GPX-Track für einen Kreis.
+ * NEU: Nimmt jetzt 'elevation' entgegen, damit der Kreis nicht unter der Erde liegt.
  */
-function createGpxCircleTrack(centerLat, centerLng, radiusMeters, name, color) {
+function createGpxCircleTrack(centerLat, centerLng, radiusMeters, name, color, elevation = 0) {
     if (radiusMeters <= 0) return '';
-    
-    // 72 Punkte für einen halbwegs runden Kreis (alle 5 Grad)
     const steps = 72; 
     let trackPoints = '';
     
     for (let i = 0; i <= steps; i++) {
         const bearing = i * (360 / steps);
         const [lat, lng] = Utils.calculateNewCenter(centerLat, centerLng, radiusMeters, bearing);
-        trackPoints += `      <trkpt lat="${lat}" lon="${lng}"><ele>0</ele></trkpt>\n`;
+        // KORREKTUR: Elevation eingefügt (gerundet auf Dezimalstellen)
+        trackPoints += `      <trkpt lat="${lat}" lon="${lng}"><ele>${elevation.toFixed(1)}</ele></trkpt>\n`;
     }
 
     return `
@@ -783,42 +783,46 @@ ${trackPoints}    </trkseg>
 }
 
 /**
- * Die Hauptfunktion für den konfigurierbaren Export.
+ * Die Hauptfunktion für den konfigurierbaren Export (Update: 3D-Höhen für Kreise).
  */
 export async function exportCompositeJumpGpx(options) {
     const { includeJumpRun, includePattern, includeExitCircles, includeCanopyCircles } = options;
-    console.log("--- Starting Composite GPX Export ---", options);
+    console.log("--- Starting Composite GPX Export (3D Mode) ---", options);
 
     if (!AppState.weatherData || AppState.lastLat == null) {
         Utils.handleError("No weather data or location available.");
         return;
     }
 
-    // =================================================================
-    // DAS NETZ: Einstellungen temporär sichern und für Export erzwingen
-    // =================================================================
+    // --- NETZ: Einstellungen temporär erzwingen ---
     const originalSettings = {
         calculateJump: Settings.state.userSettings.calculateJump,
         showCanopyArea: Settings.state.userSettings.showCanopyArea,
         showExitArea: Settings.state.userSettings.showExitArea,
-        // Falls calculateLandingPatternCoords auch Flags prüft, hier ergänzen
     };
 
-    // Wir "täuschen" dem JumpPlanner vor, dass alles aktiv ist, damit er rechnet
     Settings.state.userSettings.calculateJump = true; 
     if (includeCanopyCircles) Settings.state.userSettings.showCanopyArea = true;
     if (includeExitCircles) Settings.state.userSettings.showExitArea = true;
     
-    // =================================================================
+    // ----------------------------------------------
 
     try {
         const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
         const interpStep = Settings.getValue('interpStep', 'select', 200);
         const heightUnit = Settings.getValue('heightUnit', 'm');
+        
+        // Höhenreferenz (MSL des Bodens)
         const baseHeight = Math.round(AppState.lastAltitude);
+        const safeBaseHeight = (!isNaN(baseHeight) && baseHeight !== null) ? baseHeight : 0;
+
+        // Eingestellte Höhen abrufen (AGL)
+        const exitAltitudeAGL = Settings.getValue('exitAltitude', 3000);
+        const openingAltitudeAGL = Settings.getValue('openingAltitude', 1200);
+        const buffer = 200; // Puffer für Schirmöffnung (Standard)
 
         const interpolatedData = interpolateWeatherData(
-            AppState.weatherData, sliderIndex, interpStep, baseHeight, heightUnit
+            AppState.weatherData, sliderIndex, interpStep, safeBaseHeight, heightUnit
         );
 
         if (!interpolatedData || interpolatedData.length === 0) {
@@ -837,51 +841,60 @@ export async function exportCompositeJumpGpx(options) {
   </metadata>
 `;
 
-        // ... (Hier folgt der gesamte Rest deiner Export-Logik wie zuvor:
-        // A. Landing Pattern, B. Jump Run, C. Exit Circles, D. Canopy Circles) ...
-        
         // --- A. LANDING PATTERN ---
         if (includePattern) {
              const pattern = JumpPlanner.calculateLandingPatternCoords(AppState.lastLat, AppState.lastLng, interpolatedData);
              if (pattern) {
-                 gpxContent += `  <wpt lat="${pattern.landingPoint[0]}" lon="${pattern.landingPoint[1]}"><name>DIP</name><sym>Flag, Blue</sym></wpt>\n`;
+                 const legHeightDownwind = Settings.getValue('legHeightDownwind', 300);
+                 const legHeightBase = Settings.getValue('legHeightBase', 200);
+                 const legHeightFinal = Settings.getValue('legHeightFinal', 100);
+                 
+                 const eleDown = safeBaseHeight + legHeightDownwind;
+                 const eleBase = safeBaseHeight + legHeightBase;
+                 const eleFinal = safeBaseHeight + legHeightFinal;
+                 
+                 gpxContent += `  <wpt lat="${pattern.landingPoint[0]}" lon="${pattern.landingPoint[1]}"><name>DIP</name><ele>${safeBaseHeight}</ele><sym>Flag, Blue</sym></wpt>\n`;
+                 
                  gpxContent += `
   <trk>
     <name>Landing Pattern</name>
     <extensions><gpxx:TrackExtension><gpxx:DisplayColor>Cyan</gpxx:DisplayColor></gpxx:TrackExtension></extensions>
     <trkseg>
-      <trkpt lat="${pattern.downwindStart[0]}" lon="${pattern.downwindStart[1]}"></trkpt>
-      <trkpt lat="${pattern.baseStart[0]}" lon="${pattern.baseStart[1]}"></trkpt>
-      <trkpt lat="${pattern.finalStart[0]}" lon="${pattern.finalStart[1]}"></trkpt>
-      <trkpt lat="${pattern.landingPoint[0]}" lon="${pattern.landingPoint[1]}"></trkpt>
+      <trkpt lat="${pattern.downwindStart[0]}" lon="${pattern.downwindStart[1]}"><ele>${eleDown}</ele></trkpt>
+      <trkpt lat="${pattern.baseStart[0]}" lon="${pattern.baseStart[1]}"><ele>${eleBase}</ele></trkpt>
+      <trkpt lat="${pattern.finalStart[0]}" lon="${pattern.finalStart[1]}"><ele>${eleFinal}</ele></trkpt>
+      <trkpt lat="${pattern.landingPoint[0]}" lon="${pattern.landingPoint[1]}"><ele>${safeBaseHeight}</ele></trkpt>
     </trkseg>
   </trk>`;
              }
         }
 
-        // --- B. JUMP RUN (Updated mit X-2, HARP, LAST OUT) ---
+        // --- B. JUMP RUN ---
         if (includeJumpRun) {
             const harpAnchor = AppState.harpMarker ? AppState.harpMarker.getLatLng() : null;
             const jrt = JumpPlanner.jumpRunTrack(interpolatedData, harpAnchor);
             
             if (jrt) {
+                // Exit Höhe MSL
+                const exitAltitudeMSL = safeBaseHeight + exitAltitudeAGL;
+
                 const approachStart = jrt.approachLatLngs[1];
-                gpxContent += `  <wpt lat="${approachStart[0]}" lon="${approachStart[1]}"><name>X-2</name><sym>Waypoint</sym></wpt>\n`;
+                gpxContent += `  <wpt lat="${approachStart[0]}" lon="${approachStart[1]}"><name>X-2</name><ele>${exitAltitudeMSL}</ele><sym>Waypoint</sym></wpt>\n`;
 
                 const exit = jrt.latlngs[0];
-                gpxContent += `  <wpt lat="${exit[0]}" lon="${exit[1]}"><name>HARP</name><sym>Airplane</sym></wpt>\n`;
+                gpxContent += `  <wpt lat="${exit[0]}" lon="${exit[1]}"><name>HARP</name><ele>${exitAltitudeMSL}</ele><sym>Airplane</sym></wpt>\n`;
 
                 const lastOut = jrt.latlngs[1];
-                gpxContent += `  <wpt lat="${lastOut[0]}" lon="${lastOut[1]}"><name>LAST OUT</name><sym>Waypoint</sym></wpt>\n`;
+                gpxContent += `  <wpt lat="${lastOut[0]}" lon="${lastOut[1]}"><name>LAST OUT</name><ele>${exitAltitudeMSL}</ele><sym>Waypoint</sym></wpt>\n`;
 
                 gpxContent += `
   <trk>
     <name>Jump Run (${jrt.direction}°)</name>
     <extensions><gpxx:TrackExtension><gpxx:DisplayColor>Magenta</gpxx:DisplayColor></gpxx:TrackExtension></extensions>
     <trkseg>
-      <trkpt lat="${approachStart[0]}" lon="${approachStart[1]}"></trkpt>
-      <trkpt lat="${exit[0]}" lon="${exit[1]}"></trkpt>
-      <trkpt lat="${lastOut[0]}" lon="${lastOut[1]}"></trkpt>
+      <trkpt lat="${approachStart[0]}" lon="${approachStart[1]}"><ele>${exitAltitudeMSL}</ele></trkpt>
+      <trkpt lat="${exit[0]}" lon="${exit[1]}"><ele>${exitAltitudeMSL}</ele></trkpt>
+      <trkpt lat="${lastOut[0]}" lon="${lastOut[1]}"><ele>${exitAltitudeMSL}</ele></trkpt>
     </trkseg>
   </trk>`;
             }
@@ -891,29 +904,43 @@ export async function exportCompositeJumpGpx(options) {
         if (includeExitCircles) {
             const exitData = JumpPlanner.calculateExitCircle(interpolatedData);
             if (exitData && !exitData.error) {
-                gpxContent += createGpxCircleTrack(exitData.greenLatFull, exitData.greenLngFull, exitData.greenRadius, "Exit Area (Max)", "Green");
-                gpxContent += createGpxCircleTrack(exitData.greenLat, exitData.greenLng, exitData.darkGreenRadius, "Exit Area (Safe)", "DarkGreen");
+                // HÖHE: Exit Altitude (MSL)
+                const exitEle = safeBaseHeight + exitAltitudeAGL;
+                
+                gpxContent += createGpxCircleTrack(exitData.greenLatFull, exitData.greenLngFull, exitData.greenRadius, `Exit Area Max @ ${exitAltitudeAGL}m`, "Green", exitEle);
+                gpxContent += createGpxCircleTrack(exitData.greenLat, exitData.greenLng, exitData.darkGreenRadius, `Exit Area Safe @ ${exitAltitudeAGL}m`, "DarkGreen", exitEle);
             }
         }
 
-        // --- D. CANOPY CIRCLES (Updated mit rotem Kreis Drift-Korrektur & allen blauen Ringen) ---
+        // --- D. CANOPY CIRCLES ---
         if (includeCanopyCircles) {
             const canopyData = JumpPlanner.calculateCanopyCircles(interpolatedData);
             if (canopyData) {
-                // Roter Kreis (mit Windversatz)
+                // 1. Roter Kreis (Drift nach Öffnung)
+                // HÖHE: Opening Altitude - 200m Buffer (MSL)
+                const redEle = safeBaseHeight + openingAltitudeAGL - buffer;
+                
                 const [redCenterLat, redCenterLng] = Utils.calculateNewCenter(
                     canopyData.redLat, canopyData.redLng, 
                     canopyData.displacementFull, canopyData.directionFull
                 );
-                gpxContent += createGpxCircleTrack(redCenterLat, redCenterLng, canopyData.radiusFull, "Canopy Range (Max)", "Red");
                 
-                // Blaue Kreise (Alle)
+                gpxContent += createGpxCircleTrack(redCenterLat, redCenterLng, canopyData.radiusFull, `Max Range @ ${Math.round(openingAltitudeAGL - buffer)}m`, "Red", redEle);
+                
+                // 2. Blaue Kreise (Trichter)
                 if (canopyData.additionalBlueRadii && canopyData.additionalBlueRadii.length > 0) {
                     canopyData.additionalBlueRadii.forEach((radius, idx) => {
                         const disp = canopyData.additionalBlueDisplacements[idx];
                         const dir = canopyData.additionalBlueDirections[idx];
+                        
+                        // HÖHE: Die spezifische Höhe dieses Rings aus den Berechnungsdaten (MSL)
+                        // additionalBlueUpperLimits enthält die AGL-Höhe dieses Rings
+                        const ringHeightAGL = canopyData.additionalBlueUpperLimits[idx];
+                        const ringEle = safeBaseHeight + ringHeightAGL;
+
                         const [cLat, cLng] = Utils.calculateNewCenter(canopyData.blueLat, canopyData.blueLng, disp, dir);
-                        gpxContent += createGpxCircleTrack(cLat, cLng, radius, `Opening Area ${idx + 1}`, "Blue");
+                        
+                        gpxContent += createGpxCircleTrack(cLat, cLng, radius, `Ideal Pos @ ${Math.round(ringHeightAGL)}m`, "Blue", ringEle);
                     });
                 }
             }
@@ -951,14 +978,9 @@ export async function exportCompositeJumpGpx(options) {
         console.error("Export failed:", error);
         Utils.handleError("Could not save GPX file.");
     } finally {
-        // =================================================================
-        // NETZ WIEDER ABBAUEN: Einstellungen zurücksetzen
-        // =================================================================
         Settings.state.userSettings.calculateJump = originalSettings.calculateJump;
         Settings.state.userSettings.showCanopyArea = originalSettings.showCanopyArea;
         Settings.state.userSettings.showExitArea = originalSettings.showExitArea;
-        // WICHTIG: Nicht Settings.save() aufrufen, da wir den gespeicherten Zustand 
-        // auf der Festplatte nicht ändern wollen, sondern nur den RAM-Zustand wiederherstellen.
         console.log("--- Composite GPX Export Finished (Settings restored) ---");
     }
 }
