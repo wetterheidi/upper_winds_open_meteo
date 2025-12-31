@@ -1503,7 +1503,8 @@ function setupAppEventListeners() {
     });
 
     document.addEventListener('ui:settingChanged', async (e) => {
-        const { key, value } = e.detail;
+        const key = e.detail.key || e.detail.name || e.detail.id;
+        const { value } = e.detail;
         console.log(`[main-web] Setting '${key}' changed to '${value}'. Performing updates.`);
 
         // 1. Zentral den Slider-Wert holen (löst das "not defined" Problem)
@@ -1579,6 +1580,9 @@ function setupAppEventListeners() {
         const { name, value } = e.detail;
         console.log(`[main-web] Radio group '${name}' changed to '${value}'. Performing updates.`);
 
+                const sliderIndex = getSliderValue();
+
+
         if (name === 'heightUnit') {
             const lowerLimitInput = document.getElementById('lowerLimit');
             const upperLimitInput = document.getElementById('upperLimit');
@@ -1605,7 +1609,7 @@ function setupAppEventListeners() {
 
         // Prüfen, ob ein Update der Wetteranzeige notwendig ist
         if (['refLevel', 'heightUnit', 'temperatureUnit', 'windUnit', 'timeZone'].includes(name)) {
-            await displayManager.updateWeatherDisplay(getSliderValue(), 'weather-table-container', 'selectedTime');
+            await displayManager.updateWeatherDisplay(sliderIndex, 'weather-table-container', 'selectedTime');
         }
 
         // Jetzt steuern wir spezifische Aktionen basierend auf der geänderten Einstellung

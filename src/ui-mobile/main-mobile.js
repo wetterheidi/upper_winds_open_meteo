@@ -1746,7 +1746,8 @@ function setupAppEventListeners() {
     document.addEventListener('ui:radioGroupChanged', async (e) => {
         const { name } = e.detail;
         console.log(`[main-mobile] Radio group '${name}' changed. Performing specific updates.`);
-
+                
+        const sliderIndex = getSliderValue();
         // Zuerst führen wir Aktionen aus, die fast immer nötig sind,
         // oder die die Grundlage für weitere Berechnungen bilden.
         if (['refLevel', 'heightUnit', 'temperatureUnit', 'windUnit'].includes(name)) {
@@ -2122,7 +2123,9 @@ function setupAppEventListeners() {
 
         if (settingsThatTriggerFullUpdate.includes(key)) {
             // Führe alle notwendigen UI-Updates aus
-            await displayManager.updateWeatherDisplay(getSliderValue(), 'weather-table-container', 'selectedTime');
+            const sliderIndex = getSliderValue();
+
+            await displayManager.updateWeatherDisplay(sliderIndex, 'weather-table-container', 'selectedTime');
 
             //Ruft die Funktion auf, die die Labels aktualisiert
             if (key === 'heightUnit' || key === 'refLevel') { }

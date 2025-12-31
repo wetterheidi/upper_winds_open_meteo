@@ -164,7 +164,8 @@ export function interpolateWeatherData(weatherData, sliderIndex, interpStep, bas
     const lowestPressureLevel = Math.max(...validPressureLevels);
     const hLowest = weatherData[`geopotential_height_${lowestPressureLevel}hPa`][sliderIndex];
     if (surfacePressure > lowestPressureLevel && Number.isFinite(hLowest)) {
-        const stepsBetween = Math.floor((hLowest - baseHeight) / interpStep);
+        const interpStepInMeters = heightUnit === 'ft' ? interpStep / 3.28084 : interpStep;
+        const stepsBetween = Math.floor((hLowest - baseHeight) / interpStepInMeters);
 
         const uSurface = -weatherData.wind_speed_10m[sliderIndex] * Math.sin(weatherData.wind_direction_10m[sliderIndex] * Math.PI / 180);
         const vSurface = -weatherData.wind_speed_10m[sliderIndex] * Math.cos(weatherData.wind_direction_10m[sliderIndex] * Math.PI / 180);
@@ -172,7 +173,7 @@ export function interpolateWeatherData(weatherData, sliderIndex, interpStep, bas
         const vLowest = vComponents[validPressureLevels.indexOf(lowestPressureLevel)];
 
         for (let i = stepsBetween - 1; i >= 1; i--) {
-            const h = baseHeight + i * interpStep;
+            const h = baseHeight + i * interpStepInMeters;
             if (h >= hLowest) continue;
             const fraction = (h - baseHeight) / (hLowest - baseHeight);
             const logPSurface = Math.log(surfacePressure);
@@ -475,7 +476,9 @@ export const debouncedGetElevationAndQFE = Utils.debounce(async (lat, lng) => {
             const qfeInput = document.getElementById('qfe');
 
             if (elevationInput) {
-                elevationInput.value = data.elevation.toFixed(1);
+                const isFeet = Settings.getValue('heightUnit') === 'ft';
+                const displayValue = isFeet ? data.elevation * 3.28084 : data.elevation;
+                elevationInput.value = displayValue.toFixed(1);
             }
             if (qfeInput) {
                 qfeInput.value = data.qfe.toFixed(2);
