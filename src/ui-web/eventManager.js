@@ -8,7 +8,7 @@ import * as displayManager from './displayManager.js';
 import * as mapManager from './mapManager.js';
 import * as Coordinates from '../ui-web/coordinates.js';
 import { TileCache, cacheTilesForDIP, cacheVisibleTiles } from '../core/tileCache.js';
-import { loadKmlTrack, loadGpxTrack, loadCsvTrackUTC, exportToGpx, exportLandingPatternToGpx } from '../core/trackManager.js';
+import { loadKmlTrack, loadGpxTrack, loadCsvTrackUTC, exportToGpx, exportLandingPatternToGpx, exportCompositeJumpGpx } from '../core/trackManager.js';
 import { fetchEnsembleWeatherData, processAndVisualizeEnsemble, clearEnsembleVisualizations } from '../core/ensembleManager.js';
 import { getSliderValue, displayMessage, hideProgress, displayProgress, displayWarning, toggleLoading, updatePlannerUnits } from './ui.js';
 import { updateModelSelectUI, cleanupSelectedEnsembleModels } from './ui.js';
@@ -820,6 +820,27 @@ function setupGpxExportEvent() {
         exportLandingPatternButton.addEventListener('click', () => {
             console.log("DEBUG: Klick auf 'exportLandingPatternGpxButton' registriert.");
             exportLandingPatternToGpx();
+        });
+    }
+
+    const exportCombinedBtn = document.getElementById('exportCombinedGpxButton');
+    
+    if (exportCombinedBtn) {
+        exportCombinedBtn.addEventListener('click', async () => {
+            const options = {
+                includeJumpRun: document.getElementById('exportJumpRun')?.checked || false,
+                includePattern: document.getElementById('exportLandingPattern')?.checked || false,
+                includeExitCircles: document.getElementById('exportExitCircles')?.checked || false,
+                includeCanopyCircles: document.getElementById('exportCanopyCircles')?.checked || false
+            };
+
+            // Prüfen, ob überhaupt etwas ausgewählt ist
+            if (!Object.values(options).some(v => v)) {
+                Utils.handleError("Please select at least one element to export.");
+                return;
+            }
+
+            await exportCompositeJumpGpx(options); // Die neue Funktion aus trackManager aufrufen
         });
     }
 }

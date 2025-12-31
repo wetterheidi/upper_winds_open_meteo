@@ -246,9 +246,7 @@
                             </label>
                         </li>
                         <li>
-                            <button id="exportLandingPatternGpxButton" class="btn btn-primary">Export Landing Pattern as
-                                GPX</button>
-                        </li>
+
                     </ul>
                 </div>
             </div>
@@ -370,9 +368,6 @@
                             </div>
                             <button id="analyzeTerrainButton" class="btn btn-secondary">Analyze Terrain
                                 Clearance</button>
-                        </li>
-                        <li>
-                            <button id="exportGpxButton" class="btn btn-primary">Export Jump Run as GPX</button>
                         </li>
                     </ul>
                 </div>
@@ -705,6 +700,37 @@
                             <option value="ComprehensiveReport">Weather Briefing</option>
                         </select>
                         <button id="downloadButton" class="btn btn-primary">Generate Table</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="accordion-item">
+                <button class="accordion-header">Export Jump</button>
+                <div class="accordion-content">
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <label style="font-weight: bold;">Select Elements:</label>
+
+                        <label class="radio-label"
+                            style="padding: 10px; background: rgba(255,255,255,0.05); border-radius: 4px;">
+                            <input type="checkbox" id="exportJumpRun" checked> Jump Run & Exit
+                        </label>
+                        <label class="radio-label"
+                            style="padding: 10px; background: rgba(255,255,255,0.05); border-radius: 4px;">
+                            <input type="checkbox" id="exportLandingPattern" checked> Landing Pattern
+                        </label>
+                        <label class="radio-label"
+                            style="padding: 10px; background: rgba(255,255,255,0.05); border-radius: 4px;">
+                            <input type="checkbox" id="exportExitCircles"> Exit Area (Circles)
+                        </label>
+                        <label class="radio-label"
+                            style="padding: 10px; background: rgba(255,255,255,0.05); border-radius: 4px;">
+                            <input type="checkbox" id="exportCanopyCircles"> Canopy Area (Circles)
+                        </label>
+
+                        <button id="exportCombinedGpxButton" class="btn btn-primary"
+                            style="margin-top: 10px; padding: 15px;">
+                            Export Selected GPX
+                        </button>
                     </div>
                 </div>
             </div>
