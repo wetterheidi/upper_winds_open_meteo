@@ -931,25 +931,6 @@ function setupTrackEvents() {
     });
 }
 function setupGpxExportEvent() {
-    const exportButton = document.getElementById('exportGpxButton');
-    if (exportButton) {
-        exportButton.addEventListener('click', async () => {
-            const sliderIndex = getSliderValue();
-            const interpStep = getInterpolationStep();
-            const heightUnit = Settings.getValue('heightUnit', 'm');
-
-            await exportToGpx(sliderIndex, interpStep, heightUnit);
-        });
-    }
-
-    const exportLandingPatternButton = document.getElementById('exportLandingPatternGpxButton');
-    if (exportLandingPatternButton) {
-        exportLandingPatternButton.addEventListener('click', () => {
-            console.log("DEBUG: Klick auf 'exportLandingPatternGpxButton' registriert.");
-            exportLandingPatternToGpx();
-        });
-    }
-
     const exportCombinedBtn = document.getElementById('exportCombinedGpxButton');
     
     if (exportCombinedBtn) {
@@ -958,16 +939,18 @@ function setupGpxExportEvent() {
                 includeJumpRun: document.getElementById('exportJumpRun')?.checked || false,
                 includePattern: document.getElementById('exportLandingPattern')?.checked || false,
                 includeExitCircles: document.getElementById('exportExitCircles')?.checked || false,
-                includeCanopyCircles: document.getElementById('exportCanopyCircles')?.checked || false
+                includeCanopyCircles: document.getElementById('exportCanopyCircles')?.checked || false,
+                
+                // NEU: Merge Option
+                mergeTracks: document.getElementById('mergeTracksCheckbox')?.checked || false
             };
 
-            // Prüfen, ob überhaupt etwas ausgewählt ist
             if (!Object.values(options).some(v => v)) {
                 Utils.handleError("Please select at least one element to export.");
                 return;
             }
 
-            await exportCompositeJumpGpx(options); // Die neue Funktion aus trackManager aufrufen
+            await exportCompositeJumpGpx(options); 
         });
     }
 }

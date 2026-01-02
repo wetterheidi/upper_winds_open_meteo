@@ -727,9 +727,16 @@
                             <input type="checkbox" id="exportCanopyCircles"> Canopy Area (Circles)
                         </label>
 
-                        <button id="exportCombinedGpxButton" class="btn btn-primary"
-                            style="margin-top: 10px; padding: 15px;">
-                            Export Selected GPX
+                        <div
+                            style="margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-color, #444);">
+                            <label class="radio-label"
+                                title="Combine all elements into one single track. Useful for Garmin/Suunto watches.">
+                                <input type="checkbox" id="mergeTracksCheckbox"> Merge for Devices (Single Color)
+                            </label>
+                        </div>
+
+                        <button id="exportCombinedGpxButton" class="btn btn-primary" style="margin-top: 10px;">
+                            Export GPX
                         </button>
                     </div>
                 </div>

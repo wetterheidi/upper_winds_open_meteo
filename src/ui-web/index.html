@@ -636,23 +636,32 @@
                     <div class="accordion-item">
                         <button class="accordion-header">Export Jump</button>
                         <div class="accordion-content">
-                                <label>Include:</label>
-                                
-                                <div style="display: flex; flex-direction: column; gap: 5px;">
-                                    <label class="radio-label"><input type="checkbox" id="exportJumpRun" checked> Jump
-                                        Run & Exit</label>
-                                    <label class="radio-label"><input type="checkbox" id="exportLandingPattern" checked>
-                                        Landing Pattern</label>
-                                    <label class="radio-label"><input type="checkbox" id="exportExitCircles"> Exit Area
-                                        (Green)</label>
-                                    <label class="radio-label"><input type="checkbox" id="exportCanopyCircles"> Canopy
-                                        Range (Red/Blue)</label>
-                                </div>
+                            <label>Include:</label>
 
-                                <label></label>
-                                <button id="exportCombinedGpxButton" class="btn btn-primary" style="margin-top: 10px;">
-                                    Export GPX
-                                </button>
+                            <div style="display: flex; flex-direction: column; gap: 5px;">
+                                <label class="radio-label"><input type="checkbox" id="exportJumpRun" checked> Jump
+                                    Run & Exit</label>
+                                <label class="radio-label"><input type="checkbox" id="exportLandingPattern" checked>
+                                    Landing Pattern</label>
+                                <label class="radio-label"><input type="checkbox" id="exportExitCircles"> Exit Area
+                                    (Green)</label>
+                                <label class="radio-label"><input type="checkbox" id="exportCanopyCircles"> Canopy
+                                    Range (Red/Blue)</label>
+                            </div>
+
+                            <div
+                                style="margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-color, #444);">
+                                <label class="radio-label"
+                                    title="Combine all elements into one single track. Useful for Garmin/Suunto watches.">
+                                    <input type="checkbox" id="mergeTracksCheckbox"> Merge for Devices (Single Color)
+                                </label>
+                            </div>
+
+                            <button id="exportCombinedGpxButton" class="btn btn-primary" style="margin-top: 10px;">
+                                Export GPX
+                            </button>
+
+
                         </div>
                     </div>
 

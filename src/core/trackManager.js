@@ -750,44 +750,28 @@ async function readFileContent(file) {
 }
 
 // =================================================================
-// NEUE EXPORT LOGIK
+// NEUE EXPORT LOGIK (Refactored für Merge-Option)
 // =================================================================
 
 /**
- * Generiert einen GPX-Track für einen Kreis.
- * NEU: Nimmt jetzt 'elevation' entgegen, damit der Kreis nicht unter der Erde liegt.
+ * Generiert NUR die Trackpoints für einen Kreis (ohne <trk>-Wrapper).
  */
-function createGpxCircleTrack(centerLat, centerLng, radiusMeters, name, color, elevation = 0) {
+function getCircleTrackPoints(centerLat, centerLng, radiusMeters, elevation = 0) {
     if (radiusMeters <= 0) return '';
     const steps = 72; 
-    let trackPoints = '';
+    let points = '';
     
     for (let i = 0; i <= steps; i++) {
         const bearing = i * (360 / steps);
         const [lat, lng] = Utils.calculateNewCenter(centerLat, centerLng, radiusMeters, bearing);
-        // KORREKTUR: Elevation eingefügt (gerundet auf Dezimalstellen)
-        trackPoints += `      <trkpt lat="${lat}" lon="${lng}"><ele>${elevation.toFixed(1)}</ele></trkpt>\n`;
+        points += `      <trkpt lat="${lat}" lon="${lng}"><ele>${elevation.toFixed(1)}</ele></trkpt>\n`;
     }
-
-    return `
-  <trk>
-    <name>${name}</name>
-    <extensions>
-      <gpxx:TrackExtension xmlns:gpxx="http://www.garmin.com/xmlschemas/GpxExtensions/v3">
-        <gpxx:DisplayColor>${color}</gpxx:DisplayColor>
-      </gpxx:TrackExtension>
-    </extensions>
-    <trkseg>
-${trackPoints}    </trkseg>
-  </trk>`;
+    return points;
 }
 
-/**
- * Die Hauptfunktion für den konfigurierbaren Export (Update: 3D-Höhen für Kreise).
- */
 export async function exportCompositeJumpGpx(options) {
-    const { includeJumpRun, includePattern, includeExitCircles, includeCanopyCircles } = options;
-    console.log("--- Starting Composite GPX Export (3D Mode) ---", options);
+    const { includeJumpRun, includePattern, includeExitCircles, includeCanopyCircles, mergeTracks } = options;
+    console.log("--- Starting Composite GPX Export ---", options);
 
     if (!AppState.weatherData || AppState.lastLat == null) {
         Utils.handleError("No weather data or location available.");
@@ -812,14 +796,11 @@ export async function exportCompositeJumpGpx(options) {
         const interpStep = Settings.getValue('interpStep', 'select', 200);
         const heightUnit = Settings.getValue('heightUnit', 'm');
         
-        // Höhenreferenz (MSL des Bodens)
         const baseHeight = Math.round(AppState.lastAltitude);
         const safeBaseHeight = (!isNaN(baseHeight) && baseHeight !== null) ? baseHeight : 0;
-
-        // Eingestellte Höhen abrufen (AGL)
         const exitAltitudeAGL = Settings.getValue('exitAltitude', 3000);
         const openingAltitudeAGL = Settings.getValue('openingAltitude', 1200);
-        const buffer = 200; // Puffer für Schirmöffnung (Standard)
+        const buffer = 200;
 
         const interpolatedData = interpolateWeatherData(
             AppState.weatherData, sliderIndex, interpStep, safeBaseHeight, heightUnit
@@ -830,6 +811,7 @@ export async function exportCompositeJumpGpx(options) {
             return;
         }
 
+        // Header
         let gpxContent = `<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
 <gpx version="1.1" creator="DZMaster" 
     xmlns="http://www.topografix.com/GPX/1/1" 
@@ -840,6 +822,26 @@ export async function exportCompositeJumpGpx(options) {
     <name>Skydive Plan - ${new Date().toLocaleString()}</name>
   </metadata>
 `;
+
+        // Container für Merge-Logik
+        let mergedSegments = ""; 
+
+        // Hilfsfunktion: Fügt einen Track hinzu (Entweder als neues <trk> oder als Segment im Merge)
+        const addTrack = (name, color, pointsString) => {
+            if (mergeTracks) {
+                // Im Merge-Modus: Einfach als neues Segment anhängen. Farbe geht leider verloren.
+                mergedSegments += `    <trkseg>\n${pointsString}    </trkseg>\n`;
+            } else {
+                // Standard-Modus: Eigener Track mit Name und Farbe
+                gpxContent += `
+  <trk>
+    <name>${name}</name>
+    <extensions><gpxx:TrackExtension><gpxx:DisplayColor>${color}</gpxx:DisplayColor></gpxx:TrackExtension></extensions>
+    <trkseg>
+${pointsString}    </trkseg>
+  </trk>`;
+            }
+        };
 
         // --- A. LANDING PATTERN ---
         if (includePattern) {
@@ -853,19 +855,16 @@ export async function exportCompositeJumpGpx(options) {
                  const eleBase = safeBaseHeight + legHeightBase;
                  const eleFinal = safeBaseHeight + legHeightFinal;
                  
+                 // Waypoints (immer global)
                  gpxContent += `  <wpt lat="${pattern.landingPoint[0]}" lon="${pattern.landingPoint[1]}"><name>DIP</name><ele>${safeBaseHeight}</ele><sym>Flag, Blue</sym></wpt>\n`;
+
+                 // Track Points generieren
+                 let pts = `      <trkpt lat="${pattern.downwindStart[0]}" lon="${pattern.downwindStart[1]}"><ele>${eleDown}</ele></trkpt>\n`;
+                 pts += `      <trkpt lat="${pattern.baseStart[0]}" lon="${pattern.baseStart[1]}"><ele>${eleBase}</ele></trkpt>\n`;
+                 pts += `      <trkpt lat="${pattern.finalStart[0]}" lon="${pattern.finalStart[1]}"><ele>${eleFinal}</ele></trkpt>\n`;
+                 pts += `      <trkpt lat="${pattern.landingPoint[0]}" lon="${pattern.landingPoint[1]}"><ele>${safeBaseHeight}</ele></trkpt>\n`;
                  
-                 gpxContent += `
-  <trk>
-    <name>Landing Pattern</name>
-    <extensions><gpxx:TrackExtension><gpxx:DisplayColor>Cyan</gpxx:DisplayColor></gpxx:TrackExtension></extensions>
-    <trkseg>
-      <trkpt lat="${pattern.downwindStart[0]}" lon="${pattern.downwindStart[1]}"><ele>${eleDown}</ele></trkpt>
-      <trkpt lat="${pattern.baseStart[0]}" lon="${pattern.baseStart[1]}"><ele>${eleBase}</ele></trkpt>
-      <trkpt lat="${pattern.finalStart[0]}" lon="${pattern.finalStart[1]}"><ele>${eleFinal}</ele></trkpt>
-      <trkpt lat="${pattern.landingPoint[0]}" lon="${pattern.landingPoint[1]}"><ele>${safeBaseHeight}</ele></trkpt>
-    </trkseg>
-  </trk>`;
+                 addTrack("Landing Pattern", "Cyan", pts);
              }
         }
 
@@ -875,28 +874,22 @@ export async function exportCompositeJumpGpx(options) {
             const jrt = JumpPlanner.jumpRunTrack(interpolatedData, harpAnchor);
             
             if (jrt) {
-                // Exit Höhe MSL
                 const exitAltitudeMSL = safeBaseHeight + exitAltitudeAGL;
-
                 const approachStart = jrt.approachLatLngs[1];
-                gpxContent += `  <wpt lat="${approachStart[0]}" lon="${approachStart[1]}"><name>X-2</name><ele>${exitAltitudeMSL}</ele><sym>Waypoint</sym></wpt>\n`;
-
                 const exit = jrt.latlngs[0];
-                gpxContent += `  <wpt lat="${exit[0]}" lon="${exit[1]}"><name>HARP</name><ele>${exitAltitudeMSL}</ele><sym>Airplane</sym></wpt>\n`;
-
                 const lastOut = jrt.latlngs[1];
+
+                // Waypoints
+                gpxContent += `  <wpt lat="${approachStart[0]}" lon="${approachStart[1]}"><name>X-2</name><ele>${exitAltitudeMSL}</ele><sym>Waypoint</sym></wpt>\n`;
+                gpxContent += `  <wpt lat="${exit[0]}" lon="${exit[1]}"><name>HARP</name><ele>${exitAltitudeMSL}</ele><sym>Airplane</sym></wpt>\n`;
                 gpxContent += `  <wpt lat="${lastOut[0]}" lon="${lastOut[1]}"><name>LAST OUT</name><ele>${exitAltitudeMSL}</ele><sym>Waypoint</sym></wpt>\n`;
 
-                gpxContent += `
-  <trk>
-    <name>Jump Run (${jrt.direction}°)</name>
-    <extensions><gpxx:TrackExtension><gpxx:DisplayColor>Magenta</gpxx:DisplayColor></gpxx:TrackExtension></extensions>
-    <trkseg>
-      <trkpt lat="${approachStart[0]}" lon="${approachStart[1]}"><ele>${exitAltitudeMSL}</ele></trkpt>
-      <trkpt lat="${exit[0]}" lon="${exit[1]}"><ele>${exitAltitudeMSL}</ele></trkpt>
-      <trkpt lat="${lastOut[0]}" lon="${lastOut[1]}"><ele>${exitAltitudeMSL}</ele></trkpt>
-    </trkseg>
-  </trk>`;
+                // Track Points
+                let pts = `      <trkpt lat="${approachStart[0]}" lon="${approachStart[1]}"><ele>${exitAltitudeMSL}</ele></trkpt>\n`;
+                pts += `      <trkpt lat="${exit[0]}" lon="${exit[1]}"><ele>${exitAltitudeMSL}</ele></trkpt>\n`;
+                pts += `      <trkpt lat="${lastOut[0]}" lon="${lastOut[1]}"><ele>${exitAltitudeMSL}</ele></trkpt>\n`;
+
+                addTrack(`Jump Run (${jrt.direction}°)`, "Magenta", pts);
             }
         }
 
@@ -904,11 +897,13 @@ export async function exportCompositeJumpGpx(options) {
         if (includeExitCircles) {
             const exitData = JumpPlanner.calculateExitCircle(interpolatedData);
             if (exitData && !exitData.error) {
-                // HÖHE: Exit Altitude (MSL)
                 const exitEle = safeBaseHeight + exitAltitudeAGL;
                 
-                gpxContent += createGpxCircleTrack(exitData.greenLatFull, exitData.greenLngFull, exitData.greenRadius, `Exit Area Max @ ${exitAltitudeAGL}m`, "Green", exitEle);
-                gpxContent += createGpxCircleTrack(exitData.greenLat, exitData.greenLng, exitData.darkGreenRadius, `Exit Area Safe @ ${exitAltitudeAGL}m`, "DarkGreen", exitEle);
+                const greenPts = getCircleTrackPoints(exitData.greenLatFull, exitData.greenLngFull, exitData.greenRadius, exitEle);
+                addTrack(`Exit Area Max @ ${exitAltitudeAGL}m`, "Green", greenPts);
+
+                const darkGreenPts = getCircleTrackPoints(exitData.greenLat, exitData.greenLng, exitData.darkGreenRadius, exitEle);
+                addTrack(`Exit Area Safe @ ${exitAltitudeAGL}m`, "DarkGreen", darkGreenPts);
             }
         }
 
@@ -916,51 +911,46 @@ export async function exportCompositeJumpGpx(options) {
         if (includeCanopyCircles) {
             const canopyData = JumpPlanner.calculateCanopyCircles(interpolatedData);
             if (canopyData) {
-                // 1. Roter Kreis (Drift nach Öffnung)
-                // HÖHE: Opening Altitude - 200m Buffer (MSL)
                 const redEle = safeBaseHeight + openingAltitudeAGL - buffer;
+                const [redCenterLat, redCenterLng] = Utils.calculateNewCenter(canopyData.redLat, canopyData.redLng, canopyData.displacementFull, canopyData.directionFull);
                 
-                const [redCenterLat, redCenterLng] = Utils.calculateNewCenter(
-                    canopyData.redLat, canopyData.redLng, 
-                    canopyData.displacementFull, canopyData.directionFull
-                );
+                const redPts = getCircleTrackPoints(redCenterLat, redCenterLng, canopyData.radiusFull, redEle);
+                addTrack(`Max Range @ ${Math.round(openingAltitudeAGL - buffer)}m`, "Red", redPts);
                 
-                gpxContent += createGpxCircleTrack(redCenterLat, redCenterLng, canopyData.radiusFull, `Max Range @ ${Math.round(openingAltitudeAGL - buffer)}m`, "Red", redEle);
-                
-                // 2. Blaue Kreise (Trichter)
                 if (canopyData.additionalBlueRadii && canopyData.additionalBlueRadii.length > 0) {
                     canopyData.additionalBlueRadii.forEach((radius, idx) => {
                         const disp = canopyData.additionalBlueDisplacements[idx];
                         const dir = canopyData.additionalBlueDirections[idx];
-                        
-                        // HÖHE: Die spezifische Höhe dieses Rings aus den Berechnungsdaten (MSL)
-                        // additionalBlueUpperLimits enthält die AGL-Höhe dieses Rings
                         const ringHeightAGL = canopyData.additionalBlueUpperLimits[idx];
                         const ringEle = safeBaseHeight + ringHeightAGL;
-
                         const [cLat, cLng] = Utils.calculateNewCenter(canopyData.blueLat, canopyData.blueLng, disp, dir);
                         
-                        gpxContent += createGpxCircleTrack(cLat, cLng, radius, `Ideal Pos @ ${Math.round(ringHeightAGL)}m`, "Blue", ringEle);
+                        const bluePts = getCircleTrackPoints(cLat, cLng, radius, ringEle);
+                        addTrack(`Ideal Pos @ ${Math.round(ringHeightAGL)}m`, "Blue", bluePts);
                     });
                 }
             }
         }
 
+        // FINALE: Wenn Merge aktiv ist, jetzt den gesammelten Block schreiben
+        if (mergeTracks && mergedSegments.length > 0) {
+             gpxContent += `
+  <trk>
+    <name>Skydive Plan Combined</name>
+    <extensions><gpxx:TrackExtension><gpxx:DisplayColor>Red</gpxx:DisplayColor></gpxx:TrackExtension></extensions>
+    ${mergedSegments}
+  </trk>`;
+        }
+
         gpxContent += `</gpx>`;
 
-        // --- Speichern ---
+        // --- Speichern (unverändert) ---
         const time = Utils.formatTime(AppState.weatherData.time[sliderIndex]).replace(/ /g, '_').replace(/:/g, '');
         const filename = `Jump_Plan_${time}.gpx`;
 
         const { Filesystem, Directory, isNative } = await getCapacitor();
         if (isNative && Filesystem) {
-            await Filesystem.writeFile({
-                path: `DZMaster/${filename}`,
-                data: gpxContent,
-                directory: Directory.Documents,
-                encoding: 'utf8',
-                recursive: true
-            });
+            await Filesystem.writeFile({ path: `DZMaster/${filename}`, data: gpxContent, directory: Directory.Documents, encoding: 'utf8', recursive: true });
             Utils.handleMessage(`Saved to Documents/DZMaster/${filename}`);
         } else {
             const blob = new Blob([gpxContent], { type: "application/gpx+xml;charset=utf-8" });
@@ -981,6 +971,6 @@ export async function exportCompositeJumpGpx(options) {
         Settings.state.userSettings.calculateJump = originalSettings.calculateJump;
         Settings.state.userSettings.showCanopyArea = originalSettings.showCanopyArea;
         Settings.state.userSettings.showExitArea = originalSettings.showExitArea;
-        console.log("--- Composite GPX Export Finished (Settings restored) ---");
+        console.log("--- Composite GPX Export Finished ---");
     }
 }
