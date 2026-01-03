@@ -416,83 +416,107 @@
 
         /* Dashboard-Karten anpassen */
         .dashboard-card {
-            background-color: var(--dashboard-background); /* Dunkler Dashboard-Hintergrund */
-            color: var(--dashboard-text); /* Helle Dashboard-Textfarbe */
-            border-color: var(--dashboard-border); /* Heller Dashboard-Rahmen */
-            box-shadow: 0 0 8px var(--dashboard-glow); /* Heller Glow-Effekt */
+            background-color: var(--dashboard-background);
+            /* Dunkler Dashboard-Hintergrund */
+            color: var(--dashboard-text);
+            /* Helle Dashboard-Textfarbe */
+            border-color: var(--dashboard-border);
+            /* Heller Dashboard-Rahmen */
+            box-shadow: 0 0 8px var(--dashboard-glow);
+            /* Heller Glow-Effekt */
         }
 
         /* Labels und Einheiten anpassen */
         .card-label,
         .card-unit {
-            color: var(--dashboard-text); /* Helle Dashboard-Textfarbe */
-            opacity: 0.7; /* Etwas transparenter machen */
+            color: var(--dashboard-text);
+            /* Helle Dashboard-Textfarbe */
+            opacity: 0.7;
+            /* Etwas transparenter machen */
         }
 
         /* Hauptwerte (Zahlen) anpassen */
         .card-value {
-            color: var(--dashboard-text); /* Helle Dashboard-Textfarbe */
+            color: var(--dashboard-text);
+            /* Helle Dashboard-Textfarbe */
         }
 
         /* Spezifische Glide-Ratio Farben im Dark Mode */
         #dashboard-glide-current.glide-good {
-            color: #50fa7b !important; /* Helleres Grün */
+            color: #50fa7b !important;
+            /* Helleres Grün */
         }
+
         #dashboard-glide-current.glide-ok {
-            color: #f1fa8c !important; /* Helleres Gelb */
+            color: #f1fa8c !important;
+            /* Helleres Gelb */
         }
+
         #dashboard-glide-current.glide-bad {
-            color: #ff5555 !important; /* Helleres Rot */
+            color: #ff5555 !important;
+            /* Helleres Rot */
         }
 
         /* Buttons im Dark Mode anpassen */
         #auto-record-card,
         #manual-record-card {
-             background-color: transparent; /* Kein eigener Hintergrund für die Karte */
-             border: none;
-             box-shadow: none;
+            background-color: transparent;
+            /* Kein eigener Hintergrund für die Karte */
+            border: none;
+            box-shadow: none;
         }
 
         .arm-button {
-            border-color: var(--color-warning); /* Helleres Gelb für Rahmen */
-            color: var(--color-warning); /* Helleres Gelb für Text */
+            border-color: var(--color-warning);
+            /* Helleres Gelb für Rahmen */
+            color: var(--color-warning);
+            /* Helleres Gelb für Text */
             background-color: transparent;
         }
 
         .arm-button:hover,
         .arm-button:active {
             background-color: var(--color-warning);
-            color: var(--dashboard-background); /* Dunkler Text bei Hover */
+            color: var(--dashboard-background);
+            /* Dunkler Text bei Hover */
         }
 
         .arm-button.armed {
-            border-color: #50fa7b; /* Helleres Grün */
+            border-color: #50fa7b;
+            /* Helleres Grün */
             background-color: #50fa7b;
-            color: var(--dashboard-background); /* Dunkler Text */
+            color: var(--dashboard-background);
+            /* Dunkler Text */
         }
 
         .arm-button.recording {
-            border-color: #ff5555; /* Helleres Rot */
+            border-color: #ff5555;
+            /* Helleres Rot */
             background-color: #ff5555;
-            color: var(--dashboard-background); /* Dunkler Text */
+            color: var(--dashboard-background);
+            /* Dunkler Text */
             /* Animation bleibt gleich */
         }
 
         #manual-recording-button {
-            border-color: var(--color-primary); /* Helles Blau */
+            border-color: var(--color-primary);
+            /* Helles Blau */
             color: var(--color-primary);
         }
 
         #manual-recording-button:hover,
         #manual-recording-button:active {
             background-color: var(--color-primary);
-            color: var(--dashboard-background); /* Dunkler Text */
+            color: var(--dashboard-background);
+            /* Dunkler Text */
         }
 
         #manual-recording-button.recording {
-            border-color: var(--color-secondary); /* Helleres Grau */
+            border-color: var(--color-secondary);
+            /* Helleres Grau */
             background-color: var(--color-secondary);
-            color: var(--dashboard-background); /* Dunkler Text */
+            color: var(--dashboard-background);
+            /* Dunkler Text */
             /* Animation bleibt gleich */
         }
     }
@@ -1235,7 +1259,8 @@ input[type="checkbox"][style*="opacity: 1"] {
 
 /* --- Anpassung Breite Jump Run Direction Input --- */
 #jumpRunTrackDirection {
-    width: 80px; /* Etwas breiter als die Offset-Felder für Text wie 'CR+' */
+    width: 80px;
+    /* Etwas breiter als die Offset-Felder für Text wie 'CR+' */
     text-align: left;
     box-sizing: border-box;
 }
@@ -1674,7 +1699,8 @@ input[type="checkbox"][style*="opacity: 1"] {
 }
 
 #lockLandingDirection {
-    margin-right: 8px; /* Abstand zwischen Checkbox und "Lock" Text */
+    margin-right: 8px;
+    /* Abstand zwischen Checkbox und "Lock" Text */
     vertical-align: middle;
 }
 
@@ -1692,7 +1718,7 @@ input[type="checkbox"][style*="opacity: 1"] {
     width: 100%;
 }
 
-.landing-direction-row > span {
+.landing-direction-row>span {
     display: flex;
     align-items: center;
 }
@@ -1701,13 +1727,16 @@ input[type="checkbox"][style*="opacity: 1"] {
 .lock-landing-container {
     display: inline-flex;
     align-items: center;
-    gap: 5px; /* Abstand zwischen Checkbox und "Lock"-Label */
+    gap: 5px;
+    /* Abstand zwischen Checkbox und "Lock"-Label */
 }
 
 /* Label für die "Lock"-Checkbox */
 .lock-label {
-    text-align: left !important; /* Stellt sicher, dass das Label linksbündig ist */
-    font-weight: normal !important; /* Standard-Schriftstärke */
+    text-align: left !important;
+    /* Stellt sicher, dass das Label linksbündig ist */
+    font-weight: normal !important;
+    /* Standard-Schriftstärke */
 }
 
 /* === APP MANAGEMENT === */
@@ -2653,47 +2682,52 @@ input[type="checkbox"][style*="opacity: 1"] {
     #tab-bar {
         grid-row: 1 / -1;
         grid-column: 1;
-        
+
         flex-direction: column;
         justify-content: center;
-        gap: 15px; /* Etwas weniger Abstand, damit Text Platz hat */
-        
+        gap: 15px;
+        /* Etwas weniger Abstand, damit Text Platz hat */
+
         height: 100%;
         width: 100%;
-        
+
         border-top: none;
         border-right: 1px solid var(--border-color);
         border-left: none;
-        
+
         padding-bottom: 0;
         padding-left: env(safe-area-inset-left);
         padding-right: 0;
-        
+
         background: rgba(var(--background-white), 0.95) !important;
     }
 
-    .tab-button { 
-        width: 100%; 
-        height: auto; 
-        padding: 8px 0; /* Etwas weniger Padding vertikal */
+    .tab-button {
+        width: 100%;
+        height: auto;
+        padding: 8px 0;
+        /* Etwas weniger Padding vertikal */
     }
 
     /* WIEDERHERGESTELLT: Labels anzeigen */
     .tab-button .label {
-        display: block; 
-        font-size: 10px; /* Kleinere Schrift für kompakten Look */
+        display: block;
+        font-size: 10px;
+        /* Kleinere Schrift für kompakten Look */
         margin-top: 3px;
         text-align: center;
-        white-space: nowrap; /* Verhindert Umbruch */
+        white-space: nowrap;
+        /* Verhindert Umbruch */
         overflow: hidden;
-        text-overflow: ellipsis; /* Pünktchen falls zu lang */
+        text-overflow: ellipsis;
+        /* Pünktchen falls zu lang */
         max-width: 100%;
         padding: 0 2px;
     }
-    
-    .tab-button .icon { 
-        font-size: 24px; 
-        margin-bottom: 0; 
+
+    .tab-button .icon {
+        font-size: 24px;
+        margin-bottom: 0;
     }
 
     /* 3. MAP CONTAINER & CONTENT PANELS */
@@ -2702,42 +2736,66 @@ input[type="checkbox"][style*="opacity: 1"] {
         grid-column: 2;
         height: 100% !important;
         width: 100% !important;
+
+        /* WICHTIG: Überschreibt die .hidden Klasse von JS */
+        /* Im Landscape-Modus darf die Karte NIEMALS ausgeblendet werden */
+        display: block !important;
+        opacity: 1 !important;
+        visibility: visible !important;
     }
 
     #content-panels {
         grid-row: 1;
         grid-column: 2;
-        width: 350px;
-        max-width: 80%;
+        /* In der gleichen Spalte wie die Karte */
+
+        /* WICHTIG: Verhindert das Strecken auf volle Breite! */
+        justify-self: start;
+
+        width: 350px !important;
+        max-width: 80vw;
+        /* Auf kleinen Screens nicht breiter als 80% */
         height: 100%;
+
+        /* Styling für den Sidebar-Look */
         border-right: 1px solid var(--border-color);
         background: rgba(var(--background-white), 0.95);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
         z-index: 1002;
+
+        /* Stellt sicher, dass Padding die Breite nicht vergrößert */
+        box-sizing: border-box;
+
+        /* Optional: Padding etwas anpassen für Landscape */
+        padding: 15px;
+        padding-top: calc(15px + env(safe-area-inset-top));
+        padding-bottom: calc(15px + env(safe-area-inset-bottom));
     }
 
     /* 4. SLIDER WIDGET */
     #slider-container {
         position: absolute !important;
         top: 10px;
-        
+
         /* Standard: Zentriert */
         left: 50%;
         transform: translateX(-50%);
         right: auto;
-        
+
         width: auto;
         min-width: 320px;
         max-width: 85%;
         padding: 5px 15px;
-        
+
         border-radius: 12px;
-        border: 1px solid rgba(0,0,0,0.1);
+        border: 1px solid rgba(0, 0, 0, 0.1);
         background: rgba(var(--background-white), 0.85);
         backdrop-filter: blur(5px);
         -webkit-backdrop-filter: blur(5px);
-        box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
         z-index: 2000 !important;
-        
+
         transition: left 0.3s ease, right 0.3s ease, transform 0.3s ease;
     }
 
@@ -2745,13 +2803,13 @@ input[type="checkbox"][style*="opacity: 1"] {
     body:not([data-active-panel="map"]) #slider-container {
         left: auto;
         transform: none;
-        right: 20px; 
-        
+        right: 60px !important;
+
         /* Breite begrenzen: Screen - Tabs(72) - Panel(350) - Puffer */
         /* Wir runden auf 450px Puffer auf */
         max-width: calc(100vw - 450px);
     }
-    
+
     /* Layout im Slider selbst */
     .slider-content-wrapper {
         display: grid;
@@ -2761,10 +2819,28 @@ input[type="checkbox"][style*="opacity: 1"] {
         align-items: center;
         width: 100%;
     }
-    .slider-content-wrapper .time-row { grid-area: time; margin: 0; justify-content: flex-start; }
-    .slider-content-wrapper #model-row { grid-area: model; margin: 0; justify-content: flex-end; }
-    #modelLabel { display: none; }
-    .slider-content-wrapper .slider-wrapper { grid-area: slider; margin-top: 5px; margin-bottom: 15px; }
+
+    .slider-content-wrapper .time-row {
+        grid-area: time;
+        margin: 0;
+        justify-content: flex-start;
+    }
+
+    .slider-content-wrapper #model-row {
+        grid-area: model;
+        margin: 0;
+        justify-content: flex-end;
+    }
+
+    #modelLabel {
+        display: none;
+    }
+
+    .slider-content-wrapper .slider-wrapper {
+        grid-area: slider;
+        margin-top: 5px;
+        margin-bottom: 15px;
+    }
 
     /* 6. PLATZ FÜR GEOMAN TOOLS (Rechts) SCHAFFEN */
     /* Da Geoman im Landscape-Modus oft rechts liegt, schieben wir 
@@ -2772,12 +2848,352 @@ input[type="checkbox"][style*="opacity: 1"] {
 
     /* Live Position Button einrücken */
     .leaflet-control-live-position {
-        right: 50px !important; /* Platz für Geoman-Toolbar am rechten Rand */
+        right: 50px !important;
+        /* Platz für Geoman-Toolbar am rechten Rand */
     }
 
     /* Attribution (Copyright) einrücken */
     .leaflet-bottom .leaflet-control-attribution {
-        margin-right: 50px !important; /* Damit es nicht unter den Tools liegt */
-        max-width: calc(100% - 120px); /* Verhindert Überlappung bei langem Text */
+        margin-right: 50px !important;
+        /* Damit es nicht unter den Tools liegt */
+        max-width: calc(100% - 120px);
+        /* Verhindert Überlappung bei langem Text */
     }
+
+    /* =================================================================== */
+    /* DASHBOARD OPTIMIERUNG (Kompaktes Raster)
+    /* =================================================================== */
+
+    /* 1. Raster auf 2 Spalten umstellen */
+    .dashboard-grid {
+        display: grid;
+        /* Wir erzwingen 2 Spalten für ALLES */
+        grid-template-columns: 1fr 1fr !important;
+        /* Automatische Zeilenhöhe statt fixer Verhältnisse */
+        grid-template-rows: auto !important; 
+        gap: 8px !important;
+        padding: 5px 0 !important;
+        height: auto !important; /* Container darf wachsen (Scrollen) */
+    }
+
+    /* 2. Speed & Direction (die ersten beiden Cards) */
+    /* Da das Grid jetzt 2 Spalten hat, fallen diese automatisch 
+       in Zeile 1 links und rechts. Wir müssen nur die Höhe begrenzen. */
+    .dashboard-grid > .dashboard-card {
+        padding: 5px !important;
+        min-height: 70px; /* Kompakte Höhe */
+    }
+
+    /* 3. Die Container für Alt/Range, Glide, etc. (Split-Rows) */
+    /* Diese müssen sich jetzt über BEIDE Spalten strecken, damit 
+       ihre internen 2 Spalten wieder zum Raster passen. */
+    .dashboard-row-split {
+        grid-column: 1 / -1 !important; /* Volle Breite */
+        gap: 8px !important;
+        margin-bottom: 0 !important;
+    }
+
+    /* 4. Schriftgrößen drastisch reduzieren für Landscape */
+    /* Damit es nicht so wuchtig wirkt */
+    .card-value {
+        font-size: 2.2rem !important; /* Vorher ~4rem */
+        line-height: 1.1;
+    }
+    
+    .dashboard-row-split .card-value {
+        font-size: 2.0rem !important; /* Vorher ~3rem */
+    }
+
+    .card-label {
+        font-size: 0.8rem !important;
+        margin-bottom: 0 !important;
+    }
+    
+    .card-unit {
+        font-size: 0.8rem !important;
+        margin-top: 0 !important;
+    }
+
+    /* 5. Anpassung der Recording Buttons (ganz unten) */
+    /* Damit sie nicht zu viel Platz fressen */
+    #auto-record-card, #manual-record-card {
+        min-height: 50px;
+    }
+    
+    .arm-button {
+        font-size: 1.0rem !important;
+        padding: 5px !important;
+    }
+
+    /* =================================================================== */
+    /* JUMPMASTER DASHBOARD (Split-Screen Layout)
+    /* =================================================================== */
+
+    /* 1. Hauptcontainer in zwei Hälften teilen */
+    #jumpmaster-view-mobile {
+        display: grid;
+        grid-template-columns: 1fr 1fr; /* Links: Flugdaten, Rechts: JML */
+        gap: 10px;
+        height: 100%;
+        overflow: hidden; /* Scrollen innerhalb der Spalten erlauben, nicht body */
+    }
+
+    /* 2. Linke Seite: Flugdaten (Kompaktes Grid) */
+    #jumpmaster-view-mobile > .dashboard-grid-jm {
+        grid-template-columns: 1fr 1fr !important; /* 2 Spalten intern */
+        align-content: start; /* Oben beginnen */
+        gap: 8px !important;
+    }
+
+    /* 3. Rechte Seite: JML Details */
+    #jumpmaster-line-details-mobile {
+        /* Wichtig: Grid-Positionierung rechts erzwingen */
+        grid-column: 2;
+        grid-row: 1;
+        
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        
+        /* Optik anpassen */
+        margin-top: 0 !important;
+        border-top: none !important;
+        border-left: 1px solid var(--border-color); /* Trennlinie links */
+        padding-left: 10px;
+    }
+    
+    /* Trennlinie (hr) im Landscape ausblenden, stört nur */
+    #jumpmaster-line-details-mobile hr {
+        display: none;
+    }
+
+    /* Toggle-Buttons oben kompakt halten */
+    .jml-target-toggle {
+        flex-shrink: 0;
+        margin-bottom: 10px !important;
+        margin-top: 0 !important;
+    }
+
+    /* Das innere Grid der JML-Daten (Rechte Seite) */
+    #jumpmaster-line-details-mobile .dashboard-grid-jm {
+        display: grid;
+        grid-template-columns: 1fr 1fr !important; /* 2 Spalten für die Werte */
+        grid-auto-rows: min-content; /* So hoch wie nötig */
+        gap: 8px !important;
+        flex-grow: 1; /* Den Rest der Höhe nutzen */
+    }
+
+    /* 4. HERVORHEBUNG DER WICHTIGSTEN WERTE */
+    
+    /* HÖHE (im linken Grid): Groß machen */
+    /* Altitude ist das 2. Element im HTML. Wir nutzen nth-child */
+    #jumpmaster-view-mobile > .dashboard-grid-jm > .dashboard-item:nth-child(2) {
+        grid-column: 1 / -1; /* Volle Breite links */
+        background-color: var(--color-primary); /* Hervorheben */
+        color: var(--text-inverted);
+    }
+    #jumpmaster-view-mobile > .dashboard-grid-jm > .dashboard-item:nth-child(2) .dashboard-label,
+    #jumpmaster-view-mobile > .dashboard-grid-jm > .dashboard-item:nth-child(2) .dashboard-value {
+        color: var(--text-inverted); /* Weißer Text */
+    }
+
+    /* JML WERTE (Rechts): Bearing, Distance, TOT riesig machen */
+    
+    /* Target Label (z.B. "Target: DIP") */
+    #jumpmaster-line-details-mobile .dashboard-item:first-child {
+        grid-column: 1 / -1; /* Volle Breite */
+        padding: 5px !important;
+        background: transparent !important;
+        font-weight: bold;
+        text-align: center;
+    }
+
+    /* Bearing & Distance */
+    #jumpmaster-line-details-mobile .dashboard-item:nth-child(2), /* Bearing */
+    #jumpmaster-line-details-mobile .dashboard-item:nth-child(3) { /* Distance */
+        min-height: 80px; /* Schön hoch */
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    /* Time To Target (TOT) - Das Wichtigste! */
+    #jumpmaster-line-details-mobile .dashboard-item:nth-child(4) {
+        grid-column: 1 / -1; /* Volle Breite rechts unten */
+        background-color: var(--palette-green-500); /* Signal-Grün */
+        color: white;
+        min-height: 80px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+    /* Farbe für Labels im TOT-Kasten anpassen */
+    #jumpmaster-line-details-mobile .dashboard-item:nth-child(4) .dashboard-label,
+    #jumpmaster-line-details-mobile .dashboard-item:nth-child(4) .dashboard-value {
+        color: white;
+    }
+
+    /* Allgemeine Schriftgrößen im Jumpmaster-Mode */
+    #jumpmaster-view-mobile .dashboard-value {
+        font-size: 1.0rem !important;
+        font-weight: bold;
+        line-height: 1.1;
+    }
+    
+    /* TOT und Höhe extra fett */
+    #jumpmaster-view-mobile > .dashboard-grid-jm > .dashboard-item:nth-child(2) .dashboard-value,
+    #jumpmaster-line-details-mobile .dashboard-item:nth-child(4) .dashboard-value {
+        font-size: 1.8rem !important;
+    }
+
+    /* Labels klein halten */
+    #jumpmaster-view-mobile .dashboard-label {
+        font-size: 0.75rem !important;
+        text-transform: uppercase;
+        opacity: 0.9;
+    }
+
+
+    /* =================================================================== */
+    /* FINAL POLISHING (Snackbar, Charts, Zoom)
+    /* =================================================================== */
+
+    /* 1. SNACKBAR FIX (Aggressive Positionierung) */
+    #snackbar, 
+    #progress-snackbar {
+        position: fixed !important;
+        
+        /* inset setzt top/left/bottom/right in einem Rutsch. 
+           auto = nicht gesetzt. 
+           Wir erzwingen: top=auto, bottom=15px, left=50% */
+        inset: auto auto 15px 50% !important;
+        
+        /* Rückfalloption für ältere Browser, falls inset nicht greift */
+        top: auto !important;
+        bottom: 15px !important;
+        left: 50% !important;
+        
+        /* Breite und Zentrierung */
+        width: auto !important;
+        min-width: 250px !important;
+        max-width: 60vw !important;
+        
+        /* Wir überschreiben die Standard-Transform-Regeln komplett */
+        transform: translateX(-50%) !important;
+        
+        z-index: 20000 !important;
+        margin-bottom: env(safe-area-inset-bottom);
+        white-space: normal !important;
+    }
+
+    /* WICHTIG: Damit die "Erscheinen"-Animation nicht die Position ruiniert,
+       definieren wir den .show Status explizit für Landscape neu */
+    
+    /* Wenn NICHT sichtbar (Standard): Nach unten schieben */
+    #snackbar:not(.show),
+    #progress-snackbar:not(.show) {
+        transform: translateX(-50%) translateY(150%) !important;
+        opacity: 0 !important;
+    }
+
+    /* Wenn SICHTBAR: Auf Normalposition (unten) holen */
+    #snackbar.show,
+    #progress-snackbar.show {
+        transform: translateX(-50%) translateY(0) !important;
+        opacity: 1 !important;
+    }
+
+    /* 2. KOMPAKTERE WETTER-DIAGRAMME */
+    /* Titel näher an den Chart rücken */
+    .meteogram-title {
+        margin-bottom: 2px;
+        font-size: 1.0em;
+    }
+
+    /* =================================================================== */
+    /* OFFLINE INDICATOR FIX (Landscape)
+    /* =================================================================== */
+
+    #offline-indicator {
+        position: fixed !important;
+        
+        /* Positionierung: Unten Mitte (etwas höher als die Snackbar) */
+        /* bottom: 70px sorgt für Abstand zur Snackbar (die bei ~15px liegt) */
+        inset: auto auto 70px 50% !important;
+        top: auto !important;
+        
+        /* Design: Pille statt voller Balken */
+        width: auto !important;
+        min-width: 200px;
+        max-width: 80%;
+        border-radius: 50px; /* Runde Ecken */
+        
+        /* Zentrierung */
+        transform: translateX(-50%) !important;
+        
+        /* Optik */
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        z-index: 20005 !important; /* Über der Snackbar */
+    }
+
+    /* ANIMATION ANPASSEN (Kommt jetzt von unten statt von oben) */
+    
+    /* Zustand: VERSTECKT (Nach unten aus dem Bild schieben) */
+    #offline-indicator:not(.show) {
+        transform: translateX(-50%) translateY(150%) !important;
+        opacity: 0 !important;
+    }
+
+    /* Zustand: SICHTBAR (Auf Position fahren) */
+    #offline-indicator.show {
+        transform: translateX(-50%) translateY(0) !important;
+        opacity: 1 !important;
+    }
+
+    /* =================================================================== */
+    /* KOMPAKTE WETTER-TABELLE (Landscape)
+    /* =================================================================== */
+
+    /* 1. Schriftgröße für die Tabelle global senken */
+    #weather-table-container table {
+        font-size: 11px !important; 
+    }
+
+    /* 2. Tabellen-Kopf (Header) flacher machen */
+    #weather-table-container th {
+        padding: 2px 4px !important; /* Vorher 6px 8px */
+        height: 24px !important;     /* Fixe, geringe Höhe erzwingen */
+        line-height: 1.1 !important;
+    }
+
+    /* 3. Tabellen-Zellen (Daten) flacher machen */
+    #weather-table-container td {
+        padding: 1px 2px !important; /* Vorher 2px */
+        height: 20px !important;     /* Sehr flache Zeilen */
+        line-height: 1.1 !important;
+    }
+    
+    /* 4. Auch die Eingabefelder über der Tabelle anpassen */
+    /* Damit "Lower Limit" / "Upper Limit" nicht so wuchtig wirken */
+    #meanWindControls input, 
+    #controls-row select, 
+    #controls-row input {
+        padding: 2px 4px !important;
+        font-size: 11px !important;
+        height: 24px !important; /* Passend zum Tabellen-Header */
+    }
+    
+    #meanWindControls label,
+    #controls-row label {
+        font-size: 11px !important;
+    }
+}
+
+/* =================================================================== */
+/* LOGIK-BASIERTE ANZEIGE (Global)
+/* =================================================================== */
+
+/* Versteckt das Live-Position Overlay auf der Karte, sobald das Dashboard offen ist */
+body[data-active-panel="dashboard"] .leaflet-control-live-position {
+    display: none !important;
 }
