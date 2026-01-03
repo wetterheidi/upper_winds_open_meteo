@@ -257,7 +257,7 @@ export function calculateJump() {
     // Er prüft unabhängig von den Visualisierungs-Einstellungen (Exit/Canopy Area an/aus),
     // ob der Wind in der Safety Height kritisch ist.
     displayManager.checkSafetyHeightWindWarning();
-    
+
     const visualizationData = {
         exitCircles: [],
         canopyCircles: [],
@@ -1746,7 +1746,7 @@ function setupAppEventListeners() {
     document.addEventListener('ui:radioGroupChanged', async (e) => {
         const { name } = e.detail;
         console.log(`[main-mobile] Radio group '${name}' changed. Performing specific updates.`);
-                
+
         const sliderIndex = getSliderValue();
         // Zuerst führen wir Aktionen aus, die fast immer nötig sind,
         // oder die die Grundlage für weitere Berechnungen bilden.
@@ -2238,6 +2238,20 @@ function setupAppEventListeners() {
         }
     });
 
+    // Listener für Orientierungsänderung
+    window.addEventListener('resize', () => {
+        // Kurze Verzögerung, damit der Browser das Layout fertig berechnet hat
+        setTimeout(() => {
+            if (AppState.map) {
+                console.log('[App] Resize detected, invalidating map size.');
+                AppState.map.invalidateSize();
+
+                // Falls nötig, UI-Elemente neu zentrieren (z.B. Marker Popup)
+                // if (AppState.currentMarker && AppState.currentMarker.isPopupOpen()) { ... }
+            }
+        }, 300);
+    });
+
     // Listener, um veraltete Daten beim Reaktivieren der App zu aktualisieren
     document.addEventListener('visibilitychange', async () => {
         // Nur handeln, wenn der Tab/die App sichtbar wird
@@ -2295,6 +2309,25 @@ function setupAppEventListeners() {
                 console.log('[App Visibility] No weather data available to check for outdatedness.');
             }
         }
+    });
+
+    // --- NEU: Tracking des aktiven Panels für CSS-Styling ---
+    
+    // 1. Initialen Zustand setzen
+    const activeBtn = document.querySelector('.tab-button.active');
+    if (activeBtn) {
+        document.body.setAttribute('data-active-panel', activeBtn.dataset.panel);
+    } else {
+        document.body.setAttribute('data-active-panel', 'map'); // Fallback
+    }
+
+    // 2. Bei Klick aktualisieren
+    document.querySelectorAll('.tab-button').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const panelName = btn.dataset.panel;
+            // Setzt ein Attribut am Body, z.B. data-active-panel="data"
+            document.body.setAttribute('data-active-panel', panelName);
+        });
     });
 }
 

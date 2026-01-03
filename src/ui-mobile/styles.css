@@ -2636,3 +2636,148 @@ input[type="checkbox"][style*="opacity: 1"] {
     text-align: center !important;
     padding-left: 0 !important;
 }
+
+/* =================================================================== */
+/* LANDSCAPE MODE OPTIMIERUNGEN (Mit Beschriftung)
+/* =================================================================== */
+
+@media (orientation: landscape) {
+
+    /* 1. GRID-LAYOUT: Linke Spalte etwas breiter für Text (72px) */
+    body {
+        grid-template-columns: calc(72px + env(safe-area-inset-left)) 1fr !important;
+        grid-template-rows: 1fr !important;
+    }
+
+    /* 2. TAB-BAR */
+    #tab-bar {
+        grid-row: 1 / -1;
+        grid-column: 1;
+        
+        flex-direction: column;
+        justify-content: center;
+        gap: 15px; /* Etwas weniger Abstand, damit Text Platz hat */
+        
+        height: 100%;
+        width: 100%;
+        
+        border-top: none;
+        border-right: 1px solid var(--border-color);
+        border-left: none;
+        
+        padding-bottom: 0;
+        padding-left: env(safe-area-inset-left);
+        padding-right: 0;
+        
+        background: rgba(var(--background-white), 0.95) !important;
+    }
+
+    .tab-button { 
+        width: 100%; 
+        height: auto; 
+        padding: 8px 0; /* Etwas weniger Padding vertikal */
+    }
+
+    /* WIEDERHERGESTELLT: Labels anzeigen */
+    .tab-button .label {
+        display: block; 
+        font-size: 10px; /* Kleinere Schrift für kompakten Look */
+        margin-top: 3px;
+        text-align: center;
+        white-space: nowrap; /* Verhindert Umbruch */
+        overflow: hidden;
+        text-overflow: ellipsis; /* Pünktchen falls zu lang */
+        max-width: 100%;
+        padding: 0 2px;
+    }
+    
+    .tab-button .icon { 
+        font-size: 24px; 
+        margin-bottom: 0; 
+    }
+
+    /* 3. MAP CONTAINER & CONTENT PANELS */
+    #map-container {
+        grid-row: 1;
+        grid-column: 2;
+        height: 100% !important;
+        width: 100% !important;
+    }
+
+    #content-panels {
+        grid-row: 1;
+        grid-column: 2;
+        width: 350px;
+        max-width: 80%;
+        height: 100%;
+        border-right: 1px solid var(--border-color);
+        background: rgba(var(--background-white), 0.95);
+        z-index: 1002;
+    }
+
+    /* 4. SLIDER WIDGET */
+    #slider-container {
+        position: absolute !important;
+        top: 10px;
+        
+        /* Standard: Zentriert */
+        left: 50%;
+        transform: translateX(-50%);
+        right: auto;
+        
+        width: auto;
+        min-width: 320px;
+        max-width: 85%;
+        padding: 5px 15px;
+        
+        border-radius: 12px;
+        border: 1px solid rgba(0,0,0,0.1);
+        background: rgba(var(--background-white), 0.85);
+        backdrop-filter: blur(5px);
+        -webkit-backdrop-filter: blur(5px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+        z-index: 2000 !important;
+        
+        transition: left 0.3s ease, right 0.3s ease, transform 0.3s ease;
+    }
+
+    /* 5. SLIDER POSITION WENN PANEL OFFEN IST */
+    body:not([data-active-panel="map"]) #slider-container {
+        left: auto;
+        transform: none;
+        right: 20px; 
+        
+        /* Breite begrenzen: Screen - Tabs(72) - Panel(350) - Puffer */
+        /* Wir runden auf 450px Puffer auf */
+        max-width: calc(100vw - 450px);
+    }
+    
+    /* Layout im Slider selbst */
+    .slider-content-wrapper {
+        display: grid;
+        grid-template-areas: "time model" "slider slider";
+        grid-template-columns: 1fr auto;
+        gap: 0 15px;
+        align-items: center;
+        width: 100%;
+    }
+    .slider-content-wrapper .time-row { grid-area: time; margin: 0; justify-content: flex-start; }
+    .slider-content-wrapper #model-row { grid-area: model; margin: 0; justify-content: flex-end; }
+    #modelLabel { display: none; }
+    .slider-content-wrapper .slider-wrapper { grid-area: slider; margin-top: 5px; margin-bottom: 15px; }
+
+    /* 6. PLATZ FÜR GEOMAN TOOLS (Rechts) SCHAFFEN */
+    /* Da Geoman im Landscape-Modus oft rechts liegt, schieben wir 
+       die anderen Controls nach links weg. */
+
+    /* Live Position Button einrücken */
+    .leaflet-control-live-position {
+        right: 50px !important; /* Platz für Geoman-Toolbar am rechten Rand */
+    }
+
+    /* Attribution (Copyright) einrücken */
+    .leaflet-bottom .leaflet-control-attribution {
+        margin-right: 50px !important; /* Damit es nicht unter den Tools liegt */
+        max-width: calc(100% - 120px); /* Verhindert Überlappung bei langem Text */
+    }
+}
