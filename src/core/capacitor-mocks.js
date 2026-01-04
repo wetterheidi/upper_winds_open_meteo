@@ -8,3 +8,4 @@ export const Filesystem = null;
 export const Directory = null;
 export const Browser = null;
 export const App = null;
+export const StatusBar = null;

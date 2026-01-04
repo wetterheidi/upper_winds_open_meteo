@@ -2679,27 +2679,57 @@ input[type="checkbox"][style*="opacity: 1"] {
     }
 
     /* 2. TAB-BAR */
-    #tab-bar {
+#tab-bar {
         grid-row: 1 / -1;
         grid-column: 1;
-
+        
         flex-direction: column;
-        justify-content: center;
-        gap: 15px;
-        /* Etwas weniger Abstand, damit Text Platz hat */
-
+        
+        /* ÄNDERUNG: Statt 'center' und festem 'gap' nutzen wir den Platz dynamisch */
+        justify-content: space-between !important; 
+        gap: 0 !important; /* Keine festen Lücken mehr! */
+        
         height: 100%;
         width: 100%;
-
+        
         border-top: none;
         border-right: 1px solid var(--border-color);
         border-left: none;
-
-        padding-bottom: 0;
+        
+        /* Oben/Unten etwas Luft lassen, aber nicht zu viel */
+        padding-top: max(10px, env(safe-area-inset-top)); 
+        padding-bottom: max(10px, env(safe-area-inset-bottom));
         padding-left: env(safe-area-inset-left);
         padding-right: 0;
-
+        
         background: rgba(var(--background-white), 0.95) !important;
+        
+        /* NOTFALL-NETZ: Falls das Handy extrem flach ist, erlauben wir Scrollen */
+        overflow-y: auto !important; 
+        overflow-x: hidden;
+        
+        /* Scrollbar verstecken (für Chrome/Safari) */
+        scrollbar-width: none; 
+        -ms-overflow-style: none;
+    }
+    
+    #tab-bar::-webkit-scrollbar {
+        display: none;
+    }
+
+    /* Buttons flexibel machen */
+    .tab-button { 
+        width: 100%; 
+        height: auto !important; 
+        
+        /* ÄNDERUNG: Buttons dürfen schrumpfen, aber haben Mindesthöhe */
+        flex: 1 1 auto; 
+        min-height: 40px; /* Kleinere Mindesthöhe für kleine Screens */
+        max-height: 60px; /* Nicht riesig werden auf Tablets */
+        
+        padding: 2px 0; /* Weniger Padding */
+        display: flex;
+        justify-content: center;
     }
 
     .tab-button {
@@ -3197,3 +3227,117 @@ input[type="checkbox"][style*="opacity: 1"] {
 body[data-active-panel="dashboard"] .leaflet-control-live-position {
     display: none !important;
 }
+
+/* =================================================================== */
+/* NOTFALL-LAYOUT FÜR FLACHE SCREENS (z.B. Handys im Querformat)
+/* Greift, wenn die Höhe kleiner als 450px ist
+/* =================================================================== */
+
+@media (orientation: landscape) and (max-height: 480px) {
+
+    /* 1. SLIDER CONTAINER VERKLEINERN */
+    #slider-container {
+        /* Wir schrumpfen den ganzen Container auf 85% */
+        transform: translateX(-50%) scale(0.85) !important;
+        transform-origin: top center; /* Schrumpfen von oben her */
+        top: 0 !important; /* Ganz nach oben kleben */
+        margin-top: 5px;   /* Minimaler Abstand */
+        
+        /* Falls ein Panel offen ist (Slider ist rechts): */
+        /* Muss durch spezifischere Regel unten korrigiert werden, 
+           aber scale hilft auch dort. */
+    }
+
+    /* Korrektur für Slider wenn Panel offen (rechts) */
+    body:not([data-active-panel="map"]) #slider-container {
+        transform: none !important; /* Reset, da Position anders ist */
+        /* Manuelle Skalierung für die rechte Ecke */
+        transform: scale(0.8) !important; 
+        transform-origin: top right !important;
+        top: 5px !important;
+        right: 60px !important; /* Etwas Platz für Geoman lassen */
+    }
+
+    /* 2. GEOMAN TOOLS & ZOOM (Kompaktierung) */
+    
+    /* Geoman Toolbar Gruppen (Draw & Edit) */
+    .leaflet-pm-toolbar {
+        /* Skalierung beibehalten */
+        transform: scale(0.75) !important;
+        
+        /* WICHTIG: Ursprung oben links, damit sie nicht "wegrutschen" */
+        transform-origin: top left !important; 
+        
+        /* Kompaktierung: Wir ziehen die Boxen näher zusammen */
+        /* Kompensiert den Platzverlust durch Scale (ca. 10-15px) */
+        margin-bottom: -10px !important; 
+        margin-top: 0 !important;
+        
+        /* Optional: Den linken Abstand korrigieren, falls sie zu weit innen schweben */
+        margin-left: 0 !important; 
+    }
+    
+    /* Die einzelnen Buttons innerhalb der Geoman-Leiste */
+    .leaflet-pm-toolbar .leaflet-bar {
+        box-shadow: none !important; /* Optional: Cleaner Look */
+    }
+
+    /* Der Container für die Actions (Cancel/Finish Button neben Geoman) */
+    .leaflet-pm-actions-container {
+         transform: scale(0.8);
+         transform-origin: top left;
+         top: 5px !important; /* Feinjustierung der Höhe */
+    }
+
+    /* 3. TABBAR - EXTREM KOMPAKT */
+    #tab-bar {
+        width: 55px !important; /* Schmaler machen */
+        padding-top: 5px !important;
+        justify-content: flex-start !important; /* Oben anfangen */
+        gap: 0 !important;
+        overflow-y: auto !important; /* Scrollen erlauben! */
+    }
+    
+    /* Gitter anpassen, da Tabbar schmaler ist */
+    body {
+        grid-template-columns: calc(55px + env(safe-area-inset-left)) 1fr !important;
+    }
+
+    .tab-button {
+        min-height: 35px !important; /* Buttons dürfen sehr flach sein */
+        padding: 5px 0 !important;
+    }
+
+    .tab-button .icon {
+        font-size: 20px !important; /* Icons kleiner */
+        margin-bottom: 0 !important;
+    }
+
+    /* Text-Labels IMMER ausblenden auf flachen Screens */
+    .tab-button .label {
+        display: none !important;
+    }
+    
+    /* 4. ZOOM CONTROLS (Positionierung) */
+    .leaflet-control-zoom {
+        /* Auch hier: Skalieren und Ghost-Space kompensieren */
+        transform: scale(0.8) !important;
+        transform-origin: top left !important;
+        
+        /* Da der weiße Streifen weg ist, können wir den Zoom wieder 
+           etwas höher schieben (z.B. 40px statt 50px) */
+        margin-top: 5px !important; 
+        margin-bottom: -5px !important; /* Näher an die Geoman-Tools darunter rücken */
+        
+        margin-left: 10px !important; /* Etwas Abstand vom linken Rand */
+    }
+    
+    /* 5. DASHBOARD SCHRIFTEN NOCH KLEINER */
+    .dashboard-grid .card-value {
+        font-size: 1.5rem !important; /* Extrem kompakt */
+    }
+    .dashboard-grid .card-label {
+        font-size: 0.7rem !important;
+    }
+}
+

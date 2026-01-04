@@ -2337,6 +2337,36 @@ function setupAppEventListeners() {
 // Beschreibung: Der Code in diesem Block wird ausgeführt, sobald das
 // HTML-Dokument vollständig geladen ist. Er startet die gesamte Anwendung.
 document.addEventListener('DOMContentLoaded', async () => {
+
+    // --- NEU: Status Bar Konfiguration EINFÜGEN START ---
+    const configureStatusBar = async () => {
+        try {
+            const { StatusBar, isNative } = await getCapacitor();
+            if (isNative && StatusBar) {
+                console.log('[App] Configuring Native Status Bar (Aggressive)');
+                
+                // 1. App unter die Leiste schieben
+                await StatusBar.setOverlaysWebView({ overlay: true });
+                
+                // 2. Hintergrund transparent machen (für Android wichtig!)
+                // '#00000000' ist komplett transparent
+                await StatusBar.setBackgroundColor({ color: '#00000000' }); 
+                
+                // 3. Optional: Leiste komplett ausblenden
+                await StatusBar.hide(); 
+                
+                // Event Listener: Falls sie versehentlich wieder auftaucht (z.B. durch Keyboard)
+                // window.addEventListener('resize', () => StatusBar.hide());
+            }
+        } catch (err) {
+            console.warn('[App] Error configuring status bar:', err);
+        }
+    };
+    
+    // Direkt ausführen
+    configureStatusBar();
+    // --- NEU: Status Bar Konfiguration EINFÜGEN ENDE ---
+
     initializeApp();
     initializeUIElements();
     updateLockStatesUI();

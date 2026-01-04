@@ -18,6 +18,8 @@ PODS:
     - IONGeolocationLib (~> 1.0)
   - CapacitorSplashScreen (7.0.2):
     - Capacitor
+  - CapacitorStatusBar (7.0.4):
+    - Capacitor
   - CapawesomeCapacitorFilePicker (7.2.0):
     - Capacitor
   - IONFilesystemLib (1.0.1)
@@ -33,6 +35,7 @@ DEPENDENCIES:
   - "CapacitorFilesystem (from `../../node_modules/@capacitor/filesystem`)"
   - "CapacitorGeolocation (from `../../node_modules/@capacitor/geolocation`)"
   - "CapacitorSplashScreen (from `../../node_modules/@capacitor/splash-screen`)"
+  - "CapacitorStatusBar (from `../../node_modules/@capacitor/status-bar`)"
   - "CapawesomeCapacitorFilePicker (from `../../node_modules/@capawesome/capacitor-file-picker`)"
 
 SPEC REPOS:
@@ -59,6 +62,8 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/@capacitor/geolocation"
   CapacitorSplashScreen:
     :path: "../../node_modules/@capacitor/splash-screen"
+  CapacitorStatusBar:
+    :path: "../../node_modules/@capacitor/status-bar"
   CapawesomeCapacitorFilePicker:
     :path: "../../node_modules/@capawesome/capacitor-file-picker"
 
@@ -72,10 +77,11 @@ SPEC CHECKSUMS:
   CapacitorFilesystem: 337eeaf16a9fa5a44d2329df411523fa3a9a6ee9
   CapacitorGeolocation: 32a1f849c38c72b5071de36a28ebc548ef3bb611
   CapacitorSplashScreen: 157947576b59d913792063a8d442a79e6d283ee5
+  CapacitorStatusBar: d0e0151c89c001a9c7125bac59ddedf76b664768
   CapawesomeCapacitorFilePicker: 0f4a913a00e39dd77213449f0d917e92f35a5ca9
   IONFilesystemLib: 89258b8e3e85465da93127d25d7ce37f977e8a6f
   IONGeolocationLib: adbb2a739b0ccda686d4a66f9bc05f8c4fd3d3c0
 
-PODFILE CHECKSUM: d45ee9a08909bb4bae90c50649c4b5169db1d858
+PODFILE CHECKSUM: 3a99c6af5fddcabd1e7453b5fb6348feeb360d84
 
 COCOAPODS: 1.16.2

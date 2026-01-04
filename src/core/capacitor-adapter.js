@@ -8,6 +8,7 @@ import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Browser } from '@capacitor/browser';
 import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app'; // <<< NEUER IMPORT
+import { StatusBar } from '@capacitor/status-bar';
 
 let capacitorModulesPromise = null;
 let deviceReadyPromise = null;
@@ -66,6 +67,7 @@ async function loadModules() {
                 Browser,
                 Capacitor,
                 App,
+                StatusBar,
                 isNative: true,
                 isInitialized: true
             };
@@ -83,6 +85,7 @@ async function loadModules() {
         Browser: null,
         Capacitor: null,
         App: null,
+        StatusBar: null,
         isNative: false,
         isInitialized: false
     };
@@ -99,6 +102,7 @@ export async function getCapacitor() {
                 Browser: null,
                 Capacitor: null,
                 App: null,
+                StatusBar: null,
                 isNative: false,
                 isInitialized: false
             };
