@@ -2311,24 +2311,6 @@ function setupAppEventListeners() {
         }
     });
 
-    // --- NEU: Tracking des aktiven Panels für CSS-Styling ---
-    
-    // 1. Initialen Zustand setzen
-    const activeBtn = document.querySelector('.tab-button.active');
-    if (activeBtn) {
-        document.body.setAttribute('data-active-panel', activeBtn.dataset.panel);
-    } else {
-        document.body.setAttribute('data-active-panel', 'map'); // Fallback
-    }
-
-    // 2. Bei Klick aktualisieren
-    document.querySelectorAll('.tab-button').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const panelName = btn.dataset.panel;
-            // Setzt ein Attribut am Body, z.B. data-active-panel="data"
-            document.body.setAttribute('data-active-panel', panelName);
-        });
-    });
 }
 
 // =================================================================
@@ -2344,17 +2326,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             const { StatusBar, isNative } = await getCapacitor();
             if (isNative && StatusBar) {
                 console.log('[App] Configuring Native Status Bar (Aggressive)');
-                
+
                 // 1. App unter die Leiste schieben
                 await StatusBar.setOverlaysWebView({ overlay: true });
-                
+
                 // 2. Hintergrund transparent machen (für Android wichtig!)
                 // '#00000000' ist komplett transparent
-                await StatusBar.setBackgroundColor({ color: '#00000000' }); 
-                
+                await StatusBar.setBackgroundColor({ color: '#00000000' });
+
                 // 3. Optional: Leiste komplett ausblenden
-                await StatusBar.hide(); 
-                
+                await StatusBar.hide();
+
                 // Event Listener: Falls sie versehentlich wieder auftaucht (z.B. durch Keyboard)
                 // window.addEventListener('resize', () => StatusBar.hide());
             }
@@ -2362,7 +2344,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             console.warn('[App] Error configuring status bar:', err);
         }
     };
-    
+
     // Direkt ausführen
     configureStatusBar();
     // --- NEU: Status Bar Konfiguration EINFÜGEN ENDE ---

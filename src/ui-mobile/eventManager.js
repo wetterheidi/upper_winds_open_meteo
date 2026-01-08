@@ -190,12 +190,12 @@ function toggleSubmenu(element, submenu, isVisible) {
 
 /**
  * Richtet die Klick-Handler für die Tabbar-Navigation ein, um Panels zu öffnen/schliessen.
+ * NEUE LOGIK: Außer "map" schließt ein erneuter Tap auf ein geöffnetes Panel dieses wieder (zurück zur Map).
  * @private
  */
 function setupTabBarEvents() {
     const tabBar = document.getElementById('tab-bar');
     const sliderContainer = document.getElementById('slider-container');
-    // --- Referenzen auf die Hauptcontainer holen ---
     const mapContainer = document.getElementById('map-container');
     const contentPanelsContainer = document.getElementById('content-panels');
 
@@ -205,49 +205,52 @@ function setupTabBarEvents() {
     }
 
     tabBar.addEventListener('click', (e) => {
-        const button = e.target.closest('.tab-button');
+        let button = e.target.closest('.tab-button');
         if (!button) return;
 
-        const panelId = button.dataset.panel;
+        let panelId = button.dataset.panel;
 
+        // Lock-Logik (unverändert)
         if ((panelId === 'planner' || panelId === 'data') && !Settings.isFeatureUnlocked(panelId)) {
             Settings.showPasswordModal(
                 panelId,
-                () => { // onSuccess
-                    // Das 'ui:lockStateChanged' Event aktualisiert die UI.
-                    // Wir simulieren nur den Klick erneut, um das Panel zu öffnen.
-                    button.click();
-                },
-                () => { /* onCancel: nichts tun */ }
+                () => button.click(),
+                () => {}
             );
-            return; // Klick-Verarbeitung hier stoppen
+            return;
         }
 
-        // 1. Slider-Sichtbarkeit steuern (wie zuvor)
-        if (panelId === 'map' || panelId === 'data') {
-            sliderContainer.style.display = 'flex';
-        } else {
-            sliderContainer.style.display = 'none';
+        // --- Aktuelles Panel ermitteln: Map aktiv, wenn mapContainer sichtbar ---
+        const isCurrentlyOnMap = mapContainer.style.display === 'block';
+
+        // --- Schließen-Logik: Erneuter Tap auf offenes Nicht-Map-Panel → zurück zur Map ---
+        if (!isCurrentlyOnMap) {
+            const activeButton = document.querySelector('.tab-button.active');
+            const activePanelId = activeButton ? activeButton.dataset.panel : null;
+
+            if (activePanelId === panelId && panelId !== 'map') {
+                panelId = 'map'; // Umleiten: Wechsel zur Map
+                button = document.querySelector('.tab-button[data-panel="map"]'); // Nur für active-Klasse
+                console.log(`Panel "${activePanelId}" erneut angetippt → schließe und gehe zur Map`);
+            }
         }
 
-        // 2. Haupt-Container (Karte vs. Panels) umschalten
+        // --- Normales Wechsel-Verhalten ---
+        sliderContainer.style.display = (panelId === 'map' || panelId === 'data') ? 'flex' : 'none';
+
         if (panelId === 'map') {
-            // Zeige die Karte, verstecke die Panels
             mapContainer.style.display = 'block';
             contentPanelsContainer.style.display = 'none';
         } else {
-            // Zeige die Panels, verstecke die Karte
             mapContainer.style.display = 'none';
             contentPanelsContainer.style.display = 'block';
         }
 
-        // 3. Spezifisches Panel innerhalb des Containers anzeigen
+        // Spezifisches Panel anzeigen
         document.querySelectorAll('.content-panel').forEach(p => p.classList.add('hidden'));
         if (panelId !== 'map') {
             const panelToShow = document.getElementById(`panel-${panelId}`);
-            if (panelToShow) {
-                panelToShow.classList.remove('hidden');
-            }
+            if (panelToShow) panelToShow.classList.remove('hidden');
         }
 
         // Dashboard-Logik
@@ -259,45 +262,27 @@ function setupTabBarEvents() {
             }
         }
 
-        if (panelId === 'data' && !Settings.isFeatureUnlocked('data')) {
-            Settings.showPasswordModal('data',
-                () => { // onSuccess
-                    setDataLockState();
-                    button.click(); // Klick simulieren, um Tab zu öffnen
-                },
-                () => { // onCancel
-                    setDataLockState();
-                }
-            );
-            return; // Wichtig: Panel nicht öffnen
-        }
-
-        // Planner-Lock-Logik
-        if (panelId === 'planner' && !Settings.isFeatureUnlocked('planner')) {
-            Settings.showPasswordModal('planner', () => {
-                Settings.saveUnlockStatus('planner', true);
-                setPlannerLockState();
-                button.click(); // Simuliert einen erneuten Klick, um das Panel zu öffnen
-            }, () => { });
-            return;
-        }
-
-        // Aktiven Button-Stil setzen
+        // Active-Klasse setzen (direkt über panelId)
         document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
-        button.classList.add('active');
+        document.querySelector(`.tab-button[data-panel="${panelId}"]`)?.classList.add('active');
 
-        // Kartengröße neu berechnen, falls sie sichtbar ist
+        // Body-Attribut für CSS
+        document.body.setAttribute('data-active-panel', panelId);
+
+        // Map invalidateSize bei Bedarf
         if (AppState.map && panelId === 'map') {
-            setTimeout(() => {
-                AppState.map.invalidateSize();
-            }, 100);
+            setTimeout(() => AppState.map.invalidateSize(), 100);
         }
+
+        console.log(`Tab gewechselt zu: ${panelId}`);
     });
 
-    // Initialer Zustand beim Laden der App sicherstellen
+    // Initialer Zustand
     mapContainer.style.display = 'block';
     contentPanelsContainer.style.display = 'none';
     sliderContainer.style.display = 'flex';
+    document.querySelector('.tab-button[data-panel="map"]')?.classList.add('active');
+    document.body.setAttribute('data-active-panel', 'map');
 }
 function setupMenuEvents() {
     console.log("setupMenuEvents wird aufgerufen für allgemeine Menü-Logik.");
