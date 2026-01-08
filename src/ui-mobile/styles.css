@@ -3341,3 +3341,222 @@ body[data-active-panel="dashboard"] .leaflet-control-live-position {
     }
 }
 
+/* =================================================================== */
+/* KOMPAKTER LANDSCAPE MODUS (Für S24, iPhone Mini, etc.)
+/* Greift bei Querformat mit geringer Höhe (< 500px)
+/* =================================================================== */
+
+@media (orientation: landscape) and (max-height: 500px) {
+
+    /* 1. GLOBALE SCHRIFTVERKLEINERUNG 
+       Wir bleiben bei 11px, das ist ein guter Kompromiss */
+    html {
+        font-size: 11px !important;
+    }
+
+    /* 2. TAB-BAR ETWAS GRÖSSER ALS VORHER */
+    /* Breite auf 60px erhöht (war 50px) */
+    #tab-bar {
+        width: 60px !important; 
+        padding-top: 5px !important;
+        justify-content: flex-start !important;
+        overflow-y: auto !important;
+    }
+
+    /* Das Grid passt sich der neuen Breite an */
+    body {
+        grid-template-columns: calc(60px + env(safe-area-inset-left)) 1fr !important;
+    }
+
+    /* Buttons griffiger machen */
+    .tab-button {
+        min-height: 40px !important; /* Erhöht von 32px auf 40px */
+        padding: 6px 0 !important;   /* Etwas mehr "Fleisch" zum Klicken */
+        flex: 0 0 auto !important;
+    }
+
+    .tab-button .icon {
+        font-size: 20px !important; /* Icons deutlicher (war 1.6rem/ca 17px) */
+        margin-bottom: 0 !important;
+        line-height: 1 !important;
+    }
+
+    /* Text-Labels bleiben ausgeblendet für Platzersparnis */
+    .tab-button .label {
+        display: none !important;
+    }
+
+    /* 3. CONTENT PANELS */
+    #content-panels {
+        width: 280px !important; 
+        max-width: 55vw !important; 
+        padding: 10px !important;
+        padding-top: calc(10px + env(safe-area-inset-top)) !important;
+    }
+
+    /* 4. DASHBOARD */
+    .dashboard-grid { gap: 4px !important; }
+    .dashboard-card { 
+        padding: 4px !important; 
+        min-height: 50px !important; 
+    }
+    .card-value { font-size: 2.0rem !important; }
+    .card-label, .card-unit { font-size: 0.85rem !important; }
+    
+    #jumpmaster-view-mobile .dashboard-value { font-size: 1.3rem !important; }
+
+/* =================================================================== */
+    /* 5. SLIDER & ZEITANZEIGE OPTIMIERUNG (Grid-Layout v2)
+    /* =================================================================== */
+    
+    #slider-container {
+        position: absolute !important;
+        top: 2px !important;
+        left: 50% !important;
+        transform: translateX(-50%) scale(0.85) !important;
+        transform-origin: top center !important;
+        
+        width: auto !important;
+        min-width: 320px !important; 
+        max-width: 85vw !important;
+        
+        /* WICHTIG: Padding unten etwas reduzieren, da der Slider-Wrapper 
+           jetzt eigenen Margin mitbringt (für die Labels) */
+        padding: 4px 8px 0 8px !important; 
+        
+        margin: 0 !important;
+        box-sizing: border-box !important;
+        display: block !important; 
+    }
+
+    .slider-content-wrapper {
+        display: grid !important;
+        grid-template-areas: 
+            "time model"
+            "slider slider" !important;
+        grid-template-columns: 1fr auto !important; 
+        gap: 2px 10px !important; /* Weniger vertikaler Abstand */
+        width: 100% !important;
+        align-items: start !important; /* Oben bündig, falls Zeit umbricht */
+    }
+
+    /* --- ZONE 1: ZEIT (Oben Links) --- */
+    .slider-content-wrapper .time-row {
+        grid-area: time !important;
+        display: flex !important;
+        align-items: flex-start !important; /* Text oben bündig */
+        width: 100% !important;
+        margin: 0 !important;
+        padding-top: 2px !important; /* Ausgleich für Ausrichtung */
+    }
+
+    #selectedTime {
+        /* WICHTIG: Umbruch erlauben! */
+        white-space: normal !important; 
+        font-size: 11px !important;
+        line-height: 1.1 !important;
+        margin-right: 4px !important;
+        
+        /* Damit der Umbruch passiert, begrenzen wir die Breite relativ */
+        max-width: 130px !important; 
+        display: block !important;
+    }
+
+    /* Update-Button sicherstellen */
+    #autoupdateToggle {
+        flex: 0 0 auto !important;
+        transform: scale(0.9);
+        margin-top: 2px !important; /* Optisch zur ersten Textzeile ausrichten */
+    }
+
+    /* --- ZONE 2: MODELL (Oben Rechts) --- */
+    .slider-content-wrapper #model-row {
+        grid-area: model !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: flex-end !important;
+        margin: 0 !important;
+        height: 100% !important; /* Höhe der Zeit-Row nutzen */
+    }
+    
+    #modelLabel { display: none !important; }
+
+    #modelSelect {
+        font-size: 11px !important;
+        padding: 2px !important;
+        max-width: 100px !important;
+    }
+    
+    #modelInfoButton {
+        width: 16px !important;
+        height: 16px !important;
+        line-height: 14px !important;
+        font-size: 10px !important;
+        margin-left: 4px !important;
+    }
+
+    /* --- ZONE 3: SLIDER (Unten) - LABELS RETTEN --- */
+    .slider-content-wrapper .slider-wrapper {
+        grid-area: slider !important;
+        width: 100% !important;
+        margin-top: 4px !important;
+        
+        /* WICHTIG: Hier Platz für die Labels schaffen! */
+        margin-bottom: 16px !important; 
+        
+        position: relative !important;
+        display: flex !important;
+    }
+
+    #timeSlider {
+        width: 100% !important;
+        margin: 0 !important;
+        display: block !important;
+    }
+
+    /* Labels Positionierung feinjustieren */
+    #slider-labels {
+        /* Labels etwas näher an den Slider rücken, um Platz zu sparen */
+        top: 12px !important; 
+        font-size: 9px !important;
+        display: block !important; /* Sicherstellen, dass sie da sind */
+    }
+    
+    /* Die einzelnen Label-Ticks */
+    .slider-label {
+        margin-top: 0 !important;
+    }
+
+    /* --- PANEL GEÖFFNET --- */
+    body:not([data-active-panel="map"]) #slider-container {
+        left: auto !important;
+        transform: scale(0.75) !important;
+        transform-origin: top right !important;
+        right: 60px !important;
+        top: 2px !important;
+        max-width: calc(100vw - 360px) !important;
+        min-width: 280px !important;
+    }
+
+    /* 6. SONSTIGE TOOLS */
+    .leaflet-pm-toolbar {
+        transform: scale(0.85) !important; /* Etwas größer als vorher für Bedienbarkeit */
+        transform-origin: top left !important;
+        margin-left: -5px !important;
+    }
+
+    .leaflet-control-zoom {
+        transform: scale(0.85) !important;
+        transform-origin: top left !important;
+    }
+
+    .modal-content, .favorite-modal-content {
+        max-height: 90vh !important;
+        width: 90% !important;
+    }
+    
+    .accordion-header {
+        padding: 8px 12px !important;
+        min-height: 35px !important; /* Auch hier etwas griffiger */
+    }
+}
