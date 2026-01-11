@@ -236,6 +236,8 @@ function setupTabBarEvents() {
         }
 
         // --- Normales Wechsel-Verhalten ---
+        
+        // MODIFIZIERT: Zeige Slider nur in 'map' und 'data' (Weather)
         sliderContainer.style.display = (panelId === 'map' || panelId === 'data') ? 'flex' : 'none';
 
         if (panelId === 'map') {

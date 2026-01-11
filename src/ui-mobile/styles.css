@@ -1170,7 +1170,7 @@ input[type="checkbox"][style*="opacity: 1"] {
     position: relative;
     /* Wichtig für die Positionierung des Canvas */
     width: 100%;
-    max-width: 350px;
+    max-width: 320px;
     /* Etwas kleiner für mobile Ansicht */
     margin: 20px auto;
     aspect-ratio: 0.9 / 1;
@@ -2782,7 +2782,7 @@ input[type="checkbox"][style*="opacity: 1"] {
         /* WICHTIG: Verhindert das Strecken auf volle Breite! */
         justify-self: start;
 
-        width: 350px !important;
+        width: 320px !important;
         max-width: 80vw;
         /* Auf kleinen Screens nicht breiter als 80% */
         height: 100%;
@@ -2830,6 +2830,11 @@ input[type="checkbox"][style*="opacity: 1"] {
     }
 
     /* 5. SLIDER POSITION WENN PANEL OFFEN IST */
+    /* NEU: Regel zum Ausblenden für alles außer Map und Data */
+    body:not([data-active-panel="map"]):not([data-active-panel="data"]) #slider-container {
+        display: none !important;
+    }
+
     body:not([data-active-panel="map"]) #slider-container {
         left: auto;
         transform: none;
@@ -3230,10 +3235,10 @@ body[data-active-panel="dashboard"] .leaflet-control-live-position {
 
 /* =================================================================== */
 /* KOMPAKTER LANDSCAPE MODUS (Für S24, iPhone Mini, etc.)
-/* Greift bei Querformat mit geringer Höhe (< 500px)
+/* Greift bei Querformat mit geringer Höhe (< 400px)
 /* =================================================================== */
 
-@media (orientation: landscape) and (max-height: 500px) {
+@media (orientation: landscape) and (max-height: 400px) {
 
     /* 1. GLOBALE SCHRIFTVERKLEINERUNG 
        Wir bleiben bei 11px, das ist ein guter Kompromiss */
