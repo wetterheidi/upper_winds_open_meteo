@@ -3235,10 +3235,10 @@ body[data-active-panel="dashboard"] .leaflet-control-live-position {
 
 /* =================================================================== */
 /* KOMPAKTER LANDSCAPE MODUS (Für S24, iPhone Mini, etc.)
-/* Greift bei Querformat mit geringer Höhe (< 400px)
+/* Greift bei Querformat mit geringer Höhe (< 410px)
 /* =================================================================== */
 
-@media (orientation: landscape) and (max-height: 400px) {
+@media (orientation: landscape) and (max-height: 410px) {
 
     /* 1. GLOBALE SCHRIFTVERKLEINERUNG 
        Wir bleiben bei 11px, das ist ein guter Kompromiss */
