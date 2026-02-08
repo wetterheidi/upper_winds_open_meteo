@@ -7,7 +7,10 @@ import { Utils } from './utils.js';
 import { Settings } from './settings.js';
 
 let adsbInterval = null;
-const CORS_PROXY = 'https://corsproxy.io/?';
+// ÄNDERUNG: Wechsel von corsproxy.io zu api.cors.lol, da corsproxy.io 403-Fehler liefert.
+// Falls auch dieser Proxy Probleme macht, könnte man versuchen, ihn leer zu lassen (''), 
+// um zu testen, ob die API direkten Zugriff erlaubt.
+const CORS_PROXY = 'https://api.cors.lol/?url='; 
 const ADSB_ATTRIBUTION = 'ADS-B Data provided by <a href="https://www.adsbexchange.com/" target="_blank">ADSBexchange.com</a>';
 
 const apiHeaders = new Headers();
