@@ -1222,15 +1222,6 @@ function setupAppEventListeners() {
         cacheVisibleTiles({
             map: AppState.map,
             baseMaps: AppState.baseMaps,
-            onProgress: displayProgress,
-            onComplete: (message) => {
-                hideProgress();
-                if (message) Utils.handleMessage(message);
-            },
-            onCancel: () => {
-                hideProgress();
-                Utils.handleMessage('Caching cancelled.');
-            }
         });
     });
 
@@ -2121,15 +2112,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 cacheVisibleTiles({
                     map: AppState.map,
                     baseMaps: AppState.baseMaps,
-                    onProgress: displayProgress,
-                    onComplete: (message) => {
-                        hideProgress();
-                        if (message) displayMessage(message);
-                    },
-                    onCancel: () => {
-                        hideProgress();
-                        displayMessage('Caching cancelled.');
-                    }
+                    silent: true,
                 });
             }
 
@@ -2145,9 +2128,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     lastLat: lat,
                     lastLng: lng,
                     baseMaps: AppState.baseMaps,
-                    onProgress: displayProgress,
-                    onComplete: displayMessage,
-                    onCancel: () => displayMessage('Caching cancelled.'),
                     radiusKm: 5,
                     silent: true // <- DIESE ZEILE IST ENTSCHEIDEND
                 });

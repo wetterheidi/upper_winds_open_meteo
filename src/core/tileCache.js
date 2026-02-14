@@ -481,24 +481,27 @@ export async function cacheTilesForDIP({ map, lastLat, lastLng, baseMaps, onProg
 /**
  * Startet den Prozess, um alle aktuell sichtbaren Kacheln auf der Karte zu cachen.
  * @param {object} options - Ein Objekt mit den Caching-Parametern.
+ * HINWEIS: Diese Funktion läuft rein im Hintergrund und gibt kein UI-Feedback.
  */
-export async function cacheVisibleTiles({ map, baseMaps, onProgress, onComplete, onCancel }) {
+export async function cacheVisibleTiles({ map, baseMaps }) {
     if (!map || !navigator.onLine) {
-        console.log('Skipping visible tile caching: offline or map not initialized');
+        // console.log('Skipping visible tile caching: offline or map not initialized');
         return;
     }
 
     const bounds = map.getBounds();
     const zoom = map.getZoom();
     const zoomLevels = Settings.state.userSettings.cacheZoomLevels || Settings.defaultSettings.cacheZoomLevels;
+    
+    // Kurzer Check, ob wir überhaupt was tun müssen
     if (!zoomLevels.includes(zoom)) {
-        console.log(`Skipping caching: zoom ${zoom} not in cacheZoomLevels`, zoomLevels);
         return;
     }
 
     const tileSize = 256;
     const swPoint = map.project(bounds.getSouthWest(), zoom);
     const nePoint = map.project(bounds.getNorthEast(), zoom);
+    // ... (Berechnung der Kacheln bleibt gleich) ...
     const minX = Math.floor(swPoint.x / tileSize);
     const maxX = Math.floor(nePoint.x / tileSize);
     const minY = Math.floor(nePoint.y / tileSize);
@@ -514,7 +517,8 @@ export async function cacheVisibleTiles({ map, baseMaps, onProgress, onComplete,
         }
     }
 
-    console.log(`Caching ${tiles.length} visible tiles at zoom ${zoom} for ${Settings.state.userSettings.baseMaps}`);
+    // Nur Debug-Log, keine UI-Meldung
+    console.log(`[Background Cache] Processing ${tiles.length} visible tiles at zoom ${zoom}`);
 
     const tileLayers = [];
     const selectedLayerName = Settings.state.userSettings.baseMaps;
@@ -526,7 +530,6 @@ export async function cacheVisibleTiles({ map, baseMaps, onProgress, onComplete,
                 const url = subLayer.options.url || subLayer._url;
                 if (url) {
                     tileLayers.push({
-                        name: `${selectedLayerName} (${subLayer.options.attribution || 'sub-layer'})`,
                         url: url,
                         subdomains: subLayer.options.subdomains,
                         normalizedUrl: url.replace(/{s}\./, '')
@@ -537,7 +540,6 @@ export async function cacheVisibleTiles({ map, baseMaps, onProgress, onComplete,
             const url = layer.options.url || layer._url;
             if (url) {
                 tileLayers.push({
-                    name: selectedLayerName,
                     url: url,
                     subdomains: layer.options.subdomains,
                     normalizedUrl: url.replace(/{s}\./, '')
@@ -545,40 +547,41 @@ export async function cacheVisibleTiles({ map, baseMaps, onProgress, onComplete,
             }
         }
     } else {
-        console.warn(`Base map ${selectedLayerName} not found, skipping caching`);
-        if (onComplete) onComplete('Selected base map not available for caching.');
         return;
     }
 
-    let cachedCount = 0;
-    let failedCount = 0;
-    const totalTiles = tiles.length * tileLayers.length;
-    const failedTiles = [];
-    AppState.isCachingCancelled = false;
-
-    if (onProgress) {
-        onProgress(0, totalTiles, () => {
-            AppState.isCachingCancelled = true;
-            if (onCancel) onCancel();
-        });
-    }
-
+    // Einfache Schleife ohne Abbruch-Logik für UI
     for (const layer of tileLayers) {
-        if (AppState.isCachingCancelled) break;
-        const fetchPromises = tiles.map(async (tile, index) => {
-            if (onProgress) {
-                onProgress(cachedCount + failedCount, totalTiles, () => {
-                    AppState.isCachingCancelled = true;
-                    if (onCancel) onCancel();
+        const fetchPromises = tiles.map(async (tile) => {
+            const url = layer.url
+                .replace('{z}', tile.zoom)
+                .replace('{x}', tile.x)
+                .replace('{y}', tile.y)
+                .replace('{s}', layer.subdomains ? layer.subdomains[Math.floor(Math.random() * layer.subdomains.length)] : '');
+            
+            const normalizedUrl = layer.normalizedUrl
+                .replace('{z}', tile.zoom)
+                .replace('{x}', tile.x)
+                .replace('{y}', tile.y);
+
+            // Wir prüfen nur kurz, ob die Kachel schon da ist, um unnötige Requests zu sparen
+            const cachedBlob = await TileCache.getTile(normalizedUrl).catch(() => null);
+            if (!cachedBlob) {
+                // Wenn nicht, holen und speichern wir sie (Feuer und Vergessen)
+                cacheTileWithRetry(url).then(result => {
+                    if (result.success) {
+                        TileCache.storeTile(normalizedUrl, result.blob).catch(() => {});
+                    }
                 });
             }
         });
+        
+        // Wir warten nicht zwingend auf alle, um die UI nicht zu blockieren, 
+        // aber Promise.all ist gut, um die Netzwerk-Last zu bündeln.
         await Promise.all(fetchPromises);
     }
-
-    if (onComplete) {
-        onComplete('Visible tiles cached.');
-    }
+    
+    console.log('[Background Cache] Check complete.');
 }
 
 // ===================================================================

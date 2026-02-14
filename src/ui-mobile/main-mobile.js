@@ -1500,15 +1500,6 @@ function setupAppEventListeners() {
         cacheVisibleTiles({
             map: AppState.map,
             baseMaps: AppState.baseMaps,
-            onProgress: displayProgress,
-            onComplete: (message) => {
-                hideProgress();
-                if (message) Utils.handleMessage(message);
-            },
-            onCancel: () => {
-                hideProgress();
-                Utils.handleMessage('Caching cancelled.');
-            }
         });
     });
 
@@ -2566,9 +2557,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     lastLat: lat,
                     lastLng: lng,
                     baseMaps: AppState.baseMaps,
-                    onProgress: displayProgress,
-                    onComplete: displayMessage,
-                    onCancel: () => displayMessage('Caching cancelled.'),
                     radiusKm: 5,
                     silent: true
                 });
