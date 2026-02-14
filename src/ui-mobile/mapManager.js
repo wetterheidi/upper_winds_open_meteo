@@ -1494,6 +1494,24 @@ function _setupGeomanMeasurementHandlers() {
         if (e.shape === 'Line') {
             if (isMobileDevice()) {
                 liveMeasureLabel.innerHTML = 'Tap to set first point.';
+
+                // --- NEU: Positionierung direkt unter dem Slider ---
+                const sliderContainer = document.getElementById('slider-container');
+                // Wir holen die Höhe des Sliders oder nehmen 80px als Fallback
+                const topOffset = sliderContainer ? sliderContainer.offsetHeight - 100 : 80;
+                
+                const mapSize = map.getSize();
+                // Wir versuchen die Breite des Labels zu ermitteln, fallback 150px.
+                // Wir zentrieren es: (Bildschirmmitte) - (Halbe Labelbreite)
+                const labelWidth = liveMeasureLabel.offsetWidth || 150;
+                const labelX = (mapSize.x / 2) - (labelWidth / 2);
+                
+                const initialLabelPos = L.point(labelX, topOffset);
+                L.DomUtil.setPosition(liveMeasureLabel, initialLabelPos);
+                // --------------------------------------------------
+
+                L.DomUtil.setPosition(liveMeasureLabel, initialLabelPos);
+
                 let lastPoint = null;
                 let rubberBandLayer = null;
 
@@ -1522,12 +1540,26 @@ function _setupGeomanMeasurementHandlers() {
                         const labelPos = L.point(mapSize.x / 2 + 20, mapSize.y / 2 - 40);
                         L.DomUtil.setPosition(liveMeasureLabel, labelPos);
                     } else {
-                        // If there are no points, clear the rubber band
+                        // Wenn keine Punkte da sind (Reset oder Start)
                         if (rubberBandLayer) {
                             map.removeLayer(rubberBandLayer);
                             rubberBandLayer = null;
                         }
                         liveMeasureLabel.innerHTML = 'Tap to set first point.';
+
+                        // --- NEU: Reset-Position ebenfalls oben ---
+                        const currentSliderContainer = document.getElementById('slider-container');
+                        const currentTopOffset = currentSliderContainer ? currentSliderContainer.offsetHeight + 20 : 80;
+                        const currentMapSize = map.getSize();
+                        
+                        // Breite neu berechnen (da Text sich geändert hat)
+                        // Da innerHTML gerade gesetzt wurde, ist offsetWidth evtl. noch nicht aktuell, 
+                        // daher nutzen wir hier einen Schätzwert oder warten kurz (timeout nicht zwingend nötig für UI)
+                        const resetLabelX = (currentMapSize.x / 2) - 75; // 75px = halbe Breite von ca 150px
+                        
+                        const resetLabelPos = L.point(resetLabelX, currentTopOffset);
+                        L.DomUtil.setPosition(liveMeasureLabel, resetLabelPos);
+                        // -----------------------------------------
                     }
                 };
 
