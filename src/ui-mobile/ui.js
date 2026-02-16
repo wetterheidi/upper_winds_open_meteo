@@ -9,6 +9,7 @@ import { Utils } from '../core/utils.js';
 import { Settings } from '../core/settings.js';
 import { fetchEnsembleWeatherData, processAndVisualizeEnsemble } from '../core/ensembleManager.js';
 import { UI_DEFAULTS, WEATHER_MODELS } from '../core/constants.js';
+import { I18n } from '../core/i18n.js'; // <--- NEU
 
 // ===================================================================
 // 1. Geräte- & Style-Helfer
@@ -59,6 +60,44 @@ export function getSliderValue() {
 // ===================================================================
 // 3. Dynamische UI-Updates
 // ===================================================================
+
+/**
+ * NEU: Initialisiert den Sprachwähler (Dropdown).
+ */
+export function setupLanguageDropdown() {
+    const selector = document.getElementById('languageSelect');
+    if (!selector) return;
+
+    selector.value = Settings.getValue('language') || 'en';
+    const newSelector = selector.cloneNode(true);
+    selector.parentNode.replaceChild(newSelector, selector);
+
+    newSelector.addEventListener('change', async (e) => {
+        const newLang = e.target.value;
+        if (Settings.state.userSettings) {
+            Settings.state.userSettings.language = newLang;
+            Settings.save();
+        }
+        toggleLoading(true, 'Changing language...');
+        await I18n.loadLanguage(newLang);
+        updateTranslations();
+        toggleLoading(false);
+    });
+}
+
+/**
+ * NEU: Aktualisiert alle übersetzbaren Texte auf der Seite.
+ */
+export function updateTranslations() {
+    document.querySelectorAll('[data-i18n]').forEach(element => {
+        const key = element.getAttribute('data-i18n');
+        if (key) {
+            element.textContent = I18n.t(key);
+        }
+    });
+    const currentUnit = Settings.getValue('heightUnit');
+    updatePlannerUnits(currentUnit, false);
+}
 
 /**
  * Aktualisiert die Optionen im Dropdown-Menü für die Wettermodelle.

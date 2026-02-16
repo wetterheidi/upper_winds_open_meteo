@@ -14,6 +14,7 @@ import * as mapManager from './mapManager.js';
 import * as weatherManager from '../core/weatherManager.js';
 import { cacheVisibleTiles, cacheTilesForDIP } from '../core/tileCache.js';
 import { getSliderValue, displayError, displayMessage, displayWarning, displayProgress, hideProgress, applyDeviceSpecificStyles, updatePlannerUnits } from './ui.js';
+import { setupLanguageDropdown } from './ui.js';
 import * as AutoupdateManager from '../core/autoupdateManager.js';
 import * as displayManager from './displayManager.js';
 import * as liveTrackingManager from '../core/liveTrackingManager.js';
@@ -22,6 +23,7 @@ import * as LocationManager from '../core/locationManager.js';
 import * as AdsbManager from '../core/adsbManager.js';
 import { generateMeteogram } from '../core/meteogramChart.js';
 import { DateTime } from 'luxon';
+import { I18n } from '../core/i18n.js';
 
 "use strict";
 
@@ -77,9 +79,10 @@ export const getDownloadFormat = () => Settings.getValue('downloadFormat', 'radi
  * lädt die Einstellungen und stellt sicher, dass Features (wie der Planner)
  * basierend auf dem Speicher freigeschaltet sind.
  */
-function initializeApp() {
+async function initializeApp() {
     setAppContext(true);
     Settings.initialize();
+    await I18n.initialize(); 
 
     // VEREINFACHT: Diese Zeilen sind nicht mehr nötig. Landing Pattern und Calculate Jump
     // sind in der mobilen App immer "verfügbar", da der Planner-Tab immer da ist.
@@ -1974,7 +1977,8 @@ function setupAppEventListeners() {
 // HTML-Dokument vollständig geladen ist. Er startet die gesamte Anwendung.
 
 document.addEventListener('DOMContentLoaded', async () => {
-    initializeApp();
+    await initializeApp();
+    setupLanguageDropdown();
     initializeUIElements();
     updateLockStatesUI();
     applyDeviceSpecificStyles();

@@ -6,34 +6,22 @@ import { Settings } from '../core/settings.js';
 import { Utils } from '../core/utils.js';
 import { TileCache } from '../core/tileCache.js';
 import { updateOfflineIndicator, isMobileDevice, displayWarning } from './ui.js';
-//import './public/vendor/Leaflet.PolylineMeasure.js'; // Pfad ggf. anpassen
-import { UI_DEFAULTS, ICON_URLS, ENSEMBLE_VISUALIZATION } from '../core/constants.js'; // Importiere UI-Defaults
+import { UI_DEFAULTS, ICON_URLS, ENSEMBLE_VISUALIZATION } from '../core/constants.js';
 import * as LocationManager from '../core/locationManager.js';
+import { I18n } from '../core/i18n.js';
 
-let lastTapTime = 0; // Add this line
-
+let lastTapTime = 0;
 
 // ===================================================================
 // 1. Initialisierung
 // ===================================================================
-/**
- * Initialisiert die Leaflet-Karte und alle zugehörigen Komponenten.
- * Erstellt die Karteninstanz, richtet die Basiskarten (Tile-Layer),
- * Standard-Steuerelemente (Zoom, Maßstab etc.) und benutzerdefinierte Panes ein.
- * Startet ebenfalls die Logik für das Kachel-Caching und die Geolokalisierung.
- * @returns {Promise<L.Map>} Ein Promise, das zur fertigen Leaflet-Karteninstanz auflöst.
- */
 export async function initializeMap() {
     console.log('MapManager: Starte Karteninitialisierung...');
-
-    // Wir machen die interne initMap-Funktion ebenfalls async
     await initMap();
-
     console.log('MapManager: Karteninitialisierung abgeschlossen.');
-
-    // Gib die fertige Karte zurück, als Bestätigung, dass alles bereit ist.
     return AppState.map;
 }
+
 async function initMap() {
     if (AppState.ismapInitialized || AppState.map) {
         console.warn('Map already initialized or init in progress.');
@@ -48,13 +36,12 @@ async function initMap() {
 
     _initializeBasicMapInstance(defaultCenter, defaultZoom);
 
-    // Direkt nachdem die Karte erstellt wurde, erstellen wir unsere "Kiste" für alle Sprung-Visualisierungen.
     AppState.jumpVisualizationLayerGroup = L.layerGroup().addTo(AppState.map);
     AppState.landingPatternLayerGroup = L.layerGroup().addTo(AppState.map);
     AppState.jumpRunTrackLayerGroup = L.layerGroup().addTo(AppState.map);
-    AppState.favoritesLayerGroup = L.layerGroup().addTo(AppState.map); // <-- NEUE ZEILE HINZUFÜGEN
+    AppState.favoritesLayerGroup = L.layerGroup().addTo(AppState.map);
     console.log('Favorite marker layer added!');
-    AppState.poiLayerGroup = L.layerGroup().addTo(AppState.map); // <-- NEUE ZEILE HINZUFÜGEN
+    AppState.poiLayerGroup = L.layerGroup().addTo(AppState.map);
     console.log('POI marker layer added!');
 
     _setupBaseLayersAndHandling();
@@ -64,16 +51,10 @@ async function initMap() {
 
     _setupCoreMapEventHandlers();
 
-    // Kachel-Caching und Geolocation parallel
     Promise.all([
         _initializeTileCacheLogic(),
         _handleGeolocation(defaultCenter, defaultZoom)
     ]).then(() => {
-        if (AppState.lastLat && AppState.lastLng) {
-            // cacheTilesForDIP wird bereits in den Geolocation-Callbacks aufgerufen
-            // console.log('Ensuring tiles are cached for initial DIP after geolocation/fallback.');
-            // cacheTilesForDIP({ map: AppState.map, lastLat: AppState.lastLat, lastLng: AppState.lastLng, baseMaps: AppState.baseMaps });
-        }
         console.log('Initial tile caching and geolocation promise resolved.');
     }).catch(error => {
         console.error("Error during parallel initialization of cache/geolocation:", error);
@@ -87,17 +68,9 @@ async function initMap() {
 // 2. Öffentliche API zum Zeichnen auf der Karte
 // ===================================================================
 
-/**
- * Zeichnet alle Visualisierungen für den Sprungablauf (Exit- und Canopy-Bereiche) auf die Karte.
- * Löscht zuvor alle alten Visualisierungen, um eine saubere Anzeige zu gewährleisten.
- * @param {object|null} jumpData - Ein Objekt, das die "Bauanleitungen" für alle zu zeichnenden Kreise und Labels enthält, oder null, um die Anzeige zu löschen.
- * @returns {void}
- */
 export function drawJumpVisualization(jumpData) {
-    // 1. Immer alles sauber machen.
-    clearJumpVisualization(); // Umbenannt von clearJumpCircles für Klarheit
+    clearJumpVisualization();
 
-    // Entferne den alten Zoom-Listener, bevor neue Labels gezeichnet werden.
     if (AppState.labelZoomListener && AppState.map) {
         AppState.map.off('zoomend', AppState.labelZoomListener);
         AppState.labelZoomListener = null;
@@ -107,9 +80,8 @@ export function drawJumpVisualization(jumpData) {
         return;
     }
 
-    const labelsToUpdate = []; // Sammelt alle Labels für den Zoom-Listener
+    const labelsToUpdate = [];
 
-    // Zeichne Exit-Kreise
     if (jumpData.exitCircles) {
         jumpData.exitCircles.forEach(circleInfo => {
             const circleLayer = L.circle(circleInfo.center, {
@@ -118,7 +90,6 @@ export function drawJumpVisualization(jumpData) {
                 pmIgnore: true
             }).addTo(AppState.jumpVisualizationLayerGroup);
 
-            // NEU: Wenn eine Tooltip-Information vorhanden ist, binde sie.
             if (circleInfo.tooltip) {
                 circleLayer.bindTooltip(circleInfo.tooltip, {
                     direction: 'top',
@@ -129,18 +100,15 @@ export function drawJumpVisualization(jumpData) {
         });
     }
 
-    // Zeichne Canopy-Kreise
     if (jumpData.canopyCircles) {
         jumpData.canopyCircles.forEach(circleInfo => {
-            // Fügen Sie die Option dem zweiten Argument von L.circle hinzu
             L.circle(circleInfo.center, {
-                ...circleInfo, // Übernimmt alle bestehenden Optionen
+                ...circleInfo,
                 pmIgnore: true
             }).addTo(AppState.jumpVisualizationLayerGroup);
         });
     }
 
-    // Helferfunktion zum Positionieren der Labels (aus deinem alten Code übernommen)
     function calculateLabelAnchor(center, radius) {
         const centerLatLng = L.latLng(center[0], center[1]);
         const earthRadius = 6378137;
@@ -152,7 +120,6 @@ export function drawJumpVisualization(jumpData) {
         return [25, offsetY];
     }
 
-    // Zeichne Canopy-Labels mit dynamischem Styling
     if (jumpData.canopyLabels) {
         const currentZoom = AppState.map.getZoom();
 
@@ -166,10 +133,9 @@ export function drawJumpVisualization(jumpData) {
                     iconAnchor: calculateLabelAnchor(labelInfo.center, labelInfo.radius),
                     pmIgnore: true
                 }),
-                zIndexOffset: 2100 // Stellt sicher, dass Labels oben liegen
+                zIndexOffset: 2100
             }).addTo(AppState.jumpVisualizationLayerGroup);
 
-            // Speichere die notwendigen Infos für das spätere Update
             labelsToUpdate.push({
                 marker: labelMarker,
                 center: labelInfo.center,
@@ -180,7 +146,6 @@ export function drawJumpVisualization(jumpData) {
         });
     }
 
-    // Erstelle einen neuen Zoom-Listener, der alle gerade erstellten Labels kennt.
     if (labelsToUpdate.length > 0) {
         AppState.labelZoomListener = function () {
             const currentZoom = AppState.map.getZoom();
@@ -197,23 +162,14 @@ export function drawJumpVisualization(jumpData) {
         AppState.map.on('zoomend', AppState.labelZoomListener);
     }
 }
-/**
- * Zeichnet das Landemuster (Downwind, Base, Final) auf die Karte.
- * Nimmt die berechneten Pfade und Pfeilpositionen entgegen und fügt sie
- * einer dedizierten Layer-Gruppe hinzu.
- * @param {object|null} patternData - Ein Objekt, das die Pfade und Pfeil-Informationen für das Muster enthält, oder null, um das Muster zu löschen.
- * @returns {void}
- */
+
 export function drawLandingPattern(patternData) {
-    // 1. Immer zuerst alles sauber machen.
     clearLandingPattern();
 
-    // 2. Wenn es keine Anleitung gibt, sind wir fertig.
     if (!patternData) {
         return;
     }
 
-    // 3. Zeichne die Linien des Musters.
     patternData.legs.forEach(leg => {
         L.polyline(leg.path, {
             color: 'red',
@@ -221,16 +177,13 @@ export function drawLandingPattern(patternData) {
             opacity: 0.8,
             dashArray: '5, 10',
             pmIgnore: true
-        }).addTo(AppState.landingPatternLayerGroup); // Fügt es zur LayerGroup hinzu
+        }).addTo(AppState.landingPatternLayerGroup);
     });
 
-    // 4. Zeichne die Pfeile.
     patternData.arrows.forEach(arrow => {
-        // Die Funktion createArrowIcon muss auch hier im mapManager sein.
         const arrowIcon = createArrowIcon(arrow.position[0], arrow.position[1], arrow.bearing, arrow.color);
-
         const arrowMarker = L.marker(arrow.position, { icon: arrowIcon, pmIgnore: true })
-            .addTo(AppState.landingPatternLayerGroup); // Fügt es zur LayerGroup hinzu
+            .addTo(AppState.landingPatternLayerGroup);
 
         arrowMarker.bindTooltip(arrow.tooltipText, {
             offset: [10, 0],
@@ -240,13 +193,7 @@ export function drawLandingPattern(patternData) {
         });
     });
 }
-/**
- * Zeichnet den kompletten Absetzanflug (Jump Run Track) inklusive des Anflugpfades auf die Karte.
- * Erstellt eine verschiebbare Visualisierung mit einem Flugzeug-Marker am Ende des Tracks,
- * dessen Verschiebung die Offsets neu berechnet.
- * @param {object|null} trackData - Ein Objekt mit allen Daten für den Anflug oder null, um den Track zu löschen.
- * @returns {void}
- */
+
 export function drawJumpRunTrack(trackData) {
     clearJumpRunTrack();
 
@@ -255,12 +202,9 @@ export function drawJumpRunTrack(trackData) {
         return;
     }
     if (!trackData) {
-        // Dies ist der normale Weg, um den Track zu löschen.
-        // clearJumpRunTrack() wurde bereits aufgerufen, also beenden wir die Funktion hier einfach.
         return;
     }
 
-    // Validierung der Eingangsdaten
     if (!trackData.path?.latlngs?.length || !trackData.airplane?.position) {
         console.warn('Invalid trackData structure:', trackData);
         return;
@@ -292,12 +236,12 @@ export function drawJumpRunTrack(trackData) {
         zIndexOffset: 2000,
         pmIgnore: true
     })
-        .bindTooltip('Drag to move Jump Run Track')
+        .bindTooltip(I18n.t('map.drag_to_move_track'))
         .addTo(AppState.jumpRunTrackLayerGroup);
 
     airplaneMarker.on('mousedown', () => {
         if (Settings.state.userSettings.isInteractionLocked) {
-            displayWarning("Interaction is locked. Please unlock to move points.");
+            displayWarning(I18n.t('map.interaction_locked'));
         }
         AppState.map.dragging.disable();
     });
@@ -305,19 +249,15 @@ export function drawJumpRunTrack(trackData) {
 
     airplaneMarker.on('drag', (e) => {
         const newPos = e.target.getLatLng();
-        // Validierung von originalPosition
         const originalPos = trackData.airplane.originalPosition;
         if (!originalPos || !Number.isFinite(originalPos.lat) || !Number.isFinite(originalPos.lng)) {
-            console.warn('Invalid originalPosition:', originalPos);
             return;
         }
 
         const deltaLat = newPos.lat - originalPos.lat;
         const deltaLng = newPos.lng - originalPos.lng;
 
-        // Validierung von delta-Werten
         if (!Number.isFinite(deltaLat) || !Number.isFinite(deltaLng)) {
-            console.warn('Invalid delta values:', { deltaLat, deltaLng });
             return;
         }
 
@@ -339,14 +279,13 @@ export function drawJumpRunTrack(trackData) {
     airplaneMarker.on('dragstart', (e) => {
         if (Settings.state.userSettings.isInteractionLocked) {
             e.target.dragging.disable();
-            displayWarning("Interaction is locked. Please unlock to move points.");
+            displayWarning(I18n.t('map.interaction_locked'));
         }
     });
 
     airplaneMarker.on('dragend', (e) => {
         const newPos = e.target.getLatLng();
         if (!Number.isFinite(newPos.lat) || !Number.isFinite(newPos.lng)) {
-            console.warn('Invalid new position in dragend:', newPos);
             return;
         }
         const dragEndEvent = new CustomEvent('track:dragend', {
@@ -356,17 +295,15 @@ export function drawJumpRunTrack(trackData) {
         AppState.map.getContainer().dispatchEvent(dragEndEvent);
     });
 }
+
 export function drawCutAwayVisualization(data) {
-    // Zuerst immer den alten Kreis löschen.
     if (AppState.cutAwayCircle) {
         AppState.map.removeLayer(AppState.cutAwayCircle);
         AppState.cutAwayCircle = null;
     }
 
-    // Wenn keine neuen Daten da sind, sind wir fertig.
     if (!data) return;
 
-    // Zeichne den neuen Kreis mit den übergebenen Daten.
     AppState.cutAwayCircle = L.circle(data.center, {
         radius: data.radius,
         color: 'purple',
@@ -382,6 +319,7 @@ export function drawCutAwayVisualization(data) {
         className: 'cutaway-tooltip'
     });
 }
+
 export function drawJumpMasterLine(start, end) {
     const line = [[start.lat, start.lng], [end.lat, end.lng]];
     if (AppState.jumpMasterLine) {
@@ -392,18 +330,16 @@ export function drawJumpMasterLine(start, end) {
         }).addTo(AppState.map);
     }
 }
+
 export function drawTerrainWarning(dangerousPoints) {
     _initializeTerrainWarningLayer();
     AppState.terrainWarningLayer.clearLayers();
 
     if (!dangerousPoints || dangerousPoints.length < 3) {
-        return; // Benötigen mindestens 3 Punkte für ein Polygon
+        return;
     }
 
-    // Berechnet die konvexe Hülle, um eine saubere Umrandung zu erhalten
     const hullPoints = Utils.getConvexHull(dangerousPoints.map(p => [p.lat, p.lng]));
-
-    // Den aktuellen Schwellenwert direkt hier aus den Einstellungen holen
     const requiredClearance = Settings.getValue('terrainClearance', 100);
 
     L.polygon(hullPoints, {
@@ -413,15 +349,11 @@ export function drawTerrainWarning(dangerousPoints) {
         weight: 2,
         pmIgnore: true
     }).bindTooltip(
-        // Den Text dynamisch mit dem Wert aus der neuen Variable erstellen
-        `WARNING: Ground clearance in this area may be less than ${requiredClearance}m!`,
+        I18n.t('map.terrain_warning', { clearance: requiredClearance }),
         { sticky: true, className: 'cutaway-tooltip' }
     ).addTo(AppState.terrainWarningLayer);
 }
-/**
- * Zeichnet oder aktualisiert den Flugpfad des getrackten ADSB-Flugzeugs.
- * @param {Array<[number, number]>} trackPoints - Ein Array von [lat, lng] Koordinaten.
- */
+
 export function drawAircraftTrack(trackPoints) {
     if (!AppState.map || trackPoints.length < 2) {
         return;
@@ -449,41 +381,45 @@ function clearJumpVisualization() {
     }
     AppState.jumpVisualizationLayerGroup = L.layerGroup().addTo(AppState.map);
 }
+
 function clearJumpCircles() {
-    // Greift auf die LayerGroup zu, die wir in initializeMap erstellt haben.
     if (AppState.jumpVisualizationLayerGroup) {
         AppState.jumpVisualizationLayerGroup.clearLayers();
     }
 }
+
 function clearLandingPattern() {
     if (AppState.landingPatternLayerGroup) {
         AppState.landingPatternLayerGroup.clearLayers();
     }
 }
+
 function clearJumpRunTrack() {
     if (AppState.map && AppState.jumpRunTrackLayerGroup) {
         AppState.map.removeLayer(AppState.jumpRunTrackLayerGroup);
     }
     AppState.jumpRunTrackLayerGroup = L.layerGroup().addTo(AppState.map);
 }
+
 export function clearCutAwayMarker() {
     if (AppState.cutAwayMarker) {
         AppState.map.removeLayer(AppState.cutAwayMarker);
         AppState.cutAwayMarker = null;
     }
-    // Lösche auch den Kreis, wenn der Marker entfernt wird.
     drawCutAwayVisualization(null);
 }
+
 export function clearJumpMasterLine() {
     if (AppState.jumpMasterLine) {
         AppState.map.removeLayer(AppState.jumpMasterLine);
         AppState.jumpMasterLine = null;
     }
 }
+
 export function clearHarpMarker() {
     if (!AppState.map) {
         console.warn('Map not initialized, cannot clear HARP marker');
-        Utils.handleMessage('Map not initialized, cannot clear HARP marker.');
+        Utils.handleMessage(I18n.t('messages.map_not_init'));
         return;
     }
 
@@ -498,24 +434,18 @@ export function clearHarpMarker() {
     const harpRadio = document.querySelector('input[name="jumpMasterLineTarget"][value="HARP"]');
     if (harpRadio) {
         harpRadio.disabled = true;
-        console.log('Disabled HARP radio button');
     }
-    // If Jump Master Line is set to HARP, remove it or switch to DIP
     if (Settings.state.userSettings.jumpMasterLineTarget === 'HARP' && Settings.state.userSettings.showJumpMasterLine) {
         if (AppState.jumpMasterLine) {
             AppState.map.removeLayer(AppState.jumpMasterLine);
             AppState.jumpMasterLine = null;
-            console.log('Removed Jump Master Line: HARP marker cleared');
         }
-        // Switch to DIP
         Settings.state.userSettings.jumpMasterLineTarget = 'DIP';
         const dipRadio = document.querySelector('input[name="jumpMasterLineTarget"][value="DIP"]');
         if (dipRadio) {
             dipRadio.checked = true;
-            console.log('Switched Jump Master Line to DIP');
         }
         Settings.save();
-        // Update line if live tracking is active
         if (AppState.liveMarker && AppState.currentMarker && AppState.lastLat !== null && AppState.lastLng !== null) {
             debouncedPositionUpdate({
                 coords: {
@@ -528,20 +458,15 @@ export function clearHarpMarker() {
             });
         }
     }
-    Utils.handleMessage('HARP marker cleared');
+    Utils.handleMessage(I18n.t('messages.harp_cleared'));
 }
-/**
- * Entfernt die Terrain-Warnungs-Visualisierung von der Karte.
- */
+
 export function clearTerrainWarning() {
     if (AppState.terrainWarningLayer) {
         AppState.terrainWarningLayer.clearLayers();
-        console.log("Terrain warning layer cleared.");
     }
 }
-/**
- * Entfernt den Flugpfad des ADSB-Flugzeugs von der Karte.
- */
+
 export function clearAircraftTrack() {
     if (AppState.aircraftTrackLayer) {
         AppState.map.removeLayer(AppState.aircraftTrackLayer);
@@ -554,7 +479,6 @@ export function clearAircraftTrack() {
 // ===================================================================
 
 function createArrowIcon(lat, lng, bearing, color) {
-    // Ihr bestehender Code für createArrowIcon...
     const normalizedBearing = (bearing + 360) % 360;
     const arrowSvg = `
         <svg width="40" height="20" viewBox="0 0 40 20" xmlns="http://www.w3.org/2000/svg">
@@ -569,6 +493,7 @@ function createArrowIcon(lat, lng, bearing, color) {
         iconAnchor: [20, 10]
     });
 }
+
 export function createCutAwayMarker(lat, lng) {
     const cutAwayIcon = L.icon({
         iconUrl: ICON_URLS.CUTAWAY_MARKER,
@@ -583,10 +508,11 @@ export function createCutAwayMarker(lat, lng) {
         pmIgnore: true
     });
 }
+
 export function attachCutAwayMarkerDragend(marker) {
     marker.on('mousedown', () => {
         if (Settings.state.userSettings.isInteractionLocked) {
-            displayWarning("Interaction is locked. Please unlock to move points.");
+            displayWarning(I18n.t('map.interaction_locked'));
         }
     });
     marker.on('dragend', (e) => {
@@ -598,43 +524,32 @@ export function attachCutAwayMarkerDragend(marker) {
         AppState.map.getContainer().dispatchEvent(cutawayEvent);
     });
 }
+
 export function updateCutAwayMarkerPopup(marker, lat, lng, open = false) {
     const coordFormat = Settings.getValue('coordFormat', 'radio', 'Decimal');
-    const coords = Utils.convertCoords(lat, lng, coordFormat);
-    let popupContent = `<b>Cut-Away Start</b><br>`;
+    let popupContent = `<b>${I18n.t('map.cut_away_start')}</b><br>`;
 
     const formatDDM = (ddm) => `${ddm.deg}° ${ddm.min.toFixed(3)}' ${ddm.dir}`;
     const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
 
+    // HIER WAREN NOCH ENGLISCHE TEXTE - JETZT ÜBERSETZT
     if (coordFormat === 'MGRS') {
-        popupContent += `MGRS: ${Utils.decimalToMgrs(lat, lng)}`;
+        popupContent += `${I18n.t('map.mgrs')}: ${Utils.decimalToMgrs(lat, lng)}`;
     } else if (coordFormat === 'DMS') {
-        popupContent += `Lat: ${formatDMS(Utils.decimalToDms(lat, true))}<br>Lng: ${formatDMS(Utils.decimalToDms(lng, false))}`;
+        popupContent += `${I18n.t('map.lat')}: ${formatDMS(Utils.decimalToDms(lat, true))}<br>${I18n.t('map.lng')}: ${formatDMS(Utils.decimalToDms(lng, false))}`;
     } else if (coordFormat === 'DDM') {
-        popupContent += `Lat: ${formatDDM(Utils.decimalToDecimalMinutes(lat, true))}<br>Lng: ${formatDDM(Utils.decimalToDecimalMinutes(lng, false))}`;
+        popupContent += `${I18n.t('map.lat')}: ${formatDDM(Utils.decimalToDecimalMinutes(lat, true))}<br>${I18n.t('map.lng')}: ${formatDDM(Utils.decimalToDecimalMinutes(lng, false))}`;
     } else {
-        popupContent += `Lat: ${lat.toFixed(5)}<br>Lng: ${lng.toFixed(5)}`;
+        popupContent += `${I18n.t('map.lat')}: ${lat.toFixed(5)}<br>${I18n.t('map.lng')}: ${lng.toFixed(5)}`;
     }
 
-    // Ruft die zentrale Funktion zum Aktualisieren von Popups auf
     updatePopupContent(marker, popupContent, open);
 }
-// 2. Eine Funktion, die den Marker (die Schere) löscht.
 
-
-
-// Weitere exportierte Funktionen zum Steuern der Karte von außen
 export function moveMarker(lat, lng) {
     // ... Logik zum Bewegen des Markers ...
 }
-/**
- * Erstellt einen neuen Hauptmarker (DIP) oder aktualisiert die Position eines bestehenden Markers.
- * Dies ist die zentrale Funktion, um den primären Auswahlpunkt auf der Karte zu setzen.
- * Aktualisiert auch das zugehörige Popup mit den aktuellen Standortdaten.
- * @param {number} lat - Die geographische Breite des Markers.
- * @param {number} lng - Die geographische Länge des Markers.
- * @returns {Promise<void>}
- */
+
 export async function createOrUpdateMarker(lat, lng) {
     console.log("MapManager: Befehl erhalten, Marker zu erstellen/bewegen bei", lat, lng);
     if (typeof lat !== 'number' || typeof lng !== 'number' || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
@@ -643,10 +558,8 @@ export async function createOrUpdateMarker(lat, lng) {
     }
     const altitude = await Utils.getAltitude(lat, lng);
     if (AppState.currentMarker) {
-        console.log("MapManager: Marker existiert, bewege ihn jetzt mit setLatLng.");
         AppState.currentMarker.setLatLng([lat, lng]);
     } else {
-        console.log("MapManager: Kein Marker vorhanden, erstelle einen neuen.");
         const newMarker = createCustomMarker(lat, lng);
         attachMarkerDragend(newMarker);
         newMarker.on('click', () => {
@@ -658,15 +571,15 @@ export async function createOrUpdateMarker(lat, lng) {
         AppState.currentMarker.addTo(AppState.map);
     }
 
-    // HIER IST DIE ÄNDERUNG:
-    const popupContent = `Lat: ${lat.toFixed(5)}<br>Lng: ${lng.toFixed(5)}<br>Alt: ${altitude} m`;
-    updatePopupContent(AppState.currentMarker, popupContent); // Ruft die neue Funktion auf
+    const popupContent = `${I18n.t('map.lat')}: ${lat.toFixed(5)}<br>${I18n.t('map.lng')}: ${lng.toFixed(5)}<br>${I18n.t('map.alt')}: ${altitude} m`;
+    updatePopupContent(AppState.currentMarker, popupContent);
 
     AppState.lastLat = lat;
     AppState.lastLng = lng;
     AppState.lastAltitude = altitude;
     AppState.map.invalidateSize();
 }
+
 export function createCustomMarker(lat, lng) {
     const customIcon = L.icon({
         iconUrl: ICON_URLS.DEFAULT_MARKER,
@@ -681,10 +594,11 @@ export function createCustomMarker(lat, lng) {
         pmIgnore: true
     });
 }
+
 export function attachMarkerDragend(marker) {
     marker.on('mousedown', () => {
         if (Settings.state.userSettings.isInteractionLocked) {
-            displayWarning("Interaction is locked. Please unlock to move points.");
+            displayWarning(I18n.t('map.interaction_locked'));
         }
     });
     marker.on('dragend', (e) => {
@@ -696,11 +610,11 @@ export function attachMarkerDragend(marker) {
         AppState.map.getContainer().dispatchEvent(mapSelectEvent);
     });
 }
+
 export function updatePopupContent(marker, content, open = false) {
     if (!marker) return;
 
     const popup = marker.getPopup();
-    // 'wasOpen' prüft jetzt, ob das Popup schon offen war ODER ob 'open' explizit true ist.
     const wasOpen = (popup && popup.isOpen()) || open;
 
     if (popup) {
@@ -713,27 +627,21 @@ export function updatePopupContent(marker, content, open = false) {
         marker.openPopup();
     }
 }
-/**
- * Zeichnet Marker für alle favorisierten Orte auf der Karte.
- * @param {Array<Object>} favorites - Ein Array von Favoriten-Objekten ({lat, lng, label}).
- */
+
 export function updateFavoriteMarkers(favorites) {
     if (!AppState.map || !AppState.favoritesLayerGroup) {
-        console.warn('Cannot update favorite markers: map or layer group not ready.');
         return;
     }
 
-    // Zuerst alle alten Favoriten-Marker entfernen
     AppState.favoritesLayerGroup.clearLayers();
 
     if (!favorites || favorites.length === 0) {
-        return; // Nichts zu zeichnen
+        return;
     }
 
-    // Ein Icon für die Favoriten-Marker erstellen (z.B. ein Stern)
     const starIcon = L.divIcon({
         html: '★',
-        className: 'favorite-marker-icon', // Diese Klasse in styles.css definieren
+        className: 'favorite-marker-icon',
         iconSize: [24, 24],
         iconAnchor: [12, 12]
     });
@@ -745,7 +653,6 @@ export function updateFavoriteMarkers(favorites) {
                 direction: 'top'
             })
             .on('click', () => {
-                // Wenn auf einen Favoriten-Marker geklickt wird, die Position auswählen
                 document.dispatchEvent(new CustomEvent('location:selected', {
                     detail: { lat: fav.lat, lng: fav.lng, source: 'favorite_marker' },
                     bubbles: true
@@ -755,9 +662,10 @@ export function updateFavoriteMarkers(favorites) {
         AppState.favoritesLayerGroup.addLayer(marker);
     });
 }
+
 export function handleHarpPlacement(e) {
     if (Settings.state.userSettings.isInteractionLocked) {
-        displayWarning("Interaction is locked. Please unlock to move points.");
+        displayWarning(I18n.t('map.interaction_locked'));
         AppState.isPlacingHarp = false;
         AppState.map.off('click', handleHarpPlacement);
         return;
@@ -769,7 +677,6 @@ export function handleHarpPlacement(e) {
     } else {
         AppState.harpMarker = createHarpMarker(lat, lng).addTo(AppState.map);
     }
-    // NEU: Ruft die Popup-Aktualisierung sofort auf und öffnet es
     updateHarpMarkerPopup(AppState.harpMarker, lat, lng, true);
 
     Settings.state.userSettings.harpLat = lat;
@@ -790,6 +697,7 @@ export function handleHarpPlacement(e) {
     document.dispatchEvent(new CustomEvent('ui:recalculateJump'));
     document.dispatchEvent(new CustomEvent('harp:updated'));
 }
+
 export function createHarpMarker(latitude, longitude) {
     const marker = L.marker([latitude, longitude], {
         icon: L.divIcon({
@@ -801,22 +709,14 @@ export function createHarpMarker(latitude, longitude) {
         pane: 'markerPane',
         pmIgnore: true
     });
-    // NEU: Fügt einen Klick-Handler hinzu, um das Popup zu öffnen
     marker.on('click', () => {
         const pos = marker.getLatLng();
         updateHarpMarkerPopup(marker, pos.lat, pos.lng, true);
     });
     return marker;
 }
-/**
- * NEUE FUNKTION: Erstellt und aktualisiert das Popup für den HARP-Marker.
- * @param {L.Marker} marker - Die Marker-Instanz.
- * @param {number} lat - Die Breite.
- * @param {number} lng - Die Länge.
- * @param {boolean} [open=false] - Ob das Popup sofort geöffnet werden soll.
- */
+
 export async function updateHarpMarkerPopup(marker, lat, lng, open = false, expanded = false) {
-    // --- Schritt 1: Alle Daten sammeln (wie in deiner alten Version) ---
     const altitude = await Utils.getAltitude(lat, lng);
     const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
     let displayAltitude = 'N/A';
@@ -836,14 +736,12 @@ export async function updateHarpMarkerPopup(marker, lat, lng, open = false, expa
         }
     }
     
-    // Ein wiederverwendbarer Block für Höhe und QFE
-    const altitudeContent = `<br>Alt: ${displayAltitude} ${displayUnit}<br>QFE: ${qfeText}`;
+    // I18n Keys nutzen
+    const altitudeContent = `<br>${I18n.t('map.alt')}: ${displayAltitude} ${displayUnit}<br>${I18n.t('map.qfe')}: ${qfeText}`;
 
-    // --- Schritt 2: Den Popup-Inhalt basierend auf dem 'expanded'-Status erstellen ---
     let popupContent = `<b>HARP</b><br>`;
 
     if (expanded) {
-        // Erweiterte Ansicht mit allen Formaten
         const dms = Utils.decimalToDms(lat, true);
         const ddm = Utils.decimalToDecimalMinutes(lat, true);
         const dmsLng = Utils.decimalToDms(lng, false);
@@ -854,57 +752,49 @@ export async function updateHarpMarkerPopup(marker, lat, lng, open = false, expa
                 Decimal: ${lat.toFixed(5)}, ${lng.toFixed(5)}<br>
                 DDM: ${ddm.deg}° ${ddm.min.toFixed(3)}' ${ddm.dir}, ${ddmLng.deg}° ${ddmLng.min.toFixed(3)}' ${ddmLng.dir}<br>
                 DMS: ${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}, ${dmsLng.deg}°${dmsLng.min}'${dmsLng.sec.toFixed(0)}" ${dmsLng.dir}<br>
-                MGRS: ${Utils.decimalToMgrs(lat, lng)}
+                ${I18n.t('map.mgrs')}: ${Utils.decimalToMgrs(lat, lng)}
             </div>
             ${altitudeContent}<br>
-            <a href="#" class="toggle-coords-format" data-marker-type="harp" data-lat="${lat}" data-lng="${lng}" data-expanded="true" style="font-size: 11px;">Show less</a>
+            <a href="#" class="toggle-coords-format" data-marker-type="harp" data-lat="${lat}" data-lng="${lng}" data-expanded="true" style="font-size: 11px;">${I18n.t('map.show_less')}</a>
         `;
     } else {
-        // Standardansicht mit dem vom Benutzer ausgewählten Format
         const coordFormat = Settings.getValue('coordFormat', 'radio', 'Decimal');
         const coords = Utils.convertCoords(lat, lng, coordFormat);
         const formatDDM = (ddm) => `${ddm.deg}° ${ddm.min.toFixed(3)}' ${ddm.dir}`;
         const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
 
         if (coordFormat === 'MGRS') {
-            popupContent += `MGRS: ${coords.lat}`;
+            popupContent += `${I18n.t('map.mgrs')}: ${coords.lat}`;
         } else if (coordFormat === 'DMS') {
-            popupContent += `Lat: ${formatDMS(coords.lat)}<br>Lng: ${formatDMS(coords.lng)}`;
+            popupContent += `${I18n.t('map.lat')}: ${formatDMS(coords.lat)}<br>${I18n.t('map.lng')}: ${formatDMS(coords.lng)}`;
         } else if (coordFormat === 'DDM') {
-            popupContent += `Lat: ${formatDDM(coords.lat)}<br>Lng: ${formatDDM(coords.lng)}`;
+            popupContent += `${I18n.t('map.lat')}: ${formatDDM(coords.lat)}<br>${I18n.t('map.lng')}: ${formatDDM(coords.lng)}`;
         } else {
-            popupContent += `Lat: ${coords.lat}<br>Lng: ${coords.lng}`;
+            popupContent += `${I18n.t('map.lat')}: ${coords.lat}<br>${I18n.t('map.lng')}: ${coords.lng}`;
         }
         
         popupContent += `${altitudeContent}<br>
-            <a href="#" class="toggle-coords-format" data-marker-type="harp" data-lat="${lat}" data-lng="${lng}" data-expanded="false" style="font-size: 11px;">Show more</a>
+            <a href="#" class="toggle-coords-format" data-marker-type="harp" data-lat="${lat}" data-lng="${lng}" data-expanded="false" style="font-size: 11px;">${I18n.t('map.show_more')}</a>
         `;
     }
 
-    // --- Schritt 3: Das Popup aktualisieren ---
     updatePopupContent(marker, popupContent, open);
 }
-/**
- * Zeichnet Marker für gefundene Points of Interest (POIs) auf die Karte.
- * @param {Array<Object>} pois - Ein Array von POI-Objekten.
- */
+
 export function updatePoiMarkers(pois) {
     if (!AppState.map || !AppState.poiLayerGroup) {
-        console.warn('Cannot update POI markers: map or layer group not ready.');
         return;
     }
 
-    // Zuerst alle alten POI-Marker entfernen
     AppState.poiLayerGroup.clearLayers();
 
     if (!pois || pois.length === 0) {
-        return; // Nichts zu zeichnen
+        return;
     }
 
-    // Ein Icon für die POI-Marker (z.B. ein Fallschirm-Emoji)
     const poiIcon = L.divIcon({
         html: '🪂',
-        className: 'poi-marker-icon', // Eigene Klasse für potenzielles Styling
+        className: 'poi-marker-icon', 
         iconSize: [24, 24],
         iconAnchor: [12, 12]
     });
@@ -916,7 +806,6 @@ export function updatePoiMarkers(pois) {
                 direction: 'top',
             })
             .on('click', () => {
-                // Wenn auf einen POI-Marker geklickt wird, die Position auswählen
                 document.dispatchEvent(new CustomEvent('location:selected', {
                     detail: { lat: poi.lat, lng: poi.lon, source: 'poi_marker' },
                     bubbles: true
@@ -926,13 +815,7 @@ export function updatePoiMarkers(pois) {
         AppState.poiLayerGroup.addLayer(marker);
     });
 }
-/**
- * Erstellt einen Marker für das Absetzflugzeug mit Rotationsmöglichkeit.
- * @param {number} lat - Breite.
- * @param {number} lng - Länge.
- * @param {number} bearing - Flugrichtung in Grad.
- * @returns {L.Marker} Der erstellte Leaflet-Marker.
- */
+
 export function createAircraftMarker(lat, lng, bearing) {
     const aircraftIcon = L.icon({
         iconUrl: ICON_URLS.LIVEPLANE_MARKER,
@@ -956,10 +839,6 @@ export function createAircraftMarker(lat, lng, bearing) {
 // 4. Interne Initialisierungs-Helfer
 // ===================================================================
 
-/**
- * Initialisiert die grundlegende Leaflet-Karteninstanz.
- * @private
- */
 function _initializeBasicMapInstance(defaultCenter, defaultZoom) {
     AppState.lastLat = AppState.lastLat || defaultCenter[0];
     AppState.lastLng = AppState.lastLng || defaultCenter[1];
@@ -967,12 +846,13 @@ function _initializeBasicMapInstance(defaultCenter, defaultZoom) {
         center: defaultCenter,
         zoom: defaultZoom,
         zoomControl: false,
-        doubleClickZoom: false, // Wichtig für eigenen dblclick Handler
+        doubleClickZoom: false,
         maxZoom: 19,
         minZoom: navigator.onLine ? 6 : 11
     });
     console.log('Map instance created.');
 }
+
 function _addStandardMapControls() {
     if (!AppState.map) {
         console.error("Karte nicht initialisiert, bevor Controls hinzugefügt werden können.");
@@ -1000,7 +880,6 @@ function _addStandardMapControls() {
         maxWidth: 100
     }).addTo(AppState.map);
 
-    // Jetzt, wo die Ladereihenfolge stimmt, ist dies der saubere und richtige Weg:
     AppState.map.pm.addControls({
         position: 'topright',
         drawMarker: true,
@@ -1016,25 +895,40 @@ function _addStandardMapControls() {
         rotateMode: false
     });
 
-    AppState.map.pm.setLang('en');
+    // ============================================================
+    // NEU: Dynamische Spracheinstellung für Geoman
+    // ============================================================
+    
+    // 1. Sprache beim Start setzen
+    const currentLang = Settings.getValue('language') || 'en';
+    AppState.map.pm.setLang(currentLang);
 
-    // Wir prüfen, ob wir auf einem Mobilgerät sind.
+    // 2. Auf Sprachwechsel hören (Live-Update ohne Neuladen)
+    document.addEventListener('i18n:loaded', (e) => {
+        if (AppState.map && AppState.map.pm) {
+            console.log(`Updating Geoman language to: ${e.detail.lang}`);
+            AppState.map.pm.setLang(e.detail.lang);
+        }
+    });
+    // ============================================================
+
     if (isMobileDevice()) {
-        // Setze globale Geoman-Optionen, um die "Geisterlinie" unsichtbar zu machen.
         AppState.map.pm.setGlobalOptions({
-            hintlineStyle: { opacity: 0, color: 'green' }  // Die Linie vom letzten Punkt zum Mauszeiger/Fadenkreuz
+            hintlineStyle: { opacity: 0, color: 'green' }
         });
         console.log("Geoman global options set for mobile to hide helper lines.");
     }
 
     console.log('Standard map controls including Geoman have been added.');
 }
+
 async function _initializeDefaultMarker(defaultCenter, initialAltitude) {
     console.log("MapManager: Initialisiere den Standard-Marker...");
     await createOrUpdateMarker(defaultCenter[0], defaultCenter[1]);
     AppState.isManualPanning = false;
     console.log('Default marker initialized using the new standard method.');
 }
+
 async function _initializeTileCacheLogic() {
     try {
         await TileCache.init();
@@ -1052,30 +946,29 @@ async function _initializeTileCacheLogic() {
     }
     console.log('Tile cache logic initialized.');
 }
+
 function _initializeCoordsControlAndHandlers() {
     AppState.coordsControl = new L.Control.Coordinates();
     AppState.coordsControl.addTo(AppState.map);
     console.log('CoordsControl initialized.');
 
-    // Mousemove Handler (vereinfacht, da debouncedGetElevationAndQFE jetzt globaler ist)
     AppState.map.on('mousemove', function (e) {
-        _handleMapMouseMove(e); // Ausgelagert
+        _handleMapMouseMove(e);
     });
 
     AppState.map.on('mouseout', function () {
         if (AppState.coordsControl && AppState.coordsControl.getContainer()) {
-            AppState.coordsControl.getContainer().innerHTML = 'Move mouse over map';
+            AppState.coordsControl.getContainer().innerHTML = I18n.t('map.move_mouse_over');
         }
     });
     console.log('Mousemove and mouseout handlers set up.');
 }
+
 function _initializeTerrainWarningLayer() {
     if (!AppState.terrainWarningLayer) {
         AppState.terrainWarningLayer = L.layerGroup().addTo(AppState.map);
     }
 }
-
-// Setup Funktionen
 
 function _setupBaseLayersAndHandling() {
     AppState.baseMaps = {
@@ -1098,15 +991,13 @@ function _setupBaseLayersAndHandling() {
             attribution: '© Esri, USGS'
         }),
         "Esri Satellite": L.layerGroup([
-            // Basiskarte: Satellit
             L.tileLayer.cached('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
                 maxZoom: 19,
             }),
-            // Overlay: Nur Labels und Grenzen von Esri (sehr detailliert)
             L.tileLayer.cached('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
                 maxZoom: 19,
                 attribution: '© EsriEsri, USDA, USGS © OpenStreetMap contributors, and the GIS user community',
-                pane: 'shadowPane' // Sorgt dafür, dass Labels über den Satellitenbildern liegen
+                pane: 'shadowPane' 
             })
         ]),
         "Esri Satellite + OSM": L.layerGroup([
@@ -1151,12 +1042,10 @@ function _setupBaseLayersAndHandling() {
             attribution: '© <a href="https://www.openflightmaps.org">openflightmaps.org</a>'
         }),
         "Esri Topo + SeaMarks": L.layerGroup([
-            // Diese Ebene wird weiterhin gecached
             L.tileLayer.cached('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
                 maxZoom: 19,
                 attribution: '© Esri, USGS'
             }),
-            // DIESE ZEILE IST GEÄNDERT: .cached wurde entfernt
             L.tileLayer('https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png', {
                 maxZoom: 18,
                 attribution: ' © <a href="http://www.openseamap.org">OpenSeaMap</a> contributors',
@@ -1186,7 +1075,7 @@ function _setupBaseLayersAndHandling() {
             if (!navigator.onLine) {
                 if (!AppState.hasTileErrorSwitched) {
                     console.warn(`${selectedBaseMapName} tiles unavailable offline. Zoom restricted.`);
-                    Utils.handleMessage('Offline: Zoom restricted to levels 11–14 for cached tiles.');
+                    Utils.handleMessage(I18n.t('messages.offline_zoom_restricted'));
                     AppState.hasTileErrorSwitched = true;
                 }
                 return;
@@ -1198,7 +1087,7 @@ function _setupBaseLayersAndHandling() {
                 AppState.baseMaps[fallbackBaseMapName].addTo(AppState.map);
                 Settings.state.userSettings.baseMaps = fallbackBaseMapName;
                 Settings.save();
-                Utils.handleMessage(`${selectedBaseMapName} tiles unavailable. Switched to ${fallbackBaseMapName}.`);
+                Utils.handleMessage(I18n.t('messages.tiles_unavailable_switched', { current: selectedBaseMapName, fallback: fallbackBaseMapName }));
                 AppState.hasTileErrorSwitched = true;
             } else if (!AppState.hasTileErrorSwitched) {
                 console.warn(`Tile error in ${selectedBaseMapName}, attempting to continue.`);
@@ -1207,7 +1096,7 @@ function _setupBaseLayersAndHandling() {
         activeLayer.addTo(AppState.map);
     } else {
         console.error(`Default base map "${selectedBaseMapName}" could not be added.`);
-        AppState.baseMaps["OpenStreetMap"].addTo(AppState.map); // Sicherer Fallback
+        AppState.baseMaps["OpenStreetMap"].addTo(AppState.map);
     }
 
     if (AppState.map) AppState.map.invalidateSize();
@@ -1215,7 +1104,7 @@ function _setupBaseLayersAndHandling() {
     window.addEventListener('online', () => {
         AppState.hasTileErrorSwitched = false;
         if (AppState.map) AppState.map.options.minZoom = 6;
-        updateOfflineIndicator(); // updateOfflineIndicator muss global/importiert sein
+        updateOfflineIndicator();
     });
     window.addEventListener('offline', () => {
         if (AppState.map) AppState.map.options.minZoom = 9;
@@ -1223,6 +1112,7 @@ function _setupBaseLayersAndHandling() {
     });
     console.log('Base layers and online/offline handlers set up.');
 }
+
 function _setupCustomPanes() {
     AppState.map.createPane('gpxTrackPane');
     AppState.map.getPane('gpxTrackPane').style.zIndex = 650;
@@ -1230,6 +1120,7 @@ function _setupCustomPanes() {
     AppState.map.getPane('popupPane').style.zIndex = 700;
     console.log('Custom map panes created.');
 }
+
 function _setupGeomanMeasurementHandlers() {
     const map = AppState.map;
     if (!map) {
@@ -1239,16 +1130,13 @@ function _setupGeomanMeasurementHandlers() {
 
     console.log('Leaflet-Geoman Version:', L.PM.version);
 
-    // Stop click propagation on the Geoman toolbar to prevent map clicks
     const geomanToolbar = document.querySelector('.leaflet-pm-toolbar');
     if (geomanToolbar) {
-        // Eine Liste aller Events, die potenziell zur Karte durchsickern könnten.
         const eventsToStop = ['click', 'dblclick', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'pointerdown', 'pointerup', 'contextmenu'];
 
         eventsToStop.forEach(eventType => {
             geomanToolbar.addEventListener(eventType, (e) => {
                 L.DomEvent.stopPropagation(e);
-                // Optional: Zum Debuggen in der Konsole anzeigen, welches Event gestoppt wurde
                 console.log(`Stopped '${e.type}' event on Geoman toolbar.`);
             });
         });
@@ -1259,9 +1147,8 @@ function _setupGeomanMeasurementHandlers() {
     let lastKnownLatLngs = null;
     let lastKnownCircleState = null;
     let currentLayer = null;
-    let isDrawingCompleted = false; // Flag to track if drawing was completed or cancelled
+    let isDrawingCompleted = false;
 
-    // Helper function for permanent line labels
     function createPermanentLineLabel(latlngs, index) {
         const currentPoint = latlngs[index];
         const prevPoint = index > 0 ? latlngs[index - 1] : null;
@@ -1282,8 +1169,8 @@ function _setupGeomanMeasurementHandlers() {
 
         const labelContent = `
             <div class="geoman-permanent-label">
-                <div>In: ${inBearing.toFixed(0)}°</div>
-                <div>Out: ${outBearingText}</div>
+                <div>${I18n.t('map.geoman.in')}: ${inBearing.toFixed(0)}°</div>
+                <div>${I18n.t('map.geoman.out')}: ${outBearingText}</div>
                 <div>+: ${segmentDistanceText}</div>
                 <div>∑: ${totalDistanceText}</div>
             </div>
@@ -1296,12 +1183,11 @@ function _setupGeomanMeasurementHandlers() {
         marker.addTo(persistentLabelsGroup);
     }
 
-    // Helper function for permanent circle labels
     function createPermanentCircleLabel(layer) {
         const center = layer.getLatLng();
         const radius = layer.getRadius();
         const radiusText = radius < 1000 ? `${radius.toFixed(0)} m` : `${(radius / 1000).toFixed(2)} km`;
-        const labelContent = `<div class="geoman-permanent-label">Radius:<br> ${radiusText}</div>`;
+        const labelContent = `<div class="geoman-permanent-label">${I18n.t('map.geoman.radius')}:<br> ${radiusText}</div>`;
         const label = L.marker(center, {
             icon: L.divIcon({ className: 'geoman-label-container', html: labelContent, iconAnchor: [0, 0] }),
             pmIgnore: true
@@ -1358,7 +1244,7 @@ function _setupGeomanMeasurementHandlers() {
     startPolling();
 
     map.on('pm:drawstart', (e) => {
-        isDrawingCompleted = false; // Reset the flag at the start of any drawing action
+        isDrawingCompleted = false;
         const workingLayer = e.workingLayer;
         persistentLabelsGroup.clearLayers();
         liveMeasureLabel.style.display = 'block';
@@ -1367,7 +1253,7 @@ function _setupGeomanMeasurementHandlers() {
 
         if (e.shape === 'Line') {
             if (isMobileDevice()) {
-                liveMeasureLabel.innerHTML = 'Tap to set first point.';
+                liveMeasureLabel.innerHTML = I18n.t('map.geoman.tap_first_point');
                 let lastPoint = null;
                 let rubberBandLayer = null;
 
@@ -1391,17 +1277,16 @@ function _setupGeomanMeasurementHandlers() {
                         const bearing = Utils.calculateBearing(lastPoint.lat, lastPoint.lng, currentCenter.lat, currentCenter.lng);
                         const distanceText = distance < 1000 ? `${distance.toFixed(0)} m` : `${(distance / 1000).toFixed(2)} km`;
 
-                        liveMeasureLabel.innerHTML = `In: ${bearing.toFixed(0)}°<br>Out: ---°<br>+: ${distanceText}`;
+                        liveMeasureLabel.innerHTML = `${I18n.t('map.geoman.in')}: ${bearing.toFixed(0)}°<br>${I18n.t('map.geoman.out')}: ---°<br>+: ${distanceText}`;
                         const mapSize = map.getSize();
                         const labelPos = L.point(mapSize.x / 2 + 20, mapSize.y / 2 - 40);
                         L.DomUtil.setPosition(liveMeasureLabel, labelPos);
                     } else {
-                        // If there are no points, clear the rubber band
                         if (rubberBandLayer) {
                             map.removeLayer(rubberBandLayer);
                             rubberBandLayer = null;
                         }
-                        liveMeasureLabel.innerHTML = 'Tap to set first point.';
+                        liveMeasureLabel.innerHTML = I18n.t('map.geoman.tap_first_point');
                     }
                 };
 
@@ -1419,7 +1304,6 @@ function _setupGeomanMeasurementHandlers() {
                 vertexRemoveHandler = () => {
                     setTimeout(() => {
                         updateAllPermanentLineLabels(workingLayer);
-                        // Trigger the move handler to update the rubber band and label
                         map.fire('move');
                     }, 50);
                 };
@@ -1438,7 +1322,7 @@ function _setupGeomanMeasurementHandlers() {
                     }
                 };
             } else {
-                liveMeasureLabel.innerHTML = 'Click to set the first point.';
+                liveMeasureLabel.innerHTML = I18n.t('map.geoman.click_first_point');
                 mouseMoveHandler = (moveEvent) => {
                     const latlngs = workingLayer.getLatLngs();
                     if (latlngs.length > 0) {
@@ -1446,7 +1330,7 @@ function _setupGeomanMeasurementHandlers() {
                         const distance = lastPoint.distanceTo(moveEvent.latlng);
                         const bearing = Utils.calculateBearing(lastPoint.lat, lastPoint.lng, moveEvent.latlng.lat, moveEvent.latlng.lng);
                         const distanceText = distance < 1000 ? `${distance.toFixed(0)} m` : `${(distance / 1000).toFixed(2)} km`;
-                        liveMeasureLabel.innerHTML = `In: ${bearing.toFixed(0)}°<br>Out: ---°<br>+: ${distanceText}`;
+                        liveMeasureLabel.innerHTML = `${I18n.t('map.geoman.in')}: ${bearing.toFixed(0)}°<br>${I18n.t('map.geoman.out')}: ---°<br>+: ${distanceText}`;
                         L.DomUtil.setPosition(liveMeasureLabel, moveEvent.containerPoint.add([15, -15]));
                     }
                 };
@@ -1474,7 +1358,6 @@ function _setupGeomanMeasurementHandlers() {
         } else if (e.shape === 'Circle') {
             if (isMobileDevice()) {
                 liveMeasureLabel.innerHTML = '';
-                // Position label at map center initially
                 const mapSize = map.getSize();
                 const initialLabelPos = L.point(mapSize.x / 2, mapSize.y / 2 - 40);
                 L.DomUtil.setPosition(liveMeasureLabel, initialLabelPos);
@@ -1489,7 +1372,7 @@ function _setupGeomanMeasurementHandlers() {
                             workingLayer.setRadius(radius);
 
                             const radiusText = radius < 1000 ? `${radius.toFixed(0)} m` : `${(radius / 1000).toFixed(2)} km`;
-                            liveMeasureLabel.innerHTML = `Radius: ${radiusText}`;
+                            liveMeasureLabel.innerHTML = `${I18n.t('map.geoman.radius')}: ${radiusText}`;
                             const mapSize = map.getSize();
                             const labelPos = L.point(mapSize.x / 2, mapSize.y / 2 - 40);
                             L.DomUtil.setPosition(liveMeasureLabel, labelPos);
@@ -1500,13 +1383,12 @@ function _setupGeomanMeasurementHandlers() {
                 vertexAddHandler = () => {
                     if (!centerSet) {
                         centerSet = true;
-                        liveMeasureLabel.innerHTML = 'Move map to adjust radius. Tap again to finish.';
+                        liveMeasureLabel.innerHTML = I18n.t('map.geoman.move_map_radius');
                         const mapSize = map.getSize();
                         const labelPos = L.point(mapSize.x / 2, mapSize.y / 2 - 40);
                         L.DomUtil.setPosition(liveMeasureLabel, labelPos);
                         map.on('move', mapMoveHandler);
                     } else {
-                        // Second tap: finalize radius
                         finalize();
                         updateCircleLabel(workingLayer);
                         currentLayer = workingLayer;
@@ -1526,13 +1408,13 @@ function _setupGeomanMeasurementHandlers() {
                     liveMeasureLabel.style.display = 'none';
                 };
             } else {
-                liveMeasureLabel.innerHTML = 'Click and drag to draw a circle.';
+                liveMeasureLabel.innerHTML = I18n.t('map.geoman.click_drag_circle');
                 mouseMoveHandler = (moveEvent) => {
                     const center = workingLayer.getLatLng();
                     if (center) {
                         const radius = center.distanceTo(moveEvent.latlng);
                         const radiusText = radius < 1000 ? `${radius.toFixed(0)} m` : `${(radius / 1000).toFixed(2)} km`;
-                        liveMeasureLabel.innerHTML = `Radius: ${radiusText}`;
+                        liveMeasureLabel.innerHTML = `${I18n.t('map.geoman.radius')}: ${radiusText}`;
                         L.DomUtil.setPosition(liveMeasureLabel, moveEvent.containerPoint.add([15, -15]));
                     }
                 };
@@ -1547,7 +1429,7 @@ function _setupGeomanMeasurementHandlers() {
         };
 
         map.once('pm:create', (createEvent) => {
-            isDrawingCompleted = true; // Mark the drawing as successfully completed
+            isDrawingCompleted = true;
             finalize();
             if (createEvent.shape === 'Line' && createEvent.layer instanceof L.Polyline) {
                 updateAllPermanentLineLabels(createEvent.layer);
@@ -1565,11 +1447,10 @@ function _setupGeomanMeasurementHandlers() {
         });
 
         map.once('pm:drawend', () => {
-            // If drawend fires but create did not, the action was cancelled.
             if (!isDrawingCompleted) {
                 console.log("Drawing was cancelled, cleaning up visuals.");
-                finalize(); // This will execute our cleanup function.
-                persistentLabelsGroup.clearLayers(); // Also clear any permanent labels.
+                finalize();
+                persistentLabelsGroup.clearLayers();
             }
         });
     });
@@ -1578,12 +1459,11 @@ function _setupGeomanMeasurementHandlers() {
         if (e.shape === 'Line' && e.layer instanceof L.Polyline) {
             setTimeout(() => updateAllPermanentLineLabels(e.layer), 300);
         } else if (e.shape === 'Circle' && e.layer instanceof L.Circle) {
-            // Update live label during dragging
             if (isMobileDevice()) {
                 liveMeasureLabel.style.display = 'block';
                 const radius = e.layer.getRadius();
                 const radiusText = radius < 1000 ? `${radius.toFixed(0)} m` : `${(radius / 1000).toFixed(2)} km`;
-                liveMeasureLabel.innerHTML = `Radius: ${radiusText}`;
+                liveMeasureLabel.innerHTML = `${I18n.t('map.geoman.radius')}: ${radiusText}`;
                 const mapSize = map.getSize();
                 const labelPos = L.point(mapSize.x / 2, mapSize.y / 2 - 40);
                 L.DomUtil.setPosition(liveMeasureLabel, labelPos);
@@ -1613,16 +1493,14 @@ function _setupGeomanMeasurementHandlers() {
         liveMeasureLabel.style.display = 'none';
     });
 }
+
 function _setupCoreMapEventHandlers() {
     if (!AppState.map) {
         console.error("Karte nicht initialisiert in _setupCoreMapEventHandlers");
         return;
     }
 
-    // A. Das Control wird jetzt immer hier erstellt, egal für welchen Modus.
     if (!AppState.coordsControl) {
-        // WICHTIG: Deaktivieren der Standard-Handler des Plugins.
-        // Wir steuern die Updates jetzt zu 100% selbst.
         const coordOptions = {
             enableUserInput: false
         };
@@ -1630,37 +1508,31 @@ function _setupCoreMapEventHandlers() {
         AppState.coordsControl.addTo(AppState.map);
     }
 
-    // B. Die zentrale Entscheidung: Fadenkreuz oder Maus?
     if (isMobileDevice()) {
         _setupCrosshairCoordinateHandler(AppState.map);
     } else {
         _setupMouseCoordinateHandler(AppState.map);
     }
 
-    // Die restlichen Event-Handler bleiben für beide Plattformen aktiv.
     AppState.map.on('dblclick', _handleMapDblClick);
 
-    // Zoom Events
     AppState.map.on('zoomstart', (e) => {
         if (!navigator.onLine) {
             const targetZoom = e.target._zoom || AppState.map.getZoom();
             if (targetZoom < 11) {
                 e.target._zoom = 11;
                 AppState.map.setZoom(11);
-                Utils.handleMessage('Offline: Zoom restricted to levels 11–14 for cached tiles.');
+                Utils.handleMessage(I18n.t('messages.offline_zoom_restricted'));
             } else if (targetZoom > 14) {
                 e.target._zoom = 14;
                 AppState.map.setZoom(14);
-                Utils.handleMessage('Offline: Zoom restricted to levels 11–14 for cached tiles.');
+                Utils.handleMessage(I18n.t('messages.offline_zoom_restricted'));
             }
         }
     });
     AppState.map.on('zoomend', () => {
         const currentZoom = AppState.map.getZoom();
 
-        // HIER IST DIE ÄNDERUNG:
-        // Der Manager ruft KEINE Anwendungslogik mehr auf.
-        // Stattdessen sendet er ein Event und meldet, dass der Zoom sich geändert hat.
         const zoomEvent = new CustomEvent('map:zoomend', {
             detail: { zoom: currentZoom },
             bubbles: true,
@@ -1668,7 +1540,6 @@ function _setupCoreMapEventHandlers() {
         });
         AppState.map.getContainer().dispatchEvent(zoomEvent);
 
-        // Anker-Marker-Größe anpassen
         if (AppState.jumpRunTrackLayer && Settings.state.userSettings.showJumpRunTrack) {
             const anchorMarker = AppState.jumpRunTrackLayer.getLayers().find(layer => layer.options.icon?.options.className === 'jrt-anchor-marker');
             if (anchorMarker) {
@@ -1683,7 +1554,6 @@ function _setupCoreMapEventHandlers() {
             }
         }
 
-        // Update heatmap radius on zoomend to adjust dynamically
         if (AppState.heatmapLayer) {
             const newRadius = Utils.calculateDynamicRadius(ENSEMBLE_VISUALIZATION.HEATMAP_BASE_RADIUS, ENSEMBLE_VISUALIZATION.HEATMAP_REFERENCE_ZOOM);
             AppState.heatmapLayer.setOptions({ radius: newRadius });
@@ -1694,9 +1564,7 @@ function _setupCoreMapEventHandlers() {
         }
     });
 
-    // Movestart (für manuelles Panning)
     AppState.map.on('movestart', (e) => {
-        // Prüft, ob die Bewegung durch Ziehen der Karte ausgelöst wurde und nicht durch Ziehen eines Markers
         if (e.target === AppState.map && (!e.originalEvent || e.originalEvent.target === AppState.map.getContainer())) {
             AppState.isManualPanning = true;
             console.log('Manual map panning detected.');
@@ -1707,11 +1575,10 @@ function _setupCoreMapEventHandlers() {
     AppState.map.on('contextmenu', (e) => {
 
         if (Settings.state.userSettings.isInteractionLocked) {
-            displayWarning("Interaction is locked. Please unlock to place a new DIP.");
-            return; // Aktion unterbinden
+            displayWarning(I18n.t('map.interaction_locked'));
+            return;
         }
 
-        // Rechtsklick/Langes Drücken verschiebt jetzt den DIP
         const { lat, lng } = e.latlng;
         console.log('MapManager: Rechtsklick/Langes Drücken erkannt. Sende "location:selected"-Event.');
 
@@ -1719,7 +1586,7 @@ function _setupCoreMapEventHandlers() {
             detail: {
                 lat: lat,
                 lng: lng,
-                source: 'contextmenu' // Wir ändern die Quelle zur besseren Nachverfolgung
+                source: 'contextmenu' 
             },
             bubbles: true,
             cancelable: true
@@ -1727,15 +1594,14 @@ function _setupCoreMapEventHandlers() {
         AppState.map.getContainer().dispatchEvent(mapSelectEvent);
     });
 
-    // Touchstart (Doppel-Tipp) auf dem Kartencontainer
     const mapContainer = AppState.map.getContainer();
     mapContainer.addEventListener('touchstart', async (e) => {
-        if (e.touches.length !== 1 || e.target.closest('.leaflet-marker-icon')) return; // Ignoriere Multi-Touch oder Klick auf Marker
+        if (e.touches.length !== 1 || e.target.closest('.leaflet-marker-icon')) return; 
         const currentTime = new Date().getTime();
-        const timeSinceLastTap = currentTime - lastTapTime; // lastTapTime ist eine module-level Variable
-        const tapThreshold = 300; // ms
+        const timeSinceLastTap = currentTime - lastTapTime; 
+        const tapThreshold = 300; 
         if (timeSinceLastTap < tapThreshold && timeSinceLastTap > 0) {
-            e.preventDefault(); // Verhindere Standard-Touch-Aktionen wie Zoom
+            e.preventDefault(); 
             const rect = mapContainer.getBoundingClientRect();
             const touchX = e.touches[0].clientX - rect.left;
             const touchY = e.touches[0].clientY - rect.top;
@@ -1743,46 +1609,23 @@ function _setupCoreMapEventHandlers() {
 
             await _handleMapDblClick({ latlng: latlng, containerPoint: L.point(touchX, touchY), layerPoint: AppState.map.latLngToLayerPoint(latlng) });
         }
-        lastTapTime = currentTime; // Aktualisiere die Zeit des letzten Taps
-    }, { passive: false }); // passive: false ist wichtig, um preventDefault zu erlauben
+        lastTapTime = currentTime; 
+    }, { passive: false }); 
 
-    // Optionale, einfache Click/Mousedown-Handler (falls benötigt)
     AppState.map.on('click', (e) => {
-        // console.log('Map click event, target:', e.originalEvent.target);
-        // Z.B. um Popups zu schließen oder andere UI-Interaktionen zu steuern.
-        // Achte darauf, dass dies nicht mit dem Doppelklick/Doppel-Tipp kollidiert.
     });
     AppState.map.on('mousedown', (e) => {
-        // console.log('Map mousedown event, target:', e.originalEvent.target);
     });
-
-    // --- START: Add Double-Tap/Touch Functionality ---
-    mapContainer.addEventListener('touchstart', async (e) => {
-        if (e.touches.length !== 1 || e.target.closest('.leaflet-marker-icon')) return; // Ignore Multi-Touch or taps on markers
-        const currentTime = new Date().getTime();
-        const timeSinceLastTap = currentTime - lastTapTime;
-        const tapThreshold = 300; // Milliseconds
-        if (timeSinceLastTap < tapThreshold && timeSinceLastTap > 0) {
-            e.preventDefault(); // Prevent default zoom on double-tap
-            const rect = mapContainer.getBoundingClientRect();
-            const touchX = e.touches[0].clientX - rect.left;
-            const touchY = e.touches[0].clientY - rect.top;
-            const latlng = AppState.map.containerPointToLatLng([touchX, touchY]);
-
-            await _handleMapDblClick({ latlng: latlng, containerPoint: L.point(touchX, touchY), layerPoint: AppState.map.latLngToLayerPoint(latlng) });
-        }
-        lastTapTime = currentTime; // Update the time of the last tap
-    }, { passive: false }); // passive: false is required to allow preventDefault
-    // --- END: Add Double-Tap/Touch Functionality ---
 
     _setupGeomanMeasurementHandlers();
     console.log('All core map event handlers have been set up.');
 }
+
 function _setupCrosshairCoordinateHandler(map) {
     const updateWithDebouncedData = ({ elevation }, requestLatLng) => {
         const currentCenter = map.getCenter();
         if (Math.abs(currentCenter.lat - requestLatLng.lat) > 0.0001 || Math.abs(currentCenter.lng - requestLatLng.lng) > 0.0001) {
-            return; // Verhindert Update, wenn sich die Karte inzwischen weiterbewegt hat
+            return; 
         }
 
         const currentHTML = AppState.coordsControl._container.innerHTML;
@@ -1796,7 +1639,6 @@ function _setupCrosshairCoordinateHandler(map) {
         }
         const altString = displayElevation === 'N/A' ? 'N/A' : `${displayElevation}${heightUnit}`;
 
-        // NEUE LOGIK: QFE wird hier berechnet, NACHDEM die Höhe empfangen wurde.
         let qfeString = 'N/A';
         if (elevation !== 'N/A' && AppState.weatherData && AppState.weatherData.surface_pressure) {
             const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
@@ -1804,12 +1646,11 @@ function _setupCrosshairCoordinateHandler(map) {
             const temperature = AppState.weatherData.temperature_2m?.[sliderIndex] || 15;
             const referenceElevation = AppState.lastAltitude !== 'N/A' ? AppState.lastAltitude : 0;
 
-            // Aufruf der bestehenden QFE-Funktion in utils.js
             const qfe = Utils.calculateQFE(surfacePressure, elevation, referenceElevation, temperature);
             qfeString = qfe !== 'N/A' ? `${qfe} hPa` : 'N/A';
         }
 
-        const displayText = `${coordPart}<br>Elevation: ${altString}<br>QFE: ${qfeString}`;
+        const displayText = `${coordPart}<br>${I18n.t('map.alt')}: ${altString}<br>${I18n.t('map.qfe')}: ${qfeString}`;
         AppState.coordsControl.update(displayText);
     };
 
@@ -1823,28 +1664,28 @@ function _setupCrosshairCoordinateHandler(map) {
         const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
 
         if (coordFormat === 'MGRS') {
-            coordString = `MGRS: ${coords.lat}`;
+            coordString = `${I18n.t('map.mgrs')}: ${coords.lat}`;
         } else if (coordFormat === 'DMS') {
-            coordString = `${formatDMS(coords.lat)}, ${formatDMS(coords.lng)}`;
+            coordString = `${I18n.t('map.lat')}: ${formatDMS(coords.lat)}, ${I18n.t('map.lng')}: ${formatDMS(coords.lng)}`;
         } else if (coordFormat === 'DDM') {
-            coordString = `${formatDDM(coords.lat)}, ${formatDDM(coords.lng)}`;
+            coordString = `${I18n.t('map.lat')}: ${formatDDM(coords.lat)}, ${I18n.t('map.lng')}: ${formatDDM(coords.lng)}`;
         } else {
-            coordString = `${center.lat.toFixed(5)}, ${center.lng.toFixed(5)}`;
+            coordString = `${I18n.t('map.lat')}: ${center.lat.toFixed(5)}, ${I18n.t('map.lng')}: ${center.lng.toFixed(5)}`;
         }
 
-        AppState.coordsControl.update(`${coordString}<br>Elevation: ...<br>QFE: ...`);
-        // ... (Rest der Funktion) ...
+        AppState.coordsControl.update(`${coordString}<br>${I18n.t('map.alt')}: ...<br>${I18n.t('map.qfe')}: ...`);
     };
 
     map.on('move', handleMapMove);
-    setTimeout(() => map.fire('move'), 200); // Löst die Anzeige initial aus
+    setTimeout(() => map.fire('move'), 200); 
     console.log('Crosshair coordinate handler initialized.');
 }
+
 function _setupMouseCoordinateHandler(map) {
     map.on('mousemove', _handleMapMouseMove);
     map.on('mouseout', function () {
         if (AppState.coordsControl && AppState.coordsControl.getContainer()) {
-            AppState.coordsControl.getContainer().innerHTML = 'Move mouse over map';
+            AppState.coordsControl.getContainer().innerHTML = I18n.t('map.move_mouse_over');
         }
     });
     console.log('Mouse coordinate handler initialized.');
@@ -1856,35 +1697,27 @@ async function _geolocationSuccessCallback(position, defaultZoom) {
     const { latitude, longitude } = position.coords;
     console.log('MapManager: Geolocation erfolgreich. Sende Event.');
 
-    // 1. Aktualisiere die Marker-Position (das ist eine UI-Aufgabe des Managers)
-    // Dieser Teil kann hier bleiben.
     AppState.lastLat = latitude;
     AppState.lastLng = longitude;
     AppState.lastAltitude = await Utils.getAltitude(latitude, longitude);
-    moveMarker(latitude, longitude); // Einfach den Namen der Funktion aufrufen.
+    moveMarker(latitude, longitude); 
     AppState.map.setView([latitude, longitude], defaultZoom);
 
-    // 2. Erstelle und sende das Event.
     const mapSelectEvent = new CustomEvent('location:selected', {
         detail: {
             lat: latitude,
             lng: longitude,
-            source: 'geolocation' // Wichtige Info über die Herkunft
+            source: 'geolocation'
         },
         bubbles: true,
         cancelable: true
     });
     AppState.map.getContainer().dispatchEvent(mapSelectEvent);
-
-    // 3. ALLE Anwendungslogik-Aufrufe wie calculateJump() und LocationManager.addCoordToHistory() werden hier GELÖSCHT.
 }
+
 async function _geolocationErrorCallback(error, defaultCenter, defaultZoom) {
     console.warn(`Geolocation error: ${error.message}`);
 
-    // =================================================================
-    // ==== HIER KOMMT DIE FEHLENDE LOGIK HIN                       ====
-    // =================================================================
-    // Prüfe auf Home DZ, bevor der Default verwendet wird
     const homeDZ = LocationManager.getHomeDZ();
     let startLat, startLng, source, message;
 
@@ -1892,23 +1725,21 @@ async function _geolocationErrorCallback(error, defaultCenter, defaultZoom) {
         startLat = homeDZ.lat;
         startLng = homeDZ.lng;
         source = 'home_dz_fallback';
-        message = `Using your saved Home DZ: ${homeDZ.label}`;
+        message = I18n.t('messages.home_dz_fallback', { name: homeDZ.label });
     } else {
         startLat = defaultCenter[0];
         startLng = defaultCenter[1];
         source = 'geolocation_fallback';
-        message = 'Unable to retrieve your location. Using default location.';
+        message = I18n.t('messages.geolocation_fallback');
     }
 
     Utils.handleMessage(message);
 
-    // Setzt den Marker auf den korrekten Startpunkt (Home DZ oder Default)
     await createOrUpdateMarker(startLat, startLng);
     AppState.map.setView([startLat, startLng], defaultZoom);
     recenterMap(true);
     AppState.isManualPanning = false;
 
-    // Löst das Event aus, damit die App weitermachen kann
     const mapSelectEvent = new CustomEvent('location:selected', {
         detail: { lat: startLat, lng: startLng, source: source },
         bubbles: true,
@@ -1916,16 +1747,12 @@ async function _geolocationErrorCallback(error, defaultCenter, defaultZoom) {
     });
     AppState.map.getContainer().dispatchEvent(mapSelectEvent);
     console.log(`Dispatched 'location:selected' event from ${source}.`);
-    // =================================================================
-    // ==== ENDE DER KORREKTUR                                        ====
-    // =================================================================
 }
+
 async function _handleGeolocation(defaultCenter, defaultZoom) {
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
-            // Bei ERFOLG wird diese Funktion aufgerufen
             (position) => _geolocationSuccessCallback(position, defaultZoom),
-            // Bei FEHLER wird diese Funktion aufgerufen
             (geoError) => _geolocationErrorCallback(geoError, defaultCenter, defaultZoom),
             {
                 enableHighAccuracy: true,
@@ -1934,20 +1761,18 @@ async function _handleGeolocation(defaultCenter, defaultZoom) {
             }
         );
     } else {
-        // Fallback, wenn der Browser gar keine Ortung unterstützt
         console.warn('Geolocation not supported.');
-        await _geolocationErrorCallback({ message: "Geolocation not supported by this browser." }, defaultCenter, defaultZoom);
+        await _geolocationErrorCallback({ message: I18n.t('messages.geolocation_not_supported') }, defaultCenter, defaultZoom);
     }
 }
+
 export function toggleGeoManControls(locked) {
     if (!AppState.map || !AppState.map.pm) return;
     const toolbar = document.querySelector('.leaflet-pm-toolbar');
 
     if (locked) {
-        // Toolbar sofort ausblenden, um weitere Klicks zu verhindern
         if (toolbar) toolbar.style.display = 'none';
 
-        // WICHTIG: Nur die Modi deaktivieren, die auch wirklich aktiv sind.
         if (AppState.map.pm.globalDrawModeEnabled()) {
             AppState.map.pm.disableDraw();
         }
@@ -1958,46 +1783,42 @@ export function toggleGeoManControls(locked) {
             AppState.map.pm.disableGlobalRemovalMode();
         }
     } else {
-        // Toolbar wieder anzeigen
         if (toolbar) toolbar.style.display = 'block';
     }
 }
+
 export function updateCoordsDisplay(text) {
-    // AppState.coordsControl wurde in _initializeCoordsControlAndHandlers erstellt.
     if (AppState.coordsControl) {
         AppState.coordsControl.update(text);
     }
 }
+
 function _handleMapMouseMove(e) {
     const { lat, lng } = e.latlng;
-    AppState.lastMouseLatLng = { lat, lng }; // Position für den Callback speichern
+    AppState.lastMouseLatLng = { lat, lng };
 
     const coordFormat = Settings.getValue('coordFormat', 'radio', 'Decimal');
     let coordText;
 
-    // Koordinaten-Text korrekt formatieren
     const formatDDM = (ddm) => `${ddm.deg}° ${ddm.min.toFixed(3)}' ${ddm.dir}`;
     const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
 
     if (coordFormat === 'MGRS') {
         const mgrsVal = Utils.decimalToMgrs(lat, lng);
-        coordText = `MGRS: ${mgrsVal || 'N/A'}`;
+        coordText = `${I18n.t('map.mgrs')}: ${mgrsVal || 'N/A'}`;
     } else if (coordFormat === 'DMS') {
-        coordText = `Lat: ${formatDMS(Utils.decimalToDms(lat, true))}, Lng: ${formatDMS(Utils.decimalToDms(lng, false))}`;
+        coordText = `${I18n.t('map.lat')}: ${formatDMS(Utils.decimalToDms(lat, true))}, ${I18n.t('map.lng')}: ${formatDMS(Utils.decimalToDms(lng, false))}`;
     } else if (coordFormat === 'DDM') {
-        coordText = `Lat: ${formatDDM(Utils.decimalToDecimalMinutes(lat, true))}, Lng: ${formatDDM(Utils.decimalToDecimalMinutes(lng, false))}`;
+        coordText = `${I18n.t('map.lat')}: ${formatDDM(Utils.decimalToDecimalMinutes(lat, true))}, ${I18n.t('map.lng')}: ${formatDDM(Utils.decimalToDecimalMinutes(lng, false))}`;
     } else {
-        coordText = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
+        coordText = `${I18n.t('map.lat')}: ${lat.toFixed(5)}, ${I18n.t('map.lng')}: ${lng.toFixed(5)}`;
     }
 
-    // Sofortiges Update mit "Fetching..."
     if (AppState.coordsControl) {
-        AppState.coordsControl.update(`${coordText}<br>Elevation: Fetching...<br>QFE: Fetching...`);
+        AppState.coordsControl.update(`${coordText}<br>${I18n.t('map.alt')}: ${I18n.t('map.fetching')}<br>${I18n.t('map.qfe')}: ${I18n.t('map.fetching')}`);
     }
 
-    // Debounced-Funktion aus Utils aufrufen
     Utils.debouncedGetElevationAndQFE(lat, lng, ({ elevation }) => {
-        // Dieser Callback wird ausgeführt, nachdem die Höhe geholt wurde.
         if (AppState.lastMouseLatLng && AppState.coordsControl &&
             Math.abs(AppState.lastMouseLatLng.lat - lat) < 0.05 &&
             Math.abs(AppState.lastMouseLatLng.lng - lng) < 0.05) {
@@ -2005,7 +1826,6 @@ function _handleMapMouseMove(e) {
             const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
             let displayElevation = elevation === 'N/A' ? 'N/A' : Math.round(Utils.convertHeight(elevation, heightUnit));
 
-            // QFE-Berechnung findet jetzt hier statt
             let qfeText = 'N/A';
             if (elevation !== 'N/A' && AppState.weatherData && AppState.weatherData.surface_pressure) {
                 const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
@@ -2016,13 +1836,14 @@ function _handleMapMouseMove(e) {
                 qfeText = qfe !== 'N/A' ? `${qfe} hPa` : 'N/A';
             }
 
-            AppState.coordsControl.update(`${coordText}<br>Elevation: ${displayElevation} ${displayElevation === 'N/A' ? '' : heightUnit}<br>QFE: ${qfeText}`);
+            AppState.coordsControl.update(`${coordText}<br>${I18n.t('map.alt')}: ${displayElevation} ${displayElevation === 'N/A' ? '' : heightUnit}<br>${I18n.t('map.qfe')}: ${qfeText}`);
         }
     });
 }
+
 function _handleMapDblClick(e) {
     if (Settings.state.userSettings.isInteractionLocked) {
-        displayWarning("Interaction is locked. Please unlock to move points.");
+        displayWarning(I18n.t('map.interaction_locked'));
         return;
     }
     if (!Settings.state.userSettings.showCutAwayFinder) {
@@ -2046,10 +1867,10 @@ function _handleMapDblClick(e) {
     });
     AppState.map.getContainer().dispatchEvent(cutawayEvent);
 }
+
 export function recenterMap(force = false) {
     if (AppState.isManualPanning && !force) return;
     if (AppState.map && AppState.currentMarker) {
         AppState.map.panTo(AppState.currentMarker.getLatLng());
     }
 }
-

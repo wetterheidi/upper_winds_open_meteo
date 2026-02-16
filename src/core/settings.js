@@ -6,6 +6,7 @@
  */
 
 import { FEATURE_PASSWORD_PLANNER, FEATURE_PASSWORD_DATA, FEATURE_LOCK_ACTIVE } from './config.js';
+import { I18n } from './i18n.js';
 
 let IS_MOBILE_APP = false;
 
@@ -40,6 +41,7 @@ export const Settings = {
  * @type {object}
  */
     defaultSettings: {
+        language: 'en',
         model: 'icon_global',
         refLevel: 'AGL',
         heightUnit: 'm',
@@ -270,8 +272,11 @@ export const Settings = {
         const correctPassword = feature === 'planner' ? this.FEATURE_PASSWORD_PLANNER : this.FEATURE_PASSWORD_DATA;
 
         const featureName = feature.charAt(0).toUpperCase() + feature.slice(1);
-        header.textContent = `${featureName} Access`;
-        message.textContent = `Please enter the password to enable the ${featureName.toLowerCase()} functionality:`;
+        
+        // NEU: Übersetzte Texte verwenden
+        header.textContent = I18n.t('modals.restricted_feature');
+        message.textContent = I18n.t('messages.feature_locked', { feature: featureName });
+        
         input.value = '';
         error.style.display = 'none';
         modal.style.display = 'flex';
@@ -280,11 +285,10 @@ export const Settings = {
             if (input.value === correctPassword) {
                 modal.style.display = 'none';
                 this.saveUnlockStatus(feature, true);
-                // NEU: Ein Event auslösen, auf das die UI hören kann
                 document.dispatchEvent(new CustomEvent('ui:lockStateChanged'));
                 onSuccess();
             } else {
-                error.textContent = 'Incorrect password';
+                error.textContent = I18n.t('messages.password_error'); // NEU: Übersetzte Fehlermeldung
                 error.style.display = 'block';
             }
         };

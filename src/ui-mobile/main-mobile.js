@@ -16,6 +16,7 @@ import * as trackManager from '../core/trackManager.js';
 import * as weatherManager from '../core/weatherManager.js';
 import { cacheVisibleTiles, cacheTilesForDIP } from '../core/tileCache.js';
 import { getSliderValue, displayError, displayMessage, displayWarning, displayProgress, hideProgress, applyDeviceSpecificStyles, updatePlannerUnits } from './ui.js';
+import { setupLanguageDropdown } from './ui.js';
 import * as AutoupdateManager from '../core/autoupdateManager.js';
 import { DateTime } from 'luxon';
 import * as displayManager from './displayManager.js';
@@ -25,6 +26,7 @@ import * as LocationManager from '../core/locationManager.js';
 import { getCapacitor } from '../core/capacitor-adapter.js';
 import { generateMeteogram } from '../core/meteogramChart.js';
 import { Directory } from '@capacitor/filesystem';
+import { I18n } from '../core/i18n.js';
 
 "use strict";
 
@@ -87,9 +89,11 @@ export const getDownloadFormat = () => Settings.getValue('downloadFormat', 'csv'
  * lädt die Einstellungen und stellt sicher, dass Features (wie der Planner)
  * basierend auf dem Speicher freigeschaltet sind.
  */
-function initializeApp() {
+async function initializeApp() {
     setAppContext(true);
     Settings.initialize();
+    await I18n.initialize();
+
     if (AppState.isInitialized) {
         return;
     }
@@ -2340,7 +2344,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     configureStatusBar();
     // --- NEU: Status Bar Konfiguration EINFÜGEN ENDE ---
 
-    initializeApp();
+    await initializeApp();
+    setupLanguageDropdown();
     initializeUIElements();
     updateLockStatesUI();
 

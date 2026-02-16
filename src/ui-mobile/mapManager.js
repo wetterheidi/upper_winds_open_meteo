@@ -11,6 +11,7 @@ import { UI_DEFAULTS, ICON_URLS, ENSEMBLE_VISUALIZATION } from '../core/constant
 import { getCapacitor } from '../core/capacitor-adapter.js';
 import * as LocationManager from '../core/locationManager.js';
 import * as liveTrackingManager from '../core/liveTrackingManager.js';
+import { I18n } from '../core/i18n.js'; // <--- NEU: Importiert
 
 let lastTapTime = 0; // Add this line
 let isRotatingJRT = false;
@@ -57,9 +58,9 @@ async function initMap() {
     AppState.jumpVisualizationLayerGroup = L.layerGroup().addTo(AppState.map);
     AppState.landingPatternLayerGroup = L.layerGroup().addTo(AppState.map);
     AppState.jumpRunTrackLayerGroup = L.layerGroup().addTo(AppState.map);
-    AppState.favoritesLayerGroup = L.layerGroup().addTo(AppState.map); // <-- NEUE ZEILE HINZUFÜGEN
+    AppState.favoritesLayerGroup = L.layerGroup().addTo(AppState.map);
     console.log('Favorite marker layer added!');
-    AppState.poiLayerGroup = L.layerGroup().addTo(AppState.map); // <-- NEUE ZEILE HINZUFÜGEN
+    AppState.poiLayerGroup = L.layerGroup().addTo(AppState.map);
     console.log('POI marker layer added!');
 
     _setupBaseLayersAndHandling();
@@ -77,8 +78,6 @@ async function initMap() {
     ]).then(() => {
         if (AppState.lastLat && AppState.lastLng) {
             // cacheTilesForDIP wird bereits in den Geolocation-Callbacks aufgerufen
-            // console.log('Ensuring tiles are cached for initial DIP after geolocation/fallback.');
-            // cacheTilesForDIP({ map: AppState.map, lastLat: AppState.lastLat, lastLng: AppState.lastLng, baseMaps: AppState.baseMaps });
         }
         console.log('Initial tile caching and geolocation promise resolved.');
     }).catch(error => {
@@ -101,7 +100,7 @@ async function initMap() {
  */
 export function drawJumpVisualization(jumpData) {
     // 1. Immer alles sauber machen.
-    clearJumpVisualization(); // Umbenannt von clearJumpCircles für Klarheit
+    clearJumpVisualization();
 
     // Entferne den alten Zoom-Listener, bevor neue Labels gezeichnet werden.
     if (AppState.labelZoomListener && AppState.map) {
@@ -267,7 +266,6 @@ export function drawJumpRunTrack(trackData) {
     }
     if (!trackData) {
         // Dies ist der normale Weg, um den Track zu löschen.
-        // clearJumpRunTrack() wurde bereits aufgerufen, also beenden wir die Funktion hier einfach.
         return;
     }
 
@@ -303,12 +301,12 @@ export function drawJumpRunTrack(trackData) {
         zIndexOffset: 2000,
         pmIgnore: true
     })
-        .bindTooltip('Drag to move Jump Run Track')
+        .bindTooltip(I18n.t('map.drag_to_move_track')) // NEU: I18n
         .addTo(AppState.jumpRunTrackLayerGroup);
 
     airplaneMarker.on('mousedown', () => {
         if (Settings.state.userSettings.isInteractionLocked) {
-            displayWarning("Interaction is locked. Please unlock to move points.");
+            displayWarning(I18n.t('map.interaction_locked')); // NEU: I18n
         }
         AppState.map.dragging.disable();
     });
@@ -350,7 +348,7 @@ export function drawJumpRunTrack(trackData) {
     airplaneMarker.on('dragstart', (e) => {
         if (Settings.state.userSettings.isInteractionLocked) {
             e.target.dragging.disable();
-            displayWarning("Interaction is locked. Please unlock to move points."); // <-- KORREKTUR
+            displayWarning(I18n.t('map.interaction_locked')); // NEU: I18n
         }
     });
 
@@ -449,8 +447,8 @@ export function drawTerrainWarning(dangerousPoints) {
         weight: 2,
         pmIgnore: true
     }).bindTooltip(
-        // Den Text dynamisch mit dem Wert aus der neuen Variable erstellen
-        `WARNING: Ground clearance in this area may be less than ${requiredClearance}m!`,
+        // NEU: I18n
+        I18n.t('map.terrain_warning', { clearance: requiredClearance }),
         { sticky: true, className: 'cutaway-tooltip' }
     ).addTo(AppState.terrainWarningLayer);
 }
@@ -519,7 +517,7 @@ export function clearJumpMasterLine() {
 export function clearHarpMarker() {
     if (!AppState.map) {
         console.warn('Map not initialized, cannot clear HARP marker');
-        Utils.handleMessage('Map not initialized, cannot clear HARP marker.');
+        Utils.handleMessage(I18n.t('messages.map_not_init')); // NEU: I18n
         return;
     }
 
@@ -564,7 +562,7 @@ export function clearHarpMarker() {
             });
         }
     }
-    Utils.handleMessage('HARP marker cleared');
+    Utils.handleMessage(I18n.t('messages.harp_cleared')); // NEU: I18n
 }
 /**
  * Entfernt die Track-Linie von der Karte.
@@ -631,7 +629,7 @@ export function createCutAwayMarker(lat, lng) {
 export function attachCutAwayMarkerDragend(marker) {
     marker.on('mousedown', () => {
         if (Settings.state.userSettings.isInteractionLocked) {
-            displayWarning("Interaction is locked. Please unlock to move points.");
+            displayWarning(I18n.t('map.interaction_locked')); // NEU: I18n
         }
     });
     marker.on('dragend', (e) => {
@@ -644,20 +642,20 @@ export function attachCutAwayMarkerDragend(marker) {
     });
 }
 export function updateCutAwayMarkerPopup(marker, lat, lng, open = false) {
-    const coordFormat = Settings.getValue('coordFormat', 'Decimal');
-    let popupContent = `<b>Cut-Away Start</b><br>`;
+    const coordFormat = Settings.getValue('coordFormat', 'radio', 'Decimal');
+    let popupContent = `<b>${I18n.t('map.cut_away_start')}</b><br>`;
 
     const formatDDM = (ddm) => `${ddm.deg}° ${ddm.min.toFixed(3)}' ${ddm.dir}`;
     const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
 
     if (coordFormat === 'MGRS') {
-        popupContent += `MGRS: ${Utils.decimalToMgrs(lat, lng)}`;
+        popupContent += `${I18n.t('map.mgrs')}: ${Utils.decimalToMgrs(lat, lng)}`;
     } else if (coordFormat === 'DMS') {
-        popupContent += `Lat: ${formatDMS(Utils.decimalToDms(lat, true))}<br>Lng: ${formatDMS(Utils.decimalToDms(lng, false))}`;
+        popupContent += `${I18n.t('map.lat')}: ${formatDMS(Utils.decimalToDms(lat, true))}<br>${I18n.t('map.lng')}: ${formatDMS(Utils.decimalToDms(lng, false))}`;
     } else if (coordFormat === 'DDM') {
-        popupContent += `Lat: ${formatDDM(Utils.decimalToDecimalMinutes(lat, true))}<br>Lng: ${formatDDM(Utils.decimalToDecimalMinutes(lng, false))}`;
+        popupContent += `${I18n.t('map.lat')}: ${formatDDM(Utils.decimalToDecimalMinutes(lat, true))}<br>${I18n.t('map.lng')}: ${formatDDM(Utils.decimalToDecimalMinutes(lng, false))}`;
     } else {
-        popupContent += `Lat: ${lat.toFixed(5)}<br>Lng: ${lng.toFixed(5)}`;
+        popupContent += `${I18n.t('map.lat')}: ${lat.toFixed(5)}<br>${I18n.t('map.lng')}: ${lng.toFixed(5)}`;
     }
     // Ruft die zentrale Funktion zum Aktualisieren von Popups auf
     updatePopupContent(marker, popupContent, open);
@@ -696,7 +694,7 @@ export async function createOrUpdateMarker(lat, lng) {
         AppState.currentMarker.addTo(AppState.map);
     }
 
-    const popupContent = `Lat: ${lat.toFixed(5)}<br>Lng: ${lng.toFixed(5)}<br>Alt: ${altitude} m`;
+    const popupContent = `${I18n.t('map.lat')}: ${lat.toFixed(5)}<br>${I18n.t('map.lng')}: ${lng.toFixed(5)}<br>${I18n.t('map.alt')}: ${altitude} m`;
     updatePopupContent(AppState.currentMarker, popupContent);
 
     AppState.lastLat = lat;
@@ -722,7 +720,7 @@ export function createCustomMarker(lat, lng) {
 export function attachMarkerDragend(marker) {
     marker.on('mousedown', () => {
         if (Settings.state.userSettings.isInteractionLocked) {
-            displayWarning("Interaction is locked. Please unlock to move points.");
+            displayWarning(I18n.t('map.interaction_locked')); // NEU: I18n
         }
     });
     marker.on('dragend', (e) => {
@@ -798,7 +796,7 @@ export function updateFavoriteMarkers(favorites) {
 }
 export function handleHarpPlacement(e) {
     if (Settings.state.userSettings.isInteractionLocked) {
-        displayWarning("Interaction is locked. Please unlock to move points.");
+        displayWarning(I18n.t('map.interaction_locked')); // NEU: I18n
         AppState.isPlacingHarp = false;
         AppState.map.off('click', handleHarpPlacement);
         return;
@@ -877,7 +875,7 @@ export async function updateHarpMarkerPopup(marker, lat, lng, open = false, expa
     }
 
     // Ein wiederverwendbarer Block für Höhe und QFE
-    const altitudeContent = `<br>Alt: ${displayAltitude} ${displayUnit}<br>QFE: ${qfeText}`;
+    const altitudeContent = `<br>${I18n.t('map.alt')}: ${displayAltitude} ${displayUnit}<br>${I18n.t('map.qfe')}: ${qfeText}`; // NEU: I18n
 
     // --- Schritt 2: Den Popup-Inhalt basierend auf dem 'expanded'-Status erstellen ---
     let popupContent = `<b>HARP</b><br>`;
@@ -894,10 +892,10 @@ export async function updateHarpMarkerPopup(marker, lat, lng, open = false, expa
                 Decimal: ${lat.toFixed(5)}, ${lng.toFixed(5)}<br>
                 DDM: ${ddm.deg}° ${ddm.min.toFixed(3)}' ${ddm.dir}, ${ddmLng.deg}° ${ddmLng.min.toFixed(3)}' ${ddmLng.dir}<br>
                 DMS: ${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}, ${dmsLng.deg}°${dmsLng.min}'${dmsLng.sec.toFixed(0)}" ${dmsLng.dir}<br>
-                MGRS: ${Utils.decimalToMgrs(lat, lng)}
+                ${I18n.t('map.mgrs')}: ${Utils.decimalToMgrs(lat, lng)}
             </div>
             ${altitudeContent}<br>
-            <a href="#" class="toggle-coords-format" data-marker-type="harp" data-lat="${lat}" data-lng="${lng}" data-expanded="true" style="font-size: 11px;">Show less</a>
+            <a href="#" class="toggle-coords-format" data-marker-type="harp" data-lat="${lat}" data-lng="${lng}" data-expanded="true" style="font-size: 11px;">${I18n.t('map.show_less')}</a>
         `;
     } else {
         // Standardansicht mit dem vom Benutzer ausgewählten Format
@@ -907,17 +905,17 @@ export async function updateHarpMarkerPopup(marker, lat, lng, open = false, expa
         const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
 
         if (coordFormat === 'MGRS') {
-            popupContent += `MGRS: ${coords.lat}`;
+            popupContent += `${I18n.t('map.mgrs')}: ${coords.lat}`;
         } else if (coordFormat === 'DMS') {
-            popupContent += `Lat: ${formatDMS(coords.lat)}<br>Lng: ${formatDMS(coords.lng)}`;
+            popupContent += `${I18n.t('map.lat')}: ${formatDMS(coords.lat)}<br>${I18n.t('map.lng')}: ${formatDMS(coords.lng)}`;
         } else if (coordFormat === 'DDM') {
-            popupContent += `Lat: ${formatDDM(coords.lat)}<br>Lng: ${formatDDM(coords.lng)}`;
+            popupContent += `${I18n.t('map.lat')}: ${formatDDM(coords.lat)}<br>${I18n.t('map.lng')}: ${formatDDM(coords.lng)}`;
         } else {
-            popupContent += `Lat: ${coords.lat}<br>Lng: ${coords.lng}`;
+            popupContent += `${I18n.t('map.lat')}: ${coords.lat}<br>${I18n.t('map.lng')}: ${coords.lng}`;
         }
 
         popupContent += `${altitudeContent}<br>
-            <a href="#" class="toggle-coords-format" data-marker-type="harp" data-lat="${lat}" data-lng="${lng}" data-expanded="false" style="font-size: 11px;">Show more</a>
+            <a href="#" class="toggle-coords-format" data-marker-type="harp" data-lat="${lat}" data-lng="${lng}" data-expanded="false" style="font-size: 11px;">${I18n.t('map.show_more')}</a>
         `;
     }
 
@@ -1121,7 +1119,6 @@ function _addStandardMapControls() {
         maxWidth: 100
     }).addTo(AppState.map);
 
-    // Jetzt, wo die Ladereihenfolge stimmt, ist dies der saubere und richtige Weg:
     AppState.map.pm.addControls({
         position: 'topright',
         drawMarker: true,
@@ -1137,13 +1134,26 @@ function _addStandardMapControls() {
         rotateMode: false
     });
 
-    AppState.map.pm.setLang('en');
+    // ============================================================
+    // NEU: Dynamische Spracheinstellung für Geoman
+    // ============================================================
+    
+    // 1. Sprache beim Start setzen
+    const currentLang = Settings.getValue('language') || 'en';
+    AppState.map.pm.setLang(currentLang);
 
-    // Wir prüfen, ob wir auf einem Mobilgerät sind.
+    // 2. Auf Sprachwechsel hören (Live-Update ohne Neuladen)
+    document.addEventListener('i18n:loaded', (e) => {
+        if (AppState.map && AppState.map.pm) {
+            console.log(`Updating Geoman language to: ${e.detail.lang}`);
+            AppState.map.pm.setLang(e.detail.lang);
+        }
+    });
+    // ============================================================
+
     if (isMobileDevice()) {
-        // Setze globale Geoman-Optionen, um die "Geisterlinie" unsichtbar zu machen.
         AppState.map.pm.setGlobalOptions({
-            hintlineStyle: { opacity: 0, color: 'green' }  // Die Linie vom letzten Punkt zum Mauszeiger/Fadenkreuz
+            hintlineStyle: { opacity: 0, color: 'green' }
         });
         console.log("Geoman global options set for mobile to hide helper lines.");
     }
@@ -1191,7 +1201,7 @@ function _initializeCoordsControlAndHandlers() {
 
     AppState.map.on('mouseout', function () {
         if (AppState.coordsControl && AppState.coordsControl.getContainer()) {
-            AppState.coordsControl.getContainer().innerHTML = 'Move mouse over map';
+            AppState.coordsControl.getContainer().innerHTML = I18n.t('map.move_mouse_over'); // NEU: I18n
         }
     });
     console.log('Mousemove and mouseout handlers set up.');
@@ -1311,7 +1321,7 @@ function _setupBaseLayersAndHandling() {
             if (!navigator.onLine) {
                 if (!AppState.hasTileErrorSwitched) {
                     console.warn(`${selectedBaseMapName} tiles unavailable offline. Zoom restricted.`);
-                    Utils.handleMessage('Offline: Zoom restricted to levels 11–14 for cached tiles.');
+                    Utils.handleMessage(I18n.t('messages.offline_zoom_restricted')); // NEU: I18n
                     AppState.hasTileErrorSwitched = true;
                 }
                 return;
@@ -1323,7 +1333,7 @@ function _setupBaseLayersAndHandling() {
                 AppState.baseMaps[fallbackBaseMapName].addTo(AppState.map);
                 Settings.state.userSettings.baseMaps = fallbackBaseMapName;
                 Settings.save();
-                Utils.handleMessage(`${selectedBaseMapName} tiles unavailable. Switched to ${fallbackBaseMapName}.`);
+                Utils.handleMessage(I18n.t('messages.tiles_unavailable_switched', { current: selectedBaseMapName, fallback: fallbackBaseMapName })); // NEU: I18n
                 AppState.hasTileErrorSwitched = true;
             } else if (!AppState.hasTileErrorSwitched) {
                 console.warn(`Tile error in ${selectedBaseMapName}, attempting to continue.`);
@@ -1408,8 +1418,8 @@ function _setupGeomanMeasurementHandlers() {
 
         const labelContent = `
             <div class="geoman-permanent-label">
-                <div>In: ${inBearing.toFixed(0)}°</div>
-                <div>Out: ${outBearingText}</div>
+                <div>${I18n.t('map.geoman.in')}: ${inBearing.toFixed(0)}°</div>
+                <div>${I18n.t('map.geoman.out')}: ${outBearingText}</div>
                 <div>+: ${segmentDistanceText}</div>
                 <div>∑: ${totalDistanceText}</div>
             </div>
@@ -1427,7 +1437,7 @@ function _setupGeomanMeasurementHandlers() {
         const center = layer.getLatLng();
         const radius = layer.getRadius();
         const radiusText = radius < 1000 ? `${radius.toFixed(0)} m` : `${(radius / 1000).toFixed(2)} km`;
-        const labelContent = `<div class="geoman-permanent-label">Radius:<br> ${radiusText}</div>`;
+        const labelContent = `<div class="geoman-permanent-label">${I18n.t('map.geoman.radius')}:<br> ${radiusText}</div>`;
         const label = L.marker(center, {
             icon: L.divIcon({ className: 'geoman-label-container', html: labelContent, iconAnchor: [0, 0] }),
             pmIgnore: true
@@ -1493,7 +1503,7 @@ function _setupGeomanMeasurementHandlers() {
 
         if (e.shape === 'Line') {
             if (isMobileDevice()) {
-                liveMeasureLabel.innerHTML = 'Tap to set first point.';
+                liveMeasureLabel.innerHTML = I18n.t('map.geoman.tap_first_point'); // NEU: I18n
 
                 // --- NEU: Positionierung direkt unter dem Slider ---
                 const sliderContainer = document.getElementById('slider-container');
@@ -1535,7 +1545,7 @@ function _setupGeomanMeasurementHandlers() {
                         const bearing = Utils.calculateBearing(lastPoint.lat, lastPoint.lng, currentCenter.lat, currentCenter.lng);
                         const distanceText = distance < 1000 ? `${distance.toFixed(0)} m` : `${(distance / 1000).toFixed(2)} km`;
 
-                        liveMeasureLabel.innerHTML = `In: ${bearing.toFixed(0)}°<br>Out: ---°<br>+: ${distanceText}`;
+                        liveMeasureLabel.innerHTML = `${I18n.t('map.geoman.in')}: ${bearing.toFixed(0)}°<br>${I18n.t('map.geoman.out')}: ---°<br>+: ${distanceText}`;
                         const mapSize = map.getSize();
                         const labelPos = L.point(mapSize.x / 2 + 20, mapSize.y / 2 - 40);
                         L.DomUtil.setPosition(liveMeasureLabel, labelPos);
@@ -1545,7 +1555,7 @@ function _setupGeomanMeasurementHandlers() {
                             map.removeLayer(rubberBandLayer);
                             rubberBandLayer = null;
                         }
-                        liveMeasureLabel.innerHTML = 'Tap to set first point.';
+                        liveMeasureLabel.innerHTML = I18n.t('map.geoman.tap_first_point');
 
                         // --- NEU: Reset-Position ebenfalls oben ---
                         const currentSliderContainer = document.getElementById('slider-container');
@@ -1596,7 +1606,7 @@ function _setupGeomanMeasurementHandlers() {
                     }
                 };
             } else {
-                liveMeasureLabel.innerHTML = 'Click to set the first point.';
+                liveMeasureLabel.innerHTML = I18n.t('map.geoman.click_first_point'); // NEU: I18n
                 mouseMoveHandler = (moveEvent) => {
                     const latlngs = workingLayer.getLatLngs();
                     if (latlngs.length > 0) {
@@ -1604,7 +1614,7 @@ function _setupGeomanMeasurementHandlers() {
                         const distance = lastPoint.distanceTo(moveEvent.latlng);
                         const bearing = Utils.calculateBearing(lastPoint.lat, lastPoint.lng, moveEvent.latlng.lat, moveEvent.latlng.lng);
                         const distanceText = distance < 1000 ? `${distance.toFixed(0)} m` : `${(distance / 1000).toFixed(2)} km`;
-                        liveMeasureLabel.innerHTML = `In: ${bearing.toFixed(0)}°<br>Out: ---°<br>+: ${distanceText}`;
+                        liveMeasureLabel.innerHTML = `${I18n.t('map.geoman.in')}: ${bearing.toFixed(0)}°<br>${I18n.t('map.geoman.out')}: ---°<br>+: ${distanceText}`;
                         L.DomUtil.setPosition(liveMeasureLabel, moveEvent.containerPoint.add([15, -15]));
                     }
                 };
@@ -1647,7 +1657,7 @@ function _setupGeomanMeasurementHandlers() {
                             workingLayer.setRadius(radius);
 
                             const radiusText = radius < 1000 ? `${radius.toFixed(0)} m` : `${(radius / 1000).toFixed(2)} km`;
-                            liveMeasureLabel.innerHTML = `Radius: ${radiusText}`;
+                            liveMeasureLabel.innerHTML = `${I18n.t('map.geoman.radius')}: ${radiusText}`;
                             const mapSize = map.getSize();
                             const labelPos = L.point(mapSize.x / 2, mapSize.y / 2 - 40);
                             L.DomUtil.setPosition(liveMeasureLabel, labelPos);
@@ -1658,7 +1668,7 @@ function _setupGeomanMeasurementHandlers() {
                 vertexAddHandler = () => {
                     if (!centerSet) {
                         centerSet = true;
-                        liveMeasureLabel.innerHTML = 'Move map to adjust radius. Tap again to finish.';
+                        liveMeasureLabel.innerHTML = I18n.t('map.geoman.move_map_radius'); // NEU: I18n
                         const mapSize = map.getSize();
                         const labelPos = L.point(mapSize.x / 2, mapSize.y / 2 - 40);
                         L.DomUtil.setPosition(liveMeasureLabel, labelPos);
@@ -1684,13 +1694,13 @@ function _setupGeomanMeasurementHandlers() {
                     liveMeasureLabel.style.display = 'none';
                 };
             } else {
-                liveMeasureLabel.innerHTML = 'Click and drag to draw a circle.';
+                liveMeasureLabel.innerHTML = I18n.t('map.geoman.click_drag_circle'); // NEU: I18n
                 mouseMoveHandler = (moveEvent) => {
                     const center = workingLayer.getLatLng();
                     if (center) {
                         const radius = center.distanceTo(moveEvent.latlng);
                         const radiusText = radius < 1000 ? `${radius.toFixed(0)} m` : `${(radius / 1000).toFixed(2)} km`;
-                        liveMeasureLabel.innerHTML = `Radius: ${radiusText}`;
+                        liveMeasureLabel.innerHTML = `${I18n.t('map.geoman.radius')}: ${radiusText}`;
                         L.DomUtil.setPosition(liveMeasureLabel, moveEvent.containerPoint.add([15, -15]));
                     }
                 };
@@ -1741,7 +1751,7 @@ function _setupGeomanMeasurementHandlers() {
                 liveMeasureLabel.style.display = 'block';
                 const radius = e.layer.getRadius();
                 const radiusText = radius < 1000 ? `${radius.toFixed(0)} m` : `${(radius / 1000).toFixed(2)} km`;
-                liveMeasureLabel.innerHTML = `Radius: ${radiusText}`;
+                liveMeasureLabel.innerHTML = `${I18n.t('map.geoman.radius')}: ${radiusText}`;
                 const mapSize = map.getSize();
                 const labelPos = L.point(mapSize.x / 2, mapSize.y / 2 - 40);
                 L.DomUtil.setPosition(liveMeasureLabel, labelPos);
@@ -1805,11 +1815,11 @@ function _setupCoreMapEventHandlers() {
             if (targetZoom < 11) {
                 e.target._zoom = 11;
                 AppState.map.setZoom(11);
-                Utils.handleMessage('Offline: Zoom restricted to levels 11–14 for cached tiles.');
+                Utils.handleMessage(I18n.t('messages.offline_zoom_restricted')); // NEU: I18n
             } else if (targetZoom > 14) {
                 e.target._zoom = 14;
                 AppState.map.setZoom(14);
-                Utils.handleMessage('Offline: Zoom restricted to levels 11–14 for cached tiles.');
+                Utils.handleMessage(I18n.t('messages.offline_zoom_restricted'));
             }
         }
     });
@@ -1867,7 +1877,7 @@ function _setupCoreMapEventHandlers() {
     AppState.map.on('contextmenu', (e) => {
 
         if (Settings.state.userSettings.isInteractionLocked) {
-            displayWarning("Interaction is locked. Please unlock to place a new DIP.");
+            displayWarning(I18n.t('map.interaction_locked')); // NEU: I18n
             return; // Aktion unterbinden
         }
 
@@ -1894,7 +1904,7 @@ function _setupCoreMapEventHandlers() {
         longPressTimeout = setTimeout(() => {
 
             if (Settings.state.userSettings.isInteractionLocked) {
-                displayWarning("Interaction is locked. Please unlock to place a new DIP.");
+                displayWarning(I18n.t('map.interaction_locked')); // NEU: I18n
                 return; // Aktion unterbinden
             }
 
@@ -1972,16 +1982,16 @@ function _setupCrosshairCoordinateHandler(map) {
         const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
 
         if (coordFormat === 'MGRS') {
-            coordString = `MGRS: ${coords.lat}`;
+            coordString = `${I18n.t('map.mgrs')}: ${coords.lat}`; // NEU: I18n
         } else if (coordFormat === 'DMS') {
-            coordString = `${formatDMS(coords.lat)}, ${formatDMS(coords.lng)}`;
+            coordString = `${I18n.t('map.lat')}: ${formatDMS(coords.lat)}, ${I18n.t('map.lng')}: ${formatDMS(coords.lng)}`; // NEU: I18n
         } else if (coordFormat === 'DDM') {
-            coordString = `${formatDDM(coords.lat)}, ${formatDDM(coords.lng)}`;
+            coordString = `${I18n.t('map.lat')}: ${formatDDM(coords.lat)}, ${I18n.t('map.lng')}: ${formatDDM(coords.lng)}`; // NEU: I18n
         } else {
-            coordString = `${center.lat.toFixed(5)}, ${center.lng.toFixed(5)}`;
+            coordString = `${I18n.t('map.lat')}: ${center.lat.toFixed(5)}, ${I18n.t('map.lng')}: ${center.lng.toFixed(5)}`; // NEU: I18n
         }
         // UI sofort mit "Fetching..." aktualisieren
-        AppState.coordsControl.update(`${coordString}<br>Elevation: ...<br>QFE: ...`);
+        AppState.coordsControl.update(`${coordString}<br>${I18n.t('map.alt')}: ...<br>${I18n.t('map.qfe')}: ...`); // NEU: I18n
 
         // Die neue Funktion aus utils.js aufrufen
         Utils.debouncedGetElevationAndQFE(center.lat, center.lng, ({ elevation }) => {
@@ -2010,7 +2020,7 @@ function _setupCrosshairCoordinateHandler(map) {
                 qfeString = qfe !== 'N/A' ? `${qfe.toFixed(0)}hPa` : 'N/A';
             }
 
-            const displayText = `${coordString}<br>Elevation: ${altString}<br>QFE: ${qfeString}`;
+            const displayText = `${coordString}<br>${I18n.t('map.alt')}: ${altString}<br>${I18n.t('map.qfe')}: ${qfeString}`; // NEU: I18n
             AppState.coordsControl.update(displayText);
         });
     };
@@ -2024,7 +2034,7 @@ function _setupMouseCoordinateHandler(map) {
     map.on('mousemove', _handleMapMouseMove);
     map.on('mouseout', function () {
         if (AppState.coordsControl && AppState.coordsControl.getContainer()) {
-            AppState.coordsControl.getContainer().innerHTML = 'Move mouse over map';
+            AppState.coordsControl.getContainer().innerHTML = I18n.t('map.move_mouse_over'); // NEU: I18n
         }
     });
     console.log('Mouse coordinate handler initialized.');
@@ -2072,12 +2082,12 @@ async function _geolocationErrorCallback(error, defaultCenter, defaultZoom) {
         startLat = homeDZ.lat;
         startLng = homeDZ.lng;
         source = 'home_dz_fallback';
-        message = `Using your saved Home DZ: ${homeDZ.label}`;
+        message = I18n.t('messages.home_dz_fallback', { name: homeDZ.label }); // NEU: I18n
     } else {
         startLat = defaultCenter[0];
         startLng = defaultCenter[1];
         source = 'geolocation_fallback';
-        message = 'Unable to retrieve your location. Using default location.';
+        message = I18n.t('messages.geolocation_fallback'); // NEU: I18n
     }
 
     Utils.handleMessage(message);
@@ -2191,7 +2201,7 @@ function _handleMapMouseMove(e) {
 }
 function _handleMapDblClick(e) {
     if (Settings.state.userSettings.isInteractionLocked) {
-        displayWarning("Interaction is locked. Please unlock to move points.");
+        displayWarning(I18n.t('map.interaction_locked')); // NEU: I18n
         return;
     }
     if (!Settings.state.userSettings.showCutAwayFinder) {
