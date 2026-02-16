@@ -7,7 +7,8 @@
         "cancel": "Cancel",
         "acknowledge": "Acknowledge",
         "today": "Today",
-        "tomorrow": "Tomorrow"
+        "tomorrow": "Tomorrow",
+        "error_no_location": "Please select a location first."
     },
     "panels": {
         "map": "Map",
@@ -83,7 +84,14 @@
         "scenario_min": "Minimum Wind",
         "scenario_mean": "Mean Wind",
         "scenario_max": "Maximum Wind",
-        "calculated": "Calculated"
+        "calculated": "Calculated",
+        "error_opening_too_low": "Invalid Heights! Opening ({opening}m) is too low (Min: {min}m).",
+        "error_exit_below_opening": "Invalid Heights! Exit ({exit}m) must be above Opening ({opening}m).",
+        "error_terrain_calc": "Could not calculate the smallest canopy circle for analysis.",
+        "cutaway_title": "Cut-Away ({state})",
+        "cutaway_alt": "Cut-Away Altitude",
+        "cutaway_displacement": "Displacement",
+        "cutaway_time_speed": "Descent Time/Speed"
     },
     "jumpmaster": {
         "find_aircraft": "Find Aircraft To Track",
@@ -227,5 +235,27 @@
         "dms": "DMS",
         "start": "Start",
         "end": "End"
+    },
+    "adsb": {
+        "tracking_stopped": "ADSB tracking stopped.",
+        "error_no_dip": "Please select a point (DIP) on the map first.",
+        "searching": "Searching for aircraft nearby...",
+        "no_aircraft_found": "No aircraft found nearby.",
+        "error_fetch_failed": "Could not retrieve aircraft data: {error}",
+        "tracking_started": "Tracking {callsign}...",
+        "aircraft_lost": "{callsign} is no longer visible. Tracking stopped.",
+        "btn_stop": "Stop ADSB Tracking",
+        "btn_find": "Find Aircraft"
+    },
+    "autoupdate": {
+        "enabled": "Autoupdate enabled",
+        "disabled": "Autoupdate disabled",
+        "error_offline": "Cannot enable autoupdate while offline.",
+        "error_historical_date": "Autoupdate cannot be enabled with a historical date set."
+    },
+    "ensemble": {
+        "error_api_limit": "API-Limit for ensemble data reached. Please wait a moment and retry again.",
+        "error_api_failed": "API request failed: {status}",
+        "tooltip_mean_wind": "Mean Wind {lower}-{upper} {unit} AGL:<br>{dir}° {speed} {windUnit}"
     }
 }

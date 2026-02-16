@@ -4,6 +4,7 @@
 import { AppState } from './state.js';
 import { Settings } from './settings.js';
 import { Utils } from './utils.js';
+import { I18n } from './i18n.js'; // Import hinzugefügt
 
 /**
  * Startet den Intervall-Timer für die automatische Aktualisierung.
@@ -18,7 +19,8 @@ function startAutoupdate() {
         return;
     }
     if (!navigator.onLine) {
-        Utils.handleError('Cannot enable autoupdate while offline.');
+        // Ersetzt: 'Cannot enable autoupdate while offline.'
+        Utils.handleError(I18n.t('autoupdate.error_offline')); 
         const autoupdateCheckbox = document.getElementById('autoupdateCheckbox');
         if (autoupdateCheckbox) autoupdateCheckbox.checked = false;
         Settings.state.userSettings.autoupdate = false;
@@ -27,16 +29,15 @@ function startAutoupdate() {
     }
 
     console.log('[AutoupdateManager] Starting autoupdate interval.');
-    // Trigger an immediate update check on start
     document.dispatchEvent(new CustomEvent('autoupdate:tick', { detail: { isInitialTick: true } }));
 
-    // Check every minute for hour changes
     AppState.autoupdateInterval = setInterval(() => {
         console.log('[AutoupdateManager] Tick...');
         document.dispatchEvent(new CustomEvent('autoupdate:tick', { detail: { isInitialTick: false } }));
-    }, 60 * 1000); // Every minute
+    }, 60 * 1000);
 
-    Utils.handleMessage('Autoupdate enabled'); // ERSETZEN
+    // Ersetzt: 'Autoupdate enabled'
+    Utils.handleMessage(I18n.t('autoupdate.enabled')); 
 }
 
 /**
@@ -48,7 +49,8 @@ export function stopAutoupdate() {
         clearInterval(AppState.autoupdateInterval);
         AppState.autoupdateInterval = null;
         console.log('[AutoupdateManager] Stopped autoupdate interval.');
-        Utils.handleMessage('Autoupdate disabled');
+        // Ersetzt: 'Autoupdate disabled'
+        Utils.handleMessage(I18n.t('autoupdate.disabled')); 
     }
 }
 
@@ -76,7 +78,8 @@ export function setupAutoupdate() {
             autoupdateCheckbox.checked = false;
             Settings.state.userSettings.autoupdate = false;
             Settings.save();
-            Utils.handleError('Autoupdate cannot be enabled with a historical date set.'); // ERSETZEN
+            // Ersetzt: 'Autoupdate cannot be enabled with a historical date set.'
+            Utils.handleError(I18n.t('autoupdate.error_historical_date')); 
             return;
         }
 
@@ -87,7 +90,6 @@ export function setupAutoupdate() {
         }
     });
 
-    // Start autoupdate if it was enabled on page load
     if (Settings.state.userSettings.autoupdate && !document.getElementById('historicalDatePicker')?.value) {
         startAutoupdate();
     }

@@ -9,6 +9,7 @@ import { Settings } from './settings.js';
 import { Utils } from './utils.js';
 import * as weatherManager from './weatherManager.js';
 import { JUMP_RUN_DEFAULTS, CUTAWAY_VISUALIZATION_RADIUS_METERS, JUMPER_SEPARATION_TABLE, CONVERSIONS, FREEFALL_PHYSICS, ISA_CONSTANTS, CANOPY_OPENING_BUFFER_METERS, CUTAWAY_VERTICAL_SPEEDS_MPS } from './constants.js';
+import { I18n } from './i18n.js'; // Import ergänzt
 
 // ===================================================================
 // 1. Haupt-Berechnungsfunktionen (Public API des Moduls)
@@ -239,14 +240,20 @@ export function calculateExitCircle(interpolatedData) {
 
     // Check 1: Zu wenig Platz für Schirmfahrt
     if (openingAltitude <= minOpeningAltitude) {
-        const msg = `Invalid Heights! Opening (${Math.round(openingAltitude)}m) <= Downwind+Safety+Buffer (${Math.round(minOpeningAltitude)}m).`;
+        const msg = I18n.t('planner.error_opening_too_low', {
+            opening: Math.round(openingAltitude),
+            min: Math.round(minOpeningAltitude)
+        });
         console.warn(msg);
         return { error: msg }; // <--- HIER: Error Objekt statt null
     }
 
     // Check 2: Exit unter Öffnung
     if (exitAltitude <= openingAltitude) {
-        const msg = `Invalid Heights! Exit (${Math.round(exitAltitude)}m) <= Opening (${Math.round(openingAltitude)}m).`;
+        const msg = I18n.t('planner.error_exit_below_opening', {
+            exit: Math.round(exitAltitude),
+            opening: Math.round(openingAltitude)
+        });
         console.warn(msg);
         return { error: msg }; // <--- HIER: Error Objekt statt null
     }
@@ -645,7 +652,10 @@ export function calculateCutAway(interpolatedData) {
     const [centerLat, centerLng] = Utils.calculateNewCenter(AppState.cutAwayLat, AppState.cutAwayLng, displacementDistance, adjustedWindDirection);
 
     const stateLabel = Settings.state.userSettings.cutAwayState.replace(/([A-Z])/g, ' $1').trim();
-    const tooltipContent = `<b>Cut-Away (${stateLabel})</b><br>Cut-Away Altitude: ${cutAwayAltitude} m<br>Displacement: ${meanWindDirection.toFixed(0)}°, ${displacementDistance.toFixed(0)} m<br>Descent Time/Speed: ${descentTime.toFixed(0)} s at ${verticalSpeedSelected.toFixed(1)} m/s<br>`;
+    const tooltipContent = `<b>${I18n.t('planner.cutaway_title', { state: stateLabel })}</b><br>` +
+        `${I18n.t('planner.cutaway_alt')}: ${cutAwayAltitude} m<br>` +
+        `${I18n.t('planner.cutaway_displacement')}: ${meanWindDirection.toFixed(0)}°, ${displacementDistance.toFixed(0)} m<br>` +
+        `${I18n.t('planner.cutaway_time_speed')}: ${descentTime.toFixed(0)} s / ${verticalSpeedSelected.toFixed(1)} m/s<br>`;
 
     return { center: [centerLat, centerLng], radius: CUTAWAY_VISUALIZATION_RADIUS_METERS, tooltipContent };
 }
@@ -667,7 +677,7 @@ export async function analyzeTerrainClearance() {
     // 2. Den kleinsten blauen Kreis identifizieren.
     const canopyResult = calculateCanopyCircles(interpolatedData);
     if (!canopyResult || canopyResult.additionalBlueRadii.length === 0) {
-        throw new Error("Could not calculate the smallest canopy circle for analysis.");
+        throw new Error(I18n.t('planner.error_terrain_calc'));
     }
 
     const smallestCircleIndex = canopyResult.additionalBlueRadii.length - 1;

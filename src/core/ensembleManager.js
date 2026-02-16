@@ -12,6 +12,7 @@ import * as JumpPlanner from './jumpPlanner.js';
 import * as weatherManager from './weatherManager.js';
 import { DateTime } from 'luxon';
 import { ENSEMBLE_VISUALIZATION, API_URLS } from './constants.js';
+import { I18n } from './i18n.js'; // Import ergänzt
 
 // ===================================================================
 // 1. Öffentliche Hauptfunktionen (API des Moduls)
@@ -26,7 +27,7 @@ import { ENSEMBLE_VISUALIZATION, API_URLS } from './constants.js';
 export async function fetchEnsembleWeatherData() {
     // Vorbedingung: Eine Position muss ausgewählt sein.
     if (AppState.lastLat == null || AppState.lastLng == null) {
-        Utils.handleMessage("Please select a location first.");
+        Utils.handleMessage(I18n.t('common.error_no_location')); 
         return false;
     }
     // Wenn keine Modelle ausgewählt sind, leeren wir die Daten und melden Erfolg.
@@ -83,9 +84,9 @@ export async function fetchEnsembleWeatherData() {
         const response = await fetch(url);
         if (!response.ok) {
             if (response.status === 429) {
-                throw new Error("API-Limit for ensemble data reached. Please wait a moment and retry again.");
+                throw new Error(I18n.t('ensemble.error_api_limit'));
             }
-            throw new Error(`API request failed: ${response.status}`);
+            throw new Error(I18n.t('ensemble.error_api_failed', { status: response.status }));
         }
         const apiResponseData = await response.json();
         AppState.ensembleModelsData = {}; // Initialisieren
@@ -689,9 +690,15 @@ function drawEnsembleCircle(exitResult, color, label) {
         ? Utils.roundToTens(exitResult.meanWindDir)
         : 'N/A';
 
-    const tooltipText = `<strong>${label}</strong><br>` +
-        `Mean Wind ${lowerLimitFormatted}-${upperLimitFormatted} ${heightUnit} AGL:<br>` +
-        `${meanWindDirFormatted}° ${formattedMeanWindSpeed} ${userWindUnit}`;
+    const tooltipText = `<strong>${label}</strong><br>` + 
+        I18n.t('ensemble.tooltip_mean_wind', {
+            lower: lowerLimitFormatted,
+            upper: upperLimitFormatted,
+            unit: heightUnit,
+            dir: meanWindDirFormatted,
+            speed: formattedMeanWindSpeed,
+            windUnit: userWindUnit
+        });
 
     circle.bindTooltip(tooltipText, {
         permanent: false,

@@ -5,6 +5,7 @@
 import { AppState } from './state.js';
 import { Utils } from './utils.js';
 import { Settings } from './settings.js';
+import { I18n } from './i18n.js'; // 1. Import ergänzt
 
 let adsbInterval = null;
 // ÄNDERUNG: Wechsel von corsproxy.io zu api.cors.lol, da corsproxy.io 403-Fehler liefert.
@@ -29,16 +30,16 @@ function dispatchAdsbEvent(eventName, detail = {}) {
 export async function findAndSelectJumpShip() {
     if (adsbInterval) {
         stopAircraftTracking();
-        Utils.handleMessage("ADSB-Tracking gestoppt.");
+        Utils.handleMessage(I18n.t('adsb.tracking_stopped')); // Übersetzt
         return;
     }
 
     if (AppState.lastLat == null || AppState.lastLng == null) {
-        Utils.handleError("Bitte zuerst einen Punkt (DIP) auf der Karte auswählen.");
+        Utils.handleError(I18n.t('adsb.error_no_dip')); // Übersetzt
         return;
     }
 
-    Utils.handleMessage("Suche nach Flugzeugen in der Nähe...");
+    Utils.handleMessage(I18n.t('adsb.searching')); // Übersetzt
 
     try {
         const pos = { lat: AppState.lastLat, lng: AppState.lastLng };
@@ -53,7 +54,7 @@ export async function findAndSelectJumpShip() {
         const data = await response.json();
 
         if (!data.ac || data.ac.length === 0) {
-            Utils.handleMessage("Keine Flugzeuge in der Nähe gefunden.");
+            Utils.handleMessage(I18n.t('adsb.no_aircraft_found')); // Übersetzt
             return;
         }
 
@@ -70,12 +71,11 @@ export async function findAndSelectJumpShip() {
                 vertical_rate: ac.baro_rate
             }));
 
-        // Event senden, um das UI-Modal anzuzeigen
         dispatchAdsbEvent('adsb:showSelection', { aircraftList });
 
     } catch (error) {
         console.error("Fehler bei der ADSB-Abfrage:", error);
-        Utils.handleError(`Konnte Flugzeugdaten nicht abrufen: ${error.message}`);
+        Utils.handleError(I18n.t('adsb.error_fetch_failed', { error: error.message })); // Übersetzt mit Platzhalter
     }
 }
 
@@ -84,18 +84,17 @@ export async function findAndSelectJumpShip() {
  * @param {object} aircraft - Das ausgewählte Flugzeug-Objekt.
  */
 export function startAircraftTracking(aircraft) {
-    Utils.handleMessage(`Tracking ${aircraft.callsign}...`);
+    Utils.handleMessage(I18n.t('adsb.tracking_started', { callsign: aircraft.callsign })); // Übersetzt
 
     const findShipButton = document.getElementById('findJumpShipBtn');
     if (findShipButton) {
-        findShipButton.textContent = "Stop ADSB Tracking";
+        findShipButton.textContent = I18n.t('adsb.btn_stop'); // Übersetzt
         findShipButton.classList.remove('btn-secondary');
         findShipButton.classList.add('btn-danger');
     }
 
     AppState.adsbTrackPoints = [[aircraft.lat, aircraft.lon]];
 
-    // Event zum Erstellen des Markers senden
     dispatchAdsbEvent('adsb:aircraftSelected', { aircraft, attribution: ADSB_ATTRIBUTION });
 
     const updateAircraftPosition = async () => {
@@ -105,7 +104,7 @@ export function startAircraftTracking(aircraft) {
 
             if (response.status === 404) {
                 stopAircraftTracking();
-                Utils.handleMessage(`${aircraft.callsign} ist nicht mehr sichtbar. Tracking gestoppt.`);
+                Utils.handleMessage(I18n.t('adsb.aircraft_lost', { callsign: aircraft.callsign })); // Übersetzt
                 return;
             }
             if (!response.ok) throw new Error(`API Error ${response.status}`);
@@ -123,7 +122,6 @@ export function startAircraftTracking(aircraft) {
 
                 if (updatedAircraft.lat && updatedAircraft.lon) {
                     AppState.adsbTrackPoints.push([updatedAircraft.lat, updatedAircraft.lon]);
-                    // Event zum Aktualisieren des Markers und der Flugroute senden
                     dispatchAdsbEvent('adsb:aircraftUpdated', { aircraft: updatedAircraft });
                 }
             }
@@ -147,12 +145,11 @@ export function stopAircraftTracking() {
 
     AppState.adsbTrackPoints = [];
 
-    // Event zum Beenden des Trackings und Aufräumen der UI senden
     dispatchAdsbEvent('adsb:trackingStopped', { attribution: ADSB_ATTRIBUTION });
 
     const findShipButton = document.getElementById('findJumpShipBtn');
     if (findShipButton) {
-        findShipButton.textContent = "Find Aircraft";
+        findShipButton.textContent = I18n.t('adsb.btn_find'); // Übersetzt
         findShipButton.classList.remove('btn-danger');
         findShipButton.classList.add('btn-secondary');
     }

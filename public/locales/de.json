@@ -7,7 +7,8 @@
         "cancel": "Abbrechen",
         "acknowledge": "Bestätigen",
         "today": "Heute",
-        "tomorrow": "Morgen"
+        "tomorrow": "Morgen",
+        "error_no_location": "Bitte wählen Sie zuerst einen Ort aus."
     },
     "panels": {
         "map": "Karte",
@@ -83,7 +84,14 @@
         "scenario_min": "Minimaler Wind",
         "scenario_mean": "Mittlerer Wind",
         "scenario_max": "Maximaler Wind",
-        "calculated": "Berechnet"
+        "calculated": "Berechnet",
+        "error_opening_too_low": "Ungültige Höhen! Öffnung ({opening}m) ist zu niedrig (Min: {min}m).",
+        "error_exit_below_opening": "Ungültige Höhen! Absetzhöhe ({exit}m) muss über der Öffnungshöhe ({opening}m) liegen.",
+        "error_terrain_calc": "Konnte den kleinsten Schirmfahrt-Kreis für die Analyse nicht berechnen.",
+        "cutaway_title": "Abtrennung ({state})",
+        "cutaway_alt": "Abtrennhöhe",
+        "cutaway_displacement": "Versatz",
+        "cutaway_time_speed": "Sinkzeit/Geschw."
     },
     "jumpmaster": {
         "find_aircraft": "Flugzeug finden",
@@ -227,5 +235,27 @@
         "dms": "DMS",
         "start": "Start",
         "end": "Ende"
+    },
+    "adsb": {
+        "tracking_stopped": "ADSB-Tracking gestoppt.",
+        "error_no_dip": "Bitte zuerst einen Punkt (DIP) auf der Karte auswählen.",
+        "searching": "Suche nach Flugzeugen in der Nähe...",
+        "no_aircraft_found": "Keine Flugzeuge in der Nähe gefunden.",
+        "error_fetch_failed": "Konnte Flugzeugdaten nicht abrufen: {error}",
+        "tracking_started": "Tracking von {callsign}...",
+        "aircraft_lost": "{callsign} ist nicht mehr sichtbar. Tracking gestoppt.",
+        "btn_stop": "ADSB-Tracking stoppen",
+        "btn_find": "Flugzeug finden"
+    },
+    "autoupdate": {
+        "enabled": "Automatische Aktualisierung aktiviert",
+        "disabled": "Automatische Aktualisierung deaktiviert",
+        "error_offline": "Automatische Aktualisierung im Offline-Modus nicht möglich.",
+        "error_historical_date": "Automatische Aktualisierung kann nicht bei gewähltem historischen Datum aktiviert werden."
+    },
+    "ensemble": {
+        "error_api_limit": "API-Limit für Ensemble-Daten erreicht. Bitte kurz warten und erneut versuchen.",
+        "error_api_failed": "API-Anfrage fehlgeschlagen: {status}",
+        "tooltip_mean_wind": "Mittlerer Wind {lower}-{upper} {unit} AGL:<br>{dir}° {speed} {windUnit}"
     }
 }
