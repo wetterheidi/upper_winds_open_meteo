@@ -10,6 +10,7 @@ import { Utils } from './utils.js';
 import { Settings } from './settings.js';
 import { WEATHER_MODELS, API_URLS, STANDARD_PRESSURE_LEVELS, THUNDERSTORM_CODES } from './constants.js';
 import { DateTime } from 'luxon';
+import { I18n } from './i18n.js'; // <--- NEU: Importiert
 
 // ===================================================================
 // 1. Öffentliche Hauptfunktionen (API des Moduls)
@@ -335,11 +336,16 @@ export function interpolateWeatherData(weatherData, sliderIndex, interpStep, bas
  */
 async function fetchWeather(lat, lon, currentTime = null) {
     // Sende ein Event, damit die UI den Lade-Spinner anzeigen kann
-    document.dispatchEvent(new CustomEvent('loading:start', { detail: { message: 'Fetching Weather...' } }));
+    // Nachricht ist nun übersetzt
+    document.dispatchEvent(new CustomEvent('loading:start', { detail: { message: I18n.t('common.fetching_weather') } }));
 
     try {
         const selectedModelValue = document.getElementById('modelSelect')?.value || Settings.defaultSettings.model;
-        if (!selectedModelValue) throw new Error("No weather model selected.");
+        
+        if (!selectedModelValue) {
+            // NEU: I18n Error
+            throw new Error(I18n.t('messages.no_model_selected'));
+        }
 
         const modelMap = WEATHER_MODELS.API_MAP;
         const modelApiIdentifierForMeta = modelMap[selectedModelValue] || selectedModelValue;
@@ -370,7 +376,8 @@ async function fetchWeather(lat, lon, currentTime = null) {
         if (isHistorical && targetDateForAPI) {
             baseUrl = API_URLS.HISTORICAL;
             startDateStr = endDateStr = targetDateForAPI.toFormat('yyyy-MM-dd');
-            AppState.lastModelRun = "N/A (Historical Data)";
+            // NEU: I18n Text für historische Daten
+            AppState.lastModelRun = I18n.t('messages.historical_data_label');
         } else {
             // Normale Forecast-Logik zur Bestimmung des Zeitfensters
             let runDate;
@@ -396,7 +403,8 @@ async function fetchWeather(lat, lon, currentTime = null) {
             if (userMaxForecast !== 'Maximum') {
                 const userMaxDays = parseInt(userMaxForecast, 10);
                 if (userMaxDays > modelMaxDays) {
-                    Utils.handleMessage(`The selected model '${selectedModelValue}' only provides a ${modelMaxDays}-day forecast. Displaying maximum available time.`);
+                    // NEU: I18n Hinweis
+                    Utils.handleMessage(I18n.t('messages.model_days_limit', { model: selectedModelValue, days: modelMaxDays }));
                 }
                 forecastDays = Math.min(modelMaxDays, userMaxDays);
             }
@@ -408,19 +416,23 @@ async function fetchWeather(lat, lon, currentTime = null) {
         const url = `${baseUrl}?latitude=${lat}&longitude=${lon}&hourly=${hourlyParams}&models=${selectedModelValue}&start_date=${startDateStr}&end_date=${endDateStr}`;
         const response = await fetch(url);
         if (!response.ok) {
-            // NEU: Spezifische Fehlermeldung für Rate-Limiting
+            // NEU: Spezifische Fehlermeldung für Rate-Limiting mit I18n
             if (response.status === 429) {
-                throw new Error("API-Limit reached. Please wait a moment and retry again.");
+                throw new Error(I18n.t('messages.api_limit_reached'));
             }
-            throw new Error(`HTTP error! Status: ${response.status}`);
+            throw new Error(I18n.t('messages.api_http_error', { status: response.status }));
         }
         const data = await response.json();
-        if (!data.hourly || !data.hourly.time || !data.hourly.time.length) throw new Error('No hourly data in API response.');
+        if (!data.hourly || !data.hourly.time || !data.hourly.time.length) throw new Error(I18n.t('messages.hourly_data_missing'));
         return data.hourly;
 
     } catch (error) {
         console.error("[fetchWeather] Error:", error);
-        Utils.handleError(`Failed to fetch weather: ${error.message}`); // KORRIGIERTE ZEILE
+        // NEU: I18n Error wrapper
+        // Wir nehmen an, dass 'error.message' hier bereits übersetzt ist (durch die 'throw new Error(I18n.t...)' oben)
+        // Falls der Fehler von woanders kommt (z.B. Netzwerkabbruch ohne Response), ist er englisch. 
+        // Man könnte hier differenzieren, aber für den Moment zeigen wir den Fehler an.
+        Utils.handleError(`${I18n.t('messages.weather_fetch_error')} (${error.message})`); 
         return null;
     } finally {
         // Sende ein Event, damit die UI den Lade-Spinner ausblenden kann
@@ -449,9 +461,8 @@ async function checkAvailableModels(lat, lon) {
                 }
             } else {
                 if (response.status === 429) {
-                    // Spezifische Warnung für diesen Fall in der Konsole
+                    // Spezifische Warnung für diesen Fall in der Konsole (bleibt meist englisch für Devs)
                     console.warn(`API-Limit beim Prüfen von Modell '${model}' erreicht.`);
-                    // Optional: Man könnte hier eine einmalige Nachricht an den Benutzer senden.
                 } else {
                     console.warn(`Modell '${model}' ist nicht verfügbar (Server-Antwort: ${response.status})`);
                 }

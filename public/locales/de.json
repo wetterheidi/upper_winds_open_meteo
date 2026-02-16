@@ -5,7 +5,9 @@
         "forecast_model": "Wettermodell:",
         "save": "Speichern",
         "cancel": "Abbrechen",
-        "acknowledge": "Bestätigen"
+        "acknowledge": "Bestätigen",
+        "today": "Heute",
+        "tomorrow": "Morgen"
     },
     "panels": {
         "map": "Karte",
@@ -30,6 +32,11 @@
         "charts": {
             "upper_air": "Höhenwetter (Wind & Wolken)",
             "surface": "Bodenwetter"
+        },
+        "model_info": {
+            "resolution": "Modellauflösung",
+            "interval": "Update-Intervall",
+            "provider": "Anbieter"
         }
     },
     "planner": {
@@ -75,7 +82,8 @@
         "scenario_heatmap": "Heatmap",
         "scenario_min": "Minimaler Wind",
         "scenario_mean": "Mittlerer Wind",
-        "scenario_max": "Maximaler Wind"
+        "scenario_max": "Maximaler Wind",
+        "calculated": "Berechnet"
     },
     "jumpmaster": {
         "find_aircraft": "Flugzeug finden",
@@ -177,7 +185,18 @@
         "geolocation_fallback": "Standort nicht abrufbar. Nutze Standardposition.",
         "geolocation_not_supported": "Geolocation wird vom Browser nicht unterstützt.",
         "offline_zoom_restricted": "Offline: Zoom auf Level 11–14 beschränkt (Cache).",
-        "tiles_unavailable_switched": "{current} Kacheln nicht verfügbar. Wechsel zu {fallback}."
+        "tiles_unavailable_switched": "{current} Kacheln nicht verfügbar. Wechsel zu {fallback}.",
+        "weather_fetch_error": "Konnte Wetterdaten nicht laden. Bitte Verbindung prüfen.",
+        "weather_data_missing": "Keine Wetterdaten für diesen Ort verfügbar.",
+        "using_cached_weather": "Verwende gespeicherte Wetterdaten (Offline-Modus).",
+        "ensemble_fetch_error": "Konnte Ensemble-Daten nicht laden.",
+        "location_outside_range": "Ort liegt außerhalb des abgedeckten Bereichs.",
+        "no_model_selected": "Kein Wettermodell ausgewählt.",
+        "historical_data_label": "N/V (Historische Daten)",
+        "model_days_limit": "Das gewählte Modell '{model}' bietet nur {days} Tage Vorhersage. Zeige maximal verfügbare Zeit.",
+        "api_limit_reached": "API-Limit erreicht. Bitte warte einen Moment und versuche es erneut.",
+        "api_http_error": "HTTP Fehler! Status: {status}",
+        "hourly_data_missing": "Keine stündlichen Daten in der API-Antwort."
     },
     "map": {
         "drag_to_move_track": "Ziehen, um Absetztrack zu verschieben",
@@ -202,6 +221,11 @@
             "radius": "Radius",
             "in": "In",
             "out": "Aus"
-        }
+        },
+        "decimal": "Dezimal",
+        "ddm": "DDM",
+        "dms": "DMS",
+        "start": "Start",
+        "end": "Ende"
     }
 }

@@ -19,6 +19,7 @@ import { UI_DEFAULTS, WIND_THRESHOLDS } from '../core/constants.js'; // UI_DEFAU
 import * as JumpPlanner from '../core/jumpPlanner.js';
 import { generateWindspinne } from '../core/windchart.js';
 import { DateTime } from 'luxon';
+import { I18n } from '../core/i18n.js'; // <--- NEU: Importiert
 
 // ===================================================================
 // 1. Wetter- und Info-Anzeigen

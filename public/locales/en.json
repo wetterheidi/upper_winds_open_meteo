@@ -5,7 +5,9 @@
         "forecast_model": "Forecast Model:",
         "save": "Save",
         "cancel": "Cancel",
-        "acknowledge": "Acknowledge"
+        "acknowledge": "Acknowledge",
+        "today": "Today",
+        "tomorrow": "Tomorrow"
     },
     "panels": {
         "map": "Map",
@@ -30,6 +32,11 @@
         "charts": {
             "upper_air": "Upper Air (Wind & Clouds)",
             "surface": "Surface Conditions"
+        },
+        "model_info": {
+            "resolution": "Model Resolution",
+            "interval": "Update Interval",
+            "provider": "Provider"
         }
     },
     "planner": {
@@ -75,7 +82,8 @@
         "scenario_heatmap": "Heatmap",
         "scenario_min": "Minimum Wind",
         "scenario_mean": "Mean Wind",
-        "scenario_max": "Maximum Wind"
+        "scenario_max": "Maximum Wind",
+        "calculated": "Calculated"
     },
     "jumpmaster": {
         "find_aircraft": "Find Aircraft To Track",
@@ -177,7 +185,18 @@
         "geolocation_fallback": "Unable to retrieve your location. Using default location.",
         "geolocation_not_supported": "Geolocation not supported by this browser.",
         "offline_zoom_restricted": "Offline: Zoom restricted to levels 11–14 for cached tiles.",
-        "tiles_unavailable_switched": "{current} tiles unavailable. Switched to {fallback}."
+        "tiles_unavailable_switched": "{current} tiles unavailable. Switched to {fallback}.",
+        "weather_fetch_error": "Could not fetch weather data. Please check your connection.",
+        "weather_data_missing": "No weather data available for this location.",
+        "using_cached_weather": "Using cached weather data (offline mode).",
+        "ensemble_fetch_error": "Could not fetch ensemble data.",
+        "location_outside_range": "Location is outside the covered area.",
+        "no_model_selected": "No weather model selected.",
+        "historical_data_label": "N/A (Historical Data)",
+        "model_days_limit": "The selected model '{model}' only provides a {days}-day forecast. Displaying maximum available time.",
+        "api_limit_reached": "API limit reached. Please wait a moment and try again.",
+        "api_http_error": "HTTP error! Status: {status}",
+        "hourly_data_missing": "No hourly data in API response."
     },
     "map": {
         "drag_to_move_track": "Drag to move Jump Run Track",
@@ -202,6 +221,11 @@
             "radius": "Radius",
             "in": "In",
             "out": "Out"
-        }
+        },
+        "decimal": "Decimal",
+        "ddm": "DDM",
+        "dms": "DMS",
+        "start": "Start",
+        "end": "End"
     }
 }
