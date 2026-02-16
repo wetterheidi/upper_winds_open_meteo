@@ -7,6 +7,7 @@
 
 import { Utils } from './utils.js';
 import * as mgrs from 'mgrs';
+import { I18n } from './i18n.js'; // Import ergänzt
 
 let searchCache = JSON.parse(localStorage.getItem('searchCache')) || {};
 let isAddingFavorite = false;
@@ -30,7 +31,7 @@ export async function performSearch(query) {
     const parsedCoords = parseQueryAsCoordinates(query); // Annahme: parse... ist auch hier
     if (parsedCoords) {
         return [{
-            display_name: `Coordinate: ${parsedCoords.lat.toFixed(5)}, ${parsedCoords.lng.toFixed(5)}`,
+            display_name: `${I18n.t('location.coordinate')}: ${parsedCoords.lat.toFixed(5)}, ${parsedCoords.lng.toFixed(5)}`,
             lat: parsedCoords.lat,
             lon: parsedCoords.lng,
             type: 'coordinate'
@@ -80,7 +81,7 @@ export async function performSearch(query) {
 
     } catch (error) {
         console.error("Search failed:", error);
-        Utils.handleError("Could not find location. Please check network.");
+        Utils.handleError(I18n.t('location.error_search_failed'));
         return [];
     }
 }
@@ -102,7 +103,7 @@ export async function findParachutingPOIs(minLat, minLon, maxLat, maxLon) {
         minLat < -90 || maxLat > 90 || minLon < -180 || maxLon > 180 ||
         minLat > maxLat || minLon > maxLon) {
         console.error('findParachutingPOIs: Invalid bounding box coordinates');
-        Utils.handleError('Invalid map bounds for POI search.');
+        Utils.handleError(I18n.t('location.error_invalid_bounds'));
         return [];
     }
 
@@ -144,11 +145,11 @@ export async function findParachutingPOIs(minLat, minLon, maxLat, maxLon) {
                 tags["addr:state"] || tags.state,
                 tags["addr:country"] || tags.country,
                 tags['sport'] ? `(${tags['sport']})` : null,
-                tags['aeroway'] === 'aerodrome' ? '(Airfield)' : null
+                tags['aeroway'] === 'aerodrome' ? `(${I18n.t('location.poi_airfield')})` : null // Übersetzt
             ].filter(Boolean).join(', ');
 
             return {
-                display_name: displayNameParts || 'Unnamed Parachuting Location',
+                display_name: displayNameParts || I18n.t('location.poi_unnamed'), // Übersetzt
                 lat: item.lat || item.center?.lat,
                 lon: item.lon || item.center?.lon,
                 type: tags['sport'] || tags['aeroway'] || tags['leisure'] || 'parachuting'
@@ -172,16 +173,16 @@ export async function findParachutingPOIs(minLat, minLon, maxLat, maxLon) {
 
         if (uniqueResults.length === 0) {
             console.log('findParachutingPOIs: No parachuting POIs found in bbox');
-            Utils.handleMessage('No parachuting locations found in this area.');
+            Utils.handleMessage(I18n.t('location.poi_none_found'));
         } else {
             console.log('findParachutingPOIs: Found POIs:', uniqueResults);
-            Utils.handleMessage(`Found ${uniqueResults.length} parachuting location(s) in this area.`);
+            Utils.handleMessage(I18n.t('location.poi_found_count', { count: uniqueResults.length }));
         }
 
         return uniqueResults;
     } catch (error) {
         console.error('findParachutingPOIs: Search failed:', error);
-        Utils.handleError('Could not find parachuting locations. Please check network.');
+        Utils.handleError(I18n.t('location.error_poi_failed'));
         return [];
     }
 }
@@ -213,7 +214,7 @@ export function setHomeDZ(lat, lng) {
     }
 
     saveCoordHistory(history);
-    Utils.handleMessage(`"${homeDZLabel}" is now your Home DZ.`);
+    Utils.handleMessage(I18n.t('location.home_dz_set', { name: homeDZLabel }));
     _dispatchFavoritesUpdate(); // UI neu zeichnen lassen
 }
 
@@ -224,7 +225,7 @@ export function clearHomeDZ() {
     let history = getCoordHistory();
     history.forEach(entry => entry.isHomeDZ = false);
     saveCoordHistory(history);
-    Utils.handleMessage("Home DZ removed.");
+    Utils.handleMessage(I18n.t('location.home_dz_cleared'));
     _dispatchFavoritesUpdate();
 }
 
@@ -348,9 +349,9 @@ export function updateFavoriteStatus(lat, lng, name, isFavorite) {
 
     // Gib eine Erfolgsmeldung zurück
     if (isFavorite) {
-        Utils.handleMessage(`"${name}" saved as favorite.`);
+        Utils.handleMessage(I18n.t('location.favorite_added', { name }));
     } else {
-        Utils.handleMessage(`"${name}" removed from favorites.`);
+        Utils.handleMessage(I18n.t('location.favorite_removed', { name }));
     }
 }
 
@@ -372,7 +373,7 @@ export function removeLocationFromHistory(lat, lng) {
         return Math.abs(entryLat - lat) > 0.001 || Math.abs(entryLng - lng) > 0.001;
     });
     saveCoordHistory(updatedHistory);
-    Utils.handleMessage("Location deleted.");
+    Utils.handleMessage(I18n.t('location.deleted'));
     _dispatchFavoritesUpdate();
 }
 

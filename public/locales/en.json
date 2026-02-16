@@ -30,14 +30,24 @@
             "speed_kt": "Speed (kt)",
             "speed_ms": "Speed (m/s)"
         },
-        "charts": {
-            "upper_air": "Upper Air (Wind & Clouds)",
-            "surface": "Surface Conditions"
-        },
         "model_info": {
             "resolution": "Model Resolution",
             "interval": "Update Interval",
             "provider": "Provider"
+        },
+        "no_data": "No weather data loaded.",
+        "altitude": "Altitude",
+        "temp": "Temperature",
+        "dew_point": "Dew Point",
+        "wind": "Wind",
+        "wind_speed": "Wind Speed",
+        "gusts": "Gusts",
+        "time": "Time",
+        "cloud_cover": "Cloud Cover",
+        "freezing_level": "Freezing Level (0°C)",
+        "charts": {
+            "upper_air": "Upper Air (Wind & Clouds)",
+            "surface": "Surface Conditions"
         }
     },
     "planner": {
@@ -257,5 +267,34 @@
         "error_api_limit": "API-Limit for ensemble data reached. Please wait a moment and retry again.",
         "error_api_failed": "API request failed: {status}",
         "tooltip_mean_wind": "Mean Wind {lower}-{upper} {unit} AGL:<br>{dir}° {speed} {windUnit}"
+    },
+    "tracking": {
+        "disclosure_title": "Notice on Location Use",
+        "disclosure_message": "DZMaster collects location data to enable the functions 'Live Tracking' and 'Automatic Jump Recording'. This also happens when the app is running in the background or the screen is off. Data is only stored locally.",
+        "access_canceled": "Location access canceled.",
+        "btn_start_recording": "Start Recording",
+        "btn_stop_recording": "Stop Recording",
+        "recording_started": "Manual recording started.",
+        "recording_stopped": "Manual recording stopped.",
+        "airborne_start_warning": "Airborne start: Altitudes are uncorrected (Ellipsoid).",
+        "error_geolocation": "Geolocation error: {message}",
+        "error_start_failed": "Failed to start tracking: {message}",
+        "error_not_supported": "Geolocation is not supported by your browser.",
+        "error_permission_denied": "GPS permission was denied. Please enable 'Always' in the app settings."
+    },
+    "location": {
+        "coordinate": "Coordinate",
+        "error_search_failed": "Could not find location. Please check network.",
+        "error_invalid_bounds": "Invalid map bounds for POI search.",
+        "error_poi_failed": "Could not find parachuting locations. Please check network.",
+        "poi_airfield": "Airfield",
+        "poi_unnamed": "Unnamed Parachuting Location",
+        "poi_none_found": "No parachuting locations found in this area.",
+        "poi_found_count": "Found {count} parachuting location(s) in this area.",
+        "home_dz_set": "\"{name}\" is now your Home DZ.",
+        "home_dz_cleared": "Home DZ removed.",
+        "favorite_added": "\"{name}\" saved as favorite.",
+        "favorite_removed": "\"{name}\" removed from favorites.",
+        "deleted": "Location deleted."
     }
 }

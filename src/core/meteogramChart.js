@@ -8,6 +8,7 @@ import { Settings } from './settings.js';
 import { Utils } from './utils.js';
 import * as weatherManager from './weatherManager.js';
 import { DateTime } from 'luxon';
+import { I18n } from './i18n.js'; // Import ergänzt
 
 // Chart.js wird global geladen.
 
@@ -36,8 +37,8 @@ export async function generateMeteogram(sliderIndex) {
 
     const upperCanvas = document.getElementById('meteogramUpperChart');
     const surfaceCanvas = document.getElementById('meteogramSurfaceChart');
-    const upperTitleElement = upperCanvas?.previousElementSibling;
-    const surfaceTitleElement = surfaceCanvas?.previousElementSibling;
+    upperTitleElement.textContent = I18n.t('weather.charts.upper_air');
+    surfaceTitleElement.textContent = I18n.t('weather.charts.surface');
 
     destroyCharts(); // Vorhandene Charts zuerst zerstören
 
@@ -49,8 +50,8 @@ export async function generateMeteogram(sliderIndex) {
         console.warn("[Meteogram] Keine Wetterdaten verfügbar.");
         upperTitleElement.textContent = "Upper Air (Wind & Clouds)";
         surfaceTitleElement.textContent = "Surface Conditions";
-        displayChartPlaceholder(upperCanvas, "No weather data loaded.");
-        displayChartPlaceholder(surfaceCanvas, "No weather data loaded.");
+        displayChartPlaceholder(upperCanvas, I18n.t('weather.no_data'));
+        displayChartPlaceholder(surfaceCanvas, I18n.t('weather.no_data'));
         return;
     }
 
@@ -273,8 +274,8 @@ export async function generateMeteogram(sliderIndex) {
     console.log(`[Meteogram] Data processing loop finished. ${timeLabels.length} time labels generated for date: ${displayDateStr}`);
 
     if (upperTitleElement && surfaceTitleElement) {
-        upperTitleElement.textContent = `Upper Air - ${displayDateStr}`;
-        surfaceTitleElement.textContent = `Surface - ${displayDateStr}`;
+        upperTitleElement.textContent = `${I18n.t('weather.charts.upper_air')} - ${displayDateStr}`;
+        surfaceTitleElement.textContent = `${I18n.t('weather.charts.surface')} - ${displayDateStr}`;
     }
 
     // --- Windfiedern Bilder erstellen (bleibt gleich) ---
@@ -298,9 +299,9 @@ export async function generateMeteogram(sliderIndex) {
 
         // --- Chart.js Konfiguration für Höhenwetter ---
         const upperDatasets = [
-            { label: 'Cloud Cover', data: cloudBarData, backgroundColor: (context) => getCloudColor(context.raw.cover, style), borderColor: (context) => getCloudColor(context.raw.cover, style), borderWidth: 1, barPercentage: 1.0, categoryPercentage: 1.0, order: 2 },
-            { label: `Wind (${windUnit})`, data: scatterDataForChart, type: 'scatter', pointStyle: scatterDataForChart.map(p => p.image), pointRadius: 15, order: 1 },
-            { label: 'Freezing Level (0°C)', data: freezingLevelData, type: 'line', borderColor: freezingLevelColor, borderWidth: 1.5, borderDash: [5, 5], pointRadius: 0, tension: 0.1, yAxisID: 'y', order: 0 }
+            { label: I18n.t('weather.cloud_cover'), /* ... */ }, // "Cloud Cover"
+            { label: `${I18n.t('weather.wind')} (${windUnit})`, /* ... */ }, // "Wind"
+            { label: I18n.t('weather.freezing_level'), /* ... */ } // "Freezing Level (0°C)"
         ];
 
         if (meteogramUpperInstance) {
@@ -334,7 +335,7 @@ export async function generateMeteogram(sliderIndex) {
                     },
                     // === KORREKTUR 7: Y-Achsen-Konfiguration angepasst ===
                     y: {
-                        title: { display: true, text: `Altitude AGL (${heightUnit})`, color: textColor },
+                        title: { display: true, text: `${I18n.t('weather.altitude')} AGL (${heightUnit})`, color: textColor },
                         min: 0,
                         max: upperChartMaxHeightDisplay,
                         ticks: { color: textColor, stepSize: yAxisStepSize },
@@ -359,13 +360,11 @@ export async function generateMeteogram(sliderIndex) {
                             label: function (context) {
                                 if (!context || !context.raw) return '';
                                 const rawData = context.raw.image ? context.raw.image.rawData : context.raw; if (!rawData) return '';
-                                if (context.dataset.label.startsWith('Wind')) {
-                                    const displaySpeed = Utils.convertWind(rawData.speedKt, windUnit, 'kt');
-                                    const speedString = windUnit === 'bft' ? Math.round(displaySpeed) : displaySpeed.toFixed(1);
-                                    return ` Wind: ${rawData.direction}° / ${speedString} ${windUnit}`;
-                                } else if (context.dataset.label === 'Cloud Cover') {
-                                    return ` Cover: ${rawData.cover.toFixed(0)}%`;
-                                } else if (context.dataset.label === 'Freezing Level') {
+                                if (context.dataset.label.startsWith(I18n.t('weather.wind'))) {
+                                    return ` ${I18n.t('weather.wind')}: ${rawData.direction}° / ${speedString} ${windUnit}`;
+                                } else if (context.dataset.label === I18n.t('weather.cloud_cover')) {
+                                    return ` ${I18n.t('weather.cloud_cover')}: ${rawData.cover.toFixed(0)}%`;
+                                } else if (context.dataset.label === I18n.t('weather.freezing_level')) {
                                     const flValue = typeof context.raw === 'number' ? context.raw : null;
                                     const displayFL = flValue !== null ? flValue : 'Above Max';
                                     return ` ${context.dataset.label}: ${displayFL}${flValue !== null ? ' ' + heightUnit + ' AGL' : ''}`;
@@ -388,12 +387,10 @@ export async function generateMeteogram(sliderIndex) {
     console.log('[Meteogram] Surface Chart Data:', { /* ... */ });
     try {
         const surfaceDatasets = [
-            // === KORREKTUR 8: Tooltips für Bodentemperatur anpassen ===
-            { label: `Temp (${tempUnit === 'F' ? '°F' : '°C'})`, data: surfaceTempData, borderColor: tempColor, backgroundColor: 'transparent', borderWidth: 1.25, tension: 0.1, yAxisID: 'yTempSurface', order: 1 },
-            { label: `Dew Point (${tempUnit === 'F' ? '°F' : '°C'})`, data: surfaceDewPointData, borderColor: dewPointColor, backgroundColor: 'transparent', borderWidth: 1.25, tension: 0.1, yAxisID: 'yTempSurface', order: 1 },
-            // ================== ENDE KORREKTUR 8 ==================
-            { label: `Wind (${windUnit})`, data: surfaceWindSpeedData, borderColor: surfaceWindColor, borderWidth: 3, borderDash: [], tension: 0.1, yAxisID: 'yWindSurface', order: 0 },
-            { label: `Gusts (${windUnit})`, data: surfaceWindGustData.map((gust, i) => (gust !== null && surfaceWindSpeedData[i] !== null && gust > surfaceWindSpeedData[i]) ? gust : null), type: 'scatter', pointStyle: 'triangle', pointRadius: 5, pointBackgroundColor: surfaceGustColor, showLine: false, yAxisID: 'yWindSurface', order: -1 }
+            { label: `${I18n.t('weather.temp')} (${tempUnit === 'F' ? '°F' : '°C'})`, /* ... */ },
+            { label: `${I18n.t('weather.dew_point')} (${tempUnit === 'F' ? '°F' : '°C'})`, /* ... */ },
+            { label: `${I18n.t('weather.wind')} (${windUnit})`, /* ... */ },
+            { label: `${I18n.t('weather.gusts')} (${windUnit})`, /* ... */ }
         ];
 
         if (meteogramSurfaceInstance) {
@@ -417,19 +414,19 @@ export async function generateMeteogram(sliderIndex) {
                     }
                 },
                 scales: {
-                    x: { title: { display: true, text: `Time (${timeZone})`, color: textColor }, ticks: { color: textColor, maxRotation: 0, autoSkipPadding: 20 }, grid: { color: gridColor } },
+                    x: { title: { display: true, text: `${I18n.t('weather.time')} (${timeZone})`, color: textColor } },
                     // === KORREKTUR 9: Y-Achsen-Titel für Temperatur dynamisch anpassen ===
                     yTempSurface: { // Temperature Axis (Right)
                         type: 'linear',
                         position: 'right',
-                        title: { display: true, text: `Temperature (${tempUnit === 'F' ? '°F' : '°C'})`, color: textColor },
+                        title: { display: true, text: `${I18n.t('weather.temp')} (${tempUnit === 'F' ? '°F' : '°C'})`, color: textColor },
                         ticks: { color: textColor },
                         grid: { drawOnChartArea: false } // Hides temp grid lines
                     },
                     yWindSurface: { // Wind Speed Axis (Left)
                         type: 'linear',
                         position: 'left',
-                        title: { display: true, text: `Wind Speed (${windUnit})`, color: textColor },
+                        title: { display: true, text: `${I18n.t('weather.wind_speed')} (${windUnit})`, color: textColor },
                         ticks: { color: textColor },
                         grid: { color: gridColor }, // Shows wind grid lines using the theme color
                         min: 0

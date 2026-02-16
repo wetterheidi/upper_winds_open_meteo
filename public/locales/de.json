@@ -30,14 +30,24 @@
             "speed_kt": "Geschw. (kt)",
             "speed_ms": "Geschw. (m/s)"
         },
-        "charts": {
-            "upper_air": "Höhenwetter (Wind & Wolken)",
-            "surface": "Bodenwetter"
-        },
         "model_info": {
             "resolution": "Modellauflösung",
             "interval": "Update-Intervall",
             "provider": "Anbieter"
+        },
+        "no_data": "Keine Wetterdaten geladen.",
+        "altitude": "Höhe",
+        "temp": "Temperatur",
+        "dew_point": "Taupunkt",
+        "wind": "Wind",
+        "wind_speed": "Windgeschwindigkeit",
+        "gusts": "Böen",
+        "time": "Zeit",
+        "cloud_cover": "Bewölkung",
+        "freezing_level": "Nullgradgrenze",
+        "charts": {
+            "upper_air": "Höhenwetter (Wind & Wolken)",
+            "surface": "Bodenwetter"
         }
     },
     "planner": {
@@ -257,5 +267,34 @@
         "error_api_limit": "API-Limit für Ensemble-Daten erreicht. Bitte kurz warten und erneut versuchen.",
         "error_api_failed": "API-Anfrage fehlgeschlagen: {status}",
         "tooltip_mean_wind": "Mittlerer Wind {lower}-{upper} {unit} AGL:<br>{dir}° {speed} {windUnit}"
+    },
+    "tracking": {
+        "disclosure_title": "Hinweis zur Standortnutzung",
+        "disclosure_message": "DZMaster erfasst Standortdaten, um 'Live-Tracking' und 'Automatische Sprungaufzeichnung' zu ermöglichen. Dies geschieht auch, wenn die App im Hintergrund läuft oder der Bildschirm aus ist. Daten werden nur lokal gespeichert.",
+        "access_canceled": "Standortzugriff abgebrochen.",
+        "btn_start_recording": "Aufzeichnung starten",
+        "btn_stop_recording": "Aufzeichnung stoppen",
+        "recording_started": "Manuelle Aufzeichnung gestartet.",
+        "recording_stopped": "Manuelle Aufzeichnung gestoppt.",
+        "airborne_start_warning": "Start in der Luft: Höhen sind unkorrigiert (Ellipsoid).",
+        "error_geolocation": "GPS-Fehler: {message}",
+        "error_start_failed": "Tracking konnte nicht gestartet werden: {message}",
+        "error_not_supported": "GPS wird von diesem Browser nicht unterstützt.",
+        "error_permission_denied": "GPS-Berechtigung wurde verweigert. Bitte 'Immer zulassen' in den App-Einstellungen aktivieren."
+    },
+    "location": {
+        "coordinate": "Koordinate",
+        "error_search_failed": "Ort konnte nicht gefunden werden. Bitte Netzwerk prüfen.",
+        "error_invalid_bounds": "Ungültiger Kartenausschnitt für POI-Suche.",
+        "error_poi_failed": "Sprungplätze konnten nicht geladen werden. Bitte Netzwerk prüfen.",
+        "poi_airfield": "Flugplatz",
+        "poi_unnamed": "Unbenannter Sprungplatz",
+        "poi_none_found": "Keine Sprungplätze in diesem Bereich gefunden.",
+        "poi_found_count": "{count} Sprungplatz/plätze in diesem Bereich gefunden.",
+        "home_dz_set": "\"{name}\" ist jetzt deine Home DZ.",
+        "home_dz_cleared": "Home DZ entfernt.",
+        "favorite_added": "\"{name}\" als Favorit gespeichert.",
+        "favorite_removed": "\"{name}\" aus Favoriten entfernt.",
+        "deleted": "Ort gelöscht."
     }
 }

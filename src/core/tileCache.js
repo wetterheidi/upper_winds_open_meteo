@@ -9,6 +9,7 @@ import { Utils } from './utils.js';
 import { Settings } from './settings.js';
 import { CACHE_DEFAULTS } from './constants.js';
 import { AppState } from './state.js';
+import { I18n } from './i18n.js'; //
 
 // ===================================================================
 // 1. IndexedDB Wrapper-Objekt

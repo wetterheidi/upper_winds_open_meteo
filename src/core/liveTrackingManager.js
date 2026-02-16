@@ -15,6 +15,7 @@ import { DateTime } from 'luxon';
 import { saveRecordedTrack } from './trackManager.js';
 import { showDisclosureModal } from '../ui-mobile/ui.js';
 import { Settings } from './settings.js';
+import { I18n } from './i18n.js'; // Import ergänzt
 
 // ===================================================================
 // 1. Öffentliche Hauptfunktionen (API des Moduls)
@@ -67,7 +68,7 @@ export async function startPositionTracking() {
                             (position, error) => {
                                 if (error) {
                                     console.error("[LiveTrackingManager] Geolocation error:", error);
-                                    Utils.handleError(`Geolocation error: ${error.message || 'Unknown error'}`);
+                                    Utils.handleError(I18n.t('tracking.error_geolocation', { message: error.message || 'Unknown' }));
                                     stopPositionTracking();
                                     return;
                                 }
@@ -82,14 +83,14 @@ export async function startPositionTracking() {
                         document.dispatchEvent(new CustomEvent('tracking:started'));
                     } catch (error) {
                         console.error("[LiveTrackingManager] Failed to start native tracking:", error);
-                        Utils.handleError(`Failed to start tracking: ${error.message || 'Unknown error'}`);
+                        Utils.handleError(I18n.t('tracking.error_start_failed', { message: error.message || 'Unknown' }));
                         stopPositionTracking();
                     }
                 } else {
                     // --- Web-Fallback-Logik ---
                     console.log("[LiveTrackingManager] Using navigator.geolocation for tracking (Web).");
                     if (!navigator.geolocation) {
-                        Utils.handleError("Geolocation is not supported by your browser.");
+                        Utils.handleError(I18n.t('tracking.error_not_supported'));
                         document.dispatchEvent(new CustomEvent('tracking:stopped'));
                         return;
                     }
@@ -113,8 +114,8 @@ export async function startPositionTracking() {
             if (!hasAcknowledged) {
                 // Wenn der Hinweis noch nicht gezeigt wurde, zeige das Modal.
                 showDisclosureModal({
-                    title: "Notice on Location Use",
-                    message: "DZMaster collects location data to enable the functions <strong>'Live Tracking'</strong> and <strong>'Automatic Jump Recording'</strong>. This also happens when the app is running in the background or the screen is off in order to record your complete jump. This data is only stored locally on your device and is not shared.",
+                    title: I18n.t('tracking.disclosure_title'), // Übersetzt
+                    message: I18n.t('tracking.disclosure_message'), // Übersetzt
                     onConfirm: () => {
                         localStorage.setItem('hasAcknowledgedLocationDisclosure', 'true');
                         proceedWithTracking(); // Fahre mit der Berechtigungsanfrage fort
@@ -125,7 +126,7 @@ export async function startPositionTracking() {
                         if (trackCheckbox) trackCheckbox.checked = false;
                         Settings.state.userSettings.trackPosition = false;
                         Settings.save();
-                        Utils.handleMessage("Location access canceled.");
+                        Utils.handleMessage(I18n.t('tracking.access_canceled')); // Übersetzt
                     }
                 });
             } else {
@@ -150,10 +151,10 @@ export function toggleManualRecording() {
         // Aufzeichnung stoppen
         AppState.isManualRecording = false;
         if (manualButton) {
-            manualButton.textContent = "Start Recording";
+            manualButton.textContent = I18n.t('tracking.btn_start_recording'); // "Start Recording"
             manualButton.classList.remove('recording');
         }
-        Utils.handleMessage("Manual recording stopped.");
+        Utils.handleMessage(I18n.t('tracking.recording_stopped')); // Übersetzt
 
         if (AppState.recordedTrackPoints.length > 1) {
             saveRecordedTrack();
@@ -170,10 +171,10 @@ export function toggleManualRecording() {
         AppState.isManualRecording = true;
         AppState.recordedTrackPoints = []; // Eine saubere Aufzeichnung starten
         if (manualButton) {
-            manualButton.textContent = "Stop Recording";
+            manualButton.textContent = I18n.t('tracking.btn_stop_recording'); // "Stop Recording"
             manualButton.classList.add('recording');
         }
-        Utils.handleMessage("Manual recording started.");
+        Utils.handleMessage(I18n.t('tracking.recording_started')); // Übersetzt
 
         // Sicherstellen, dass das Live-Tracking aktiv ist
         if (AppState.watchId === null) {
@@ -231,7 +232,7 @@ export async function stopPositionTracking() {
     // Setzt die Flags zurück, die den Neustart blockiert haben.
     isTrackingInitializing = false;
     trackingInitPromise = null;
-    
+
     document.dispatchEvent(new CustomEvent('tracking:stopped'));
 }
 
@@ -264,7 +265,7 @@ const debouncedPositionUpdate = Utils.debounce(async (position) => {
     // Offset-Berechnung wird jetzt nur noch EINMAL pro Sitzung ausgeführt.
     if (!AppState.altitudeCorrectionPerformed && deviceAltitude !== null && AppState.lastAltitude !== 'N/A') {
         // Flag sofort setzen, um wiederholte Ausführung zu blockieren.
-        AppState.altitudeCorrectionPerformed = true; 
+        AppState.altitudeCorrectionPerformed = true;
 
         const heightDifference = Math.abs(deviceAltitude - AppState.lastAltitude);
 
@@ -274,7 +275,7 @@ const debouncedPositionUpdate = Utils.debounce(async (position) => {
         } else {
             AppState.altitudeCorrectionOffset = 0;
             console.warn(`Start in der Luft erkannt (Höhendifferenz: ${heightDifference.toFixed(0)}m). Es wird keine Höhenkorrektur angewendet.`);
-            Utils.handleMessage("Airborne start: Altitudes are uncorrected (Ellipsoid).");
+            Utils.handleMessage(I18n.t('tracking.airborne_start_warning'));
         }
     }
 
@@ -424,7 +425,7 @@ function updateAccuracyCircle(lat, lng, accuracy) {
 async function checkAndRequestPermissions() {
     try {
         const { Geolocation, isInitialized } = await getCapacitor();
-        
+
         if (!isInitialized) {
             console.error('Capacitor not fully initialized');
             return false;
@@ -447,14 +448,14 @@ async function checkAndRequestPermissions() {
                     permissions: ['location', 'coarseLocation']
                 });
                 console.log('New geolocation permissions state:', requestResult);
-                
+
                 if (requestResult.location !== 'granted') {
                     Utils.handleError('GPS permission is required for live tracking.');
                     return false;
                 }
             } catch (error) {
                 console.error('[LiveTrackingManager] Permission request error:', error);
-                Utils.handleError(`Failed to request permissions: ${error.message}`);
+                Utils.handleError(I18n.t('tracking.error_permission_denied'));
                 return false;
             }
         }
