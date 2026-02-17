@@ -244,7 +244,18 @@
         "ddm": "DDM",
         "dms": "DMS",
         "start": "Start",
-        "end": "Ende"
+        "end": "Ende",
+        "cache": {
+            "error_store": "Fehler beim Speichern einiger Kacheln. Bitte Cache leeren.",
+            "error_offline_zoom": "Offline: Zoom ist für Cache-Kacheln auf Stufen 11–14 beschränkt.",
+            "error_not_cached": "Dieser Bereich ist nicht im Cache. Bitte mehr Kacheln online speichern.",
+            "status_not_ready": "Karte oder Ort nicht bereit für Caching.",
+            "status_no_tiles": "Keine Kacheln für diese Karte zum Cachen gefunden.",
+            "status_error": "Ein Fehler ist während des Cachings aufgetreten.",
+            "status_cancelled": "Caching abgebrochen. {count} Kacheln verarbeitet.",
+            "status_complete": "Caching abgeschlossen. {count} Kacheln gespeichert.",
+            "status_complete_with_errors": "Caching abgeschlossen. {count} Kacheln gespeichert, {failed} fehlgeschlagen."
+        }
     },
     "adsb": {
         "tracking_stopped": "ADSB-Tracking gestoppt.",
@@ -296,5 +307,43 @@
         "favorite_added": "\"{name}\" als Favorit gespeichert.",
         "favorite_removed": "\"{name}\" aus Favoriten entfernt.",
         "deleted": "Ort gelöscht."
+    },
+    "tracks": {
+        "error_map_init": "Karte nicht initialisiert.",
+        "error_kml_no_geometry": "KML-Datei enthält keine gültigen Geometrien zur Anzeige.",
+        "error_kml_parse": "Fehler beim Parsen der KML-Datei: {message}",
+        "error_gpx_points": "GPX-Track enthält zu wenige Punkte.",
+        "error_gpx_parse": "Fehler beim Parsen der GPX-Datei: {message}",
+        "error_csv_points": "CSV-Track enthält zu wenige Punkte.",
+        "error_csv_parse": "Fehler beim Lesen oder Parsen der CSV-Datei: {message}",
+        "error_no_data_save": "Keine Track-Daten zum Speichern vorhanden.",
+        "error_filesystem": "Track konnte nicht gespeichert werden: Dateisystem-Modul nicht verfügbar.",
+        "error_save_generic": "Track konnte nicht gespeichert werden.",
+        "error_activate_jrt": "Aktiviere 'Jump Run Track anzeigen', um den Track zu exportieren.",
+        "error_no_weather_dip": "Wetterdaten oder DIP-Position nicht verfügbar. Export nicht möglich.",
+        "error_jrt_calc": "Jump Run Track konnte nicht berechnet werden.",
+        "error_activate_pattern": "Landemuster vor dem Export aktivieren.",
+        "error_render_map": "Karte nicht initialisiert. Track kann nicht gerendert werden.",
+        "error_render_invalid": "Track kann nicht angezeigt werden: Ungültige Koordinaten.",
+        "status_saved_docs": "Track in Documents/DZMaster gespeichert",
+        "status_refreshing": "Wettervorhersage wird auf den aktuellen Tag aktualisiert...",
+        "summary": "Distanz: {distance} km, Min. Höhe: {min} m, Max. Höhe: {max} m (Quelle: {file})",
+        "error_insufficient_points": "Nicht genügend gültige Datenpunkte zum Speichern des Tracks.",
+        "error_filesystem_missing": "Track konnte nicht gespeichert werden: Dateisystem-Modul nicht verfügbar.",
+        "error_save_failed": "Track konnte nicht gespeichert werden.",
+        "error_no_weather_data": "Keine Wetterdaten für die GPX-Erstellung verfügbar.",
+        "error_jrt_calc_failed": "Jump Run Track konnte nicht berechnet werden.",
+        "status_gpx_saved": "GPX in Documents/DZMaster gespeichert",
+        "error_gpx_save_failed": "GPX-Datei konnte nicht gespeichert werden.",
+        "error_pattern_activation": "Landemuster vor dem Export aktivieren.",
+        "error_interpolation_failed": "Fehler: Keine interpolierten Wetterdaten für GPX-Erstellung verfügbar.",
+        "error_pattern_coords_failed": "Fehler: Berechnung des Landemusters lieferte keine Daten. Export abgebrochen.",
+        "status_pattern_gpx_saved": "Landemuster-GPX in Documents/DZMaster gespeichert",
+        "error_pattern_gpx_save_failed": "Landemuster-GPX konnte nicht gespeichert werden.",
+        "error_render_invalid_coords": "Track kann nicht angezeigt werden: Ungültige Koordinaten.",
+        "error_render_generic": "Fehler beim Rendern des Tracks: {message}",
+        "error_no_location_weather": "Keine Wetterdaten oder Position verfügbar.",
+        "error_calc_no_data": "Berechnung fehlgeschlagen: Keine interpolierten Daten.",
+        "status_generic_saved": "Gespeichert unter Documents/DZMaster/{filename}"
     }
 }

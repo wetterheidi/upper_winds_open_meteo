@@ -63,7 +63,7 @@ export const TileCache = {
             };
             request.onerror = (event) => {
                 console.warn(`Failed to store tile: ${url}`, event);
-                Utils.handleError('Failed to store some tiles. Try clearing cache.');
+                Utils.handleError(I18n.t('map.cache.error_store'));
                 reject(event);
             };
         });
@@ -294,7 +294,7 @@ L.TileLayer.Cached = L.TileLayer.extend({
 
         if (!navigator.onLine && (coords.z < 11 || coords.z > 14)) {
             console.log(`Skipping tile request outside cached zoom levels (11–14): ${url}`);
-            Utils.handleError('Offline: Zoom restricted to levels 11–14 for cached tiles.');
+            Utils.handleError(I18n.t('map.cache.error_offline_zoom'));
             done(new Error('Zoom level not cached'), tile);
             return tile;
         }
@@ -307,12 +307,12 @@ L.TileLayer.Cached = L.TileLayer.extend({
                     console.log(`Tile loaded from cache: ${normalizedUrl}`);
                 } else {
                     console.warn(`Tile not in cache: ${normalizedUrl}`);
-                    Utils.handleError('This area is not cached. Please cache more tiles while online.');
+                    Utils.handleError(I18n.t('map.cache.error_not_cached'));
                     done(new Error('Tile not in cache'), tile);
                 }
             }).catch(error => {
                 console.warn('Cache error for offline tile:', normalizedUrl, error);
-                Utils.handleError('This area is not cached. Please cache more tiles while online.');
+                Utils.handleError(I18n.t('map.cache.error_not_cached'));
                 done(error, tile);
             });
         } else {
@@ -373,7 +373,7 @@ L.tileLayer.cached = function (url, options) {
  */
 export async function cacheTilesForDIP({ map, lastLat, lastLng, baseMaps, onProgress, onComplete, onCancel, radiusKm: forcedRadius = null, silent = false }) {
     if (!map || !lastLat || !lastLng) {
-        if (onComplete && !silent) onComplete('Map or location not ready for caching.');
+        if (onComplete && !silent) onComplete(I18n.t('map.cache.status_not_ready'));
         return;
     }
 
@@ -410,7 +410,7 @@ export async function cacheTilesForDIP({ map, lastLat, lastLng, baseMaps, onProg
 
     const totalTiles = tiles.length * tileLayers.length;
     if (totalTiles === 0) {
-        if (onComplete && !silent) onComplete('No tiles to cache for this basemap.');
+        if (onComplete && !silent) onComplete(I18n.t('map.cache.status_no_tiles'));
         return;
     }
 
@@ -466,14 +466,17 @@ export async function cacheTilesForDIP({ map, lastLat, lastLng, baseMaps, onProg
 
     } catch (error) {
         console.error('Unexpected error in cacheTilesForDIP:', error);
-        if (onComplete && !silent) onComplete('An error occurred during caching.');
+        if (onComplete && !silent) onComplete(I18n.t('map.cache.status_error'));
     } finally {
         const failedCount = processedCount - successCount;
         let message = '';
-        if (AppState.isCachingCancelled) {
-            message = `Caching cancelled. ${successCount} tiles processed.`;
+        if (failedCount > 0) {
+            message = I18n.t('map.cache.status_complete_with_errors')
+                .replace('{count}', successCount)
+                .replace('{failed}', failedCount);
         } else {
-            message = `Caching complete. ${successCount} tiles cached${failedCount > 0 ? `, ${failedCount} failed` : '.'}`;
+            message = I18n.t('map.cache.status_complete')
+                .replace('{count}', successCount);
         }
         if (onComplete && !silent) onComplete(message);
     }
@@ -493,7 +496,7 @@ export async function cacheVisibleTiles({ map, baseMaps }) {
     const bounds = map.getBounds();
     const zoom = map.getZoom();
     const zoomLevels = Settings.state.userSettings.cacheZoomLevels || Settings.defaultSettings.cacheZoomLevels;
-    
+
     // Kurzer Check, ob wir überhaupt was tun müssen
     if (!zoomLevels.includes(zoom)) {
         return;
@@ -559,7 +562,7 @@ export async function cacheVisibleTiles({ map, baseMaps }) {
                 .replace('{x}', tile.x)
                 .replace('{y}', tile.y)
                 .replace('{s}', layer.subdomains ? layer.subdomains[Math.floor(Math.random() * layer.subdomains.length)] : '');
-            
+
             const normalizedUrl = layer.normalizedUrl
                 .replace('{z}', tile.zoom)
                 .replace('{x}', tile.x)
@@ -571,17 +574,17 @@ export async function cacheVisibleTiles({ map, baseMaps }) {
                 // Wenn nicht, holen und speichern wir sie (Feuer und Vergessen)
                 cacheTileWithRetry(url).then(result => {
                     if (result.success) {
-                        TileCache.storeTile(normalizedUrl, result.blob).catch(() => {});
+                        TileCache.storeTile(normalizedUrl, result.blob).catch(() => { });
                     }
                 });
             }
         });
-        
+
         // Wir warten nicht zwingend auf alle, um die UI nicht zu blockieren, 
         // aber Promise.all ist gut, um die Netzwerk-Last zu bündeln.
         await Promise.all(fetchPromises);
     }
-    
+
     console.log('[Background Cache] Check complete.');
 }
 

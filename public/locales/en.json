@@ -244,7 +244,18 @@
         "ddm": "DDM",
         "dms": "DMS",
         "start": "Start",
-        "end": "End"
+        "end": "End",
+        "cache": {
+            "error_store": "Failed to store some tiles. Try clearing cache.",
+            "error_offline_zoom": "Offline: Zoom restricted to levels 11–14 for cached tiles.",
+            "error_not_cached": "This area is not cached. Please cache more tiles while online.",
+            "status_not_ready": "Map or location not ready for caching.",
+            "status_no_tiles": "No tiles to cache for this basemap.",
+            "status_error": "An error occurred during caching.",
+            "status_cancelled": "Caching cancelled. {count} tiles processed.",
+            "status_complete": "Caching complete. {count} tiles cached.",
+            "status_complete_with_errors": "Caching complete. {count} tiles cached, {failed} failed."
+        }
     },
     "adsb": {
         "tracking_stopped": "ADSB tracking stopped.",
@@ -296,5 +307,43 @@
         "favorite_added": "\"{name}\" saved as favorite.",
         "favorite_removed": "\"{name}\" removed from favorites.",
         "deleted": "Location deleted."
+    },
+    "tracks": {
+        "error_map_init": "Map not initialized.",
+        "error_kml_no_geometry": "KML file contains no valid geometries to display.",
+        "error_kml_parse": "Error parsing KML file: {message}",
+        "error_gpx_points": "GPX track has insufficient points.",
+        "error_gpx_parse": "Error parsing GPX file: {message}",
+        "error_csv_points": "CSV track has insufficient points.",
+        "error_csv_parse": "Error reading or parsing CSV file: {message}",
+        "error_no_data_save": "No track data available to save.",
+        "error_filesystem": "Could not save track: Filesystem module not available.",
+        "error_save_generic": "Could not save track.",
+        "error_activate_jrt": "Activate 'Show Jump Run Track' to export the track.",
+        "error_no_weather_dip": "Weather data or DIP position not available. Export not possible.",
+        "error_jrt_calc": "Jump Run Track could not be calculated.",
+        "error_activate_pattern": "Activate 'Landing Pattern' before export.",
+        "error_render_map": "Map not initialized. Cannot render track.",
+        "error_render_invalid": "Unable to display track: invalid coordinates.",
+        "status_saved_docs": "Track saved in Documents/DZMaster",
+        "status_refreshing": "Refreshing forecast to the current day...",
+        "summary": "Distance: {distance} km, Min Elevation: {min} m, Max Elevation: {max} m (Source: {file})",
+        "error_insufficient_points": "Not enough valid data points to save track.",
+        "error_filesystem_missing": "Could not save track: Filesystem module not available.",
+        "error_save_failed": "Could not save track.",
+        "error_no_weather_data": "No weather data available for GPX creation.",
+        "error_jrt_calc_failed": "Jump Run Track could not be calculated.",
+        "status_gpx_saved": "GPX saved in Documents/DZMaster",
+        "error_gpx_save_failed": "Could not save GPX file.",
+        "error_pattern_activation": "Activate 'Landing Pattern' before export.",
+        "error_interpolation_failed": "Error: No interpolated weather data available for GPX creation.",
+        "error_pattern_coords_failed": "Error: Landing pattern calculation returned no data. Export aborted.",
+        "status_pattern_gpx_saved": "Landing Pattern GPX saved in Documents/DZMaster",
+        "error_pattern_gpx_save_failed": "Could not save Landing Pattern GPX file.",
+        "error_render_invalid_coords": "Unable to display track: invalid coordinates.",
+        "error_render_generic": "Error rendering track: {message}",
+        "error_no_location_weather": "No weather data or location available.",
+        "error_calc_no_data": "Calculation failed: No interpolated data.",
+        "status_generic_saved": "Saved to Documents/DZMaster/{filename}"
     }
 }

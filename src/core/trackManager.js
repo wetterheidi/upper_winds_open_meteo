@@ -26,7 +26,7 @@ import { Settings } from './settings.js';
  */
 export async function loadKmlTrack(file) {
     if (!AppState.map) {
-        Utils.handleError('Map not initialized.');
+        Utils.handleError(I18n.t('tracks.error_map_init'));
         return null;
     }
     AppState.isLoadingGpx = true;
@@ -72,7 +72,7 @@ export async function loadKmlTrack(file) {
                 if (!style.color && !style.fillColor) {
                     if (feature.properties.styleUrl === '#StyleDANGER') {
                         // **ÄNDERUNG:** Verwende die ausgelesene CSS-Variable
-                        style.color = dangerColor; 
+                        style.color = dangerColor;
                         style.weight = 1.5;
                         style.opacity = 1.0;
                         style.fillColor = dangerColor; // Verwende dieselbe Farbe für die Füllung
@@ -91,7 +91,7 @@ export async function loadKmlTrack(file) {
         // --- ENDE DER KORREKTUR ---
 
         if (kmlLayer.getLayers().length === 0) {
-            throw new Error('KML file contains no valid geometries to display.');
+            throw new Error(I18n.t('tracks.error_kml_no_geometry'));
         }
 
         AppState.gpxLayer = kmlLayer;
@@ -102,7 +102,7 @@ export async function loadKmlTrack(file) {
 
     } catch (error) {
         console.error('[trackManager] Error in loadKmlTrack:', error);
-        Utils.handleError('Error parsing KML file: ' + error.message);
+        Utils.handleError(I18n.t('tracks.error_kml_parse').replace('{message}', error.message));
         return null;
     } finally {
         AppState.isLoadingGpx = false;
@@ -115,7 +115,7 @@ export async function loadKmlTrack(file) {
  * @returns {Promise<object|null>} Ein Promise, das zu den Metadaten des Tracks auflöst.
  */
 export async function loadGpxTrack(file) {
-    if (!AppState.map) { /* istanbul ignore next */ Utils.handleError('Map not initialized.'); return null; }
+    if (!AppState.map) { Utils.handleError(I18n.t('tracks.error_map_init')); return null; }
     AppState.isLoadingGpx = true;
 
     try {
@@ -162,7 +162,7 @@ export async function loadGpxTrack(file) {
                 time: normalizedTime ? DateTime.fromISO(normalizedTime, { zone: 'utc' }) : null
             });
         }
-        if (points.length < 2) throw new Error('GPX track has insufficient points.');
+        if (points.length < 2) throw new Error(I18n.t('tracks.error_gpx_points'));
 
         // --- KORREKTUR: Der gefundene dipWaypoint wird hier übergeben ---
         const trackMetaData = await renderTrack(points, file.name, dipWaypoint);
@@ -170,7 +170,7 @@ export async function loadGpxTrack(file) {
 
     } catch (error) {
         console.error('[trackManager] Error in loadGpxTrack:', error);
-        Utils.handleError('Error parsing GPX file: ' + error.message);
+        Utils.handleError(I18n.t('tracks.error_gpx_parse').replace('{message}', error.message));
         return null;
     } finally {
         AppState.isLoadingGpx = false;
@@ -183,7 +183,7 @@ export async function loadGpxTrack(file) {
  * @returns {Promise<object|null>} Ein Promise, das zu den Metadaten des Tracks auflöst.
  */
 export async function loadCsvTrackUTC(file) {
-    if (!AppState.map) { /* istanbul ignore next */ Utils.handleError('Map not initialized.'); return null; }
+    if (!AppState.map) { Utils.handleError(I18n.t('tracks.error_map_init')); return null; }
     AppState.isLoadingGpx = true;
 
     try {
@@ -221,7 +221,7 @@ export async function loadCsvTrackUTC(file) {
                 },
                 complete: async function () {
                     if (points.length < 2) {
-                        reject(new Error('CSV track has insufficient points.'));
+                        reject(new Error(I18n.t('tracks.error_csv_points')));
                         return;
                     }
                     // --- KORREKTUR: Explizit 'null' für den DIP übergeben, da CSVs keinen DIP unterstützen ---
@@ -235,7 +235,7 @@ export async function loadCsvTrackUTC(file) {
         });
     } catch (error) {
         console.error('[trackManager] Error in loadCsvTrackUTC:', error);
-        Utils.handleError('Error reading or parsing CSV file: ' + error.message);
+        Utils.handleError(I18n.t('tracks.error_csv_parse').replace('{message}', error.message));
         return null;
     } finally {
         AppState.isLoadingGpx = false;
@@ -250,7 +250,7 @@ export async function saveRecordedTrack() {
     console.log(`--- Starte saveRecordedTrack mit ${AppState.recordedTrackPoints.length} Punkten ---`);
 
     if (!AppState.recordedTrackPoints || AppState.recordedTrackPoints.length < 2) {
-        Utils.handleError("Keine Track-Daten zum Speichern vorhanden.");
+        Utils.handleError(I18n.t('tracks.error_no_data_save'));
         return;
     }
 
@@ -280,7 +280,7 @@ ${dipWaypoint}<trk><name>Recorded Skydive</name><trkseg>`;
         }).filter(Boolean);
 
         if (trackpointStrings.length < 2) {
-            Utils.handleError("Not enough valid data points to save track.");
+            Utils.handleError(I18n.t('tracks.error_insufficient_points'));
             return;
         }
 
@@ -297,10 +297,10 @@ ${dipWaypoint}<trk><name>Recorded Skydive</name><trkseg>`;
                 encoding: 'utf8',
                 recursive: true
             });
-            Utils.handleMessage(`Track saved in Documents/DZMaster`);
+            Utils.handleMessage(I18n.t('tracks.status_saved_docs'));
         } else {
             if (isNative) {
-                Utils.handleError("Could not save track: Filesystem module not available.");
+                Utils.handleError(I18n.t('tracks.error_filesystem_missing'));
             } else {
                 const blob = new Blob([gpxContent], { type: "application/gpx+xml;charset=utf-8" });
                 const a = document.createElement('a');
@@ -314,7 +314,7 @@ ${dipWaypoint}<trk><name>Recorded Skydive</name><trkseg>`;
 
     } catch (error) {
         console.error("Error in saveRecordedTrack:", error);
-        Utils.handleError("Could not save track.");
+        Utils.handleError(I18n.t('tracks.error_save_failed'));
     } finally {
         AppState.recordedTrackPoints = [];
     }
@@ -335,12 +335,12 @@ ${dipWaypoint}<trk><name>Recorded Skydive</name><trkseg>`;
 export async function exportToGpx(sliderIndex, interpStep, heightUnit) {
     console.log("--- GPX EXPORT DEBUG START ---");
     if (!Settings.getValue('showJumpRunTrack', false)) {
-        Utils.handleError("Activate 'Show Jump Run Track' to export the track.");
+        Utils.handleError(I18n.t('tracks.error_activate_jrt'));
         return;
     }
 
     if (!AppState.weatherData || AppState.lastLat == null || AppState.lastLng == null || AppState.lastAltitude === 'N/A') {
-        Utils.handleError("Wetterdaten oder DIP-Position nicht verfügbar. GPX-Export nicht möglich.");
+        Utils.handleError(I18n.t('tracks.error_no_weather_dip'));
         return;
     }
 
@@ -362,14 +362,14 @@ export async function exportToGpx(sliderIndex, interpStep, heightUnit) {
     );
 
     if (!interpolatedData || interpolatedData.length === 0) {
-        Utils.handleError("Keine Wetterdaten für die GPX-Erstellung verfügbar.");
+        Utils.handleError(I18n.t('tracks.error_no_weather_data'));
         return;
     }
 
     const trackData = JumpPlanner.jumpRunTrack(interpolatedData, harpAnchor);
 
     if (!trackData || !trackData.latlngs || !trackData.approachLatLngs) {
-        Utils.handleError("Jump Run Track konnte nicht berechnet werden.");
+        Utils.handleError(I18n.t('tracks.error_jrt_calc_failed'));
         return;
     }
 
@@ -419,7 +419,7 @@ export async function exportToGpx(sliderIndex, interpStep, heightUnit) {
                 encoding: 'utf8',
                 recursive: true
             });
-            Utils.handleMessage(`GPX saved in Documents/DZMaster`);
+            Utils.handleMessage(I18n.t('tracks.status_gpx_saved'));
         } else {
             // Fallback für den Webbrowser
             const blob = new Blob([gpxContent], { type: "application/gpx+xml;charset=utf-8" });
@@ -434,7 +434,7 @@ export async function exportToGpx(sliderIndex, interpStep, heightUnit) {
         }
     } catch (error) {
         console.error("Error saving GPX file:", error);
-        Utils.handleError("Could not save GPX file.");
+        Utils.handleError(I18n.t('tracks.error_gpx_save_failed'));
     }
 }
 
@@ -449,12 +449,12 @@ export async function exportLandingPatternToGpx() {
     const heightUnit = Settings.getValue('heightUnit', 'm');
 
     if (!Settings.getValue('showLandingPattern', false)) {
-        Utils.handleError("Activate 'Landing Pattern' before export.");
+        Utils.handleError(I18n.t('tracks.error_pattern_activation'));
         return;
     }
 
     if (!AppState.weatherData || AppState.lastLat == null || AppState.lastLng == null || AppState.lastAltitude === 'N/A') {
-        Utils.handleError("Wetterdaten oder DIP-Position für GPX-Export nicht verfügbar.");
+        Utils.handleError(I18n.t('tracks.error_activate_pattern'));
         return;
     }
     console.log("Schritt 1: Vorbedingungen erfüllt. Wetterdaten und Position vorhanden.");
@@ -464,7 +464,7 @@ export async function exportLandingPatternToGpx() {
     );
 
     if (!interpolatedData || interpolatedData.length === 0) {
-        Utils.handleError("Fehler in Schritt 2: Keine interpolierten Wetterdaten für GPX-Erstellung verfügbar.");
+        Utils.handleError(I18n.t('tracks.error_interpolation_failed'));
         return;
     }
     console.log("Schritt 2: Wetterdaten erfolgreich interpoliert.");
@@ -474,7 +474,7 @@ export async function exportLandingPatternToGpx() {
     // ================== DEBUGGING-BLOCK ==================
     console.log("Schritt 3: Ergebnis von calculateLandingPatternCoords:", patternDataForExport);
     if (!patternDataForExport) {
-        Utils.handleError("Fehler in Schritt 3: calculateLandingPatternCoords hat keine Daten zurückgegeben. Export abgebrochen.");
+        Utils.handleError(I18n.t('tracks.error_pattern_coords_failed'));
         return;
     }
     console.log("Schritt 3: Koordinaten des Landemusters erfolgreich berechnet.");
@@ -533,7 +533,7 @@ export async function exportLandingPatternToGpx() {
                 encoding: 'utf8',
                 recursive: true
             });
-            Utils.handleMessage(`Landing Pattern GPX saved in Documents/DZMaster`);
+            Utils.handleMessage(I18n.t('tracks.status_pattern_gpx_saved'));
         } else {
             // Fallback für den Webbrowser
             const blob = new Blob([gpxContent], { type: "application/gpx+xml;charset=utf-8" });
@@ -548,7 +548,7 @@ export async function exportLandingPatternToGpx() {
         }
     } catch (error) {
         console.error("Error saving Landing Pattern GPX file:", error);
-        Utils.handleError("Could not save Landing Pattern GPX file.");
+        Utils.handleError(I18n.t('tracks.error_pattern_gpx_save_failed'));
     }
     console.log("--- GPX Landing Pattern Export beendet ---");
 }
@@ -571,7 +571,7 @@ async function renderTrack(points, fileName, dipWaypoint = null) {
         console.log(`[trackManager] renderTrack called for ${fileName} with ${points.length} points.`);
         if (!AppState.map) {
             console.warn('[trackManager] Map object in AppState is not available in renderTrack.');
-            Utils.handleError('Map not initialized. Cannot render track.');
+            Utils.handleError(I18n.t('tracks.error_render_map'));
             return null;
         }
 
@@ -639,7 +639,11 @@ async function renderTrack(points, fileName, dipWaypoint = null) {
                     altitude: AppState.lastAltitude,
                     timestamp: trackMetaData.timestampToUseForWeather,
                     historicalDate: trackMetaData.historicalDateString,
-                    summary: `<br><strong>Track:</strong> Distance: ${distance} km, Min Elevation: ${elevationMin} m, Max Elevation: ${elevationMax} m (Source: ${fileName})`
+                    summary: `<br><strong>Track:</strong> ` + I18n.t('tracks.summary')
+                        .replace('{distance}', distance)
+                        .replace('{min}', elevationMin)
+                        .replace('{max}', elevationMax)
+                        .replace('{file}', fileName)
                 },
                 bubbles: true,
                 cancelable: true
@@ -681,7 +685,7 @@ async function renderTrack(points, fileName, dipWaypoint = null) {
         if (points.length > 0 && AppState.map) {
             const bounds = L.latLngBounds(points.map(p => [p.lat, p.lng]));
             if (bounds.isValid()) AppState.map.fitBounds(bounds, { padding: [50, 50], maxZoom: AppState.map.getMaxZoom() || 18 });
-            else Utils.handleError('Unable to display track: invalid coordinates.');
+            Utils.handleError(I18n.t('tracks.error_render_invalid_coords'));
         }
 
         trackMetaData.success = true;
@@ -690,7 +694,7 @@ async function renderTrack(points, fileName, dipWaypoint = null) {
 
     } catch (error) {
         console.error('[trackManager] Error in renderTrack:', error);
-        Utils.handleError('Error rendering track: ' + error.message);
+        Utils.handleError(I18n.t('tracks.error_render_generic').replace('{message}', error.message));
         AppState.gpxPoints = [];
         if (AppState.gpxLayer && AppState.map && AppState.map.hasLayer(AppState.gpxLayer)) {
             AppState.map.removeLayer(AppState.gpxLayer);
@@ -758,9 +762,9 @@ async function readFileContent(file) {
  */
 function getCircleTrackPoints(centerLat, centerLng, radiusMeters, elevation = 0) {
     if (radiusMeters <= 0) return '';
-    const steps = 72; 
+    const steps = 72;
     let points = '';
-    
+
     for (let i = 0; i <= steps; i++) {
         const bearing = i * (360 / steps);
         const [lat, lng] = Utils.calculateNewCenter(centerLat, centerLng, radiusMeters, bearing);
@@ -774,7 +778,7 @@ export async function exportCompositeJumpGpx(options) {
     console.log("--- Starting Composite GPX Export ---", options);
 
     if (!AppState.weatherData || AppState.lastLat == null) {
-        Utils.handleError("No weather data or location available.");
+        Utils.handleError(I18n.t('tracks.error_no_location_weather'));
         return;
     }
 
@@ -785,17 +789,17 @@ export async function exportCompositeJumpGpx(options) {
         showExitArea: Settings.state.userSettings.showExitArea,
     };
 
-    Settings.state.userSettings.calculateJump = true; 
+    Settings.state.userSettings.calculateJump = true;
     if (includeCanopyCircles) Settings.state.userSettings.showCanopyArea = true;
     if (includeExitCircles) Settings.state.userSettings.showExitArea = true;
-    
+
     // ----------------------------------------------
 
     try {
         const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
         const interpStep = Settings.getValue('interpStep', 'select', 200);
         const heightUnit = Settings.getValue('heightUnit', 'm');
-        
+
         const baseHeight = Math.round(AppState.lastAltitude);
         const safeBaseHeight = (!isNaN(baseHeight) && baseHeight !== null) ? baseHeight : 0;
         const exitAltitudeAGL = Settings.getValue('exitAltitude', 3000);
@@ -807,7 +811,7 @@ export async function exportCompositeJumpGpx(options) {
         );
 
         if (!interpolatedData || interpolatedData.length === 0) {
-            Utils.handleError("Calculation failed: No interpolated data.");
+            Utils.handleError(I18n.t('tracks.error_calc_no_data'));
             return;
         }
 
@@ -824,7 +828,7 @@ export async function exportCompositeJumpGpx(options) {
 `;
 
         // Container für Merge-Logik
-        let mergedSegments = ""; 
+        let mergedSegments = "";
 
         // Hilfsfunktion: Fügt einen Track hinzu (Entweder als neues <trk> oder als Segment im Merge)
         const addTrack = (name, color, pointsString) => {
@@ -845,34 +849,34 @@ ${pointsString}    </trkseg>
 
         // --- A. LANDING PATTERN ---
         if (includePattern) {
-             const pattern = JumpPlanner.calculateLandingPatternCoords(AppState.lastLat, AppState.lastLng, interpolatedData);
-             if (pattern) {
-                 const legHeightDownwind = Settings.getValue('legHeightDownwind', 300);
-                 const legHeightBase = Settings.getValue('legHeightBase', 200);
-                 const legHeightFinal = Settings.getValue('legHeightFinal', 100);
-                 
-                 const eleDown = safeBaseHeight + legHeightDownwind;
-                 const eleBase = safeBaseHeight + legHeightBase;
-                 const eleFinal = safeBaseHeight + legHeightFinal;
-                 
-                 // Waypoints (immer global)
-                 gpxContent += `  <wpt lat="${pattern.landingPoint[0]}" lon="${pattern.landingPoint[1]}"><name>DIP</name><ele>${safeBaseHeight}</ele><sym>Flag, Blue</sym></wpt>\n`;
+            const pattern = JumpPlanner.calculateLandingPatternCoords(AppState.lastLat, AppState.lastLng, interpolatedData);
+            if (pattern) {
+                const legHeightDownwind = Settings.getValue('legHeightDownwind', 300);
+                const legHeightBase = Settings.getValue('legHeightBase', 200);
+                const legHeightFinal = Settings.getValue('legHeightFinal', 100);
 
-                 // Track Points generieren
-                 let pts = `      <trkpt lat="${pattern.downwindStart[0]}" lon="${pattern.downwindStart[1]}"><ele>${eleDown}</ele></trkpt>\n`;
-                 pts += `      <trkpt lat="${pattern.baseStart[0]}" lon="${pattern.baseStart[1]}"><ele>${eleBase}</ele></trkpt>\n`;
-                 pts += `      <trkpt lat="${pattern.finalStart[0]}" lon="${pattern.finalStart[1]}"><ele>${eleFinal}</ele></trkpt>\n`;
-                 pts += `      <trkpt lat="${pattern.landingPoint[0]}" lon="${pattern.landingPoint[1]}"><ele>${safeBaseHeight}</ele></trkpt>\n`;
-                 
-                 addTrack("Landing Pattern", "Cyan", pts);
-             }
+                const eleDown = safeBaseHeight + legHeightDownwind;
+                const eleBase = safeBaseHeight + legHeightBase;
+                const eleFinal = safeBaseHeight + legHeightFinal;
+
+                // Waypoints (immer global)
+                gpxContent += `  <wpt lat="${pattern.landingPoint[0]}" lon="${pattern.landingPoint[1]}"><name>DIP</name><ele>${safeBaseHeight}</ele><sym>Flag, Blue</sym></wpt>\n`;
+
+                // Track Points generieren
+                let pts = `      <trkpt lat="${pattern.downwindStart[0]}" lon="${pattern.downwindStart[1]}"><ele>${eleDown}</ele></trkpt>\n`;
+                pts += `      <trkpt lat="${pattern.baseStart[0]}" lon="${pattern.baseStart[1]}"><ele>${eleBase}</ele></trkpt>\n`;
+                pts += `      <trkpt lat="${pattern.finalStart[0]}" lon="${pattern.finalStart[1]}"><ele>${eleFinal}</ele></trkpt>\n`;
+                pts += `      <trkpt lat="${pattern.landingPoint[0]}" lon="${pattern.landingPoint[1]}"><ele>${safeBaseHeight}</ele></trkpt>\n`;
+
+                addTrack("Landing Pattern", "Cyan", pts);
+            }
         }
 
         // --- B. JUMP RUN ---
         if (includeJumpRun) {
             const harpAnchor = AppState.harpMarker ? AppState.harpMarker.getLatLng() : null;
             const jrt = JumpPlanner.jumpRunTrack(interpolatedData, harpAnchor);
-            
+
             if (jrt) {
                 const exitAltitudeMSL = safeBaseHeight + exitAltitudeAGL;
                 const approachStart = jrt.approachLatLngs[1];
@@ -898,7 +902,7 @@ ${pointsString}    </trkseg>
             const exitData = JumpPlanner.calculateExitCircle(interpolatedData);
             if (exitData && !exitData.error) {
                 const exitEle = safeBaseHeight + exitAltitudeAGL;
-                
+
                 const greenPts = getCircleTrackPoints(exitData.greenLatFull, exitData.greenLngFull, exitData.greenRadius, exitEle);
                 addTrack(`Exit Area Max @ ${exitAltitudeAGL}m`, "Green", greenPts);
 
@@ -913,10 +917,10 @@ ${pointsString}    </trkseg>
             if (canopyData) {
                 const redEle = safeBaseHeight + openingAltitudeAGL - buffer;
                 const [redCenterLat, redCenterLng] = Utils.calculateNewCenter(canopyData.redLat, canopyData.redLng, canopyData.displacementFull, canopyData.directionFull);
-                
+
                 const redPts = getCircleTrackPoints(redCenterLat, redCenterLng, canopyData.radiusFull, redEle);
                 addTrack(`Max Range @ ${Math.round(openingAltitudeAGL - buffer)}m`, "Red", redPts);
-                
+
                 if (canopyData.additionalBlueRadii && canopyData.additionalBlueRadii.length > 0) {
                     canopyData.additionalBlueRadii.forEach((radius, idx) => {
                         const disp = canopyData.additionalBlueDisplacements[idx];
@@ -924,7 +928,7 @@ ${pointsString}    </trkseg>
                         const ringHeightAGL = canopyData.additionalBlueUpperLimits[idx];
                         const ringEle = safeBaseHeight + ringHeightAGL;
                         const [cLat, cLng] = Utils.calculateNewCenter(canopyData.blueLat, canopyData.blueLng, disp, dir);
-                        
+
                         const bluePts = getCircleTrackPoints(cLat, cLng, radius, ringEle);
                         addTrack(`Ideal Pos @ ${Math.round(ringHeightAGL)}m`, "Blue", bluePts);
                     });
@@ -934,7 +938,7 @@ ${pointsString}    </trkseg>
 
         // FINALE: Wenn Merge aktiv ist, jetzt den gesammelten Block schreiben
         if (mergeTracks && mergedSegments.length > 0) {
-             gpxContent += `
+            gpxContent += `
   <trk>
     <name>Skydive Plan Combined</name>
     <extensions><gpxx:TrackExtension><gpxx:DisplayColor>Red</gpxx:DisplayColor></gpxx:TrackExtension></extensions>
@@ -951,7 +955,7 @@ ${pointsString}    </trkseg>
         const { Filesystem, Directory, isNative } = await getCapacitor();
         if (isNative && Filesystem) {
             await Filesystem.writeFile({ path: `DZMaster/${filename}`, data: gpxContent, directory: Directory.Documents, encoding: 'utf8', recursive: true });
-            Utils.handleMessage(`Saved to Documents/DZMaster/${filename}`);
+            Utils.handleMessage(I18n.t('tracks.status_generic_saved').replace('{filename}', filename));
         } else {
             const blob = new Blob([gpxContent], { type: "application/gpx+xml;charset=utf-8" });
             const url = window.URL.createObjectURL(blob);
@@ -966,7 +970,7 @@ ${pointsString}    </trkseg>
 
     } catch (error) {
         console.error("Export failed:", error);
-        Utils.handleError("Could not save GPX file.");
+        Utils.handleError(I18n.t('tracks.error_gpx_save_failed'));
     } finally {
         Settings.state.userSettings.calculateJump = originalSettings.calculateJump;
         Settings.state.userSettings.showCanopyArea = originalSettings.showCanopyArea;

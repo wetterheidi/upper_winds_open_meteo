@@ -37,9 +37,19 @@ export async function generateMeteogram(sliderIndex) {
 
     const upperCanvas = document.getElementById('meteogramUpperChart');
     const surfaceCanvas = document.getElementById('meteogramSurfaceChart');
+    // NEU: Definition der Titel-Elemente
+    const upperTitleElement = document.getElementById('meteogramUpperTitle');
+    const surfaceTitleElement = document.getElementById('meteogramSurfaceTitle');
+
+    // Sicherheitscheck: Nur weitermachen, wenn die Elemente im DOM existieren
+    if (!upperCanvas || !surfaceCanvas || !upperTitleElement || !surfaceTitleElement) {
+        console.warn("[Meteogram] Canvas oder Titel Elemente nicht gefunden.");
+        return;
+    }
+
+    // Jetzt können die Titel gesetzt werden
     upperTitleElement.textContent = I18n.t('weather.charts.upper_air');
     surfaceTitleElement.textContent = I18n.t('weather.charts.surface');
-
     destroyCharts(); // Vorhandene Charts zuerst zerstören
 
     if (!upperCanvas || !surfaceCanvas || !upperTitleElement || !surfaceTitleElement) {
