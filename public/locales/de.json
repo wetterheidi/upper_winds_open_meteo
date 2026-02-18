@@ -47,8 +47,29 @@
         "freezing_level": "Nullgradgrenze",
         "charts": {
             "upper_air": "Höhenwetter (Wind & Wolken)",
-            "surface": "Bodenwetter"
-        }
+            "surface": "Bodenwetter",
+            "wind_chart_title": "Windspinne für den aktuellen Standort"
+        },
+        "error_fetch_failed": "Wetterdaten konnten nicht geladen werden: {error}",
+        "error_no_data": "Keine Wetterdaten von der API empfangen.",
+        "error_location_missing": "Position (Lat/Lng) wird für den Wetterabruf benötigt.",
+        "error_geocoding_failed": "Rückwärts-Geokodierung fehlgeschlagen.",
+        "error_parse_failed": "Wetterdaten konnten nicht verarbeitet werden.",
+        "status_fetching": "Lade Wetterdaten für {lat}, {lng}...",
+        "status_success": "Wetterdaten erfolgreich aktualisiert.",
+        "alerts": {
+            "high_winds": "Warnung: Starkwind in Sprunghöhe!",
+            "high_gusts": "Warnung: Starke Böen am Boden!",
+            "thunderstorms": "Gefahr: Gewitter vorhergesagt!",
+            "cloud_base": "Warnung: Niedrige Wolkenuntergrenze ({altitude} {unit})"
+        },
+        "model_run": "Modell-Lauf",
+        "elevation": "Geländehöhe",
+        "surface_data": "Bodendaten",
+        "no_alerts": "Keine Wetterwarnungen für den gewählten Zeitraum.",
+        "safety_warning_title": "Sicherheitshöhe Windwarnung",
+        "safety_warning_msg": "Wind in Sicherheitshöhe ({height} {unit}) überschreitet {limit} kt! ({current} kt)"
+
     },
     "planner": {
         "landing_pattern": "Landemuster",
@@ -101,7 +122,19 @@
         "cutaway_title": "Abtrennung ({state})",
         "cutaway_alt": "Abtrennhöhe",
         "cutaway_displacement": "Versatz",
-        "cutaway_time_speed": "Sinkzeit/Geschw."
+        "cutaway_time_speed": "Sinkzeit/Geschw.",
+        "jump_run_details": "Absetzstrecke: {dir}° (Versatz: L {lat}m / V {fwd}m)",
+        "exit_info_tooltip": "Exit-Bereiche berechnet mit:\nVorwärtsweg: {dir}° {dist} m\nFreifallzeit: {time} sek",
+        "landing_direction_warning": "Warnung! Landerichtung fixiert",
+        "jump_run_tooltip": "Absetzstrecke: {dir}°, {dist} m",
+        "approach_tooltip": "Anflug: {dir}°, {dist} m",
+        "error_location_weather": "Bitte wählen Sie zuerst einen Ort aus und laden Sie Wetterdaten.",
+        "error_activate_canopy": "Bitte aktivieren Sie 'Schirmfahrtgebiet anzeigen' für die Analyse.",
+        "terrain_none_found": "Geländeanalyse abgeschlossen. Keine kritischen Bereiche gefunden.",
+        "terrain_error": "Ein Fehler ist während der Geländeanalyse aufgetreten.",
+        "direction_locked": "Landerichtung fixiert auf {direction}°",
+        "direction_invalid": "Bitte geben Sie eine gültige Richtung (0-360°) ein.",
+        "error_fetch_scenario": "Fehler beim Laden der Daten für das Szenario."
     },
     "jumpmaster": {
         "find_aircraft": "Flugzeug finden",
@@ -214,7 +247,17 @@
         "model_days_limit": "Das gewählte Modell '{model}' bietet nur {days} Tage Vorhersage. Zeige maximal verfügbare Zeit.",
         "api_limit_reached": "API-Limit erreicht. Bitte warte einen Moment und versuche es erneut.",
         "api_http_error": "HTTP Fehler! Status: {status}",
-        "hourly_data_missing": "Keine stündlichen Daten in der API-Antwort."
+        "hourly_data_missing": "Keine stündlichen Daten in der API-Antwort.",
+        "interaction_locked": "Karteninteraktionen sind jetzt gesperrt.",
+        "interaction_unlocked": "Karteninteraktionen sind jetzt entsperrt.",
+        "place_harp_click": "Klicken Sie auf die Karte, um den HARP-Marker zu setzen.",
+        "start_tracking_first": "Bitte starten Sie zuerst das Live-Tracking.",
+        "leg_order_adjusted": "{id} auf {adjustedValue} angepasst, um Reihenfolge einzuhalten.",
+        "opening_alt_range": "Öffnungshöhe muss zwischen 500 und 15000 Metern liegen.",
+        "exit_alt_range": "Absprunghöhe muss zwischen 500 und 15000 Metern liegen.",
+        "enter_coords": "Bitte Koordinaten eingeben.",
+        "invalid_coords_format": "Ungültige Koordinaten. Bitte MGRS oder Dezimalgrad nutzen.",
+        "poi_search_error": "Ein Fehler ist während der Suche aufgetreten."
     },
     "map": {
         "drag_to_move_track": "Ziehen, um Absetztrack zu verschieben",
@@ -254,7 +297,19 @@
             "status_error": "Ein Fehler ist während des Cachings aufgetreten.",
             "status_cancelled": "Caching abgebrochen. {count} Kacheln verarbeitet.",
             "status_complete": "Caching abgeschlossen. {count} Kacheln gespeichert.",
-            "status_complete_with_errors": "Caching abgeschlossen. {count} Kacheln gespeichert, {failed} fehlgeschlagen."
+            "status_complete_with_errors": "Caching abgeschlossen. {count} Kacheln gespeichert, {failed} fehlgeschlagen.",
+            "status_cancelled_all": "Caching abgebrochen.",
+            "cleared_success": "Tile Cache erfolgreich geleert ({size} MB freigegeben).",
+            "cleared_error": "Fehler beim Leeren des Tile Caches: {error}",
+            "radius_min_warning": "Cache-Radius muss mindestens 1 km betragen.",
+            "radius_max_warning": "Cache-Radius darf 50 km nicht überschreiten.",
+            "zoom_error": "Max-Zoom darf nicht kleiner als Min-Zoom sein.",
+            "zoom_autoadjust": "Zoomstufen automatisch angepasst (Bereich: 6-15)."
+        },
+        "marker_popup": {
+            "set_as_dip": "Als DIP setzen",
+            "coords": "Koordinaten",
+            "alt": "Höhe"
         }
     },
     "adsb": {
@@ -306,7 +361,16 @@
         "home_dz_cleared": "Home DZ entfernt.",
         "favorite_added": "\"{name}\" als Favorit gespeichert.",
         "favorite_removed": "\"{name}\" aus Favoriten entfernt.",
-        "deleted": "Ort gelöscht."
+        "deleted": "Ort gelöscht.",
+        "results_title": "Ergebnisse",
+        "favorites_title": "Favoriten",
+        "recent_searches_title": "Letzte Suchen",
+        "set_home_dz": "Als Home DZ festlegen",
+        "toggle_favorite": "Favorit umschalten",
+        "delete_entry": "Diesen Eintrag löschen",
+        "delete_confirm": "\"{name}\" löschen?",
+        "default_favorite_name": "DIP auf {lat}, {lng}",
+        "error_select_first": "Zuerst einen Ort auf der Karte auswählen."
     },
     "tracks": {
         "error_map_init": "Karte nicht initialisiert.",
@@ -344,6 +408,11 @@
         "error_render_generic": "Fehler beim Rendern des Tracks: {message}",
         "error_no_location_weather": "Keine Wetterdaten oder Position verfügbar.",
         "error_calc_no_data": "Berechnung fehlgeschlagen: Keine interpolierten Daten.",
-        "status_generic_saved": "Gespeichert unter Documents/DZMaster/{filename}"
+        "status_generic_saved": "Gespeichert unter Documents/DZMaster/{filename}",
+        "error_unsupported_format": "Nicht unterstütztes Dateiformat. Bitte .gpx, .kml oder .csv nutzen.",
+        "error_clear_init": "Track löschen nicht möglich: Karte nicht initialisiert.",
+        "error_clear_failed": "Fehler beim Löschen des Tracks: {message}",
+        "no_track_to_clear": "Kein Track zum Löschen vorhanden.",
+        "error_select_elements": "Bitte wählen Sie mindestens ein Element für den Export aus."
     }
 }

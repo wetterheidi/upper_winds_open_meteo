@@ -47,8 +47,28 @@
         "freezing_level": "Freezing Level (0°C)",
         "charts": {
             "upper_air": "Upper Air (Wind & Clouds)",
-            "surface": "Surface Conditions"
-        }
+            "surface": "Surface Conditions",
+            "wind_chart_title": "Wind chart for current location"
+        },
+        "error_fetch_failed": "Failed to fetch weather data: {error}",
+        "error_no_data": "No weather data received from API.",
+        "error_location_missing": "Location (Lat/Lng) is required for weather fetch.",
+        "error_geocoding_failed": "Reverse geocoding failed.",
+        "error_parse_failed": "Failed to parse weather data.",
+        "status_fetching": "Fetching weather data for {lat}, {lng}...",
+        "status_success": "Weather data successfully updated.",
+        "alerts": {
+            "high_winds": "Warning: High winds at jump altitudes!",
+            "high_gusts": "Warning: Strong gusts at surface!",
+            "thunderstorms": "Danger: Thunderstorms forecasted!",
+            "cloud_base": "Warning: Low cloud base ({altitude} {unit})"
+        },
+        "model_run": "Model Run",
+        "elevation": "Elevation",
+        "surface_data": "Surface Data",
+        "no_alerts": "No weather alerts for the selected period.",
+        "safety_warning_title": "Safety Height Wind Warning",
+        "safety_warning_msg": "Wind at safety height ({height} {unit}) exceeds {limit} kt! ({current} kt)",
     },
     "planner": {
         "landing_pattern": "Landing Pattern",
@@ -101,7 +121,19 @@
         "cutaway_title": "Cut-Away ({state})",
         "cutaway_alt": "Cut-Away Altitude",
         "cutaway_displacement": "Displacement",
-        "cutaway_time_speed": "Descent Time/Speed"
+        "cutaway_time_speed": "Descent Time/Speed",
+        "jump_run_details": "Jump Run: {dir}° (Offset: L {lat}m / F {fwd}m)",
+        "exit_info_tooltip": "Exit areas calculated with:\nThrow/Drift: {dir}° {dist} m\nFree Fall Time: {time} sec",
+        "landing_direction_warning": "Warning! Landing direction locked",
+        "jump_run_tooltip": "Jump Run: {dir}°, {dist} m",
+        "approach_tooltip": "Approach: {dir}°, {dist} m",
+        "error_location_weather": "Please select a location and fetch weather data first.",
+        "error_activate_canopy": "Please activate 'Show Canopy Flight Area' to analyze terrain.",
+        "terrain_none_found": "Terrain analysis complete. No low clearance areas found.",
+        "terrain_error": "An error occurred during terrain analysis.",
+        "direction_locked": "Landing direction locked to {direction}°",
+        "direction_invalid": "Please enter a valid 0-360° direction before locking.",
+        "error_fetch_scenario": "Failed to fetch data for scenario."
     },
     "jumpmaster": {
         "find_aircraft": "Find Aircraft To Track",
@@ -214,7 +246,17 @@
         "model_days_limit": "The selected model '{model}' only provides a {days}-day forecast. Displaying maximum available time.",
         "api_limit_reached": "API limit reached. Please wait a moment and try again.",
         "api_http_error": "HTTP error! Status: {status}",
-        "hourly_data_missing": "No hourly data in API response."
+        "hourly_data_missing": "No hourly data in API response.",
+        "interaction_locked": "Map interactions are now locked.",
+        "interaction_unlocked": "Map interactions are now unlocked.",
+        "place_harp_click": "Click the map to place the HARP marker.",
+        "start_tracking_first": "Please start Live Tracking first.",
+        "leg_order_adjusted": "Adjusted {id} to {adjustedValue} to maintain valid leg order.",
+        "opening_alt_range": "Opening altitude must be between 500 and 15000 meters.",
+        "exit_alt_range": "Exit altitude must be between 500 and 15000 meters.",
+        "enter_coords": "Please enter coordinates.",
+        "invalid_coords_format": "Invalid coordinates. Please enter a valid MGRS or Decimal Degree format.",
+        "poi_search_error": "An error occurred during the search."
     },
     "map": {
         "drag_to_move_track": "Drag to move Jump Run Track",
@@ -254,7 +296,19 @@
             "status_error": "An error occurred during caching.",
             "status_cancelled": "Caching cancelled. {count} tiles processed.",
             "status_complete": "Caching complete. {count} tiles cached.",
-            "status_complete_with_errors": "Caching complete. {count} tiles cached, {failed} failed."
+            "status_complete_with_errors": "Caching complete. {count} tiles cached, {failed} failed.",
+            "status_cancelled_all": "Caching cancelled.",
+            "cleared_success": "Tile cache cleared successfully (freed {size} MB).",
+            "cleared_error": "Failed to clear tile cache: {error}",
+            "radius_min_warning": "Cache radius must be at least 1 km.",
+            "radius_max_warning": "Cache radius cannot exceed 50 km.",
+            "zoom_error": "Max zoom cannot be less than min zoom.",
+            "zoom_autoadjust": "Zoom levels automatically adjusted (Range: 6-15)."
+        },
+        "marker_popup": {
+            "set_as_dip": "Set as DIP",
+            "coords": "Coordinates",
+            "alt": "Alt"
         }
     },
     "adsb": {
@@ -306,7 +360,16 @@
         "home_dz_cleared": "Home DZ removed.",
         "favorite_added": "\"{name}\" saved as favorite.",
         "favorite_removed": "\"{name}\" removed from favorites.",
-        "deleted": "Location deleted."
+        "deleted": "Location deleted.",
+        "results_title": "Results",
+        "favorites_title": "Favorites",
+        "recent_searches_title": "Recent Searches",
+        "set_home_dz": "Set as Home DZ",
+        "toggle_favorite": "Toggle favorite",
+        "delete_entry": "Delete this entry",
+        "delete_confirm": "Delete \"{name}\"?",
+        "default_favorite_name": "DIP at {lat}, {lng}",
+        "error_select_first": "Please select a location on the map first."
     },
     "tracks": {
         "error_map_init": "Map not initialized.",
@@ -344,6 +407,11 @@
         "error_render_generic": "Error rendering track: {message}",
         "error_no_location_weather": "No weather data or location available.",
         "error_calc_no_data": "Calculation failed: No interpolated data.",
-        "status_generic_saved": "Saved to Documents/DZMaster/{filename}"
+        "status_generic_saved": "Saved to Documents/DZMaster/{filename}",
+        "error_unsupported_format": "Unsupported file type. Please upload a .gpx, .kml or .csv file.",
+        "error_clear_init": "Cannot clear track: map not initialized.",
+        "error_clear_failed": "Failed to clear track: {message}",
+        "no_track_to_clear": "No track to clear.",
+        "error_select_elements": "Please select at least one element to export."
     }
 }

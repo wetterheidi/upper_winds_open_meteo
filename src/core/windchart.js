@@ -1,6 +1,7 @@
 import { AppState } from './state.js';
 import { Utils } from './utils.js';
 import { Settings } from './settings.js';
+import { I18n } from './i18n.js';
 
 let windspinneChart = null; // To hold the chart instance
 
@@ -25,7 +26,7 @@ export function generateWindspinne(interpolatedData, userMaxHoehe) {
     const ff_vec_mps = interpolatedData.map(d => Utils.convertWind(d.spd, 'm/s', 'km/h')); // speed in m/s
 
     const maxDatenHoeheMsl = Math.max(...hoehenVektor);
-    
+
     // userMaxHoehe kommt aus dem Input-Feld und ist bereits in der richtigen Einheit (ft oder m)
     const maxRadius = userMaxHoehe;
 
@@ -45,12 +46,12 @@ export function generateWindspinne(interpolatedData, userMaxHoehe) {
 
     // 3. Linie generieren (hohe Auflösung)
     // Schrittweite anpassen: ~50m oder ~150ft
-    const lineStep = isFeet ? 150 : 50; 
+    const lineStep = isFeet ? 150 : 50;
     const linePolarData = [];
-    
+
     for (let r = 0; r <= maxRadius; r += lineStep) {
         const queryHeightMsl = getMslMeters(r);
-        
+
         // Stoppen, wenn wir höher sind als die Wetterdaten reichen
         if (queryHeightMsl > maxDatenHoeheMsl) break;
 
@@ -96,20 +97,20 @@ export function generateWindspinne(interpolatedData, userMaxHoehe) {
         type: 'scatter',
         data: {
             datasets: [
-                { 
-                    data: convertToCartesian(linePolarData), 
-                    showLine: true, 
-                    pointRadius: 0, 
-                    segment: { 
-                        borderColor: ctx => getWindColor((ctx.p0.raw.original.speed + ctx.p1.raw.original.speed) / 2), 
-                        borderWidth: 2.5 
-                    } 
+                {
+                    data: convertToCartesian(linePolarData),
+                    showLine: true,
+                    pointRadius: 0,
+                    segment: {
+                        borderColor: ctx => getWindColor((ctx.p0.raw.original.speed + ctx.p1.raw.original.speed) / 2),
+                        borderWidth: 2.5
+                    }
                 },
-                { 
-                    data: convertToCartesian(pointsPolarData), 
-                    showLine: false, 
-                    pointRadius: 3, 
-                    pointBackgroundColor: ctx => getWindColor(ctx.raw.original.speed) 
+                {
+                    data: convertToCartesian(pointsPolarData),
+                    showLine: false,
+                    pointRadius: 3,
+                    pointBackgroundColor: ctx => getWindColor(ctx.raw.original.speed)
                 }
             ]
         },
@@ -119,12 +120,12 @@ export function generateWindspinne(interpolatedData, userMaxHoehe) {
             // Achsen sind nun in der Anzeigeeinheit
             scales: { x: { display: false, min: -maxRadius, max: maxRadius }, y: { display: false, min: -maxRadius, max: maxRadius } },
             plugins: {
-                title: { 
-                    display: true, 
-                    text: `Wind chart for current location`, 
-                    font: { size: 16 }, 
+                title: {
+                    display: true,
+                    text: I18n.t('weather.charts.wind_chart_title'),
+                    font: { size: 16 },
                     padding: { top: 5, bottom: 35 },
-                    color: style.getPropertyValue('--text-primary').trim() 
+                    color: style.getPropertyValue('--text-primary').trim()
                 },
                 legend: { display: false },
                 tooltip: {
@@ -147,8 +148,8 @@ export function generateWindspinne(interpolatedData, userMaxHoehe) {
                 ctx.font = '10px Roboto';
 
                 // Grid-Kreise passend zu den Punkten zeichnen
-                const circleStep = pointStep; 
-                
+                const circleStep = pointStep;
+
                 // Labels alle 1000m oder ~2000ft/3000ft, damit es nicht zu voll wird
                 let labelStep;
                 if (isFeet) {

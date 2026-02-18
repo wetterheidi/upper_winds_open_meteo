@@ -9,6 +9,7 @@
 import { Utils } from '../core/utils.js';
 import { AppState } from '../core/state.js';
 import * as LocationManager from '../core/locationManager.js';
+import { I18n } from '../core/i18n.js';
 
 let currentFavoriteData = null; // Speichert temporär die Daten für das Favoriten-Modal
 
@@ -59,7 +60,9 @@ export function initializeLocationSearch() {
             currentFavoriteData = {
                 lat: AppState.lastLat,
                 lng: AppState.lastLng,
-                defaultName: `DIP at ${AppState.lastLat.toFixed(4)}, ${AppState.lastLng.toFixed(4)}`
+                defaultName: I18n.t('location.default_favorite_name')
+                    .replace('{lat}', AppState.lastLat.toFixed(4))
+                    .replace('{lng}', AppState.lastLng.toFixed(4))
             };
             favoriteNameInput.value = currentFavoriteData.defaultName;
             favoriteModal.style.display = 'block';
@@ -132,9 +135,9 @@ function renderResultsList(searchResults = []) {
         resultsList.appendChild(sectionDiv);
     };
 
-    createSection('Results', searchResults);
-    createSection('Favorites', favorites);
-    createSection('Recent Searches', recents);
+    createSection(I18n.t('location.results_title'), searchResults);
+    createSection(I18n.t('location.favorites_title'), favorites);
+    createSection(I18n.t('location.recent_searches_title'), recents);
 }
 
 /**
@@ -154,7 +157,7 @@ function _createListItem(item) {
     const textContainer = document.createElement('div');
     textContainer.className = 'search-item-text';
     textContainer.innerHTML = `<span class="name">${item.display_name || item.label}</span>`;
-    
+
     // Klick auf den Text-Container wählt den Ort aus
     textContainer.addEventListener('click', () => {
         document.dispatchEvent(new CustomEvent('location:selected', { detail: { lat, lng, source: 'search' }, bubbles: true }));
@@ -171,10 +174,10 @@ function _createListItem(item) {
     if (item.isFavorite) {
         const homeBtn = document.createElement('button');
         homeBtn.innerHTML = '🏠';
-        homeBtn.title = 'Set as Home DZ';
+        homeBtn.title = I18n.t('location.set_home_dz');
         // Die CSS-Klasse wird basierend auf dem 'isHomeDZ'-Flag gesetzt
-        homeBtn.className = `home-toggle ${item.isHomeDZ ? 'is-home' : ''}`; 
-        
+        homeBtn.className = `home-toggle ${item.isHomeDZ ? 'is-home' : ''}`;
+
         homeBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             if (item.isHomeDZ) {
@@ -184,7 +187,7 @@ function _createListItem(item) {
             }
             // **DER ENTSCHEIDENDE FIX:**
             // Zeichne die gesamte Liste sofort neu, um die Änderung sichtbar zu machen.
-            renderResultsList(); 
+            renderResultsList();
         });
         actionsDiv.appendChild(homeBtn);
     }
@@ -193,7 +196,7 @@ function _createListItem(item) {
     const favToggle = document.createElement('button');
     favToggle.className = `favorite-toggle ${item.isFavorite ? 'is-favorite' : ''}`;
     favToggle.innerHTML = '★';
-    favToggle.title = "Toggle favorite";
+    favToggle.title = I18n.t('location.toggle_favorite');
     favToggle.addEventListener('click', (e) => {
         e.stopPropagation();
         toggleFavorite(lat, lng, item.display_name || item.label);
@@ -204,12 +207,12 @@ function _createListItem(item) {
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'delete-btn';
     deleteBtn.textContent = '×';
-    deleteBtn.title = "Delete this entry";
+    deleteBtn.title = I18n.t('location.delete_entry');
     deleteBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (confirm(`Delete "${item.display_name || item.label}"?`)) {
+        if (confirm(I18n.t('location.delete_confirm').replace('{name}', item.display_name || item.label))) {
             LocationManager.removeLocationFromHistory(lat, lng);
-            renderResultsList(); // Auch hier die Liste sofort neu zeichnen
+            renderResultsList();
         }
     });
     actionsDiv.appendChild(deleteBtn);
@@ -236,7 +239,7 @@ function toggleFavorite(lat, lng, defaultName, onFinish) {
         const favoriteModal = document.getElementById('favoriteModal');
         const favoriteNameInput = document.getElementById('favoriteNameInput');
         favoriteNameInput.value = defaultName;
-        
+
         // Sorge dafür, dass nach dem Schließen des Modals (egal wie) neu gezeichnet wird
         const modalConfirm = () => {
             const name = favoriteNameInput.value.trim() || currentFavoriteData.defaultName;
@@ -250,9 +253,9 @@ function toggleFavorite(lat, lng, defaultName, onFinish) {
         };
 
         // Event-Listener im Modal neu zuweisen
-        document.getElementById('submitFavoriteName').onclick = modalConfirm;
-        document.getElementById('cancelFavoriteName').onclick = modalCancel;
-        
+        document.getElementById('submitFavoriteName').textContent = I18n.t('common.save');
+        document.getElementById('cancelFavoriteName').textContent = I18n.t('common.cancel');
+
         favoriteModal.style.display = 'block';
     }
 }

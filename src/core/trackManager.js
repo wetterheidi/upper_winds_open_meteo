@@ -13,6 +13,7 @@ import * as JumpPlanner from './jumpPlanner.js';
 import { interpolateWeatherData } from './weatherManager.js';
 import { getCapacitor } from './capacitor-adapter.js';
 import { Settings } from './settings.js';
+import { I18n } from './i18n.js';
 
 // ===================================================================
 // 1. Öffentliche Lade- & Speicherfunktionen

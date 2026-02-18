@@ -19,7 +19,7 @@ import * as weatherManager from '../core/weatherManager.js'; // NEUER IMPORT
 import { DateTime } from 'luxon';                         // NEUER IMPORT
 import { generateMeteogram } from '../core/meteogramChart.js';
 import { CANOPY_OPENING_BUFFER_METERS, CONVERSIONS } from '../core/constants.js';
-
+import { I18n } from '../core/i18n.js';
 
 // =================================================================
 // 1. Globale Variablen & Zustand
@@ -319,7 +319,7 @@ function setupMapEventListeners() {
             },
             onCancel: () => {
                 hideProgress();
-                Utils.handleMessage('Caching cancelled.');
+                Utils.handleMessage(I18n.t('map.cache.status_cancelled_all'));
             }
         });
     }, 1000);
@@ -450,7 +450,7 @@ function setupJumpRunTrackEvents() {
         directionInput.value = Settings.state.userSettings.customJumpRunDirection !== null ? Settings.state.userSettings.customJumpRunDirection : '';
 
         // ÄNDERUNG: Zurück zum 'change' Event, kein Debounce nötig
-        directionInput.addEventListener('change', () => { 
+        directionInput.addEventListener('change', () => {
             const value = directionInput.value.trim();
 
             // --- Offsets zurücksetzen ---
@@ -497,15 +497,15 @@ function setupSafetyHeightValidation() {
         if (isNaN(value)) return;
 
         const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
-        
+
         // 1. Relevante Werte aus der UI lesen (um den aktuellen Editier-Stand zu haben)
         const openingAlt = parseFloat(document.getElementById('openingAltitude')?.value) || 0;
         const legDown = parseFloat(document.getElementById('legHeightDownwind')?.value) || 0;
 
         // 2. Puffer in die aktuelle Einheit umrechnen
         // CANOPY_OPENING_BUFFER_METERS ist meist 200m
-        const buffer = heightUnit === 'ft' 
-            ? CANOPY_OPENING_BUFFER_METERS * CONVERSIONS.METERS_TO_FEET 
+        const buffer = heightUnit === 'ft'
+            ? CANOPY_OPENING_BUFFER_METERS * CONVERSIONS.METERS_TO_FEET
             : CANOPY_OPENING_BUFFER_METERS;
 
         // 3. Verfügbare Höhe berechnen (Öffnung - Puffer - Pattern Entry)
@@ -529,10 +529,10 @@ function setupSafetyHeightValidation() {
 
             // 1. Warnung anzeigen
             displayWarning(`Safety Height ${reasonText}. Resetting to ${maxAllowed} ${heightUnit}.`);
-            
+
             // 2. Wert im Input korrigieren
             input.value = maxAllowed;
-            
+
             // 3. Settings speichern
             Settings.state.userSettings.safetyHeight = maxAllowed;
             Settings.save();
@@ -617,7 +617,7 @@ function setupDeselectAllEnsembleButton() {
         AppState.ensembleModelsData = null;
         clearEnsembleVisualizations(); // Diese Funktion aus ensembleManager.js wird hier wiederverwendet
 
-        Utils.handleMessage('All ensemble models deselected.');
+        Utils.handleMessage(I18n.t('planner.deselect_all') + " " + I18n.t('status_success'));
     });
 }
 /**
@@ -629,13 +629,13 @@ function setupTerrainAnalysisEvents() {
     if (analyzeTerrainBtn) {
         analyzeTerrainBtn.addEventListener('click', async () => {
             if (!AppState.weatherData || AppState.lastLat == null || AppState.lastLng == null) {
-                Utils.handleError("Please select a location and fetch weather data first.");
+                Utils.handleError(I18n.t('planner.error_location_weather'));
                 return;
             }
 
             // Prüfen, ob die Schirmfahrt-Anzeige aktiviert ist.
             if (!Settings.state.userSettings.showCanopyArea) {
-                Utils.handleError("Please activate 'Show Canopy Flight Area' to analyze terrain.");
+                Utils.handleError(I18n.t('planner.error_activate_canopy'));
                 return; // Analyse abbrechen und die verständliche Meldung anzeigen.
             }
 
@@ -648,12 +648,12 @@ function setupTerrainAnalysisEvents() {
                 if (dangerousPoints.length > 0) {
                     displayWarning("Warning: Low clearance areas detected and marked in red.");
                 } else {
-                    Utils.handleMessage("Terrain analysis complete. No low clearance areas found.");
+                    Utils.handleMessage(I18n.t('planner.terrain_none_found'));
                 }
 
             } catch (error) {
                 console.error("Terrain analysis failed:", error);
-                Utils.handleError("An error occurred during terrain analysis.");
+                Utils.handleError(I18n.t('planner.terrain_error'));
             } finally {
                 toggleLoading(false);
             }
@@ -688,7 +688,7 @@ function handleLockCheckboxChange(checkbox, type) {
             AppState.isLandingDirectionLocked = true;
             AppState.lockedLandingDirection = direction;
             console.log(`Landing direction locked to: ${direction}°`);
-            Utils.handleMessage(`Landing direction locked to ${direction}°`);
+            Utils.handleMessage(I18n.t('planner.direction_locked', { direction: direction }));
 
             // Alle Eingaben deaktivieren
             if (customLL) customLL.disabled = true;
@@ -699,7 +699,7 @@ function handleLockCheckboxChange(checkbox, type) {
         } else {
             // Sperren fehlgeschlagen (ungültiger Wert)
             console.warn('Invalid landing direction to lock. Unchecking.');
-            Utils.handleError('Please enter a valid 0-360° direction before locking.');
+            Utils.handleError(I18n.t('planner.direction_invalid'));
             checkbox.checked = false; // Checkbox zurücksetzen
             AppState.isLandingDirectionLocked = false;
             AppState.lockedLandingDirection = null;
@@ -763,7 +763,7 @@ function setupTrackEvents() {
                 } else if (extension === 'kml') { // NEUE BEDINGUNG
                     await loadKmlTrack(file);
                 } else {
-                    Utils.handleError('Unsupported file type. Please upload a .gpx or .csv file.');
+                    Utils.handleError(I18n.t('tracks.error_unsupported_format'));
                 }
             } catch (error) {
                 console.error('Error during track file processing:', error);
@@ -777,7 +777,7 @@ function setupTrackEvents() {
     // Logik für den "Clear Track" Button
     clearTrackButton.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (!AppState.map) { Utils.handleError('Cannot clear track: map not initialized.'); return; }
+        if (!AppState.map) { Utils.handleError(I18n.t('tracks.error_clear_init')); return; }
 
         if (AppState.gpxLayer) {
             try {
@@ -791,16 +791,16 @@ function setupTrackEvents() {
                 fileNameDisplay.style.fontStyle = 'italic';
 
             } catch (error) {
-                Utils.handleError('Failed to clear track: ' + error.message);
+                Utils.handleError(I18n.t('tracks.error_clear_failed', { message: error.message }));
             }
         } else {
-            Utils.handleMessage('No track to clear.');
+            Utils.handleMessage(I18n.t('tracks.no_track_to_clear'));
         }
     });
 }
 function setupGpxExportEvent() {
     const exportCombinedBtn = document.getElementById('exportCombinedGpxButton');
-    
+
     if (exportCombinedBtn) {
         exportCombinedBtn.addEventListener('click', async () => {
             const options = {
@@ -808,17 +808,17 @@ function setupGpxExportEvent() {
                 includePattern: document.getElementById('exportLandingPattern')?.checked || false,
                 includeExitCircles: document.getElementById('exportExitCircles')?.checked || false,
                 includeCanopyCircles: document.getElementById('exportCanopyCircles')?.checked || false,
-                
+
                 // NEU: Merge Option
                 mergeTracks: document.getElementById('mergeTracksCheckbox')?.checked || false
             };
 
             if (!Object.values(options).some(v => v)) {
-                Utils.handleError("Please select at least one element to export.");
+                Utils.handleError(I18n.t('tracks.error_select_elements'));
                 return;
             }
 
-            await exportCompositeJumpGpx(options); 
+            await exportCompositeJumpGpx(options);
         });
     }
 }
@@ -887,7 +887,7 @@ function setupCheckboxEvents() {
         // Prüfung, ob Live-Tracking aktiv ist
         if (checkbox.checked && !Settings.state.userSettings.trackPosition) {
             checkbox.checked = false;
-            Utils.handleError('Please start Live Tracking first.');
+            Utils.handleError(I18n.t('messages.start_tracking_first'));
             return;
         }
 
@@ -970,9 +970,9 @@ function setupCheckboxEvents() {
 
 
         if (isLocked) {
-            Utils.handleMessage("Map interactions are now locked.");
+            Utils.handleMessage(I18n.t('messages.interaction_locked'));
         } else {
-            Utils.handleMessage("Map interactions are now unlocked.");
+            Utils.handleMessage(I18n.t('messages.interaction_unlocked'));
         }
     });
 
@@ -982,7 +982,7 @@ function setupCheckboxEvents() {
             AppState.isPlacingHarp = true;
             console.log('HARP placement mode activated');
             AppState.map.on('click', mapManager.handleHarpPlacement);
-            Utils.handleMessage('Click the map to place the HARP marker');
+            Utils.handleMessage(I18n.t('messages.place_harp_click'));
 
             // NEUE LOGIK: Sidebar schließen und Karte anpassen
             const mainLayout = document.querySelector('.main-layout');
@@ -1032,7 +1032,7 @@ function setupRadioEvents() {
                 if (!modelsLoaded && radio.value !== 'all_models') {
                     const success = await fetchEnsembleWeatherData();
                     if (!success) {
-                        Utils.handleError("Failed to fetch data for scenario.");
+                        Utils.handleError(I18n.t('planner.error_fetch_scenario'));
                         return; // Abbrechen bei Fehler
                     }
                 }
@@ -1107,7 +1107,7 @@ function setupInputEvents() {
 
                 input.value = adjustedValue;
                 value = adjustedValue; // Wichtig: Den Wert für das Event aktualisieren
-                Utils.handleError(`Adjusted ${id} to ${adjustedValue} to maintain valid leg order.`);
+                Utils.handleError(I18n.t('messages.leg_order_adjusted', { id: id, adjustedValue: adjustedValue }));
             }
 
             // Setting speichern und Event auslösen
@@ -1129,7 +1129,7 @@ function setupInputEvents() {
 
     setupInput('openingAltitude', 'change', 300, (value) => {
         if (isNaN(value) || value < 500 || value > 15000) {
-            Utils.handleError('Opening altitude must be between 500 and 15000 meters.');
+            Utils.handleError(I18n.t('messages.opening_alt_range'));
 
             // Event auslösen, um die UI zurückzusetzen
             document.dispatchEvent(new CustomEvent('ui:invalidInput', {
@@ -1142,7 +1142,7 @@ function setupInputEvents() {
 
     setupInput('exitAltitude', 'change', 300, (value) => {
         if (isNaN(value) || value < 500 || value > 15000) {
-            Utils.handleError('Exit altitude must be between 500 and 15000 meters.');
+            Utils.handleError(I18n.t('messages.exit_alt_range'));
 
             //Event auslösen, um die UI zurückzusetzen
             document.dispatchEvent(new CustomEvent('ui:invalidInput', {
@@ -1374,9 +1374,9 @@ function setupCacheManagement() {
         try {
             const size = await TileCache.getCacheSize();
             await TileCache.clearCache();
-            Utils.handleMessage(`Tile cache cleared successfully (freed ${size.toFixed(2)} MB).`);
+            Utils.handleMessage(I18n.t('map.cache.cleared_success', { size: size.toFixed(2) }));
         } catch (error) {
-            Utils.handleError('Failed to clear tile cache: ' + error.message);
+            Utils.handleError(I18n.t('map.cache.cleared_error', { error: error.message }));
         }
     });
 
@@ -1404,10 +1404,10 @@ function setupCacheSettings() {
             // Validierungslogik
             if (isNaN(value) || value < 1) {
                 value = 1; // Auf Minimum setzen, wenn zu klein oder ungültig
-                Utils.handleMessage("Cache radius must be at least 1 km.");
+                Utils.handleMessage(I18n.t('map.cache.radius_min_warning'));
             } else if (value > 50) {
                 value = 50; // Auf Maximum setzen, wenn zu groß
-                Utils.handleMessage("Cache radius cannot exceed 50 km.");
+                Utils.handleMessage(I18n.t('map.cache.radius_max_warning'));
             }
 
             // Korrigierten Wert im UI und in den Settings speichern
@@ -1438,7 +1438,7 @@ function setupCacheSettings() {
                 // Wenn min > max, setze max auf den gleichen Wert wie min
                 maxZoom = minZoom;
                 zoomMaxInput.value = maxZoom;
-                Utils.handleMessage("Max zoom cannot be less than min zoom.");
+                Utils.handleMessage(I18n.t('map.cache.zoom_error'));
             }
 
             // Stelle sicher, dass die UI die validierten Werte anzeigt
@@ -1565,7 +1565,7 @@ function setupHarpCoordInputEvents() {
     placeHarpCoordButton.addEventListener('click', async () => {
         const inputValue = harpCoordInput.value.trim();
         if (!inputValue) {
-            Utils.handleError('Please enter coordinates.');
+            Utils.handleError(I18n.t('messages.enter_coords'));
             return;
         }
 
@@ -1585,7 +1585,7 @@ function setupHarpCoordInputEvents() {
             console.log('HARP placed via coords. JRT offsets reset to 0.');
 
             Settings.save();
-            Utils.handleMessage('HARP marker placed successfully.');
+            Utils.handleMessage(I18n.t('planner.harp_manager') + " " + I18n.t('status_success'));
             harpRadio.disabled = false;
             harpRadio.checked = true;
             document.dispatchEvent(new CustomEvent('ui:jumpMasterLineTargetChanged'));
@@ -1604,7 +1604,7 @@ function setupHarpCoordInputEvents() {
             }, 300);
 
         } else {
-            Utils.handleError('Invalid coordinates. Please enter a valid MGRS or Decimal Degree format.');
+            Utils.handleError(I18n.t('messages.invalid_coords_format'));
         }
     });
 }
@@ -1771,7 +1771,7 @@ function setupPoiSearchButton() {
 
     poiButton.addEventListener('click', async () => {
         if (!AppState.map) {
-            Utils.handleError("Map is not available.");
+            Utils.handleError(I18n.t('tracks.error_map_init'));
             return;
         }
 
@@ -1804,7 +1804,7 @@ function setupPoiSearchButton() {
             }
         } catch (error) {
             console.error("Error during POI search:", error);
-            Utils.handleError("An error occurred during the search.");
+            Utils.handleError(I18n.t('messages.poi_search_error'));
         } finally {
             // KORREKTUR: Schalte den Spinner über die Funktion wieder aus
             toggleLoading(false);
