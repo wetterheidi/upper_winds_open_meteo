@@ -168,7 +168,8 @@
         "find_dropzones": "Search for Dropzones in this Area",
         "favorites": "Favorites",
         "recents": "Recent Searches",
-        "results": "Results"
+        "results": "Results",
+        "placeholder": "Look up city or coordinates..."
     },
     "settings": {
         "language": "Language",
@@ -213,7 +214,26 @@
         "alert_ts": "Thunderstorm Alert:",
         "alert_cloud_base": "Cloud Base Alert:",
         "min_cover": "Min. Cloud Cover:",
-        "max_base": "Max. Cloud Base (m):"
+        "max_base": "Max. Cloud Base (m):",
+        "placeholder": "No file chosen",
+        "time_1_day": "1 Day",
+        "time_2_days": "2 Days",
+        "time_3_days": "3 Days",
+        "time_4_days": "4 Days",
+        "time_5_days": "5 Days",
+        "time_6_days": "6 Days",
+        "time_7_days": "7 Days",
+        "time_maximum": "Maximum Time",
+        "customized": "Customized",
+        "surface_data": "Surface Data",
+        "weather_briefing": "Weather Briefing",
+        "track_info": "GPX, KML or FlySight-CSV",
+        "no_file_chosen": "No file chosen",
+        "reset_settings": "Reset Settings",
+        "reset_settings_title": "Resets all settings to their default values and locks all features",
+        "reset_confirm": "Are you sure you want to reset all settings and lock all features?",
+        "clear_cache": "Clear Tile Cache",
+        "clear_cache_title": "Clears cached map tiles. Pan/zoom to cache more tiles for offline use."
     },
     "modals": {
         "restricted_feature": "Restricted Feature",

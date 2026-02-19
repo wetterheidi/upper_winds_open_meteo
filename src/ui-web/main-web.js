@@ -185,6 +185,12 @@ function initializeUIElements() {
     const directionSpan = document.getElementById('jumpRunTrackDirection');
     if (directionSpan) directionSpan.textContent = '-'; // Initial placeholder
     updateUIState();
+
+    // NEU: Suchfeld-Placeholder beim App-Start übersetzen
+    const searchInput = document.getElementById('locationSearchInput');
+    if (searchInput) {
+        searchInput.placeholder = I18n.t('search.placeholder');
+    }
 }
 
 // =================================================================
@@ -1164,10 +1170,10 @@ function updateJumpMasterDashboard(data) {
         // Entweder mit echten Daten füllen...
         if (data.jumpMasterLineData) {
             const settings = { heightUnit: getHeightUnit() }; // Holen der Einheit für die Distanz
-            
+
             // NEU: Übersetzten Text mit dem Ziel (HARP/DIP) setzen
             targetLabel.textContent = I18n.t('jumpmaster.jml_to', { target: data.jumpMasterLineData.target });
-            
+
             bearingEl.textContent = `${data.jumpMasterLineData.bearing}°`;
             distanceEl.textContent = `${Math.round(Utils.convertHeight(data.jumpMasterLineData.distance, settings.heightUnit))} ${settings.heightUnit}`;
             totEl.textContent = data.jumpMasterLineData.tot < 1200 ? `X - ${data.jumpMasterLineData.tot} s` : 'N/A';
@@ -1176,7 +1182,7 @@ function updateJumpMasterDashboard(data) {
         else {
             // NEU: Übersetzten Text mit Platzhalter "--" setzen
             targetLabel.textContent = I18n.t('jumpmaster.jml_to', { target: '--' });
-            
+
             bearingEl.textContent = '--';
             distanceEl.textContent = '--';
             totEl.textContent = '--';
@@ -1202,6 +1208,12 @@ function setupAppEventListeners() {
 
     document.addEventListener('i18n:loaded', async () => {
         console.log("[main-web] Language changed, updating dynamic UI components.");
+
+        // NEU: Suchfeld-Placeholder beim Sprachwechsel übersetzen
+        const searchInput = document.getElementById('locationSearchInput');
+        if (searchInput) {
+            searchInput.placeholder = I18n.t('search.placeholder');
+        }
 
         // Prüfen, ob wir überhaupt schon Wetterdaten geladen haben
         if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {

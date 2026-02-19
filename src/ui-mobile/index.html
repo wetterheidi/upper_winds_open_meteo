@@ -45,7 +45,8 @@
                 <div id="slider-labels"></div>
             </div>
             <div id="model-row">
-                <label id="" for="modelSelect" title="Model Run" data-i18n="common.forecast_model">Forecast Model:</label>
+                <label id="" for="modelSelect" title="Model Run" data-i18n="common.forecast_model">Forecast
+                    Model:</label>
                 <select id="modelSelect">
                     <option value="icon_global" selected>ICON GLOBAL</option>
                     <option value="gfs">GFS</option>
@@ -65,13 +66,15 @@
     <div id="passwordModal" class="modal" style="display: none;">
         <div class="modal-content">
             <h3 id="modalHeader" data-i18n="modals.restricted_feature">Restricted Feature</h3>
-            <p id="modalMessage" data-i18n="modals.password_prompt">Please enter the password to enable this feature:</p>
+            <p id="modalMessage" data-i18n="modals.password_prompt">Please enter the password to enable this feature:
+            </p>
             <input type="password" id="passwordInput" placeholder="Password">
             <div class="modal-buttons">
                 <button id="passwordSubmit" data-i18n="modals.submit">Submit</button>
                 <button id="passwordCancel" data-i18n="modals.cancel">Cancel</button>
             </div>
-            <p id="passwordError" style="color: red; display: none;" data-i18n="modals.password_error">Incorrect password!</p>
+            <p id="passwordError" style="color: red; display: none;" data-i18n="modals.password_error">Incorrect
+                password!</p>
         </div>
     </div>
 
@@ -124,15 +127,17 @@
 
             <div id="bottom-container">
                 <div id="meanWindControls">
-                    <label for="lowerLimit" title="Lower altitude for mean wind calculation" data-i18n="weather.lower_limit">Lower Limit (m):</label>
+                    <label for="lowerLimit" title="Lower altitude for mean wind calculation"
+                        data-i18n="weather.lower_limit">Lower Limit (m):</label>
                     <input type="number" id="lowerLimit" min="0" step="100" value="0">
-                    <label for="upperLimit" title="Upper altitude for mean wind calculation" data-i18n="weather.upper_limit">Upper Limit (m):</label>
+                    <label for="upperLimit" title="Upper altitude for mean wind calculation"
+                        data-i18n="weather.upper_limit">Upper Limit (m):</label>
                     <input type="number" id="upperLimit" min="0" step="100" value="3000">
                     <div id="meanWindResult"></div>
                 </div>
                 <div id="controls-row">
-                    <label for="interpStep"
-                        title="Select the altitude interval for weather data interpolation" data-i18n="weather.step">Step:</label>
+                    <label for="interpStep" title="Select the altitude interval for weather data interpolation"
+                        data-i18n="weather.step">Step:</label>
                     <select id="interpStep" aria-label="Interpolation step interval">
                         <option value="100">100</option>
                         <option value="200" selected>200</option>
@@ -185,7 +190,8 @@
                     <ul>
                         <li>
                             <label class="radio-label">
-                                <input type="checkbox" id="showLandingPattern" name="showLandingPattern"> <span data-i18n="planner.show_landing_pattern">Show Landing Pattern</span>
+                                <input type="checkbox" id="showLandingPattern" name="showLandingPattern"> <span
+                                    data-i18n="planner.show_landing_pattern">Show Landing Pattern</span>
                             </label>
                         </li>
                         <li>
@@ -197,7 +203,8 @@
                                 </span>
                                 <span id="lock-container-LL" class="lock-landing-container hidden">
                                     <input type="checkbox" id="lockLandingDirectionLL" class="lock-landing-cb">
-                                    <label for="lockLandingDirectionLL" class="lock-label" data-i18n="planner.lock">Lock</label>
+                                    <label for="lockLandingDirectionLL" class="lock-label"
+                                        data-i18n="planner.lock">Lock</label>
                                 </span>
                             </label>
                         </li>
@@ -210,7 +217,8 @@
                                 </span>
                                 <span id="lock-container-RR" class="lock-landing-container hidden">
                                     <input type="checkbox" id="lockLandingDirectionRR" class="lock-landing-cb">
-                                    <label for="lockLandingDirectionRR" class="lock-label" data-i18n="planner.lock">Lock</label>
+                                    <label for="lockLandingDirectionRR" class="lock-label"
+                                        data-i18n="planner.lock">Lock</label>
                                 </span>
                             </label>
                         </li>
@@ -251,7 +259,8 @@
             </div>
 
             <div class="accordion-item">
-                <button class="accordion-header" data-planner-section="calculateJump" data-i18n="planner.calculate_jump">Calculate Jump</button>
+                <button class="accordion-header" data-planner-section="calculateJump"
+                    data-i18n="planner.calculate_jump">Calculate Jump</button>
                 <div class="accordion-content">
                     <ul>
                         <li>
@@ -294,7 +303,8 @@
                         </li>
                         <li>
                             <label class="radio-label">
-                                <input type="checkbox" id="showJumpRunTrack" /> <span data-i18n="planner.show_jump_run_track">Show Jump Run Track:</span>
+                                <input type="checkbox" id="showJumpRunTrack" /> <span
+                                    data-i18n="planner.show_jump_run_track">Show Jump Run Track:</span>
                                 <input type="text" id="jumpRunTrackDirection" min="0" max="360" step="1"
                                     placeholder="Calculated">
                                 <label>°</label>
@@ -316,15 +326,18 @@
                         </li>
                         <li>
                             <label class="radio-label">
-                                <input type="checkbox" id="showExitAreaCheckbox"> <span data-i18n="planner.show_exit_area">Show Exit Area</span></label>
+                                <input type="checkbox" id="showExitAreaCheckbox"> <span
+                                    data-i18n="planner.show_exit_area">Show Exit Area</span></label>
                         </li>
                         <li>
                             <label class="radio-label">
-                                <input type="checkbox" id="showCanopyAreaCheckbox"> <span data-i18n="planner.show_canopy_area">Show Canopy Flight Area</span> </label>
+                                <input type="checkbox" id="showCanopyAreaCheckbox"> <span
+                                    data-i18n="planner.show_canopy_area">Show Canopy Flight Area</span> </label>
                         </li>
                         <li>
                             <label class="radio-label">
-                                <input type="checkbox" id="showCutAwayFinder" name="showCutAwayFinder"> <span data-i18n="planner.show_cut_away">Show Cut Away Finder</span>
+                                <input type="checkbox" id="showCutAwayFinder" name="showCutAwayFinder"> <span
+                                    data-i18n="planner.show_cut_away">Show Cut Away Finder</span>
                             </label>
                             <ul class="submenu hidden">
                                 <li>
@@ -336,21 +349,25 @@
                                 </li>
                                 <li>
                                     <label class="radio-label">
-                                        <input type="radio" name="cutAwayState" value="Collapsed"> <span data-i18n="planner.state_collapsed">Fully Collapsed</span>
+                                        <input type="radio" name="cutAwayState" value="Collapsed"> <span
+                                            data-i18n="planner.state_collapsed">Fully Collapsed</span>
                                     </label>
                                 </li>
                                 <li>
                                     <label class="radio-label">
-                                        <input type="radio" name="cutAwayState" value="Partially" checked> <span data-i18n="planner.state_partially">Partially Collapsed</span>
+                                        <input type="radio" name="cutAwayState" value="Partially" checked> <span
+                                            data-i18n="planner.state_partially">Partially Collapsed</span>
                                     </label>
                                 </li>
                                 <li>
                                     <label class="radio-label">
-                                        <input type="radio" name="cutAwayState" value="Open"> <span data-i18n="planner.state_open">Fully Open</span>
+                                        <input type="radio" name="cutAwayState" value="Open"> <span
+                                            data-i18n="planner.state_open">Fully Open</span>
                                     </label>
                                 </li>
                                 <li>
-                                    <button id="resetCutAwayMarker" class="btn btn-secondary" data-i18n="planner.reset_marker">Reset Cut-Away Marker</button>
+                                    <button id="resetCutAwayMarker" class="btn btn-secondary"
+                                        data-i18n="planner.reset_marker">Reset Cut-Away Marker</button>
                                 </li>
                             </ul>
                         </li>
@@ -362,7 +379,8 @@
                                         style="width: 80px; padding: 1px 2px;">
                                 </label>
                             </div>
-                            <button id="analyzeTerrainButton" class="btn btn-secondary" data-i18n="planner.analyze_terrain">Analyze Terrain Clearance</button>
+                            <button id="analyzeTerrainButton" class="btn btn-secondary"
+                                data-i18n="planner.analyze_terrain">Analyze Terrain Clearance</button>
                         </li>
                     </ul>
                 </div>
@@ -373,23 +391,28 @@
                 <div class="accordion-content">
                     <ul>
                         <li>
-                            <button id="placeHarpButton" class="btn btn-primary" data-i18n="planner.place_harp">Place HARP</button>
-                            <button id="clearHarpButton" class="btn btn-primary" data-i18n="planner.clear_harp">Clear HARP</button>
+                            <button id="placeHarpButton" class="btn btn-primary" data-i18n="planner.place_harp">Place
+                                HARP</button>
+                            <button id="clearHarpButton" class="btn btn-primary" data-i18n="planner.clear_harp">Clear
+                                HARP</button>
                         </li>
                         <li>
                             <label class="radio-label">
                                 <input type="text" id="harpCoordInput" placeholder="Enter HARP Coords (MGRS/Dec)" />
                             </label>
-                            <button id="placeHarpCoordButton" class="btn btn-primary" data-i18n="planner.place_coords">Place Coords</button>
+                            <button id="placeHarpCoordButton" class="btn btn-primary"
+                                data-i18n="planner.place_coords">Place Coords</button>
                         </li>
                         <li>
                             <label class="radio-label">
-                                <input type="checkbox" id="trackPositionCheckbox" name="trackPosition"> <span data-i18n="jumpmaster.start_tracking">Start Live Tracking</span>
+                                <input type="checkbox" id="trackPositionCheckbox" name="trackPosition"> <span
+                                    data-i18n="jumpmaster.start_tracking">Start Live Tracking</span>
                             </label>
                         </li>
                         <li>
                             <label class="radio-label">
-                                <input type="checkbox" id="showJumpMasterLine" name="showJumpMasterLine"> <span data-i18n="jumpmaster.show_line">Show Jump Master Line To</span>
+                                <input type="checkbox" id="showJumpMasterLine" name="showJumpMasterLine"> <span
+                                    data-i18n="jumpmaster.show_line">Show Jump Master Line To</span>
                             </label>
                             <ul class="submenu hidden">
                                 <li>
@@ -406,10 +429,12 @@
                         </li>
                         <li>
                             <label class="radio-label">
-                                <input type="checkbox" id="lockInteractionCheckbox" name="lockInteraction"> <span data-i18n="jumpmaster.lock_points">Lock all Points</span>
+                                <input type="checkbox" id="lockInteractionCheckbox" name="lockInteraction"> <span
+                                    data-i18n="jumpmaster.lock_points">Lock all Points</span>
                             </label>
                         </li>
-                        <button id="findJumpShipBtn" class="btn btn-secondary" data-i18n="jumpmaster.find_aircraft">Find Aircraft To Track</button>
+                        <button id="findJumpShipBtn" class="btn btn-secondary" data-i18n="jumpmaster.find_aircraft">Find
+                            Aircraft To Track</button>
 
                     </ul>
                 </div>
@@ -423,7 +448,8 @@
                             <span class="list-header" data-i18n="planner.models">Models</span>
                             <ul class="submenu" id="ensembleModelsSubmenu">
                             </ul>
-                            <button id="deselectAllEnsembleButton" class="btn btn-secondary" data-i18n="planner.deselect_all">Deselect All</button>
+                            <button id="deselectAllEnsembleButton" class="btn btn-secondary"
+                                data-i18n="planner.deselect_all">Deselect All</button>
                         </li>
                         <li>
                             <span class="list-header" data-i18n="planner.scenarios">Scenarios</span>
@@ -436,22 +462,26 @@
                                 </li>
                                 <li>
                                     <label class="radio-label">
-                                        <input type="radio" name="ensembleScenario" value="heatmap"> <span data-i18n="planner.scenario_heatmap">Heatmap</span>
+                                        <input type="radio" name="ensembleScenario" value="heatmap"> <span
+                                            data-i18n="planner.scenario_heatmap">Heatmap</span>
                                     </label>
                                 </li>
                                 <li>
                                     <label class="radio-label">
-                                        <input type="radio" name="ensembleScenario" value="min_wind"> <span data-i18n="planner.scenario_min">Minimum Wind</span>
+                                        <input type="radio" name="ensembleScenario" value="min_wind"> <span
+                                            data-i18n="planner.scenario_min">Minimum Wind</span>
                                     </label>
                                 </li>
                                 <li>
                                     <label class="radio-label">
-                                        <input type="radio" name="ensembleScenario" value="mean_wind"> <span data-i18n="planner.scenario_mean">Mean Wind</span>
+                                        <input type="radio" name="ensembleScenario" value="mean_wind"> <span
+                                            data-i18n="planner.scenario_mean">Mean Wind</span>
                                     </label>
                                 </li>
                                 <li>
                                     <label class="radio-label">
-                                        <input type="radio" name="ensembleScenario" value="max_wind"> <span data-i18n="planner.scenario_max">Maximum Wind</span>
+                                        <input type="radio" name="ensembleScenario" value="max_wind"> <span
+                                            data-i18n="planner.scenario_max">Maximum Wind</span>
                                     </label>
                                 </li>
                             </ul>
@@ -520,7 +550,8 @@
                             </button>
                         </div>
                         <div class="dashboard-card" id="manual-record-card">
-                            <button id="manual-recording-button" class="arm-button" data-i18n="dashboard.start_recording">
+                            <button id="manual-recording-button" class="arm-button"
+                                data-i18n="dashboard.start_recording">
                                 Start Recording
                             </button>
                         </div>
@@ -590,15 +621,18 @@
                 <span id="clearSearchInput" class="clear-icon" style="display: none;">×</span>
             </div>
 
-            <button id="saveFavoriteBtn" class="btn btn-primary" data-i18n="search.save_favorite">Save current location as Favorite</button>
-            <button id="findPoisInViewBtn" class="btn btn-secondary" data-i18n="search.find_dropzones">Search for Dropzones in this Area</button>
+            <button id="saveFavoriteBtn" class="btn btn-primary" data-i18n="search.save_favorite">Save current location
+                as Favorite</button>
+            <button id="findPoisInViewBtn" class="btn btn-secondary" data-i18n="search.find_dropzones">Search for
+                Dropzones in this Area</button>
             <div id="favoriteModal" class="favorite-modal" style="display: none;">
                 <div class="favorite-modal-content">
                     <h3 data-i18n="search.save_favorite_title">Save Favorite</h3>
                     <input id="favoriteNameInput" type="text" placeholder="Enter favorite name">
                     <div class="favorite-modal-actions">
                         <button id="submitFavoriteName" class="modal-btn" data-i18n="common.save">Save</button>
-                        <button id="cancelFavoriteName" class="modal-btn cancel" data-i18n="common.cancel">Cancel</button>
+                        <button id="cancelFavoriteName" class="modal-btn cancel"
+                            data-i18n="common.cancel">Cancel</button>
                     </div>
                 </div>
             </div>
@@ -625,13 +659,13 @@
             <div class="accordion-item">
                 <button class="accordion-header" data-i18n="settings.language">Language</button>
                 <div class="accordion-content">
-                        <div class="settings-grid">
+                    <div class="settings-grid">
                         <label for="languageSelect" data-i18n="settings.select_language">Language:</label>
                         <select id="languageSelect">
                             <option value="en">English</option>
                             <option value="de">Deutsch</option>
                         </select>
-                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -646,7 +680,7 @@
                         </select>
                         <label for="heightUnit" data-i18n="settings.height_unit">Height Unit:</label>
                         <select id="heightUnit">
-                            <option value="m">Meters</option>
+                            <option value="m">Meter</option>
                             <option value="ft">Feet</option>
                         </select>
                         <label for="temperatureUnit" data-i18n="settings.temp_unit">Temperature Unit:</label>
@@ -676,14 +710,14 @@
                         </select>
                         <label for="maxForecastTime" data-i18n="settings.max_forecast">Max. Forecast Time:</label>
                         <select id="maxForecastTime">
-                            <option value="1">1 Day</option>
-                            <option value="2">2 Days</option>
-                            <option value="3">3 Days</option>
-                            <option value="4">4 Days</option>
-                            <option value="5">5 Days</option>
-                            <option value="6">6 Days</option>
-                            <option value="7">7 Days</option>
-                            <option value="Maximum">Maximum Time</option>
+                            <option value="1" data-i18n="settings.time_1_day">1 Day</option>
+                            <option value="2" data-i18n="settings.time_2_days">2 Days</option>
+                            <option value="3" data-i18n="settings.time_3_days">3 Days</option>
+                            <option value="4" data-i18n="settings.time_4_days">4 Days</option>
+                            <option value="5" data-i18n="settings.time_5_days">5 Days</option>
+                            <option value="6" data-i18n="settings.time_6_days">6 Days</option>
+                            <option value="7" data-i18n="settings.time_7_days">7 Days</option>
+                            <option value="Maximum" data-i18n="settings.time_maximum">Maximum Time</option>
                         </select>
                     </div>
                 </div>
@@ -698,11 +732,12 @@
                             <option value="HEIDIS">HEIDIS</option>
                             <option value="ATAK">ATAK</option>
                             <option value="Windwatch">Windwatch</option>
-                            <option value="Customized">Customized</option>
-                            <option value="SurfaceData">Surface Data</option>
-                            <option value="ComprehensiveReport">Weather Briefing</option>
+                            <option data-i18n="settings.customized">Customized</option>
+                            <option data-i18n="settings.surface_data">Surface Data</option>
+                            <option data-i18n="settings.weather_briefing">Weather Briefing</option>
                         </select>
-                        <button id="downloadButton" class="btn btn-primary" data-i18n="settings.generate_table">Generate Table</button>
+                        <button id="downloadButton" class="btn btn-primary" data-i18n="settings.generate_table">Generate
+                            Table</button>
                     </div>
                 </div>
             </div>
@@ -715,30 +750,36 @@
 
                         <label class="radio-label"
                             style="padding: 10px; background: rgba(255,255,255,0.05); border-radius: 4px;">
-                            <input type="checkbox" id="exportJumpRun" checked> <span data-i18n="settings.jump_run_exit">Jump Run & Exit</span>
+                            <input type="checkbox" id="exportJumpRun" checked> <span
+                                data-i18n="settings.jump_run_exit">Jump Run & Exit</span>
                         </label>
                         <label class="radio-label"
                             style="padding: 10px; background: rgba(255,255,255,0.05); border-radius: 4px;">
-                            <input type="checkbox" id="exportLandingPattern" checked> <span data-i18n="settings.landing_pattern">Landing Pattern</span>
+                            <input type="checkbox" id="exportLandingPattern" checked> <span
+                                data-i18n="settings.landing_pattern">Landing Pattern</span>
                         </label>
                         <label class="radio-label"
                             style="padding: 10px; background: rgba(255,255,255,0.05); border-radius: 4px;">
-                            <input type="checkbox" id="exportExitCircles"> <span data-i18n="settings.exit_area">Exit Area (Circles)</span>
+                            <input type="checkbox" id="exportExitCircles"> <span data-i18n="settings.exit_area">Exit
+                                Area (Circles)</span>
                         </label>
                         <label class="radio-label"
                             style="padding: 10px; background: rgba(255,255,255,0.05); border-radius: 4px;">
-                            <input type="checkbox" id="exportCanopyCircles"> <span data-i18n="settings.canopy_range">Canopy Area (Circles)</span>
+                            <input type="checkbox" id="exportCanopyCircles"> <span
+                                data-i18n="settings.canopy_range">Canopy Area (Circles)</span>
                         </label>
 
                         <div
                             style="margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-color, #444);">
                             <label class="radio-label"
                                 title="Combine all elements into one single track. Useful for Garmin/Suunto watches.">
-                                <input type="checkbox" id="mergeTracksCheckbox"> <span data-i18n="settings.merge_tracks">Merge for Devices (Single Color)</span>
+                                <input type="checkbox" id="mergeTracksCheckbox"> <span
+                                    data-i18n="settings.merge_tracks">Merge for Devices (Single Color)</span>
                             </label>
                         </div>
 
-                        <button id="exportCombinedGpxButton" class="btn btn-primary" style="margin-top: 10px;" data-i18n="settings.export_gpx">
+                        <button id="exportCombinedGpxButton" class="btn btn-primary" style="margin-top: 10px;"
+                            data-i18n="settings.export_gpx">
                             Export GPX
                         </button>
                     </div>
@@ -759,7 +800,8 @@
                             <input type="number" id="cacheZoomMax" min="6" max="15">
                         </div>
                         </label>
-                        <button id="recacheNowButton" class="btn btn-primary" data-i18n="settings.recache">Recache Now</button>
+                        <button id="recacheNowButton" class="btn btn-primary" data-i18n="settings.recache">Recache
+                            Now</button>
                     </div>
                 </div>
             </div>
@@ -770,7 +812,8 @@
                     <div id="historical-date" class="settings-grid">
                         <label for="historicalDatePicker" data-i18n="settings.select_date">Select Date:</label>
                         <input type="date" id="historicalDatePicker" min="2022-01-01">
-                        <button id="clearHistoricalDate" class="btn btn-secondary" data-i18n="settings.clear">Clear</button>
+                        <button id="clearHistoricalDate" class="btn btn-secondary"
+                            data-i18n="settings.clear">Clear</button>
                     </div>
                 </div>
             </div>
@@ -781,19 +824,22 @@
                     <div id="track-upload" class="settings-grid">
 
                         <div style="position: relative; display: flex; align-items: center; justify-content: flex-end;">
-                            <span class="info-icon info-button-shared" data-info="GPX, KML or FlySight-CSV">i</span>
-                            <div class="info-popup"></div>
+                            <span class="info-icon info-button-shared">i</span>
+                            <div id="trackInfoPopup" class="info-popup" data-i18n="settings.track_info">GPX, KML or
+                                FlySight-CSV</div>
                         </div>
 
-                        <button type="button" id="uploadTrackButton" class="btn btn-primary" data-i18n="settings.choose_file">Choose File...</button>
+                        <div>
+                            <button type="button" id="uploadTrackButton" class="btn btn-primary"
+                                data-i18n="settings.choose_file">Choose File...</button>
+                            <input type="file" id="trackFileInput" accept=".gpx,.csv,.kml" class="hidden">
+                            <label data-i18n="settings.selected_file">Selected File</label>
+                            <span id="fileNameDisplay" class="file-name-display" data-i18n="settings.no_file_chosen">No
+                                file chosen</span>
+                        </div>
 
-                        <input type="file" id="trackFileInput" accept=".gpx,.csv,.kml" class="hidden">
-
-                        <label data-i18n="settings.selected_file">Selected File</label>
-
-                        <span id="fileNameDisplay" class="file-name-display">No file chosen</span>
-
-                        <button id="clearTrack" class="btn btn-secondary" data-i18n="settings.clear_track">Clear Track</button>
+                        <button id="clearTrack" class="btn btn-secondary" data-i18n="settings.clear_track">Clear
+                            Track</button>
                     </div>
                 </div>
             </div>
@@ -801,7 +847,8 @@
             <div class="accordion-item">
                 <button class="accordion-header" data-i18n="settings.app_management">App Management</button>
                 <div class="accordion-content" id="app-management-settings">
-                    <button id="theme-toggle" class="btn btn-secondary" data-i18n="settings.dark_mode">Switch to Dark Mode</button>
+                    <button id="theme-toggle" class="btn btn-secondary" data-i18n="settings.dark_mode">Switch to Dark
+                        Mode</button>
                 </div>
             </div>
 
@@ -815,16 +862,19 @@
                         <label for="alertWindThreshold" data-i18n="settings.threshold">Threshold (kt):</label>
                         <input type="number" id="alertWindThreshold" min="5" max="50" step="1">
 
-                        <div class="grid-separator"></div> <label for="alertGustEnabled" data-i18n="settings.alert_gust">High Gust Alert:</label>
+                        <div class="grid-separator"></div> <label for="alertGustEnabled"
+                            data-i18n="settings.alert_gust">High Gust Alert:</label>
                         <input type="checkbox" id="alertGustEnabled">
 
                         <label for="alertGustThreshold" data-i18n="settings.threshold">Threshold (kt):</label>
                         <input type="number" id="alertGustThreshold" min="10" max="60" step="1">
 
-                        <div class="grid-separator"></div> <label for="alertThunderstormEnabled" data-i18n="settings.alert_ts">Thunderstorm Alert:</label>
+                        <div class="grid-separator"></div> <label for="alertThunderstormEnabled"
+                            data-i18n="settings.alert_ts">Thunderstorm Alert:</label>
                         <input type="checkbox" id="alertThunderstormEnabled">
 
-                        <div class="grid-separator"></div> <label for="alertCloudsEnabled" data-i18n="settings.alert_cloud_base">Cloud Base Alert:</label>
+                        <div class="grid-separator"></div> <label for="alertCloudsEnabled"
+                            data-i18n="settings.alert_cloud_base">Cloud Base Alert:</label>
                         <input type="checkbox" id="alertCloudsEnabled">
 
                         <label for="alertCloudCover" data-i18n="settings.min_cover">Min. Cloud Cover:</label>

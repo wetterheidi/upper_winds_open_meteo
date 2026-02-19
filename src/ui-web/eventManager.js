@@ -750,6 +750,7 @@ function setupTrackEvents() {
             const file = e.target.files[0];
 
             // UI aktualisieren
+            fileNameDisplay.removeAttribute('data-i18n'); // Verhindert das Überschreiben beim Sprachwechsel
             fileNameDisplay.textContent = file.name;
             fileNameDisplay.style.fontStyle = 'normal';
             if (loadingElement) loadingElement.style.display = 'block';
@@ -787,7 +788,8 @@ function setupTrackEvents() {
                 AppState.isTrackLoaded = false;
 
                 trackFileInput.value = ''; // Input zurücksetzen
-                fileNameDisplay.textContent = 'No file chosen';
+                fileNameDisplay.setAttribute('data-i18n', 'settings.no_file_chosen'); // Reaktiviert die Übersetzung
+                fileNameDisplay.textContent = I18n.t('settings.no_file_chosen');      // Setzt sofort den richtigen Text
                 fileNameDisplay.style.fontStyle = 'italic';
 
             } catch (error) {
@@ -1206,10 +1208,10 @@ function setupAlertSelectEvents() {
  * Richtet den Klick-Event-Listener für das Wetter-Alarm-Icon auf der Karte ein.
  * @private
  */
-async function setupAlertIconEvents() { 
+async function setupAlertIconEvents() {
     const alertIcon = document.getElementById('map-alert-icon');
     if (alertIcon) {
-        alertIcon.addEventListener('click', async () => { 
+        alertIcon.addEventListener('click', async () => {
             const { highWinds, highGusts, thunderstorms, cloudAlerts } = weatherManager.checkWeatherAlerts(AppState.weatherData);
 
             const popupContainer = document.getElementById('info-popup-container');
@@ -1235,16 +1237,16 @@ async function setupAlertIconEvents() {
             if (highWinds.length > 0) {
                 const windThreshold = Settings.state.userSettings.alerts.wind.threshold;
                 const firstTime = await Utils.getDisplayTime(AppState.weatherData.time[highWinds[0]], AppState.lastLat, AppState.lastLng, timeZoneSetting);
-                
+
                 const msg = I18n.t('alerts.high_winds', { threshold: windThreshold, time: firstTime });
                 popupList.appendChild(createListItem(msg));
             }
-            
+
             // 3. Böen-Warnung übersetzen
             if (highGusts.length > 0) {
                 const gustThreshold = Settings.state.userSettings.alerts.gust.threshold;
                 const firstTime = await Utils.getDisplayTime(AppState.weatherData.time[highGusts[0]], AppState.lastLat, AppState.lastLng, timeZoneSetting);
-                
+
                 const msg = I18n.t('alerts.high_gusts', { threshold: gustThreshold, time: firstTime });
                 popupList.appendChild(createListItem(msg));
             }
@@ -1252,7 +1254,7 @@ async function setupAlertIconEvents() {
             // 4. Gewitter-Warnung übersetzen
             if (thunderstorms.length > 0) {
                 const firstTime = await Utils.getDisplayTime(AppState.weatherData.time[thunderstorms[0]], AppState.lastLat, AppState.lastLng, timeZoneSetting);
-                
+
                 const msg = I18n.t('alerts.thunderstorms', { time: firstTime });
                 popupList.appendChild(createListItem(msg));
             }
@@ -1261,7 +1263,7 @@ async function setupAlertIconEvents() {
             if (cloudAlerts.length > 0) {
                 const cloudConfig = Settings.state.userSettings.alerts.clouds;
                 const firstTime = await Utils.getDisplayTime(AppState.weatherData.time[cloudAlerts[0]], AppState.lastLat, AppState.lastLng, timeZoneSetting);
-                
+
                 const msg = I18n.t('alerts.cloud_base', { base: cloudConfig.base, cover: cloudConfig.cover, time: firstTime });
                 popupList.appendChild(createListItem(msg));
             }
@@ -1357,13 +1359,16 @@ function setupCacheManagement() {
     // --- Reset Settings Button ---
     const resetButton = document.createElement('button');
     resetButton.id = 'resetButton';
-    resetButton.textContent = 'Reset Settings';
-    resetButton.title = 'Resets all settings to their default values and locks all features';
-
-    resetButton.className = 'btn btn-danger'; // Weist die neuen CSS-Klassen zu
+    // NEU: Attribut für den automatischen Sprachwechsel setzen
+    resetButton.setAttribute('data-i18n', 'settings.reset_settings');
+    // NEU: Initialen Text und Tooltip übersetzen
+    resetButton.textContent = I18n.t('settings.reset_settings');
+    resetButton.title = I18n.t('settings.reset_settings_title');
+    resetButton.className = 'btn btn-danger'; 
 
     resetButton.addEventListener('click', () => {
-        if (confirm("Are you sure you want to reset all settings and lock all features?")) {
+        // NEU: Confirm-Dialog übersetzen
+        if (confirm(I18n.t('settings.reset_confirm'))) {
             localStorage.removeItem('unlockedFeatures');
             localStorage.removeItem('upperWindsSettings');
             window.location.reload();
@@ -1377,10 +1382,12 @@ function setupCacheManagement() {
     // --- Clear Tile Cache Button ---
     const clearCacheButton = document.createElement('button');
     clearCacheButton.id = 'clearCacheButton';
-    clearCacheButton.textContent = 'Clear Tile Cache';
-    clearCacheButton.title = 'Clears cached map tiles. Pan/zoom to cache more tiles for offline use.';
-
-    clearCacheButton.className = 'btn btn-danger'; // Weist die neuen CSS-Klassen zu
+    // NEU: Attribut für den automatischen Sprachwechsel setzen
+    clearCacheButton.setAttribute('data-i18n', 'settings.clear_cache');
+    // NEU: Initialen Text und Tooltip übersetzen
+    clearCacheButton.textContent = I18n.t('settings.clear_cache');
+    clearCacheButton.title = I18n.t('settings.clear_cache_title');
+    clearCacheButton.className = 'btn btn-danger'; 
 
     clearCacheButton.addEventListener('click', async () => {
         try {
@@ -1397,7 +1404,14 @@ function setupCacheManagement() {
     buttonWrapper.appendChild(clearCacheButton);
 
     targetContainer.appendChild(buttonWrapper);
+
+    // Kleiner Bonus: Tooltips (titles) beim Sprachwechsel sofort mit übersetzen!
+    document.addEventListener('i18n:loaded', () => {
+        resetButton.title = I18n.t('settings.reset_settings_title');
+        clearCacheButton.title = I18n.t('settings.clear_cache_title');
+    });
 }
+
 function setupCacheSettings() {
     const cacheRadiusInput = document.getElementById('cacheRadiusSelect');
     if (cacheRadiusInput) {
@@ -1719,7 +1733,7 @@ function setupAdsbEvents() {
         const speedText = hasNumericSpeed
             ? `${speedUnit === 'bft' ? Math.round(speed) : speed.toFixed(0)} ${speedUnit}`
             : 'N/A';
-            
+
         // HIER STARTEN DIE ÄNDERUNGEN:
         // 1. "Level" übersetzen
         let verticalRateText = I18n.t('adsb.level');
@@ -1728,7 +1742,7 @@ function setupAdsbEvents() {
             if (rateFPM > 100) verticalRateText = `+${rateFPM} ft/min`;
             else if (rateFPM < -100) verticalRateText = `${rateFPM} ft/min`;
         }
-        
+
         // 2. Den HTML-Tooltip mit übersetzten Labels zusammenbauen
         const tooltipContent = `
             <strong>${aircraftData.callsign || 'N/A'}</strong><br>

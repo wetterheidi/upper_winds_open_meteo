@@ -69,28 +69,29 @@ export function setupLanguageDropdown() {
     const selector = document.getElementById('languageSelect');
     if (!selector) return;
 
-    // Setze initialen Wert
-    selector.value = Settings.getValue('language') || 'en';
-
-    // Event Listener für Änderungen
-    // Wir klonen das Element, um sicherzugehen, dass keine alten Listener stören
+    // 1. Wir klonen das Element zuerst
     const newSelector = selector.cloneNode(true);
     selector.parentNode.replaceChild(newSelector, selector);
 
+    // 2. Erst NACH dem Klonen weisen wir den Wert zu!
+    // Wir greifen sicherheitshalber direkt auf die Settings zu
+    newSelector.value = Settings.state.userSettings.language || 'en';
+
+    // 3. Event Listener für Änderungen anbinden
     newSelector.addEventListener('change', async (e) => {
         const newLang = e.target.value;
         
-        // 1. Speichern
+        // Speichern
         if (Settings.state.userSettings) {
             Settings.state.userSettings.language = newLang;
             Settings.save();
         }
 
-        // 2. Laden
+        // Laden
         toggleLoading(true, 'Changing language...');
         await I18n.loadLanguage(newLang);
         
-        // 3. UI Aktualisieren
+        // UI Aktualisieren
         updateTranslations();
         
         toggleLoading(false);

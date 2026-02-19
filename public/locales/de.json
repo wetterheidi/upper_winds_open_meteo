@@ -168,7 +168,8 @@
         "find_dropzones": "Suche nach Dropzones in der Nähe",
         "favorites": "Favoriten",
         "recents": "Letzte Suchanfragen",
-        "results": "Ergebnisse"
+        "results": "Ergebnisse",
+        "placeholder": "Stadt oder Koordinaten suchen..."
     },
     "settings": {
         "language": "Sprache",
@@ -213,7 +214,26 @@
         "alert_ts": "Gewitter-Alarm:",
         "alert_cloud_base": "Wolkenuntergrenzen-Alarm:",
         "min_cover": "Min. Bedeckung:",
-        "max_base": "Max. Untergrenze (m):"
+        "max_base": "Max. Untergrenze (m):",
+        "placeholder": "Keine Datei ausgewählt",
+        "time_1_day": "1 Tag",
+        "time_2_days": "2 Tage",
+        "time_3_days": "3 Tage",
+        "time_4_days": "4 Tage",
+        "time_5_days": "5 Tage",
+        "time_6_days": "6 Tage",
+        "time_7_days": "7 Tage",
+        "time_maximum": "Maximale Zeit",
+        "customized": "Nutzerdefiniert",
+        "surface_data": "Bodendaten",
+        "weather_briefing": "Wetterbriefing",
+        "track_info": "GPX, KML oder FlySight-CSV",
+        "no_file_chosen": "Keine Datei ausgewählt",
+        "reset_settings": "Einstellungen zurücksetzen",
+        "reset_settings_title": "Setzt alle Einstellungen auf die Standardwerte zurück und sperrt alle Funktionen.",
+        "reset_confirm": "Sind Sie sicher, dass Sie alle Einstellungen zurücksetzen und alle Funktionen sperren möchten?",
+        "clear_cache": "Tile-Cache leeren",
+        "clear_cache_title": "Löscht zwischengespeicherte Kartenkacheln. Bewegen/Zoomen Sie, um weitere Kacheln für die Offline-Nutzung zu speichern."
     },
     "modals": {
         "restricted_feature": "Geschützte Funktion",

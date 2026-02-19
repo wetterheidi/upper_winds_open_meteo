@@ -175,6 +175,12 @@ function initializeUIElements() {
     const directionSpan = document.getElementById('jumpRunTrackDirection');
     if (directionSpan) directionSpan.textContent = '-';
 
+    // NEU: Suchfeld-Placeholder beim App-Start übersetzen
+    const searchInput = document.getElementById('locationSearchInput');
+    if (searchInput) {
+        searchInput.placeholder = I18n.t('search.placeholder');
+    }
+
     // Explizit den Slider auf die aktuelle Stunde setzen
     const slider = document.getElementById('timeSlider');
     if (slider) {
@@ -1482,6 +1488,12 @@ function setupAppEventListeners() {
 
     document.addEventListener('i18n:loaded', async () => {
         console.log("[main-web] Language changed, updating dynamic UI components.");
+
+        // NEU: Suchfeld-Placeholder beim Sprachwechsel übersetzen
+        const searchInput = document.getElementById('locationSearchInput');
+        if (searchInput) {
+            searchInput.placeholder = I18n.t('search.placeholder');
+        }
 
         // Prüfen, ob wir überhaupt schon Wetterdaten geladen haben
         if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
