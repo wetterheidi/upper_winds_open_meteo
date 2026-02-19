@@ -282,12 +282,16 @@ export function calculateJump() {
                 weight: 2
             });
 
-            // Erstellen des Tooltip-Inhalts
-            const tooltipContent = `
-                Exit areas calculated with:<br>
-                Throw/Drift: ${Number.isFinite(exitResult.freeFallDirection) ? Math.round(exitResult.freeFallDirection) : 'N/A'}° ${Number.isFinite(exitResult.freeFallDistance) ? Math.round(exitResult.freeFallDistance) : 'N/A'} m<br>
-                Free Fall Time: ${exitResult.freeFallTime != null && !isNaN(exitResult.freeFallTime) ? Math.round(exitResult.freeFallTime) : 'N/A'} sec
-            `;
+            // Erstellen des Tooltip-Inhalts mit Übersetzung
+            const dirVal = Number.isFinite(exitResult.freeFallDirection) ? Math.round(exitResult.freeFallDirection) : 'N/A';
+            const distVal = Number.isFinite(exitResult.freeFallDistance) ? Math.round(exitResult.freeFallDistance) : 'N/A';
+            const timeVal = (exitResult.freeFallTime != null && !isNaN(exitResult.freeFallTime)) ? Math.round(exitResult.freeFallTime) : 'N/A';
+
+            const tooltipContent = I18n.t('planner.exit_tooltip', {
+                dir: dirVal,
+                dist: distVal,
+                time: timeVal
+            });
 
             // Der dunkelgrüne Kreis (Bereich bis zum Downwind) bekommt den Tooltip
             visualizationData.exitCircles.push({
@@ -466,10 +470,17 @@ export function calculateMeanWind() {
     const displayUpper = Math.round(Utils.convertHeight(upperLimitInput, heightUnit));
     const displaySpd = Utils.convertWind(spd, windSpeedUnit, 'kt');
     const formattedSpd = Number.isFinite(spd) ? (windSpeedUnit === 'bft' ? Math.round(spd) : spd.toFixed(1)) : 'N/A';
-    const result = I18n.t('weather.mean_wind_result', { lower: displayLower, upper: displayUpper, heightUnit, refLevel, dir: roundedDir, spd: formattedSpd, windSpeedUnit });
+    // 1. Nur das Wort übersetzen
+    const translatedLabel = I18n.t('weather.mean_wind_result');
 
-    document.getElementById('meanWindResult').innerHTML = result;
-    console.log('Calculated Mean Wind:', result, 'u:', meanWind[2], 'v:', meanWind[3]);
+    // 2. HTML zusammensetzen (mit explizit erzwungenem Styling für das span)
+    const resultHTML = `<span data-i18n="weather.mean_wind_result" style="font-weight: bold; font-size: 16px;">${translatedLabel}</span> (${displayLower}-${displayUpper} ${heightUnit} ${refLevel}): ${roundedDir}° ${formattedSpd} ${windSpeedUnit}`;
+
+    // 3. Ins HTML einfügen
+    document.getElementById('meanWindResult').innerHTML = resultHTML;
+
+    // 4. In der Konsole ausgeben (ohne den HTML-Code, damit es übersichtlich bleibt)
+    console.log('Calculated Mean Wind:', roundedDir + '°', formattedSpd + ' ' + windSpeedUnit);
 }
 
 /**
@@ -1468,6 +1479,33 @@ function updateDashboardPanel(data) {
  */
 function setupAppEventListeners() {
     console.log("[App] Setting up application event listeners...");
+
+    document.addEventListener('i18n:loaded', async () => {
+        console.log("[main-web] Language changed, updating dynamic UI components.");
+
+        // Prüfen, ob wir überhaupt schon Wetterdaten geladen haben
+        if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
+            const sliderIndex = getSliderValue();
+
+            // 1. Wettertabelle und Windspinne komplett neu generieren (mit neuer Sprache)
+            await displayManager.updateWeatherDisplay(sliderIndex, 'weather-table-container', 'selectedTime');
+
+            // 2. Meteogramme (Upper Air / Surface Charts) neu zeichnen, um deren Titel zu übersetzen
+            generateMeteogram(sliderIndex);
+
+            // 3. Popups auf der Karte neu rendern (z.B. "Lat/Lng" vs "Breite/Länge")
+            await displayManager.refreshMarkerPopup();
+
+            // 4. Tooltips der Sprung-Elemente (Landemuster, Jump Run) neu berechnen
+            displayManager.updateLandingPatternDisplay();
+            if (Settings.state.userSettings.showJumpRunTrack) {
+                displayManager.updateJumpRunTrackDisplay();
+            }
+            if (Settings.state.userSettings.calculateJump) {
+                calculateJump();
+            }
+        }
+    });
 
     document.addEventListener('map:moved', () => {
         console.log('[main-mobile] Map has moved or zoomed. Updating visualizations based on new view.');

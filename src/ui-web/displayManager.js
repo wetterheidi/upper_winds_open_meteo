@@ -263,7 +263,7 @@ export async function refreshMarkerPopup(expanded = false, open = false) {
                 MGRS: ${Utils.decimalToMgrs(lat, lng)}
             </div>
             ${altitudeContent}<br>
-            <a href="#" class="toggle-coords-format" data-marker-type="dip" data-expanded="true" style="font-size: 11px;">${I18n.t('common.show_less')}</a>
+            <a href="#" class="toggle-coords-format" data-marker-type="dip" data-expanded="true" style="font-size: 11px;">${I18n.t('map.show_less')}</a>
         `;
     } else {
         const coordFormat = Settings.getValue('coordFormat', 'radio', 'Decimal');
@@ -286,7 +286,7 @@ export async function refreshMarkerPopup(expanded = false, open = false) {
         popupContent = `
             ${coordDisplay}
             ${altitudeContent}<br>
-            <a href="#" class="toggle-coords-format" data-marker-type="dip" data-expanded="false" style="font-size: 11px;">${I18n.t('common.show_more')}</a>
+            <a href="#" class="toggle-coords-format" data-marker-type="dip" data-expanded="false" style="font-size: 11px;">${I18n.t('map.show_more')}</a>
         `;
     }
 

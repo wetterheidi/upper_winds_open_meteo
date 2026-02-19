@@ -73,10 +73,10 @@
         "landing_pattern": "Landemuster",
         "show_landing_pattern": "Landemuster anzeigen",
         "lock": "Sperren",
-        "leg_downwind": "Start Gegenanflug (m AGL):",
-        "leg_base": "Start Queranflug (m AGL):",
+        "leg_downwind": "Start Rückenwindteil (m AGL):",
+        "leg_base": "Start Basisteil (m AGL):",
         "leg_final": "Start Endanflug (m AGL):",
-        "canopy_speed": "Schirmfahrt (kt):",
+        "canopy_speed": "Schirmgeschwindigkeit (kt):",
         "descent_rate": "Sinkrate (m/s):",
         "calculate_jump": "Sprungberechnung",
         "exit_altitude": "Absprunghöhe (m AGL):",
@@ -91,12 +91,12 @@
         "show_exit_area": "Absetzgebiet anzeigen",
         "show_canopy_area": "Schirmfahrtgebiet anzeigen",
         "show_cut_away": "Cut-Away Finder anzeigen",
-        "cut_away_altitude": "Cut-Away Höhe (m):",
+        "cut_away_altitude": "Abtrennhöhe (m):",
         "state_collapsed": "Kollabiert",
         "state_partially": "Teilweise kollabiert",
         "state_open": "Vollständig offen",
         "reset_marker": "Marker zurücksetzen",
-        "min_clearance": "Min. Abstand (m):",
+        "min_clearance": "Mindestabstand (m):",
         "analyze_terrain": "Geländeabstand prüfen",
         "harp_manager": "HARP Manager",
         "place_harp": "HARP setzen",
@@ -132,7 +132,8 @@
         "terrain_error": "Ein Fehler ist während der Geländeanalyse aufgetreten.",
         "direction_locked": "Landerichtung fixiert auf {direction}°",
         "direction_invalid": "Bitte geben Sie eine gültige Richtung (0-360°) ein.",
-        "error_fetch_scenario": "Fehler beim Laden der Daten für das Szenario."
+        "error_fetch_scenario": "Fehler beim Laden der Daten für das Szenario.",
+        "exit_tooltip": "Absetzbereiche berechnet mit:<br>Wurf/Drift: {dir}° {dist} m<br>Freifallzeit: {time} sek"
     },
     "jumpmaster": {
         "find_aircraft": "Flugzeug finden",
@@ -147,7 +148,8 @@
         "accuracy": "Genauigkeit",
         "bearing": "Peilung",
         "distance": "Distanz",
-        "time_to_target": "Zeit zum Ziel"
+        "time_to_target": "Zeit zum Ziel",
+        "jml_to": "JML zum {target}"
     },
     "dashboard": {
         "jumper": "SPRINGER",
@@ -320,7 +322,11 @@
         "tracking_started": "Tracking von {callsign}...",
         "aircraft_lost": "{callsign} ist nicht mehr sichtbar. Tracking gestoppt.",
         "btn_stop": "ADSB-Tracking stoppen",
-        "btn_find": "Flugzeug finden"
+        "btn_find": "Flugzeug finden",
+        "altitude": "Höhe",
+        "speed": "Geschwindigkeit",
+        "vs": "Steig-/Sinkrate",
+        "level": "Horizontal"
     },
     "autoupdate": {
         "enabled": "Automatische Aktualisierung aktiviert",
@@ -419,5 +425,12 @@
         "error_clear_failed": "Fehler beim Löschen des Tracks: {message}",
         "no_track_to_clear": "Kein Track zum Löschen vorhanden.",
         "error_select_elements": "Bitte wählen Sie mindestens ein Element für den Export aus."
+    },
+    "alerts": {
+        "title": "Aktive Wetterwarnungen",
+        "high_winds": "Starker Wind (> {threshold} kt) erkannt ab {time} und zu anderen Zeiten.",
+        "high_gusts": "Starke Böen (> {threshold} kt) erkannt ab {time} und zu anderen Zeiten.",
+        "thunderstorms": "Gewittervorhersage ab {time} und zu anderen Zeiten.",
+        "cloud_base": "Wolkenuntergrenze unter {base} m mit mindestens {cover} Bedeckung erkannt ab {time} und zu anderen Zeiten."
     }
 }

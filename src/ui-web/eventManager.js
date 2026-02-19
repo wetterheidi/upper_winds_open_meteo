@@ -1206,10 +1206,10 @@ function setupAlertSelectEvents() {
  * Richtet den Klick-Event-Listener für das Wetter-Alarm-Icon auf der Karte ein.
  * @private
  */
-async function setupAlertIconEvents() { // Die Funktion ist jetzt async
+async function setupAlertIconEvents() { 
     const alertIcon = document.getElementById('map-alert-icon');
     if (alertIcon) {
-        alertIcon.addEventListener('click', async () => { // Der Callback ist ebenfalls async
+        alertIcon.addEventListener('click', async () => { 
             const { highWinds, highGusts, thunderstorms, cloudAlerts } = weatherManager.checkWeatherAlerts(AppState.weatherData);
 
             const popupContainer = document.getElementById('info-popup-container');
@@ -1219,7 +1219,8 @@ async function setupAlertIconEvents() { // Die Funktion ist jetzt async
 
             if (!popupContainer || !popupTitle || !popupList || !popupClose) return;
 
-            popupTitle.textContent = 'Active Weather Alert';
+            // 1. Titel übersetzen
+            popupTitle.textContent = I18n.t('alerts.title');
             popupList.innerHTML = '';
 
             const createListItem = (text) => {
@@ -1230,28 +1231,39 @@ async function setupAlertIconEvents() { // Die Funktion ist jetzt async
 
             const timeZoneSetting = Settings.getValue('timeZone', 'Z');
 
+            // 2. Starkwind-Warnung übersetzen
             if (highWinds.length > 0) {
                 const windThreshold = Settings.state.userSettings.alerts.wind.threshold;
-                // KORREKTUR: Nutzt getDisplayTime für die korrekte Zeitzone
                 const firstTime = await Utils.getDisplayTime(AppState.weatherData.time[highWinds[0]], AppState.lastLat, AppState.lastLng, timeZoneSetting);
-                popupList.appendChild(createListItem(`High Winds (> ${windThreshold} kt) detected at ${firstTime} and other times.`));
+                
+                const msg = I18n.t('alerts.high_winds', { threshold: windThreshold, time: firstTime });
+                popupList.appendChild(createListItem(msg));
             }
+            
+            // 3. Böen-Warnung übersetzen
             if (highGusts.length > 0) {
                 const gustThreshold = Settings.state.userSettings.alerts.gust.threshold;
-                // KORREKTUR: Nutzt getDisplayTime für die korrekte Zeitzone
                 const firstTime = await Utils.getDisplayTime(AppState.weatherData.time[highGusts[0]], AppState.lastLat, AppState.lastLng, timeZoneSetting);
-                popupList.appendChild(createListItem(`High Gusts (> ${gustThreshold} kt) detected at ${firstTime} and other times.`));
+                
+                const msg = I18n.t('alerts.high_gusts', { threshold: gustThreshold, time: firstTime });
+                popupList.appendChild(createListItem(msg));
             }
 
+            // 4. Gewitter-Warnung übersetzen
             if (thunderstorms.length > 0) {
                 const firstTime = await Utils.getDisplayTime(AppState.weatherData.time[thunderstorms[0]], AppState.lastLat, AppState.lastLng, timeZoneSetting);
-                popupList.appendChild(createListItem(`Thunderstorm forecast at ${firstTime} and other times.`));
+                
+                const msg = I18n.t('alerts.thunderstorms', { time: firstTime });
+                popupList.appendChild(createListItem(msg));
             }
 
+            // 5. Wolken-Warnung übersetzen
             if (cloudAlerts.length > 0) {
                 const cloudConfig = Settings.state.userSettings.alerts.clouds;
                 const firstTime = await Utils.getDisplayTime(AppState.weatherData.time[cloudAlerts[0]], AppState.lastLat, AppState.lastLng, timeZoneSetting);
-                popupList.appendChild(createListItem(`Cloud base below ${cloudConfig.base}m with at least ${cloudConfig.cover} cover detected at ${firstTime} and other times.`));
+                
+                const msg = I18n.t('alerts.cloud_base', { base: cloudConfig.base, cover: cloudConfig.cover, time: firstTime });
+                popupList.appendChild(createListItem(msg));
             }
 
             popupContainer.classList.remove('hidden');
@@ -1707,17 +1719,22 @@ function setupAdsbEvents() {
         const speedText = hasNumericSpeed
             ? `${speedUnit === 'bft' ? Math.round(speed) : speed.toFixed(0)} ${speedUnit}`
             : 'N/A';
-        let verticalRateText = "Level";
+            
+        // HIER STARTEN DIE ÄNDERUNGEN:
+        // 1. "Level" übersetzen
+        let verticalRateText = I18n.t('adsb.level');
         if (aircraftData.vertical_rate) {
             const rateFPM = aircraftData.vertical_rate;
             if (rateFPM > 100) verticalRateText = `+${rateFPM} ft/min`;
             else if (rateFPM < -100) verticalRateText = `${rateFPM} ft/min`;
         }
+        
+        // 2. Den HTML-Tooltip mit übersetzten Labels zusammenbauen
         const tooltipContent = `
             <strong>${aircraftData.callsign || 'N/A'}</strong><br>
-            Altitude: ${altitudeText}<br>
-            Speed: ${speedText}<br>
-            V/S: ${verticalRateText}
+            ${I18n.t('adsb.altitude')}: ${altitudeText}<br>
+            ${I18n.t('adsb.speed')}: ${speedText}<br>
+            ${I18n.t('adsb.vs')}: ${verticalRateText}
         `;
         AppState.aircraftMarker.setTooltipContent(tooltipContent);
     }

@@ -651,8 +651,19 @@ export function calculateCutAway(interpolatedData) {
 
     const [centerLat, centerLng] = Utils.calculateNewCenter(AppState.cutAwayLat, AppState.cutAwayLng, displacementDistance, adjustedWindDirection);
 
-    const stateLabel = Settings.state.userSettings.cutAwayState.replace(/([A-Z])/g, ' $1').trim();
-    const tooltipContent = `<b>${I18n.t('planner.cutaway_title', { state: stateLabel })}</b><br>` +
+    // 1. Mapping der internen Werte auf die Übersetzungs-Keys
+    const stateMapping = {
+        'Open': 'planner.state_open',
+        'Partially': 'planner.state_partially',
+        'Collapsed': 'planner.state_collapsed'
+    };
+    
+    // 2. Den aktuellen Status auslesen und den passenden übersetzten Text holen
+    const rawState = Settings.state.userSettings.cutAwayState;
+    const translatedState = I18n.t(stateMapping[rawState] || 'planner.state_partially');
+
+    // 3. Den Tooltip mit dem übersetzten Status zusammenbauen
+    const tooltipContent = `<b>${I18n.t('planner.cutaway_title', { state: translatedState })}</b><br>` +
         `${I18n.t('planner.cutaway_alt')}: ${cutAwayAltitude} m<br>` +
         `${I18n.t('planner.cutaway_displacement')}: ${meanWindDirection.toFixed(0)}°, ${displacementDistance.toFixed(0)} m<br>` +
         `${I18n.t('planner.cutaway_time_speed')}: ${descentTime.toFixed(0)} s / ${verticalSpeedSelected.toFixed(1)} m/s<br>`;

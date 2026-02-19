@@ -219,8 +219,9 @@ export function updatePlannerUnits(unit, convertValues = true) {
 
             const textSuffix = field.simpleSuffix ? suffixSimple : suffix;
             
-            if (labelEl.firstChild && labelEl.firstChild.nodeType === Node.TEXT_NODE) {
-                labelEl.firstChild.textContent = `${cleanText} ${textSuffix} `;
+            const spanEl = labelEl.querySelector('span[data-i18n]');
+            if (spanEl) {
+                spanEl.textContent = `${cleanText} ${textSuffix} `;
             }
 
             // 2. Limits (min/max/step) anpassen
