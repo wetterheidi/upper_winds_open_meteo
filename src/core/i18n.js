@@ -49,7 +49,7 @@ export const I18n = {
             // Cache-Busting mit Zeitstempel, um sicherzugehen, dass wir die neue Datei bekommen
             // (kann im Produktionsbetrieb entfernt werden)
             const response = await fetch(`./locales/${lang}.json?v=${new Date().getTime()}`);
-            
+
             if (!response.ok) {
                 throw new Error(`Could not load language file: ${lang}`);
             }
@@ -59,7 +59,8 @@ export const I18n = {
 
             // Setze das Attribut am HTML-Tag (gut für CSS Selektoren: html[lang="de"])
             document.documentElement.lang = lang;
-
+            this.updateDom();
+            
             // Event feuern, damit die UI weiß, dass sie sich aktualisieren muss
             document.dispatchEvent(new CustomEvent('i18n:loaded', { detail: { lang } }));
 
@@ -120,5 +121,27 @@ export const I18n = {
         }
 
         return result;
-    }
+    },
+
+    /**
+     * Scannt das gesamte Dokument nach Elementen mit 'data-i18n' Attribut
+     * und ersetzt deren Inhalt durch die passende Übersetzung.
+     */
+    updateDom() {
+        const elements = document.querySelectorAll('[data-i18n]');
+        elements.forEach(el => {
+            const key = el.getAttribute('data-i18n');
+            const translation = this.t(key);
+
+            if (translation !== key) {
+                // Wenn das Element ein Input mit Placeholder ist
+                if (el.tagName === 'INPUT' && el.placeholder) {
+                    el.placeholder = translation;
+                } else {
+                    el.textContent = translation;
+                }
+            }
+        });
+        console.log(`DOM updated with language: ${currentLang}`);
+    },
 };

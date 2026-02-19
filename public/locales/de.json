@@ -2,12 +2,10 @@
     "common": {
         "fetching_weather": "Lade Wetterdaten...",
         "selected_time": "Gewählte Zeit:",
-        "forecast_model": "Wettermodell:",
+        "forecast_model": "Wettermodell",
         "save": "Speichern",
         "cancel": "Abbrechen",
         "acknowledge": "Bestätigen",
-        "today": "Heute",
-        "tomorrow": "Morgen",
         "error_no_location": "Bitte wählen Sie zuerst einen Ort aus."
     },
     "panels": {
@@ -22,6 +20,7 @@
     "weather": {
         "lower_limit": "Untere Grenze (m):",
         "upper_limit": "Obere Grenze (m):",
+        "mean_wind_result": "Mittelwind",
         "step": "Schritt:",
         "table": {
             "altitude_m": "Höhe (m)",
@@ -40,7 +39,7 @@
         "temp": "Temperatur",
         "dew_point": "Taupunkt",
         "wind": "Wind",
-        "wind_speed": "Windgeschwindigkeit",
+        "wind_speed": "Geschw.",
         "gusts": "Böen",
         "time": "Zeit",
         "cloud_cover": "Bewölkung",
@@ -69,7 +68,6 @@
         "no_alerts": "Keine Wetterwarnungen für den gewählten Zeitraum.",
         "safety_warning_title": "Sicherheitshöhe Windwarnung",
         "safety_warning_msg": "Wind in Sicherheitshöhe ({height} {unit}) überschreitet {limit} kt! ({current} kt)"
-
     },
     "planner": {
         "landing_pattern": "Landemuster",
@@ -299,6 +297,7 @@
             "status_complete": "Caching abgeschlossen. {count} Kacheln gespeichert.",
             "status_complete_with_errors": "Caching abgeschlossen. {count} Kacheln gespeichert, {failed} fehlgeschlagen.",
             "status_cancelled_all": "Caching abgebrochen.",
+            "status_setup_failed": "Fehler beim Setup des Tile caching.",
             "cleared_success": "Tile Cache erfolgreich geleert ({size} MB freigegeben).",
             "cleared_error": "Fehler beim Leeren des Tile Caches: {error}",
             "radius_min_warning": "Cache-Radius muss mindestens 1 km betragen.",
@@ -346,7 +345,13 @@
         "error_geolocation": "GPS-Fehler: {message}",
         "error_start_failed": "Tracking konnte nicht gestartet werden: {message}",
         "error_not_supported": "GPS wird von diesem Browser nicht unterstützt.",
-        "error_permission_denied": "GPS-Berechtigung wurde verweigert. Bitte 'Immer zulassen' in den App-Einstellungen aktivieren."
+        "error_permission_denied": "GPS-Berechtigung wurde verweigert. Bitte 'Immer zulassen' in den App-Einstellungen aktivieren.",
+        "status_armed_ready": "System scharfgeschaltet. Bereit für Sprungherkennung.",
+        "error_start_accel": "Beschleunigungssensor konnte nicht gestartet werden: {error}",
+        "error_motion_denied": "Berechtigung für Bewegungssensoren wurde verweigert.",
+        "error_motion_request": "Sensor-Berechtigung konnte nicht angefordert werden.",
+        "error_accel_denied": "Berechtigung für Beschleunigungssensor wurde verweigert.",
+        "error_accel_query": "Beschleunigungssensor-Status konnte nicht abgefragt werden."
     },
     "location": {
         "coordinate": "Koordinate",

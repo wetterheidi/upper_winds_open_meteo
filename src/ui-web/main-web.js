@@ -446,7 +446,7 @@ export function calculateMeanWind() {
     const displayUpper = Math.round(Utils.convertHeight(upperLimitInput, heightUnit));
     const displaySpd = Utils.convertWind(spd, windSpeedUnit, 'kt');
     const formattedSpd = Number.isFinite(spd) ? (windSpeedUnit === 'bft' ? Math.round(spd) : spd.toFixed(1)) : 'N/A';
-    const result = `Mean wind (${displayLower}-${displayUpper} ${heightUnit} ${refLevel}): ${roundedDir}° ${formattedSpd} ${windSpeedUnit}`;
+    const result = I18n.t('weather.mean_wind_result', { lower: displayLower, upper: displayUpper, heightUnit, refLevel, dir: roundedDir, spd: formattedSpd, windSpeedUnit });
     document.getElementById('meanWindResult').innerHTML = result;
     console.log('Calculated Mean Wind:', result, 'u:', meanWind[2], 'v:', meanWind[3]);
 }

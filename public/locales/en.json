@@ -2,12 +2,10 @@
     "common": {
         "fetching_weather": "Fetching Weather...",
         "selected_time": "Selected Time:",
-        "forecast_model": "Forecast Model:",
+        "forecast_model": "Forecast Model",
         "save": "Save",
         "cancel": "Cancel",
         "acknowledge": "Acknowledge",
-        "today": "Today",
-        "tomorrow": "Tomorrow",
         "error_no_location": "Please select a location first."
     },
     "panels": {
@@ -22,11 +20,12 @@
     "weather": {
         "lower_limit": "Lower Limit (m):",
         "upper_limit": "Upper Limit (m):",
+        "mean_wind_result": "Mean wind",
         "step": "Step:",
         "table": {
             "altitude_m": "Altitude (m)",
             "altitude_ft": "Altitude (ft)",
-            "direction": "Direction (°)",
+            "direction": "Dir (deg)",
             "speed_kt": "Speed (kt)",
             "speed_ms": "Speed (m/s)"
         },
@@ -68,7 +67,7 @@
         "surface_data": "Surface Data",
         "no_alerts": "No weather alerts for the selected period.",
         "safety_warning_title": "Safety Height Wind Warning",
-        "safety_warning_msg": "Wind at safety height ({height} {unit}) exceeds {limit} kt! ({current} kt)",
+        "safety_warning_msg": "Wind at safety height ({height} {unit}) exceeds {limit} kt! ({current} kt)"
     },
     "planner": {
         "landing_pattern": "Landing Pattern",
@@ -298,6 +297,7 @@
             "status_complete": "Caching complete. {count} tiles cached.",
             "status_complete_with_errors": "Caching complete. {count} tiles cached, {failed} failed.",
             "status_cancelled_all": "Caching cancelled.",
+            "status_setup_failed": "Tile caching setup failed.",
             "cleared_success": "Tile cache cleared successfully (freed {size} MB).",
             "cleared_error": "Failed to clear tile cache: {error}",
             "radius_min_warning": "Cache radius must be at least 1 km.",
@@ -345,7 +345,13 @@
         "error_geolocation": "Geolocation error: {message}",
         "error_start_failed": "Failed to start tracking: {message}",
         "error_not_supported": "Geolocation is not supported by your browser.",
-        "error_permission_denied": "GPS permission was denied. Please enable 'Always' in the app settings."
+        "error_permission_denied": "GPS permission was denied. Please enable 'Always' in the app settings.",
+        "status_armed_ready": "System armed. Ready for jump detection.",
+        "error_start_accel": "Could not start accelerometer: {error}",
+        "error_motion_denied": "Permission to use motion sensors was denied.",
+        "error_motion_request": "Could not request sensor permission.",
+        "error_accel_denied": "Permission to use accelerometer was denied.",
+        "error_accel_query": "Could not query accelerometer permission."
     },
     "location": {
         "coordinate": "Coordinate",

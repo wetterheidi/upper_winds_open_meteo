@@ -564,7 +564,7 @@ export async function createOrUpdateMarker(lat, lng) {
         attachMarkerDragend(newMarker);
         newMarker.on('click', () => {
             import('../ui-web/displayManager.js').then(displayManager => {
-                 displayManager.refreshMarkerPopup(false, true);
+                displayManager.refreshMarkerPopup(false, true);
             });
         });
         AppState.currentMarker = newMarker;
@@ -735,7 +735,7 @@ export async function updateHarpMarkerPopup(marker, lat, lng, open = false, expa
             qfeText = `${qfe} hPa`;
         }
     }
-    
+
     // I18n Keys nutzen
     const altitudeContent = `<br>${I18n.t('map.alt')}: ${displayAltitude} ${displayUnit}<br>${I18n.t('map.qfe')}: ${qfeText}`;
 
@@ -772,7 +772,7 @@ export async function updateHarpMarkerPopup(marker, lat, lng, open = false, expa
         } else {
             popupContent += `${I18n.t('map.lat')}: ${coords.lat}<br>${I18n.t('map.lng')}: ${coords.lng}`;
         }
-        
+
         popupContent += `${altitudeContent}<br>
             <a href="#" class="toggle-coords-format" data-marker-type="harp" data-lat="${lat}" data-lng="${lng}" data-expanded="false" style="font-size: 11px;">${I18n.t('map.show_more')}</a>
         `;
@@ -794,7 +794,7 @@ export function updatePoiMarkers(pois) {
 
     const poiIcon = L.divIcon({
         html: '🪂',
-        className: 'poi-marker-icon', 
+        className: 'poi-marker-icon',
         iconSize: [24, 24],
         iconAnchor: [12, 12]
     });
@@ -898,7 +898,7 @@ function _addStandardMapControls() {
     // ============================================================
     // NEU: Dynamische Spracheinstellung für Geoman
     // ============================================================
-    
+
     // 1. Sprache beim Start setzen
     const currentLang = Settings.getValue('language') || 'en';
     AppState.map.pm.setLang(currentLang);
@@ -936,13 +936,13 @@ async function _initializeTileCacheLogic() {
         const size = await TileCache.getCacheSize();
         if (size > 500) {
             const result = await TileCache.clearOldTiles(3);
-            Utils.handleMessage(`Cleared ${result.deletedCount} old tiles: ${result.deletedSizeMB.toFixed(2)} MB freed.`);
+            Utils.handleMessage(I18n.t('map.cache.cleared_success')); // NEU: I18n
         } else {
             await TileCache.clearOldTiles();
         }
     } catch (error) {
         console.error('Failed to initialize or manage tile cache:', error);
-        Utils.handleError('Tile caching setup failed.');
+        Utils.handleError(I18n.t('map.cache.status_setup_failed'));
     }
     console.log('Tile cache logic initialized.');
 }
@@ -997,7 +997,7 @@ function _setupBaseLayersAndHandling() {
             L.tileLayer.cached('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
                 maxZoom: 19,
                 attribution: '© EsriEsri, USDA, USGS © OpenStreetMap contributors, and the GIS user community',
-                pane: 'shadowPane' 
+                pane: 'shadowPane'
             })
         ]),
         "Esri Satellite + OSM": L.layerGroup([
@@ -1586,7 +1586,7 @@ function _setupCoreMapEventHandlers() {
             detail: {
                 lat: lat,
                 lng: lng,
-                source: 'contextmenu' 
+                source: 'contextmenu'
             },
             bubbles: true,
             cancelable: true
@@ -1596,12 +1596,12 @@ function _setupCoreMapEventHandlers() {
 
     const mapContainer = AppState.map.getContainer();
     mapContainer.addEventListener('touchstart', async (e) => {
-        if (e.touches.length !== 1 || e.target.closest('.leaflet-marker-icon')) return; 
+        if (e.touches.length !== 1 || e.target.closest('.leaflet-marker-icon')) return;
         const currentTime = new Date().getTime();
-        const timeSinceLastTap = currentTime - lastTapTime; 
-        const tapThreshold = 300; 
+        const timeSinceLastTap = currentTime - lastTapTime;
+        const tapThreshold = 300;
         if (timeSinceLastTap < tapThreshold && timeSinceLastTap > 0) {
-            e.preventDefault(); 
+            e.preventDefault();
             const rect = mapContainer.getBoundingClientRect();
             const touchX = e.touches[0].clientX - rect.left;
             const touchY = e.touches[0].clientY - rect.top;
@@ -1609,8 +1609,8 @@ function _setupCoreMapEventHandlers() {
 
             await _handleMapDblClick({ latlng: latlng, containerPoint: L.point(touchX, touchY), layerPoint: AppState.map.latLngToLayerPoint(latlng) });
         }
-        lastTapTime = currentTime; 
-    }, { passive: false }); 
+        lastTapTime = currentTime;
+    }, { passive: false });
 
     AppState.map.on('click', (e) => {
     });
@@ -1625,7 +1625,7 @@ function _setupCrosshairCoordinateHandler(map) {
     const updateWithDebouncedData = ({ elevation }, requestLatLng) => {
         const currentCenter = map.getCenter();
         if (Math.abs(currentCenter.lat - requestLatLng.lat) > 0.0001 || Math.abs(currentCenter.lng - requestLatLng.lng) > 0.0001) {
-            return; 
+            return;
         }
 
         const currentHTML = AppState.coordsControl._container.innerHTML;
@@ -1677,7 +1677,7 @@ function _setupCrosshairCoordinateHandler(map) {
     };
 
     map.on('move', handleMapMove);
-    setTimeout(() => map.fire('move'), 200); 
+    setTimeout(() => map.fire('move'), 200);
     console.log('Crosshair coordinate handler initialized.');
 }
 
@@ -1700,7 +1700,7 @@ async function _geolocationSuccessCallback(position, defaultZoom) {
     AppState.lastLat = latitude;
     AppState.lastLng = longitude;
     AppState.lastAltitude = await Utils.getAltitude(latitude, longitude);
-    moveMarker(latitude, longitude); 
+    moveMarker(latitude, longitude);
     AppState.map.setView([latitude, longitude], defaultZoom);
 
     const mapSelectEvent = new CustomEvent('location:selected', {

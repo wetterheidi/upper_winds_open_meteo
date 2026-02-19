@@ -305,7 +305,7 @@ export function updateModelInfoPopup() {
     const modelRun = AppState.lastModelRun || "N/A"; // Holt den Model-Run aus dem AppState
 
     // LOKALISIERUNG: Nutzt 'common.forecast_model' und 'weather.model_run'
-    const titleContent = `${I18n.t('common.forecast_model')}: ${model.replace(/_/g, ' ').toUpperCase()}\\n${I18n.t('weather.model_run')}: ${modelRun}`;
+    const titleContent = `${I18n.t('common.forecast_model')}: ${model.replace(/_/g, ' ').toUpperCase()}\\n${I18n.t('weather.model_run')} ${modelRun}`;
 
     // Ersetzt Zeilenumbrüche durch <br> für die HTML-Anzeige (unverändert)
     modelInfoPopup.innerHTML = titleContent.replace(/\\n/g, '<br>');
@@ -369,19 +369,9 @@ export async function updateSliderLabels() {
                 const label = document.createElement('div');
                 label.className = 'slider-label';
 
-                // --- LOKALISIERUNG DES DATUMS-TEXTES ---
-                const currentDtStart = dt.startOf('day');
-                
-                if (currentDtStart.equals(now)) {
-                    // Nutzt "Today" aus en.json / "Heute" aus de.json
-                    label.textContent = I18n.t('common.today');
-                } else if (currentDtStart.equals(now.plus({ days: 1 }))) {
-                    // Nutzt "Tomorrow" aus en.json / "Morgen" aus de.json
-                    label.textContent = I18n.t('common.tomorrow');
-                } else {
-                    // Nutzt Luxon's eingebaute Lokalisierung für Monatsnamen (z.B. "May" vs "Mai")
-                    label.textContent = dt.setLocale(I18n.currentLocale || 'en').toFormat('MMM dd');
-                }
+                // Nutzt Luxon-Lokalisierung für ein einheitliches Datumsformat (z.B. "Okt 24" / "Oct 24")
+                // I18n.getCurrentLanguage() stellt sicher, dass die Sprache aus deinem i18n-Modul verwendet wird.
+                label.textContent = dt.setLocale(I18n.getCurrentLanguage() || 'en').toFormat('MMM dd');
 
                 const positionPercent = (bestIndexForNewDay / totalSteps) * 100;
 
@@ -466,7 +456,7 @@ export function checkSafetyHeightWindWarning() {
 
     // Prüfen auf Error-Objekt aus dem Hierarchy-Check (unverändert)
     if (calcResult && calcResult.error) {
-        displayWarning(calcResult.error); 
+        displayWarning(calcResult.error);
         return;
     }
 
@@ -665,7 +655,7 @@ export function updateJumpRunTrackDisplay() {
         const jumpRunTooltip = I18n.t('planner.jump_run_tooltip')
             .replace('{dir}', trackData.direction)
             .replace('{dist}', trackData.trackLength);
-            
+
         const approachTooltip = I18n.t('planner.approach_tooltip')
             .replace('{dir}', trackData.direction)
             .replace('{dist}', trackData.approachLength);

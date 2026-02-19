@@ -43,7 +43,7 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
 
     if (!AppState.weatherData || !AppState.weatherData.time || index < 0 || index >= AppState.weatherData.time.length) {
         console.error('No weather data available or index out of bounds:', index);
-        tableContainer.innerHTML = `<p style="padding: 20px; text-align: center;">${I18n.t('weather.no_data')}</p>`; 
+        tableContainer.innerHTML = `<p style="padding: 20px; text-align: center;">${I18n.t('weather.no_data')}</p>`;
         timeContainer.innerHTML = `${I18n.t('common.selected_time')}`;
         const slider = document.getElementById('timeSlider');
         if (slider) slider.value = 0;
@@ -301,7 +301,7 @@ export function updateModelInfoPopup() {
     const modelRun = AppState.lastModelRun || "N/A";
 
     // "Model:" und "Run:" werden durch I18n.t ersetzt
-    const titleContent = `${I18n.t('common.forecast_model')}: ${model.replace(/_/g, ' ').toUpperCase()}\n${I18n.t('weather.model_run')}: ${modelRun}`;
+    const titleContent = `${I18n.t('common.forecast_model')}: ${model.replace(/_/g, ' ').toUpperCase()}\n${I18n.t('weather.model_run')} ${modelRun}`;
 
     // Ersetzt Zeilenumbrüche durch <br> für die HTML-Anzeige
     modelInfoPopup.innerHTML = titleContent.replace(/\n/g, '<br>');
@@ -364,18 +364,9 @@ export async function updateSliderLabels() {
                 const label = document.createElement('div');
                 label.className = 'slider-label';
 
-                // --- LOKALISIERUNGS-LOGIK START ---
-                // Prüfen auf "Heute" oder "Morgen", sonst Standard-Formatierung
-                const currentDtStart = dt.startOf('day');
-                if (currentDtStart.equals(now)) {
-                    label.textContent = I18n.t('common.today');
-                } else if (currentDtStart.equals(now.plus({ days: 1 }))) {
-                    label.textContent = I18n.t('common.tomorrow');
-                } else {
-                    // Nutzt Luxon-Lokalisierung für Monatsnamen (z.B. "Okt 24" vs "Oct 24")
-                    label.textContent = dt.setLocale(I18n.currentLocale || 'en').toFormat('MMM dd');
-                }
-                // --- LOKALISIERUNGS-LOGIK ENDE ---
+                // Nutzt Luxon-Lokalisierung für ein einheitliches Datumsformat (z.B. "Okt 24" / "Oct 24")
+                // I18n.getCurrentLanguage() stellt sicher, dass die Sprache aus deinem i18n-Modul verwendet wird.
+                label.textContent = dt.setLocale(I18n.getCurrentLanguage() || 'en').toFormat('MMM dd');
 
                 const positionPercent = (bestIndexForNewDay / totalSteps) * 100;
 

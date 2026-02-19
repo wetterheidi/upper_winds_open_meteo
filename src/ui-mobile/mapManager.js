@@ -1179,13 +1179,13 @@ async function _initializeTileCacheLogic() {
         const size = await TileCache.getCacheSize();
         if (size > 500) {
             const result = await TileCache.clearOldTiles(3);
-            Utils.handleMessage(`Cleared ${result.deletedCount} old tiles: ${result.deletedSizeMB.toFixed(2)} MB freed.`);
+            Utils.handleMessage(I18n.t('map.cache.cleared_success')); // NEU: I18n
         } else {
             await TileCache.clearOldTiles();
         }
     } catch (error) {
         console.error('Failed to initialize or manage tile cache:', error);
-        Utils.handleError('Tile caching setup failed.');
+        Utils.handleError(I18n.t('map.cache.status_setup_failed'));
     }
     console.log('Tile cache logic initialized.');
 }

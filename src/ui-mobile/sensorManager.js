@@ -49,15 +49,15 @@ export const SensorManager = {
         const activateSensors = async () => {
             try {
                 await startSensor(); // Warte, bis der Sensor wirklich gestartet ist
-                
+
                 AppState.isArmed = true;
                 document.addEventListener('tracking:positionUpdated', updateDescentRate);
-                
-                Utils.handleMessage('System armed. Ready for jump detection.');
+
+                Utils.handleMessage(I18n.t('tracking.status_armed_ready'));
                 document.dispatchEvent(new CustomEvent('sensor:armed'));
 
             } catch (error) {
-                Utils.handleError(`Could not start accelerometer: ${error.message}`);
+                Utils.handleError(I18n.t('tracking.error_start_accel', { error: error.message }));
             }
         };
 
@@ -67,23 +67,23 @@ export const SensorManager = {
                 if (permissionState === 'granted') {
                     await activateSensors();
                 } else {
-                    Utils.handleError('Permission to use motion sensors was denied.');
+                    Utils.handleError(I18n.t('tracking.error_motion_denied'));
                 }
             } catch (error) {
                 console.error('Error requesting motion sensor permission:', error);
-                Utils.handleError('Could not request sensor permission.');
+                Utils.handleError(I18n.t('tracking.error_motion_request'));
             }
         } else {
             // Fallback für Android etc.
             try {
                 const result = await navigator.permissions.query({ name: 'accelerometer' });
                 if (result.state === 'denied') {
-                    Utils.handleError('Permission to use accelerometer was denied.');
+                    Utils.handleError(I18n.t('tracking.error_accel_denied'));
                     return;
                 }
                 await activateSensors();
             } catch (error) {
-                Utils.handleError('Could not query accelerometer permission.');
+                Utils.handleError(I18n.t('tracking.error_accel_query'));
                 console.error(error);
             }
         }
@@ -99,7 +99,7 @@ export const SensorManager = {
         stopSensor();
         document.dispatchEvent(new CustomEvent('sensor:disarmed'));
     },
-    
+
     /**
      * Überprüft bei jeder Positionsaktualisierung, ob eine Landung stattgefunden hat.
      * @param {number} descentRateMps - Die aktuelle Sinkrate in m/s.
@@ -149,9 +149,9 @@ function processSensorData(ax, ay, az, timestamp) {
     if (dt <= 0) return;
 
     if (AppState.isArmed) {
-        const jerkMagnitude = Math.sqrt(((ax - lastX) / dt)**2 + ((ay - lastY) / dt)**2 + ((az - lastZ) / dt)**2);
+        const jerkMagnitude = Math.sqrt(((ax - lastX) / dt) ** 2 + ((ay - lastY) / dt) ** 2 + ((az - lastZ) / dt) ** 2);
         // Da der Standard-Accelerometer die Schwerkraft misst, ist der Betrag im freien Fall nahe 0 (nicht ~9.81).
-        const accelMagnitude = Math.sqrt(ax**2 + ay**2 + az**2);
+        const accelMagnitude = Math.sqrt(ax ** 2 + ay ** 2 + az ** 2);
 
         // Zustand 1: Warten auf den initialen Ruck
         if (!jerkDetectionTimeout) {
@@ -167,9 +167,9 @@ function processSensorData(ax, ay, az, timestamp) {
         else {
             if (accelMagnitude < FREEFALL_ACCEL_MAX && lastDescentRate > DESCENT_RATE_THRESHOLD) {
                 console.log(`Phase 2: Confirmation! Freefall (Accel: ${accelMagnitude.toFixed(2)}) AND Descent Rate (${lastDescentRate.toFixed(1)} m/s). Starting recording!`);
-                
+
                 document.dispatchEvent(new CustomEvent('sensor:freefall_detected'));
-                
+
                 clearTimeout(jerkDetectionTimeout);
                 jerkDetectionTimeout = null;
                 SensorManager.disarm();
@@ -207,15 +207,15 @@ function startSensor() {
             } catch (error) {
                 reject(error);
             }
-        // 2. Wahl: DeviceMotionEvent (iOS)
+            // 2. Wahl: DeviceMotionEvent (iOS)
         } else if (typeof DeviceMotionEvent !== 'undefined') {
             window.addEventListener('devicemotion', handleDeviceMotionEvent);
             sensorApi = 'devicemotion';
             console.log("Attached devicemotion listener for iOS.");
             resolve();
-        // 3. Wahl: Standard Accelerometer (Fallback)
+            // 3. Wahl: Standard Accelerometer (Fallback)
         } else if ('Accelerometer' in window) {
-             try {
+            try {
                 const sensor = new Accelerometer({ frequency: SENSOR_FREQUENCY });
                 sensor.addEventListener('reading', handleSensorReading);
                 sensor.addEventListener('error', (event) => reject(event.error));
@@ -245,7 +245,7 @@ function stopSensor() {
         window.removeEventListener('devicemotion', handleDeviceMotionEvent);
         console.log("Removed devicemotion listener.");
     }
-    
+
     sensorApi = null;
     document.removeEventListener('tracking:positionUpdated', updateDescentRate);
     if (jerkDetectionTimeout) {
