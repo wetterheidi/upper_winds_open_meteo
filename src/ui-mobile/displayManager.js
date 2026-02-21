@@ -272,13 +272,13 @@ export async function refreshMarkerPopup(expanded = false, open = false) {
         if (coordFormat === 'MGRS') {
             coordDisplay = `MGRS: ${coords.lat}`;
         } else if (coordFormat === 'DMS') {
-            coordDisplay = `${I18n.t('location.latitude')}: ${formatDMS(coords.lat)}<br>${I18n.t('location.longitude')}: ${formatDMS(coords.lng)}`;
+            coordDisplay = `${I18n.t('map.lat')}: ${formatDMS(coords.lat)}<br>${I18n.t('map.lng')}: ${formatDMS(coords.lng)}`;
         } else if (coordFormat === 'DDM') {
-            coordDisplay = `${I18n.t('location.latitude')}: ${formatDDM(coords.lat)}<br>${I18n.t('location.longitude')}: ${formatDDM(coords.lng)}`;
+            coordDisplay = `${I18n.t('map.lat')}: ${formatDDM(coords.lat)}<br>${I18n.t('map.lng')}: ${formatDDM(coords.lng)}`;
         } else {
-            coordDisplay = `${I18n.t('location.latitude')}: ${coords.lat}<br>${I18n.t('location.longitude')}: ${coords.lng}`;
+            coordDisplay = `${I18n.t('map.lat')}: ${coords.lat}<br>${I18n.t('map.lng')}: ${coords.lng}`;
         }
-
+ 
         popupContent = `
             ${coordDisplay}
             ${altitudeContent}<br>

@@ -195,8 +195,8 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
                     <th>${I18n.t('weather.wind_speed')} (${windSpeedUnit})</th>
                     <th>${I18n.t('weather.wind')}</th>
                     <th>${I18n.t('weather.temp').charAt(0)} (${temperatureUnit === 'C' ? '°C' : '°F'})</th>
-                    <th>RH (%)</th>
-                    <th>CC (%)</th>
+                    <th>${I18n.t('weather.humidity')} (%)</th>
+                    <th>${I18n.t('weather.clouds')} (%)</th>
                 </tr>
             </thead>
             <tbody>
@@ -276,11 +276,11 @@ export async function refreshMarkerPopup(expanded = false, open = false) {
         if (coordFormat === 'MGRS') {
             coordDisplay = `MGRS: ${coords.lat}`;
         } else if (coordFormat === 'DMS') {
-            coordDisplay = `${I18n.t('location.latitude')}: ${formatDMS(coords.lat)}<br>${I18n.t('location.longitude')}: ${formatDMS(coords.lng)}`;
+            coordDisplay = `${I18n.t('map.lat')}: ${formatDMS(coords.lat)}<br>${I18n.t('map.lng')}: ${formatDMS(coords.lng)}`;
         } else if (coordFormat === 'DDM') {
-            coordDisplay = `${I18n.t('location.latitude')}: ${formatDDM(coords.lat)}<br>${I18n.t('location.longitude')}: ${formatDDM(coords.lng)}`;
+            coordDisplay = `${I18n.t('map.lat')}: ${formatDDM(coords.lat)}<br>${I18n.t('map.lng')}: ${formatDDM(coords.lng)}`;
         } else {
-            coordDisplay = `${I18n.t('location.latitude')}: ${coords.lat}<br>${I18n.t('location.longitude')}: ${coords.lng}`;
+            coordDisplay = `${I18n.t('map.lat')}: ${coords.lat}<br>${I18n.t('map.lng')}: ${coords.lng}`;
         }
 
         popupContent = `

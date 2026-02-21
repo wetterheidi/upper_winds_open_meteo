@@ -382,7 +382,7 @@
                                 <li>
                                     <label for="harpCoordInput" class="radio-label" data-i18n="planner.enter_coords">Or
                                         enter coordinates:</label>
-                                    <input type="text" id="harpCoordInput" placeholder="e.g., 48.123, 11.456 or MGRS">
+                                    <input type="text" id="harpCoordInput" placeholder="e.g.: 48.123, 11.456 or MGRS">
                                     <button id="placeHarpCoordButton" class="btn btn-primary"
                                         data-i18n="planner.place_by_coords">Place by Coords</button>
                                 </li>
@@ -579,18 +579,6 @@
                 </div>
 
                 <div id="panel-settings" class="panel hidden">
-                    <div class="accordion-item">
-                        <button class="accordion-header" data-i18n="settings.language">Language</button>
-                        <div class="accordion-content">
-                            <div class="settings-grid">
-                                <label for="languageSelect" data-i18n="settings.select_language">Language:</label>
-                                <select id="languageSelect">
-                                    <option value="en">English</option>
-                                    <option value="de">Deutsch</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
 
                     <div class="accordion-item">
                         <button class="accordion-header" data-i18n="settings.units">Units</button>
@@ -803,6 +791,19 @@
 
                                 <label for="alertCloudBase" data-i18n="settings.max_base">Max. Cloud Base (m):</label>
                                 <input type="number" id="alertCloudBase" min="100" max="10000" step="100">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item">
+                        <button class="accordion-header" data-i18n="settings.language">Language</button>
+                        <div class="accordion-content">
+                            <div class="settings-grid">
+                                <label for="languageSelect" data-i18n="settings.select_language">Language:</label>
+                                <select id="languageSelect">
+                                    <option value="en">English</option>
+                                    <option value="de">Deutsch</option>
+                                </select>
                             </div>
                         </div>
                     </div>

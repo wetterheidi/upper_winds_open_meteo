@@ -42,6 +42,8 @@
         "dew_point": "Dew Point",
         "wind": "Wind",
         "wind_speed": "Wind Speed",
+        "humidity": "Humidity",
+        "clouds": "Clouds",
         "gusts": "Gusts",
         "time": "Time",
         "cloud_cover": "Cloud Cover",
@@ -150,7 +152,8 @@
         "terrain_analyzing": "Analyzing terrain... ({current}/{total})",
         "terrain_warning": "Warning: Low clearance areas detected and marked in red.",
         "safety_height_exceeds": "Safety Height exceeds available canopy altitude. Resetting to {max} {unit}.",
-        "safety_height_limited": "Safety Height limited to max 600m. Resetting to {max} {unit}."
+        "safety_height_limited": "Safety Height limited to max 600m. Resetting to {max} {unit}.",
+        "harp_coordinates_placeholder": "e.g.: 48.123, 11.456 or MGRS"
     },
     "jumpmaster": {
         "find_aircraft": "Find Aircraft To Track",
@@ -262,7 +265,8 @@
         "aircraft_nearby": "Aircrafts nearby (Call Sign / Altitude):",
         "weather_briefing": "Weather Briefing",
         "notice_location": "Notice on Location Use",
-        "confirm": "Confirm"
+        "confirm": "Confirm",
+        "favorite_name": "Enter favorite name"
     },
     "messages": {
         "password_error": "Incorrect password",

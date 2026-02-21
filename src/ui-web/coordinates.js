@@ -53,7 +53,7 @@ export function initializeLocationSearch() {
         currentFavoriteData = {
             lat: AppState.lastLat,
             lng: AppState.lastLng,
-            defaultName: `DIP at ${AppState.lastLat.toFixed(4)}, ${AppState.lastLng.toFixed(4)}`
+            defaultName: I18n.t('location.default_favorite_name', { lat: AppState.lastLat.toFixed(4), lng: AppState.lastLng.toFixed(4) })
         };
         favoriteNameInput.value = currentFavoriteData.defaultName;
         favoriteModal.style.display = 'flex';

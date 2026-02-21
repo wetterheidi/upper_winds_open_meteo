@@ -42,6 +42,8 @@
         "dew_point": "Taupunkt",
         "wind": "Wind",
         "wind_speed": "Geschw.",
+        "humidity": "Feuchte",
+        "clouds": "Wolken",
         "gusts": "Böen",
         "time": "Zeit",
         "cloud_cover": "Bewölkung",
@@ -93,7 +95,7 @@
         "aircraft_speed": "Absetzgeschwindigkeit (ktIAS):",
         "number_of_jumpers": "Anzahl Springer:",
         "separation": "Abstand (s):",
-        "show_jump_run_track": "Absetzrichtung anzeigen:",
+        "show_jump_run_track": "Anflugrichtung anzeigen:",
         "jump_run_offset": "Seitlicher Versatz (m):",
         "jump_run_forward_offset": "Längsversatz (m):",
         "show_exit_area": "Absetzgebiet anzeigen",
@@ -150,7 +152,8 @@
         "freefall_mean_wind_calculation_failed": "calculateFreeFall: Konnte mittleren Wind nicht berechnen.",
         "terrain_analyzing": "Analysiere Gelände... ({current}/{total})",
         "safety_height_exceeds": "Sicherheitshöhe überschreitet verfügbare Schirmfahrthöhe. Setze zurück auf {max} {unit}.",
-        "safety_height_limited": "Sicherheitshöhe ist auf maximal 600m begrenzt. Setze zurück auf {max} {unit}."
+        "safety_height_limited": "Sicherheitshöhe ist auf maximal 600m begrenzt. Setze zurück auf {max} {unit}.",
+        "harp_coordinates_placeholder": "z.B.: 48.123, 11.456 oder MGRS"
     },
     "jumpmaster": {
         "find_aircraft": "Flugzeug finden",
@@ -205,7 +208,7 @@
         "export_jump": "Sprung exportieren",
         "select_elements": "Elemente wählen:",
         "include": "Einschließen:",
-        "jump_run_exit": "Absetzrichtung & Exit",
+        "jump_run_exit": "Anflugrichtung & Exit",
         "landing_pattern": "Landemuster",
         "exit_area": "Absetzgebiet (Grün)",
         "canopy_range": "Schirmreichweite (Rot/Blau)",
@@ -262,7 +265,8 @@
         "aircraft_nearby": "Flugzeuge in der Nähe (Call Sign / Höhe):",
         "weather_briefing": "Wetter Briefing",
         "notice_location": "Hinweis zur Standortnutzung",
-        "confirm": "Bestätigen"
+        "confirm": "Bestätigen",
+        "favorite_name": "Enter favorite name"
     },
     "messages": {
         "password_error": "Falsches Passwort",

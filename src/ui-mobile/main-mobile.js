@@ -181,6 +181,21 @@ function initializeUIElements() {
         searchInput.placeholder = I18n.t('search.placeholder');
     }
 
+    const jumpRunDirectionInput = document.getElementById('jumpRunTrackDirection');
+    if (jumpRunDirectionInput) {
+        jumpRunDirectionInput.placeholder = I18n.t('planner.calculated');
+    }
+
+    const harpCoordInput = document.getElementById('harpCoordInput');
+    if (harpCoordInput) {
+        harpCoordInput.placeholder = I18n.t('planner.harp_coordinates_placeholder');
+    }
+
+    const favInput = document.getElementById('favoriteNameInput');
+    if (favInput) {
+        favInput.placeholder = I18n.t('modals.favorite_name');
+    }
+
     // Explizit den Slider auf die aktuelle Stunde setzen
     const slider = document.getElementById('timeSlider');
     if (slider) {
@@ -1502,6 +1517,21 @@ function setupAppEventListeners() {
         const searchInput = document.getElementById('locationSearchInput');
         if (searchInput) {
             searchInput.placeholder = I18n.t('search.placeholder');
+        }
+
+        const jumpRunDirectionInput = document.getElementById('jumpRunTrackDirection');
+        if (jumpRunDirectionInput) {
+            jumpRunDirectionInput.placeholder = I18n.t('planner.calculated');
+        }
+
+        const harpCoordInput = document.getElementById('harpCoordInput');
+        if (harpCoordInput) {
+            harpCoordInput.placeholder = I18n.t('planner.harp_coordinates_placeholder');
+        }
+
+        const favInput = document.getElementById('favoriteNameInput');
+        if (favInput) {
+            favInput.placeholder = I18n.t('modals.favorite_name');
         }
 
         // Prüfen, ob wir überhaupt schon Wetterdaten geladen haben
