@@ -101,7 +101,7 @@ export async function startPositionTracking() {
                         },
                         (error) => {
                             console.error("[LiveTrackingManager] Web Geolocation error:", error);
-                            Utils.handleError(`Geolocation error: ${error.message || 'Unknown error'}`);
+                            Utils.handleError(I18n.t('tracking.error_geolocation', { message: error.message || 'Unknown' }));
                             stopPositionTracking();
                         },
                         { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
@@ -438,7 +438,7 @@ async function checkAndRequestPermissions() {
         console.log('Initial geolocation permissions state:', permissions);
 
         if (permissions.location === 'denied') {
-            Utils.handleError('GPS permission was denied. Please enable "Always" in the app settings.');
+            Utils.handleError(I18n.t('tracking.error_gps_denied'));
             return false;
         }
 
@@ -450,7 +450,7 @@ async function checkAndRequestPermissions() {
                 console.log('New geolocation permissions state:', requestResult);
 
                 if (requestResult.location !== 'granted') {
-                    Utils.handleError('GPS permission is required for live tracking.');
+                    Utils.handleError(I18n.t('tracking.error_gps_denied'));
                     return false;
                 }
             } catch (error) {
@@ -463,7 +463,7 @@ async function checkAndRequestPermissions() {
         return true;
     } catch (error) {
         console.error('Error in checkAndRequestPermissions:', error);
-        Utils.handleError('Could not check location permissions.');
+        Utils.handleError(I18n.t('tracking.error_location_denied', { message: error.message || 'Unknown' }));
         return false;
     }
 }

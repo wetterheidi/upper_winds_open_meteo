@@ -6,7 +6,9 @@
         "save": "Save",
         "cancel": "Cancel",
         "acknowledge": "Acknowledge",
-        "error_no_location": "Please select a location first."
+        "error_no_location": "Please select a location first.",
+        "file_saved": "File saved: {filename}",
+        "error_opening_file": "Could not open file: {error.message}"
     },
     "panels": {
         "map": "Map",
@@ -50,6 +52,7 @@
             "wind_chart_title": "Wind chart for current location"
         },
         "error_fetch_failed": "Failed to fetch weather data: {error}",
+        "error_updating_data": "Failed to update weather data: {error}",
         "error_no_data": "No weather data received from API.",
         "error_location_missing": "Location (Lat/Lng) is required for weather fetch.",
         "error_geocoding_failed": "Reverse geocoding failed.",
@@ -67,7 +70,12 @@
         "surface_data": "Surface Data",
         "no_alerts": "No weather alerts for the selected period.",
         "safety_warning_title": "Safety Height Wind Warning",
-        "safety_warning_msg": "Wind at safety height ({height} {unit}) exceeds {limit} kt! ({current} kt)"
+        "safety_warning_msg": "Wind at safety height ({height} {unit}) exceeds {limit} kt! ({current} kt)",
+        "mean_wind_error": "Cannot calculate mean wind: missing data or altitude",
+        "mean_wind_layer_error": "Invalid layer limits. Ensure Lower < Upper and both are numbers.",
+        "weather_fetch_failed": "No weather data available.",
+        "error_layer_below_terrain": "The entire layer ({lower}-{upper} {unit}) is below the terrain elevation of {base} {unit}.",
+        "lower_limit_adjusted": "Lower limit adjusted to {base} {unit} to align with terrain elevation."
     },
     "planner": {
         "landing_pattern": "Landing Pattern",
@@ -133,7 +141,16 @@
         "direction_locked": "Landing direction locked to {direction}°",
         "direction_invalid": "Please enter a valid 0-360° direction before locking.",
         "error_fetch_scenario": "Failed to fetch data for scenario.",
-        "exit_tooltip": "Exit areas calculated with:<br>Throw/Drift: {dir}° {dist} m<br>Free Fall Time: {time} sec"
+        "exit_tooltip": "Exit areas calculated with:<br>Throw/Drift: {dir}° {dist} m<br>Free Fall Time: {time} sec",
+        "cached_terrain_data": "Using cached terrain data for instant analysis.",
+        "freefall_weather_data_missing": "calculateFreeFall: Weather data missing.",
+        "freefall_invalid_coordinates": "calculateFreeFall: Invalid start coordinates or terrain height.",
+        "freefall_exit_altitude_invalid": "calculateFreeFall: Exit altitude must be above the opening altitude.",
+        "freefall_mean_wind_calculation_failed": "calculateFreeFall: Failed to calculate mean wind.",
+        "terrain_analyzing": "Analyzing terrain... ({current}/{total})",
+        "terrain_warning": "Warning: Low clearance areas detected and marked in red.",
+        "safety_height_exceeds": "Safety Height exceeds available canopy altitude. Resetting to {max} {unit}.",
+        "safety_height_limited": "Safety Height limited to max 600m. Resetting to {max} {unit}."
     },
     "jumpmaster": {
         "find_aircraft": "Find Aircraft To Track",
@@ -277,7 +294,16 @@
         "exit_alt_range": "Exit altitude must be between 500 and 15000 meters.",
         "enter_coords": "Please enter coordinates.",
         "invalid_coords_format": "Invalid coordinates. Please enter a valid MGRS or Decimal Degree format.",
-        "poi_search_error": "An error occurred during the search."
+        "poi_search_error": "An error occurred during the search.",
+        "ensemble_fetch_error_details": "Could not fetch ensemble data: {error}",
+        "slider_update_error": "Error during slider update: {error}",
+        "location_select_error": "Error processing selected location: {error}",
+        "clear_date_failed": "Failed to clear historical date filter.",
+        "location_selection_failed": "Failed to process selected location: {error}",
+        "refresh_failed": "Failed to refresh forecast.",
+        "refresh_successful": "Forecast updated to the current day.",
+        "refresh_in_progress": "Refreshing forecast to the current day...",
+        "landing_direction_locked": "Warning! Landing direction locked"
     },
     "map": {
         "drag_to_move_track": "Drag to move Jump Run Track",
@@ -331,7 +357,10 @@
             "set_as_dip": "Set as DIP",
             "coords": "Coordinates",
             "alt": "Alt"
-        }
+        },
+        "map_init_failed": "Failed to initialize map. Using default position.",
+        "invalid_position": "Invalid position selected. Using default position.",
+        "select_position": "Please select a position on the map first."
     },
     "adsb": {
         "tracking_stopped": "ADSB tracking stopped.",
@@ -352,12 +381,16 @@
         "enabled": "Autoupdate enabled",
         "disabled": "Autoupdate disabled",
         "error_offline": "Cannot enable autoupdate while offline.",
-        "error_historical_date": "Autoupdate cannot be enabled with a historical date set."
+        "error_historical_date": "Autoupdate cannot be enabled with a historical date set.",
+        "no_location_error": "Please select a location to enable autoupdate.",
+        "offline_error": "Cannot update weather data while offline.",
+        "historical_track_loaded_warning": "Autoupdate disabled for historical track viewing."
     },
     "ensemble": {
         "error_api_limit": "API-Limit for ensemble data reached. Please wait a moment and retry again.",
         "error_api_failed": "API request failed: {status}",
-        "tooltip_mean_wind": "Mean Wind {lower}-{upper} {unit} AGL:<br>{dir}° {speed} {windUnit}"
+        "tooltip_mean_wind": "Mean Wind {lower}-{upper} {unit} AGL:<br>{dir}° {speed} {windUnit}",
+        "all_models_deselected": "All ensemble models deselected."
     },
     "tracking": {
         "disclosure_title": "Notice on Location Use",
@@ -377,7 +410,10 @@
         "error_motion_denied": "Permission to use motion sensors was denied.",
         "error_motion_request": "Could not request sensor permission.",
         "error_accel_denied": "Permission to use accelerometer was denied.",
-        "error_accel_query": "Could not query accelerometer permission."
+        "error_accel_query": "Could not query accelerometer permission.",
+        "error_gps_denied": "GPS permission was denied. Please enable \"Always\" in the app settings.",
+        "error_location_denied": "Location permission was denied. Please enable \"Always\" in the app settings.",
+        "freefall_detected": "Freefall detected! Recording started."
     },
     "location": {
         "coordinate": "Coordinate",
@@ -401,7 +437,8 @@
         "delete_entry": "Delete this entry",
         "delete_confirm": "Delete \"{name}\"?",
         "default_favorite_name": "DIP at {lat}, {lng}",
-        "error_select_first": "Please select a location on the map first."
+        "error_select_first": "Please select a location on the map first.",
+        "warning_zoom_poi": "Please zoom in to Level {zoom}+ to search for dropzones."
     },
     "tracks": {
         "error_map_init": "Map not initialized.",
@@ -444,7 +481,12 @@
         "error_clear_init": "Cannot clear track: map not initialized.",
         "error_clear_failed": "Failed to clear track: {message}",
         "no_track_to_clear": "No track to clear.",
-        "error_select_elements": "Please select at least one element to export."
+        "error_select_elements": "Please select at least one element to export.",
+        "error_process_track_file": "Failed to process track file.",
+        "opening_track_file": "Opening track file...",
+        "error_loading_completely": "Could not load track data completely.",
+        "error_invalid_data": "Received invalid track data. Please try again.",
+        "kml_loaded": "KML file loaded successfully."
     },
     "alerts": {
         "title": "Active Weather Alerts",
@@ -452,5 +494,18 @@
         "high_gusts": "High Gusts (> {threshold} kt) detected at {time} and other times.",
         "thunderstorms": "Thunderstorm forecast at {time} and other times.",
         "cloud_base": "Cloud base below {base}m with at least {cover} cover detected at {time} and other times."
+    },
+    "utils": {
+        "mean_wind_error_details": "Failed to calculate mean wind: {error}",
+        "base_leg_error": "Base leg must start higher than final leg.",
+        "downwind_leg_error": "Downwind leg must start higher than base leg."
+    },
+    "download": {
+        "no_data_error": "No weather data available to download.",
+        "no_interpolated_data_error": "No interpolated data available to download.",
+        "could_not_save_file": "Could not save file.",
+        "no_report_data": "No weather data available for the report.",
+        "error_showing_report": "Could not save or show briefing file.",
+        "briefing_saved": "Briefing saved in Documents/DZMaster"
     }
 }

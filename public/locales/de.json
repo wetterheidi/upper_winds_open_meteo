@@ -6,7 +6,9 @@
         "save": "Speichern",
         "cancel": "Abbrechen",
         "acknowledge": "Bestätigen",
-        "error_no_location": "Bitte wählen Sie zuerst einen Ort aus."
+        "error_no_location": "Bitte wählen Sie zuerst einen Ort aus.",
+        "file_saved": "Datei gespeichert: {filename}",
+        "error_opening_file": "Konnte Datei nicht öffnen: {error.message}"
     },
     "panels": {
         "map": "Karte",
@@ -50,6 +52,7 @@
             "wind_chart_title": "Windspinne für den aktuellen Standort"
         },
         "error_fetch_failed": "Wetterdaten konnten nicht geladen werden: {error}",
+        "error_updating_data": "Failed to update weather data: {error}",
         "error_no_data": "Keine Wetterdaten von der API empfangen.",
         "error_location_missing": "Position (Lat/Lng) wird für den Wetterabruf benötigt.",
         "error_geocoding_failed": "Rückwärts-Geokodierung fehlgeschlagen.",
@@ -67,7 +70,12 @@
         "surface_data": "Bodendaten",
         "no_alerts": "Keine Wetterwarnungen für den gewählten Zeitraum.",
         "safety_warning_title": "Sicherheitshöhe Windwarnung",
-        "safety_warning_msg": "Wind in Sicherheitshöhe ({height} {unit}) überschreitet {limit} kt! ({current} kt)"
+        "safety_warning_msg": "Wind in Sicherheitshöhe ({height} {unit}) überschreitet {limit} kt! ({current} kt)",
+        "mean_wind_error": "Mittelwind kann nicht berechnet werden: fehlende Daten oder Höhe",
+        "mean_wind_layer_error": "Ungültige Schichtgrenzen. Stelle sicher, dass Untere < Obere und beide Zahlen sind.",
+        "weather_fetch_failed": "Keine Wetterdaten verfügbar.",
+        "error_layer_below_terrain": "Die gesamte gewählte Schicht ({lower}-{upper} {unit}) liegt unter der Geländehöhe von {base} {unit}.",
+        "lower_limit_adjusted": "Untere Grenze auf {base} {unit} angepasst, um auf Geländehöhe zu liegen."
     },
     "planner": {
         "landing_pattern": "Landemuster",
@@ -130,10 +138,19 @@
         "error_activate_canopy": "Bitte aktivieren Sie 'Schirmfahrtgebiet anzeigen' für die Analyse.",
         "terrain_none_found": "Geländeanalyse abgeschlossen. Keine kritischen Bereiche gefunden.",
         "terrain_error": "Ein Fehler ist während der Geländeanalyse aufgetreten.",
+        "terrain_warning": "Warnung: Bereiche unter Mindesthöhe entdeckt und in rot markiert.",
         "direction_locked": "Landerichtung fixiert auf {direction}°",
         "direction_invalid": "Bitte geben Sie eine gültige Richtung (0-360°) ein.",
         "error_fetch_scenario": "Fehler beim Laden der Daten für das Szenario.",
-        "exit_tooltip": "Absetzbereiche berechnet mit:<br>Wurf/Drift: {dir}° {dist} m<br>Freifallzeit: {time} sek"
+        "exit_tooltip": "Absetzbereiche berechnet mit:<br>Wurf/Drift: {dir}° {dist} m<br>Freifallzeit: {time} sek",
+        "cached_terrain_data": "Using cached terrain data for instant analysis.",
+        "freefall_weather_data_missing": "calculateFreeFall: Wetterdaten fehlen.",
+        "freefall_invalid_coordinates": "calculateFreeFall: Ungültige Startkoordinaten oder Geländehöhe.",
+        "freefall_exit_altitude_invalid": "calculateFreeFall: Exit-Höhe muss über der Öffnungshöhe liegen.",
+        "freefall_mean_wind_calculation_failed": "calculateFreeFall: Konnte mittleren Wind nicht berechnen.",
+        "terrain_analyzing": "Analysiere Gelände... ({current}/{total})",
+        "safety_height_exceeds": "Sicherheitshöhe überschreitet verfügbare Schirmfahrthöhe. Setze zurück auf {max} {unit}.",
+        "safety_height_limited": "Sicherheitshöhe ist auf maximal 600m begrenzt. Setze zurück auf {max} {unit}."
     },
     "jumpmaster": {
         "find_aircraft": "Flugzeug finden",
@@ -277,7 +294,16 @@
         "exit_alt_range": "Absprunghöhe muss zwischen 500 und 15000 Metern liegen.",
         "enter_coords": "Bitte Koordinaten eingeben.",
         "invalid_coords_format": "Ungültige Koordinaten. Bitte MGRS oder Dezimalgrad nutzen.",
-        "poi_search_error": "Ein Fehler ist während der Suche aufgetreten."
+        "poi_search_error": "Ein Fehler ist während der Suche aufgetreten.",
+        "ensemble_fetch_error_details": "Ensemble-Daten konnten nicht geladen werden: {error}",
+        "slider_update_error": "Fehler beim Aktualisieren des Schiebereglers: {error}",
+        "location_select_error": "Fehler beim Verarbeiten der ausgewählten Position: {error}",
+        "clear_date_failed": "Failed to clear historical date filter.",
+        "location_selection_failed": "Failed to process selected location: {error}",
+        "refresh_failed": "Vorhersage konnte nicht aktualisiert werden.",
+        "refresh_successful": "Vorhersage erfolgreich auf den aktuellen Tag aktualisiert.",
+        "refresh_in_progress": "Aktualisiere Vorhersage auf den aktuellen Tag...",
+        "landing_direction_locked": "Warnung! Landerichtung fixiert"
     },
     "map": {
         "drag_to_move_track": "Ziehen, um Absetztrack zu verschieben",
@@ -331,7 +357,10 @@
             "set_as_dip": "Als DIP setzen",
             "coords": "Koordinaten",
             "alt": "Höhe"
-        }
+        },
+        "map_init_failed": "Konnte Karte nicht initialisieren. Verwende Standardposition.",
+        "invalid_position": "Ungültige Position ausgewählt. Verwende Standardposition.",
+        "select_position": "Bitte wählen Sie einen Ort auf der Karte aus."
     },
     "adsb": {
         "tracking_stopped": "ADSB-Tracking gestoppt.",
@@ -352,12 +381,16 @@
         "enabled": "Automatische Aktualisierung aktiviert",
         "disabled": "Automatische Aktualisierung deaktiviert",
         "error_offline": "Automatische Aktualisierung im Offline-Modus nicht möglich.",
-        "error_historical_date": "Automatische Aktualisierung kann nicht bei gewähltem historischen Datum aktiviert werden."
+        "error_historical_date": "Automatische Aktualisierung kann nicht bei gewähltem historischen Datum aktiviert werden.",
+        "no_location_error": "Bitte wählen Sie einen Ort aus, um die automatische Aktualisierung zu aktivieren.",
+        "offline_error": "Wetterdaten können im Offline-Modus nicht aktualisiert werden.",
+        "historical_track_loaded_warning": "Autoupdate für die Anzeige historischer Tracks deaktiviert."
     },
     "ensemble": {
         "error_api_limit": "API-Limit für Ensemble-Daten erreicht. Bitte kurz warten und erneut versuchen.",
         "error_api_failed": "API-Anfrage fehlgeschlagen: {status}",
-        "tooltip_mean_wind": "Mittlerer Wind {lower}-{upper} {unit} AGL:<br>{dir}° {speed} {windUnit}"
+        "tooltip_mean_wind": "Mittlerer Wind {lower}-{upper} {unit} AGL:<br>{dir}° {speed} {windUnit}",
+        "all_models_deselected": "Alle Ensemble-Modelle abgewählt."
     },
     "tracking": {
         "disclosure_title": "Hinweis zur Standortnutzung",
@@ -377,7 +410,10 @@
         "error_motion_denied": "Berechtigung für Bewegungssensoren wurde verweigert.",
         "error_motion_request": "Sensor-Berechtigung konnte nicht angefordert werden.",
         "error_accel_denied": "Berechtigung für Beschleunigungssensor wurde verweigert.",
-        "error_accel_query": "Beschleunigungssensor-Status konnte nicht abgefragt werden."
+        "error_accel_query": "Beschleunigungssensor-Status konnte nicht abgefragt werden.",
+        "error_gps_denied": "GPS Erlaubnis verweigert. Bitte \"Immer\" in den App-Einstellungen aktivieren.",
+        "error_location_denied": "Ortungsberechtigung verweigert. Bitte \"Immer\" in den App-Einstellungen aktivieren.",
+        "freefall_detected": "Freifall erkannt! Aufzeichnung gestartet."
     },
     "location": {
         "coordinate": "Koordinate",
@@ -401,7 +437,8 @@
         "delete_entry": "Diesen Eintrag löschen",
         "delete_confirm": "\"{name}\" löschen?",
         "default_favorite_name": "DIP auf {lat}, {lng}",
-        "error_select_first": "Zuerst einen Ort auf der Karte auswählen."
+        "error_select_first": "Zuerst einen Ort auf der Karte auswählen.",
+        "warning_zoom_poi": "Bitte zoomen Sie auf Level {zoom} oder näher heran, um nach Dropzones zu suchen."
     },
     "tracks": {
         "error_map_init": "Karte nicht initialisiert.",
@@ -444,7 +481,12 @@
         "error_clear_init": "Track löschen nicht möglich: Karte nicht initialisiert.",
         "error_clear_failed": "Fehler beim Löschen des Tracks: {message}",
         "no_track_to_clear": "Kein Track zum Löschen vorhanden.",
-        "error_select_elements": "Bitte wählen Sie mindestens ein Element für den Export aus."
+        "error_select_elements": "Bitte wählen Sie mindestens ein Element für den Export aus.",
+        "error_process_track_file": "Fehler beim Verarbeiten der Track-Datei.",
+        "opening_track_file": "Track-Datei wird geöffnet...",
+        "error_loading_completely": "Track konnte nicht komplett geladen werden.",
+        "error_invalid_data": "Ungültige Track-Daten erhalten. Bitte erneut versuchen.",
+        "kml_loaded": "KML-Datei erfolgreich geladen."
     },
     "alerts": {
         "title": "Aktive Wetterwarnungen",
@@ -452,5 +494,18 @@
         "high_gusts": "Starke Böen (> {threshold} kt) erkannt ab {time} und zu anderen Zeiten.",
         "thunderstorms": "Gewittervorhersage ab {time} und zu anderen Zeiten.",
         "cloud_base": "Wolkenuntergrenze unter {base} m mit mindestens {cover} Bedeckung erkannt ab {time} und zu anderen Zeiten."
+    },
+    "utils": {
+        "mean_wind_error_details": "Fehler bei der Berechnung des Mittelwinds: {error}",
+        "base_leg_error": "Basisteil muss höher starten als der Endanflug.",
+        "downwind_leg_error": "Rückenwindteil muss höher starten als der Basisteil."
+    },
+    "download": {
+        "no_data_error": "No weather data available to download.",
+        "no_interpolated_data_error": "No interpolated data available to download.",
+        "could_not_save_file": "Datei konnte nicht gespeichert werden.",
+        "no_report_data": "Keine Wetterdaten für den Bericht verfügbar.",
+        "error_showing_report": "Briefing konnte nicht angezeigt oder gespeichert werden.",
+        "briefing_saved": "Briefing in Documents/DZMaster gespeichert"
     }
 }

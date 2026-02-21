@@ -657,7 +657,7 @@ export function calculateCutAway(interpolatedData) {
         'Partially': 'planner.state_partially',
         'Collapsed': 'planner.state_collapsed'
     };
-    
+
     // 2. Den aktuellen Status auslesen und den passenden übersetzten Text holen
     const rawState = Settings.state.userSettings.cutAwayState;
     const translatedState = I18n.t(stateMapping[rawState] || 'planner.state_partially');
@@ -713,7 +713,7 @@ export async function analyzeTerrainClearance() {
 
     if (AppState.terrainAnalysisCache && AppState.terrainAnalysisCache.key === cacheKey) {
         console.log("Using cached terrain elevation data.");
-        Utils.handleMessage("Using cached terrain data for instant analysis.");
+        Utils.handleMessage(I18n.t('planner.cached_terrain_data'));
         pointsWithGroundEle = AppState.terrainAnalysisCache.data;
     } else {
         // 3. Ein Raster von Punkten INNERHALB des Kreises erstellen (wie zuvor)
@@ -738,7 +738,10 @@ export async function analyzeTerrainClearance() {
         const batchSize = 100;
         for (let i = 0; i < pointsToCheck.length; i += batchSize) {
             const batch = pointsToCheck.slice(i, i + batchSize);
-            Utils.handleMessage(`Analyzing terrain... (${i + batch.length}/${pointsToCheck.length})`);
+            Utils.handleMessage(I18n.t('planner.terrain_analyzing', {
+                current: i + batch.length,
+                total: pointsToCheck.length
+            }));
             const elevations = await Utils.getMultipleAltitudes(batch);
 
             for (let j = 0; j < batch.length; j++) {
@@ -820,15 +823,15 @@ export async function analyzeTerrainClearance() {
 export function calculateFreeFall(weatherData, exitAltitude, openingAltitude, interpolatedData, startLat, startLng, elevation, jumpRunDirection) {
     // --- 1. Eingabe-Validierung ---
     if (!weatherData || !interpolatedData || interpolatedData.length === 0) {
-        Utils.handleError("calculateFreeFall: Wetterdaten fehlen.");
+        Utils.handleError(I18n.t('planner.freefall_weather_data_missing'));
         return null;
     }
     if (!Utils.isValidLatLng(startLat, startLng) || !Number.isFinite(elevation)) {
-        Utils.handleError("calculateFreeFall: Ungültige Startkoordinaten oder Geländehöhe.");
+        Utils.handleError(I18n.t('planner.freefall_invalid_coordinates'));
         return null;
     }
     if (exitAltitude <= openingAltitude) {
-        Utils.handleError("calculateFreeFall: Exit-Höhe muss über der Öffnungshöhe liegen.");
+        Utils.handleError(I18n.t('planner.freefall_exit_altitude_invalid'));
         return null;
     }
 
@@ -877,7 +880,7 @@ export function calculateFreeFall(weatherData, exitAltitude, openingAltitude, in
     const meanWind = Utils.calculateMeanWind(interpolatedData.map(d => d.height), uComponents, vComponents, elevation + openingAltitude, elevation + exitAltitude);
 
     if (!meanWind) {
-        Utils.handleError("calculateFreeFall: Konnte mittleren Wind nicht berechnen.");
+        Utils.handleError(I18n.t('planner.freefall_mean_wind_calculation_failed'));
         return null;
     }
 

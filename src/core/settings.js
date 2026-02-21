@@ -363,6 +363,5 @@ export const Settings = {
 
     handleError(error, userMessage = 'An error occurred.') {
         console.error('Settings Error:', error);
-        // Utils.handleError(userMessage); // Auskommentiert, falls Utils hier nicht verfügbar ist
     },
 };

@@ -9,6 +9,7 @@ import * as mgrs from 'mgrs';
 import { AppState } from './state.js';
 import { CONVERSIONS, ISA_CONSTANTS, DEWPOINT_COEFFICIENTS, EARTH_RADIUS_METERS, PHYSICAL_CONSTANTS, BEAUFORT, ENSEMBLE_VISUALIZATION } from './constants.js';
 import { Settings } from "./settings.js";
+import { I18n } from './i18n.js';
 
 // Private Variablen für das Handler-System
 let customErrorHandler = console.error;
@@ -61,32 +62,6 @@ export class Utils {
             console.log(message);
         }
     }
-
-    /*    static handleError(message, log = true) {
-            if (log) console.error(message);
-            if (typeof displayError === 'function') {
-                displayError(message);
-            } else {
-                // Dieser Fall sollte nun seltener eintreten
-                console.warn('Utils.js: displayError function is not available, logging to console only.');
-                console.error('Error message:', message);
-            }
-        }
-    
-        static handleMessage(message) {
-            const infoDiv = document.getElementById('info');
-            if (infoDiv) {
-                infoDiv.textContent = message;
-                infoDiv.style.display = 'block';
-                setTimeout(() => {
-                    infoDiv.style.display = 'none';
-                }, 3000); // Hide after 3 seconds
-                console.log('Displayed message:', message);
-            } else {
-                console.warn('Info div not found for handleMessage, using alert');
-                alert(message);
-            }
-        } */
 
     // ===================================================================
     // 2. Einheitenumrechnungen
@@ -595,7 +570,7 @@ export class Utils {
             return dddff;
         } catch (error) {
             console.error('Error in calculateMeanWind:', error, { heights, xComponents, yComponents, lowerLimit, upperLimit });
-            Utils.handleError('Failed to calculate mean wind: ' + error.message);
+            Utils.handleError(I18n.t('utils.mean_wind_error_details', { error: error.message }));
             return null;
         }
     }
@@ -924,11 +899,11 @@ export class Utils {
         const downwindVal = parseInt(downwind.value) || 300;
 
         if (baseVal <= finalVal) {
-            Utils.handleError('Base leg must start higher than final leg.');
+            Utils.handleError(I18n.t('utils.base_leg_error'));
             return false;
         }
         if (downwindVal <= baseVal) {
-            Utils.handleError('Downwind leg must start higher than base leg.');
+            Utils.handleError(I18n.t('utils.downwind_leg_error'));
             return false;
         }
         return true;

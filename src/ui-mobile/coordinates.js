@@ -54,7 +54,7 @@ export function initializeLocationSearch() {
     if (saveFavoriteBtn) {
         saveFavoriteBtn.addEventListener('click', () => {
             if (AppState.lastLat === null || AppState.lastLng === null) {
-                Utils.handleError("Please select a location on the map first.");
+                Utils.handleError(I18n.t('location.error_select_first'));
                 return;
             }
             currentFavoriteData = {

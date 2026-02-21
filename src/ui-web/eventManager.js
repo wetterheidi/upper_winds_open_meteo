@@ -519,16 +519,18 @@ function setupSafetyHeightValidation() {
         const maxAllowed = Math.floor(Math.max(0, Math.min(availableHeight, limit600)));
 
         if (value > maxAllowed) {
-            // Grund für die Warnmeldung ermitteln
-            let reasonText = "";
+            // 1. Grund für die Warnmeldung ermitteln und direkt den fertigen übersetzten Satz holen
+            let warningMessage = "";
             if (availableHeight < limit600) {
-                reasonText = "exceeds available canopy altitude"; // Zu wenig Höhe insgesamt
+                // Zu wenig Höhe insgesamt
+                warningMessage = I18n.t('planner.safety_height_exceeds', { max: maxAllowed, unit: heightUnit });
             } else {
-                reasonText = "limited to max 600m"; // Generelles Limit
+                // Generelles Limit
+                warningMessage = I18n.t('planner.safety_height_limited', { max: maxAllowed, unit: heightUnit });
             }
 
-            // 1. Warnung anzeigen
-            displayWarning(`Safety Height ${reasonText}. Resetting to ${maxAllowed} ${heightUnit}.`);
+            // 2. Warnung anzeigen
+            displayWarning(warningMessage);
 
             // 2. Wert im Input korrigieren
             input.value = maxAllowed;
@@ -646,7 +648,7 @@ function setupTerrainAnalysisEvents() {
                 mapManager.drawTerrainWarning(dangerousPoints);
 
                 if (dangerousPoints.length > 0) {
-                    displayWarning("Warning: Low clearance areas detected and marked in red.");
+                    displayWarning(I18n.t('planner.terrain_warning'));
                 } else {
                     Utils.handleMessage(I18n.t('planner.terrain_none_found'));
                 }
@@ -768,7 +770,7 @@ function setupTrackEvents() {
                 }
             } catch (error) {
                 console.error('Error during track file processing:', error);
-                Utils.handleError('Failed to process track file.');
+                Utils.handleError(I18n.t('tracks.error_process_track_file'));
             } finally {
                 if (loadingElement) loadingElement.style.display = 'none';
             }
@@ -1364,7 +1366,7 @@ function setupCacheManagement() {
     // NEU: Initialen Text und Tooltip übersetzen
     resetButton.textContent = I18n.t('settings.reset_settings');
     resetButton.title = I18n.t('settings.reset_settings_title');
-    resetButton.className = 'btn btn-danger'; 
+    resetButton.className = 'btn btn-danger';
 
     resetButton.addEventListener('click', () => {
         // NEU: Confirm-Dialog übersetzen
@@ -1387,7 +1389,7 @@ function setupCacheManagement() {
     // NEU: Initialen Text und Tooltip übersetzen
     clearCacheButton.textContent = I18n.t('settings.clear_cache');
     clearCacheButton.title = I18n.t('settings.clear_cache_title');
-    clearCacheButton.className = 'btn btn-danger'; 
+    clearCacheButton.className = 'btn btn-danger';
 
     clearCacheButton.addEventListener('click', async () => {
         try {
@@ -1506,7 +1508,7 @@ function setupCacheSettings() {
                 },
                 onCancel: () => {
                     hideProgress();
-                    displayMessage('Caching cancelled.');
+                    displayMessage(I18n.t('status_cancelled_all'));
                 }
             });
         });
@@ -1810,7 +1812,7 @@ function setupPoiSearchButton() {
         const minZoomForPoiSearch = 10;
 
         if (currentZoom < minZoomForPoiSearch) {
-            displayWarning(`Please zoom in to Level ${minZoomForPoiSearch}+ to search for dropzones.`);
+            displayWarning(I18n.t('location.warning_zoom_poi', { zoom: minZoomForPoiSearch }));
             return;
         }
 

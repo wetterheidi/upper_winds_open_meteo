@@ -27,7 +27,7 @@ import { I18n } from './i18n.js'; // Import ergänzt
 export async function fetchEnsembleWeatherData() {
     // Vorbedingung: Eine Position muss ausgewählt sein.
     if (AppState.lastLat == null || AppState.lastLng == null) {
-        Utils.handleMessage(I18n.t('common.error_no_location')); 
+        Utils.handleMessage(I18n.t('common.error_no_location'));
         return false;
     }
     // Wenn keine Modelle ausgewählt sind, leeren wir die Daten und melden Erfolg.
@@ -115,7 +115,7 @@ export async function fetchEnsembleWeatherData() {
         return true; // Erfolg signalisieren
     } catch (error) {
         console.error("Failed to fetch ensemble weather data:", error);
-        Utils.handleError(error.message);
+        Utils.handleError(I18n.t('messages.ensemble_fetch_error_details', { error: error.message }));
         return false;
     } finally {
         if (loadingElement) loadingElement.style.display = 'none';
@@ -690,7 +690,7 @@ function drawEnsembleCircle(exitResult, color, label) {
         ? Utils.roundToTens(exitResult.meanWindDir)
         : 'N/A';
 
-    const tooltipText = `<strong>${label}</strong><br>` + 
+    const tooltipText = `<strong>${label}</strong><br>` +
         I18n.t('ensemble.tooltip_mean_wind', {
             lower: lowerLimitFormatted,
             upper: upperLimitFormatted,

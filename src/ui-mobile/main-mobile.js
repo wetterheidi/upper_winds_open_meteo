@@ -378,11 +378,11 @@ export function validateLegHeights(final, base, downwind) {
     const downwindVal = parseInt(downwind.value) || 300;
 
     if (baseVal <= finalVal) {
-        Utils.handleError('Base leg must start higher than final leg.');
+        Utils.handleError(I18n.t('planner.base_leg_error'));
         return false;
     }
     if (downwindVal <= baseVal) {
-        Utils.handleError('Downwind leg must start higher than base leg.');
+        Utils.handleError(I18n.t('planner.downwind_leg_error'));
         return false;
     }
     return true;
@@ -414,7 +414,7 @@ export function calculateMeanWind() {
     const baseHeight = Math.round(AppState.lastAltitude);
 
     if (!AppState.weatherData || AppState.lastAltitude === 'N/A') {
-        Utils.handleError('Cannot calculate mean wind: missing data or altitude');
+        Utils.handleError(I18n.t('weather.mean_wind_error'));
         return;
     }
 
@@ -426,19 +426,28 @@ export function calculateMeanWind() {
     let upperLimit = refLevel === 'AGL' ? upperLimitInput + baseHeight : upperLimitInput;
 
     if (isNaN(lowerLimitInput) || isNaN(upperLimitInput) || lowerLimitInput >= upperLimitInput) {
-        Utils.handleError('Invalid layer limits. Ensure Lower < Upper and both are numbers.');
+        Utils.handleError(I18n.t('weather.mean_wind_layer_error'));
         return;
     }
 
     if (refLevel === 'AMSL' && upperLimit < baseHeight) {
-        Utils.handleError(`The entire selected layer (${Math.round(Utils.convertHeight(lowerLimit, heightUnit))}-${Math.round(Utils.convertHeight(upperLimit, heightUnit))} ${heightUnit}) is below the terrain altitude of ${Math.round(Utils.convertHeight(baseHeight, heightUnit))} ${heightUnit}.`);
+        Utils.handleError(I18n.t('weather.error_layer_below_terrain', {
+            lower: Math.round(Utils.convertHeight(lowerLimit, heightUnit)),
+            upper: Math.round(Utils.convertHeight(upperLimit, heightUnit)),
+            base: Math.round(Utils.convertHeight(baseHeight, heightUnit)),
+            unit: heightUnit
+        }));
         document.getElementById('meanWindResult').innerHTML = 'Mean wind: N/A (Layer is below ground)';
         return;
     }
 
     if (refLevel === 'AMSL' && lowerLimit < baseHeight) {
         // Die Benachrichtigung bleibt erhalten
-        Utils.handleMessage(`Note: Lower limit adjusted to terrain altitude (${Math.round(Utils.convertHeight(baseHeight, heightUnit))} ${heightUnit}) as it cannot be below ground level.`);
+
+        Utils.handleError(I18n.t('weather.lower_limit_adjusted', {
+            base: Math.round(Utils.convertHeight(baseHeight, heightUnit)),
+            unit: heightUnit
+        }));
 
         //Berechne den korrigierten Wert in der aktuell angezeigten Einheit
         const correctedLowerLimit = Math.round(Utils.convertHeight(baseHeight, heightUnit));
@@ -456,7 +465,7 @@ export function calculateMeanWind() {
 
     // Check if interpolatedData is valid
     if (!interpolatedData || interpolatedData.length === 0) {
-        Utils.handleError('No valid weather data available to calculate mean wind.');
+        Utils.handleError(I18n.t('weather.mean_wind_error'));
         return;
     }
 
@@ -496,7 +505,7 @@ export function calculateMeanWind() {
 export async function updateToCurrentHour() {
     if (AppState.lastLat == null || AppState.lastLng == null) {
         console.warn('No location selected, cannot update weather data');
-        Utils.handleError('Please select a location to enable autoupdate.');
+        Utils.handleError(I18n.t('autoupdate.no_location_error'));
         stopAutoupdate();
         document.getElementById('autoupdateCheckbox').checked = false;
         Settings.state.userSettings.autoupdate = false;
@@ -506,7 +515,7 @@ export async function updateToCurrentHour() {
 
     if (!navigator.onLine) {
         console.warn('Cannot update weather data: offline');
-        Utils.handleError('Cannot update weather data while offline.');
+        Utils.handleError(I18n.t('autoupdate.offline_error'));
         stopAutoupdate();
         document.getElementById('autoupdateCheckbox').checked = false;
         Settings.state.userSettings.autoupdate = false;
@@ -543,7 +552,7 @@ export async function updateToCurrentHour() {
         console.log('Updated all displays for current hour');
     } catch (error) {
         console.error('Error updating to current hour:', error);
-        Utils.handleError('Failed to update weather data: ' + error.message);
+        Utils.handleError(I18n.t('weather.error_updating_data', { error: error.message }));
     }
 }
 
@@ -552,7 +561,7 @@ export async function updateToCurrentHour() {
  */
 export async function downloadTableAsAscii(format) {
     if (!AppState.weatherData || !AppState.weatherData.time) {
-        Utils.handleError('No weather data available to download.');
+        Utils.handleError(I18n.t('download.no_data_error'));
         return;
     }
 
@@ -581,7 +590,7 @@ export async function downloadTableAsAscii(format) {
     );
 
     if (!interpolatedData || interpolatedData.length === 0) {
-        Utils.handleError('No interpolated data available to download.');
+        Utils.handleError(I18n.t('download.no_interpolated_data_error'));
         return;
     }
 
@@ -631,7 +640,7 @@ export async function downloadTableAsAscii(format) {
                 directory: Directory.Documents, // Speichert im "Dokumente"-Ordner
                 encoding: 'utf8'
             });
-            Utils.handleMessage(`File saved: ${filename}`);
+            Utils.handleMessage(I18n.t('common.file_saved', { filename }));
         } else {
             // Fallback für Webbrowser
             const blob = new Blob([content], { type: 'text/plain' });
@@ -646,7 +655,7 @@ export async function downloadTableAsAscii(format) {
         }
     } catch (error) {
         console.error("Error saving file:", error);
-        Utils.handleError("Could not save file.");
+        Utils.handleError(I18n.t('download.could_not_save_file'));
     }
 }
 
@@ -656,7 +665,7 @@ export async function downloadTableAsAscii(format) {
  */
 async function downloadSurfaceDataAsAscii() {
     if (!AppState.weatherData || !AppState.weatherData.time) {
-        Utils.handleError('No weather data available to download.');
+        Utils.handleError(I18n.t('download.no_data_error'));
         return;
     }
 
@@ -704,7 +713,7 @@ async function downloadSurfaceDataAsAscii() {
                 directory: Directory.Documents, // Speichert im "Dokumente"-Ordner
                 encoding: 'utf8'
             });
-            Utils.handleMessage(`File saved: ${filename}`);
+            Utils.handleMessage(I18n.t('common.file_saved', { filename }));
         } else {
             // Fallback für Webbrowser
             const blob = new Blob([content], { type: 'text/plain' });
@@ -719,7 +728,7 @@ async function downloadSurfaceDataAsAscii() {
         }
     } catch (error) {
         console.error("Error saving surface data file:", error);
-        Utils.handleError("Could not save file.");
+        Utils.handleError(I18n.t('download.could_not_save_file'));
     }
 }
 
@@ -729,7 +738,7 @@ async function downloadSurfaceDataAsAscii() {
  */
 async function exportComprehensiveReportAsHtml() {
     if (!AppState.weatherData || AppState.lastLat == null || AppState.lastLng == null) {
-        Utils.handleError("No weather data available for the report.");
+        Utils.handleError(I18n.t('download.no_report_data'));
         return;
     }
 
@@ -941,7 +950,7 @@ async function exportComprehensiveReportAsHtml() {
                 encoding: 'utf8',
                 recursive: true
             });
-            Utils.handleMessage(`Briefing saved in Documents/DZMaster`);
+            Utils.handleMessage(I18n.t('download.briefing_saved'));
 
             // Temporäre Datei für die Anzeige speichern
             const tempFilename = 'briefing_temp.html';
@@ -979,7 +988,7 @@ async function exportComprehensiveReportAsHtml() {
         }
     } catch (error) {
         console.error("Error saving or showing HTML briefing:", error);
-        Utils.handleError("Could not save or show briefing file.");
+        Utils.handleError(I18n.t('download.error_showing_report'));
     }
 }
 
@@ -1627,7 +1636,7 @@ function setupAppEventListeners() {
         const loadingElement = document.getElementById('loading');
         try {
             if (!event || !event.detail) {
-                Utils.handleError('Received invalid track data. Please try again.');
+                Utils.handleError(I18n.t('tracks.error_invalid_data'));
                 return;
             }
 
@@ -1645,7 +1654,7 @@ function setupAppEventListeners() {
                 // Speichere die neue Einstellung
                 Settings.state.userSettings.autoupdate = false;
                 Settings.save();
-                Utils.handleMessage("Autoupdate disabled for historical track viewing.");
+                Utils.handleMessage(I18n.t('autoupdate.historical_track_loaded_warning'));
             }
 
             // Schritt 1: Marker auf der Karte erstellen ODER aktualisieren.
@@ -1704,8 +1713,8 @@ function setupAppEventListeners() {
             }
 
         } catch (error) {
-            console.error('Erroro processing track:loaded:', error);
-            Utils.handleError('Could not load track data completely.');
+            console.error('Error processing track:loaded:', error);
+            Utils.handleError(I18n.t('tracks.error_loading_completely'));
         } finally {
             if (loadingElement) {
                 loadingElement.style.display = 'none';
@@ -1745,7 +1754,7 @@ function setupAppEventListeners() {
         console.log("[main-mobile] Event 'ui:sliderChanged' empfangen, spezifische Updates werden ausgeführt.");
 
         if (AppState.isLandingDirectionLocked) {
-            displayWarning("Warning! Landing direction locked");
+            displayWarning(I18n.t('messages.landing_direction_locked'));
         }
 
         try {
@@ -1775,7 +1784,7 @@ function setupAppEventListeners() {
             }
         } catch (error) {
             console.error('Error during slider update:', error);
-            displayError(error.message);
+            displayError(I18n.t('messages.slider_update_error', { error: error.message }));
         }
     });
 
@@ -1785,7 +1794,7 @@ function setupAppEventListeners() {
         // HIER kommt die Warn-Logik hin.
         // Sie wird jetzt nur einmal ausgelöst, wenn der Benutzer den Slider loslässt.
         if (AppState.isLandingDirectionLocked) {
-            displayWarning("Warning! Landing direction locked");
+            displayWarning(I18n.t('messages.landing_direction_locked'));
         }
     });
 
@@ -1985,7 +1994,7 @@ function setupAppEventListeners() {
                 await updateUIWithNewWeatherData(newWeatherData, timeIndexToPreserve);
             }
         } else {
-            Utils.handleError('Please select a position on the map first.');
+            Utils.handleError(I18n.t('map.select_position'));
         }
     });
 
@@ -2098,7 +2107,7 @@ function setupAppEventListeners() {
                         await updateUIWithNewWeatherData(newWeatherData);
                     }
                 } catch (error) {
-                    displayError(error.message);
+                    displayError(I18n.t('messages.clear_date_failed'));
                 }
             }
         }
@@ -2236,7 +2245,7 @@ function setupAppEventListeners() {
                 armButton.textContent = "Recording...";
                 armButton.classList.add('recording');
             }
-            Utils.handleMessage("Freefall detected! Recording started.");
+            Utils.handleMessage(I18n.t('tracking: freefall_detected')); // Informiert den Nutzer, dass die Aufzeichnung gestartet wurde
         }
     });
 
@@ -2320,7 +2329,7 @@ function setupAppEventListeners() {
                 // WENN: Die Daten von einem vergangenen Tag sind UND kein historisches Datum explizit gewählt wurde
                 if (firstDataTime < currentUtcDay && !isHistoricalDateSelected) {
                     console.log('[App Visibility] Weather data is outdated and no historical date is selected. Refreshing to current forecast...');
-                    Utils.handleMessage("Refreshing forecast to the current day..."); // Info für den Nutzer
+                    Utils.handleMessage(I18n.t('messages.refresh_in_progress')); // Info für den Nutzer
 
                     // Sicherstellen, dass der Date Picker geleert wird (falls er doch irgendwie befüllt war)
                     if (historicalPicker) {
@@ -2337,13 +2346,13 @@ function setupAppEventListeners() {
                             if (newWeatherData) {
                                 // UI komplett mit den neuesten Daten aktualisieren (lässt Slider auf aktueller Stunde starten)
                                 await updateUIWithNewWeatherData(newWeatherData);
-                                Utils.handleMessage("Forecast updated to the current day.");
+                                Utils.handleMessage(I18n.t('messages.refresh_successful'));
                             } else {
-                                Utils.handleError("Failed to refresh forecast.");
+                                Utils.handleError(I18n.t('messages.refresh_failed'));
                             }
                         } catch (error) {
                             console.error("[App Visibility] Error refreshing weather data:", error);
-                            Utils.handleError("Failed to refresh forecast.");
+                            Utils.handleError(I18n.t('messages.refresh_failed'));
                         }
                     } else {
                         console.warn("[App Visibility] Cannot refresh weather, no location selected.");
@@ -2460,7 +2469,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     async function handleOpenFileUrl(fileUrl, detectedType) { // Behalte detectedType für den ersten Hinweis
         const loadingElement = document.getElementById('loading');
         if (loadingElement) loadingElement.style.display = 'block'; //
-        Utils.handleMessage("Opening track file..."); //
+        Utils.handleMessage(I18n.t('tracks.opening_track_file')); //
 
         try {
             const { Filesystem } = await getCapacitor(); //
@@ -2525,7 +2534,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 fileToLoad = new File([blob], fileName, { type: blob.type }); //
                 console.log('Creating KML File object:', fileToLoad.name, fileToLoad.size); //
                 await trackManager.loadKmlTrack(fileToLoad); //
-                successMessage = "KML file loaded successfully."; // <<< Korrekte Nachricht
+                successMessage = I18n.t('tracks.kml_loaded'); // <<< Korrekte Nachricht
 
             } else { // Annahme: GPX
                 blob = new Blob([fileContent], { type: 'application/gpx+xml' }); //
@@ -2539,7 +2548,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         } catch (error) {
             console.error('Error handling opened file:', error); //
-            let userMessage = `Could not open file: ${error.message}`; //
+            let userMessage = `I18n.t('common.error_opening_file', { error })`; //
             if (error.message && error.message.includes('permission')) { //
                 userMessage = 'Could not open file: Permission denied.'; //
             } else if (error.message && error.message.includes('Could not read file')) { //
@@ -2572,7 +2581,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Validierung der Koordinaten
         if (!Utils.isValidLatLng(lat, lng)) {
             console.warn('[App] Ungültige Koordinaten empfangen:', { lat, lng });
-            Utils.handleError('Ungültige Position ausgewählt. Verwende Standardposition.');
+            Utils.handleError(I18n.t('map.invalid_position'));
             return;
         }
 
@@ -2595,7 +2604,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 await updateUIWithNewWeatherData(newWeatherData, isInitialLoad ? null : getSliderValue());
             } else {
                 AppState.weatherData = null;
-                Utils.handleError('Keine Wetterdaten verfügbar.');
+                Utils.handleError(I18n.t('messages.weather_fetch_failed'));
             }
 
             await mapManager.createOrUpdateMarker(lat, lng);
@@ -2619,7 +2628,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         } catch (error) {
             console.error('[App] Fehler beim Verarbeiten von "location:selected":', error);
-            displayError(error.message);
+            displayError(I18n.t('messages.location_select_error', { error: error.message }));
         } finally {
             if (loadingElement) loadingElement.style.display = 'none';
         }
@@ -2654,7 +2663,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     } catch (error) {
         console.error('[App] Fehler bei der Karteninitialisierung:', error);
-        displayError('Konnte Karte nicht initialisieren. Verwende Standardposition.');
+        displayError(I18n.t('messages.map_init_failed'));
 
         // Fallback: Verwende eine Standardposition
         const fallbackLat = 51.505; // Beispiel: London

@@ -305,7 +305,7 @@ export function addOrUpdateFavorite(lat, lng, name, skipMessage = false) {
         }
         saveCoordHistory(history);
         if (!skipMessage) {
-            Utils.handleMessage(`"${name}" saved as favorite.`);
+            Utils.handleMessage(I18n.t('location.favorite_added', { name }));
         }
         _dispatchFavoritesUpdate();
     } catch (error) {
