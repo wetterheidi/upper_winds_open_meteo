@@ -2634,7 +2634,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 await updateUIWithNewWeatherData(newWeatherData, isInitialLoad ? null : getSliderValue());
             } else {
                 AppState.weatherData = null;
-                Utils.handleError(I18n.t('messages.weather_fetch_failed'));
+                Utils.handleError(I18n.t('weather.weather_fetch_failed'));
             }
 
             await mapManager.createOrUpdateMarker(lat, lng);
