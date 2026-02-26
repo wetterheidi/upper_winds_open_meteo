@@ -38,11 +38,13 @@
         "@capacitor/status-bar": "^7.0.4",
         "@capawesome/capacitor-android-edge-to-edge-support": "^7.2.3",
         "@capawesome/capacitor-file-picker": "^7.2.0",
+        "@mhaberler/capacitor-barometer": "^2.0.1",
         "leaflet": "^1.9.4",
         "leaflet-gpx": "^2.2.0",
         "leaflet-rotatedmarker": "^0.2.0",
         "leaflet.heat": "^0.2.0",
         "luxon": "^3.6.1",
+        "mathjs": "^15.1.1",
         "mgrs": "^2.1.0",
         "papaparse": "^5.5.3"
     },
