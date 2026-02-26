@@ -417,7 +417,9 @@
         "error_accel_query": "Could not query accelerometer permission.",
         "error_gps_denied": "GPS permission was denied. Please enable \"Always\" in the app settings.",
         "error_location_denied": "Location permission was denied. Please enable \"Always\" in the app settings.",
-        "freefall_detected": "Freefall detected! Recording started."
+        "freefall_detected": "Freefall detected! Recording started.",
+        "background_title": "Location tracking active",
+        "background_message": "DZMaster is recording your track. Stop the recording in the app to finish."
     },
     "location": {
         "coordinate": "Coordinate",

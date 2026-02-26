@@ -9,6 +9,7 @@ import { Browser } from '@capacitor/browser';
 import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app'; // <<< NEUER IMPORT
 import { StatusBar } from '@capacitor/status-bar';
+import { BackgroundGeolocation } from '@capacitor-community/background-geolocation';
 
 let capacitorModulesPromise = null;
 let deviceReadyPromise = null;
@@ -68,6 +69,7 @@ async function loadModules() {
                 Capacitor,
                 App,
                 StatusBar,
+                BackgroundGeolocation,
                 isNative: true,
                 isInitialized: true
             };

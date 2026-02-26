@@ -58,28 +58,49 @@ export async function startPositionTracking() {
                             return;
                         }
 
-                        // Starte native Hintergrund-Tracking mit Capacitor Geolocation
-                        const watchId = await Geolocation.watchPosition(
+                        // Starte Background-Tracking — läuft auch bei gesperrtem/ausgeschaltetem Display.
+                        // Auf Android wird ein Foreground-Service gestartet, auf iOS die Background-Location-API genutzt.
+                        const { BackgroundGeolocation } = await getCapacitor();
+                        const watchId = await BackgroundGeolocation.addWatcher(
                             {
-                                enableHighAccuracy: true,
-                                timeout: 10000,
-                                maximumAge: 0
+                                backgroundMessage: I18n.t('tracking.background_message'),
+                                backgroundTitle: I18n.t('tracking.background_title'),
+                                requestPermissions: false, // Berechtigungen werden oben bereits geprüft
+                                stale: false,
+                                distanceFilter: 0
                             },
-                            (position, error) => {
+                            (location, error) => {
                                 if (error) {
-                                    console.error("[LiveTrackingManager] Geolocation error:", error);
-                                    Utils.handleError(I18n.t('tracking.error_geolocation', { message: error.message || 'Unknown' }));
+                                    console.error("[LiveTrackingManager] BackgroundGeolocation error:", error);
+                                    if (error.code === 'NOT_AUTHORIZED') {
+                                        Utils.handleError(I18n.t('tracking.error_gps_denied'));
+                                    } else {
+                                        Utils.handleError(I18n.t('tracking.error_geolocation', { message: error.code || 'Unknown' }));
+                                    }
                                     stopPositionTracking();
                                     return;
                                 }
-                                if (position) {
-                                    console.log("[LiveTrackingManager] Received position:", position.coords);
-                                    debouncedPositionUpdate(position);
+                                if (location) {
+                                    console.log("[LiveTrackingManager] Received position:", location);
+                                    // Normalisiere auf das Standard-GeolocationPosition-Format (position.coords.*)
+                                    const normalizedPosition = {
+                                        coords: {
+                                            latitude: location.latitude,
+                                            longitude: location.longitude,
+                                            accuracy: location.accuracy,
+                                            altitude: location.altitude,
+                                            altitudeAccuracy: location.altitudeAccuracy,
+                                            heading: location.bearing,
+                                            speed: location.speed
+                                        },
+                                        timestamp: location.time
+                                    };
+                                    debouncedPositionUpdate(normalizedPosition);
                                 }
                             }
                         );
                         AppState.watchId = watchId;
-                        console.log("[LiveTrackingManager] Native Geolocation watcher started:", watchId);
+                        console.log("[LiveTrackingManager] BackgroundGeolocation watcher started:", watchId);
                         document.dispatchEvent(new CustomEvent('tracking:started'));
                     } catch (error) {
                         console.error("[LiveTrackingManager] Failed to start native tracking:", error);
@@ -193,14 +214,14 @@ export function toggleManualRecording() {
  */
 export async function stopPositionTracking() {
     if (AppState.watchId !== null) {
-        const { Geolocation, isNative } = await getCapacitor();
+        const { isNative, BackgroundGeolocation } = await getCapacitor();
 
-        if (isNative && Geolocation) {
+        if (isNative) {
             try {
-                await Geolocation.clearWatch({ id: AppState.watchId });
-                console.log("[LiveTrackingManager] Stopped native Geolocation watcher:", AppState.watchId);
+                await BackgroundGeolocation.removeWatcher({ id: AppState.watchId });
+                console.log("[LiveTrackingManager] Stopped BackgroundGeolocation watcher:", AppState.watchId);
             } catch (error) {
-                console.error("[LiveTrackingManager] Error stopping native watcher:", error);
+                console.error("[LiveTrackingManager] Error stopping background watcher:", error);
             }
         } else if (navigator.geolocation) {
             navigator.geolocation.clearWatch(AppState.watchId);
