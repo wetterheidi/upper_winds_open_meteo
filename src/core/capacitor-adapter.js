@@ -9,6 +9,7 @@ import { Browser } from '@capacitor/browser';
 import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app'; // <<< NEUER IMPORT
 import { StatusBar } from '@capacitor/status-bar';
+import { Barometer } from '@mhaberler/capacitor-barometer';
 
 let capacitorModulesPromise = null;
 let deviceReadyPromise = null;
@@ -57,7 +58,7 @@ async function initialize() {
 async function loadModules() {
     try {
         await waitForDeviceReady();
-        
+
         if (window.Capacitor?.isNativePlatform()) {
             console.log('Loading native Capacitor modules');
             const modules = {
@@ -68,6 +69,7 @@ async function loadModules() {
                 Capacitor,
                 App,
                 StatusBar,
+                Barometer,
                 isNative: true,
                 isInitialized: true
             };
@@ -77,7 +79,7 @@ async function loadModules() {
     } catch (error) {
         console.error('Error loading Capacitor modules:', error);
     }
-    
+
     return {
         Geolocation: null,
         Filesystem: null,
@@ -86,6 +88,7 @@ async function loadModules() {
         Capacitor: null,
         App: null,
         StatusBar: null,
+        Barometer: null,
         isNative: false,
         isInitialized: false
     };
@@ -103,6 +106,7 @@ export async function getCapacitor() {
                 Capacitor: null,
                 App: null,
                 StatusBar: null,
+                Barometer: null,
                 isNative: false,
                 isInitialized: false
             };

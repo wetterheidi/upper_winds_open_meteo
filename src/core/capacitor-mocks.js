@@ -9,3 +9,4 @@ export const Directory = null;
 export const Browser = null;
 export const App = null;
 export const StatusBar = null;
+export const Barometer = null;
