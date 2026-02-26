@@ -1,5 +1,5 @@
 import { Barometer } from '@mhaberler/capacitor-barometer'
-import { processPressureSample } from '@/process/pressure'
+import { processPressureSample } from './pressure'
 
 let barometerAvailable = false
 let baroActive = false
@@ -18,8 +18,8 @@ async function startBarometer() {
 
     if (barometerAvailable && !baroActive) {
       baroListener = await Barometer.addListener('onPressureChange', (data) => {
-        // processPressureSample(data.pressure, data.timestamp)
-        console.log(data.pressure, data.timestamp)
+        processPressureSample(data.pressure, data.timestamp)
+        // console.log(data.pressure, data.timestamp)
       })
       await Barometer.start({ interval: 500 })
       baroActive = true
