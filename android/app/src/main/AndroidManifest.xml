@@ -9,6 +9,8 @@
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
 
@@ -62,7 +64,7 @@
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
         </provider>
 
-        <service android:name="com.getcapacitor.BackgroundService" android:foregroundServiceType="location" />
+        <!-- BackgroundGeolocationService wird durch "npx cap sync" aus dem Plugin-Manifest eingetragen -->
     </application>
 
     <queries>

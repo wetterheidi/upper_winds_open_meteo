@@ -10,7 +10,7 @@ android {
         applicationId "com.wetterheidi.dzmaster"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 36
+        versionCode 37
         versionName "1.3.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
@@ -83,6 +83,7 @@ dependencies {
     implementation project(':capacitor-android')
     implementation project(':capacitor-browser') // <-- HINZUGEFÜGT
     implementation "androidx.core:core-splashscreen:1.0.0"
+    implementation "androidx.localbroadcastmanager:localbroadcastmanager:1.1.0"
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"

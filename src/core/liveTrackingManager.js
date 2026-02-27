@@ -21,9 +21,12 @@ import { I18n } from './i18n.js'; // Import ergänzt
 // 1. Öffentliche Hauptfunktionen (API des Moduls)
 // ===================================================================
 
-// NEU: Initialisierungs-Flag und Promise
+// Initialisierungs-Flag und Promise
 let isTrackingInitializing = false;
 let trackingInitPromise = null;
+
+// Handle für den App-State-Listener (GPS-Puffer-Verarbeitung beim Wakeup)
+let gpsBufferAppStateListener = null;
 
 /**
  * Startet die kontinuierliche Abfrage der GPS-Position des Geräts.
@@ -65,7 +68,7 @@ export async function startPositionTracking() {
                             {
                                 backgroundMessage: I18n.t('tracking.background_message'),
                                 backgroundTitle: I18n.t('tracking.background_title'),
-                                requestPermissions: false, // Berechtigungen werden oben bereits geprüft
+                                requestPermissions: true, // Plugin fragt iOS nach „Immer erlauben" für Background-Tracking
                                 stale: false,
                                 distanceFilter: 0
                             },
@@ -101,6 +104,14 @@ export async function startPositionTracking() {
                         );
                         AppState.watchId = watchId;
                         console.log("[LiveTrackingManager] BackgroundGeolocation watcher started:", watchId);
+
+                        // GPS-Puffer: beim Aufwachen aus dem Hintergrund fehlende Punkte nachladen.
+                        const { App } = await import('@capacitor/app');
+                        gpsBufferAppStateListener = await App.addListener('appStateChange', async (state) => {
+                            if (state.isActive) await processGPSBuffer();
+                        });
+                        await processGPSBuffer(); // Eventuell noch Puffer von vorherigen Sessions
+
                         document.dispatchEvent(new CustomEvent('tracking:started'));
                     } catch (error) {
                         console.error("[LiveTrackingManager] Failed to start native tracking:", error);
@@ -213,6 +224,10 @@ export function toggleManualRecording() {
  * @returns {void}
  */
 export async function stopPositionTracking() {
+    if (gpsBufferAppStateListener) {
+        gpsBufferAppStateListener.remove();
+        gpsBufferAppStateListener = null;
+    }
     if (AppState.watchId !== null) {
         const { isNative, BackgroundGeolocation } = await getCapacitor();
 
@@ -436,6 +451,63 @@ function updateAccuracyCircle(lat, lng, accuracy) {
     AppState.accuracyCircle = L.circle([lat, lng], {
         radius: accuracy, color: 'blue', fillOpacity: 0.1, weight: 1, dashArray: '5, 5', pmIgnore: true
     }).addTo(AppState.map);
+}
+
+/**
+ * Liest den nativen GPS-Puffer (gps_buffer.jsonl), der von MainActivity befüllt wird,
+ * wenn JavaScript im Hintergrund eingefroren ist. Fügt fehlende Punkte chronologisch
+ * in den laufenden Track ein und löscht danach die Pufferdatei.
+ * @private
+ */
+async function processGPSBuffer() {
+    try {
+        const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem');
+        const result = await Filesystem.readFile({
+            path: 'gps_buffer.jsonl',
+            directory: Directory.Data,
+            encoding: Encoding.UTF8
+        });
+        if (!result.data || !result.data.trim()) return;
+
+        const lines = result.data.trim().split('\n').filter(l => l.trim());
+        let added = 0;
+
+        for (const line of lines) {
+            try {
+                const p = JSON.parse(line);
+                if (!p.lat || !p.lon || !p.time) continue;
+
+                // Deduplizierung: Zeitstempel bereits im Track vorhanden? (±500 ms)
+                const alreadyExists = AppState.recordedTrackPoints.some(
+                    tp => Math.abs(tp.time.toMillis() - p.time) < 500
+                );
+                if (alreadyExists) continue;
+
+                if (AppState.isAutoRecording || AppState.isManualRecording) {
+                    AppState.recordedTrackPoints.push({
+                        lat: p.lat,
+                        lng: p.lon,
+                        ele: p.alt ?? null,
+                        time: DateTime.fromMillis(p.time, { zone: 'utc' })
+                    });
+                    added++;
+                }
+            } catch (_) { /* Fehlerhafte Zeile überspringen */ }
+        }
+
+        if (added > 0) {
+            AppState.recordedTrackPoints.sort((a, b) => a.time.toMillis() - b.time.toMillis());
+            console.log(`[LiveTrackingManager] GPS-Puffer: ${added} Punkte nachgeladen.`);
+            document.dispatchEvent(new CustomEvent('track:point_added'));
+        }
+
+        await Filesystem.deleteFile({ path: 'gps_buffer.jsonl', directory: Directory.Data });
+    } catch (e) {
+        // Datei existiert nicht → kein Puffer, kein Problem.
+        if (e?.message && !e.message.toLowerCase().includes('not exist') && !e.message.toLowerCase().includes('no such')) {
+            console.warn('[LiveTrackingManager] GPS-Puffer Fehler:', e.message);
+        }
+    }
 }
 
 /**
