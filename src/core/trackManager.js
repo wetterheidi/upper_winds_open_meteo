@@ -685,8 +685,13 @@ async function renderTrack(points, fileName, dipWaypoint = null) {
 
         if (points.length > 0 && AppState.map) {
             const bounds = L.latLngBounds(points.map(p => [p.lat, p.lng]));
-            if (bounds.isValid()) AppState.map.fitBounds(bounds, { padding: [50, 50], maxZoom: AppState.map.getMaxZoom() || 18 });
-            Utils.handleError(I18n.t('tracks.error_render_invalid_coords'));
+            if (bounds.isValid()) {
+                // Wenn die Koordinaten gültig sind: Zoomen und KEINEN Fehler werfen
+                AppState.map.fitBounds(bounds, { padding: [50, 50], maxZoom: AppState.map.getMaxZoom() || 18 });
+            } else {
+                // Nur wenn die Koordinaten wirklich ungültig sind, den Fehler anzeigen
+                Utils.handleError(I18n.t('tracks.error_render_invalid_coords'));
+            }
         }
 
         trackMetaData.success = true;
