@@ -120,6 +120,8 @@ function initializeUIElements() {
     applySettingToInput('safetyHeight', Settings.state.userSettings.safetyHeight);
     applySettingToSelect('interpStep', Settings.state.userSettings.interpStep);
     applySettingToSelect('maxForecastTime', Settings.state.userSettings.maxForecastTime); // Hinzugefügt
+    applySettingToSelect('northReference', Settings.state.userSettings.northReference);
+    Utils.updateNorthReferenceSuffixes();
     applySettingToInput('aircraftSpeedKt', Settings.state.userSettings.aircraftSpeedKt);
     applySettingToInput('jumpRunTrackOffset', Settings.state.userSettings.jumpRunTrackOffset);
     applySettingToInput('numberOfJumpers', Settings.state.userSettings.numberOfJumpers);
@@ -155,10 +157,10 @@ function initializeUIElements() {
     const customLL = document.getElementById('customLandingDirectionLL');
     const customRR = document.getElementById('customLandingDirectionRR');
     if (customLL && Settings.state.userSettings.customLandingDirectionLL !== '' && !isNaN(Settings.state.userSettings.customLandingDirectionLL)) {
-        customLL.value = Settings.state.userSettings.customLandingDirectionLL;
+        customLL.value = Math.round(Utils.applyNorthReference(Settings.state.userSettings.customLandingDirectionLL, AppState.lastLat, AppState.lastLng));
     }
     if (customRR && Settings.state.userSettings.customLandingDirectionRR !== '' && !isNaN(Settings.state.userSettings.customLandingDirectionRR)) {
-        customRR.value = Settings.state.userSettings.customLandingDirectionRR;
+        customRR.value = Math.round(Utils.applyNorthReference(Settings.state.userSettings.customLandingDirectionRR, AppState.lastLat, AppState.lastLng));
     }
     const separation = JumpPlanner.getSeparationFromTAS(Settings.state.userSettings.aircraftSpeedKt);
     applySettingToInput('jumperSeparation', separation);
@@ -1276,7 +1278,7 @@ function updateJumpMasterDashboard(data) {
     }
 
     mainElements.coordsEl.textContent = coordText; mainElements.altitudeEl.textContent = deviceAltitude !== null ? `${Math.round(Utils.convertHeight(deviceAltitude - (refLevel === 'AGL' ? AppState.lastAltitude || 0 : 0), heightUnit))} ${heightUnit}` : "N/A";
-    mainElements.directionEl.textContent = `${direction}°`;
+    mainElements.directionEl.textContent = Utils.formatDirectionOutput(direction, latitude, longitude, false);
     const displaySpeed = Utils.convertWind(speedMs, effectiveWindUnit, 'm/s');
     mainElements.speedEl.textContent = `${Number.isFinite(displaySpeed) ? displaySpeed.toFixed(1) : 'N/A'} ${effectiveWindUnit}`;
     mainElements.accuracyEl.textContent = `± ${Math.round(Utils.convertHeight(accuracy, heightUnit))} ${heightUnit}`;
@@ -1335,7 +1337,7 @@ function updateJumpMasterDashboard(data) {
 
             if (allDetailsFound) {
                 detailElements.targetLabel.textContent = `JML to ${jumpMasterLineData.target}`;
-                detailElements.bearingEl.textContent = `${jumpMasterLineData.bearing}°`;
+                detailElements.bearingEl.textContent = Utils.formatDirectionOutput(jumpMasterLineData.bearing, latitude, longitude, false);
                 detailElements.distanceEl.textContent = `${Math.round(Utils.convertHeight(jumpMasterLineData.distance, heightUnit))} ${heightUnit}`;
                 detailElements.totEl.textContent = jumpMasterLineData.tot < 1200 ? `X - ${jumpMasterLineData.tot} s` : 'N/A';
             }
@@ -1411,7 +1413,7 @@ function updateDashboardPanel(data) {
 
     const directionEl = document.getElementById('dashboard-direction');
     if (direction !== 'N/A' && directionEl) {
-        directionEl.textContent = Math.round(direction);
+        directionEl.textContent = Utils.formatDirectionOutput(direction, latitude, longitude, false);
     }
 
     const dipMarker = AppState.currentMarker;
@@ -1451,8 +1453,8 @@ function updateDashboardPanel(data) {
         distanceEl.textContent = displayDistance;
         distanceUnitEl.textContent = displayDistUnit;
 
-        const bearing = Math.round(Utils.calculateBearing(latitude, longitude, dipPos.lat, dipPos.lng));
-        bearingEl.textContent = bearing;
+        const bearing = Utils.calculateBearing(latitude, longitude, dipPos.lat, dipPos.lng);
+        bearingEl.textContent = Utils.formatDirectionOutput(bearing, latitude, longitude, false);
     }
 
     // ... (Der restliche Teil der Funktion für Gleitverhältnisse bleibt unverändert)
@@ -2199,6 +2201,33 @@ function setupAppEventListeners() {
                     await updateUIWithNewWeatherData(newWeatherData, timeIndexToPreserve);
                 }
             }
+        }
+
+        // North Reference geändert: Suffixes und Input-Werte aktualisieren
+        if (key === 'northReference') {
+            Utils.updateNorthReferenceSuffixes();
+            const customLL = document.getElementById('customLandingDirectionLL');
+            const customRR = document.getElementById('customLandingDirectionRR');
+            const savedLL = Settings.state.userSettings.customLandingDirectionLL;
+            const savedRR = Settings.state.userSettings.customLandingDirectionRR;
+            console.log(`[NorthRef] Changed to: ${value}, savedLL: ${savedLL}, savedRR: ${savedRR}, lat: ${AppState.lastLat}, lng: ${AppState.lastLng}`);
+            if (customLL && savedLL !== '' && !isNaN(savedLL)) {
+                customLL.value = Math.round(Utils.applyNorthReference(savedLL, AppState.lastLat, AppState.lastLng));
+            }
+            if (customRR && savedRR !== '' && !isNaN(savedRR)) {
+                customRR.value = Math.round(Utils.applyNorthReference(savedRR, AppState.lastLat, AppState.lastLng));
+            }
+            const jrtInput = document.getElementById('jumpRunTrackDirection');
+            const savedJRT = Settings.state.userSettings.customJumpRunDirection;
+            if (jrtInput && savedJRT !== null && savedJRT !== undefined) {
+                const parsed = parseFloat(savedJRT);
+                if (Number.isFinite(parsed)) {
+                    jrtInput.value = Math.round(Utils.applyNorthReference(parsed, AppState.lastLat, AppState.lastLng));
+                }
+            }
+            // Kartenanzeige aktualisieren (JRT + Approach Tooltips)
+            displayManager.updateJumpRunTrackDisplay();
+            displayManager.updateLandingPatternDisplay();
         }
 
         // All Einheiten-Änderungen erfordern jetzt eine breite Aktualisierung

@@ -134,8 +134,8 @@
         "jump_run_details": "Absetzstrecke: {dir}° (Versatz: L {lat}m / V {fwd}m)",
         "exit_info_tooltip": "Exit-Bereiche berechnet mit:\nVorwärtsweg: {dir}° {dist} m\nFreifallzeit: {time} sek",
         "landing_direction_warning": "Warnung! Landerichtung fixiert",
-        "jump_run_tooltip": "Absetzstrecke: {dir}°, {dist} m",
-        "approach_tooltip": "Anflug: {dir}°, {dist} m",
+        "jump_run_tooltip": "Absetzstrecke: {dir}, {dist} m",
+        "approach_tooltip": "Anflug: {dir}, {dist} m",
         "error_location_weather": "Bitte wählen Sie zuerst einen Ort aus und laden Sie Wetterdaten.",
         "error_activate_canopy": "Bitte aktivieren Sie 'Schirmfahrtgebiet anzeigen' für die Analyse.",
         "terrain_none_found": "Geländeanalyse abgeschlossen. Keine kritischen Bereiche gefunden.",
@@ -253,7 +253,10 @@
         "reset_settings_title": "Setzt alle Einstellungen auf die Standardwerte zurück und sperrt alle Funktionen.",
         "reset_confirm": "Sind Sie sicher, dass Sie alle Einstellungen zurücksetzen und alle Funktionen sperren möchten?",
         "clear_cache": "Tile-Cache leeren",
-        "clear_cache_title": "Löscht zwischengespeicherte Kartenkacheln. Bewegen/Zoomen Sie, um weitere Kacheln für die Offline-Nutzung zu speichern."
+        "clear_cache_title": "Löscht zwischengespeicherte Kartenkacheln. Bewegen/Zoomen Sie, um weitere Kacheln für die Offline-Nutzung zu speichern.",
+        "north_ref": "Nordrichtung",
+        "true": "Rechtweisend",
+        "magnetic": "Missweisend"
     },
     "modals": {
         "restricted_feature": "Geschützte Funktion",
@@ -317,6 +320,7 @@
         "harp_location": "HARP Position",
         "show_more": "Mehr anzeigen",
         "show_less": "Weniger anzeigen",
+        "magnetic_declination": "Missweisung",
         "move_mouse_over": "Maus über Karte bewegen",
         "fetching": "Laden...",
         "lat": "Breite",

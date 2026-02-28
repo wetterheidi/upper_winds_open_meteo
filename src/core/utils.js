@@ -1170,6 +1170,121 @@ export class Utils {
             return points.map(() => 'N/A');
         }
     }
+
+    /**
+     * Berechnet die aktuelle magnetische Missweisung (Deklination) für eine Koordinate.
+     * Nutzt das World Magnetic Model (WMM) via geomagnetism Bibliothek.
+     * @param {number} lat - Breitengrad
+     * @param {number} lng - Längengrad
+     * @returns {number} Die Missweisung in Grad.
+     */
+    static getMagneticDeclination(lat, lng) {
+        // Prüfen, ob die geomag Library geladen ist
+        if (typeof geomag !== 'undefined') {
+            try {
+                const field = geomag.field(lat, lng);
+                const decl = field.declination;
+                console.log(`[MagDecl] Position: ${lat.toFixed(4)}, ${lng.toFixed(4)} → Deklination: ${decl >= 0 ? '+' : ''}${decl.toFixed(2)}° (${decl >= 0 ? 'E' : 'W'})`);
+                return decl;
+            } catch (error) {
+                console.error("Fehler bei der Berechnung der Deklination:", error);
+                return 0;
+            }
+        }
+        console.warn("geomag library nicht gefunden, Deklination = 0");
+        return 0;
+    }
+
+    /**
+     * Wandelt eine geografische Richtung (True North) in eine magnetische Richtung um.
+     * @param {number} trueDirection - Geografische Richtung
+     * @param {number} lat - Aktueller Breitengrad
+     * @param {number} lng - Aktueller Längengrad
+     */
+    static applyNorthReference(trueDirection, lat, lng) {
+        if (isNaN(trueDirection) || lat == null || lng == null) return trueDirection;
+
+        const reference = Settings.getValue('northReference', 'true');
+        if (reference === 'magnetic') {
+            // Deklination automatisch für die aktuelle Position berechnen
+            const declination = Utils.getMagneticDeclination(lat, lng);
+            let magDir = trueDirection - declination;
+            return Utils.normalizeAngle(magDir);
+        }
+        
+        return trueDirection;
+    }
+
+    /**
+     * Formatiert eine geografische Richtung für das UI und wendet, falls gewünscht,
+     * die magnetische Missweisung an. Hängt automatisch °T oder °M an.
+     * @param {number} trueDirection - Die geografische Richtung.
+     * @param {number} lat - Breitengrad (für die Berechnung der Missweisung).
+     * @param {number} lng - Längengrad.
+     * @param {boolean} [padToThree=true] - Ob die Zahl mit Nullen aufgefüllt werden soll (z.B. 090).
+     * @returns {string} Der formatierte String, z.B. "090°M" oder "270°T".
+     */
+    static formatDirectionOutput(trueDirection, lat, lng, padToThree = true) {
+        if (isNaN(trueDirection) || trueDirection === null) return 'N/A';
+
+        const reference = Settings.getValue('northReference', 'true');
+        let displayDir = trueDirection;
+        let suffix = '°T';
+
+        if (reference === 'magnetic' && lat != null && lng != null) {
+            const declination = Utils.getMagneticDeclination(lat, lng);
+            displayDir = Utils.normalizeAngle(trueDirection - declination);
+            suffix = '°M';
+        }
+
+        let roundedDir = Math.round(displayDir);
+        if (roundedDir === 0 || roundedDir >= 360) roundedDir = 360;
+
+        if (padToThree) {
+            return `${roundedDir.toString().padStart(3, '0')}${suffix}`;
+        } else {
+            return `${roundedDir}${suffix}`;
+        }
+    }
+    
+    /**
+     * Wandelt eine Richtung im Display-Format (ggf. magnetisch) zurück in True North.
+     * Umkehrfunktion zu applyNorthReference.
+     * @param {number} displayDirection - Die angezeigte Richtung (True oder Magnetic).
+     * @param {number} lat - Breitengrad.
+     * @param {number} lng - Längengrad.
+     * @returns {number} Die Richtung in True North.
+     */
+    static reverseNorthReference(displayDirection, lat, lng) {
+        if (isNaN(displayDirection) || lat == null || lng == null) return displayDirection;
+        const reference = Settings.getValue('northReference', 'true');
+        if (reference === 'magnetic') {
+            const declination = Utils.getMagneticDeclination(lat, lng);
+            return Utils.normalizeAngle(displayDirection + declination);
+        }
+        return displayDirection;
+    }
+
+    /**
+     * Gibt das aktuelle Suffix für Richtungsangaben zurück (°T oder °M).
+     * @returns {string} "°M" bei magnetischer Referenz, sonst "°T".
+     */
+    static getNorthReferenceSuffix() {
+        const ref = Settings.getValue('northReference', 'true');
+        return ref === 'magnetic' ? '°M' : '°T';
+    }
+
+    /**
+     * Aktualisiert alle °-Suffix-Spans in der UI (degSuffixLL, degSuffixRR, degSuffixJRT).
+     */
+    static updateNorthReferenceSuffixes() {
+        const suffix = Utils.getNorthReferenceSuffix();
+        ['degSuffixLL', 'degSuffixRR', 'degSuffixJRT'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = suffix;
+        });
+    }
+
     // ===================================================================
     // 6. Allgemeine Hilfs- & UI-Funktionen
     // ===================================================================

@@ -94,6 +94,7 @@ export const Settings = {
         currentEnsembleScenario: 'all_models',
         isInteractionLocked: false,
         enableWindAlert: true,
+        northReference: 'true',
 
         alerts: {
             wind: {

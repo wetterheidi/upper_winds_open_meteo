@@ -114,6 +114,8 @@ function initializeUIElements() {
     applySettingToSelect('coordFormat', Settings.state.userSettings.coordFormat);
     applySettingToSelect('downloadFormat', Settings.state.userSettings.downloadFormat);
     applySettingToSelect('maxForecastTime', Settings.state.userSettings.maxForecastTime); // Hinzugefügt
+    applySettingToSelect('northReference', Settings.state.userSettings.northReference);
+    Utils.updateNorthReferenceSuffixes();
     applySettingToRadio('landingDirection', Settings.state.userSettings.landingDirection);
     applySettingToInput('canopySpeed', Settings.state.userSettings.canopySpeed);
     applySettingToInput('descentRate', Settings.state.userSettings.descentRate);
@@ -165,10 +167,10 @@ function initializeUIElements() {
     const customLL = document.getElementById('customLandingDirectionLL');
     const customRR = document.getElementById('customLandingDirectionRR');
     if (customLL && Settings.state.userSettings.customLandingDirectionLL !== '' && !isNaN(Settings.state.userSettings.customLandingDirectionLL)) {
-        customLL.value = Settings.state.userSettings.customLandingDirectionLL;
+        customLL.value = Math.round(Utils.applyNorthReference(Settings.state.userSettings.customLandingDirectionLL, AppState.lastLat, AppState.lastLng));
     }
     if (customRR && Settings.state.userSettings.customLandingDirectionRR !== '' && !isNaN(Settings.state.userSettings.customLandingDirectionRR)) {
-        customRR.value = Settings.state.userSettings.customLandingDirectionRR;
+        customRR.value = Math.round(Utils.applyNorthReference(Settings.state.userSettings.customLandingDirectionRR, AppState.lastLat, AppState.lastLng));
     }
     const separation = JumpPlanner.getSeparationFromTAS(Settings.state.userSettings.aircraftSpeedKt);
     applySettingToInput('jumperSeparation', separation);
@@ -1147,7 +1149,7 @@ function updateJumpMasterDashboard(data) {
     }
     altitudeEl.textContent = altText;
 
-    directionEl.textContent = `${data.direction}°`;
+    directionEl.textContent = Utils.formatDirectionOutput(data.direction, data.latitude, data.longitude, false);
     const displaySpeed = Utils.convertWind(data.speedMs, settings.effectiveWindUnit, 'm/s');
     const formattedSpeed = settings.effectiveWindUnit === 'bft' ? Math.round(displaySpeed) : displaySpeed.toFixed(1);
     speedEl.textContent = `${formattedSpeed} ${settings.effectiveWindUnit}`;
@@ -1196,7 +1198,7 @@ function updateJumpMasterDashboard(data) {
             // NEU: Übersetzten Text mit dem Ziel (HARP/DIP) setzen
             targetLabel.textContent = I18n.t('jumpmaster.jml_to', { target: data.jumpMasterLineData.target });
 
-            bearingEl.textContent = `${data.jumpMasterLineData.bearing}°`;
+            bearingEl.textContent = Utils.formatDirectionOutput(data.jumpMasterLineData.bearing, data.latitude, data.longitude, false);
             distanceEl.textContent = `${Math.round(Utils.convertHeight(data.jumpMasterLineData.distance, settings.heightUnit))} ${settings.heightUnit}`;
             totEl.textContent = data.jumpMasterLineData.tot < 1200 ? `X - ${data.jumpMasterLineData.tot} s` : 'N/A';
         }
@@ -1655,7 +1657,35 @@ function setupAppEventListeners() {
             }
         }
 
-        // 4. Spezifische Logik für Landing Direction (war früher im Switch)
+        // 4. North Reference geändert: Suffixes und Input-Werte aktualisieren
+        if (key === 'northReference') {
+            Utils.updateNorthReferenceSuffixes();
+            // Input-Werte aus gespeicherten true-Werten neu befüllen
+            const customLL = document.getElementById('customLandingDirectionLL');
+            const customRR = document.getElementById('customLandingDirectionRR');
+            const savedLL = Settings.state.userSettings.customLandingDirectionLL;
+            const savedRR = Settings.state.userSettings.customLandingDirectionRR;
+            console.log(`[NorthRef] Changed to: ${value}, savedLL: ${savedLL}, savedRR: ${savedRR}, lat: ${AppState.lastLat}, lng: ${AppState.lastLng}`);
+            if (customLL && savedLL !== '' && !isNaN(savedLL)) {
+                customLL.value = Math.round(Utils.applyNorthReference(savedLL, AppState.lastLat, AppState.lastLng));
+            }
+            if (customRR && savedRR !== '' && !isNaN(savedRR)) {
+                customRR.value = Math.round(Utils.applyNorthReference(savedRR, AppState.lastLat, AppState.lastLng));
+            }
+            const jrtInput = document.getElementById('jumpRunTrackDirection');
+            const savedJRT = Settings.state.userSettings.customJumpRunDirection;
+            if (jrtInput && savedJRT !== null && savedJRT !== undefined) {
+                const parsed = parseFloat(savedJRT);
+                if (Number.isFinite(parsed)) {
+                    jrtInput.value = Math.round(Utils.applyNorthReference(parsed, AppState.lastLat, AppState.lastLng));
+                }
+            }
+            // Kartenanzeige aktualisieren (JRT + Approach Tooltips)
+            displayManager.updateJumpRunTrackDisplay();
+            displayManager.updateLandingPatternDisplay();
+        }
+
+        // 5. Spezifische Logik für Landing Direction (war früher im Switch)
         if (key === 'landingDirection') {
             updateUIState();
             displayManager.updateLandingPatternDisplay();
@@ -2170,9 +2200,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.addEventListener('location:selected', async (event) => {
         const { lat, lng, source } = event.detail;
-        console.log(`App: Event 'location:selected' empfangen. Quelle: ${source}`);
+        console.log(`App: Event 'location:selected' empfangen. Quelle: ${source}, Koordinaten: ${lat}, ${lng}`);
         mapManager.clearTerrainWarning(); // Alte Terrain-Analyse sofort entfernen
         AppState.terrainAnalysisCache = null;
+
+        // Koordinaten sofort aktualisieren, damit alle nachfolgenden Berechnungen
+        // (insbesondere Magnetic Declination) die richtige Position verwenden
+        AppState.lastLat = lat;
+        AppState.lastLng = lng;
 
         const loadingElement = document.getElementById('loading');
         if (loadingElement) loadingElement.style.display = 'block';

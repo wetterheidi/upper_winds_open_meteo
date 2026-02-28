@@ -72,8 +72,13 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
         const customLandingDirectionLLInput = document.getElementById('customLandingDirectionLL');
         const customLandingDirectionRRInput = document.getElementById('customLandingDirectionRR');
         if (customLandingDirectionLLInput && customLandingDirectionRRInput && AppState.landingWindDir !== null) {
-            customLandingDirectionLLInput.value = Math.round(AppState.landingWindDir);
-            customLandingDirectionRRInput.value = Math.round(AppState.landingWindDir);
+            const trueDir = Math.round(AppState.landingWindDir);
+            customLandingDirectionLLInput.value = Math.round(Utils.applyNorthReference(trueDir, AppState.lastLat, AppState.lastLng));
+            customLandingDirectionRRInput.value = Math.round(Utils.applyNorthReference(trueDir, AppState.lastLat, AppState.lastLng));
+            // True-Wert in Settings speichern, damit northReference-Wechsel korrekt umrechnet
+            Settings.state.userSettings.customLandingDirectionLL = trueDir;
+            Settings.state.userSettings.customLandingDirectionRR = trueDir;
+            Settings.save();
         }
     } else {
         console.log('Landing direction is locked. Skipping input field update.');
@@ -255,12 +260,17 @@ export async function refreshMarkerPopup(expanded = false, open = false) {
         const dmsLng = Utils.decimalToDms(lng, false);
         const ddmLng = Utils.decimalToDecimalMinutes(lng, false);
 
+        const declination = Utils.getMagneticDeclination(lat, lng);
+        const declSign = declination >= 0 ? 'E' : 'W';
+        const declText = `${Math.abs(declination).toFixed(1)}° ${declSign}`;
+
         popupContent = `
             <div style="font-size: 11px; line-height: 1.4;">
                 Decimal: ${lat.toFixed(5)}, ${lng.toFixed(5)}<br>
                 DDM: ${ddm.deg}° ${ddm.min.toFixed(3)}' ${ddm.dir}, ${ddmLng.deg}° ${ddmLng.min.toFixed(3)}' ${ddmLng.dir}<br>
                 DMS: ${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}, ${dmsLng.deg}°${dmsLng.min}'${dmsLng.sec.toFixed(0)}" ${dmsLng.dir}<br>
-                MGRS: ${Utils.decimalToMgrs(lat, lng)}
+                MGRS: ${Utils.decimalToMgrs(lat, lng)}<br>
+                ${I18n.t('map.magnetic_declination')}: ${declText}
             </div>
             ${altitudeContent}<br>
             <a href="#" class="toggle-coords-format" data-marker-type="dip" data-expanded="true" style="font-size: 11px;">${I18n.t('map.show_less')}</a>
@@ -647,17 +657,18 @@ export function updateJumpRunTrackDisplay() {
         console.log('Drawing jump run track with data:', trackData);
 
         if (directionInput && !Settings.state.userSettings.customJumpRunDirection) {
-            directionInput.value = trackData.direction;
+            directionInput.value = Math.round(Utils.applyNorthReference(trackData.direction, AppState.lastLat, AppState.lastLng));
         }
 
         // --- LOKALISIERUNG DER TOOLTIPS ---
         // Nutzt Platzhalter für Richtung und Distanz
+        const displayDir = Utils.formatDirectionOutput(trackData.direction, AppState.lastLat, AppState.lastLng, false);
         const jumpRunTooltip = I18n.t('planner.jump_run_tooltip')
-            .replace('{dir}', trackData.direction)
+            .replace('{dir}', displayDir)
             .replace('{dist}', trackData.trackLength);
 
         const approachTooltip = I18n.t('planner.approach_tooltip')
-            .replace('{dir}', trackData.direction)
+            .replace('{dir}', displayDir)
             .replace('{dist}', trackData.approachLength);
 
         const drawData = {

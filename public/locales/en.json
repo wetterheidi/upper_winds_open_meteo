@@ -134,8 +134,8 @@
         "jump_run_details": "Jump Run: {dir}° (Offset: L {lat}m / F {fwd}m)",
         "exit_info_tooltip": "Exit areas calculated with:\nThrow/Drift: {dir}° {dist} m\nFree Fall Time: {time} sec",
         "landing_direction_warning": "Warning! Landing direction locked",
-        "jump_run_tooltip": "Jump Run: {dir}°, {dist} m",
-        "approach_tooltip": "Approach: {dir}°, {dist} m",
+        "jump_run_tooltip": "Jump Run: {dir}, {dist} m",
+        "approach_tooltip": "Approach: {dir}, {dist} m",
         "error_location_weather": "Please select a location and fetch weather data first.",
         "error_activate_canopy": "Please activate 'Show Canopy Flight Area' to analyze terrain.",
         "terrain_none_found": "Terrain analysis complete. No low clearance areas found.",
@@ -253,7 +253,10 @@
         "reset_settings_title": "Resets all settings to their default values and locks all features",
         "reset_confirm": "Are you sure you want to reset all settings and lock all features?",
         "clear_cache": "Clear Tile Cache",
-        "clear_cache_title": "Clears cached map tiles. Pan/zoom to cache more tiles for offline use."
+        "clear_cache_title": "Clears cached map tiles. Pan/zoom to cache more tiles for offline use.",
+        "north_ref": "North Reference",
+        "true": "True",
+        "magnetic": "Magnetic"
     },
     "modals": {
         "restricted_feature": "Restricted Feature",
@@ -317,6 +320,7 @@
         "harp_location": "HARP Location",
         "show_more": "Show more",
         "show_less": "Show less",
+        "magnetic_declination": "Mag. Decl.",
         "move_mouse_over": "Move mouse over map",
         "fetching": "Fetching...",
         "lat": "Lat",

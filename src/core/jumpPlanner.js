@@ -530,7 +530,9 @@ export function calculateLandingPatternCoords(lat, lng, interpolatedData) {
 
     const landingDirectionSetting = document.querySelector('input[name="landingDirection"]:checked')?.value || 'LL';
     const customLandingDirInput = document.getElementById(landingDirectionSetting === 'LL' ? 'customLandingDirectionLL' : 'customLandingDirectionRR');
-    const customLandingDir = customLandingDirInput ? parseInt(customLandingDirInput.value, 10) : NaN;
+    const rawInput = customLandingDirInput ? parseInt(customLandingDirInput.value, 10) : NaN;
+    // DOM-Wert ist ggf. magnetic → zurück in true north konvertieren
+    const customLandingDir = Number.isFinite(rawInput) ? Utils.reverseNorthReference(rawInput, AppState.lastLat, AppState.lastLng) : NaN;
     let effectiveLandingWindDir = Number.isFinite(customLandingDir) ? customLandingDir : (Number.isFinite(AppState.landingWindDir) ? AppState.landingWindDir : interpolatedData[0]?.dir);
 
     if (!Number.isFinite(effectiveLandingWindDir)) return null;

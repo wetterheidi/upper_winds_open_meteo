@@ -105,16 +105,18 @@ function setupRadioGroup(name, callback) {
 
                     // Auto-Fill-Logik (bleibt gleich)
                     if (newValue === 'LL' && customLL && !customLL.value && Settings.state.userSettings.customLandingDirectionLL === '') {
-                        customLL.value = Math.round(AppState.landingWindDir || 0);
-                        Settings.state.userSettings.customLandingDirectionLL = parseInt(customLL.value);
+                        const trueDir = Math.round(AppState.landingWindDir || 0);
+                        customLL.value = Math.round(Utils.applyNorthReference(trueDir, AppState.lastLat, AppState.lastLng));
+                        Settings.state.userSettings.customLandingDirectionLL = trueDir;
                         Settings.save();
-                        console.log(`Set customLandingDirectionLL to ${customLL.value}`);
+                        console.log(`Set customLandingDirectionLL to ${trueDir} (true), displayed as ${customLL.value}`);
                     }
                     if (newValue === 'RR' && customRR && !customRR.value && Settings.state.userSettings.customLandingDirectionRR === '') {
-                        customRR.value = Math.round(AppState.landingWindDir || 0);
-                        Settings.state.userSettings.customLandingDirectionRR = parseInt(customRR.value);
+                        const trueDir = Math.round(AppState.landingWindDir || 0);
+                        customRR.value = Math.round(Utils.applyNorthReference(trueDir, AppState.lastLat, AppState.lastLng));
+                        Settings.state.userSettings.customLandingDirectionRR = trueDir;
                         Settings.save();
-                        console.log(`Set customLandingDirectionRR to ${customRR.value}`);
+                        console.log(`Set customLandingDirectionRR to ${trueDir} (true), displayed as ${customRR.value}`);
                     }
                 }
             }
@@ -447,7 +449,15 @@ function setupJumpRunTrackEvents() {
     const directionInput = document.getElementById('jumpRunTrackDirection');
     if (directionInput) {
         // Initialwert setzen
-        directionInput.value = Settings.state.userSettings.customJumpRunDirection !== null ? Settings.state.userSettings.customJumpRunDirection : '';
+        const savedJRT = Settings.state.userSettings.customJumpRunDirection;
+        if (savedJRT !== null && savedJRT !== undefined) {
+            const parsed = parseFloat(savedJRT);
+            directionInput.value = Number.isFinite(parsed)
+                ? Math.round(Utils.applyNorthReference(parsed, AppState.lastLat, AppState.lastLng))
+                : savedJRT; // "IN", "CR+", "CR-" unverändert
+        } else {
+            directionInput.value = '';
+        }
 
         // ÄNDERUNG: Zurück zum 'change' Event, kein Debounce nötig
         directionInput.addEventListener('change', () => {
@@ -462,10 +472,18 @@ function setupJumpRunTrackEvents() {
             if (forwardOffsetInput) forwardOffsetInput.value = 0;
             console.log('Manuelle JRT-Richtungsänderung: Offsets auf 0 zurückgesetzt.');
 
-            // Speichern (leer wird zu null -> automatische Berechnung)
-            Settings.state.userSettings.customJumpRunDirection = value || null;
+            // Speichern: numerische Werte von display → true konvertieren
+            // Textuelle Eingaben ("IN", "CR+", "CR-") bleiben unverändert
+            let saveValue = value || null;
+            if (saveValue) {
+                const parsed = parseFloat(saveValue);
+                if (Number.isFinite(parsed)) {
+                    saveValue = Utils.reverseNorthReference(parsed, AppState.lastLat, AppState.lastLng);
+                }
+            }
+            Settings.state.userSettings.customJumpRunDirection = saveValue;
             Settings.save();
-            console.log(`Gespeicherter customJumpRunDirection Wert: ${Settings.state.userSettings.customJumpRunDirection}`);
+            console.log(`JRT direction input: "${value}", saved as: ${Settings.state.userSettings.customJumpRunDirection}`);
 
             // 1. UI Input Event auslösen
             document.dispatchEvent(new CustomEvent('ui:inputChanged', {
@@ -1062,7 +1080,7 @@ function setupRadioEvents() {
     }
 }
 function setupSelectEvents() {
-    const selectIds = ['refLevel', 'heightUnit', 'temperatureUnit', 'windUnit', 'timeZone', 'coordFormat', 'downloadFormat', 'maxForecastTime']; // Hinzugefügt
+    const selectIds = ['refLevel', 'heightUnit', 'temperatureUnit', 'windUnit', 'timeZone', 'coordFormat', 'downloadFormat', 'maxForecastTime', 'northReference']; // Hinzugefügt
 
     selectIds.forEach(id => {
         const selectElement = document.getElementById(id);
@@ -1163,8 +1181,23 @@ function setupInputEvents() {
     setupInput('descentRate', 'change', 300);
     setupInput('interpStep', 'change', 300, null, 'interpStep');
 
-    setupInput('customLandingDirectionLL', 'input', 100);
-    setupInput('customLandingDirectionRR', 'input', 100);
+    // Landing Direction Inputs: Display-Wert (ggf. magnetic) → true north für Speicherung
+    ['customLandingDirectionLL', 'customLandingDirectionRR'].forEach(id => {
+        const input = document.getElementById(id);
+        if (!input) return;
+        input.addEventListener('input', Utils.debounce(() => {
+            const displayValue = parseFloat(input.value);
+            const trueValue = Number.isFinite(displayValue)
+                ? Utils.reverseNorthReference(displayValue, AppState.lastLat, AppState.lastLng)
+                : displayValue;
+            Settings.state.userSettings[id] = trueValue;
+            Settings.save();
+            console.log(`${id} display: ${displayValue}, saved as true: ${trueValue}`);
+            document.dispatchEvent(new CustomEvent('ui:inputChanged', {
+                detail: { name: id, value: trueValue }
+            }));
+        }, 100));
+    });
 
     setupInput('jumpRunTrackDirection', 'change', 0);
     setupInput('jumpRunTrackOffset', 'change', 0);
