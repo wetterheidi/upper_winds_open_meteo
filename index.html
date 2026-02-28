@@ -20,7 +20,8 @@
     <script src="https://unpkg.com/leaflet-rotatedmarker@0.2.0/leaflet.rotatedMarker.js" defer></script>
     <script src="https://unpkg.com/@tmcw/togeojson@4.7.0/dist/togeojson.umd.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
-  <script type="module" crossorigin src="/upper_winds_open_meteo/assets/index-D12hxxwN.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/geomag/dist/geomag.min.js" defer></script>
+  <script type="module" crossorigin src="/upper_winds_open_meteo/assets/index-CDrgbTh9.js"></script>
   <link rel="stylesheet" crossorigin href="/upper_winds_open_meteo/assets/index-XcKul45H.css">
 </head>
 
@@ -177,7 +178,7 @@
                                         <span>
                                             <input type="radio" name="landingDirection" value="LL" checked> LL
                                             <input type="number" id="customLandingDirectionLL" min="0" max="360"
-                                                placeholder="0-360°"> °
+                                                placeholder="0-360°"> <span id="degSuffixLL">°</span>
                                         </span>
                                         <span id="lock-container-LL" class="lock-landing-container hidden">
                                             <input type="checkbox" id="lockLandingDirectionLL" class="lock-landing-cb">
@@ -191,7 +192,7 @@
                                         <span>
                                             <input type="radio" name="landingDirection" value="RR"> RR
                                             <input type="number" id="customLandingDirectionRR" min="0" max="360"
-                                                placeholder="0-360°"> °
+                                                placeholder="0-360°"> <span id="degSuffixRR">°</span>
                                         </span>
                                         <span id="lock-container-RR" class="lock-landing-container hidden">
                                             <input type="checkbox" id="lockLandingDirectionRR" class="lock-landing-cb">
@@ -290,7 +291,7 @@
                                             data-i18n="planner.show_jump_run_track">Show Jump Run Track:</span>
                                         <input type="text" id="jumpRunTrackDirection" min="0" max="360" step="1"
                                             placeholder="Calculated">
-                                        <label>°</label>
+                                        <span id="degSuffixJRT">°</span>
                                     </label>
                                 </li>
                                 <li>
@@ -619,6 +620,11 @@
                                     <option value="DDM">Deg Decimal Min</option>
                                     <option value="DMS">Deg Min Sec</option>
                                     <option value="MGRS">MGRS</option>
+                                </select>
+                                <label for="northReference" data-i18n="settings.north_ref">North Ref.:</label>
+                                <select id="northReference">
+                                    <option value="true" data-i18n="settings.true">True</option>
+                                    <option value="magnetic" data-i18n="settings.magnetic">Magnetic</option>
                                 </select>
                                 <label for="maxForecastTime" data-i18n="settings.max_forecast">Max. Forecast
                                     Time:</label>
