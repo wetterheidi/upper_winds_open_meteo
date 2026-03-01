@@ -221,7 +221,7 @@
         "historical_date": "Historisches Datum",
         "select_date": "Datum wählen:",
         "clear": "Löschen",
-        "track_upload": "Track Upload",
+        "track_upload": "Track hochladen",
         "choose_file": "Datei wählen...",
         "selected_file": "Ausgewählte Datei",
         "clear_track": "Track löschen",
@@ -255,8 +255,8 @@
         "clear_cache": "Tile-Cache leeren",
         "clear_cache_title": "Löscht zwischengespeicherte Kartenkacheln. Bewegen/Zoomen Sie, um weitere Kacheln für die Offline-Nutzung zu speichern.",
         "north_ref": "Nordrichtung",
-        "true": "Rechtweisend",
-        "magnetic": "Missweisend"
+        "true": "True",
+        "magnetic": "Magnetisch"
     },
     "modals": {
         "restricted_feature": "Geschützte Funktion",
