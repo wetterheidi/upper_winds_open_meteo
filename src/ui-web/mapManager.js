@@ -8,6 +8,7 @@ import { TileCache } from '../core/tileCache.js';
 import { updateOfflineIndicator, isMobileDevice, displayWarning } from './ui.js';
 import { UI_DEFAULTS, ICON_URLS, ENSEMBLE_VISUALIZATION } from '../core/constants.js';
 import * as LocationManager from '../core/locationManager.js';
+import * as PinManager from '../core/pinManager.js';
 import { I18n } from '../core/i18n.js';
 
 let lastTapTime = 0;
@@ -39,6 +40,7 @@ async function initMap() {
     AppState.jumpVisualizationLayerGroup = L.layerGroup().addTo(AppState.map);
     AppState.landingPatternLayerGroup = L.layerGroup().addTo(AppState.map);
     AppState.jumpRunTrackLayerGroup = L.layerGroup().addTo(AppState.map);
+    AppState.pinLayerGroup = L.layerGroup().addTo(AppState.map);
     AppState.favoritesLayerGroup = L.layerGroup().addTo(AppState.map);
     console.log('Favorite marker layer added!');
     AppState.poiLayerGroup = L.layerGroup().addTo(AppState.map);
@@ -423,6 +425,12 @@ export function clearHarpMarker() {
         return;
     }
 
+    // Alle Pins löschen wenn HARP entfernt wird
+    if (AppState.pinnedJumps.length > 0) {
+        PinManager.clearAllPins();
+        clearAllPinMarkers();
+    }
+
     if (AppState.harpMarker) {
         AppState.map.removeLayer(AppState.harpMarker);
         AppState.harpMarker = null;
@@ -459,6 +467,53 @@ export function clearHarpMarker() {
         }
     }
     Utils.handleMessage(I18n.t('messages.harp_cleared'));
+}
+
+// ===================================================================
+// Pin-Marker Funktionen
+// ===================================================================
+
+export function createPinMarker(pin) {
+    const isActive = pin.isActive;
+    const marker = L.marker([pin.harpLatLng.lat, pin.harpLatLng.lng], {
+        icon: L.divIcon({
+            className: `pin-marker ${isActive ? 'pin-marker-active' : ''}`,
+            html: `<div class="pin-marker-inner">${pin.id}</div>`,
+            iconSize: [24, 24],
+            iconAnchor: [12, 12]
+        }),
+        pane: 'markerPane',
+        zIndexOffset: 1400,
+        pmIgnore: true
+    });
+
+    marker.on('click', () => {
+        document.dispatchEvent(new CustomEvent('pin:activate', { detail: { pinId: pin.id } }));
+    });
+
+    marker.on('contextmenu', (e) => {
+        L.DomEvent.stopPropagation(e);
+        document.dispatchEvent(new CustomEvent('pin:remove', { detail: { pinId: pin.id } }));
+    });
+
+    return marker;
+}
+
+export function redrawPinMarkers() {
+    if (!AppState.pinLayerGroup) return;
+    AppState.pinLayerGroup.clearLayers();
+
+    AppState.pinnedJumps.forEach(pin => {
+        const marker = createPinMarker(pin);
+        marker.addTo(AppState.pinLayerGroup);
+        pin.marker = marker;
+    });
+}
+
+export function clearAllPinMarkers() {
+    if (AppState.pinLayerGroup) {
+        AppState.pinLayerGroup.clearLayers();
+    }
 }
 
 export function clearTerrainWarning() {
@@ -686,6 +741,15 @@ export function handleHarpPlacement(e) {
     Settings.state.userSettings.jumpRunTrackForwardOffset = 0;
     console.log('HARP placed. JRT offsets reset to 0.');
 
+    // Aktiven Pin deaktivieren, damit Live-Berechnung wieder gezeichnet wird
+    // Pins bleiben bestehen — jeder Pin hat seine eigene HARP-Position
+    if (AppState.activePinId !== null) {
+        AppState.pinnedJumps.forEach(p => { p.isActive = false; });
+        AppState.activePinId = null;
+        redrawPinMarkers();
+        console.log('Active pin deactivated due to HARP repositioning.');
+    }
+
     Settings.save();
     AppState.isPlacingHarp = false;
     AppState.map.off('click', handleHarpPlacement);
@@ -776,6 +840,18 @@ export async function updateHarpMarkerPopup(marker, lat, lng, open = false, expa
         popupContent += `${altitudeContent}<br>
             <a href="#" class="toggle-coords-format" data-marker-type="harp" data-lat="${lat}" data-lng="${lng}" data-expanded="false" style="font-size: 11px;">${I18n.t('map.show_more')}</a>
         `;
+    }
+
+    // Pin Jump Button
+    const pinCount = AppState.pinnedJumps.length;
+    const canPin = pinCount < 4 && Settings.state.userSettings.calculateJump && AppState.lastVisualizationData;
+    if (canPin) {
+        popupContent += `<br><button class="pin-jump-btn" style="margin-top: 4px; padding: 2px 8px; font-size: 11px; cursor: pointer;">📌 ${I18n.t('planner.pin_jump')} (${pinCount}/4)</button>`;
+    } else if (pinCount >= 4) {
+        popupContent += `<br><span style="font-size: 11px; color: gray;">📌 ${I18n.t('planner.pin_limit_reached')}</span>`;
+    }
+    if (pinCount > 0) {
+        popupContent += `<br><a href="#" class="clear-all-pins-btn" style="font-size: 11px; color: red;">${I18n.t('planner.clear_all_pins')}</a>`;
     }
 
     updatePopupContent(marker, popupContent, open);

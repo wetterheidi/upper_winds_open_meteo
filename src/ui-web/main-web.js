@@ -21,6 +21,7 @@ import * as liveTrackingManager from '../core/liveTrackingManager.js';
 import * as EnsembleManager from '../core/ensembleManager.js';
 import * as LocationManager from '../core/locationManager.js';
 import * as AdsbManager from '../core/adsbManager.js';
+import * as PinManager from '../core/pinManager.js';
 import { generateMeteogram } from '../core/meteogramChart.js';
 import { DateTime } from 'luxon';
 import { I18n } from '../core/i18n.js';
@@ -337,6 +338,14 @@ export function calculateJump() {
                 });
             });
         }
+    }
+
+    // Visualisierungsdaten für Pinning zwischenspeichern
+    AppState.lastVisualizationData = visualizationData;
+
+    // Wenn ein Pin aktiv ist, nicht die Live-Visualisierung zeichnen
+    if (AppState.activePinId !== null) {
+        return;
     }
 
     mapManager.drawJumpVisualization(visualizationData);
@@ -1069,8 +1078,15 @@ export function updateJumpMasterLineAndPanel(positionData = null) {
         let targetName = '';
 
         if (Settings.state.userSettings.jumpMasterLineTarget === 'HARP' && AppState.harpMarker) {
-            targetPos = AppState.harpMarker.getLatLng();
-            targetName = 'HARP';
+            // Bei aktivem Pin auf dessen HARP-Position zeigen
+            const activePin = PinManager.getActivePin();
+            if (activePin) {
+                targetPos = L.latLng(activePin.harpLatLng.lat, activePin.harpLatLng.lng);
+                targetName = `Pin ${activePin.id}`;
+            } else {
+                targetPos = AppState.harpMarker.getLatLng();
+                targetName = 'HARP';
+            }
         } else if (AppState.currentMarker) {
             targetPos = AppState.currentMarker.getLatLng();
             targetName = 'DIP';
@@ -2001,6 +2017,89 @@ function setupAppEventListeners() {
         console.log('[main-web] Recalculate jump triggered.');
         if (AppState.weatherData && AppState.lastLat && AppState.lastLng && Settings.state.userSettings.calculateJump) {
             calculateJump();
+        }
+    });
+
+    // ===================================================================
+    // Pin Jump Event-Handler
+    // ===================================================================
+
+    document.addEventListener('pin:createPin', () => {
+        const trackDrawData = displayManager.getLastTrackDrawData();
+        const pin = PinManager.createPin(
+            AppState.lastVisualizationData,
+            trackDrawData,
+            AppState.lastTrackData
+        );
+        if (!pin) {
+            console.warn('[PinManager] Pin konnte nicht erstellt werden.');
+            return;
+        }
+        // Pin wird NICHT aktiviert — Live-Berechnung bleibt sichtbar
+        mapManager.redrawPinMarkers();
+        // HARP-Popup aktualisieren (Pin-Zähler)
+        if (AppState.harpMarker) {
+            const pos = AppState.harpMarker.getLatLng();
+            mapManager.updateHarpMarkerPopup(AppState.harpMarker, pos.lat, pos.lng, true);
+        }
+    });
+
+    document.addEventListener('pin:activate', (e) => {
+        const pin = PinManager.activatePin(e.detail.pinId);
+        if (!pin) return;
+        mapManager.redrawPinMarkers();
+        if (pin.visualizationData) {
+            mapManager.drawJumpVisualization(pin.visualizationData);
+        }
+        if (pin.trackDrawData) {
+            mapManager.drawJumpRunTrack(pin.trackDrawData);
+        }
+        // JML aktualisieren wenn aktiv
+        if (Settings.state.userSettings.showJumpMasterLine) {
+            updateJumpMasterLineAndPanel();
+        }
+    });
+
+    document.addEventListener('pin:remove', (e) => {
+        const removed = PinManager.removePin(e.detail.pinId);
+        mapManager.redrawPinMarkers();
+
+        // HARP an die Position des entfernten Pins verschieben und
+        // dessen Parameter wiederherstellen → Live-Berechnung dort fortführen
+        if (removed && removed.harpLatLng && AppState.harpMarker) {
+            const { lat, lng } = removed.harpLatLng;
+            AppState.harpMarker.setLatLng([lat, lng]);
+            Settings.state.userSettings.harpLat = lat;
+            Settings.state.userSettings.harpLng = lng;
+            Settings.state.userSettings.openingAltitude = removed.openingAltitude;
+            Settings.state.userSettings.exitAltitude = removed.exitAltitude;
+            Settings.save();
+            // UI-Höhenfelder aktualisieren
+            const openingInput = document.getElementById('openingAltitude');
+            const exitInput = document.getElementById('exitAltitude');
+            if (openingInput) openingInput.value = removed.openingAltitude;
+            if (exitInput) exitInput.value = removed.exitAltitude;
+        }
+
+        // Live-Berechnung wiederherstellen
+        calculateJump();
+        displayManager.updateJumpRunTrackDisplay();
+        // HARP-Popup aktualisieren
+        if (AppState.harpMarker) {
+            const pos = AppState.harpMarker.getLatLng();
+            mapManager.updateHarpMarkerPopup(AppState.harpMarker, pos.lat, pos.lng, true);
+        }
+    });
+
+    document.addEventListener('pin:clearAll', () => {
+        PinManager.clearAllPins();
+        mapManager.clearAllPinMarkers();
+        calculateJump();
+        displayManager.updateJumpRunTrackDisplay();
+        // HARP-Popup aktualisieren
+        if (AppState.harpMarker) {
+            const pos = AppState.harpMarker.getLatLng();
+            mapManager.updateHarpMarkerPopup(AppState.harpMarker, pos.lat, pos.lng, true);
         }
     });
 

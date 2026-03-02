@@ -400,6 +400,18 @@ function setupPopupFormatToggle() {
     }
 
     AppState.map.getContainer().addEventListener('click', (e) => {
+        // Pin Jump Button im HARP-Popup
+        if (e.target.closest('.pin-jump-btn')) {
+            e.preventDefault();
+            document.dispatchEvent(new CustomEvent('pin:createPin'));
+            return;
+        }
+        // Alle Pins löschen Link im HARP-Popup
+        if (e.target.closest('.clear-all-pins-btn')) {
+            e.preventDefault();
+            document.dispatchEvent(new CustomEvent('pin:clearAll'));
+            return;
+        }
         // Prüfen, ob auf einen unserer Links geklickt wurde
         if (e.target.classList.contains('toggle-coords-format')) {
             e.preventDefault(); // Verhindert, dass der Link die Seite neu lädt

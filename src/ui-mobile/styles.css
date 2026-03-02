@@ -2023,6 +2023,27 @@ input[type="checkbox"][style*="opacity: 1"] {
     background: transparent;
 }
 
+/* --- Pin-Marker --- */
+.pin-marker-inner {
+    width: 22px;
+    height: 22px;
+    background-color: #FF6600;
+    border: 2px solid white;
+    border-radius: 50%;
+    box-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
+    color: white;
+    font-size: 12px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+.pin-marker-active .pin-marker-inner {
+    background-color: #FF0000;
+    box-shadow: 0 0 10px rgba(255, 0, 0, 0.8);
+}
 
 /* =================================================================== */
 /* 6. SPEZIFISCHE ELEMENT-STILE

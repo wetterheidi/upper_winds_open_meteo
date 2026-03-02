@@ -609,10 +609,23 @@ export function updateLandingPatternDisplay() {
  * an den mapManager zum Zeichnen der Anfluglinie und des Flugzeug-Markers.
  * @returns {void}
  */
+// Modul-Variable für die letzten JRT-Zeichendaten (für Pin Jump)
+let lastTrackDrawData = null;
+
+export function getLastTrackDrawData() {
+    return lastTrackDrawData;
+}
+
 export function updateJumpRunTrackDisplay() {
     console.log('updateJumpRunTrackDisplay called');
     if (!AppState.map) {
         console.warn('Map not initialized, cannot update jump run track display');
+        return;
+    }
+
+    // Wenn ein Pin aktiv ist, nicht die Live-Berechnung zeichnen
+    if (AppState.activePinId !== null) {
+        console.log('Active pin present, skipping live JRT display.');
         return;
     }
 
@@ -693,6 +706,7 @@ export function updateJumpRunTrackDisplay() {
                     L.latLng(trackData.latlngs[1][0], trackData.latlngs[1][1]),
             }
         };
+        lastTrackDrawData = drawData;
         mapManager.drawJumpRunTrack(drawData);
         AppState.lastTrackData = {
             latlngs: trackData.latlngs,

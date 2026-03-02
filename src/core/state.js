@@ -53,6 +53,10 @@ export const AppState = {
     lastTrackData: null,               // @type {object|null} - Speichert die letzten JRT-Daten, um Drag&Drop zu ermöglichen.
     isPlacingHarp: false,              // @type {boolean} - True, wenn der Benutzer gerade einen HARP platziert.
     harpMarker: null,                  // @type {L.Marker|null} - Der HARP-Marker.
+    pinnedJumps: [],                   // @type {object[]} - Array von bis zu 4 gepinnten Sprung-Snapshots.
+    activePinId: null,                 // @type {number|null} - ID des aktiven Pins (1-4) oder null.
+    pinLayerGroup: null,               // @type {L.LayerGroup|null} - Gruppe für Pin-Marker auf der Karte.
+    lastVisualizationData: null,       // @type {object|null} - Letzte berechnete Visualisierungsdaten (für Pinning).
     cutAwayMarker: null,               // @type {L.Marker|null} - Der Marker für den Abtrennpunkt.
     cutAwayLat: null,                  // @type {number|null} - Breite des Abtrennpunkts.
     cutAwayLng: null,                  // @type {number|null} - Länge des Abtrennpunkts.
