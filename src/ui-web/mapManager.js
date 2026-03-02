@@ -488,12 +488,12 @@ export function createPinMarker(pin) {
     });
 
     marker.on('click', () => {
-        document.dispatchEvent(new CustomEvent('pin:activate', { detail: { pinId: pin.id } }));
-    });
-
-    marker.on('contextmenu', (e) => {
-        L.DomEvent.stopPropagation(e);
-        document.dispatchEvent(new CustomEvent('pin:remove', { detail: { pinId: pin.id } }));
+        if (pin.isActive) {
+            // Zweiter Klick auf aktiven Pin → entfernen
+            document.dispatchEvent(new CustomEvent('pin:remove', { detail: { pinId: pin.id } }));
+        } else {
+            document.dispatchEvent(new CustomEvent('pin:activate', { detail: { pinId: pin.id } }));
+        }
     });
 
     return marker;
