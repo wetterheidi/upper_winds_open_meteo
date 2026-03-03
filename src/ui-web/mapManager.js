@@ -86,6 +86,7 @@ export function drawJumpVisualization(jumpData) {
 
     if (jumpData.exitCircles) {
         jumpData.exitCircles.forEach(circleInfo => {
+            if (!_isValidCircle(circleInfo)) return;
             const circleLayer = L.circle(circleInfo.center, {
                 radius: circleInfo.radius,
                 className: 'jump-viz-exit-area',
@@ -104,6 +105,7 @@ export function drawJumpVisualization(jumpData) {
 
     if (jumpData.canopyCircles) {
         jumpData.canopyCircles.forEach(circleInfo => {
+            if (!_isValidCircle(circleInfo)) return;
             L.circle(circleInfo.center, {
                 ...circleInfo,
                 pmIgnore: true
@@ -373,6 +375,24 @@ export function drawAircraftTrack(trackPoints) {
     } else {
         AppState.aircraftTrackLayer = L.polyline(trackPoints, trackOptions).addTo(AppState.map);
     }
+}
+
+// Validierung: Prüft ob ein Kreis gültige Koordinaten und Radius hat
+function _isValidCircle(circleInfo) {
+    if (!circleInfo || !Array.isArray(circleInfo.center) || circleInfo.center.length < 2) {
+        console.warn('drawJumpVisualization: Ungültiges center:', circleInfo);
+        return false;
+    }
+    const [lat, lng] = circleInfo.center;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        console.warn('drawJumpVisualization: NaN/Infinity in center:', circleInfo.center);
+        return false;
+    }
+    if (!Number.isFinite(circleInfo.radius) || circleInfo.radius < 0) {
+        console.warn('drawJumpVisualization: Ungültiger radius:', circleInfo.radius);
+        return false;
+    }
+    return true;
 }
 
 // Clear Funktionen für die API

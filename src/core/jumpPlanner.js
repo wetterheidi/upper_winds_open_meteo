@@ -198,7 +198,7 @@ export function calculateExitCircle(interpolatedData) {
 
     // ÄNDERUNG 1: showExitArea aus der Bedingung entfernt, damit die Warnung auch berechnet wird, 
     // wenn die Visualisierung ausgeschaltet ist.
-    if (!Settings.state.userSettings.calculateJump || !AppState.weatherData || AppState.lastLat == null || AppState.lastLng == null) {
+    if (!Settings.state.userSettings.calculateJump || !AppState.weatherData || AppState.lastLat == null || AppState.lastLng == null || AppState.lastAltitude === 'N/A') {
         console.log('Debug calculateExitCircle: Frühe Rückgabe wegen Einstellungen');
         return null;
     }
@@ -385,7 +385,7 @@ export function calculateExitCircle(interpolatedData) {
  * @returns {object|null} Ein Objekt mit allen notwendigen Daten für die Visualisierung der Schirmfahrtbereiche oder null.
  */
 export function calculateCanopyCircles(interpolatedData) {
-    if (!Settings.state.userSettings.showCanopyArea || !Settings.state.userSettings.calculateJump || !AppState.weatherData || AppState.lastLat == null || AppState.lastLng == null) return null;
+    if (!Settings.state.userSettings.showCanopyArea || !Settings.state.userSettings.calculateJump || !AppState.weatherData || AppState.lastLat == null || AppState.lastLng == null || AppState.lastAltitude === 'N/A') return null;
     if (!interpolatedData || interpolatedData.length === 0) return null;
 
     const heightUnit = Settings.getValue('heightUnit', 'm');
@@ -429,6 +429,11 @@ export function calculateCanopyCircles(interpolatedData) {
     const meanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, elevation + legHeightDownwind, elevation + safetyHeight + openingAltitude - CANOPY_OPENING_BUFFER_METERS);
     const meanWindFull = Utils.calculateMeanWind(heights, uComponents, vComponents, elevation + safetyHeight, elevation + openingAltitude - CANOPY_OPENING_BUFFER_METERS);
 
+    if (!meanWind || !meanWindFull) {
+        console.warn('calculateCanopyCircles: Kein Wind für den angegebenen Höhenbereich gefunden (meanWind ist null).');
+        return null;
+    }
+
     const landingPatternCoords = calculateLandingPatternCoords(AppState.lastLat, AppState.lastLng, interpolatedData);
     let [blueLat, blueLng] = landingPatternCoords.downwindStart;
     if (!Number.isFinite(blueLat)) { blueLat = AppState.lastLat; blueLng = AppState.lastLng; }
@@ -442,6 +447,7 @@ export function calculateCanopyCircles(interpolatedData) {
         const currentRadius = currentFlyTime * canopySpeedMps;
         if (currentRadius > 0) {
             const currentMeanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, lowerLimit, currentUpper);
+            if (!currentMeanWind) continue;
             additionalBlueRadii.push(Math.max(0, currentRadius - reductionDistance));
             additionalBlueDisplacements.push(currentMeanWind[1] * currentFlyTime);
             additionalBlueDirections.push(currentMeanWind[0]);

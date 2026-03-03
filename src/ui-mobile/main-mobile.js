@@ -2270,7 +2270,6 @@ function setupAppEventListeners() {
 
         if (key === 'timeZone') {
             await displayManager.updateSliderLabels();
-            updatePlannerUnits(value);
         }
 
         if (key === 'heightUnit') {
