@@ -688,7 +688,6 @@ export async function analyzeTerrainClearance() {
         AppState.weatherData, sliderIndex, interpStep, Math.round(AppState.lastAltitude), heightUnit
     );
 
-    const legHeightDownwind = parseInt(document.getElementById('legHeightDownwind')?.value) || 300;
     const descentRate = parseFloat(document.getElementById('descentRate')?.value) || 3.5;
     const canopySpeedMps = (parseFloat(document.getElementById('canopySpeed')?.value) || 20) * CONVERSIONS.KNOTS_TO_MPS;
     const dipElevation = AppState.lastAltitude;
@@ -729,7 +728,6 @@ export async function analyzeTerrainClearance() {
         const pointsToCheck = [];
         const centerLatLng = L.latLng(circleCenter);
 
-        const latRadius = circleRadius / 111320;
         for (let i = -circleRadius; i <= circleRadius; i += gridSpacingMeters) {
             for (let j = -circleRadius; j <= circleRadius; j += gridSpacingMeters) {
                 if (i * i + j * j <= circleRadius * circleRadius) {
@@ -768,7 +766,11 @@ export async function analyzeTerrainClearance() {
     }
 
 
-    // 5. Gefahrenpunkte identifizieren (Logik bleibt gleich, nutzt jetzt aber ggf. die gecachten Daten)
+    // 5. Springerhöhe pro Punkt berechnen (proportional zur Distanz vom Downwind-Einstieg)
+    const maxDist = displacement + circleRadius;
+    const altitudeRange = (circleRadius / canopySpeedMps) * descentRate;
+    const lowerAltAGL = entryAltitudeAGL - altitudeRange;
+
     const dangerousPoints = [];
 
     let clearanceRaw = parseInt(document.getElementById('terrainClearance')?.value) || 100;
@@ -780,21 +782,20 @@ export async function analyzeTerrainClearance() {
         requiredClearance = clearanceRaw;
     }
     for (const point of pointsWithGroundEle) {
-        // Variable explizit deklarieren, um Minifier zu helfen
         const groundElevation = point.groundEle;
 
         if (groundElevation === null) continue;
 
-        const distanceToPoint = AppState.map.distance(downwindStartPoint, point);
-        const timeToReach = distanceToPoint / canopySpeedMps;
-        const altitudeLoss = timeToReach * descentRate;
-
-        const skydiverMslAltitude = (dipElevation + entryAltitudeAGL) - altitudeLoss;
+        const distToDownwind = AppState.map.distance(point, downwindStartPoint);
+        const fraction = Math.min(distToDownwind / maxDist, 1);
+        const skydiverAltAGL = lowerAltAGL + fraction * altitudeRange;
+        const skydiverMslAltitude = dipElevation + skydiverAltAGL;
         const clearance = skydiverMslAltitude - groundElevation;
 
         console.log(`[Point Analysis] Lat: ${point.lat.toFixed(4)}, Lng: ${point.lng.toFixed(4)}
             - Ground MSL: ${groundElevation.toFixed(0)}m
             - Skydiver MSL (estimated): ${skydiverMslAltitude.toFixed(0)}m
+            - Distance to Downwind: ${distToDownwind.toFixed(0)}m (${(fraction * 100).toFixed(0)}%)
             - CLEARANCE: ${clearance.toFixed(0)}m`);
 
         if (clearance < requiredClearance) {

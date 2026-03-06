@@ -345,6 +345,7 @@ export function drawTerrainWarning(dangerousPoints) {
 
     const hullPoints = Utils.getConvexHull(dangerousPoints.map(p => [p.lat, p.lng]));
     const requiredClearance = Settings.getValue('terrainClearance', 100);
+    const heightUnit = Settings.getValue('heightUnit', 'm');
 
     L.polygon(hullPoints, {
         color: 'red',
@@ -353,7 +354,7 @@ export function drawTerrainWarning(dangerousPoints) {
         weight: 2,
         pmIgnore: true
     }).bindTooltip(
-        I18n.t('map.terrain_warning', { clearance: requiredClearance }),
+        I18n.t('map.terrain_warning', { clearance: requiredClearance, unit: heightUnit }),
         { sticky: true, className: 'cutaway-tooltip' }
     ).addTo(AppState.terrainWarningLayer);
 }

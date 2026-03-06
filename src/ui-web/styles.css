@@ -220,6 +220,7 @@
         /* Buttons */
         .btn-primary,
         .btn-secondary,
+        .btn-success,
         .btn-danger {
             color: var(--text-inverted) !important;
         }
@@ -827,6 +828,10 @@ button.btn {
 
 .btn-secondary:hover {
     background-color: var(--color-secondary-hover);
+}
+
+.btn-success {
+    background-color: var(--color-success);
 }
 
 .btn-danger {

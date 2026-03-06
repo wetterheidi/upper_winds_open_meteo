@@ -675,21 +675,44 @@ function setupTerrainAnalysisEvents() {
 
             try {
                 const dangerousPoints = await JumpPlanner.analyzeTerrainClearance();
+                AppState.terrainDangerousPoints = dangerousPoints.length > 0 ? dangerousPoints : [];
                 mapManager.drawTerrainWarning(dangerousPoints);
 
                 if (dangerousPoints.length > 0) {
                     displayWarning(I18n.t('planner.terrain_warning'));
+                    _setTerrainButtonState(analyzeTerrainBtn, 'danger');
                 } else {
                     Utils.handleMessage(I18n.t('planner.terrain_none_found'));
+                    _setTerrainButtonState(analyzeTerrainBtn, 'safe');
                 }
 
             } catch (error) {
                 console.error("Terrain analysis failed:", error);
                 Utils.handleError(I18n.t('planner.terrain_error'));
+                AppState.terrainDangerousPoints = null;
+                _setTerrainButtonState(analyzeTerrainBtn, 'inactive');
             } finally {
                 toggleLoading(false);
             }
         });
+    }
+}
+
+/**
+ * Setzt den visuellen Zustand des Terrain-Analyse-Buttons.
+ * @param {HTMLElement} btn - Der Button.
+ * @param {'safe'|'danger'|'inactive'} state - Der Zustand.
+ * @private
+ */
+function _setTerrainButtonState(btn, state) {
+    if (!btn) return;
+    btn.classList.remove('btn-secondary', 'btn-success', 'btn-danger');
+    if (state === 'safe') {
+        btn.classList.add('btn-success');
+    } else if (state === 'danger') {
+        btn.classList.add('btn-danger');
+    } else {
+        btn.classList.add('btn-secondary');
     }
 }
 /**

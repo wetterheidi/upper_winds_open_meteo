@@ -250,6 +250,17 @@ function updateLockStatesUI() {
  * die Ergebnisse (Exit-Kreise, Schirmfahrt-Bereiche etc.) auf der Karte zu zeichnen.
  */
 export function calculateJump() {
+    // Terrain-Warnung erhalten, wenn Gefahrenpunkte vorhanden sind
+    if (AppState.terrainDangerousPoints) {
+        mapManager.drawTerrainWarning(AppState.terrainDangerousPoints);
+    } else {
+        mapManager.clearTerrainWarning();
+        const terrainBtn = document.getElementById('analyzeTerrainButton');
+        if (terrainBtn && !terrainBtn.classList.contains('btn-secondary')) {
+            terrainBtn.classList.remove('btn-success', 'btn-danger');
+            terrainBtn.classList.add('btn-secondary');
+        }
+    }
     const index = getSliderValue();
     const interpStep = getInterpolationStep();
     const heightUnit = getHeightUnit();
@@ -1800,6 +1811,15 @@ function setupAppEventListeners() {
 
     document.addEventListener('ui:sliderChanged', async (e) => {
         console.log("[main-mobile] Event 'ui:sliderChanged' empfangen, spezifische Updates werden ausgeführt.");
+        // Terrain-Analyse invalidieren, da sich die Winddaten geändert haben
+        AppState.terrainDangerousPoints = null;
+        AppState.terrainAnalysisCache = null;
+        mapManager.clearTerrainWarning();
+        const terrainBtn = document.getElementById('analyzeTerrainButton');
+        if (terrainBtn) {
+            terrainBtn.classList.remove('btn-success', 'btn-danger');
+            terrainBtn.classList.add('btn-secondary');
+        }
 
         if (AppState.isLandingDirectionLocked) {
             displayWarning(I18n.t('messages.landing_direction_locked'));
@@ -1966,6 +1986,8 @@ function setupAppEventListeners() {
             case 'legHeightFinal':
             case 'legHeightBase':
             case 'legHeightDownwind':
+                AppState.terrainDangerousPoints = null;
+                AppState.terrainAnalysisCache = null;
                 if (AppState.weatherData) {
                     calculateJump();
                     displayManager.updateLandingPatternDisplay();
@@ -2728,8 +2750,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.addEventListener('location:selected', async (event) => {
         const { lat, lng, source } = event.detail;
         console.log(`App: Event 'location:selected' empfangen. Quelle: ${source}, Koordinaten: ${lat}, ${lng}`);
-        mapManager.clearTerrainWarning(); // Alte Terrain-Analyse sofort entfernen
+        mapManager.clearTerrainWarning();
         AppState.terrainAnalysisCache = null;
+        AppState.terrainDangerousPoints = null;
+        const terrainBtn = document.getElementById('analyzeTerrainButton');
+        if (terrainBtn) {
+            terrainBtn.classList.remove('btn-success', 'btn-danger');
+            terrainBtn.classList.add('btn-secondary');
+        }
 
         // Validierung der Koordinaten
         if (!Utils.isValidLatLng(lat, lng)) {
