@@ -318,7 +318,7 @@
     "map": {
         "drag_to_move_track": "Ziehen, um Absetztrack zu verschieben",
         "interaction_locked": "Interaktion gesperrt. Bitte entsperren.",
-        "terrain_warning": "WARNUNG: Bodenabstand in diesem Bereich evtl. unter {clearance}m!",
+        "terrain_warning": "WARNUNG: Bodenabstand in diesem Bereich evtl. unter {clearance}{unit}!",
         "cut_away_start": "Cut-Away Start",
         "harp_location": "HARP Position",
         "show_more": "Mehr anzeigen",

@@ -318,7 +318,7 @@
     "map": {
         "drag_to_move_track": "Drag to move Jump Run Track",
         "interaction_locked": "Interaction is locked. Please unlock to move points.",
-        "terrain_warning": "WARNING: Ground clearance in this area may be less than {clearance}m!",
+        "terrain_warning": "WARNING: Ground clearance in this area may be less than {clearance}{unit}!",
         "cut_away_start": "Cut-Away Start",
         "harp_location": "HARP Location",
         "show_more": "Show more",
