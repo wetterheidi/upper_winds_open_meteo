@@ -740,21 +740,34 @@ export async function analyzeTerrainClearance() {
 
         if (pointsToCheck.length === 0) return [];
 
-        // 4. Geländehöhen in Batches abrufen (wie zuvor)
+        // 4. Geländehöhen in Batches abrufen mit Pause zwischen Batches
         const batchSize = 100;
+        let failedPoints = 0;
         for (let i = 0; i < pointsToCheck.length; i += batchSize) {
             const batch = pointsToCheck.slice(i, i + batchSize);
             Utils.handleMessage(I18n.t('planner.terrain_analyzing', {
                 current: i + batch.length,
                 total: pointsToCheck.length
             }));
+
+            // Pause zwischen Batches, um Rate Limiting zu vermeiden
+            if (i > 0) {
+                await new Promise(resolve => setTimeout(resolve, 300));
+            }
+
             const elevations = await Utils.getMultipleAltitudes(batch);
 
             for (let j = 0; j < batch.length; j++) {
                 const point = batch[j];
                 const groundEle = elevations[j];
+                if (groundEle === 'N/A') failedPoints++;
                 pointsWithGroundEle.push({ ...point, groundEle: groundEle !== 'N/A' ? groundEle : null });
             }
+        }
+
+        if (failedPoints > 0) {
+            console.warn(`Terrain analysis: ${failedPoints} of ${pointsToCheck.length} elevation points failed (likely rate limited).`);
+            Utils.handleError(I18n.t('planner.terrain_rate_limited'));
         }
 
         // Speichere die frisch abgerufenen Daten im Cache für die nächste Analyse

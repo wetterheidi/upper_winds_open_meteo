@@ -1089,30 +1089,36 @@ export class Utils {
             return Utils.locationCache.get(cacheKey);
         }
 
-        try {
-            const response = await fetch(
-                `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&timezone=auto`
-            );
-            if (!response.ok) {
+        const maxRetries = 3;
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+            try {
+                const response = await fetch(
+                    `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&timezone=auto`
+                );
                 if (response.status === 429) {
-                    // Hier reicht eine Konsolennachricht, da es keine kritische Funktion ist
-                    console.warn('API rate limit hit while fetching location data.');
+                    const waitTime = Math.pow(2, attempt + 1) * 1000; // 2s, 4s, 8s
+                    console.warn(`Location API rate limit (429). Retry ${attempt + 1}/${maxRetries} in ${waitTime / 1000}s...`);
+                    await new Promise(resolve => setTimeout(resolve, waitTime));
+                    continue;
                 }
-                throw new Error(`Open-Meteo fetch failed: ${response.status}`);
+                if (!response.ok) {
+                    throw new Error(`Open-Meteo fetch failed: ${response.status}`);
+                }
+                const data = await response.json();
+                const locationData = {
+                    timezone: data.timezone || 'GMT',
+                    timezone_abbreviation: data.timezone_abbreviation || 'GMT',
+                    elevation: data.elevation !== undefined ? data.elevation : 'N/A'
+                };
+                Utils.locationCache.set(cacheKey, locationData);
+                return locationData;
+            } catch (error) {
+                if (attempt < maxRetries - 1) continue;
+                console.error('Error fetching location data:', error.message);
+                return { timezone: 'UTC', elevation: 'N/A' };
             }
-            const data = await response.json();
-            const locationData = {
-                timezone: data.timezone || 'GMT', // Fallback to UTC
-                timezone_abbreviation: data.timezone_abbreviation || 'GMT', // Fallback to UTC
-                elevation: data.elevation !== undefined ? data.elevation : 'N/A'
-            };
-            Utils.locationCache.set(cacheKey, locationData);
-            //console.log(`Fetched location data for ${cacheKey}:`, locationData);
-            return locationData;
-        } catch (error) {
-            console.error('Error fetching location data:', error.message);
-            return { timezone: 'UTC', elevation: 'N/A' }; // Fallback
         }
+        return { timezone: 'UTC', elevation: 'N/A' };
     }
 
     /**
@@ -1157,18 +1163,30 @@ export class Utils {
         const latitudes = points.map(p => p.lat.toFixed(4)).join(',');
         const longitudes = points.map(p => p.lng.toFixed(4)).join(',');
 
-        try {
-            const response = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${latitudes}&longitude=${longitudes}`);
-            if (!response.ok) {
-                throw new Error(`Elevation API Error: ${response.status}`);
+        const maxRetries = 3;
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+            try {
+                const response = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${latitudes}&longitude=${longitudes}`);
+                if (response.status === 429) {
+                    const waitTime = Math.pow(2, attempt + 1) * 1000; // 2s, 4s, 8s
+                    console.warn(`Elevation API rate limit (429). Retry ${attempt + 1}/${maxRetries} in ${waitTime / 1000}s...`);
+                    await new Promise(resolve => setTimeout(resolve, waitTime));
+                    continue;
+                }
+                if (!response.ok) {
+                    throw new Error(`Elevation API Error: ${response.status}`);
+                }
+                const data = await response.json();
+                return data.elevation || [];
+            } catch (error) {
+                if (attempt < maxRetries - 1 && error.message?.includes('429')) continue;
+                console.error("Error fetching multiple altitudes:", error);
+                return points.map(() => 'N/A');
             }
-            const data = await response.json();
-            return data.elevation || [];
-        } catch (error) {
-            console.error("Error fetching multiple altitudes:", error);
-            // Im Fehlerfall geben wir ein Array zurück, das die fehlenden Daten signalisiert
-            return points.map(() => 'N/A');
         }
+        // Alle Retries erschöpft
+        console.error("Elevation API: Rate limit exceeded after all retries.");
+        return points.map(() => 'N/A');
     }
 
     /**

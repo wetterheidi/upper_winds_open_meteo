@@ -144,6 +144,7 @@
         "error_activate_canopy": "Please activate 'Show Canopy Flight Area' to analyze terrain.",
         "terrain_none_found": "Terrain analysis complete. No low clearance areas found.",
         "terrain_error": "An error occurred during terrain analysis.",
+        "terrain_rate_limited": "Elevation API temporarily overloaded. Some data points are missing. Please wait approx. 1 minute and try again.",
         "direction_locked": "Landing direction locked to {direction}°",
         "direction_invalid": "Please enter a valid 0-360° direction before locking.",
         "error_fetch_scenario": "Failed to fetch data for scenario.",

@@ -144,6 +144,7 @@
         "error_activate_canopy": "Bitte aktivieren Sie 'Schirmfahrtgebiet anzeigen' für die Analyse.",
         "terrain_none_found": "Geländeanalyse abgeschlossen. Keine kritischen Bereiche gefunden.",
         "terrain_error": "Ein Fehler ist während der Geländeanalyse aufgetreten.",
+        "terrain_rate_limited": "Höhendaten-API vorübergehend überlastet. Einige Messpunkte fehlen. Bitte ca. 1 Minute warten und erneut versuchen.",
         "terrain_warning": "Warnung: Bereiche unter Mindesthöhe entdeckt und in rot markiert.",
         "direction_locked": "Landerichtung fixiert auf {direction}°",
         "direction_invalid": "Bitte geben Sie eine gültige Richtung (0-360°) ein.",
