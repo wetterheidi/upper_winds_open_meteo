@@ -108,6 +108,7 @@
         "reset_marker": "Reset Cut-Away Marker",
         "min_clearance": "Min. Clearance (m):",
         "analyze_terrain": "Analyze Terrain Clearance",
+        "analyze_terrain_active": "Terrain Check Active",
         "harp_manager": "HARP Manager",
         "place_harp": "Place HARP",
         "clear_harp": "Clear HARP",

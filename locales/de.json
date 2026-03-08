@@ -108,6 +108,7 @@
         "reset_marker": "Marker zurücksetzen",
         "min_clearance": "Mindestabstand (m):",
         "analyze_terrain": "Geländeabstand prüfen",
+        "analyze_terrain_active": "Geländeprüfung aktiv",
         "harp_manager": "HARP Manager",
         "place_harp": "HARP in der Karte setzen",
         "clear_harp": "HARP löschen",
