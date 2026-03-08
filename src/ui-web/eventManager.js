@@ -660,15 +660,23 @@ function setupTerrainAnalysisEvents() {
     const analyzeTerrainBtn = document.getElementById('analyzeTerrainButton');
     if (analyzeTerrainBtn) {
         analyzeTerrainBtn.addEventListener('click', async () => {
+            // Toggle: Wenn Analyse aktiv → deaktivieren
+            if (AppState.terrainDangerousPoints !== null) {
+                AppState.terrainDangerousPoints = null;
+                AppState.terrainAllPoints = null;
+                mapManager.clearTerrainWarning();
+                _setTerrainButtonState(analyzeTerrainBtn, 'inactive');
+                return;
+            }
+
             if (!AppState.weatherData || AppState.lastLat == null || AppState.lastLng == null) {
                 Utils.handleError(I18n.t('planner.error_location_weather'));
                 return;
             }
 
-            // Prüfen, ob die Schirmfahrt-Anzeige aktiviert ist.
             if (!Settings.state.userSettings.showCanopyArea) {
                 Utils.handleError(I18n.t('planner.error_activate_canopy'));
-                return; // Analyse abbrechen und die verständliche Meldung anzeigen.
+                return;
             }
 
             toggleLoading(true, 'Analyzing terrain, this may take a moment...');
@@ -676,20 +684,18 @@ function setupTerrainAnalysisEvents() {
             try {
                 const dangerousPoints = await JumpPlanner.analyzeTerrainClearance();
                 AppState.terrainDangerousPoints = dangerousPoints.length > 0 ? dangerousPoints : [];
-                mapManager.drawTerrainWarning(dangerousPoints);
+                mapManager.drawTerrainHeatmap(AppState.terrainAllPoints, AppState.terrainRequiredClearance);
 
                 if (dangerousPoints.length > 0) {
                     displayWarning(I18n.t('planner.terrain_warning'));
-                    _setTerrainButtonState(analyzeTerrainBtn, 'danger');
-                } else {
-                    Utils.handleMessage(I18n.t('planner.terrain_none_found'));
-                    _setTerrainButtonState(analyzeTerrainBtn, 'safe');
                 }
+                _setTerrainButtonState(analyzeTerrainBtn, 'active');
 
             } catch (error) {
                 console.error("Terrain analysis failed:", error);
                 Utils.handleError(I18n.t('planner.terrain_error'));
                 AppState.terrainDangerousPoints = null;
+                AppState.terrainAllPoints = null;
                 _setTerrainButtonState(analyzeTerrainBtn, 'inactive');
             } finally {
                 toggleLoading(false);
@@ -706,13 +712,13 @@ function setupTerrainAnalysisEvents() {
  */
 function _setTerrainButtonState(btn, state) {
     if (!btn) return;
-    btn.classList.remove('btn-secondary', 'btn-success', 'btn-danger');
-    if (state === 'safe') {
-        btn.classList.add('btn-success');
-    } else if (state === 'danger') {
-        btn.classList.add('btn-danger');
+    btn.classList.remove('btn-secondary', 'btn-primary', 'btn-success', 'btn-danger');
+    if (state === 'active') {
+        btn.classList.add('btn-primary');
+        btn.textContent = I18n.t('planner.analyze_terrain_active');
     } else {
         btn.classList.add('btn-secondary');
+        btn.textContent = I18n.t('planner.analyze_terrain');
     }
 }
 /**

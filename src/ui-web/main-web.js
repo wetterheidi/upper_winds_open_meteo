@@ -226,14 +226,15 @@ function initializeUIElements() {
  */
 export function calculateJump() {
     // Terrain-Warnung erhalten, wenn Gefahrenpunkte vorhanden sind
-    if (AppState.terrainDangerousPoints) {
-        mapManager.drawTerrainWarning(AppState.terrainDangerousPoints);
+    if (AppState.terrainDangerousPoints && AppState.terrainAllPoints) {
+        mapManager.drawTerrainHeatmap(AppState.terrainAllPoints, AppState.terrainRequiredClearance);
     } else {
         mapManager.clearTerrainWarning();
         const terrainBtn = document.getElementById('analyzeTerrainButton');
         if (terrainBtn && !terrainBtn.classList.contains('btn-secondary')) {
-            terrainBtn.classList.remove('btn-success', 'btn-danger');
+            terrainBtn.classList.remove('btn-primary', 'btn-success', 'btn-danger');
             terrainBtn.classList.add('btn-secondary');
+            terrainBtn.textContent = I18n.t('planner.analyze_terrain');
         }
     }
     const index = getSliderValue();
@@ -1574,6 +1575,7 @@ function setupAppEventListeners() {
         console.log("[main-web] Event 'ui:sliderChanged' empfangen, spezifische Updates werden ausgeführt.");
         // Terrain-Analyse invalidieren, da sich die Winddaten geändert haben
         AppState.terrainDangerousPoints = null;
+        AppState.terrainAllPoints = null;
         AppState.terrainAnalysisCache = null;
         mapManager.clearTerrainWarning();
         const terrainBtn = document.getElementById('analyzeTerrainButton');
@@ -1814,6 +1816,19 @@ function setupAppEventListeners() {
                 displayManager.updateJumpRunTrackDisplay();
                 break;
 
+            // --- Geländeabstand geändert: Heatmap live aktualisieren ---
+            case 'terrainClearance':
+                if (AppState.terrainDangerousPoints !== null && AppState.terrainAllPoints) {
+                    const heightUnit = getHeightUnit();
+                    const rawVal = parseInt(value) || 100;
+                    const newClearance = heightUnit === 'ft' ? Utils.convertFeetToMeters(rawVal) : rawVal;
+                    AppState.terrainRequiredClearance = newClearance;
+                    AppState.terrainDangerousPoints = AppState.terrainAllPoints
+                        .filter(p => p.clearance < newClearance);
+                    mapManager.drawTerrainHeatmap(AppState.terrainAllPoints, newClearance);
+                }
+                break;
+
             //Eigener Fall für die Cut-Away-Höhe ---
             case 'cutAwayAltitude':
                 if (AppState.weatherData && AppState.cutAwayLat !== null) {
@@ -1835,6 +1850,7 @@ function setupAppEventListeners() {
             case 'legHeightBase':
             case 'legHeightDownwind':
                 AppState.terrainDangerousPoints = null;
+        AppState.terrainAllPoints = null;
                 AppState.terrainAnalysisCache = null;
                 if (AppState.weatherData) {
                     calculateJump();
@@ -2325,6 +2341,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         mapManager.clearTerrainWarning();
         AppState.terrainAnalysisCache = null;
         AppState.terrainDangerousPoints = null;
+        AppState.terrainAllPoints = null;
         const terrainBtn = document.getElementById('analyzeTerrainButton');
         if (terrainBtn) {
             terrainBtn.classList.remove('btn-success', 'btn-danger');

@@ -648,6 +648,45 @@ export function clearRecordedTrack() {
     }
 }
 /**
+ * Zeichnet eine Heatmap aller analysierten Terrain-Punkte mit farbcodierter Clearance.
+ * @param {object[]} allPoints - Alle analysierten Punkte mit clearance-Werten.
+ * @param {number} requiredClearance - Der eingestellte Mindestabstand in Metern.
+ */
+export function drawTerrainHeatmap(allPoints, requiredClearance) {
+    _initializeTerrainWarningLayer();
+    AppState.terrainWarningLayer.clearLayers();
+
+    if (!allPoints || allPoints.length === 0) return;
+
+    for (const p of allPoints) {
+        let color;
+        if (p.clearance < requiredClearance) {
+            color = '#e74c3c'; // Rot: unter Mindestabstand
+        } else if (p.clearance < requiredClearance + 50) {
+            color = '#f39c12'; // Orange: bis +50m über Mindestabstand
+        } else if (p.clearance < requiredClearance + 100) {
+            color = '#f1c40f'; // Gelb: bis +100m über Mindestabstand
+        } else {
+            color = '#27ae60'; // Grün: > 100m über Mindestabstand
+        }
+
+        L.circleMarker([p.lat, p.lng], {
+            radius: 5,
+            color: color,
+            fillColor: color,
+            fillOpacity: 0.7,
+            weight: 1,
+            pmIgnore: true
+        }).bindTooltip(
+            `Clearance: ${Math.round(p.clearance)}m<br>` +
+            `Gelände: ${Math.round(p.groundElevation)}m MSL<br>` +
+            `Springer: ${Math.round(p.skydiverMslAltitude)}m MSL`,
+            { sticky: true, className: 'cutaway-tooltip' }
+        ).addTo(AppState.terrainWarningLayer);
+    }
+}
+
+/**
  * Entfernt die Terrain-Warnungs-Visualisierung von der Karte.
  */
 export function clearTerrainWarning() {

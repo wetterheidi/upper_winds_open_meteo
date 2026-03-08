@@ -772,6 +772,7 @@ export async function analyzeTerrainClearance() {
     const lowerAltAGL = entryAltitudeAGL - altitudeRange;
 
     const dangerousPoints = [];
+    const allAnalyzedPoints = [];
 
     let clearanceRaw = parseInt(document.getElementById('terrainClearance')?.value) || 100;
     let requiredClearance;
@@ -792,19 +793,21 @@ export async function analyzeTerrainClearance() {
         const skydiverMslAltitude = dipElevation + skydiverAltAGL;
         const clearance = skydiverMslAltitude - groundElevation;
 
-        console.log(`[Point Analysis] Lat: ${point.lat.toFixed(4)}, Lng: ${point.lng.toFixed(4)}
-            - Ground MSL: ${groundElevation.toFixed(0)}m
-            - Skydiver MSL (estimated): ${skydiverMslAltitude.toFixed(0)}m
-            - Distance to Downwind: ${distToDownwind.toFixed(0)}m (${(fraction * 100).toFixed(0)}%)
-            - CLEARANCE: ${clearance.toFixed(0)}m`);
+        allAnalyzedPoints.push({
+            lat: point.lat, lng: point.lng,
+            clearance, groundElevation, skydiverMslAltitude
+        });
 
         if (clearance < requiredClearance) {
             dangerousPoints.push(point);
         }
     }
 
+    AppState.terrainAllPoints = allAnalyzedPoints;
+    AppState.terrainRequiredClearance = requiredClearance;
+
     console.log(`--- TERRAIN ANALYSIS FINISHED ---
-    - Points Analyzed: ${pointsWithGroundEle.length}
+    - Points Analyzed: ${allAnalyzedPoints.length}
     - Dangerous Points Found: ${dangerousPoints.length}
     --------------------------------`);
 
