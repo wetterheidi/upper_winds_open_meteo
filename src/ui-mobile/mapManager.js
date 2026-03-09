@@ -2106,44 +2106,38 @@ function _setupCoreMapEventHandlers() {
     console.log('All core map event handlers have been set up.');
 }
 function _setupCrosshairCoordinateHandler(map) {
-    const handleMapMove = () => {
-        const center = map.getCenter();
+    // Letzte bekannte Höhen-/QFE-Werte für die Anzeige während der Bewegung
+    let lastAltString = '...';
+    let lastQfeString = '...';
+    let elevationFetchTimeout = null;
+
+    const _buildCoordString = (center) => {
         const coordFormat = Settings.getValue('coordFormat', 'Decimal');
         const coords = Utils.convertCoords(center.lat, center.lng, coordFormat);
-
-        let coordString;
         const formatDDM = (ddm) => `${ddm.deg}° ${ddm.min.toFixed(3)}' ${ddm.dir}`;
         const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
 
         if (coordFormat === 'MGRS') {
-            coordString = `${I18n.t('map.mgrs')}: ${coords.lat}`; // NEU: I18n
+            return `${I18n.t('map.mgrs')}: ${coords.lat}`;
         } else if (coordFormat === 'DMS') {
-            coordString = `${I18n.t('map.lat')}: ${formatDMS(coords.lat)}, ${I18n.t('map.lng')}: ${formatDMS(coords.lng)}`; // NEU: I18n
+            return `${I18n.t('map.lat')}: ${formatDMS(coords.lat)}, ${I18n.t('map.lng')}: ${formatDMS(coords.lng)}`;
         } else if (coordFormat === 'DDM') {
-            coordString = `${I18n.t('map.lat')}: ${formatDDM(coords.lat)}, ${I18n.t('map.lng')}: ${formatDDM(coords.lng)}`; // NEU: I18n
+            return `${I18n.t('map.lat')}: ${formatDDM(coords.lat)}, ${I18n.t('map.lng')}: ${formatDDM(coords.lng)}`;
         } else {
-            coordString = `${I18n.t('map.lat')}: ${center.lat.toFixed(5)}, ${I18n.t('map.lng')}: ${center.lng.toFixed(5)}`; // NEU: I18n
+            return `${I18n.t('map.lat')}: ${center.lat.toFixed(5)}, ${I18n.t('map.lng')}: ${center.lng.toFixed(5)}`;
         }
-        // UI sofort mit "Fetching..." aktualisieren
-        AppState.coordsControl.update(`${coordString}<br>${I18n.t('map.alt')}: ...<br>${I18n.t('map.qfe')}: ...`); // NEU: I18n
+    };
 
-        // Die neue Funktion aus utils.js aufrufen
-        Utils.debouncedGetElevationAndQFE(center.lat, center.lng, ({ elevation }) => {
-            // Dieser Callback wird ausgeführt, sobald die Höhe verfügbar ist.
-            const currentCenter = map.getCenter();
-            if (Math.abs(currentCenter.lat - center.lat) > 0.0001 || Math.abs(currentCenter.lng - center.lng) > 0.0001) {
-                return; // Verhindert Update, wenn sich die Karte inzwischen weiterbewegt hat
-            }
-
+    const _updateElevationDisplay = (elevation, center) => {
+        try {
             const heightUnit = Settings.getValue('heightUnit', 'm');
             let displayElevation = 'N/A';
-            if (elevation !== 'N/A') {
+            if (elevation !== 'N/A' && elevation !== undefined && elevation !== null) {
                 const convertedElevation = Utils.convertHeight(elevation, heightUnit);
                 displayElevation = Math.round(convertedElevation);
             }
-            const altString = displayElevation === 'N/A' ? 'N/A' : `${displayElevation}${heightUnit}`;
+            lastAltString = displayElevation === 'N/A' ? 'N/A' : `${displayElevation}${heightUnit}`;
 
-            // QFE-Berechnung findet jetzt hier statt
             let qfeString = 'N/A';
             if (elevation !== 'N/A' && AppState.weatherData && AppState.weatherData.surface_pressure) {
                 const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
@@ -2153,15 +2147,57 @@ function _setupCrosshairCoordinateHandler(map) {
                 const qfe = Utils.calculateQFE(surfacePressure, elevation, referenceElevation, temperature);
                 qfeString = qfe !== 'N/A' ? `${qfe.toFixed(0)}hPa` : 'N/A';
             }
+            lastQfeString = qfeString;
 
-            const displayText = `${coordString}<br>${I18n.t('map.alt')}: ${altString}<br>${I18n.t('map.qfe')}: ${qfeString}`; // NEU: I18n
-            AppState.coordsControl.update(displayText);
-        });
+            const coordString = _buildCoordString(center);
+            AppState.coordsControl.update(`${coordString}<br>${I18n.t('map.alt')}: ${lastAltString}<br>${I18n.t('map.qfe')}: ${lastQfeString}`);
+        } catch (err) {
+            console.error('Crosshair elevation display error:', err);
+            lastAltString = 'N/A';
+            lastQfeString = 'N/A';
+        }
+    };
+
+    const _fetchElevation = async (center) => {
+        try {
+            const elevation = await Utils.getAltitude(center.lat, center.lng);
+            // Nur aktualisieren, wenn sich die Karte nicht zu weit bewegt hat
+            const currentCenter = map.getCenter();
+            if (Math.abs(currentCenter.lat - center.lat) > 0.0001 || Math.abs(currentCenter.lng - center.lng) > 0.0001) {
+                return;
+            }
+            _updateElevationDisplay(elevation, currentCenter);
+        } catch (err) {
+            console.error('Crosshair elevation fetch error:', err);
+            _updateElevationDisplay('N/A', map.getCenter());
+        }
+    };
+
+    // move: Koordinaten live aktualisieren, Höhe/QFE beibehalten
+    const handleMapMove = () => {
+        const center = map.getCenter();
+        const coordString = _buildCoordString(center);
+        AppState.coordsControl.update(`${coordString}<br>${I18n.t('map.alt')}: ${lastAltString}<br>${I18n.t('map.qfe')}: ${lastQfeString}`);
+    };
+
+    // moveend: Höhe und QFE abrufen, sobald die Karte stillsteht
+    const handleMapMoveEnd = () => {
+        const center = map.getCenter();
+        const coordString = _buildCoordString(center);
+
+        lastAltString = '...';
+        lastQfeString = '...';
+        AppState.coordsControl.update(`${coordString}<br>${I18n.t('map.alt')}: ...<br>${I18n.t('map.qfe')}: ...`);
+
+        // Eigener Debounce: vorherigen Fetch-Timer abbrechen, neuen starten
+        if (elevationFetchTimeout) clearTimeout(elevationFetchTimeout);
+        elevationFetchTimeout = setTimeout(() => _fetchElevation(center), 300);
     };
 
     map.on('move', handleMapMove);
-    // Ersten Aufruf auslösen, um die initiale Anzeige zu füllen
-    setTimeout(() => map.fire('move'), 200);
+    map.on('moveend', handleMapMoveEnd);
+    // Ersten Aufruf direkt auslösen (ohne Debounce, damit initiale Anzeige sofort kommt)
+    setTimeout(() => _fetchElevation(map.getCenter()), 500);
     console.log('Crosshair coordinate handler initialized.');
 }
 function _setupMouseCoordinateHandler(map) {

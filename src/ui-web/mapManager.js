@@ -1756,62 +1756,94 @@ function _setupCoreMapEventHandlers() {
 }
 
 function _setupCrosshairCoordinateHandler(map) {
-    const updateWithDebouncedData = ({ elevation }, requestLatLng) => {
-        const currentCenter = map.getCenter();
-        if (Math.abs(currentCenter.lat - requestLatLng.lat) > 0.0001 || Math.abs(currentCenter.lng - requestLatLng.lng) > 0.0001) {
-            return;
-        }
+    let lastAltString = '...';
+    let lastQfeString = '...';
+    let elevationFetchTimeout = null;
 
-        const currentHTML = AppState.coordsControl._container.innerHTML;
-        const coordPart = currentHTML.split('<br>')[0];
-        const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
-
-        let displayElevation = 'N/A';
-        if (elevation !== 'N/A') {
-            const convertedElevation = Utils.convertHeight(elevation, heightUnit);
-            displayElevation = Math.round(convertedElevation);
-        }
-        const altString = displayElevation === 'N/A' ? 'N/A' : `${displayElevation}${heightUnit}`;
-
-        let qfeString = 'N/A';
-        if (elevation !== 'N/A' && AppState.weatherData && AppState.weatherData.surface_pressure) {
-            const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
-            const surfacePressure = AppState.weatherData.surface_pressure[sliderIndex];
-            const temperature = AppState.weatherData.temperature_2m?.[sliderIndex] || 15;
-            const referenceElevation = AppState.lastAltitude !== 'N/A' ? AppState.lastAltitude : 0;
-
-            const qfe = Utils.calculateQFE(surfacePressure, elevation, referenceElevation, temperature);
-            qfeString = qfe !== 'N/A' ? `${qfe} hPa` : 'N/A';
-        }
-
-        const displayText = `${coordPart}<br>${I18n.t('map.alt')}: ${altString}<br>${I18n.t('map.qfe')}: ${qfeString}`;
-        AppState.coordsControl.update(displayText);
-    };
-
-    const handleMapMove = () => {
-        const center = map.getCenter();
+    const _buildCoordString = (center) => {
         const coordFormat = Settings.getValue('coordFormat', 'Decimal');
         const coords = Utils.convertCoords(center.lat, center.lng, coordFormat);
-
-        let coordString;
         const formatDDM = (ddm) => `${ddm.deg}° ${ddm.min.toFixed(3)}' ${ddm.dir}`;
         const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
 
         if (coordFormat === 'MGRS') {
-            coordString = `${I18n.t('map.mgrs')}: ${coords.lat}`;
+            return `${I18n.t('map.mgrs')}: ${coords.lat}`;
         } else if (coordFormat === 'DMS') {
-            coordString = `${I18n.t('map.lat')}: ${formatDMS(coords.lat)}, ${I18n.t('map.lng')}: ${formatDMS(coords.lng)}`;
+            return `${I18n.t('map.lat')}: ${formatDMS(coords.lat)}, ${I18n.t('map.lng')}: ${formatDMS(coords.lng)}`;
         } else if (coordFormat === 'DDM') {
-            coordString = `${I18n.t('map.lat')}: ${formatDDM(coords.lat)}, ${I18n.t('map.lng')}: ${formatDDM(coords.lng)}`;
+            return `${I18n.t('map.lat')}: ${formatDDM(coords.lat)}, ${I18n.t('map.lng')}: ${formatDDM(coords.lng)}`;
         } else {
-            coordString = `${I18n.t('map.lat')}: ${center.lat.toFixed(5)}, ${I18n.t('map.lng')}: ${center.lng.toFixed(5)}`;
+            return `${I18n.t('map.lat')}: ${center.lat.toFixed(5)}, ${I18n.t('map.lng')}: ${center.lng.toFixed(5)}`;
         }
+    };
 
+    const _updateElevationDisplay = (elevation, center) => {
+        try {
+            const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
+            let displayElevation = 'N/A';
+            if (elevation !== 'N/A' && elevation !== undefined && elevation !== null) {
+                const convertedElevation = Utils.convertHeight(elevation, heightUnit);
+                displayElevation = Math.round(convertedElevation);
+            }
+            lastAltString = displayElevation === 'N/A' ? 'N/A' : `${displayElevation}${heightUnit}`;
+
+            let qfeString = 'N/A';
+            if (elevation !== 'N/A' && AppState.weatherData && AppState.weatherData.surface_pressure) {
+                const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
+                const surfacePressure = AppState.weatherData.surface_pressure[sliderIndex];
+                const temperature = AppState.weatherData.temperature_2m?.[sliderIndex] || 15;
+                const referenceElevation = AppState.lastAltitude !== 'N/A' ? AppState.lastAltitude : 0;
+                const qfe = Utils.calculateQFE(surfacePressure, elevation, referenceElevation, temperature);
+                qfeString = qfe !== 'N/A' ? `${qfe} hPa` : 'N/A';
+            }
+            lastQfeString = qfeString;
+
+            const coordString = _buildCoordString(center);
+            AppState.coordsControl.update(`${coordString}<br>${I18n.t('map.alt')}: ${lastAltString}<br>${I18n.t('map.qfe')}: ${lastQfeString}`);
+        } catch (err) {
+            console.error('Crosshair elevation display error:', err);
+            lastAltString = 'N/A';
+            lastQfeString = 'N/A';
+        }
+    };
+
+    const _fetchElevation = async (center) => {
+        try {
+            const elevation = await Utils.getAltitude(center.lat, center.lng);
+            const currentCenter = map.getCenter();
+            if (Math.abs(currentCenter.lat - center.lat) > 0.0001 || Math.abs(currentCenter.lng - center.lng) > 0.0001) {
+                return;
+            }
+            _updateElevationDisplay(elevation, currentCenter);
+        } catch (err) {
+            console.error('Crosshair elevation fetch error:', err);
+            _updateElevationDisplay('N/A', map.getCenter());
+        }
+    };
+
+    // move: Koordinaten live aktualisieren, Höhe/QFE beibehalten
+    const handleMapMove = () => {
+        const center = map.getCenter();
+        const coordString = _buildCoordString(center);
+        AppState.coordsControl.update(`${coordString}<br>${I18n.t('map.alt')}: ${lastAltString}<br>${I18n.t('map.qfe')}: ${lastQfeString}`);
+    };
+
+    // moveend: Höhe und QFE abrufen, sobald die Karte stillsteht
+    const handleMapMoveEnd = () => {
+        const center = map.getCenter();
+        const coordString = _buildCoordString(center);
+
+        lastAltString = '...';
+        lastQfeString = '...';
         AppState.coordsControl.update(`${coordString}<br>${I18n.t('map.alt')}: ...<br>${I18n.t('map.qfe')}: ...`);
+
+        if (elevationFetchTimeout) clearTimeout(elevationFetchTimeout);
+        elevationFetchTimeout = setTimeout(() => _fetchElevation(center), 300);
     };
 
     map.on('move', handleMapMove);
-    setTimeout(() => map.fire('move'), 200);
+    map.on('moveend', handleMapMoveEnd);
+    setTimeout(() => _fetchElevation(map.getCenter()), 500);
     console.log('Crosshair coordinate handler initialized.');
 }
 
