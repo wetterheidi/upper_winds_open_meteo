@@ -261,7 +261,9 @@
         "clear_cache_title": "Löscht zwischengespeicherte Kartenkacheln. Bewegen/Zoomen Sie, um weitere Kacheln für die Offline-Nutzung zu speichern.",
         "north_ref": "Nordrichtung",
         "true": "True",
-        "magnetic": "Magnetisch"
+        "magnetic": "Magnetisch",
+        "about": "Über DZMaster",
+        "buy_coffee": "Kauf mir einen Kaffee"
     },
     "modals": {
         "restricted_feature": "Geschützte Funktion",

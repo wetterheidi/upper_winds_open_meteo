@@ -261,7 +261,9 @@
         "clear_cache_title": "Clears cached map tiles. Pan/zoom to cache more tiles for offline use.",
         "north_ref": "North Reference",
         "true": "True",
-        "magnetic": "Magnetic"
+        "magnetic": "Magnetic",
+        "about": "About",
+        "buy_coffee": "Buy me a Coffee"
     },
     "modals": {
         "restricted_feature": "Restricted Feature",
