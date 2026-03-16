@@ -2,6 +2,7 @@
 
 import { AppState } from '../core/state.js';
 import { Settings, getInterpolationStep } from '../core/settings.js';
+import { getCapacitor } from '../core/capacitor-adapter.js';
 import { Utils } from '../core/utils.js';
 import * as JumpPlanner from '../core/jumpPlanner.js';
 import * as displayManager from './displayManager.js';
@@ -1910,6 +1911,21 @@ function setupThemeToggle() {
     }
 }
 
+function setupKofiButton() {
+    const kofiLink = document.querySelector('.btn-kofi');
+    if (kofiLink) {
+        kofiLink.addEventListener('click', async (e) => {
+            e.preventDefault();
+            const { Browser, isNative } = await getCapacitor();
+            if (isNative && Browser) {
+                await Browser.open({ url: 'https://ko-fi.com/dzmaster' });
+            } else {
+                window.open('https://ko-fi.com/dzmaster', '_blank');
+            }
+        });
+    }
+}
+
 // --- Live Tracking & Dashboard ---
 
 function setupTrackRecordingEvents() {
@@ -2265,6 +2281,7 @@ export function initializeEventListeners() {
     setupCacheManagement();
     setupCacheSettings();
     setupThemeToggle();
+    setupKofiButton();
 
     // 7. Live-Funktionen
     setupTrackRecordingEvents();

@@ -842,6 +842,35 @@ button.btn {
     background-color: var(--color-danger-hover);
 }
 
+.btn-kofi {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background-color: var(--color-secondary);
+    padding: 10px;
+    margin: 10px 0;
+    font-size: 14px;
+    font-weight: bold;
+    color: var(--text-inverted);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    text-decoration: none;
+    width: 100%;
+    box-sizing: border-box;
+    transition: background-color 0.2s ease;
+}
+
+.btn-kofi .kofi-icon {
+    font-size: 24px;
+    line-height: 1;
+}
+
+.btn-kofi:hover {
+    background-color: var(--color-secondary-hover);
+}
+
 /* =================================================================== */
 /* 4. HEADER & SLIDER-CONTAINER
 /* =================================================================== */
