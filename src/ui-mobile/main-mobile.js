@@ -28,6 +28,7 @@ import { generateMeteogram } from '../core/meteogramChart.js';
 import { Directory } from '@capacitor/filesystem';
 import { I18n } from '../core/i18n.js';
 import * as PinManager from '../core/pinManager.js';
+import * as RainRadar from '../core/rainRadarManager.js';
 
 "use strict";
 
@@ -1829,6 +1830,12 @@ function setupAppEventListeners() {
 
         try {
             const sliderIndex = getSliderValue();
+
+            // Radar ausblenden wenn Timeslider in der Zukunft
+            if (AppState.weatherData?.time?.[sliderIndex]) {
+                RainRadar.handleTimeChange(AppState.weatherData.time[sliderIndex]);
+            }
+
             if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
                 // 1. Die Haupt-Wettertabelle anzeigen lassen
                 await displayManager.updateWeatherDisplay(sliderIndex, 'weather-table-container', 'selectedTime');

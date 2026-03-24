@@ -375,7 +375,16 @@
         },
         "map_init_failed": "Konnte Karte nicht initialisieren. Verwende Standardposition.",
         "invalid_position": "Ungültige Position ausgewählt. Verwende Standardposition.",
-        "select_position": "Bitte wählen Sie einen Ort auf der Karte aus."
+        "select_position": "Bitte wählen Sie einen Ort auf der Karte aus.",
+        "radar": {
+            "title": "Wetterradar",
+            "toggle": "Radar",
+            "opacity": "Deckkraft",
+            "animate": "Abspielen",
+            "stop": "Stopp",
+            "attribution": "Radardaten von RainViewer",
+            "suppressed": "Radar ausgeblendet (zukünftiger Zeitpunkt gewählt)"
+        }
     },
     "adsb": {
         "tracking_stopped": "ADSB-Tracking gestoppt.",

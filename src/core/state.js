@@ -117,4 +117,14 @@ export const AppState = {
     ensembleLayerGroup: null,          // @type {L.LayerGroup|null} - Gruppe für alle Ensemble-Visualisierungen.
     ensembleScenarioCircles: {},       // @type {Object.<string, L.Circle>} - Speichert die Leaflet-Layer für Szenario-Kreise.
     heatmapLayer: null,                // @type {L.HeatLayer|null} - Der Leaflet.heat-Layer für die Heatmap-Darstellung.
+
+    // ===================================================================
+    // Wetterradar (RainViewer)
+    // ===================================================================
+    radarLayer: null,                  // @type {L.TileLayer|null} - Der aktuelle Radar-Tile-Layer.
+    radarTimestamps: [],               // @type {number[]} - Verfügbare Radar-Zeitstempel von RainViewer.
+    radarCurrentIndex: -1,             // @type {number} - Index des aktuell angezeigten Radar-Frames.
+    radarAnimationTimer: null,         // @type {number|null} - Intervall-ID für die Radar-Animation.
+    radarRefreshTimer: null,           // @type {number|null} - Intervall-ID für das automatische Neuladen der Radar-Daten.
+    isRadarVisible: false,             // @type {boolean} - True, wenn der Radar-Layer sichtbar ist.
 };
