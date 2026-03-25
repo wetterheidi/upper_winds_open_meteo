@@ -15,7 +15,7 @@ import * as mapManager from './mapManager.js';
 import * as trackManager from '../core/trackManager.js';
 import * as weatherManager from '../core/weatherManager.js';
 import { cacheVisibleTiles, cacheTilesForDIP } from '../core/tileCache.js';
-import { getSliderValue, displayError, displayMessage, displayWarning, displayProgress, hideProgress, applyDeviceSpecificStyles, updatePlannerUnits } from './ui.js';
+import { getSliderValue, displayError, displayMessage, displayWarning, displayProgress, hideProgress, applyDeviceSpecificStyles, updatePlannerUnits, updateOffsetNmHints } from './ui.js';
 import { setupLanguageDropdown } from './ui.js';
 import * as AutoupdateManager from '../core/autoupdateManager.js';
 import { DateTime } from 'luxon';
@@ -1802,6 +1802,7 @@ function setupAppEventListeners() {
         // NEU: Setzt die sichtbaren Input-Felder auf 0 zurück.
         setInputValueSilently('jumpRunTrackOffset', 0);
         setInputValueSilently('jumpRunTrackForwardOffset', 0);
+        updateOffsetNmHints();
 
         // Bestehende Logik zum Neuzeichnen des Tracks und der JM-Linie
         displayManager.updateJumpRunTrackDisplay();
@@ -2173,8 +2174,9 @@ function setupAppEventListeners() {
     document.addEventListener('ui:downloadClicked', () => {
         console.log('[main-mobile] Download button clicked.');
 
-        // Logik, die vorher im eventManager war:
-        const downloadFormat = getDownloadFormat();
+        // Wert direkt vom Select-Element lesen, um Probleme mit veralteten localStorage-Werten zu vermeiden
+        const selectElement = document.getElementById('downloadFormat');
+        const downloadFormat = selectElement ? selectElement.value : getDownloadFormat();
         if (downloadFormat === 'SurfaceData') {
             downloadSurfaceDataAsAscii();
         } else if (downloadFormat === 'ComprehensiveReport') { // NEUER FALL
@@ -2945,6 +2947,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         setInputValueSilently('jumpRunTrackOffset', lateralOffset);
         setInputValueSilently('jumpRunTrackForwardOffset', forwardOffset);
+        updateOffsetNmHints();
 
         displayManager.updateJumpRunTrackDisplay();
     });

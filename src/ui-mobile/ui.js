@@ -244,8 +244,29 @@ export function updatePlannerUnits(unit, convertValues = true) {
             }
         }
     });
+
+    updateOffsetNmHints();
 }
 
+/**
+ * Aktualisiert die nm-Hinweise neben den JRT-Offset-Eingabefeldern.
+ * Wandelt den aktuellen Wert (in m oder ft) in nautische Meilen um.
+ */
+export function updateOffsetNmHints() {
+    const heightUnit = Settings.getValue('heightUnit', 'm');
+    const pairs = [
+        { inputId: 'jumpRunTrackOffset', hintId: 'nmHintOffset' },
+        { inputId: 'jumpRunTrackForwardOffset', hintId: 'nmHintForwardOffset' },
+    ];
+    for (const { inputId, hintId } of pairs) {
+        const hintEl = document.getElementById(hintId);
+        if (!hintEl) continue;
+        const raw = parseFloat(document.getElementById(inputId)?.value);
+        if (isNaN(raw) || raw === 0) { hintEl.textContent = ''; continue; }
+        const meters = heightUnit === 'ft' ? raw * 0.3048 : raw;
+        hintEl.textContent = Utils.formatAsNm(meters);
+    }
+}
 
 /**
  * Bereinigt die Liste der ausgewählten Ensemble-Modelle, falls einige nicht mehr verfügbar sind.

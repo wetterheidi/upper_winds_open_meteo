@@ -13,7 +13,7 @@ import * as JumpPlanner from '../core/jumpPlanner.js';
 import * as mapManager from './mapManager.js';
 import * as weatherManager from '../core/weatherManager.js';
 import { cacheVisibleTiles, cacheTilesForDIP } from '../core/tileCache.js';
-import { getSliderValue, displayError, displayMessage, displayWarning, displayProgress, hideProgress, applyDeviceSpecificStyles, updatePlannerUnits } from './ui.js';
+import { getSliderValue, displayError, displayMessage, displayWarning, displayProgress, hideProgress, applyDeviceSpecificStyles, updatePlannerUnits, updateOffsetNmHints } from './ui.js';
 import { setupLanguageDropdown } from './ui.js';
 import * as AutoupdateManager from '../core/autoupdateManager.js';
 import * as displayManager from './displayManager.js';
@@ -2026,7 +2026,9 @@ function setupAppEventListeners() {
     document.addEventListener('ui:downloadClicked', () => {
         console.log('[main-web] Download button clicked.');
 
-        const downloadFormat = getDownloadFormat();
+        // Wert direkt vom Select-Element lesen, um Probleme mit veralteten localStorage-Werten zu vermeiden
+        const selectElement = document.getElementById('downloadFormat');
+        const downloadFormat = selectElement ? selectElement.value : getDownloadFormat();
         if (downloadFormat === 'SurfaceData') {
             downloadSurfaceDataAsAscii();
         } else if (downloadFormat === 'ComprehensiveReport') { // NEUER FALL
@@ -2321,6 +2323,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         setInputValueSilently('jumpRunTrackOffset', lateralOffset);
         setInputValueSilently('jumpRunTrackForwardOffset', forwardOffset);
+        updateOffsetNmHints();
 
         // Schritt 6: Den Track neu zeichnen lassen. Die `jumpPlanner` Funktion verwendet
         // jetzt den Anker + die neuen Offsets und kommt zum korrekten Ergebnis.
@@ -2333,6 +2336,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // NEU: Setzt die sichtbaren Input-Felder auf 0 zurück.
         setInputValueSilently('jumpRunTrackOffset', 0);
         setInputValueSilently('jumpRunTrackForwardOffset', 0);
+        updateOffsetNmHints();
 
         // Bestehende Logik zum Neuzeichnen des Tracks und der JM-Linie
         displayManager.updateJumpRunTrackDisplay();

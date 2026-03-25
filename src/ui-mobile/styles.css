@@ -1744,6 +1744,13 @@ input[type="checkbox"][style*="opacity: 1"] {
     width: 100%;
 }
 
+.nm-hint {
+    font-size: 0.85em;
+    color: #888;
+    margin-left: 6px;
+    white-space: nowrap;
+}
+
 /* Stile für die neue Landing-Direction-Zeile */
 .landing-direction-row {
     display: flex;

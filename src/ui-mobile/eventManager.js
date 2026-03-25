@@ -2,7 +2,6 @@
 
 import { AppState } from '../core/state.js';
 import { Settings, getInterpolationStep } from '../core/settings.js';
-import { getCapacitor } from '../core/capacitor-adapter.js';
 import { Utils } from '../core/utils.js';
 import * as JumpPlanner from '../core/jumpPlanner.js';
 import * as displayManager from './displayManager.js';
@@ -13,7 +12,7 @@ import { loadKmlTrack, loadGpxTrack, loadCsvTrackUTC, exportToGpx, exportLanding
 import { SensorManager } from './sensorManager.js';
 import * as liveTrackingManager from '../core/liveTrackingManager.js';
 import { fetchEnsembleWeatherData, processAndVisualizeEnsemble, clearEnsembleVisualizations } from '../core/ensembleManager.js';
-import { getSliderValue, displayMessage, hideProgress, displayProgress, displayWarning, toggleLoading, updatePlannerUnits } from './ui.js';
+import { getSliderValue, displayMessage, hideProgress, displayProgress, displayWarning, toggleLoading, updatePlannerUnits, updateOffsetNmHints } from './ui.js';
 import { updateModelSelectUI, cleanupSelectedEnsembleModels } from './ui.js';
 import 'leaflet-gpx';
 import { FilePicker } from '@capawesome/capacitor-file-picker';
@@ -570,6 +569,11 @@ function setupJumpRunTrackEvents() {
     setupInput('jumpRunTrackOffset', 'jumpRunTrackOffset');
     setupInput('jumpRunTrackForwardOffset', 'jumpRunTrackForwardOffset');
 
+    // Initiale nm-Hints setzen und bei Offset-Änderungen aktualisieren
+    updateOffsetNmHints();
+    document.getElementById('jumpRunTrackOffset')?.addEventListener('input', updateOffsetNmHints);
+    document.getElementById('jumpRunTrackForwardOffset')?.addEventListener('input', updateOffsetNmHints);
+
     const directionInput = document.getElementById('jumpRunTrackDirection');
     if (directionInput) {
         // Initialwert setzen
@@ -594,6 +598,7 @@ function setupJumpRunTrackEvents() {
             const forwardOffsetInput = document.getElementById('jumpRunTrackForwardOffset');
             if (offsetInput) offsetInput.value = 0;
             if (forwardOffsetInput) forwardOffsetInput.value = 0;
+            updateOffsetNmHints();
             console.log('Manuelle JRT-Richtungsänderung: Offsets auf 0 zurückgesetzt.');
 
             // Speichern: numerische Werte von display → true konvertieren
@@ -1913,17 +1918,14 @@ function setupThemeToggle() {
 
 function setupKofiButton() {
     const kofiLink = document.querySelector('.btn-kofi');
-    if (kofiLink) {
-        kofiLink.addEventListener('click', async (e) => {
-            e.preventDefault();
-            const { Browser, isNative } = await getCapacitor();
-            if (isNative && Browser) {
-                await Browser.open({ url: 'https://ko-fi.com/dzmaster' });
-            } else {
-                window.open('https://ko-fi.com/dzmaster', '_blank');
-            }
-        });
-    }
+    if (!kofiLink) return;
+
+    // Remove target="_blank" so the <a> tag triggers a normal navigation.
+    // Capacitor intercepts external URLs automatically:
+    // - iOS: WKNavigationDelegate calls UIApplication.shared.open() → Safari
+    // - Android: shouldOverrideUrlLoading calls Intent.ACTION_VIEW → System browser
+    // This avoids SFSafariViewController which blocks PayPal's popup flow.
+    kofiLink.removeAttribute('target');
 }
 
 // --- Live Tracking & Dashboard ---
@@ -1976,6 +1978,7 @@ function setupHarpCoordInputEvents() {
 
             Settings.state.userSettings.jumpRunTrackOffset = 0;
             Settings.state.userSettings.jumpRunTrackForwardOffset = 0;
+            updateOffsetNmHints();
             console.log('HARP placed via coords. JRT offsets reset to 0.');
 
             Settings.save();

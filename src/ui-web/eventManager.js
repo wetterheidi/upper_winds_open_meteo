@@ -10,7 +10,7 @@ import * as Coordinates from '../ui-web/coordinates.js';
 import { TileCache, cacheTilesForDIP, cacheVisibleTiles } from '../core/tileCache.js';
 import { loadKmlTrack, loadGpxTrack, loadCsvTrackUTC, exportToGpx, exportLandingPatternToGpx, exportCompositeJumpGpx } from '../core/trackManager.js';
 import { fetchEnsembleWeatherData, processAndVisualizeEnsemble, clearEnsembleVisualizations } from '../core/ensembleManager.js';
-import { getSliderValue, displayMessage, hideProgress, displayProgress, displayWarning, toggleLoading, updatePlannerUnits } from './ui.js';
+import { getSliderValue, displayMessage, hideProgress, displayProgress, displayWarning, toggleLoading, updatePlannerUnits, updateOffsetNmHints } from './ui.js';
 import { updateModelSelectUI, cleanupSelectedEnsembleModels } from './ui.js';
 import 'leaflet-gpx';
 import * as LocationManager from '../core/locationManager.js';
@@ -458,6 +458,11 @@ function setupJumpRunTrackEvents() {
     setupInput('jumpRunTrackOffset', 'jumpRunTrackOffset');
     setupInput('jumpRunTrackForwardOffset', 'jumpRunTrackForwardOffset');
 
+    // Initiale nm-Hints setzen und bei Offset-Änderungen aktualisieren
+    updateOffsetNmHints();
+    document.getElementById('jumpRunTrackOffset')?.addEventListener('input', updateOffsetNmHints);
+    document.getElementById('jumpRunTrackForwardOffset')?.addEventListener('input', updateOffsetNmHints);
+
     const directionInput = document.getElementById('jumpRunTrackDirection');
     if (directionInput) {
         // Initialwert setzen
@@ -482,6 +487,7 @@ function setupJumpRunTrackEvents() {
             const forwardOffsetInput = document.getElementById('jumpRunTrackForwardOffset');
             if (offsetInput) offsetInput.value = 0;
             if (forwardOffsetInput) forwardOffsetInput.value = 0;
+            updateOffsetNmHints();
             console.log('Manuelle JRT-Richtungsänderung: Offsets auf 0 zurückgesetzt.');
 
             // Speichern: numerische Werte von display → true konvertieren
@@ -1684,6 +1690,7 @@ function setupHarpCoordInputEvents() {
 
             Settings.state.userSettings.jumpRunTrackOffset = 0;
             Settings.state.userSettings.jumpRunTrackForwardOffset = 0;
+            updateOffsetNmHints();
             console.log('HARP placed via coords. JRT offsets reset to 0.');
 
             Settings.save();

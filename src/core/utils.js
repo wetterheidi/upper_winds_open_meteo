@@ -168,6 +168,33 @@ export class Utils {
     }
 
     /**
+     * Formatiert einen Meterwert als nautische Meilen für die Piloten-Kommunikation.
+     * Zeigt gängige Bruchteile (¼, ½, ¾) wenn der Wert nahe genug liegt.
+     * @param {number} meters - Der Wert in Metern.
+     * @returns {string} Formatierter String wie "≈ ½ nm" oder "≈ 1.3 nm", oder '' wenn zu klein.
+     */
+    static formatAsNm(meters) {
+        const nm = Math.abs(meters) * CONVERSIONS.METERS_TO_NM;
+        if (nm < 0.05) return '';
+
+        // Gängige Bruchteile prüfen (Toleranz ±0.03 nm)
+        const fractions = [
+            { value: 0.25, label: '¼' },
+            { value: 0.5, label: '½' },
+            { value: 0.75, label: '¾' },
+        ];
+        for (const f of fractions) {
+            if (Math.abs(nm - f.value) < 0.03) return `≈ ${f.label} nm`;
+        }
+
+        // Ganze Zahlen oder eine Dezimalstelle
+        if (Math.abs(nm - Math.round(nm)) < 0.03) {
+            return `≈ ${Math.round(nm)} nm`;
+        }
+        return `≈ ${nm.toFixed(1)} nm`;
+    }
+
+    /**
      * Normalisiert einen Winkel auf den Bereich 0-360 Grad.
      * @param {number} angle - Der zu normalisierende Winkel.
      * @returns {number} Der normalisierte Winkel.

@@ -298,6 +298,7 @@
                                         <span data-i18n="planner.jump_run_offset">Jump Run Offset (m):</span>
                                         <input type="number" id="jumpRunTrackOffset" min="-50000" max="50000" step="100"
                                             value="0" style="width: 80px;">
+                                        <span id="nmHintOffset" class="nm-hint"></span>
                                     </label>
                                 </li>
                                 <li>
@@ -306,6 +307,7 @@
                                             (m):</span>
                                         <input type="number" id="jumpRunTrackForwardOffset" min="-50000" max="50000"
                                             step="100" value="0" style="width: 80px;">
+                                        <span id="nmHintForwardOffset" class="nm-hint"></span>
                                     </label>
                                 </li>
                                 <li>
@@ -651,9 +653,9 @@
                                     <option value="HEIDIS">HEIDIS</option>
                                     <option value="ATAK">ATAK</option>
                                     <option value="Windwatch">Windwatch</option>
-                                    <option data-i18n="settings.customized">Customized</option>
-                                    <option data-i18n="settings.surface_data">Surface Data</option>
-                                    <option data-i18n="settings.weather_briefing">Weather Briefing</option>
+                                    <option value="Customized" data-i18n="settings.customized">Customized</option>
+                                    <option value="SurfaceData" data-i18n="settings.surface_data">Surface Data</option>
+                                    <option value="ComprehensiveReport" data-i18n="settings.weather_briefing">Weather Briefing</option>
                                 </select>
                                 <button id="downloadButton" class="btn btn-primary"
                                     data-i18n="settings.generate_table">Generate Table</button>
