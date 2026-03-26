@@ -1640,13 +1640,13 @@ function _setupGeomanMeasurementHandlers() {
         const nextPoint = index < latlngs.length - 1 ? latlngs[index + 1] : null;
         const inBearing = Utils.calculateBearing(prevPoint.lat, prevPoint.lng, currentPoint.lat, currentPoint.lng);
         const segmentDistance = prevPoint.distanceTo(currentPoint);
-        const segmentDistanceText = segmentDistance < 1000 ? `${segmentDistance.toFixed(0)} m` : `${(segmentDistance / 1000).toFixed(2)} km`;
+        const segmentDistanceText = Utils.formatDistance(segmentDistance);
 
         let totalDistance = 0;
         for (let i = 1; i <= index; i++) {
             totalDistance += latlngs[i - 1].distanceTo(latlngs[i]);
         }
-        const totalDistanceText = totalDistance < 1000 ? `${totalDistance.toFixed(0)} m` : `${(totalDistance / 1000).toFixed(2)} km`;
+        const totalDistanceText = Utils.formatDistance(totalDistance);
 
         const outBearingText = nextPoint ? `${Utils.calculateBearing(currentPoint.lat, currentPoint.lng, nextPoint.lat, nextPoint.lng).toFixed(0)}°` : '---';
 
@@ -1670,7 +1670,7 @@ function _setupGeomanMeasurementHandlers() {
     function createPermanentCircleLabel(layer) {
         const center = layer.getLatLng();
         const radius = layer.getRadius();
-        const radiusText = radius < 1000 ? `${radius.toFixed(0)} m` : `${(radius / 1000).toFixed(2)} km`;
+        const radiusText = Utils.formatDistance(radius);
         const labelContent = `<div class="geoman-permanent-label">${I18n.t('map.geoman.radius')}:<br> ${radiusText}</div>`;
         const label = L.marker(center, {
             icon: L.divIcon({ className: 'geoman-label-container', html: labelContent, iconAnchor: [0, 0] }),
@@ -1777,7 +1777,7 @@ function _setupGeomanMeasurementHandlers() {
 
                         const distance = lastPoint.distanceTo(currentCenter);
                         const bearing = Utils.calculateBearing(lastPoint.lat, lastPoint.lng, currentCenter.lat, currentCenter.lng);
-                        const distanceText = distance < 1000 ? `${distance.toFixed(0)} m` : `${(distance / 1000).toFixed(2)} km`;
+                        const distanceText = Utils.formatDistance(distance);
 
                         liveMeasureLabel.innerHTML = `${I18n.t('map.geoman.in')}: ${bearing.toFixed(0)}°<br>${I18n.t('map.geoman.out')}: ---°<br>+: ${distanceText}`;
                         const mapSize = map.getSize();
@@ -1847,7 +1847,7 @@ function _setupGeomanMeasurementHandlers() {
                         const lastPoint = latlngs[latlngs.length - 1];
                         const distance = lastPoint.distanceTo(moveEvent.latlng);
                         const bearing = Utils.calculateBearing(lastPoint.lat, lastPoint.lng, moveEvent.latlng.lat, moveEvent.latlng.lng);
-                        const distanceText = distance < 1000 ? `${distance.toFixed(0)} m` : `${(distance / 1000).toFixed(2)} km`;
+                        const distanceText = Utils.formatDistance(distance);
                         liveMeasureLabel.innerHTML = `${I18n.t('map.geoman.in')}: ${bearing.toFixed(0)}°<br>${I18n.t('map.geoman.out')}: ---°<br>+: ${distanceText}`;
                         L.DomUtil.setPosition(liveMeasureLabel, moveEvent.containerPoint.add([15, -15]));
                     }
@@ -1890,7 +1890,7 @@ function _setupGeomanMeasurementHandlers() {
                             const radius = center.distanceTo(crosshairPos);
                             workingLayer.setRadius(radius);
 
-                            const radiusText = radius < 1000 ? `${radius.toFixed(0)} m` : `${(radius / 1000).toFixed(2)} km`;
+                            const radiusText = Utils.formatDistance(radius);
                             liveMeasureLabel.innerHTML = `${I18n.t('map.geoman.radius')}: ${radiusText}`;
                             const mapSize = map.getSize();
                             const labelPos = L.point(mapSize.x / 2, mapSize.y / 2 - 40);
@@ -1933,7 +1933,7 @@ function _setupGeomanMeasurementHandlers() {
                     const center = workingLayer.getLatLng();
                     if (center) {
                         const radius = center.distanceTo(moveEvent.latlng);
-                        const radiusText = radius < 1000 ? `${radius.toFixed(0)} m` : `${(radius / 1000).toFixed(2)} km`;
+                        const radiusText = Utils.formatDistance(radius);
                         liveMeasureLabel.innerHTML = `${I18n.t('map.geoman.radius')}: ${radiusText}`;
                         L.DomUtil.setPosition(liveMeasureLabel, moveEvent.containerPoint.add([15, -15]));
                     }
@@ -1984,7 +1984,7 @@ function _setupGeomanMeasurementHandlers() {
             if (isMobileDevice()) {
                 liveMeasureLabel.style.display = 'block';
                 const radius = e.layer.getRadius();
-                const radiusText = radius < 1000 ? `${radius.toFixed(0)} m` : `${(radius / 1000).toFixed(2)} km`;
+                const radiusText = Utils.formatDistance(radius);
                 liveMeasureLabel.innerHTML = `${I18n.t('map.geoman.radius')}: ${radiusText}`;
                 const mapSize = map.getSize();
                 const labelPos = L.point(mapSize.x / 2, mapSize.y / 2 - 40);

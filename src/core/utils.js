@@ -73,6 +73,39 @@ export class Utils {
      * @param {'m'|'ft'} toUnit - Die Zieleinheit.
      * @returns {number|string} Die umgerechnete Höhe oder 'N/A'.
      */
+    /**
+     * Formatiert eine Distanz in Metern als lesbaren Text mit nm-Zusatzinfo.
+     * @param {number} meters - Die Distanz in Metern.
+     * @returns {string} Formatierter Text, z.B. "460 m (≈ 1/4 nm)" oder "2.50 km (≈ 1.3 nm)".
+     */
+    static formatDistance(meters) {
+        const base = meters < 1000 ? `${meters.toFixed(0)} m` : `${(meters / 1000).toFixed(2)} km`;
+        const nm = meters * CONVERSIONS.METERS_TO_NM;
+        if (nm < 0.1) return base;
+
+        // Gängige Bruchteile für Piloten
+        const fractions = [
+            { value: 0.25, label: '1/4' },
+            { value: 0.5, label: '1/2' },
+            { value: 0.75, label: '3/4' },
+            { value: 1, label: '1' },
+            { value: 1.5, label: '1.5' },
+            { value: 2, label: '2' },
+            { value: 3, label: '3' },
+            { value: 5, label: '5' },
+        ];
+
+        const closest = fractions.reduce((best, f) =>
+            Math.abs(nm - f.value) < Math.abs(nm - best.value) ? f : best
+        );
+
+        const tolerance = closest.value * 0.15;
+        if (Math.abs(nm - closest.value) <= tolerance) {
+            return `${base} (≈ ${closest.label} nm)`;
+        }
+        return `${base} (≈ ${nm.toFixed(1)} nm)`;
+    }
+
     static convertHeight(value, toUnit) {
         const numericValue = parseFloat(value);
         if (isNaN(numericValue)) {
