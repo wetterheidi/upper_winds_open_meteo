@@ -1359,6 +1359,38 @@ button.btn {
     margin-top: 10px;
 }
 
+.dashboard-toggle {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 15px;
+    background-color: var(--background-interactive);
+    border-radius: 8px;
+    padding: 4px;
+}
+
+.toggle-btn {
+    flex: 1;
+    padding: 10px;
+    background-color: transparent;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: bold;
+    color: var(--palette-grey-900);
+    cursor: pointer;
+    transition: background-color 0.3s, color 0.3s;
+}
+
+.toggle-btn.active {
+    background-color: var(--color-primary);
+    color: var(--text-inverted);
+    box-shadow: var(--shadow);
+}
+
+.jml-target-toggle {
+    margin-top: 15px;
+}
+
 .dashboard-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;

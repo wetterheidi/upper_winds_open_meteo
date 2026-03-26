@@ -677,6 +677,16 @@ export async function createOrUpdateMarker(lat, lng) {
         const newMarker = createCustomMarker(lat, lng);
         attachMarkerDragend(newMarker);
         newMarker.on('click', () => {
+            // Wenn Live-Tracking + JML aktiv und JML nicht auf DIP zeigt: umschalten statt Popup
+            if (AppState.watchId !== null &&
+                Settings.state.userSettings.showJumpMasterLine &&
+                Settings.state.userSettings.jumpMasterLineTarget !== 'DIP') {
+                Settings.state.userSettings.jumpMasterLineTarget = 'DIP';
+                Settings.save();
+                document.dispatchEvent(new CustomEvent('ui:jumpMasterLineTargetChanged'));
+                setTimeout(() => newMarker.closePopup(), 0);
+                return;
+            }
             import('../ui-web/displayManager.js').then(displayManager => {
                 displayManager.refreshMarkerPopup(false, true);
             });
@@ -833,6 +843,16 @@ export function createHarpMarker(latitude, longitude) {
         pmIgnore: true
     });
     marker.on('click', () => {
+        // Wenn Live-Tracking + JML aktiv und JML nicht auf HARP zeigt: umschalten statt Popup
+        if (AppState.watchId !== null &&
+            Settings.state.userSettings.showJumpMasterLine &&
+            Settings.state.userSettings.jumpMasterLineTarget !== 'HARP') {
+            Settings.state.userSettings.jumpMasterLineTarget = 'HARP';
+            Settings.save();
+            document.dispatchEvent(new CustomEvent('ui:jumpMasterLineTargetChanged'));
+            setTimeout(() => marker.closePopup(), 0);
+            return;
+        }
         const pos = marker.getLatLng();
         updateHarpMarkerPopup(marker, pos.lat, pos.lng, true);
     });

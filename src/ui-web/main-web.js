@@ -84,6 +84,9 @@ export const getDownloadFormat = () => Settings.getValue('downloadFormat', 'radi
 async function initializeApp() {
     setAppContext(true);
     Settings.initialize();
+    // JML ist nur im aktiven Tracking relevant — beim App-Start immer zurücksetzen
+    Settings.state.userSettings.showJumpMasterLine = false;
+    Settings.save();
     await I18n.initialize();
 
     // VEREINFACHT: Diese Zeilen sind nicht mehr nötig. Landing Pattern und Calculate Jump
@@ -1212,6 +1215,15 @@ function updateJumpMasterDashboard(data) {
 
     // Schritt 1: Blende den Detail-Container basierend auf der Checkbox ein oder aus.
     jmlDetails.classList.toggle('hidden', !showJML);
+
+    // Schritt 1b: Toggle-Buttons synchronisieren
+    const dipBtn = document.getElementById('jml-target-dip-btn');
+    const harpBtn = document.getElementById('jml-target-harp-btn');
+    if (dipBtn && harpBtn) {
+        dipBtn.classList.toggle('active', Settings.state.userSettings.jumpMasterLineTarget === 'DIP');
+        harpBtn.classList.toggle('active', Settings.state.userSettings.jumpMasterLineTarget === 'HARP');
+        harpBtn.style.opacity = AppState.harpMarker ? 1 : 0.5;
+    }
 
     // Schritt 2: Wenn der Container sichtbar ist, fülle ihn.
     if (showJML) {

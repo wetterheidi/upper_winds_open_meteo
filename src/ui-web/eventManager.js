@@ -1659,6 +1659,39 @@ function setupThemeToggle() {
     }
 }
 
+// --- JML Target Toggle (Dashboard) ---
+function setupJmlTargetToggleEvents() {
+    const dipBtn = document.getElementById('jml-target-dip-btn');
+    const harpBtn = document.getElementById('jml-target-harp-btn');
+    const harpRadioPlanner = document.querySelector('input[name="jumpMasterLineTarget"][value="HARP"]');
+
+    if (!dipBtn || !harpBtn) return;
+
+    const syncRadioButtons = (value) => {
+        const radio = document.querySelector(`input[name="jumpMasterLineTarget"][value="${value}"]`);
+        if (radio) radio.checked = true;
+    };
+
+    dipBtn.addEventListener('click', () => {
+        Settings.state.userSettings.jumpMasterLineTarget = 'DIP';
+        Settings.save();
+        syncRadioButtons('DIP');
+        document.dispatchEvent(new CustomEvent('ui:jumpMasterLineTargetChanged'));
+    });
+
+    harpBtn.addEventListener('click', () => {
+        if (harpRadioPlanner && harpRadioPlanner.disabled) {
+            console.warn("HARP marker is not placed yet.");
+            Utils.handleMessage(I18n.t('planner.place_harp'));
+            return;
+        }
+        Settings.state.userSettings.jumpMasterLineTarget = 'HARP';
+        Settings.save();
+        syncRadioButtons('HARP');
+        document.dispatchEvent(new CustomEvent('ui:jumpMasterLineTargetChanged'));
+    });
+}
+
 // --- Live Tracking ---
 function setupHarpCoordInputEvents() {
     const harpCoordInput = document.getElementById('harpCoordInput');
@@ -1983,6 +2016,7 @@ export function initializeEventListeners() {
 
     // 7. Live-Funktionen
     setupHarpCoordInputEvents();
+    setupJmlTargetToggleEvents();
     setupAdsbEvents();
 
     // 8. Search

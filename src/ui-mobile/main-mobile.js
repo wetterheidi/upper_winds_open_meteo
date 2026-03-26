@@ -94,6 +94,9 @@ export const getDownloadFormat = () => Settings.getValue('downloadFormat', 'csv'
 async function initializeApp() {
     setAppContext(true);
     Settings.initialize();
+    // JML ist nur im aktiven Tracking relevant — beim App-Start immer zurücksetzen
+    Settings.state.userSettings.showJumpMasterLine = false;
+    Settings.save();
     await I18n.initialize();
 
     if (AppState.isInitialized) {
