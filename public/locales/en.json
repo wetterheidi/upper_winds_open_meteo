@@ -263,7 +263,11 @@
         "true": "True",
         "magnetic": "Magnetic",
         "about": "About",
-        "buy_coffee": "Buy me a Coffee"
+        "contact": "Contact",
+        "buy_coffee": "Buy me a Coffee",
+        "credits": "Credits & Attributions",
+        "credits_data": "Data Providers",
+        "credits_libs": "Libraries"
     },
     "modals": {
         "restricted_feature": "Restricted Feature",

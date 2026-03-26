@@ -2258,6 +2258,9 @@ function setupAppEventListeners() {
 // HTML-Dokument vollständig geladen ist. Er startet die gesamte Anwendung.
 
 document.addEventListener('DOMContentLoaded', async () => {
+    const versionEl = document.getElementById('appVersion');
+    if (versionEl) versionEl.textContent = 'v' + __APP_VERSION__;
+
     await initializeApp();
     setupLanguageDropdown();
     initializeUIElements();

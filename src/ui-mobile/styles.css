@@ -738,33 +738,106 @@ body {
     background-color: var(--color-danger-hover);
 }
 
+.accordion-content:has(.about-version) {
+    flex-direction: column;
+}
+
+.about-version {
+    text-align: center;
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin: 5px 0 10px;
+}
+
+.about-contact {
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin: 0 0 10px;
+}
+
+.about-contact a {
+    color: var(--color-primary);
+    text-decoration: none;
+}
+
+.about-contact a:hover {
+    text-decoration: underline;
+}
+
+.about-credits {
+    margin-top: 15px;
+    font-size: 13px;
+    color: var(--text-primary);
+}
+
+.about-credits summary {
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 14px;
+    padding: 8px 0;
+    color: var(--text-primary);
+}
+
+.about-credits h4 {
+    margin: 10px 0 5px;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.about-credits ul {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 10px;
+}
+
+.about-credits li {
+    padding: 3px 0;
+}
+
+.about-credits a {
+    color: var(--color-primary);
+    text-decoration: none;
+}
+
+.about-credits a:hover {
+    text-decoration: underline;
+}
+
 .btn-kofi {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
-    background-color: var(--color-secondary);
-    padding: 10px;
+    background: linear-gradient(135deg, #c8a26a, #a0784a);
+    padding: 12px;
     margin: 10px 0;
     font-size: 14px;
     font-weight: bold;
-    color: var(--text-inverted);
+    color: #fff;
     border: none;
-    border-radius: 6px;
+    border-radius: 8px;
     cursor: pointer;
     text-decoration: none;
     width: 100%;
     box-sizing: border-box;
-    transition: background-color 0.2s ease;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    box-shadow: 0 2px 6px rgba(160, 120, 74, 0.3);
 }
 
 .btn-kofi .kofi-icon {
-    font-size: 24px;
+    font-size: 26px;
     line-height: 1;
+    transition: transform 0.3s ease;
 }
 
 .btn-kofi:hover {
-    background-color: var(--color-secondary-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(160, 120, 74, 0.4);
+}
+
+.btn-kofi:hover .kofi-icon {
+    transform: scale(1.2) rotate(-10deg);
 }
 
 /* --- Accordion --- */

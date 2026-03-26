@@ -1,6 +1,9 @@
 import { defineConfig } from 'vite'
 import { resolve } from 'path'
 import commonjs from '@rollup/plugin-commonjs'
+import { readFileSync } from 'fs'
+
+const pkg = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf-8'))
 
 export default defineConfig({
   root: 'src/ui-mobile',
@@ -20,6 +23,10 @@ export default defineConfig({
       external: []
     }
   },
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+  },
+
   plugins: [
     commonjs(),
   ],

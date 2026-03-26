@@ -1,6 +1,9 @@
 import { defineConfig } from 'vite'
 import { resolve } from 'path'
 import commonjs from '@rollup/plugin-commonjs'
+import { readFileSync } from 'fs'
+
+const pkg = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf-8'))
 
 export default defineConfig({
   // NEU: Definiere den Root für die Web-App, genau wie bei der mobilen Konfiguration
@@ -34,6 +37,10 @@ export default defineConfig({
     rollupOptions: {
       // Vite findet die index.html automatisch im oben definierten 'root'
     },
+  },
+
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
   },
 
   plugins: [

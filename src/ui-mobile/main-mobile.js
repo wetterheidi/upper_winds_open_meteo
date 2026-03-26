@@ -2577,6 +2577,8 @@ function setupAppEventListeners() {
 // Beschreibung: Der Code in diesem Block wird ausgeführt, sobald das
 // HTML-Dokument vollständig geladen ist. Er startet die gesamte Anwendung.
 document.addEventListener('DOMContentLoaded', async () => {
+    const versionEl = document.getElementById('appVersion');
+    if (versionEl) versionEl.textContent = 'v' + __APP_VERSION__;
 
     // --- NEU: Status Bar Konfiguration EINFÜGEN START ---
     const configureStatusBar = async () => {

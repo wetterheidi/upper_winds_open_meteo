@@ -263,7 +263,11 @@
         "true": "True",
         "magnetic": "Magnetisch",
         "about": "Über DZMaster",
-        "buy_coffee": "Kauf mir einen Kaffee"
+        "contact": "Kontakt",
+        "buy_coffee": "Kauf mir einen Kaffee",
+        "credits": "Credits & Lizenzen",
+        "credits_data": "Datenanbieter",
+        "credits_libs": "Bibliotheken"
     },
     "modals": {
         "restricted_feature": "Geschützte Funktion",
