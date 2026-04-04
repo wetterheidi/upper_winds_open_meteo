@@ -15,8 +15,8 @@
       "backgroundColor": "#ffffff",
       "androidSplashResourceName": "splash",
       "androidScaleType": "CENTER_CROP",
-      "splashFullScreen": true,
-      "splashImmersive": true,
+      "splashFullScreen": false,
+      "splashImmersive": false,
       "layoutName": "launch_screen",
       "useDialog": false
     }
