@@ -21,8 +21,8 @@
     <script src="https://unpkg.com/@tmcw/togeojson@4.7.0/dist/togeojson.umd.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/geomag/dist/geomag.min.js" defer></script>
-  <script type="module" crossorigin src="/upper_winds_open_meteo/assets/index-C7zCnGUF.js"></script>
-  <link rel="stylesheet" crossorigin href="/upper_winds_open_meteo/assets/index-DQZWoaVm.css">
+  <script type="module" crossorigin src="/upper_winds_open_meteo/assets/index-BuQ8gyvU.js"></script>
+  <link rel="stylesheet" crossorigin href="/upper_winds_open_meteo/assets/index-CxQ-rio7.css">
 </head>
 
 <body>
@@ -299,6 +299,7 @@
                                         <span data-i18n="planner.jump_run_offset">Jump Run Offset (m):</span>
                                         <input type="number" id="jumpRunTrackOffset" min="-50000" max="50000" step="100"
                                             value="0" style="width: 80px;">
+                                        <span id="nmHintOffset" class="nm-hint"></span>
                                     </label>
                                 </li>
                                 <li>
@@ -307,6 +308,7 @@
                                             (m):</span>
                                         <input type="number" id="jumpRunTrackForwardOffset" min="-50000" max="50000"
                                             step="100" value="0" style="width: 80px;">
+                                        <span id="nmHintForwardOffset" class="nm-hint"></span>
                                     </label>
                                 </li>
                                 <li>
@@ -518,8 +520,12 @@
 
                         <div id="jumpmaster-line-details" class="hidden">
                             <hr>
+                            <div class="dashboard-toggle jml-target-toggle">
+                                <button id="jml-target-dip-btn" class="toggle-btn active">JML TO DIP</button>
+                                <button id="jml-target-harp-btn" class="toggle-btn">JML TO HARP</button>
+                            </div>
                             <div class="dashboard-grid">
-                                <div class="dashboard-item span-2">
+                                <div class="dashboard-item span-2" style="display: none;">
                                     <div class="dashboard-label" id="dashboard-jm-target-label">JML to --</div>
                                 </div>
                                 <div class="dashboard-item">
@@ -652,9 +658,9 @@
                                     <option value="HEIDIS">HEIDIS</option>
                                     <option value="ATAK">ATAK</option>
                                     <option value="Windwatch">Windwatch</option>
-                                    <option data-i18n="settings.customized">Customized</option>
-                                    <option data-i18n="settings.surface_data">Surface Data</option>
-                                    <option data-i18n="settings.weather_briefing">Weather Briefing</option>
+                                    <option value="Customized" data-i18n="settings.customized">Customized</option>
+                                    <option value="SurfaceData" data-i18n="settings.surface_data">Surface Data</option>
+                                    <option value="ComprehensiveReport" data-i18n="settings.weather_briefing">Weather Briefing</option>
                                 </select>
                                 <button id="downloadButton" class="btn btn-primary"
                                     data-i18n="settings.generate_table">Generate Table</button>
@@ -818,8 +824,36 @@
                     <div class="accordion-item">
                         <button class="accordion-header" data-i18n="settings.about">About</button>
                         <div class="accordion-content">
+                            <p class="about-version">DZMaster <span id="appVersion"></span></p>
+                            <p class="about-contact"><span data-i18n="settings.contact">Contact</span>: <a href="mailto:info.dzmaster@gmail.com">info.dzmaster@gmail.com</a></p>
                             <a href="https://ko-fi.com/dzmaster" target="_blank" rel="noopener noreferrer"
                                 class="btn btn-kofi"><span class="kofi-icon">☕</span> <span data-i18n="settings.buy_coffee">Buy me a Coffee</span></a>
+
+                            <details class="about-credits">
+                                <summary data-i18n="settings.credits">Credits & Attributions</summary>
+                                <h4 data-i18n="settings.credits_data">Data Providers</h4>
+                                <ul>
+                                    <li><a href="https://open-meteo.com" target="_blank" rel="noopener noreferrer">Open-Meteo</a> — Weather Data</li>
+                                    <li><a href="https://www.rainviewer.com" target="_blank" rel="noopener noreferrer">RainViewer</a> — Weather Radar</li>
+                                    <li><a href="https://www.adsbexchange.com" target="_blank" rel="noopener noreferrer">ADSBexchange</a> — ADS-B Aircraft Data</li>
+                                    <li><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> — Map Data (ODbL)</li>
+                                    <li><a href="https://opentopomap.org" target="_blank" rel="noopener noreferrer">OpenTopoMap</a> — Topographic Maps (CC-BY-SA)</li>
+                                    <li><a href="https://www.esri.com" target="_blank" rel="noopener noreferrer">Esri</a> — Satellite Imagery</li>
+                                    <li><a href="https://www.openflightmaps.org" target="_blank" rel="noopener noreferrer">Open Flightmaps</a> — Aeronautical Charts</li>
+                                    <li><a href="https://www.openseamap.org" target="_blank" rel="noopener noreferrer">OpenSeaMap</a> — Nautical Data</li>
+                                    <li><a href="https://carto.com/attributions" target="_blank" rel="noopener noreferrer">CARTO</a> — Dark Matter Basemap</li>
+                                </ul>
+                                <h4 data-i18n="settings.credits_libs">Libraries</h4>
+                                <ul>
+                                    <li><a href="https://leafletjs.com" target="_blank" rel="noopener noreferrer">Leaflet</a> — Interactive Maps</li>
+                                    <li><a href="https://geoman.io" target="_blank" rel="noopener noreferrer">Leaflet-Geoman</a> — Drawing & Measurement Tools</li>
+                                    <li><a href="https://www.chartjs.org" target="_blank" rel="noopener noreferrer">Chart.js</a> — Charts & Graphs</li>
+                                    <li><a href="https://github.com/AkenoSyuRi/geomag" target="_blank" rel="noopener noreferrer">geomag</a> — Magnetic Declination (WMM)</li>
+                                    <li><a href="https://www.papaparse.com" target="_blank" rel="noopener noreferrer">PapaParse</a> — CSV Parsing</li>
+                                    <li><a href="https://moment.github.io/luxon" target="_blank" rel="noopener noreferrer">Luxon</a> — Date & Time</li>
+                                    <li><a href="https://capacitorjs.com" target="_blank" rel="noopener noreferrer">Capacitor</a> — Mobile App Framework</li>
+                                </ul>
+                            </details>
                         </div>
                     </div>
                 </div>

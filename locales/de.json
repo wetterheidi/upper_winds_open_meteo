@@ -263,7 +263,11 @@
         "true": "True",
         "magnetic": "Magnetisch",
         "about": "Über DZMaster",
-        "buy_coffee": "Kauf mir einen Kaffee"
+        "contact": "Kontakt",
+        "buy_coffee": "Kauf mir einen Kaffee",
+        "credits": "Credits & Lizenzen",
+        "credits_data": "Datenanbieter",
+        "credits_libs": "Bibliotheken"
     },
     "modals": {
         "restricted_feature": "Geschützte Funktion",
@@ -297,6 +301,7 @@
         "historical_data_label": "N/V (Historische Daten)",
         "model_days_limit": "Das gewählte Modell '{model}' bietet nur {days} Tage Vorhersage. Zeige maximal verfügbare Zeit.",
         "api_limit_reached": "API-Limit erreicht. Bitte warte einen Moment und versuche es erneut.",
+        "api_timeout": "Open Meteo antwortet nicht. Bitte später erneut versuchen.",
         "api_http_error": "HTTP Fehler! Status: {status}",
         "hourly_data_missing": "Keine stündlichen Daten in der API-Antwort.",
         "interaction_locked": "Karteninteraktionen sind jetzt gesperrt.",
@@ -375,7 +380,16 @@
         },
         "map_init_failed": "Konnte Karte nicht initialisieren. Verwende Standardposition.",
         "invalid_position": "Ungültige Position ausgewählt. Verwende Standardposition.",
-        "select_position": "Bitte wählen Sie einen Ort auf der Karte aus."
+        "select_position": "Bitte wählen Sie einen Ort auf der Karte aus.",
+        "radar": {
+            "title": "Wetterradar",
+            "toggle": "Radar",
+            "opacity": "Deckkraft",
+            "animate": "Abspielen",
+            "stop": "Stopp",
+            "attribution": "Radardaten von RainViewer",
+            "suppressed": "Radar ausgeblendet (zukünftiger Zeitpunkt gewählt)"
+        }
     },
     "adsb": {
         "tracking_stopped": "ADSB-Tracking gestoppt.",

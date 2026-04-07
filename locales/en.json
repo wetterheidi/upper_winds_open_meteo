@@ -263,7 +263,11 @@
         "true": "True",
         "magnetic": "Magnetic",
         "about": "About",
-        "buy_coffee": "Buy me a Coffee"
+        "contact": "Contact",
+        "buy_coffee": "Buy me a Coffee",
+        "credits": "Credits & Attributions",
+        "credits_data": "Data Providers",
+        "credits_libs": "Libraries"
     },
     "modals": {
         "restricted_feature": "Restricted Feature",
@@ -297,6 +301,7 @@
         "historical_data_label": "N/A (Historical Data)",
         "model_days_limit": "The selected model '{model}' only provides a {days}-day forecast. Displaying maximum available time.",
         "api_limit_reached": "API limit reached. Please wait a moment and try again.",
+        "api_timeout": "Open Meteo is not responding. Please try again later.",
         "api_http_error": "HTTP error! Status: {status}",
         "hourly_data_missing": "No hourly data in API response.",
         "interaction_locked": "Map interactions are now locked.",
@@ -375,7 +380,16 @@
         },
         "map_init_failed": "Failed to initialize map. Using default position.",
         "invalid_position": "Invalid position selected. Using default position.",
-        "select_position": "Please select a position on the map first."
+        "select_position": "Please select a position on the map first.",
+        "radar": {
+            "title": "Weather Radar",
+            "toggle": "Radar",
+            "opacity": "Opacity",
+            "animate": "Play",
+            "stop": "Stop",
+            "attribution": "Radar data by RainViewer",
+            "suppressed": "Radar hidden (future time selected)"
+        }
     },
     "adsb": {
         "tracking_stopped": "ADSB tracking stopped.",
