@@ -81,12 +81,17 @@ export async function fetchEnsembleWeatherData() {
             endDateStr = now.plus({ days: 7 }).toFormat('yyyy-MM-dd');
         }
         const url = `${baseUrl}?latitude=${lat}&longitude=${lon}&hourly=${hourlyVariablesString}&models=${modelString}&start_date=${startDateStr}&end_date=${endDateStr}`;
-        const response = await fetch(url);
+        const response = await fetch(url, { signal: AbortSignal.timeout(30000) });
         if (!response.ok) {
             if (response.status === 429) {
                 throw new Error(I18n.t('ensemble.error_api_limit'));
             }
-            throw new Error(I18n.t('ensemble.error_api_failed', { status: response.status }));
+            let errorDetail = '';
+            try {
+                const errData = await response.json();
+                if (errData.reason) errorDetail = `: ${errData.reason}`;
+            } catch {}
+            throw new Error(I18n.t('ensemble.error_api_failed', { status: response.status }) + errorDetail);
         }
         const apiResponseData = await response.json();
         AppState.ensembleModelsData = {}; // Initialisieren
@@ -115,7 +120,11 @@ export async function fetchEnsembleWeatherData() {
         return true; // Erfolg signalisieren
     } catch (error) {
         console.error("Failed to fetch ensemble weather data:", error);
-        Utils.handleError(I18n.t('messages.ensemble_fetch_error_details', { error: error.message }));
+        if (error.name === 'TimeoutError' || error.name === 'AbortError') {
+            Utils.handleError(I18n.t('messages.api_timeout'));
+        } else {
+            Utils.handleError(I18n.t('messages.ensemble_fetch_error_details', { error: error.message }));
+        }
         return false;
     } finally {
         if (loadingElement) loadingElement.style.display = 'none';

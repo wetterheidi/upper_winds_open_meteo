@@ -301,6 +301,7 @@
         "historical_data_label": "N/A (Historical Data)",
         "model_days_limit": "The selected model '{model}' only provides a {days}-day forecast. Displaying maximum available time.",
         "api_limit_reached": "API limit reached. Please wait a moment and try again.",
+        "api_timeout": "Open Meteo is not responding. Please try again later.",
         "api_http_error": "HTTP error! Status: {status}",
         "hourly_data_missing": "No hourly data in API response.",
         "interaction_locked": "Map interactions are now locked.",

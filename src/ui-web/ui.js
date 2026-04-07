@@ -320,9 +320,10 @@ function showSnackbar(message, type = 'default') {
         clearTimeout(window.snackbarTimeout);
     }
 
+    const duration = type === 'error' ? 6000 : 3000;
     window.snackbarTimeout = setTimeout(() => {
         snackbar.className = snackbar.className.replace('show', '');
-    }, 3000);
+    }, duration);
 }
 
 /** Zeigt eine Erfolgsmeldung an. */

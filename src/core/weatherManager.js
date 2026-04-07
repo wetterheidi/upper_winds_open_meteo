@@ -414,13 +414,17 @@ async function fetchWeather(lat, lon, currentTime = null) {
 
         const hourlyParams = "surface_pressure,temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,visibility,weather_code,cloud_cover_low,cloud_cover_mid,cloud_cover_high,temperature_1000hPa,relative_humidity_1000hPa,wind_speed_1000hPa,wind_direction_1000hPa,geopotential_height_1000hPa,cloud_cover_1000hPa,temperature_950hPa,relative_humidity_950hPa,wind_speed_950hPa,wind_direction_950hPa,geopotential_height_950hPa,cloud_cover_950hPa,temperature_925hPa,relative_humidity_925hPa,wind_speed_925hPa,wind_direction_925hPa,geopotential_height_925hPa,cloud_cover_925hPa,temperature_900hPa,relative_humidity_900hPa,wind_speed_900hPa,wind_direction_900hPa,geopotential_height_900hPa,cloud_cover_900hPa,temperature_850hPa,relative_humidity_850hPa,wind_speed_850hPa,wind_direction_850hPa,geopotential_height_850hPa,cloud_cover_850hPa,temperature_800hPa,relative_humidity_800hPa,wind_speed_800hPa,wind_direction_800hPa,geopotential_height_800hPa,cloud_cover_800hPa,temperature_700hPa,relative_humidity_700hPa,wind_speed_700hPa,wind_direction_700hPa,geopotential_height_700hPa,cloud_cover_700hPa,temperature_600hPa,relative_humidity_600hPa,wind_speed_600hPa,wind_direction_600hPa,geopotential_height_600hPa,cloud_cover_600hPa,temperature_500hPa,relative_humidity_500hPa,wind_speed_500hPa,wind_direction_500hPa,geopotential_height_500hPa,cloud_cover_500hPa,temperature_400hPa,relative_humidity_400hPa,wind_speed_400hPa,wind_direction_400hPa,geopotential_height_400hPa,cloud_cover_400hPa,temperature_300hPa,relative_humidity_300hPa,wind_speed_300hPa,wind_direction_300hPa,geopotential_height_300hPa,cloud_cover_300hPa,temperature_250hPa,relative_humidity_250hPa,wind_speed_250hPa,wind_direction_250hPa,geopotential_height_250hPa,cloud_cover_250hPa,temperature_200hPa,relative_humidity_200hPa,wind_speed_200hPa,wind_direction_200hPa,geopotential_height_200hPa,cloud_cover_200hPa";
         const url = `${baseUrl}?latitude=${lat}&longitude=${lon}&hourly=${hourlyParams}&models=${selectedModelValue}&start_date=${startDateStr}&end_date=${endDateStr}`;
-        const response = await fetch(url);
+        const response = await fetch(url, { signal: AbortSignal.timeout(30000) });
         if (!response.ok) {
-            // NEU: Spezifische Fehlermeldung für Rate-Limiting mit I18n
             if (response.status === 429) {
                 throw new Error(I18n.t('messages.api_limit_reached'));
             }
-            throw new Error(I18n.t('messages.api_http_error', { status: response.status }));
+            let errorDetail = '';
+            try {
+                const errData = await response.json();
+                if (errData.reason) errorDetail = `: ${errData.reason}`;
+            } catch {}
+            throw new Error(I18n.t('messages.api_http_error', { status: response.status }) + errorDetail);
         }
         const data = await response.json();
         if (!data.hourly || !data.hourly.time || !data.hourly.time.length) throw new Error(I18n.t('messages.hourly_data_missing'));
@@ -428,11 +432,13 @@ async function fetchWeather(lat, lon, currentTime = null) {
 
     } catch (error) {
         console.error("[fetchWeather] Error:", error);
-        // NEU: I18n Error wrapper
-        // Wir nehmen an, dass 'error.message' hier bereits übersetzt ist (durch die 'throw new Error(I18n.t...)' oben)
-        // Falls der Fehler von woanders kommt (z.B. Netzwerkabbruch ohne Response), ist er englisch. 
-        // Man könnte hier differenzieren, aber für den Moment zeigen wir den Fehler an.
-        Utils.handleError(`${I18n.t('messages.weather_fetch_error')} (${error.message})`); 
+        let userMessage;
+        if (error.name === 'TimeoutError' || error.name === 'AbortError') {
+            userMessage = I18n.t('messages.api_timeout');
+        } else {
+            userMessage = `${I18n.t('messages.weather_fetch_error')} (${error.message})`;
+        }
+        Utils.handleError(userMessage);
         return null;
     } finally {
         // Sende ein Event, damit die UI den Lade-Spinner ausblenden kann
