@@ -11,6 +11,7 @@ import { Settings } from './settings.js';
 import { WEATHER_MODELS, API_URLS, STANDARD_PRESSURE_LEVELS, THUNDERSTORM_CODES } from './constants.js';
 import { DateTime } from 'luxon';
 import { I18n } from './i18n.js'; // <--- NEU: Importiert
+import { SOUNDING_MODEL_ID, checkSoundingAvailability, fetchSoundingData } from './soundingManager.js';
 
 // ===================================================================
 // 1. Öffentliche Hauptfunktionen (API des Moduls)
@@ -28,7 +29,7 @@ export function analyzeCloudLayers(weatherData) {
     }
 
     const thresholds = [];
-    const pressureLevels = [1000, 950, 925, 900, 850, 800, 700, 600, 500, 400, 300, 250, 200];
+    const pressureLevels = AppState.customPressureLevels || STANDARD_PRESSURE_LEVELS;
 
     for (let i = 0; i < weatherData.time.length; i++) {
         const groundTemp = weatherData.temperature_2m[i];
@@ -81,8 +82,16 @@ export function analyzeCloudLayers(weatherData) {
 export async function fetchWeatherForLocation(lat, lng, currentTime = null) {
     console.log('[weatherManager] Starting full weather fetch for location:', { lat, lng });
 
-    // 1. Prüfen, welche Modelle verfügbar sind
-    const availableModels = await checkAvailableModels(lat, lng);
+    // 1. Prüfen, welche Modelle verfügbar sind (Open-Meteo + Progtemp parallel)
+    const [availableModels, soundingAvailable] = await Promise.all([
+        checkAvailableModels(lat, lng),
+        checkSoundingAvailability(lat, lng)
+    ]);
+
+    // Progtemp-Option am Ende der Liste eintragen, wenn ein Standort im 20-km-Umkreis liegt
+    if (soundingAvailable) {
+        availableModels.push(SOUNDING_MODEL_ID);
+    }
 
     // 2. Ein Event auslösen, damit die UI sich aktualisieren kann
     document.dispatchEvent(new CustomEvent('models:available', {
@@ -92,6 +101,53 @@ export async function fetchWeatherForLocation(lat, lng, currentTime = null) {
     // 3. Die eigentlichen Wetterdaten für das aktuell ausgewählte Modell abrufen
     const weatherData = await fetchWeather(lat, lng, currentTime);
     return weatherData;
+}
+
+/**
+ * Ermittelt den Slider-Index für den aktuellen UTC-Zeitpunkt in den geladenen Wetterdaten.
+ * Funktioniert korrekt für beliebige Startzeiten (00Z Open-Meteo, 06Z/12Z/... Progtemp).
+ * @param {object} weatherData - Das aktuelle weatherData-Objekt mit einem 'time'-Array.
+ * @returns {number} Der Index des nächstgelegenen vergangenen oder gleichen Zeitschritts,
+ *                   oder der letzte verfügbare Index falls alle Zeiten in der Vergangenheit liegen.
+ */
+/**
+ * Sucht den Index in weatherData.time, der einem gegebenen ISO-Zeitstempel am nächsten liegt.
+ * Normiert beide Strings auf "YYYY-MM-DDTHH" für modell-unabhängigen Vergleich.
+ * @param {object} weatherData
+ * @param {string} isoTime - ISO-Zeitstempel (mit oder ohne Z-Suffix)
+ * @returns {number}
+ */
+export function findTimeIndex(weatherData, isoTime) {
+    if (!weatherData?.time?.length || !isoTime) return 0;
+    const targetPrefix = isoTime.substring(0, 13); // "YYYY-MM-DDTHH"
+    let bestIndex = 0;
+    let bestDiff = Infinity;
+    for (let i = 0; i < weatherData.time.length; i++) {
+        const diff = Math.abs(weatherData.time[i].substring(0, 13).localeCompare(targetPrefix));
+        if (diff < bestDiff) { bestDiff = diff; bestIndex = i; }
+        // Exakter Treffer
+        if (weatherData.time[i].substring(0, 13) === targetPrefix) return i;
+    }
+    return bestIndex;
+}
+
+export function findCurrentTimeIndex(weatherData) {
+    if (!weatherData?.time?.length) return 0;
+    // UTC-Stunde als String "YYYY-MM-DDTHH" aufbauen — kein Date-Parsing nötig.
+    // Funktioniert für Open-Meteo ("2026-04-08T12:00", kein Z) und Sounding ("2026-04-08T12:00Z")
+    // gleichermaßen, da ISO-Timestamps lexikografisch sortierbar sind.
+    const now = new Date();
+    const nowPrefix =
+        now.getUTCFullYear() + '-' +
+        String(now.getUTCMonth() + 1).padStart(2, '0') + '-' +
+        String(now.getUTCDate()).padStart(2, '0') + 'T' +
+        String(now.getUTCHours()).padStart(2, '0');
+    let bestIndex = 0;
+    for (let i = 0; i < weatherData.time.length; i++) {
+        if (weatherData.time[i].substring(0, 13) <= nowPrefix) bestIndex = i;
+        else break;
+    }
+    return bestIndex;
 }
 
 /**
@@ -110,7 +166,7 @@ export function interpolateWeatherData(weatherData, sliderIndex, interpStep, bas
 
     const currentThresholds = AppState.cloudThresholds[sliderIndex];
     if (!currentThresholds) {
-        console.warn('No pre-analyzed cloud thresholds for this index. Performing on-the-fly analysis.');
+        console.warn(`[DIAG2] No cloudThresholds at index ${sliderIndex}, total=${AppState.cloudThresholds.length}, weatherData.time.length=${weatherData.time.length}, time=${weatherData.time[sliderIndex]}`);
         AppState.cloudThresholds = analyzeCloudLayers(weatherData);
         if (!AppState.cloudThresholds[sliderIndex]) {
             console.error('Cloud threshold analysis failed. Cannot interpolate weather data.');
@@ -118,10 +174,10 @@ export function interpolateWeatherData(weatherData, sliderIndex, interpStep, bas
         }
     }
 
-    const allPressureLevels = STANDARD_PRESSURE_LEVELS;
+    const allPressureLevels = AppState.customPressureLevels || STANDARD_PRESSURE_LEVELS;
 
     // Filtere Drucklevel nur, wenn ALLE benötigten Daten für diesen Level vorhanden sind.
-    const validPressureLevels = allPressureLevels.filter(hPa => {
+    let validPressureLevels = allPressureLevels.filter(hPa => {
         const height = weatherData[`geopotential_height_${hPa}hPa`]?.[sliderIndex];
         // temp und rh werden für die Validierung nicht mehr benötigt
         const speed = weatherData[`wind_speed_${hPa}hPa`]?.[sliderIndex];
@@ -130,6 +186,18 @@ export function interpolateWeatherData(weatherData, sliderIndex, interpStep, bas
         // Es werden nur noch die für die Sprungberechnung kritischen Werte geprüft.
         return [height, speed, dir].every(val => val != null);
     });
+
+    // DIAGNOSE: Zeige für Sounding-Daten bei < 2 valid levels was fehlt
+    if (validPressureLevels.length < 2 && AppState.customPressureLevels) {
+        const sample = allPressureLevels.slice(0, 5);
+        console.error(`[interpolate] DIAG sliderIndex=${sliderIndex} validLevels=${validPressureLevels.length}/${allPressureLevels.length} baseHeight=${baseHeight} time=${weatherData.time[sliderIndex]}`);
+        sample.forEach(hPa => {
+            const h = weatherData[`geopotential_height_${hPa}hPa`]?.[sliderIndex];
+            const s = weatherData[`wind_speed_${hPa}hPa`]?.[sliderIndex];
+            const d = weatherData[`wind_direction_${hPa}hPa`]?.[sliderIndex];
+            console.error(`  key${hPa}: height=${h} speed=${s} dir=${d}`);
+        });
+    }
 
     const ccPressureLevels = allPressureLevels.filter(hPa => {
         const height = weatherData[`geopotential_height_${hPa}hPa`]?.[sliderIndex];
@@ -153,6 +221,23 @@ export function interpolateWeatherData(weatherData, sliderIndex, interpStep, bas
     let spdData = validPressureLevels.map(hPa => weatherData[`wind_speed_${hPa}hPa`][sliderIndex]);
     let dirData = validPressureLevels.map(hPa => weatherData[`wind_direction_${hPa}hPa`][sliderIndex]);
 
+    // Deduplizierung: Einträge entfernen, wo die Höhe nicht streng monoton steigt.
+    // Ursache: _closestLevel() kann für zwei Referenz-Druckniveaus dasselbe Sounding-Level
+    // zurückgeben → identische geopotential_height → Division durch 0 in linearInterpolate.
+    {
+        const toKeep = heightData.map((h, i) => i === 0 || h > heightData[i - 1]);
+        if (toKeep.includes(false)) {
+            const filt = (arr) => arr.filter((_, i) => toKeep[i]);
+            heightData        = filt(heightData);
+            validPressureLevels = filt(validPressureLevels);
+            tempData          = filt(tempData);
+            rhData            = filt(rhData);
+            ccData            = filt(ccData);
+            spdData           = filt(spdData);
+            dirData           = filt(dirData);
+        }
+    }
+
     // Füge Bodendaten hinzu, um die Interpolation nach unten hin zu verbessern
     const surfacePressure = weatherData.surface_pressure[sliderIndex];
     if (surfacePressure === null || surfacePressure === undefined) {
@@ -162,6 +247,7 @@ export function interpolateWeatherData(weatherData, sliderIndex, interpStep, bas
 
     let uComponents = spdData.map((spd, i) => -spd * Math.sin(dirData[i] * Math.PI / 180));
     let vComponents = spdData.map((spd, i) => -spd * Math.cos(dirData[i] * Math.PI / 180));
+
     const lowestPressureLevel = Math.max(...validPressureLevels);
     const hLowest = weatherData[`geopotential_height_${lowestPressureLevel}hPa`][sliderIndex];
     if (surfacePressure > lowestPressureLevel && Number.isFinite(hLowest)) {
@@ -214,7 +300,7 @@ export function interpolateWeatherData(weatherData, sliderIndex, interpStep, bas
     const maxHeightASL = heightData[minPressureIndex];
     const maxHeightAGL = maxHeightASL - baseHeight;
     if (maxHeightAGL <= 0 || isNaN(maxHeightAGL)) {
-        console.warn('Invalid max height at lowest pressure level:', { maxHeightASL, baseHeight, minPressure: validPressureLevels[minPressureIndex] });
+        console.warn(`[DIAG3] Invalid maxHeight at sliderIndex=${sliderIndex} time=${weatherData.time[sliderIndex]}: maxHeightASL=${maxHeightASL} baseHeight=${baseHeight} minPressure=${validPressureLevels[minPressureIndex]} validLevels=${validPressureLevels.length} heightData[0]=${heightData[0]} heightData.last=${heightData[heightData.length-1]}`);
         return [];
     }
 
@@ -316,7 +402,6 @@ export function interpolateWeatherData(weatherData, sliderIndex, interpStep, bas
         interpolatedData.push(dataPoint);
     });
 
-    console.log(`[DEBUG] interpolateWeatherData finished. baseHeight: ${baseHeight}, Returning ${interpolatedData.length} data points. First point:`, interpolatedData[0]);
     return interpolatedData;
 }
 
@@ -341,11 +426,19 @@ async function fetchWeather(lat, lon, currentTime = null) {
 
     try {
         const selectedModelValue = document.getElementById('modelSelect')?.value || Settings.defaultSettings.model;
-        
+
         if (!selectedModelValue) {
             // NEU: I18n Error
             throw new Error(I18n.t('messages.no_model_selected'));
         }
+
+        // Progtemp-Modell abfangen: Sounding-Daten statt Open-Meteo laden
+        if (selectedModelValue === SOUNDING_MODEL_ID) {
+            return await fetchSoundingData(lat, lon, currentTime);
+        }
+
+        // Bei regulären Modellen sicherstellen, dass keine Progtemp-Level aktiv sind
+        AppState.customPressureLevels = null;
 
         const modelMap = WEATHER_MODELS.API_MAP;
         const modelApiIdentifierForMeta = modelMap[selectedModelValue] || selectedModelValue;

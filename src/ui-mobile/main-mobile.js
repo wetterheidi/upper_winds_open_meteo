@@ -203,12 +203,12 @@ function initializeUIElements() {
         favInput.placeholder = I18n.t('modals.favorite_name');
     }
 
-    // Explizit den Slider auf die aktuelle Stunde setzen
+    // Explizit den Slider auf den aktuellen Zeitpunkt setzen (anhand weatherData.time)
     const slider = document.getElementById('timeSlider');
-    if (slider) {
-        const currentUtcHour = new Date().getUTCHours();
-        slider.value = currentUtcHour;
-        console.log(`[App] Initialized timeSlider to current UTC hour: ${currentUtcHour}`);
+    if (slider && AppState.weatherData) {
+        const currentIndex = weatherManager.findCurrentTimeIndex(AppState.weatherData);
+        slider.value = currentIndex;
+        console.log(`[App] Initialized timeSlider to current time index: ${currentIndex}`);
     }
 
     updateUIState();
@@ -571,14 +571,13 @@ export async function updateToCurrentHour() {
         return;
     }
 
-    const now = new Date();
-    const currentHour = now.getUTCHours();
-    slider.value = currentHour;
-    console.log(`Set slider to current hour: ${currentHour}`);
-
     try {
         await weatherManager.fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, null, false);
         console.log('Weather data fetched for current hour');
+
+        const currentHour = weatherManager.findCurrentTimeIndex(AppState.weatherData);
+        slider.value = currentHour;
+        console.log(`Set slider to current time index: ${currentHour}`);
 
         await displayManager.updateWeatherDisplay(currentHour, 'weather-table-container', 'selectedTime');
         if (AppState.lastAltitude !== 'N/A') {
@@ -1070,9 +1069,13 @@ export function resetJumpRunDirection(triggerUpdate = true) {
  * @param {object} newWeatherData - Das neu von der API abgerufene Wetterdatenobjekt.
  * @param {number|null} [preservedIndex=null] - Der Index des Sliders, der beibehalten werden soll.
  */
-export async function updateUIWithNewWeatherData(newWeatherData, preservedIndex = null) {
+export async function updateUIWithNewWeatherData(newWeatherData, preservedTime = null) {
     AppState.weatherData = newWeatherData;
     AppState.cloudThresholds = weatherManager.analyzeCloudLayers(newWeatherData);
+
+    const preservedIndex = preservedTime
+        ? weatherManager.findTimeIndex(newWeatherData, preservedTime)
+        : null;
 
     const slider = document.getElementById('timeSlider');
 
@@ -1112,15 +1115,9 @@ export async function updateUIWithNewWeatherData(newWeatherData, preservedIndex 
         currentIndex = preservedIndex; // Den beizubehaltenden Index verwenden
         console.log(`Slider restored to preserved index: ${currentIndex}`);
     } else {
-        const currentUtcHour = new Date().getUTCHours();
-        if (currentUtcHour <= maxSliderIndex) {
-            slider.value = currentUtcHour;
-            currentIndex = currentUtcHour; // Aktuelle Stunde verwenden
-        } else {
-            slider.value = maxSliderIndex;
-            currentIndex = maxSliderIndex; // Maximalen Index verwenden
-        }
-        console.log(`Slider set to default (current hour or max): ${currentIndex}`);
+        currentIndex = Math.min(weatherManager.findCurrentTimeIndex(newWeatherData), maxSliderIndex);
+        slider.value = currentIndex;
+        console.log(`Slider set to current time index: ${currentIndex}`);
     }
 
     const { highWinds, highGusts, thunderstorms, cloudAlerts } = weatherManager.checkWeatherAlerts(newWeatherData);
@@ -2088,7 +2085,7 @@ function setupAppEventListeners() {
 
             const newWeatherData = await weatherManager.fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, currentTime);
             if (newWeatherData) {
-                await updateUIWithNewWeatherData(newWeatherData, timeIndexToPreserve);
+                await updateUIWithNewWeatherData(newWeatherData, currentTime);
             }
         } else {
             Utils.handleError(I18n.t('map.select_position'));
@@ -2342,7 +2339,7 @@ function setupAppEventListeners() {
 
                 const newWeatherData = await weatherManager.fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, currentTime);
                 if (newWeatherData) {
-                    await updateUIWithNewWeatherData(newWeatherData, timeIndexToPreserve);
+                    await updateUIWithNewWeatherData(newWeatherData, currentTime);
                 }
             }
         }
@@ -2768,12 +2765,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     // === ENDE: Code für GPX-Öffnen ===
 
-    // Explizit den Slider auf die aktuelle Stunde setzen
+    // Explizit den Slider auf den aktuellen Zeitpunkt setzen (anhand weatherData.time)
     const slider = document.getElementById('timeSlider');
-    if (slider) {
-        const currentUtcHour = new Date().getUTCHours();
-        slider.value = currentUtcHour;
-        console.log(`[App] Initialized timeSlider to current UTC hour: ${currentUtcHour}`);
+    if (slider && AppState.weatherData) {
+        const currentIndex = weatherManager.findCurrentTimeIndex(AppState.weatherData);
+        slider.value = currentIndex;
+        console.log(`[App] Initialized timeSlider to current time index: ${currentIndex}`);
     }
 
     // KORREKTUR: Der Event-Listener wird hier registriert, BEVOR das Event ausgelöst wird.
@@ -2813,7 +2810,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             if (newWeatherData) {
                 console.log('[App] Weather data loaded successfully:', newWeatherData);
-                await updateUIWithNewWeatherData(newWeatherData, isInitialLoad ? null : getSliderValue());
+                await updateUIWithNewWeatherData(newWeatherData, isInitialLoad ? null : currentTimeToPreserve);
             } else {
                 AppState.weatherData = null;
                 Utils.handleError(I18n.t('weather.weather_fetch_failed'));

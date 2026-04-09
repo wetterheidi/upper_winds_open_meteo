@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(xargs ls:*)"
+      "Bash(xargs ls:*)",
+      "Bash(grep -E \"\\\\.js$|\\\\.html$|\\\\.ts$|index\")"
     ]
   }
 }

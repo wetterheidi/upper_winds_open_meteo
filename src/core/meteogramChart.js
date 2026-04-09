@@ -133,7 +133,7 @@ export async function generateMeteogram(sliderIndex) {
             windBarbAltitudes.forEach(alt => {
                 const altM = heightUnit === 'ft' ? Utils.convertFeetToMeters(alt) : alt;
                 const closest = interpolated.reduce((prev, curr) => Math.abs(curr.height - (baseHeight + altM)) < Math.abs(prev.height - (baseHeight + altM)) ? curr : prev);
-                if (closest) {
+                if (closest && Number.isFinite(closest.spd)) {
                     windBarbDataPoints.push({ x: currentLabel, y: alt, speedKt: parseFloat(Utils.convertWind(closest.spd, 'kt', 'km/h').toFixed(1)), direction: Math.round(closest.dir) });
                 }
             });

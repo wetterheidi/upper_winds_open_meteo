@@ -123,7 +123,9 @@ export function updateModelSelectUI(availableModels) {
     availableModels.forEach(model => {
         const option = document.createElement('option');
         option.value = model;
-        option.textContent = model.replace(/_/g, ' ').toUpperCase();
+        option.textContent = model === 'dwd_icon_d2_sounding'
+            ? '★ ICON-D2 Progtemp (DWD)'
+            : model.replace(/_/g, ' ').toUpperCase();
         modelSelect.appendChild(option);
     });
     if (availableModels.includes(Settings.state.userSettings.model)) {

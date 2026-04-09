@@ -39,6 +39,7 @@ export const AppState = {
     weatherData: null,              // @type {object|null} - Das 'hourly' Objekt aus der Open-Meteo API-Antwort.
     cloudThresholds: [],            // @type {object[]} - NEU: Speichert die berechneten RH-Schwellenwerte für jede Stunde.
     lastModelRun: null,             // @type {string|null} - Zeitstempel des letzten Wettermodell-Laufs.
+    customPressureLevels: null,     // @type {number[]|null} - Überschreibt STANDARD_PRESSURE_LEVELS wenn Progtemp-Daten geladen sind.
     landingWindDir: null,           // @type {number|null} - Windrichtung in 10m Höhe für das Landemuster.
     autoupdateInterval: null,       // @type {number|null} - Die ID des Intervall-Timers für das Auto-Update.
 
