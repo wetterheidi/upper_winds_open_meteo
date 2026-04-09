@@ -15,6 +15,9 @@ import { I18n } from './i18n.js'; // Import ergänzt
 let meteogramUpperInstance = null; // Instanz für Höhenwetter
 let meteogramSurfaceInstance = null; // Instanz für Bodenwetter
 
+// Cache für Zeitzonen-Abfragen (Key: "lat,lng")
+const _timezoneCache = new Map();
+
 // Hilfsfunktion: Gibt die passende Farbe für den Bedeckungsgrad zurück
 function getCloudColor(cloudCoverPercent, style) {
     if (cloudCoverPercent <= 5) return style.getPropertyValue('--cc-clear').trim();
@@ -75,21 +78,54 @@ export async function generateMeteogram(sliderIndex) {
     // Timezone & Filtering
     let locationTimezone = 'utc';
     if (timeZone.toLowerCase() === 'loc' && AppState.lastLat != null) {
-        const locData = await Utils.getLocationData(AppState.lastLat, AppState.lastLng);
-        locationTimezone = locData.timezone || 'utc';
+        const cacheKey = `${AppState.lastLat},${AppState.lastLng}`;
+        if (_timezoneCache.has(cacheKey)) {
+            locationTimezone = _timezoneCache.get(cacheKey);
+        } else {
+            const locData = await Utils.getLocationData(AppState.lastLat, AppState.lastLng);
+            locationTimezone = locData.timezone || 'utc';
+            _timezoneCache.set(cacheKey, locationTimezone);
+        }
     }
 
     const sliderTime = DateTime.fromISO(weatherData.time[sliderIndex], { zone: 'utc' }).setZone(locationTimezone);
-    const targetDate = sliderTime.startOf('day');
-    const displayDateStr = targetDate.toFormat('MMM dd');
+
+    // Clamped Sliding Window: immer 24h, an Datengrenzen eingefroren
+    const dataStart = DateTime.fromISO(weatherData.time[0], { zone: 'utc' }).setZone(locationTimezone);
+    const dataEnd = DateTime.fromISO(weatherData.time[weatherData.time.length - 1], { zone: 'utc' }).setZone(locationTimezone);
+    let windowEnd = sliderTime.plus({ hours: 24 });
+    if (windowEnd > dataEnd) windowEnd = dataEnd;
+    let windowStart = windowEnd.minus({ hours: 24 });
+    if (windowStart < dataStart) windowStart = dataStart;
+
+    const isLocalTime = timeZone.toLowerCase() === 'loc';
+    const labelFmt = isLocalTime ? 'HH' : "HH'Z'";
+    const boundaryFmt = isLocalTime ? 'MMM dd HH:mm' : "MMM dd HH'Z'";
+    const displayDateStr = windowStart.hasSame(windowEnd, 'day')
+        ? windowStart.toFormat('MMM dd')
+        : `${windowStart.toFormat(boundaryFmt)} – ${windowEnd.toFormat(boundaryFmt)}`;
 
     const timeIndicesForDay = [];
     const timeLabels = [];
+    let sliderLabelIndex = -1;
+    let minSliderDiff = Infinity;
+    const midnightMarkers = []; // { labelIndex, dateStr } für jeden Tageswechsel im Fenster
+    let prevDay = null;
     for (let i = 0; i < weatherData.time.length; i++) {
         const dt = DateTime.fromISO(weatherData.time[i], { zone: 'utc' }).setZone(locationTimezone);
-        if (dt.hasSame(targetDate, 'day')) {
+        if (dt >= windowStart && dt < windowEnd) {  // exklusives Ende → kein doppelter Stunden-Label
             timeIndicesForDay.push(i);
-            timeLabels.push(dt.toFormat(timeZone.toLowerCase() === 'loc' ? 'HH' : 'HH\'Z\''));
+            const label = dt.toFormat(labelFmt);
+            timeLabels.push(label);
+            // Nächstgelegenen Datenpunkt zum Slider-Zeitpunkt finden (robust auch an Fenstergrenzen)
+            const diff = Math.abs(dt.valueOf() - sliderTime.valueOf());
+            if (diff < minSliderDiff) { minSliderDiff = diff; sliderLabelIndex = timeLabels.length - 1; }
+            // Tageswechsel erkennen (außer beim allerersten Datenpunkt im Fenster)
+            const currentDay = dt.startOf('day').valueOf();
+            if (prevDay !== null && currentDay !== prevDay) {
+                midnightMarkers.push({ labelIndex: timeLabels.length - 1, dateStr: dt.toFormat('MMM dd') });
+            }
+            prevDay = currentDay;
         }
     }
 
@@ -150,6 +186,50 @@ export async function generateMeteogram(sliderIndex) {
     upperTitleElement.textContent = `${I18n.t('weather.charts.upper_air')} - ${displayDateStr}`;
     surfaceTitleElement.textContent = `${I18n.t('weather.charts.surface')} - ${displayDateStr}`;
 
+    // Plugin: Slider-Linie + Tageswechsel-Markierung
+    const verticalLinePlugin = {
+        id: 'verticalLine',
+        afterDraw(chart) {
+            const xScale = chart.scales.x;
+            if (!xScale) return;
+            const { ctx, chartArea } = chart;
+
+            // Tageswechsel-Linien
+            const dayLineColor = style.getPropertyValue('--text-secondary').trim() || 'rgba(150,150,150,0.6)';
+            for (const marker of midnightMarkers) {
+                const x = xScale.getPixelForValue(timeLabels[marker.labelIndex]);
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(x, chartArea.top);
+                ctx.lineTo(x, chartArea.bottom);
+                ctx.lineWidth = 1;
+                ctx.strokeStyle = dayLineColor;
+                ctx.setLineDash([]);
+                ctx.stroke();
+                // Datums-Label
+                ctx.font = `10px sans-serif`;
+                ctx.fillStyle = dayLineColor;
+                ctx.textAlign = 'left';
+                ctx.fillText(marker.dateStr, x + 3, chartArea.top + 10);
+                ctx.restore();
+            }
+
+            // Slider-Linie
+            if (sliderLabelIndex >= 0) {
+                const x = xScale.getPixelForValue(timeLabels[sliderLabelIndex]);
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(x, chartArea.top);
+                ctx.lineTo(x, chartArea.bottom);
+                ctx.lineWidth = 1.5;
+                ctx.strokeStyle = style.getPropertyValue('--color-warning').trim() || 'rgba(255,200,0,0.9)';
+                ctx.setLineDash([5, 3]);
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+    };
+
     const barbImages = await Promise.all(windBarbDataPoints.map(p => new Promise(res => {
         const img = new Image(40, 40);
         img.src = `data:image/svg+xml;base64,${btoa(Utils.generateWindBarb(p.direction, p.speedKt, null, barbColor))}`;
@@ -163,6 +243,7 @@ export async function generateMeteogram(sliderIndex) {
     // --- Upper Chart ---
     meteogramUpperInstance = new Chart(upperCtx, {
         type: 'bar', // Basis-Typ bleibt Bar für die Wolken
+        plugins: [verticalLinePlugin],
         data: {
             labels: timeLabels,
             datasets: [
@@ -250,6 +331,7 @@ export async function generateMeteogram(sliderIndex) {
     // --- Surface Chart ---
     meteogramSurfaceInstance = new Chart(surfaceCtx, {
         type: 'line',
+        plugins: [verticalLinePlugin],
         data: {
             labels: timeLabels,
             datasets: [
@@ -262,8 +344,12 @@ export async function generateMeteogram(sliderIndex) {
         options: {
             responsive: true, maintainAspectRatio: false,
             scales: {
-                yTempSurface: { position: 'right', title: { display: true, text: I18n.t('weather.temp'), color: textColor } },
-                yWindSurface: { position: 'left', title: { display: true, text: I18n.t('weather.wind_speed'), color: textColor }, min: 0 }
+                x: {
+                    grid: { color: gridColor },
+                    ticks: { color: textColor }
+                },
+                yTempSurface: { position: 'right', title: { display: true, text: I18n.t('weather.temp'), color: textColor }, ticks: { color: textColor }, grid: { color: gridColor } },
+                yWindSurface: { position: 'left', title: { display: true, text: I18n.t('weather.wind_speed'), color: textColor }, ticks: { color: textColor }, grid: { color: gridColor }, min: 0 }
             }
         }
     });
