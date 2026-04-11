@@ -2,6 +2,8 @@
 "use strict";
 
 import { AppState } from './state.js';
+import { I18n } from './i18n.js';
+import { Utils } from './utils.js';
 
 const RAINVIEWER_API = 'https://api.rainviewer.com/public/weather-maps.json';
 const RAINVIEWER_TILE_HOST = 'https://tilecache.rainviewer.com';
@@ -24,8 +26,16 @@ let isSuppressed = false;
  * @returns {Promise<{time: number, path: string}[]>}
  */
 async function fetchRadarFrames() {
-    const response = await fetch(RAINVIEWER_API);
-    if (!response.ok) throw new Error(`RainViewer API error: ${response.status}`);
+    const response = await fetch(RAINVIEWER_API, { signal: AbortSignal.timeout(15000) });
+    if (!response.ok) {
+        if (response.status === 429) {
+            throw new Error(I18n.t('radar.error_api_limit'));
+        }
+        if (response.status >= 500) {
+            throw new Error(I18n.t('radar.error_server', { status: response.status }));
+        }
+        throw new Error(I18n.t('radar.error_fetch_failed'));
+    }
     const data = await response.json();
     return data.radar?.past || [];
 }
@@ -69,6 +79,7 @@ async function _loadAndPreloadFrames() {
     radarFrames = await fetchRadarFrames();
     if (!radarFrames.length) {
         console.warn('RainViewer: No radar frames available.');
+        Utils.handleError(I18n.t('radar.error_no_frames'));
         return false;
     }
 
@@ -110,6 +121,11 @@ export async function showRadar() {
         console.log(`RainViewer: ${preloadedLayers.length} frames preloaded, showing latest.`);
     } catch (error) {
         console.error('RainViewer: Failed to load radar data:', error);
+        if (error.name === 'TimeoutError' || error.name === 'AbortError') {
+            Utils.handleError(I18n.t('radar.error_fetch_failed'));
+        } else {
+            Utils.handleError(error.message || I18n.t('radar.error_fetch_failed'));
+        }
     }
 }
 
@@ -264,6 +280,7 @@ function _startAutoRefresh() {
                 _updateTimestampDisplay();
             } catch (e) {
                 console.warn('RainViewer: Auto-refresh failed:', e);
+                Utils.handleError(e.message || I18n.t('radar.error_fetch_failed'));
             }
         }
     }, REFRESH_INTERVAL_MS);

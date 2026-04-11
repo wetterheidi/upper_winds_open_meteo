@@ -2898,6 +2898,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         mapManager.updateFavoriteMarkers(initialFavorites);
     }
 
+    showKofiBannerIfNeeded();
+
     document.addEventListener('cutaway:marker_placed', () => {
         console.log("App: Event 'cutaway:marker_placed' empfangen. Neuberechnung wird ausgelöst.");
         if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
@@ -3013,6 +3015,36 @@ function applySettingToRadio(name, value) {
     const radio = document.querySelector(`input[name="${name}"][value="${value}"]`);
     if (radio) radio.checked = true;
     else console.warn(`Radio ${name} with value ${value} not found`);
+}
+
+// =================================================================
+//  KO-FI SUPPORT BANNER
+// =================================================================
+function showKofiBannerIfNeeded() {
+    const count = parseInt(localStorage.getItem('kofiStartCount') || '0') + 1;
+    localStorage.setItem('kofiStartCount', count.toString());
+
+    // Zeige Banner ab dem 5. Start, dann alle 20 Starts (5, 25, 45, ...)
+    if (count < 5 || (count - 5) % 10 !== 0) return;
+
+    setTimeout(() => {
+        const banner = document.getElementById('kofi-banner');
+        if (!banner) return;
+        banner.style.display = 'flex';
+        I18n.updateDom();
+
+        const hide = () => { banner.style.display = 'none'; };
+        const autoHide = setTimeout(hide, 12000);
+
+        banner.querySelector('.kofi-banner-close').addEventListener('click', () => {
+            clearTimeout(autoHide);
+            hide();
+        }, { once: true });
+        banner.querySelector('.kofi-banner-btn').addEventListener('click', () => {
+            clearTimeout(autoHide);
+            hide();
+        }, { once: true });
+    }, 2500);
 }
 
 window.simulateFreefall = () => document.dispatchEvent(new CustomEvent('sensor:freefall_detected'));

@@ -1917,15 +1917,14 @@ function setupThemeToggle() {
 }
 
 function setupKofiButton() {
-    const kofiLink = document.querySelector('.btn-kofi');
-    if (!kofiLink) return;
-
-    // Remove target="_blank" so the <a> tag triggers a normal navigation.
+    // Remove target="_blank" from all Ko-fi links so Capacitor can intercept them.
     // Capacitor intercepts external URLs automatically:
     // - iOS: WKNavigationDelegate calls UIApplication.shared.open() → Safari
     // - Android: shouldOverrideUrlLoading calls Intent.ACTION_VIEW → System browser
     // This avoids SFSafariViewController which blocks PayPal's popup flow.
-    kofiLink.removeAttribute('target');
+    document.querySelectorAll('.btn-kofi, .kofi-banner-btn').forEach(link => {
+        link.removeAttribute('target');
+    });
 }
 
 // --- Live Tracking & Dashboard ---
