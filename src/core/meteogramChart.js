@@ -18,6 +18,22 @@ let meteogramSurfaceInstance = null; // Instanz für Bodenwetter
 // Cache für Zeitzonen-Abfragen (Key: "lat,lng")
 const _timezoneCache = new Map();
 
+// Hilfsfunktion: Kategorisiert WMO-Wettercodes für Wettermarkierungen
+function getPrecipCategory(code) {
+    // Hazard (rot): Gewitter + alle Vereisung (FZ)
+    if (code === 95 || code === 96 || code === 99) return 'hazard';
+    if (code === 48 || code === 56 || code === 57 || code === 66 || code === 67) return 'hazard';
+    // Nebel (gelb)
+    if (code === 45) return 'fog';
+    // Schauer (konvektiv)
+    if ((code >= 80 && code <= 83) || code === 85 || code === 86) return 'shower';
+    // Regen/Niesel ohne FZ
+    if ((code >= 51 && code <= 55) || (code >= 61 && code <= 65)) return 'rain';
+    // Schnee
+    if (code >= 71 && code <= 77) return 'snow';
+    return null;
+}
+
 // Hilfsfunktion: Gibt die passende Farbe für den Bedeckungsgrad zurück
 function getCloudColor(cloudCoverPercent, style) {
     if (cloudCoverPercent <= 5) return style.getPropertyValue('--cc-clear').trim();
@@ -136,6 +152,7 @@ export async function generateMeteogram(sliderIndex) {
     const surfaceDewPointData = [];
     const surfaceWindSpeedData = [];
     const surfaceWindGustData = [];
+    const precipData = [];
 
     let pointsProcessed = 0;
     for (const i of timeIndicesForDay) {
@@ -150,6 +167,7 @@ export async function generateMeteogram(sliderIndex) {
 
         surfaceWindSpeedData.push(parseFloat(Utils.convertWind(weatherData.wind_speed_10m[i], windUnit, 'km/h').toFixed(1)));
         surfaceWindGustData.push(parseFloat(Utils.convertWind(weatherData.wind_gusts_10m[i], windUnit, 'km/h').toFixed(1)));
+        precipData.push(weatherData.weather_code ? (weatherData.weather_code[i] ?? 0) : 0);
 
         // Upper Data
         const interpolated = weatherManager.interpolateWeatherData(weatherData, i, 100, baseHeight, 'm');
@@ -227,6 +245,42 @@ export async function generateMeteogram(sliderIndex) {
                 ctx.stroke();
                 ctx.restore();
             }
+        }
+    };
+
+    const dangerColor = style.getPropertyValue('--color-danger').trim();
+    const warningColor = style.getPropertyValue('--color-warning').trim();
+    const precipPlugin = {
+        id: 'precipitationMarkers',
+        afterDraw(chart) {
+            const xScale = chart.scales.x;
+            if (!xScale || precipData.length === 0) return;
+            const { ctx, chartArea } = chart;
+            const barHeight = 14;
+            const stepWidth = timeLabels.length > 1
+                ? Math.abs(xScale.getPixelForValue(timeLabels[1]) - xScale.getPixelForValue(timeLabels[0]))
+                : 20;
+            precipData.forEach((code, idx) => {
+                const category = getPrecipCategory(code);
+                if (!category || idx >= timeLabels.length) return;
+                const fillColor = category === 'hazard' ? dangerColor
+                    : category === 'fog' ? warningColor
+                    : category === 'shower' ? 'rgba(160, 80, 220, 0.80)'
+                    : category === 'rain' ? 'rgba(30, 144, 255, 0.75)'
+                    : 'rgba(176, 224, 230, 0.85)';
+                const x = xScale.getPixelForValue(timeLabels[idx]);
+                const barTop = chartArea.bottom - barHeight;
+                ctx.save();
+                ctx.fillStyle = fillColor;
+                ctx.fillRect(x - stepWidth / 2, barTop, stepWidth, barHeight);
+                const label = Utils.translateWmoCodeToTaf(code);
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+                ctx.font = 'bold 8px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(label, x, barTop + barHeight / 2, stepWidth - 2);
+                ctx.restore();
+            });
         }
     };
 
@@ -331,7 +385,7 @@ export async function generateMeteogram(sliderIndex) {
     // --- Surface Chart ---
     meteogramSurfaceInstance = new Chart(surfaceCtx, {
         type: 'line',
-        plugins: [verticalLinePlugin],
+        plugins: [verticalLinePlugin, precipPlugin],
         data: {
             labels: timeLabels,
             datasets: [
