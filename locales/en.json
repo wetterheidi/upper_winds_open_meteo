@@ -535,6 +535,12 @@
         "base_leg_error": "Base leg must start higher than final leg.",
         "downwind_leg_error": "Downwind leg must start higher than base leg."
     },
+    "radar": {
+        "error_api_limit": "Radar data temporarily unavailable (API limit reached). Please try again later.",
+        "error_server": "Radar data temporarily unavailable (server error {status}). Please try again later.",
+        "error_fetch_failed": "Could not load radar data. Please check your connection.",
+        "error_no_frames": "No radar data currently available."
+    },
     "download": {
         "no_data_error": "No weather data available to download.",
         "no_interpolated_data_error": "No interpolated data available to download.",

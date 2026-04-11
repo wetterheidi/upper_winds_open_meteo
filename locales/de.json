@@ -535,6 +535,12 @@
         "base_leg_error": "Basisteil muss höher starten als der Endanflug.",
         "downwind_leg_error": "Rückenwindteil muss höher starten als der Basisteil."
     },
+    "radar": {
+        "error_api_limit": "Radardaten vorübergehend nicht verfügbar (API-Limit erreicht). Bitte später erneut versuchen.",
+        "error_server": "Radardaten vorübergehend nicht verfügbar (Serverfehler {status}). Bitte später erneut versuchen.",
+        "error_fetch_failed": "Radardaten konnten nicht geladen werden. Bitte Verbindung prüfen.",
+        "error_no_frames": "Aktuell keine Radardaten verfügbar."
+    },
     "download": {
         "no_data_error": "No weather data available to download.",
         "no_interpolated_data_error": "No interpolated data available to download.",
