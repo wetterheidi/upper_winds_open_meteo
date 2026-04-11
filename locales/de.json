@@ -269,6 +269,10 @@
         "credits_data": "Datenanbieter",
         "credits_libs": "Bibliotheken"
     },
+    "kofi_banner": {
+        "message": "DZMaster gefällt dir? Unterstütze die Entwickler!",
+        "support": "Kauf uns einen Kaffee ☕"
+    },
     "modals": {
         "restricted_feature": "Geschützte Funktion",
         "password_prompt": "Bitte Passwort eingeben, um diese Funktion freizuschalten:",

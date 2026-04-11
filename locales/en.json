@@ -269,6 +269,10 @@
         "credits_data": "Data Providers",
         "credits_libs": "Libraries"
     },
+    "kofi_banner": {
+        "message": "Enjoying DZMaster? Support the developers!",
+        "support": "Buy us a Coffee ☕"
+    },
     "modals": {
         "restricted_feature": "Restricted Feature",
         "password_prompt": "Please enter the password to enable this feature:",
