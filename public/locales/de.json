@@ -347,6 +347,10 @@
         "geoman": {
             "tap_first_point": "Tippen für ersten Punkt.",
             "click_first_point": "Klicken für ersten Punkt.",
+            "tap_continue": "Tippen um weiterzuzeichnen.",
+            "click_continue": "Klicken um weiterzuzeichnen.",
+            "tap_place_marker": "Tippen um Marker zu setzen.",
+            "click_place_marker": "Klicken um Marker zu setzen.",
             "move_map_radius": "Karte bewegen für Radius. Tippen zum Beenden.",
             "click_drag_circle": "Klicken und ziehen für Kreis.",
             "radius": "Radius",

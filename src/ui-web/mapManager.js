@@ -1067,10 +1067,11 @@ function _addStandardMapControls() {
     });
     // ============================================================
 
+    AppState.map.pm.setGlobalOptions({
+        tooltips: false,
+        ...(isMobileDevice() ? { hintlineStyle: { opacity: 0, color: 'green' } } : {})
+    });
     if (isMobileDevice()) {
-        AppState.map.pm.setGlobalOptions({
-            hintlineStyle: { opacity: 0, color: 'green' }
-        });
         console.log("Geoman global options set for mobile to hide helper lines.");
     }
 
@@ -1377,7 +1378,24 @@ function _setupGeomanMeasurementHandlers() {
         });
     }
     const liveMeasureLabel = L.DomUtil.create('div', 'leaflet-measure-label', map.getContainer());
+    const geomanHintBar = L.DomUtil.create('div', 'geoman-hint-bar', map.getContainer());
     const persistentLabelsGroup = L.layerGroup().addTo(map);
+
+    let hintFadeTimer = null;
+    function showGeomanHint(text, duration = 1500) {
+        clearTimeout(hintFadeTimer);
+        geomanHintBar.textContent = text;
+        geomanHintBar.style.display = 'block';
+        geomanHintBar.classList.remove('fading');
+        hintFadeTimer = setTimeout(() => {
+            geomanHintBar.classList.add('fading');
+            setTimeout(() => { geomanHintBar.style.display = 'none'; }, 500);
+        }, duration);
+    }
+    function hideGeomanHint() {
+        clearTimeout(hintFadeTimer);
+        geomanHintBar.style.display = 'none';
+    }
 
     let lastKnownLatLngs = null;
     let lastKnownCircleState = null;
@@ -1489,6 +1507,7 @@ function _setupGeomanMeasurementHandlers() {
         if (e.shape === 'Line') {
             if (isMobileDevice()) {
                 liveMeasureLabel.innerHTML = I18n.t('map.geoman.tap_first_point');
+                showGeomanHint(I18n.t('map.geoman.tap_first_point'));
                 let lastPoint = null;
                 let rubberBandLayer = null;
 
@@ -1530,6 +1549,7 @@ function _setupGeomanMeasurementHandlers() {
                         map.removeLayer(rubberBandLayer);
                         rubberBandLayer = null;
                     }
+                    showGeomanHint(I18n.t('map.geoman.tap_continue'));
                     setTimeout(() => {
                         updateAllPermanentLineLabels(workingLayer);
                         map.fire('move');
@@ -1558,6 +1578,7 @@ function _setupGeomanMeasurementHandlers() {
                 };
             } else {
                 liveMeasureLabel.innerHTML = I18n.t('map.geoman.click_first_point');
+                showGeomanHint(I18n.t('map.geoman.click_first_point'));
                 mouseMoveHandler = (moveEvent) => {
                     const latlngs = workingLayer.getLatLngs();
                     if (latlngs.length > 0) {
@@ -1571,6 +1592,7 @@ function _setupGeomanMeasurementHandlers() {
                 };
 
                 vertexAddHandler = () => {
+                    showGeomanHint(I18n.t('map.geoman.click_continue'));
                     setTimeout(() => updateAllPermanentLineLabels(workingLayer), 50);
                 };
 
@@ -1593,6 +1615,7 @@ function _setupGeomanMeasurementHandlers() {
         } else if (e.shape === 'Circle') {
             if (isMobileDevice()) {
                 liveMeasureLabel.innerHTML = '';
+                showGeomanHint(I18n.t('map.geoman.tap_first_point'));
                 const mapSize = map.getSize();
                 const initialLabelPos = L.point(mapSize.x / 2, mapSize.y / 2 - 40);
                 L.DomUtil.setPosition(liveMeasureLabel, initialLabelPos);
@@ -1619,6 +1642,7 @@ function _setupGeomanMeasurementHandlers() {
                     if (!centerSet) {
                         centerSet = true;
                         liveMeasureLabel.innerHTML = I18n.t('map.geoman.move_map_radius');
+                        showGeomanHint(I18n.t('map.geoman.move_map_radius'));
                         const mapSize = map.getSize();
                         const labelPos = L.point(mapSize.x / 2, mapSize.y / 2 - 40);
                         L.DomUtil.setPosition(liveMeasureLabel, labelPos);
@@ -1644,6 +1668,7 @@ function _setupGeomanMeasurementHandlers() {
                 };
             } else {
                 liveMeasureLabel.innerHTML = I18n.t('map.geoman.click_drag_circle');
+                showGeomanHint(I18n.t('map.geoman.click_drag_circle'));
                 mouseMoveHandler = (moveEvent) => {
                     const center = workingLayer.getLatLng();
                     if (center) {
@@ -1656,11 +1681,14 @@ function _setupGeomanMeasurementHandlers() {
                 map.on('mousemove', mouseMoveHandler);
                 cleanup = () => map.off('mousemove', mouseMoveHandler);
             }
+        } else if (e.shape === 'Marker') {
+            showGeomanHint(I18n.t(isMobileDevice() ? 'map.geoman.tap_place_marker' : 'map.geoman.click_place_marker'));
         }
 
         const finalize = () => {
             if (cleanup) cleanup();
             liveMeasureLabel.style.display = 'none';
+            hideGeomanHint();
         };
 
         map.once('pm:create', (createEvent) => {

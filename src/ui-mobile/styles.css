@@ -2358,6 +2358,29 @@ input[type="checkbox"][style*="opacity: 1"] {
     font-weight: bold;
 }
 
+/* === GEOMAN HINWEIS-BANNER (oben in der Karte, auto-fade) === */
+.geoman-hint-bar {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(30, 30, 30, 0.82);
+    color: #fff;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 9001;
+    opacity: 1;
+    transition: opacity 0.5s ease;
+    display: none;
+}
+.geoman-hint-bar.fading {
+    opacity: 0;
+}
+
 /* === ANZEIGE FÜR GEOMAN-MESSWERKZEUG === */
 .leaflet-measure-label {
     position: absolute;
