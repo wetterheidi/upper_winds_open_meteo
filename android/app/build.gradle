@@ -10,7 +10,7 @@ android {
         applicationId "com.wetterheidi.dzmaster"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 45
+        versionCode 46
         versionName "1.5.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {

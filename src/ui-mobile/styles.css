@@ -2883,6 +2883,33 @@ input[type="checkbox"][style*="opacity: 1"] {
     /* Stellt sicher, dass sie über anderen Elementen liegt */
 }
 
+/* === GEOMAN ACTION-BUTTONS: Icon-only auf Mobile === */
+/* Draw-Modus: action-finish / Edit-Drag-Delete-Modus: action-finishMode */
+.button-container .leaflet-pm-actions-container .leaflet-pm-action.action-finish,
+.button-container .leaflet-pm-actions-container .leaflet-pm-action.action-finishMode,
+.button-container .leaflet-pm-actions-container .leaflet-pm-action.action-removeLastVertex,
+.button-container .leaflet-pm-actions-container .leaflet-pm-action.action-cancel {
+    font-size: 0 !important;
+    padding: 0 8px !important;
+    text-align: center;
+}
+.button-container .leaflet-pm-actions-container .leaflet-pm-action.action-finish::before,
+.button-container .leaflet-pm-actions-container .leaflet-pm-action.action-finishMode::before {
+    content: '✓';
+    font-size: 20px;
+    font-weight: bold;
+    color: #4caf50;
+}
+.button-container .leaflet-pm-actions-container .leaflet-pm-action.action-removeLastVertex::before {
+    content: '⌫';
+    font-size: 18px;
+}
+.button-container .leaflet-pm-actions-container .leaflet-pm-action.action-cancel::before {
+    content: '✕';
+    font-size: 18px;
+    color: #f44336;
+}
+
 .pm-textarea {
     text-align: center !important;
     padding-left: 0 !important;
