@@ -1,10 +1,11 @@
 /**
  * @file soundingManager.js
  * @description Verwaltet den Abruf und die Konvertierung von hochaufgelösten
- * ICON-D2 Progtemp-Daten aus dem wetterheidi/sounding_data GitHub-Repository.
+ * ICON-D2/EU/GLOBAL Progtemp-Daten aus dem wetterheidi/sounding_data GitHub-Repository.
  * Die Daten werden in das Open-Meteo-kompatible weatherData-Format überführt,
  * sodass alle bestehenden Features (Zeitslider, Jump-Planner, Charts) unverändert
- * mit den 65 Modelleveln des DWD ICON-D2 arbeiten können.
+ * mit den hochaufgelösten Modelleveln des DWD arbeiten können.
+ * Modellpriorität: ICON-D2 > ICON-EU > ICON-GLOBAL.
  */
 
 import { AppState } from './state.js';
@@ -18,8 +19,19 @@ export const SOUNDING_MODEL_ID = 'dwd_icon_d2_sounding';
 
 const GITHUB_API_URL = 'https://api.github.com/repos/wetterheidi/sounding_data/contents/data';
 const RAW_BASE_URL = 'https://raw.githubusercontent.com/wetterheidi/sounding_data/main/data';
+const OPENMETEO_FORECAST_URL = 'https://api.open-meteo.com/v1/forecast';
 const MAX_DISTANCE_KM = 20;
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 Stunde
+
+// Modellpriorität: Index 0 = höchste Auflösung / Präferenz
+const MODEL_PRIORITY = ['ICON-D2', 'ICON-EU', 'ICON-GLOBAL'];
+
+// Mapping Sounding-Modellname → OpenMeteo model-ID für den Oberflächendaten-Request
+const OPENMETEO_MODEL_MAP = {
+    'ICON-D2':     'icon_d2',
+    'ICON-EU':     'icon_eu',
+    'ICON-GLOBAL': 'icon_global',
+};
 
 // Interner Cache für die GitHub-Dateiliste
 let _fileListCache = null;
@@ -63,12 +75,12 @@ export async function fetchSoundingData(lat, lng, targetTime) {
         const locationKey = _findNearestLocation(lat, lng, locations);
         if (!locationKey) throw new Error('Kein Progtemp-Standort im 20-km-Umkreis');
 
-        const bestFileName = _selectBestFile(files, locationKey, targetTime);
-        if (!bestFileName) throw new Error('Keine aktuelle Progtemp-Datei verfügbar');
+        const bestFile = _selectBestFile(files, locationKey, targetTime);
+        if (!bestFile) throw new Error('Keine aktuelle Progtemp-Datei verfügbar');
 
-        const url = `${RAW_BASE_URL}/${bestFileName}`;
+        const url = `${RAW_BASE_URL}/${bestFile.name}`;
         const response = await fetch(url, { signal: AbortSignal.timeout(15000) });
-        if (!response.ok) throw new Error(`HTTP ${response.status} beim Abrufen von ${bestFileName}`);
+        if (!response.ok) throw new Error(`HTTP ${response.status} beim Abrufen von ${bestFile.name}`);
 
         const soundingFile = await response.json();
         if (!Array.isArray(soundingFile) || soundingFile.length === 0) {
@@ -86,7 +98,22 @@ export async function fetchSoundingData(lat, lng, targetTime) {
         AppState.lastAltitude = terrainElevM;
         console.log(`[soundingManager] Geländehöhe aus Oberflächendruck: ${terrainElevM}m MSL`);
 
-        return _convertToWeatherData(soundingFile, terrainElevM);
+        console.log(`[soundingManager] Verwende ${bestFile.model} Sounding (${bestFile.name})`);
+
+        // Sounding-Daten konvertieren und parallel OpenMeteo-Oberflächendaten laden
+        const [weatherData, surfaceData] = await Promise.all([
+            Promise.resolve(_convertToWeatherData(soundingFile, terrainElevM)),
+            _fetchOpenMeteoSurface(lat, lng, soundingFile, bestFile.model),
+        ]);
+
+        // OpenMeteo-Oberflächendiagnostik überschreibt Sounding-Bodenlevel:
+        // OpenMeteo ICON-D2 hat Grenzschichtparametrisierung (2m-Diagnose, Böenparametrisierung),
+        // das Sounding-Bodenlevel (~10–30 m AGL) kennt diese Korrekturen nicht.
+        if (surfaceData?.data) {
+            _applySurfaceData(weatherData, surfaceData.data, soundingFile.map(s => s.valid_time), surfaceData.model);
+        }
+
+        return weatherData;
 
     } catch (e) {
         console.error('[soundingManager] Fehler beim Laden des Progtempss:', e.message);
@@ -108,7 +135,7 @@ async function _fetchFileList() {
     const response = await fetch(GITHUB_API_URL, { signal: AbortSignal.timeout(10000) });
     if (!response.ok) throw new Error(`GitHub API: HTTP ${response.status}`);
     const all = await response.json();
-    _fileListCache = all.filter(f => f.name.startsWith('sounding_ICON-D2_') && f.name.endsWith('.json'));
+    _fileListCache = all.filter(f => f.name.startsWith('sounding_ICON-') && f.name.endsWith('.json'));
     _fileListCacheTime = now;
     return _fileListCache;
 }
@@ -144,32 +171,88 @@ function _findNearestLocation(lat, lng, locations) {
 }
 
 /**
- * Wählt die beste (neueste) Sounding-Datei, deren Vorhersagezeitraum den
- * gewünschten Zeitpunkt abdeckt.
+ * Wählt die beste Sounding-Datei für locationKey und targetTime.
+ * Priorität: ICON-D2 > ICON-EU > ICON-GLOBAL; bei gleichem Modell neuester Run zuerst.
+ * Gibt { name, model } zurück oder null wenn keine Datei gefunden.
  */
 function _selectBestFile(files, locationKey, targetTime) {
     const relevant = files
         .filter(f => f.name.includes(locationKey))
         .map(f => {
-            const m = f.name.match(/sounding_ICON-D2_(\d{8})_(\d{2})Z_/);
+            const m = f.name.match(/sounding_(ICON-[\w]+)_(\d{8})_(\d{2})Z_/);
             if (!m) return null;
-            const y = m[1].slice(0, 4), mo = m[1].slice(4, 6), d = m[1].slice(6, 8);
-            const runTime = new Date(`${y}-${mo}-${d}T${m[2].padStart(2, '0')}:00:00Z`);
-            return { name: f.name, runTime };
+            const model = m[1]; // z.B. 'ICON-D2', 'ICON-EU', 'ICON-GLOBAL'
+            const y = m[2].slice(0, 4), mo = m[2].slice(4, 6), d = m[2].slice(6, 8);
+            const runTime = new Date(`${y}-${mo}-${d}T${m[3].padStart(2, '0')}:00:00Z`);
+            const priority = MODEL_PRIORITY.indexOf(model); // -1 für unbekannte Modelle → niedrigste Prio
+            return { name: f.name, model, runTime, priority: priority === -1 ? 999 : priority };
         })
         .filter(Boolean)
-        .sort((a, b) => b.runTime - a.runTime); // neuester Run zuerst
+        .sort((a, b) => a.priority - b.priority || b.runTime - a.runTime); // Prio aufsteigend, dann neuester Run
 
     if (!relevant.length) return null;
-    if (!targetTime) return relevant[0].name;
+    if (!targetTime) return relevant[0];
 
     const target = new Date(targetTime);
+
+    // Erst bestes Modell suchen, das den Zielzeitpunkt abdeckt
     for (const r of relevant) {
         // Jede Datei deckt step_h 0–24 ab → Zeitfenster [runTime, runTime + 24h]
         const runEnd = new Date(r.runTime.getTime() + 24 * 3600 * 1000);
-        if (r.runTime <= target && target <= runEnd) return r.name;
+        if (r.runTime <= target && target <= runEnd) return r;
     }
-    return relevant[0].name; // Fallback: neueste verfügbare Datei
+    return relevant[0]; // Fallback: höchste Priorität, neuester Run
+}
+
+// ===================================================================
+// Private Hilfsfunktionen – OpenMeteo-Oberflächendaten
+// ===================================================================
+
+/**
+ * Ruft die 5 Oberflächendiagnostiken für den Sounding-Zeitraum von OpenMeteo ab.
+ * Das Modell (icon_d2 / icon_eu / icon_global) wird aus dem Sounding-Modellnamen abgeleitet.
+ * Gibt null zurück wenn der Request fehlschlägt, damit der Fallback (Sounding-Bodenlevel) greift.
+ */
+async function _fetchOpenMeteoSurface(lat, lng, soundingFile, soundingModel) {
+    try {
+        const omModel = OPENMETEO_MODEL_MAP[soundingModel] ?? 'icon_d2';
+        const times = soundingFile.map(s => s.valid_time);
+        const startDate = times[0].slice(0, 10);
+        const endDate   = times[times.length - 1].slice(0, 10);
+        const params = 'temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m';
+        const url = `${OPENMETEO_FORECAST_URL}?latitude=${lat}&longitude=${lng}&hourly=${params}&models=${omModel}&start_date=${startDate}&end_date=${endDate}&wind_speed_unit=kmh`;
+
+        const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const json = await response.json();
+        return { data: json.hourly ?? null, model: omModel };
+    } catch (e) {
+        console.warn(`[soundingManager] OpenMeteo-Oberflächendaten (${soundingModel}) nicht verfügbar, Fallback auf Sounding-Bodenlevel:`, e.message);
+        return null;
+    }
+}
+
+/**
+ * Überschreibt die 5 Oberflächenfelder in weatherData mit den OpenMeteo-Werten.
+ * Matched per ISO-Zeitstempel; fehlt ein Zeitstempel in OpenMeteo bleibt der Sounding-Wert erhalten.
+ */
+function _applySurfaceData(weatherData, surfaceData, soundingTimes, omModel) {
+    // OpenMeteo liefert hourly.time als ISO-Array
+    const omTimeIndex = new Map(surfaceData.time.map((t, i) => [t, i]));
+
+    for (let ti = 0; ti < soundingTimes.length; ti++) {
+        // Sounding-Zeitstempel können Sekunden enthalten (:00), OpenMeteo endet auf :00 — normalize
+        const key = soundingTimes[ti].slice(0, 16); // "YYYY-MM-DDTHH:MM"
+        const oi  = omTimeIndex.get(key) ?? omTimeIndex.get(soundingTimes[ti]);
+        if (oi === undefined) continue;
+
+        if (surfaceData.temperature_2m[oi]      != null) weatherData.temperature_2m[ti]       = surfaceData.temperature_2m[oi];
+        if (surfaceData.relative_humidity_2m[oi] != null) weatherData.relative_humidity_2m[ti] = surfaceData.relative_humidity_2m[oi];
+        if (surfaceData.wind_speed_10m[oi]       != null) weatherData.wind_speed_10m[ti]        = surfaceData.wind_speed_10m[oi];
+        if (surfaceData.wind_direction_10m[oi]   != null) weatherData.wind_direction_10m[ti]    = surfaceData.wind_direction_10m[oi];
+        if (surfaceData.wind_gusts_10m[oi]       != null) weatherData.wind_gusts_10m[ti]        = surfaceData.wind_gusts_10m[oi];
+    }
+    console.log(`[soundingManager] Oberflächendaten (T2m, RH2m, Wind10m, Böen) aus OpenMeteo ${omModel} übernommen.`);
 }
 
 // ===================================================================
@@ -282,9 +365,9 @@ function _convertToWeatherData(soundingFile, terrainElevM = 0) {
         const sfc = levels[0];
         temperature_2m[ti]       = sfc.T_C;
         relative_humidity_2m[ti] = _rhFromTd(sfc.T_C, sfc.Td_C);
-        wind_speed_10m[ti]       = sfc.wspd_kn * 1.852; // kn → km/h
-        wind_direction_10m[ti]   = sfc.wdir_deg;
-        wind_gusts_10m[ti]       = sfc.wspd_kn * 1.852 * 1.3; // Näherung
+        wind_speed_10m[ti]       = sfc.wspd_kn * 1.852; // kn → km/h; wird durch OpenMeteo überschrieben
+        wind_direction_10m[ti]   = sfc.wdir_deg;        // wird durch OpenMeteo überschrieben
+        wind_gusts_10m[ti]       = sfc.wspd_kn * 1.852 * 1.3; // Fallback-Näherung; wird durch OpenMeteo überschrieben
 
         // Grobe Wolkenbedeckung nach Stockwerken (für Meteogramm)
         let ccLow = 0, ccMid = 0, ccHigh = 0;
