@@ -347,6 +347,10 @@
         "geoman": {
             "tap_first_point": "Tap to set first point.",
             "click_first_point": "Click to set the first point.",
+            "tap_continue": "Tap to continue drawing.",
+            "click_continue": "Click to continue drawing.",
+            "tap_place_marker": "Tap to place marker.",
+            "click_place_marker": "Click to place marker.",
             "move_map_radius": "Move map to adjust radius. Tap again to finish.",
             "click_drag_circle": "Click and drag to draw a circle.",
             "radius": "Radius",
