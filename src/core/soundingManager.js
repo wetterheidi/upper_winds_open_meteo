@@ -17,8 +17,9 @@ import { AppState } from './state.js';
 /** Model-ID, die im Dropdown erscheint und intern zur Erkennung genutzt wird. */
 export const SOUNDING_MODEL_ID = 'dwd_icon_d2_sounding';
 
-const GITHUB_API_URL = 'https://api.github.com/repos/wetterheidi/sounding_data/contents/data';
-const RAW_BASE_URL = 'https://raw.githubusercontent.com/wetterheidi/sounding_data/main/data';
+const SERVER_BASE_URL = 'https://tlogpviewer.wetterheidi.de/data';
+const INDEX_URL = `${SERVER_BASE_URL}/index.json`;
+const RAW_BASE_URL = SERVER_BASE_URL;
 const OPENMETEO_FORECAST_URL = 'https://api.open-meteo.com/v1/forecast';
 const MAX_DISTANCE_KM = 20;
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 Stunde
@@ -132,10 +133,12 @@ async function _fetchFileList() {
     if (_fileListCache && (now - _fileListCacheTime) < CACHE_TTL_MS) {
         return _fileListCache;
     }
-    const response = await fetch(GITHUB_API_URL, { signal: AbortSignal.timeout(10000) });
-    if (!response.ok) throw new Error(`GitHub API: HTTP ${response.status}`);
-    const all = await response.json();
-    _fileListCache = all.filter(f => f.name.startsWith('sounding_ICON-') && f.name.endsWith('.json'));
+    const response = await fetch(INDEX_URL, { signal: AbortSignal.timeout(10000) });
+    if (!response.ok) throw new Error(`Server index.json: HTTP ${response.status}`);
+    const names = await response.json(); // Array von Dateinamen (Strings)
+    _fileListCache = names
+        .filter(n => n.startsWith('sounding_ICON-') && n.endsWith('.json'))
+        .map(n => ({ name: n })); // { name } damit der Rest des Codes unverändert bleibt
     _fileListCacheTime = now;
     return _fileListCache;
 }
