@@ -648,7 +648,7 @@ export class Utils {
             61: '-RA', 63: 'RA', 65: '+RA', 66: '-FZRA', 67: 'FZRA',
             71: '-SN', 73: 'SN', 75: '+SN', 77: 'SG',
             80: '-SHRA', 81: 'SHRA', 82: '+SHRA', 83: '-SHRASN', 85: '-SHSN', 86: 'SHSN',
-            95: 'TS', 96: 'TSGR', 99: '+TSGR'
+            95: 'TSRA', 96: 'TSGR', 99: '+TSGR'
         };
         const codeNum = parseInt(code, 10);
         if (isNaN(codeNum)) {
