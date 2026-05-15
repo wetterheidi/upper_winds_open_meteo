@@ -1814,7 +1814,7 @@ function setupAdsbEvents() {
         if (AppState.aircraftMarker && aircraft.lat && aircraft.lon) {
             AppState.aircraftMarker.setLatLng([aircraft.lat, aircraft.lon]);
             if (aircraft.track) {
-                AppState.aircraftMarker.setRotationAngle(aircraft.track);
+                AppState.aircraftMarker.setRotation(aircraft.track * Math.PI / 180);
             }
             updateAircraftTooltip(aircraft);
             mapManager.drawAircraftTrack(AppState.adsbTrackPoints);

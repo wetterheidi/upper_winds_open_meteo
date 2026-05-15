@@ -11,6 +11,7 @@ import * as LocationManager from '../core/locationManager.js';
 import * as PinManager from '../core/pinManager.js';
 import { I18n } from '../core/i18n.js';
 import * as RainRadar from '../core/rainRadarManager.js';
+import 'leaflet-rotate';
 
 let lastTapTime = 0;
 
@@ -185,8 +186,10 @@ export function drawLandingPattern(patternData) {
         }).addTo(AppState.landingPatternLayerGroup);
     });
 
+    AppState.patternArrowMarkers = [];
     patternData.arrows.forEach(arrow => {
-        const arrowIcon = createArrowIcon(arrow.position[0], arrow.position[1], arrow.bearing, arrow.color);
+        const mapBearing = AppState.map ? AppState.map.getBearing() : 0;
+        const arrowIcon = createArrowIcon(arrow.bearing, arrow.color, mapBearing);
         const arrowMarker = L.marker(arrow.position, { icon: arrowIcon, pmIgnore: true })
             .addTo(AppState.landingPatternLayerGroup);
 
@@ -196,6 +199,7 @@ export function drawLandingPattern(patternData) {
             className: 'wind-tooltip',
             pmIgnore: true
         });
+        AppState.patternArrowMarkers.push({ marker: arrowMarker, bearing: arrow.bearing, color: arrow.color });
     });
 }
 
@@ -235,8 +239,8 @@ export function drawJumpRunTrack(trackData) {
 
     const airplaneMarker = L.marker(trackData.airplane.position, {
         icon: airplaneIcon,
-        rotationAngle: trackData.airplane.bearing,
-        rotationOrigin: 'center center',
+        rotation: trackData.airplane.bearing * Math.PI / 180,
+        rotateWithView: true,
         draggable: !Settings.state.userSettings.isInteractionLocked,
         zIndexOffset: 2000,
         pmIgnore: true
@@ -416,6 +420,7 @@ function clearLandingPattern() {
     if (AppState.landingPatternLayerGroup) {
         AppState.landingPatternLayerGroup.clearLayers();
     }
+    AppState.patternArrowMarkers = [];
 }
 
 function clearJumpRunTrack() {
@@ -592,8 +597,8 @@ export function clearAircraftTrack() {
 // 3. Marker-Management
 // ===================================================================
 
-function createArrowIcon(lat, lng, bearing, color) {
-    const normalizedBearing = (bearing + 360) % 360;
+function createArrowIcon(bearing, color, mapBearing = 0) {
+    const normalizedBearing = (bearing + mapBearing + 360) % 360;
     const arrowSvg = `
         <svg width="40" height="20" viewBox="0 0 40 20" xmlns="http://www.w3.org/2000/svg">
             <line x1="0" y1="10" x2="30" y2="10" stroke="${color}" stroke-width="4" />
@@ -980,8 +985,8 @@ export function createAircraftMarker(lat, lng, bearing) {
 
     const marker = L.marker([lat, lng], {
         icon: aircraftIcon,
-        rotationAngle: bearing,
-        rotationOrigin: 'center center',
+        rotation: bearing * Math.PI / 180,
+        rotateWithView: true,
         zIndexOffset: 1500,
         pmIgnore: true
     }).addTo(AppState.map);
@@ -1003,7 +1008,12 @@ function _initializeBasicMapInstance(defaultCenter, defaultZoom) {
         zoomControl: false,
         doubleClickZoom: false,
         maxZoom: 19,
-        minZoom: navigator.onLine ? 6 : 11
+        minZoom: navigator.onLine ? 6 : 11,
+        rotate: true,
+        bearing: 0,
+        touchRotate: true,
+        shiftKeyRotate: true,
+        rotateControl: false,
     });
     console.log('Map instance created.');
 }
@@ -1027,6 +1037,7 @@ function _addStandardMapControls() {
     });
 
     L.control.zoom({ position: 'topright' }).addTo(AppState.map);
+    L.control.rotate({ position: 'topright' }).addTo(AppState.map);
 
     L.control.scale({
         position: 'bottomleft',
@@ -1778,6 +1789,15 @@ function _setupCoreMapEventHandlers() {
     }
 
     AppState.map.on('dblclick', _handleMapDblClick);
+
+    AppState.map.on('rotate', () => {
+        const mb = AppState.map.getBearing();
+        if (AppState.patternArrowMarkers) {
+            AppState.patternArrowMarkers.forEach(({ marker, bearing, color }) => {
+                marker.setIcon(createArrowIcon(bearing, color, mb));
+            });
+        }
+    });
 
     AppState.map.on('zoomstart', (e) => {
         if (!navigator.onLine) {
