@@ -8,14 +8,29 @@ import { Settings } from './settings.js';
 import { I18n } from './i18n.js'; // 1. Import ergänzt
 
 let adsbInterval = null;
-// ÄNDERUNG: Wechsel von corsproxy.io zu api.cors.lol, da corsproxy.io 403-Fehler liefert.
-// Falls auch dieser Proxy Probleme macht, könnte man versuchen, ihn leer zu lassen (''), 
-// um zu testen, ob die API direkten Zugriff erlaubt.
-const CORS_PROXY = 'https://api.cors.lol/?url='; 
 const ADSB_ATTRIBUTION = 'ADS-B Data provided by <a href="https://www.adsbexchange.com/" target="_blank">ADSBexchange.com</a>';
+
+const CORS_PROXIES = [
+    url => url,                                              // direkt (falls API CORS erlaubt)
+    url => `https://api.cors.lol/?url=${encodeURIComponent(url)}`,
+    url => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+    url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+];
 
 const apiHeaders = new Headers();
 apiHeaders.append("Accept", "application/json");
+
+async function fetchWithFallback(url) {
+    for (const proxy of CORS_PROXIES) {
+        try {
+            const response = await fetch(proxy(url), { headers: apiHeaders });
+            if (response.ok) return response;
+        } catch {
+            // nächsten Proxy versuchen
+        }
+    }
+    throw new Error('Alle CORS-Proxies fehlgeschlagen');
+}
 
 /**
  * Löst ein benutzerdefiniertes Event im gesamten Dokument aus.
@@ -44,7 +59,7 @@ export async function findAndSelectJumpShip() {
     try {
         const pos = { lat: AppState.lastLat, lng: AppState.lastLng };
         const apiUrl = `https://api.adsb.lol/v2/lat/${pos.lat}/lon/${pos.lng}/dist/15`;
-        const response = await fetch(CORS_PROXY + encodeURIComponent(apiUrl), { headers: apiHeaders });
+        const response = await fetchWithFallback(apiUrl);
 
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({ msg: "Unbekannter API-Fehler" }));
@@ -100,7 +115,7 @@ export function startAircraftTracking(aircraft) {
     const updateAircraftPosition = async () => {
         try {
             const apiUrl = `https://api.adsb.lol/v2/hex/${aircraft.icao24}`;
-            const response = await fetch(CORS_PROXY + encodeURIComponent(apiUrl), { headers: apiHeaders });
+            const response = await fetchWithFallback(apiUrl);
 
             if (response.status === 404) {
                 stopAircraftTracking();
