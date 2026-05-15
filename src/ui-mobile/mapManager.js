@@ -14,6 +14,7 @@ import * as liveTrackingManager from '../core/liveTrackingManager.js';
 import { I18n } from '../core/i18n.js'; // <--- NEU: Importiert
 import * as PinManager from '../core/pinManager.js';
 import * as RainRadar from '../core/rainRadarManager.js';
+import 'leaflet-rotate';
 
 let lastTapTime = 0; // Add this line
 let isRotatingJRT = false;
@@ -66,9 +67,9 @@ async function initMap() {
     console.log('POI marker layer added!');
     AppState.pinLayerGroup = L.layerGroup().addTo(AppState.map);
 
+    _setupCustomPanes();
     _setupBaseLayersAndHandling();
     _addStandardMapControls();
-    _setupCustomPanes();
     _initializeLivePositionControl();
     _initializeDefaultMarker(defaultCenter, initialAltitude);
 
@@ -238,9 +239,10 @@ export function drawLandingPattern(patternData) {
     });
 
     // 4. Zeichne die Pfeile.
+    AppState.patternArrowMarkers = [];
     patternData.arrows.forEach(arrow => {
         // Die Funktion createArrowIcon muss auch hier im mapManager sein.
-        const arrowIcon = createArrowIcon(arrow.position[0], arrow.position[1], arrow.bearing, arrow.color);
+        const arrowIcon = createArrowIcon(arrow.position[0], arrow.position[1], arrow.bearing, arrow.color, AppState.map ? AppState.map.getBearing() : 0);
 
         const arrowMarker = L.marker(arrow.position, { icon: arrowIcon, pmIgnore: true })
             .addTo(AppState.landingPatternLayerGroup); // Fügt es zur LayerGroup hinzu
@@ -251,6 +253,8 @@ export function drawLandingPattern(patternData) {
             className: 'wind-tooltip',
             pmIgnore: true
         });
+
+        AppState.patternArrowMarkers.push({ marker: arrowMarker, bearing: arrow.bearing, color: arrow.color });
     });
 }
 
@@ -299,8 +303,8 @@ export function drawJumpRunTrack(trackData) {
 
     const airplaneMarker = L.marker(trackData.airplane.position, {
         icon: airplaneIcon,
-        rotationAngle: trackData.airplane.bearing,
-        rotationOrigin: 'center center',
+        rotation: trackData.airplane.bearing * Math.PI / 180,
+        rotateWithView: true,
         draggable: !Settings.state.userSettings.isInteractionLocked,
         zIndexOffset: 2000,
         pmIgnore: true
@@ -515,6 +519,7 @@ function clearLandingPattern() {
     if (AppState.landingPatternLayerGroup) {
         AppState.landingPatternLayerGroup.clearLayers();
     }
+    AppState.patternArrowMarkers = [];
 }
 function clearJumpRunTrack() {
     if (AppState.map && AppState.jumpRunTrackLayerGroup) {
@@ -710,9 +715,8 @@ export function clearAircraftTrack() {
 // 3. Marker-Management
 // ===================================================================
 
-function createArrowIcon(lat, lng, bearing, color) {
-    // Ihr bestehender Code für createArrowIcon...
-    const normalizedBearing = (bearing + 360) % 360;
+function createArrowIcon(lat, lng, bearing, color, mapBearing = 0) {
+    const normalizedBearing = (bearing + mapBearing + 360) % 360;
     const arrowSvg = `
         <svg width="40" height="20" viewBox="0 0 40 20" xmlns="http://www.w3.org/2000/svg">
             <line x1="0" y1="10" x2="30" y2="10" stroke="${color}" stroke-width="4" />
@@ -1216,8 +1220,8 @@ export function createAircraftMarker(lat, lng, bearing) {
 
     const marker = L.marker([lat, lng], {
         icon: aircraftIcon,
-        rotationAngle: bearing,
-        rotationOrigin: 'center center',
+        rotation: bearing * Math.PI / 180,
+        rotateWithView: true,
         zIndexOffset: 1500,
         pmIgnore: true
     }).addTo(AppState.map);
@@ -1244,6 +1248,11 @@ function _initializeBasicMapInstance(defaultCenter, defaultZoom) {
         doubleClickZoom: false, // Wichtig für eigenen dblclick Handler
         maxZoom: 19,
         minZoom: navigator.onLine ? 6 : 11,
+        rotate: true,
+        bearing: 0,
+        touchRotate: true,
+        shiftKeyRotate: false,
+        rotateControl: false,
         preferCanvas: true,
         zoomAnimation: false
     });
@@ -1255,7 +1264,10 @@ function _addStandardMapControls() {
         return;
     }
 
-    L.control.layers(AppState.baseMaps, null, { position: 'topright' }).addTo(AppState.map);
+    const radarOverlayGroup = L.layerGroup();
+    const overlays = { [I18n.t('map.radar.toggle')]: radarOverlayGroup };
+    L.control.layers(AppState.baseMaps, overlays, { position: 'topright' }).addTo(AppState.map);
+
     AppState.map.on('baselayerchange', function (e) {
         if (Settings && Settings.state && Settings.state.userSettings) {
             Settings.state.userSettings.baseMaps = e.name;
@@ -1267,7 +1279,41 @@ function _addStandardMapControls() {
         }
     });
 
+    AppState.map.on('overlayadd', async (e) => {
+        if (e.layer !== radarOverlayGroup) return;
+        if (!AppState.isRadarVisible) await RainRadar.toggleRadar();
+        const panel = AppState.radarOptionsControl?.getContainer();
+        if (panel) {
+            panel.style.display = 'block';
+            try {
+                const saved = localStorage.getItem('radarOpacity');
+                const slider = panel.querySelector('#radarOpacitySlider');
+                if (slider && saved !== null) {
+                    const val = parseFloat(saved);
+                    slider.value = (Number.isFinite(val) && val > 0) ? Math.round(val * 100) : 50;
+                }
+            } catch (_) { /* ignore */ }
+        }
+    });
+
+    AppState.map.on('overlayremove', (e) => {
+        if (e.layer !== radarOverlayGroup) return;
+        if (AppState.isRadarVisible) RainRadar.toggleRadar();
+        if (RainRadar.isAnimating()) {
+            RainRadar.stopAnimation();
+            const animBtn = AppState.radarOptionsControl?.getContainer()?.querySelector('#radarAnimateBtn');
+            if (animBtn) animBtn.textContent = I18n.t('map.radar.animate');
+        }
+        const panel = AppState.radarOptionsControl?.getContainer();
+        if (panel) panel.style.display = 'none';
+    });
+
     L.control.zoom({ position: 'topright' }).addTo(AppState.map);
+
+    const NorthResetControl = L.Control.Rotate.extend({
+        _cycleState() { this._map.setBearing(0); }
+    });
+    new NorthResetControl({ position: 'topright' }).addTo(AppState.map);
 
     L.control.scale({
         position: 'bottomleft',
@@ -1317,65 +1363,38 @@ function _addStandardMapControls() {
     }
 
     // ============================================================
-    // Wetterradar-Control (RainViewer)
+    // Wetterradar-Optionen (RainViewer)
     // ============================================================
-    _addRadarControl();
+    _addRadarOptionsPanel();
 
     console.log('Standard map controls including Geoman have been added.');
 }
 
-function _addRadarControl() {
-    const RadarControl = L.Control.extend({
+function _addRadarOptionsPanel() {
+    const RadarOptionsControl = L.Control.extend({
         options: { position: 'bottomright' },
 
         onAdd() {
             const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-radar');
             L.DomEvent.disableClickPropagation(container);
             L.DomEvent.disableScrollPropagation(container);
+            container.style.display = 'none';
 
             container.innerHTML = `
                 <div class="radar-control-panel">
-                    <button id="radarToggleBtn" class="radar-btn" title="${I18n.t('map.radar.toggle')}">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="10"/>
-                            <circle cx="12" cy="12" r="6"/>
-                            <circle cx="12" cy="12" r="2"/>
-                            <line x1="12" y1="2" x2="12" y2="12"/>
-                        </svg>
-                        <span>${I18n.t('map.radar.toggle')}</span>
-                    </button>
-                    <div id="radarOptions" class="radar-options" style="display:none;">
-                        <div class="radar-opacity-row">
-                            <label>${I18n.t('map.radar.opacity')}:</label>
-                            <input id="radarOpacitySlider" type="range" min="0" max="100" value="50" />
-                        </div>
-                        <div class="radar-animation-row">
-                            <button id="radarAnimateBtn" class="radar-btn-small">${I18n.t('map.radar.animate')}</button>
-                            <span id="radarTimestamp" class="radar-timestamp"></span>
-                        </div>
+                    <div class="radar-opacity-row">
+                        <label>${I18n.t('map.radar.opacity')}:</label>
+                        <input id="radarOpacitySlider" type="range" min="0" max="100" value="50" />
+                    </div>
+                    <div class="radar-animation-row">
+                        <button id="radarAnimateBtn" class="radar-btn-small">${I18n.t('map.radar.animate')}</button>
+                        <span id="radarTimestamp" class="radar-timestamp"></span>
                     </div>
                 </div>
             `;
 
-            const toggleBtn = container.querySelector('#radarToggleBtn');
-            const optionsPanel = container.querySelector('#radarOptions');
             const opacitySlider = container.querySelector('#radarOpacitySlider');
             const animateBtn = container.querySelector('#radarAnimateBtn');
-
-            // Restore saved opacity (match _getStoredOpacity logic: ignore 0, fallback to 50%)
-            try {
-                const saved = localStorage.getItem('radarOpacity');
-                if (saved !== null) {
-                    const val = parseFloat(saved);
-                    opacitySlider.value = (Number.isFinite(val) && val > 0) ? Math.round(val * 100) : 50;
-                }
-            } catch (e) { /* ignore */ }
-
-            toggleBtn.addEventListener('click', async () => {
-                await RainRadar.toggleRadar();
-                toggleBtn.classList.toggle('radar-active', AppState.isRadarVisible);
-                optionsPanel.style.display = AppState.isRadarVisible ? 'block' : 'none';
-            });
 
             opacitySlider.addEventListener('input', (e) => {
                 RainRadar.setOpacity(parseInt(e.target.value, 10) / 100);
@@ -1395,7 +1414,8 @@ function _addRadarControl() {
         }
     });
 
-    new RadarControl().addTo(AppState.map);
+    AppState.radarOptionsControl = new RadarOptionsControl();
+    AppState.radarOptionsControl.addTo(AppState.map);
 }
 
 function _initializeLivePositionControl() {
@@ -1480,7 +1500,7 @@ function _setupBaseLayersAndHandling() {
             L.tileLayer.cached('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
                 maxZoom: 19,
                 attribution: '© EsriEsri, USDA, USGS © OpenStreetMap contributors, and the GIS user community',
-                pane: 'shadowPane' // Sorgt dafür, dass Labels über den Satellitenbildern liegen
+                pane: 'labelsPane' // rotiert mit der Karte (in rotatePane), liegt über Satellit und Vektoren
             })
         ]),
         "Esri Satellite + OSM": L.layerGroup([
@@ -1600,6 +1620,10 @@ function _setupCustomPanes() {
     AppState.map.getPane('gpxTrackPane').style.zIndex = 650;
     AppState.map.getPane('tooltipPane').style.zIndex = 700;
     AppState.map.getPane('popupPane').style.zIndex = 700;
+    // labelsPane lives inside rotatePane so label tile overlays rotate with the map.
+    // z-index 450: above overlayPane (400), below markerPane (600).
+    const labelsPane = AppState.map.createPane('labelsPane', AppState.map._rotatePane);
+    labelsPane.style.zIndex = 450;
     console.log('Custom map panes created.');
 }
 function _setupGeomanMeasurementHandlers() {
@@ -2069,6 +2093,37 @@ function _setupCoreMapEventHandlers() {
     }
 
     // Die restlichen Event-Handler bleiben für beide Plattformen aktiv.
+
+    // Touch-Rotation: _project() für alle Canvas-Vektorlayer aufrufen bevor
+    // renderer._update() zeichnet, damit _parts mit dem neuen _pixelOrigin
+    // aktuell sind (gleiche Logik wie Renderer._onZoomEnd nach Zoom-Änderungen).
+    const _updateCanvasPaths = () => {
+        const map = AppState.map;
+        if (!map?._rotate || map._animatingZoom) return;
+        const renderer = map._renderer;
+        if (!renderer) return;
+        map._pixelOrigin = map._getNewPixelOrigin(map.getCenter(), map.getZoom());
+        for (const id in renderer._layers) {
+            renderer._layers[id]._project?.();
+        }
+        renderer._update();
+    };
+    AppState.map.on('rotate', _updateCanvasPaths);
+    AppState.map.on('move', _updateCanvasPaths);
+
+    // Pfeil-Marker im norotatePane gegen-rotieren, damit sie geografisch korrekt zeigen.
+    AppState.map.on('rotate', () => {
+        const mb = AppState.map.getBearing();
+        if (AppState.patternArrowMarkers) {
+            AppState.patternArrowMarkers.forEach(({ marker, bearing }) => {
+                const el = marker.getElement();
+                if (el?.firstElementChild) {
+                    el.firstElementChild.style.transform = `rotate(${(bearing + mb + 360) % 360}deg)`;
+                }
+            });
+        }
+    });
+
     AppState.map.on('dblclick', _handleMapDblClick);
 
     // Zoom Events
