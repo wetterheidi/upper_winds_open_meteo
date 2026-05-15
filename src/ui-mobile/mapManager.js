@@ -1243,7 +1243,9 @@ function _initializeBasicMapInstance(defaultCenter, defaultZoom) {
         zoomControl: false,
         doubleClickZoom: false, // Wichtig für eigenen dblclick Handler
         maxZoom: 19,
-        minZoom: navigator.onLine ? 6 : 11
+        minZoom: navigator.onLine ? 6 : 11,
+        preferCanvas: true,
+        zoomAnimation: false
     });
     console.log('Map instance created.');
 }

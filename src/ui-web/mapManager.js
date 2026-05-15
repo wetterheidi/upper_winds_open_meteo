@@ -1014,6 +1014,8 @@ function _initializeBasicMapInstance(defaultCenter, defaultZoom) {
         touchRotate: true,
         shiftKeyRotate: true,
         rotateControl: false,
+        preferCanvas: true,
+        zoomAnimation: false
     });
     console.log('Map instance created.');
 }
@@ -1069,7 +1071,12 @@ function _addStandardMapControls() {
     });
 
     L.control.zoom({ position: 'topright' }).addTo(AppState.map);
-    L.control.rotate({ position: 'topright' }).addTo(AppState.map);
+    // Subklasse mit überschriebenem _cycleState, damit der Event-Listener
+    // bereits die korrekte Funktion referenziert (nicht nachträglich patchbar).
+    const NorthResetControl = L.Control.Rotate.extend({
+        _cycleState() { this._map.setBearing(0); }
+    });
+    new NorthResetControl({ position: 'topright' }).addTo(AppState.map);
 
     L.control.scale({
         position: 'bottomleft',
@@ -1249,7 +1256,8 @@ function _setupBaseLayersAndHandling() {
             L.tileLayer.cached('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
                 maxZoom: 19,
                 attribution: '© EsriEsri, USDA, USGS © OpenStreetMap contributors, and the GIS user community',
-                pane: 'shadowPane'
+                pane: 'overlayPane',
+                zIndex: 2
             })
         ]),
         "Esri Satellite + OSM": L.layerGroup([
@@ -1370,6 +1378,7 @@ function _setupCustomPanes() {
     AppState.map.getPane('gpxTrackPane').style.zIndex = 650;
     AppState.map.getPane('tooltipPane').style.zIndex = 700;
     AppState.map.getPane('popupPane').style.zIndex = 700;
+
     console.log('Custom map panes created.');
 }
 
@@ -1795,11 +1804,37 @@ function _setupCoreMapEventHandlers() {
 
     AppState.map.on('dblclick', _handleMapDblClick);
 
+    // During touch rotation, setBearing() updates _bearing but NOT _pixelOrigin,
+    // and the renderer draws paths using stale _parts (pixel coords computed with
+    // the old _pixelOrigin). We fix this by:
+    //   1. updating _pixelOrigin for the new bearing
+    //   2. re-projecting every vector layer (_project rebuilds _parts from LatLngs)
+    //   3. forcing a renderer redraw so the freshly-projected coords are painted
+    // This mirrors what Renderer._onZoomEnd does after a zoom change.
+    // The 'rotate' listener handles the immediate visual; 'move' corrects for any
+    // subsequent _updateTransform displacement from map._move() in the next rAF.
+    const _updateSvgPaths = () => {
+        const map = AppState.map;
+        if (!map?._rotate || map._animatingZoom) return;
+        const renderer = map._renderer;
+        if (!renderer) return;
+        map._pixelOrigin = map._getNewPixelOrigin(map.getCenter(), map.getZoom());
+        for (const id in renderer._layers) {
+            renderer._layers[id]._project?.();
+        }
+        renderer._update();
+    };
+    AppState.map.on('rotate', _updateSvgPaths);
+    AppState.map.on('move', _updateSvgPaths);
+
     AppState.map.on('rotate', () => {
         const mb = AppState.map.getBearing();
         if (AppState.patternArrowMarkers) {
-            AppState.patternArrowMarkers.forEach(({ marker, bearing, color }) => {
-                marker.setIcon(createArrowIcon(bearing, color, mb));
+            AppState.patternArrowMarkers.forEach(({ marker, bearing }) => {
+                const el = marker.getElement();
+                if (el?.firstElementChild) {
+                    el.firstElementChild.style.transform = `rotate(${(bearing + mb + 360) % 360}deg)`;
+                }
             });
         }
     });

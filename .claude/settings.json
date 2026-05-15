@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(xargs ls:*)",
-      "Bash(grep -E \"\\\\.js$|\\\\.html$|\\\\.ts$|index\")"
+      "Bash(grep -E \"\\\\.js$|\\\\.html$|\\\\.ts$|index\")",
+      "Bash(awk -F: '$2+0 >= 12460 && $2+0 <= 12560')"
     ]
   }
 }
