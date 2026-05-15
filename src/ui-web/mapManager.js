@@ -1024,7 +1024,10 @@ function _addStandardMapControls() {
         return;
     }
 
-    L.control.layers(AppState.baseMaps, null, { position: 'topright' }).addTo(AppState.map);
+    const radarOverlayGroup = L.layerGroup();
+    const overlays = { [I18n.t('map.radar.toggle')]: radarOverlayGroup };
+    L.control.layers(AppState.baseMaps, overlays, { position: 'topright' }).addTo(AppState.map);
+
     AppState.map.on('baselayerchange', function (e) {
         if (Settings && Settings.state && Settings.state.userSettings) {
             Settings.state.userSettings.baseMaps = e.name;
@@ -1034,6 +1037,35 @@ function _addStandardMapControls() {
         if (AppState.lastLat && AppState.lastLng && typeof cacheTilesForDIP === 'function') {
             cacheTilesForDIP({ map: AppState.map, lastLat: AppState.lastLat, lastLng: AppState.lastLng, baseMaps: AppState.baseMaps });
         }
+    });
+
+    AppState.map.on('overlayadd', async (e) => {
+        if (e.layer !== radarOverlayGroup) return;
+        if (!AppState.isRadarVisible) await RainRadar.toggleRadar();
+        const panel = AppState.radarOptionsControl?.getContainer();
+        if (panel) {
+            panel.style.display = 'block';
+            try {
+                const saved = localStorage.getItem('radarOpacity');
+                const slider = panel.querySelector('#radarOpacitySlider');
+                if (slider && saved !== null) {
+                    const val = parseFloat(saved);
+                    slider.value = (Number.isFinite(val) && val > 0) ? Math.round(val * 100) : 50;
+                }
+            } catch (_) { /* ignore */ }
+        }
+    });
+
+    AppState.map.on('overlayremove', (e) => {
+        if (e.layer !== radarOverlayGroup) return;
+        if (AppState.isRadarVisible) RainRadar.toggleRadar();
+        if (RainRadar.isAnimating()) {
+            RainRadar.stopAnimation();
+            const animBtn = AppState.radarOptionsControl?.getContainer()?.querySelector('#radarAnimateBtn');
+            if (animBtn) animBtn.textContent = I18n.t('map.radar.animate');
+        }
+        const panel = AppState.radarOptionsControl?.getContainer();
+        if (panel) panel.style.display = 'none';
     });
 
     L.control.zoom({ position: 'topright' }).addTo(AppState.map);
@@ -1087,66 +1119,38 @@ function _addStandardMapControls() {
     }
 
     // ============================================================
-    // Wetterradar-Control (RainViewer)
+    // Wetterradar-Optionen (RainViewer)
     // ============================================================
-    _addRadarControl();
+    _addRadarOptionsPanel();
 
     console.log('Standard map controls including Geoman have been added.');
 }
 
-function _addRadarControl() {
-    const RadarControl = L.Control.extend({
+function _addRadarOptionsPanel() {
+    const RadarOptionsControl = L.Control.extend({
         options: { position: 'bottomright' },
 
         onAdd() {
             const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-radar');
             L.DomEvent.disableClickPropagation(container);
             L.DomEvent.disableScrollPropagation(container);
+            container.style.display = 'none';
 
             container.innerHTML = `
                 <div class="radar-control-panel">
-                    <button id="radarToggleBtn" class="radar-btn" title="${I18n.t('map.radar.toggle')}">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="10"/>
-                            <circle cx="12" cy="12" r="6"/>
-                            <circle cx="12" cy="12" r="2"/>
-                            <line x1="12" y1="2" x2="12" y2="12"/>
-                        </svg>
-                        <span>${I18n.t('map.radar.toggle')}</span>
-                    </button>
-                    <div id="radarOptions" class="radar-options" style="display:none;">
-                        <div class="radar-opacity-row">
-                            <label>${I18n.t('map.radar.opacity')}:</label>
-                            <input id="radarOpacitySlider" type="range" min="0" max="100" value="50" />
-                        </div>
-                        <div class="radar-animation-row">
-                            <button id="radarAnimateBtn" class="radar-btn-small">${I18n.t('map.radar.animate')}</button>
-                            <span id="radarTimestamp" class="radar-timestamp"></span>
-                        </div>
+                    <div class="radar-opacity-row">
+                        <label>${I18n.t('map.radar.opacity')}:</label>
+                        <input id="radarOpacitySlider" type="range" min="0" max="100" value="50" />
+                    </div>
+                    <div class="radar-animation-row">
+                        <button id="radarAnimateBtn" class="radar-btn-small">${I18n.t('map.radar.animate')}</button>
+                        <span id="radarTimestamp" class="radar-timestamp"></span>
                     </div>
                 </div>
             `;
 
-            // Toggle radar on/off
-            const toggleBtn = container.querySelector('#radarToggleBtn');
-            const optionsPanel = container.querySelector('#radarOptions');
             const opacitySlider = container.querySelector('#radarOpacitySlider');
             const animateBtn = container.querySelector('#radarAnimateBtn');
-
-            // Restore saved opacity (match _getStoredOpacity logic: ignore 0, fallback to 50%)
-            try {
-                const saved = localStorage.getItem('radarOpacity');
-                if (saved !== null) {
-                    const val = parseFloat(saved);
-                    opacitySlider.value = (Number.isFinite(val) && val > 0) ? Math.round(val * 100) : 50;
-                }
-            } catch (e) { /* ignore */ }
-
-            toggleBtn.addEventListener('click', async () => {
-                await RainRadar.toggleRadar();
-                toggleBtn.classList.toggle('radar-active', AppState.isRadarVisible);
-                optionsPanel.style.display = AppState.isRadarVisible ? 'block' : 'none';
-            });
 
             opacitySlider.addEventListener('input', (e) => {
                 RainRadar.setOpacity(parseInt(e.target.value, 10) / 100);
@@ -1166,7 +1170,8 @@ function _addRadarControl() {
         }
     });
 
-    new RadarControl().addTo(AppState.map);
+    AppState.radarOptionsControl = new RadarOptionsControl();
+    AppState.radarOptionsControl.addTo(AppState.map);
 }
 
 async function _initializeDefaultMarker(defaultCenter, initialAltitude) {
