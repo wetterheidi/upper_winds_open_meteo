@@ -4,7 +4,8 @@
       "Bash(xargs ls:*)",
       "Bash(grep -E \"\\\\.js$|\\\\.html$|\\\\.ts$|index\")",
       "Bash(awk -F: '$2+0 >= 12460 && $2+0 <= 12560')",
-      "Bash(npx cap *)"
+      "Bash(npx cap *)",
+      "Bash(grep -v \"^.*//.*$\")"
     ]
   }
 }

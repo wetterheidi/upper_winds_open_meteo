@@ -252,6 +252,7 @@ export async function stopPositionTracking() {
     // Zustand zurücksetzen
     AppState.liveMarker = null;
     AppState.accuracyCircle = null;
+    AppState.lastSmoothedHeading = null;
     AppState.prevLat = null;
     AppState.prevLng = null;
     AppState.altitudeCorrectionOffset = 0;
@@ -383,7 +384,9 @@ const debouncedPositionUpdate = Utils.debounce(async (position) => {
             altitudeAccuracy, accuracy,
             speedMs: AppState.lastSmoothedSpeedMs,
             rateOfClimbMps: AppState.lastSmoothedRateOfClimbMps,
-            direction: typeof direction === 'number' ? direction.toFixed(0) : 'N/A'
+            direction: typeof direction === 'number' ? direction.toFixed(0) : 'N/A',
+            directionDeg: typeof direction === 'number' ? direction : null,
+            gpsHeading: typeof position.coords.heading === 'number' ? position.coords.heading : null
         },
         bubbles: true, cancelable: true
     });

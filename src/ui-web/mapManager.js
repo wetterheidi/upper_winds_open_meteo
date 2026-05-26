@@ -15,6 +15,11 @@ import 'leaflet-rotate';
 
 let lastTapTime = 0;
 
+// Heading-Up Zustand
+let _isAutoRotating = false;
+let _headingUpPaused = false;
+let _headingUpPauseTimeout = null;
+
 // ===================================================================
 // 1. Initialisierung
 // ===================================================================
@@ -51,6 +56,7 @@ async function initMap() {
     _setupBaseLayersAndHandling();
     _addStandardMapControls();
     _setupCustomPanes();
+    _initializeHeadingUpControl();
     _initializeDefaultMarker(defaultCenter, initialAltitude);
 
     _setupCoreMapEventHandlers();
@@ -1133,6 +1139,86 @@ function _addStandardMapControls() {
     console.log('Standard map controls including Geoman have been added.');
 }
 
+const HeadingUpControl = L.Control.extend({
+    options: { position: 'topright' },
+    onAdd: function () {
+        const container = L.DomUtil.create('div', 'leaflet-control-heading-up leaflet-bar');
+        container.style.display = 'none';
+        const btn = L.DomUtil.create('a', '', container);
+        btn.href = '#';
+        btn.setAttribute('role', 'button');
+        btn.style.cssText = 'font-size:11px;font-weight:bold;letter-spacing:0.03em;min-width:34px;text-align:center;padding:0 4px;line-height:26px;';
+        L.DomEvent.on(btn, 'click', L.DomEvent.stop);
+        L.DomEvent.on(btn, 'click', () => {
+            const newVal = !Settings.state.userSettings.headingUp;
+            Settings.state.userSettings.headingUp = newVal;
+            Settings.save();
+            if (!newVal) {
+                _headingUpPaused = false;
+                clearTimeout(_headingUpPauseTimeout);
+                AppState.lastSmoothedHeading = null;
+                AppState.map.setBearing(0);
+            }
+            this._updateStyle();
+        });
+        this._btn = btn;
+        this._container = container;
+        this._updateStyle();
+        return container;
+    },
+    setVisible: function (visible) {
+        this._container.style.display = visible ? '' : 'none';
+    },
+    _updateStyle: function () {
+        const active = Settings.state.userSettings.headingUp;
+        this._btn.textContent = active ? 'HDG' : 'N Up';
+        this._btn.title = active ? 'Heading Up aktiv – klicken für North Up' : 'North Up – klicken für Heading Up';
+        this._btn.style.color = active ? '#2979ff' : '';
+        this._btn.style.background = active ? 'rgba(41,121,255,0.1)' : '';
+    }
+});
+
+function _initializeHeadingUpControl() {
+    AppState.headingUpControl = new HeadingUpControl().addTo(AppState.map);
+
+    document.addEventListener('tracking:started', () => {
+        AppState.headingUpControl?.setVisible(true);
+        AppState.headingUpControl?._updateStyle();
+    });
+    document.addEventListener('tracking:stopped', () => {
+        AppState.headingUpControl?.setVisible(false);
+        Settings.state.userSettings.headingUp = false;
+        Settings.save();
+        _headingUpPaused = false;
+        clearTimeout(_headingUpPauseTimeout);
+        AppState.lastSmoothedHeading = null;
+    });
+}
+
+/**
+ * Aktualisiert die Kartenausrichtung im "Heading Up"-Modus.
+ * @param {number|null} gpsHeading - Nativer GPS/Kompass-Heading, oder null
+ * @param {number|null} directionDeg - Berechneter Kurs aus zwei Positionen, oder null
+ * @param {number} speedMs - Aktuelle geglättete Geschwindigkeit in m/s
+ */
+export function updateHeadingUp(gpsHeading, directionDeg, speedMs) {
+    if (!Settings.getValue('headingUp') || _headingUpPaused) return;
+    if (speedMs < 2.5) return;
+
+    const rawHeading = typeof gpsHeading === 'number' ? gpsHeading
+        : typeof directionDeg === 'number' ? directionDeg
+        : null;
+    if (rawHeading === null) return;
+
+    const prev = AppState.lastSmoothedHeading ?? rawHeading;
+    const diff = ((rawHeading - prev + 540) % 360) - 180;
+    AppState.lastSmoothedHeading = (prev + 0.15 * diff + 360) % 360;
+
+    _isAutoRotating = true;
+    AppState.map.setBearing(AppState.lastSmoothedHeading, { animate: false });
+    _isAutoRotating = false;
+}
+
 function _addRadarOptionsPanel() {
     const RadarOptionsControl = L.Control.extend({
         options: { position: 'bottomright' },
@@ -1826,6 +1912,15 @@ function _setupCoreMapEventHandlers() {
     };
     AppState.map.on('rotate', _updateSvgPaths);
     AppState.map.on('move', _updateSvgPaths);
+
+    // Manuelle Touch-Rotation: Heading-Up für 10 s pausieren
+    AppState.map.on('rotate', () => {
+        if (!_isAutoRotating && Settings.getValue('headingUp')) {
+            _headingUpPaused = true;
+            clearTimeout(_headingUpPauseTimeout);
+            _headingUpPauseTimeout = setTimeout(() => { _headingUpPaused = false; }, 10000);
+        }
+    });
 
     AppState.map.on('rotate', () => {
         const mb = AppState.map.getBearing();

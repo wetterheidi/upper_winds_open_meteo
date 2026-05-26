@@ -70,6 +70,7 @@ export const AppState = {
     watchId: null,                     // @type {string|number|null} - Die ID des aktiven Geolocation-Watchers.
     liveMarker: null,                  // @type {L.Marker|null} - Der Marker, der die Live-Position anzeigt.
     livePositionControl: null,         // @type {L.Control|null} - Das Control zur Anzeige der Live-Positionsdaten.
+    headingUpControl: null,            // @type {L.Control|null} - Das Toggle-Control für den "Heading Up"-Modus.
     accuracyCircle: null,              // @type {L.Circle|null} - Der Genauigkeitskreis um den Live-Marker.
     jumpMasterLine: null,              // @type {L.Polyline|null} - Die Linie vom Live-Marker zum Ziel (DIP/HARP).
     aircraftMarker: null,              // @type {L.Marker|null} - NEU: Der Marker für das Absetzflugzeug.
@@ -95,6 +96,7 @@ export const AppState = {
     lastAccuracy: null,                // @type {number|null} - Horizontale Genauigkeit der Position.
     lastSpeed: 'N/A',                  // @type {number|string} - *HINWEIS: Wird von `lastSmoothedSpeedMs` abgedeckt, könnte redundant sein.*
     lastSmoothedSpeedMs: 0,            // @type {number} - Geglättete Geschwindigkeit in m/s.
+    lastSmoothedHeading: null,         // @type {number|null} - Geglättetes Heading für "Heading Up"-Modus in Grad.
     lastDirection: 'N/A',              // @type {number|string} - Geglättete Richtung in Grad.
     lastTerrainAltitude: 'N/A',        // @type {number|string} - *HINWEIS: Wird von `lastAltitude` abgedeckt, könnte redundant sein.*
     lastEffectiveWindUnit: 'kt',       // @type {string} - *HINWEIS: Gehört eher in `Settings`, da es eine Benutzereinstellung ist.*

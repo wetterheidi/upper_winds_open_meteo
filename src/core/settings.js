@@ -96,6 +96,7 @@ export const Settings = {
         isInteractionLocked: false,
         enableWindAlert: true,
         northReference: 'true',
+        headingUp: false,
 
         alerts: {
             wind: {

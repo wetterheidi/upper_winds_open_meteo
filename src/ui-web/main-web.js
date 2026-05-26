@@ -1578,6 +1578,7 @@ function setupAppEventListeners() {
 
     document.addEventListener('tracking:positionUpdated', (event) => {
         updateJumpMasterLineAndPanel(event.detail);
+        mapManager.updateHeadingUp(event.detail.gpsHeading, event.detail.directionDeg, event.detail.speedMs);
     });
 
     document.addEventListener('jml:targetChanged', () => {
