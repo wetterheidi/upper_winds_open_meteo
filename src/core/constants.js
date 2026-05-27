@@ -34,7 +34,7 @@ export const JUMPER_SEPARATION_TABLE = {
  */
 export const FREEFALL_PHYSICS = {
     TERMINAL_VELOCITY_VERTICAL_MPS: 50,   // m/s, typische vertikale Endgeschwindigkeit Mini: Belly 50-55 m/s, Headdown 69-77 m/s
-    GRAVITY_ACCELERATION: 9.81,           // m/s², Erdbeschleunigung
+    GRAVITY_ACCELERATION: 9.80665,         // m/s², Erdbeschleunigung (ISA-Standardwert)
     HORIZONTAL_DRAG_TAU_SECONDS: 5,       // Sekunden, Zeitkonstante für den Abbau der horiz. Geschwindigkeit
     DEFAULT_AREA_VERTICAL: 0.5,           // m², angenommene Fläche für vertikalen Luftwiderstand
     DEFAULT_AREA_HORIZONTAL: 0.5,         // m², angenommene Fläche für horizontalen Luftwiderstand
@@ -150,14 +150,13 @@ export const CONVERSIONS = {
     KNOTS_TO_KMH: 1.852,
     MPH_TO_KMH: 1.60934,
     CELSIUS_TO_KELVIN: 273.15,
-    MOLAR_MASS_AIR: 0.0289644, // kg/mol
 };
 
 /** Physikalische Konstanten. */
 export const PHYSICAL_CONSTANTS = {
     MOLAR_MASS_AIR: 0.0289644, // kg/mol
     UNIVERSAL_GAS_CONSTANT: 8.31446261815324, // J/(mol·K)
-}
+};
 
 /** Konstanten der Internationalen Standardatmosphäre (ISA). */
 export const ISA_CONSTANTS = { // International Standard Atmosphere
@@ -211,7 +210,7 @@ export const SMOOTHING_DEFAULTS = {
     MIN_TIME_DIFF_FOR_SPEED_CALC_S: 0.5,
     SPEED_SMOOTHING_LOW: 0.5, // Glättungsfaktor für niedrige Geschwindigkeiten
     SPEED_SMOOTHING_HIGH: 0.2, // Glättungsfaktor für hohe Geschwindigkeiten
-    SPEED_SMOOTHING_TRESHOLD: 25, // m/s, Schwelle, ab der die stärkere Glättung greift
+    SPEED_SMOOTHING_THRESHOLD: 25, // m/s, Schwelle, ab der die stärkere Glättung greift
 };
 
 /** Konfiguration für das Caching von Kartenkacheln. */

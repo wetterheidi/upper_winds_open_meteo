@@ -349,7 +349,7 @@ const debouncedPositionUpdate = Utils.debounce(async (position) => {
     }
 
     // Glättung der Werte für eine stabilere Anzeige
-    const alphaSpeed = speedMs < SMOOTHING_DEFAULTS.SPEED_SMOOTHING_TRESHOLD ? SMOOTHING_DEFAULTS.SPEED_SMOOTHING_LOW : SMOOTHING_DEFAULTS.SPEED_SMOOTHING_HIGH;
+    const alphaSpeed = speedMs < SMOOTHING_DEFAULTS.SPEED_SMOOTHING_THRESHOLD ? SMOOTHING_DEFAULTS.SPEED_SMOOTHING_LOW : SMOOTHING_DEFAULTS.SPEED_SMOOTHING_HIGH;
     AppState.lastSmoothedSpeedMs = alphaSpeed * speedMs + (1 - alphaSpeed) * AppState.lastSmoothedSpeedMs;
     const alphaVario = 0.5; // Fester Glättungsfaktor für das Variometer
     AppState.lastSmoothedRateOfClimbMps = alphaVario * verticalSpeedMps + (1 - alphaVario) * (AppState.lastSmoothedRateOfClimbMps || 0);
