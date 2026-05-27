@@ -115,7 +115,7 @@ export class Utils {
     }
 
     /**
-     * Rechnet Meter in Fuss um.
+     * Rechnet Fuss in Meter um.
      * @param {number|null|undefined} feet - Der Wert in Fuss.
      * @returns {number} Der umgerechnete Wert in Metern, oder 0 bei ungültiger Eingabe.
      */
@@ -123,7 +123,7 @@ export class Utils {
         if (feet === null || feet === undefined || isNaN(feet)) {
             return 0;
         }
-        return feet / 3.28084;
+        return feet * CONVERSIONS.FEET_TO_METERS;
     }
 
     /**
@@ -163,7 +163,7 @@ export class Utils {
                 break;
             case 'mph':
                 speedInKmH = value * 1.60934;
-                break; // Double-check this break is present
+                break;
             case 'bft':
                 speedInKmH = Utils.beaufortToKnots(value) * CONVERSIONS.KNOTS_TO_KMH;
                 break;
@@ -197,7 +197,7 @@ export class Utils {
 
     /** Wandelt Beaufort in Knoten um. @private */
     static beaufortToKnots(bft) {
-        return BEAUFORT.BEAUFORT_THRESHOLDS[bft] || 63; // Default to max if bft > 12
+        return BEAUFORT.BEAUFORT_THRESHOLDS[bft] ?? 63; // Default to max if bft > 12
     }
 
     /**
@@ -275,7 +275,6 @@ export class Utils {
         if (!surfacePressure || elevation === 'N/A' || referenceElevation === 'N/A' || isNaN(surfacePressure) || isNaN(elevation) || isNaN(referenceElevation)) {
             return 'N/A';
         }
-        //console.log('QFE reference elevation: ', referenceElevation);
         // Constants for barometric formula
         const g = ISA_CONSTANTS.GRAVITY; // Gravitational acceleration (m/s²)
         const M = PHYSICAL_CONSTANTS.MOLAR_MASS_AIR; // Molar mass of air (kg/mol)
@@ -289,7 +288,6 @@ export class Utils {
         const exponent = (g * M) / (R * L);
         const qfePa = P0 * Math.pow(1 - (L * h) / T, exponent);
 
-        //console.log(surfacePressure, elevation, referenceElevation);
         // Convert back to hPa and round to nearest integer
         const qfe = Math.round(qfePa / 100);
         return isNaN(qfe) ? 'N/A' : qfe;
@@ -342,62 +340,6 @@ export class Utils {
                 xVector.reverse();
             }
         }
-    }
-
-    /**
-     * Führt eine lineare Interpolation für Winkel durch und wählt dabei den kürzesten Weg. (Für Windspinne)
-     * @param {number[]} xVector - Der Vektor der Stützstellen (z.B. Höhen).
-     * @param {number[]} yVector - Der Vektor der Winkelwerte in Grad.
-     * @param {number} xValue - Der Wert, für den ein Winkel gefunden werden soll.
-     * @returns {number} Der interpolierte Winkel in Grad (0-360).
-     */
-    static linearInterpolateAngle(xVector, yVector, xValue) {
-        if (!xVector?.length || !yVector?.length || xVector.length !== yVector.length) {
-            return NaN;
-        }
-
-        // Stellt sicher, dass der Höhenvektor immer absteigend sortiert ist, um die Logik zu vereinfachen
-        let isReversed = false;
-        if (xVector[0] < xVector[xVector.length - 1]) { // Prüft, ob aufsteigend sortiert
-            xVector = [...xVector].reverse();
-            yVector = [...yVector].reverse();
-            isReversed = true;
-        }
-
-        const len = xVector.length;
-        let i = 0;
-        // Findet das Segment, in das der xValue fällt
-        while (i < len && xVector[i] > xValue) {
-            i++;
-        }
-
-        // Behandelt Extrapolation (wenn xValue außerhalb des Bereichs liegt)
-        if (i === 0) i = 1;
-        else if (i === len) i = len - 1;
-
-        const x0 = xVector[i - 1], x1 = xVector[i];
-        let y0 = yVector[i - 1], y1 = yVector[i];
-
-        // --- Die Kernlogik für die Winkelinterpolation ---
-        let diff = y1 - y0;
-        if (diff > 180) diff -= 360;      // Wähle den kürzeren Weg (z.B. 350° -> 10° ist -20°, nicht +340°)
-        if (diff < -180) diff += 360;     // Wähle den kürzeren Weg in die andere Richtung
-
-        if (x1 - x0 === 0) return y0; // Vermeide Division durch Null
-
-        const factor = (xValue - x0) / (x1 - x0);
-        let result = y0 + factor * diff;
-
-        // Normalisiere das Ergebnis auf den Bereich [0, 360)
-        result = (result + 360) % 360;
-
-        // Macht die Umkehrung der Vektoren rückgängig, falls sie am Anfang stattgefunden hat
-        if (isReversed) {
-            xVector.reverse();
-            yVector.reverse();
-        }
-
-        return result;
     }
 
     /**
@@ -488,7 +430,7 @@ export class Utils {
      * @returns {{u: number, v: number}|{u: string, v: string}} Ein Objekt mit den interpolierten u- und v-Komponenten oder ein Fehlerobjekt.
      */
     static interpolateWindAtAltitude(z, pressureLevels, heights, uComponents, vComponents) {
-        if (pressureLevels.length != heights.length || pressureLevels.length != uComponents.length || pressureLevels.length != vComponents.length) {
+        if (pressureLevels.length !== heights.length || pressureLevels.length !== uComponents.length || pressureLevels.length !== vComponents.length) {
             return { u: 'Invalid input', v: 'Invalid input' };
         }
 
@@ -503,7 +445,7 @@ export class Utils {
         // Step 2: Interpolate u and v at p(z) using log(p) interpolation
         const u_z = Utils.linearInterpolate(log_pressureLevels, uComponents, Math.log(p_z));
         const v_z = Utils.linearInterpolate(log_pressureLevels, vComponents, Math.log(p_z));
-        if (typeof u_z === 'string' && u_z.includes('error') || typeof v_z === 'string' && v_z.includes('error')) {
+        if ((typeof u_z === 'string' && u_z.includes('error')) || (typeof v_z === 'string' && v_z.includes('error'))) {
             return { u: 'Interpolation error', v: 'Interpolation error' };
         }
 
@@ -658,7 +600,7 @@ export class Utils {
     }
 
     /**
-         * NEUE FUNKTION: Findet signifikante Wolkenschichten und gibt sie als strukturiertes Array zurück.
+     * Findet signifikante Wolkenschichten und gibt sie als strukturiertes Array zurück.
          * @param {object[]} interpolatedData - Die interpolierten Wetterdaten.
          * @returns {Array<{cover: string, base: number}>} Ein Array von Wolkenschicht-Objekten.
          * @private
@@ -699,7 +641,7 @@ export class Utils {
     }
 
     /**
-     * KORRIGIERTE FUNKTION: Nutzt nun findCloudLayers und kümmert sich nur noch um die Formatierung.
+     * Nutzt findCloudLayers und formatiert das Ergebnis als METAR-String.
      */
     static getCloudLayersForMetar(interpolatedData, heightUnit) {
         const layers = Utils.findCloudLayers(interpolatedData);
@@ -801,19 +743,6 @@ export class Utils {
         const exponent = (gravity / (lapseRate * gasConstant)) - 1;
         const densityRatio = Math.pow(base, exponent);
         const tas = ias / Math.sqrt(densityRatio);
-
-        console.log('calculateTAS debug:', {
-            ias,
-            heightFt,
-            heightM,
-            tempAtAltitude,
-            tempRatio,
-            base,
-            exponent,
-            densityRatio,
-            tas,
-            tasRounded: Number(tas.toFixed(2))
-        });
 
         return Number(tas.toFixed(2));
     }
@@ -987,7 +916,7 @@ export class Utils {
 
         // Return based on the requested format
         switch (format) {
-            case 'DDM': // NEU: Grad Dezimalminuten
+            case 'DDM':
                 return {
                     lat: Utils.decimalToDecimalMinutes(lat, true),
                     lng: Utils.decimalToDecimalMinutes(lng, false)
@@ -997,16 +926,17 @@ export class Utils {
                     lat: Utils.decimalToDms(lat, true),
                     lng: Utils.decimalToDms(lng, false)
                 };
-            case 'MGRS':
+            case 'MGRS': {
                 const mgrsVal = Utils.decimalToMgrs(lat, lng);
                 return { lat: mgrsVal, lng: mgrsVal }; // MGRS is a single string
+            }
             case 'Decimal':
             default:
                 return { lat: lat.toFixed(6), lng: lng.toFixed(6) };
         }
     }
 
-    /** NEUE FUNKTION: Konvertiert Dezimalgrad in Grad Dezimalminuten. @private */
+    /** Konvertiert Dezimalgrad in Grad Dezimalminuten. @private */
     static decimalToDecimalMinutes(decimal, isLat) {
         if (isNaN(decimal) || decimal === null || decimal === undefined) {
             throw new Error('Invalid coordinate for DDM conversion');
@@ -1385,7 +1315,6 @@ export class Utils {
      * @returns {Promise<string>} Der formatierte lokale Zeit-String.
      */
     static async formatLocalTime(utcTimeStr, lat, lng) {
-        // Die Prüfung und die Deklaration sind nicht mehr nötig.
         const { timezone, timezone_abbreviation } = await Utils.getLocationData(lat, lng);
         const utcDate = DateTime.fromISO(utcTimeStr, { zone: 'UTC' });
         const localDate = utcDate.setZone(timezone);
@@ -1403,7 +1332,6 @@ export class Utils {
         const utcDate = now.getUTCDate();
         const utcHour = now.getUTCHours();
         const lastFullHour = new Date(Date.UTC(utcYear, utcMonth, utcDate, utcHour, 0, 0));
-        console.log('Last full hour UTC:', lastFullHour.toISOString());
         return lastFullHour; // Return Date object instead of string
     }
 
@@ -1416,8 +1344,6 @@ export class Utils {
      * @returns {Promise<string>} Der formatierte Zeit-String.
      */
     static async getDisplayTime(utcTimeStr, lat, lng, timeZone = 'Z') {
-        // KORREKTUR: Die Funktion greift nicht mehr selbst auf das Dokument zu.
-        // Sie verlässt sich auf den übergebenen 'timeZone'-Parameter.
         if (timeZone.toLowerCase() === 'loc' && lat && lng) {
             return await Utils.formatLocalTime(utcTimeStr, lat, lng);
         } else {
@@ -1604,13 +1530,9 @@ export class Utils {
      * @param {number} [referenceZoom] - Der Referenz-Zoom-Level.
      * @returns {number} Der angepasste Radius in Pixeln.
      */
-    static calculateDynamicRadius(baseRadius = ENSEMBLE_VISUALIZATION.HEATMAP_SCALING_BASE, referenceZoom = ENSEMBLE_VISUALIZATION.HEATMAP_REFERENCE_ZOOM) {
+    static calculateDynamicRadius(baseRadius = ENSEMBLE_VISUALIZATION.HEATMAP_BASE_RADIUS, referenceZoom = ENSEMBLE_VISUALIZATION.HEATMAP_REFERENCE_ZOOM) {
         const currentZoom = AppState.map.getZoom();
-        // NEU: Anstatt der festen "2" verwenden wir eine anpassbare Basis.
-        // Ein Wert um 1.6 ist oft ein guter Kompromiss.
-        // - Näher an 1: Sanftere Skalierung
-        // - Näher an 2: Aggressivere Skalierung
-        const scalingBase = ENSEMBLE_VISUALIZATION.HEATMAP_SCALING_BASE || 1.6; // Fallback auf 1.6, wenn nicht definiert
+        const scalingBase = ENSEMBLE_VISUALIZATION.HEATMAP_SCALING_BASE;
 
         const scaleFactor = Math.pow(scalingBase, currentZoom - referenceZoom);
         const dynamicRadius = baseRadius * scaleFactor;
@@ -1618,7 +1540,6 @@ export class Utils {
         const minRadius = ENSEMBLE_VISUALIZATION.HEATMAP_MIN_RADIUS_PX;  // Minimum radius to avoid disappearing at high zooms
         const maxRadius = ENSEMBLE_VISUALIZATION.HEATMAP_MAX_RADIUS_PX; // Maximum radius to avoid excessive spread at low zooms
         const adjustedRadius = Math.max(minRadius, Math.min(maxRadius, dynamicRadius));
-        console.log('[calculateDynamicRadius] Calculated dynamic radius:', { currentZoom, baseRadius, scaleFactor, dynamicRadius, adjustedRadius });
         return adjustedRadius;
     }
 
@@ -1646,7 +1567,6 @@ export class Utils {
         const coords = Utils.convertCoords(point.lat, point.lng, currentCoordFormat);
         let tooltipContent;
 
-        // NEUE, ERWEITERTE FORMATIERUNG
         const formatDDM = (ddm) => `${ddm.deg}° ${ddm.min.toFixed(3)}' ${ddm.dir}`;
         const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
 
