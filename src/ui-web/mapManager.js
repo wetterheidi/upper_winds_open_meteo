@@ -96,7 +96,7 @@ export function drawJumpVisualization(jumpData) {
         jumpData.exitCircles.forEach(circleInfo => {
             if (!_isValidCircle(circleInfo)) return;
             const circleLayer = L.circle(circleInfo.center, {
-                radius: circleInfo.radius,
+                ...circleInfo,
                 className: 'jump-viz-exit-area',
                 pmIgnore: true
             }).addTo(AppState.jumpVisualizationLayerGroup);

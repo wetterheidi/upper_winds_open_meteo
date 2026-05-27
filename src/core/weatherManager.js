@@ -8,9 +8,9 @@
 import { AppState } from './state.js';
 import { Utils } from './utils.js';
 import { Settings } from './settings.js';
-import { WEATHER_MODELS, API_URLS, STANDARD_PRESSURE_LEVELS, THUNDERSTORM_CODES } from './constants.js';
+import { WEATHER_MODELS, API_URLS, STANDARD_PRESSURE_LEVELS, THUNDERSTORM_CODES, CONVERSIONS } from './constants.js';
 import { DateTime } from 'luxon';
-import { I18n } from './i18n.js'; // <--- NEU: Importiert
+import { I18n } from './i18n.js';
 import { SOUNDING_MODEL_ID, checkSoundingAvailability, fetchSoundingData } from './soundingManager.js';
 
 // ===================================================================
@@ -104,13 +104,6 @@ export async function fetchWeatherForLocation(lat, lng, currentTime = null) {
 }
 
 /**
- * Ermittelt den Slider-Index für den aktuellen UTC-Zeitpunkt in den geladenen Wetterdaten.
- * Funktioniert korrekt für beliebige Startzeiten (00Z Open-Meteo, 06Z/12Z/... Progtemp).
- * @param {object} weatherData - Das aktuelle weatherData-Objekt mit einem 'time'-Array.
- * @returns {number} Der Index des nächstgelegenen vergangenen oder gleichen Zeitschritts,
- *                   oder der letzte verfügbare Index falls alle Zeiten in der Vergangenheit liegen.
- */
-/**
  * Sucht den Index in weatherData.time, der einem gegebenen ISO-Zeitstempel am nächsten liegt.
  * Normiert beide Strings auf "YYYY-MM-DDTHH" für modell-unabhängigen Vergleich.
  * @param {object} weatherData
@@ -131,6 +124,13 @@ export function findTimeIndex(weatherData, isoTime) {
     return bestIndex;
 }
 
+/**
+ * Ermittelt den Slider-Index für den aktuellen UTC-Zeitpunkt in den geladenen Wetterdaten.
+ * Funktioniert korrekt für beliebige Startzeiten (00Z Open-Meteo, 06Z/12Z/... Progtemp).
+ * @param {object} weatherData - Das aktuelle weatherData-Objekt mit einem 'time'-Array.
+ * @returns {number} Der Index des nächstgelegenen vergangenen oder gleichen Zeitschritts,
+ *                   oder der letzte verfügbare Index falls alle Zeiten in der Vergangenheit liegen.
+ */
 export function findCurrentTimeIndex(weatherData) {
     if (!weatherData?.time?.length) return 0;
     // UTC-Stunde als String "YYYY-MM-DDTHH" aufbauen — kein Date-Parsing nötig.
@@ -251,7 +251,7 @@ export function interpolateWeatherData(weatherData, sliderIndex, interpStep, bas
     const lowestPressureLevel = Math.max(...validPressureLevels);
     const hLowest = weatherData[`geopotential_height_${lowestPressureLevel}hPa`][sliderIndex];
     if (surfacePressure > lowestPressureLevel && Number.isFinite(hLowest)) {
-        const interpStepInMeters = heightUnit === 'ft' ? interpStep / 3.28084 : interpStep;
+        const interpStepInMeters = heightUnit === 'ft' ? interpStep * CONVERSIONS.FEET_TO_METERS : interpStep;
         const stepsBetween = Math.floor((hLowest - baseHeight) / interpStepInMeters);
 
         const uSurface = -weatherData.wind_speed_10m[sliderIndex] * Math.sin(weatherData.wind_direction_10m[sliderIndex] * Math.PI / 180);
@@ -304,13 +304,13 @@ export function interpolateWeatherData(weatherData, sliderIndex, interpStep, bas
         return [];
     }
 
-    const maxHeightInUnit = heightUnit === 'ft' ? maxHeightAGL * 3.28084 : maxHeightAGL;
+    const maxHeightInUnit = heightUnit === 'ft' ? maxHeightAGL * CONVERSIONS.METERS_TO_FEET : maxHeightAGL;
     const steps = Math.floor(maxHeightInUnit / interpStep);
     const heightsInUnit = Array.from({ length: steps + 1 }, (_, i) => i * interpStep);
 
     const interpolatedData = [];
     heightsInUnit.forEach(height => {
-        const heightAGLInMeters = heightUnit === 'ft' ? height / 3.28084 : height;
+        const heightAGLInMeters = heightUnit === 'ft' ? height * CONVERSIONS.FEET_TO_METERS : height;
         const heightASLInMeters = baseHeight + heightAGLInMeters;
 
         let dataPoint;
@@ -428,7 +428,6 @@ async function fetchWeather(lat, lon, currentTime = null) {
         const selectedModelValue = document.getElementById('modelSelect')?.value || Settings.defaultSettings.model;
 
         if (!selectedModelValue) {
-            // NEU: I18n Error
             throw new Error(I18n.t('messages.no_model_selected'));
         }
 
@@ -469,7 +468,6 @@ async function fetchWeather(lat, lon, currentTime = null) {
         if (isHistorical && targetDateForAPI) {
             baseUrl = API_URLS.HISTORICAL;
             startDateStr = endDateStr = targetDateForAPI.toFormat('yyyy-MM-dd');
-            // NEU: I18n Text für historische Daten
             AppState.lastModelRun = I18n.t('messages.historical_data_label');
         } else {
             // Normale Forecast-Logik zur Bestimmung des Zeitfensters
@@ -496,7 +494,6 @@ async function fetchWeather(lat, lon, currentTime = null) {
             if (userMaxForecast !== 'Maximum') {
                 const userMaxDays = parseInt(userMaxForecast, 10);
                 if (userMaxDays > modelMaxDays) {
-                    // NEU: I18n Hinweis
                     Utils.handleMessage(I18n.t('messages.model_days_limit', { model: selectedModelValue, days: modelMaxDays }));
                 }
                 forecastDays = Math.min(modelMaxDays, userMaxDays);
@@ -571,36 +568,8 @@ async function checkAvailableModels(lat, lon) {
             console.error(`Netzwerkfehler beim Abruf von Modell '${model}':`, e);
         }
     }
-    /*updateModelSelectUI(availableModels);
-    updateEnsembleModelUI(availableModels);
-    cleanupSelectedEnsembleModels(availableModels);*/
     return availableModels;
 }
-
-// HINWEIS: Diese Funktion gibt es in ähnlicher Weise auch in utils.js. Überprüfen, ob diese hir entfernt werden kann!
-export const debouncedGetElevationAndQFE = Utils.debounce(async (lat, lng) => {
-    try {
-        const data = await Utils.getElevationAndQFE(lat, lng, AppState.apiKey);
-        if (data) {
-            const elevationInput = document.getElementById('elevation');
-            const qfeInput = document.getElementById('qfe');
-
-            if (elevationInput) {
-                const isFeet = Settings.getValue('heightUnit') === 'ft';
-                const displayValue = isFeet ? data.elevation * 3.28084 : data.elevation;
-                elevationInput.value = displayValue.toFixed(1);
-            }
-            if (qfeInput) {
-                qfeInput.value = data.qfe.toFixed(2);
-            }
-
-            AppState.currentElevation = data.elevation;
-            Settings.state.userSettings.qfe = data.qfe;
-        }
-    } catch (error) {
-        console.error('Error fetching elevation and QFE:', error);
-    }
-}, 500);
 
 /**
  * Überprüft die stündlichen Wetterdaten auf Überschreitungen der Alarm-Grenzwerte.
