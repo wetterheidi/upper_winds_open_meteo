@@ -46,9 +46,7 @@ export const I18n = {
      */
     async loadLanguage(lang) {
         try {
-            // Cache-Busting mit Zeitstempel, um sicherzugehen, dass wir die neue Datei bekommen
-            // (kann im Produktionsbetrieb entfernt werden)
-            const response = await fetch(`./locales/${lang}.json?v=${new Date().getTime()}`);
+            const response = await fetch(`./locales/${lang}.json?v=${__APP_VERSION__}`);
 
             if (!response.ok) {
                 throw new Error(`Could not load language file: ${lang}`);
@@ -95,7 +93,7 @@ export const I18n = {
     /**
      * Holt einen übersetzten Text anhand des Schlüssels.
      * Unterstützt verschachtelte Schlüssel mit Punkt-Notation (z.B. "planner.title").
-     * * @param {string} key - Der Schlüssel für den Text.
+     * @param {string} key - Der Schlüssel für den Text.
      * @param {object} [placeholders] - Optionale Ersetzungen (z.B. { value: 100 }).
      * @returns {string} Der übersetzte Text oder der Key, falls nicht gefunden.
      */
@@ -118,6 +116,11 @@ export const I18n = {
             for (const [phKey, phValue] of Object.entries(placeholders)) {
                 result = result.replace(new RegExp(`{${phKey}}`, 'g'), phValue);
             }
+        }
+
+        if (typeof result !== 'string') {
+            console.warn(`Translation key "${key}" resolves to a non-string value (${currentLang})`);
+            return key;
         }
 
         return result;
