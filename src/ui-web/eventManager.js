@@ -20,6 +20,7 @@ import { DateTime } from 'luxon';                         // NEUER IMPORT
 import { generateMeteogram } from '../core/meteogramChart.js';
 import { CANOPY_OPENING_BUFFER_METERS, CONVERSIONS } from '../core/constants.js';
 import { I18n } from '../core/i18n.js';
+import { SOUNDING_MODEL_ID } from '../core/soundingManager.js';
 
 // =================================================================
 // 1. Globale Variablen & Zustand
@@ -1875,7 +1876,7 @@ export function updateEnsembleModelUI(availableModels) {
     const submenu = document.getElementById('ensembleModelsSubmenu');
     if (!submenu) return;
     submenu.innerHTML = '';
-    availableModels.forEach(model => {
+    availableModels.filter(m => m !== SOUNDING_MODEL_ID).forEach(model => {
         const li = document.createElement('li');
         const label = document.createElement('label');
         label.className = 'radio-label';

@@ -9,6 +9,7 @@ import { Utils } from '../core/utils.js';
 import { Settings } from '../core/settings.js';
 import { fetchEnsembleWeatherData, processAndVisualizeEnsemble } from '../core/ensembleManager.js';
 import { UI_DEFAULTS, WEATHER_MODELS } from '../core/constants.js';
+import { SOUNDING_MODEL_ID } from '../core/soundingManager.js';
 import { I18n } from '../core/i18n.js'; // <--- NEU
 
 // ===================================================================
@@ -150,7 +151,7 @@ export function updateEnsembleModelUI(availableModels) {
     const submenu = document.getElementById('ensembleModelsSubmenu');
     if (!submenu) return;
     submenu.innerHTML = '';
-    availableModels.forEach(model => {
+    availableModels.filter(m => m !== SOUNDING_MODEL_ID).forEach(model => {
         // ... (Code zum Erstellen von li, label, checkbox bleibt gleich)
         const li = document.createElement('li');
         const label = document.createElement('label');

@@ -12,7 +12,8 @@ import * as JumpPlanner from './jumpPlanner.js';
 import * as weatherManager from './weatherManager.js';
 import { DateTime } from 'luxon';
 import { ENSEMBLE_VISUALIZATION, API_URLS } from './constants.js';
-import { I18n } from './i18n.js'; // Import ergänzt
+import { I18n } from './i18n.js';
+import { SOUNDING_MODEL_ID } from './soundingManager.js';
 
 // ===================================================================
 // 1. Öffentliche Hauptfunktionen (API des Moduls)
@@ -43,7 +44,12 @@ export async function fetchEnsembleWeatherData() {
     try {
         const lat = AppState.lastLat;
         const lon = AppState.lastLng;
-        const modelsToFetch = Settings.state.userSettings.selectedEnsembleModels;
+        const modelsToFetch = Settings.state.userSettings.selectedEnsembleModels.filter(m => m !== SOUNDING_MODEL_ID);
+        if (modelsToFetch.length === 0) {
+            AppState.ensembleModelsData = null;
+            clearEnsembleVisualizations();
+            return true;
+        }
         const modelString = modelsToFetch.join(',');
         // Die Liste der benötigten Wettervariablen.
         const baseVariablesList = [
@@ -115,7 +121,6 @@ export async function fetchEnsembleWeatherData() {
                 AppState.ensembleModelsData[modelName] = modelSpecificHourlyData;
             }
         });
-
 
         return true; // Erfolg signalisieren
     } catch (error) {
