@@ -2198,6 +2198,17 @@ function _setupCoreMapEventHandlers() {
                 }
             });
         }
+        // Live-Marker-Pfeil mitrotieren (markerPane liegt außerhalb des Rotations-Panes)
+        if (AppState.liveMarker) {
+            const el = AppState.liveMarker.getElement();
+            const wrapper = el?.querySelector('.live-marker-wrapper');
+            if (wrapper) {
+                const dir = parseFloat(AppState.lastDirection);
+                if (!isNaN(dir)) {
+                    wrapper.style.transform = `rotate(${(dir + mb + 360) % 360}deg)`;
+                }
+            }
+        }
     });
 
     AppState.map.on('dblclick', _handleMapDblClick);
@@ -2677,7 +2688,7 @@ export function updateHeadingUp(gpsHeading, directionDeg, speedMs) {
     AppState.lastSmoothedHeading = (prev + 0.15 * diff + 360) % 360;
 
     _isAutoRotating = true;
-    AppState.map.setBearing(AppState.lastSmoothedHeading, { animate: false });
+    AppState.map.setBearing((360 - AppState.lastSmoothedHeading) % 360, { animate: false });
     _isAutoRotating = false;
 }
 

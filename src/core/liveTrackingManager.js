@@ -420,8 +420,9 @@ const debouncedPositionUpdate = Utils.debounce(async (position) => {
  * @private
  */
 function createLiveMarkerIcon(direction) {
-    // Stellt sicher, dass die Rotation eine gültige Zahl ist, ansonsten 0.
-    const rotation = (typeof direction === 'number' && isFinite(direction)) ? direction : 0;
+    const mapBearing = AppState.map?.getBearing?.() ?? 0;
+    const raw = (typeof direction === 'number' && isFinite(direction)) ? direction : 0;
+    const rotation = (raw + mapBearing + 360) % 360;
 
     // Das HTML für das Icon: ein Wrapper für die Rotation, der Punkt und der Pfeil.
     const iconHtml = `
