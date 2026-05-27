@@ -1487,7 +1487,7 @@ function _addRadarOptionsPanel() {
 
 function _initializeLivePositionControl() {
     // Erstelle das Control mit der neuen Definition
-    AppState.livePositionControl = new LivePositionControl({ position: 'bottomright' }).addTo(AppState.map);
+    AppState.livePositionControl = new LivePositionControl({ position: 'topleft' }).addTo(AppState.map);
     console.log('Initialized livePositionControl and hid by default');
 }
 async function _initializeDefaultMarker(defaultCenter, initialAltitude) {

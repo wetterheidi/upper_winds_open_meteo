@@ -1935,17 +1935,11 @@ input[type="checkbox"][style*="opacity: 1"] {
 
 /* === ALERT STILE === */
 #map-alert-icon {
-    position: absolute;
-    top: 15px;
-    left: 15px;
-    z-index: 1000;
-    font-size: 28px;
-    padding: 5px;
-    background-color: rgba(var(--background-white), 0.7);
-    ;
-    border-radius: 50%;
+    display: inline-block;
+    font-size: 20px;
+    margin-left: 4px;
     cursor: pointer;
-    text-shadow: var(--shadow);
+    vertical-align: middle;
     animation: pulse-alert 2s infinite ease-in-out;
 }
 
@@ -2119,10 +2113,6 @@ input[type="checkbox"][style*="opacity: 1"] {
 }
 
 .leaflet-control-live-position {
-    position: absolute;
-    right: 0px;
-    bottom: calc(50px + env(safe-area-inset-bottom)) !important;
-    z-index: 1000 !important;
     font-size: 12px;
     line-height: 1.4;
     background: rgba(var(--background-white), 0.8) !important;
@@ -2130,7 +2120,7 @@ input[type="checkbox"][style*="opacity: 1"] {
     border: 1px solid var(--border-color);
     border-radius: 4px;
     box-shadow: var(--shadow);
-    max-width: 300px;
+    max-width: 220px;
     pointer-events: none;
 }
 
@@ -3131,11 +3121,6 @@ input[type="checkbox"][style*="opacity: 1"] {
        die anderen Controls nach links weg. */
 
     /* Live Position Button einrücken */
-    .leaflet-control-live-position {
-        right: 50px !important;
-        /* Platz für Geoman-Toolbar am rechten Rand */
-    }
-
     /* Attribution (Copyright) einrücken */
     .leaflet-bottom .leaflet-control-attribution {
         margin-right: 50px !important;
