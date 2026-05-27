@@ -4,8 +4,6 @@
  * von GPS-Tracks aus verschiedenen Dateiformaten (GPX, KML, CSV).
  */
 
-"use strict";
-
 import { AppState } from './state.js';
 import { Utils } from "./utils.js";
 import { DateTime } from 'luxon';
@@ -42,44 +40,25 @@ export async function loadKmlTrack(file) {
             AppState.map.removeLayer(AppState.gpxLayer);
         }
 
-        // --- START DER KORREKTUR ---
         const kmlLayer = L.geoJSON(geojson, {
-            // Die "style"-Funktion wird für jedes Feature (Polygon, Linie) aufgerufen
             style: function (feature) {
-                // togeojson wandelt KML-Styles in diese Properties um.
-                // Wir erstellen ein leeres Stil-Objekt und füllen es.
                 const styles = getComputedStyle(document.body);
                 // .trim() ist wichtig, da getPropertyValue manchmal Leerzeichen zurückgibt
-                const dangerColor = styles.getPropertyValue('--color-danger').trim() || '#ff0000'; // Fallback auf Rot
-                // 2. Versuche, die konvertierten Inline-Stile zu lesen (wie bisher)
+                const dangerColor = styles.getPropertyValue('--color-danger').trim() || '#ff0000';
                 const style = {};
-                if (feature.properties.stroke) {
-                    style.color = feature.properties.stroke;
-                }
-                if (feature.properties['stroke-width']) {
-                    style.weight = feature.properties['stroke-width'];
-                }
-                if (feature.properties['stroke-opacity']) {
-                    style.opacity = feature.properties['stroke-opacity'];
-                }
-                if (feature.properties.fill) {
-                    style.fillColor = feature.properties.fill;
-                }
-                if (feature.properties['fill-opacity']) {
-                    style.fillOpacity = feature.properties['fill-opacity'];
-                }
-                // 2. FALLBACK: Wenn keine Farben gefunden wurden (wegen <styleUrl>),
-                //    prüfe manuell auf bekannte Stil-IDs aus der KML.
+                if (feature.properties.stroke) style.color = feature.properties.stroke;
+                if (feature.properties['stroke-width']) style.weight = feature.properties['stroke-width'];
+                if (feature.properties['stroke-opacity']) style.opacity = feature.properties['stroke-opacity'];
+                if (feature.properties.fill) style.fillColor = feature.properties.fill;
+                if (feature.properties['fill-opacity']) style.fillOpacity = feature.properties['fill-opacity'];
                 if (!style.color && !style.fillColor) {
                     if (feature.properties.styleUrl === '#StyleDANGER') {
-                        // **ÄNDERUNG:** Verwende die ausgelesene CSS-Variable
                         style.color = dangerColor;
                         style.weight = 1.5;
                         style.opacity = 1.0;
-                        style.fillColor = dangerColor; // Verwende dieselbe Farbe für die Füllung
-                        style.fillOpacity = 0.2; // 80 (Hex) ist ca. 128 (Dez), also 128/255 ≈ 0.5
+                        style.fillColor = dangerColor;
+                        style.fillOpacity = 0.2;
                     }
-                    // Hier könnten Sie bei Bedarf weitere "else if" für andere Stil-IDs hinzufügen.
                 }
                 return style;
             },
@@ -89,7 +68,6 @@ export async function loadKmlTrack(file) {
                 }
             }
         });
-        // --- ENDE DER KORREKTUR ---
 
         if (kmlLayer.getLayers().length === 0) {
             throw new Error(I18n.t('tracks.error_kml_no_geometry'));
@@ -165,7 +143,6 @@ export async function loadGpxTrack(file) {
         }
         if (points.length < 2) throw new Error(I18n.t('tracks.error_gpx_points'));
 
-        // --- KORREKTUR: Der gefundene dipWaypoint wird hier übergeben ---
         const trackMetaData = await renderTrack(points, file.name, dipWaypoint);
         return trackMetaData;
 
@@ -225,7 +202,6 @@ export async function loadCsvTrackUTC(file) {
                         reject(new Error(I18n.t('tracks.error_csv_points')));
                         return;
                     }
-                    // --- KORREKTUR: Explizit 'null' für den DIP übergeben, da CSVs keinen DIP unterstützen ---
                     const trackMetaData = await renderTrack(points, file.name, null);
                     resolve(trackMetaData);
                 },
@@ -256,7 +232,6 @@ export async function saveRecordedTrack() {
     }
 
     try {
-        // NEU: DIP-Wegpunkt erstellen, falls vorhanden
         let dipWaypoint = '';
         if (AppState.lastLat !== null && AppState.lastLng !== null) {
             const dipElevation = AppState.lastAltitude !== 'N/A' ? AppState.lastAltitude.toFixed(2) : '0';
@@ -327,8 +302,6 @@ ${dipWaypoint}<trk><name>Recorded Skydive</name><trkseg>`;
 
 /**
  * Erstellt eine GPX-Datei für den Jump Run Track und löst den Download aus.
- * HINWEIS (ToDo): Diese Funktion enthält viel Berechnungslogik. Zukünftig könnte
- * die reine GPX-Erstellung von der Datenberechnung getrennt werden.
  * @param {number} sliderIndex - Der Index des Zeitschiebereglers.
  * @param {number} interpStep - Der Interpolationsschritt.
  * @param {string} heightUnit - Die aktuell ausgewählte Höheneinheit.
@@ -412,7 +385,6 @@ export async function exportToGpx(sliderIndex, interpStep, heightUnit) {
     try {
         const { Filesystem, Directory, isNative } = await getCapacitor();
         if (isNative && Filesystem) {
-            // Native mobile App: Speichere in Documents/DZMaster
             await Filesystem.writeFile({
                 path: `DZMaster/${filename}`,
                 data: gpxContent,
@@ -422,7 +394,6 @@ export async function exportToGpx(sliderIndex, interpStep, heightUnit) {
             });
             Utils.handleMessage(I18n.t('tracks.status_gpx_saved'));
         } else {
-            // Fallback für den Webbrowser
             const blob = new Blob([gpxContent], { type: "application/gpx+xml;charset=utf-8" });
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -472,14 +443,12 @@ export async function exportLandingPatternToGpx() {
 
     const patternDataForExport = JumpPlanner.calculateLandingPatternCoords(AppState.lastLat, AppState.lastLng, interpolatedData);
 
-    // ================== DEBUGGING-BLOCK ==================
     console.log("Schritt 3: Ergebnis von calculateLandingPatternCoords:", patternDataForExport);
     if (!patternDataForExport) {
         Utils.handleError(I18n.t('tracks.error_pattern_coords_failed'));
         return;
     }
     console.log("Schritt 3: Koordinaten des Landemusters erfolgreich berechnet.");
-    // =====================================================
 
     const { downwindStart, baseStart, finalStart, landingPoint } = patternDataForExport;
 
@@ -526,7 +495,6 @@ export async function exportLandingPatternToGpx() {
     try {
         const { Filesystem, Directory, isNative } = await getCapacitor();
         if (isNative && Filesystem) {
-            // Native mobile App: Speichere in Documents/DZMaster
             await Filesystem.writeFile({
                 path: `DZMaster/${filename}`,
                 data: gpxContent,
@@ -536,7 +504,6 @@ export async function exportLandingPatternToGpx() {
             });
             Utils.handleMessage(I18n.t('tracks.status_pattern_gpx_saved'));
         } else {
-            // Fallback für den Webbrowser
             const blob = new Blob([gpxContent], { type: "application/gpx+xml;charset=utf-8" });
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -593,15 +560,12 @@ async function renderTrack(points, fileName, dipWaypoint = null) {
 
         if (points.length > 0) {
 
-            // --- KORRIGIERTE DIP-LOGIK ---
             if (dipWaypoint) {
-                // Wenn ein DIP-Wegpunkt in der GPX-Datei gefunden wurde, wird dieser verwendet.
                 console.log("[trackManager] DIP waypoint found in GPX. Setting DIP to waypoint position.");
                 AppState.lastLat = dipWaypoint.lat;
                 AppState.lastLng = dipWaypoint.lng;
                 AppState.lastAltitude = await Utils.getAltitude(AppState.lastLat, AppState.lastLng);
             } else {
-                // Andernfalls wird IMMER der letzte Punkt des Tracks als neuer DIP gesetzt.
                 console.log("[trackManager] No DIP waypoint in file. Setting DIP to the last point of the track.");
                 const finalPoint = points[points.length - 1];
                 AppState.lastLat = finalPoint.lat;
@@ -686,10 +650,8 @@ async function renderTrack(points, fileName, dipWaypoint = null) {
         if (points.length > 0 && AppState.map) {
             const bounds = L.latLngBounds(points.map(p => [p.lat, p.lng]));
             if (bounds.isValid()) {
-                // Wenn die Koordinaten gültig sind: Zoomen und KEINEN Fehler werfen
                 AppState.map.fitBounds(bounds, { padding: [50, 50], maxZoom: AppState.map.getMaxZoom() || 18 });
             } else {
-                // Nur wenn die Koordinaten wirklich ungültig sind, den Fehler anzeigen
                 Utils.handleError(I18n.t('tracks.error_render_invalid_coords'));
             }
         }
@@ -728,19 +690,14 @@ async function readFileContent(file) {
     if (isNative && file.path && Filesystem) {
         console.log(`[trackManager] Reading file via Capacitor Filesystem API: ${file.path}`);
         try {
-            // KORREKTUR: Datei direkt als UTF-8 Text einlesen
             const result = await Filesystem.readFile({
                 path: file.path,
-                // Hinweis: Je nach Android-Version und wie der Picker die Datei zurückgibt,
-                // ist 'directory' eventuell nicht nötig. Falls doch, ist 'Directory.Cache' oft eine gute Wahl.
-                // directory: Directory.Cache,
                 encoding: 'utf8'
             });
-            // KORREKTUR: Das Ergebnis ist bereits der Textinhalt, kein atob() nötig
             return result.data;
         } catch (error) {
             console.error('[trackManager] Error reading file with Capacitor:', error);
-            // Fallback für den Fall, dass der Pfad nicht direkt lesbar ist (z.B. bei Content-URIs)
+            // Fallback für Content-URIs auf Android, die nicht direkt per Pfad lesbar sind
             if (file.webPath) {
                 const response = await fetch(file.webPath);
                 return await response.text();
@@ -748,7 +705,6 @@ async function readFileContent(file) {
             throw new Error('Could not read file using native API.');
         }
     } else {
-        // Der Web-Fallback bleibt unverändert und korrekt
         console.log(`[trackManager] Reading file via Web FileReader: ${file.name}`);
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -759,9 +715,9 @@ async function readFileContent(file) {
     }
 }
 
-// =================================================================
-// NEUE EXPORT LOGIK (Refactored für Merge-Option)
-// =================================================================
+// ===================================================================
+// 4. Composite GPX Export
+// ===================================================================
 
 /**
  * Generiert NUR die Trackpoints für einen Kreis (ohne <trk>-Wrapper).
@@ -788,7 +744,6 @@ export async function exportCompositeJumpGpx(options) {
         return;
     }
 
-    // --- NETZ: Einstellungen temporär erzwingen ---
     const originalSettings = {
         calculateJump: Settings.state.userSettings.calculateJump,
         showCanopyArea: Settings.state.userSettings.showCanopyArea,
@@ -798,8 +753,6 @@ export async function exportCompositeJumpGpx(options) {
     Settings.state.userSettings.calculateJump = true;
     if (includeCanopyCircles) Settings.state.userSettings.showCanopyArea = true;
     if (includeExitCircles) Settings.state.userSettings.showExitArea = true;
-
-    // ----------------------------------------------
 
     try {
         const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
@@ -821,7 +774,6 @@ export async function exportCompositeJumpGpx(options) {
             return;
         }
 
-        // Header
         let gpxContent = `<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
 <gpx version="1.1" creator="DZMaster" 
     xmlns="http://www.topografix.com/GPX/1/1" 
@@ -833,16 +785,13 @@ export async function exportCompositeJumpGpx(options) {
   </metadata>
 `;
 
-        // Container für Merge-Logik
         let mergedSegments = "";
 
-        // Hilfsfunktion: Fügt einen Track hinzu (Entweder als neues <trk> oder als Segment im Merge)
         const addTrack = (name, color, pointsString) => {
             if (mergeTracks) {
-                // Im Merge-Modus: Einfach als neues Segment anhängen. Farbe geht leider verloren.
+                // Im Merge-Modus werden Name und Farbe verworfen — GPX unterstützt keine Segment-Farben
                 mergedSegments += `    <trkseg>\n${pointsString}    </trkseg>\n`;
             } else {
-                // Standard-Modus: Eigener Track mit Name und Farbe
                 gpxContent += `
   <trk>
     <name>${name}</name>
@@ -853,7 +802,6 @@ ${pointsString}    </trkseg>
             }
         };
 
-        // --- A. LANDING PATTERN ---
         if (includePattern) {
             const pattern = JumpPlanner.calculateLandingPatternCoords(AppState.lastLat, AppState.lastLng, interpolatedData);
             if (pattern) {
@@ -865,10 +813,8 @@ ${pointsString}    </trkseg>
                 const eleBase = safeBaseHeight + legHeightBase;
                 const eleFinal = safeBaseHeight + legHeightFinal;
 
-                // Waypoints (immer global)
                 gpxContent += `  <wpt lat="${pattern.landingPoint[0]}" lon="${pattern.landingPoint[1]}"><name>DIP</name><ele>${safeBaseHeight}</ele><sym>Flag, Blue</sym></wpt>\n`;
 
-                // Track Points generieren
                 let pts = `      <trkpt lat="${pattern.downwindStart[0]}" lon="${pattern.downwindStart[1]}"><ele>${eleDown}</ele></trkpt>\n`;
                 pts += `      <trkpt lat="${pattern.baseStart[0]}" lon="${pattern.baseStart[1]}"><ele>${eleBase}</ele></trkpt>\n`;
                 pts += `      <trkpt lat="${pattern.finalStart[0]}" lon="${pattern.finalStart[1]}"><ele>${eleFinal}</ele></trkpt>\n`;
@@ -878,7 +824,6 @@ ${pointsString}    </trkseg>
             }
         }
 
-        // --- B. JUMP RUN ---
         if (includeJumpRun) {
             const harpAnchor = AppState.harpMarker ? AppState.harpMarker.getLatLng() : null;
             const jrt = JumpPlanner.jumpRunTrack(interpolatedData, harpAnchor);
@@ -889,12 +834,10 @@ ${pointsString}    </trkseg>
                 const exit = jrt.latlngs[0];
                 const lastOut = jrt.latlngs[1];
 
-                // Waypoints
                 gpxContent += `  <wpt lat="${approachStart[0]}" lon="${approachStart[1]}"><name>X-2</name><ele>${exitAltitudeMSL}</ele><sym>Waypoint</sym></wpt>\n`;
                 gpxContent += `  <wpt lat="${exit[0]}" lon="${exit[1]}"><name>HARP</name><ele>${exitAltitudeMSL}</ele><sym>Airplane</sym></wpt>\n`;
                 gpxContent += `  <wpt lat="${lastOut[0]}" lon="${lastOut[1]}"><name>LAST OUT</name><ele>${exitAltitudeMSL}</ele><sym>Waypoint</sym></wpt>\n`;
 
-                // Track Points
                 let pts = `      <trkpt lat="${approachStart[0]}" lon="${approachStart[1]}"><ele>${exitAltitudeMSL}</ele></trkpt>\n`;
                 pts += `      <trkpt lat="${exit[0]}" lon="${exit[1]}"><ele>${exitAltitudeMSL}</ele></trkpt>\n`;
                 pts += `      <trkpt lat="${lastOut[0]}" lon="${lastOut[1]}"><ele>${exitAltitudeMSL}</ele></trkpt>\n`;
@@ -903,7 +846,6 @@ ${pointsString}    </trkseg>
             }
         }
 
-        // --- C. EXIT CIRCLES ---
         if (includeExitCircles) {
             const exitData = JumpPlanner.calculateExitCircle(interpolatedData);
             if (exitData && !exitData.error) {
@@ -917,7 +859,6 @@ ${pointsString}    </trkseg>
             }
         }
 
-        // --- D. CANOPY CIRCLES ---
         if (includeCanopyCircles) {
             const canopyData = JumpPlanner.calculateCanopyCircles(interpolatedData);
             if (canopyData) {
@@ -942,7 +883,6 @@ ${pointsString}    </trkseg>
             }
         }
 
-        // FINALE: Wenn Merge aktiv ist, jetzt den gesammelten Block schreiben
         if (mergeTracks && mergedSegments.length > 0) {
             gpxContent += `
   <trk>
@@ -954,7 +894,6 @@ ${pointsString}    </trkseg>
 
         gpxContent += `</gpx>`;
 
-        // --- Speichern (unverändert) ---
         const time = Utils.formatTime(AppState.weatherData.time[sliderIndex]).replace(/ /g, '_').replace(/:/g, '');
         const filename = `Jump_Plan_${time}.gpx`;
 
