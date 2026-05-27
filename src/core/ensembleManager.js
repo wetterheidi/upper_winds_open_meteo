@@ -160,7 +160,6 @@ export function processAndVisualizeEnsemble(sliderIndex, interpStep) {
         case 'all_models':
             for (const modelName in AppState.ensembleModelsData) {
                 const modelHourlyData = AppState.ensembleModelsData[modelName];
-                // HINWEIS: Hier wird die Logik zur Parameterübergabe noch nicht umgesetzt
                 const exitResult = calculateExitCircleForEnsemble(modelName, sliderIndex, { hourly: modelHourlyData });
                 if (exitResult) {
                     drawEnsembleCircle(exitResult, getDistinctColorForModel(modelName), modelName);
@@ -193,15 +192,12 @@ export function clearEnsembleVisualizations() {
     if (AppState.ensembleLayerGroup) {
         AppState.map.removeLayer(AppState.ensembleLayerGroup);
     }
-    // Die Heatmap und der einzelne Contour-Layer werden nicht mehr benötigt
     if (AppState.heatmapLayer) {
         AppState.map.removeLayer(AppState.heatmapLayer);
         AppState.heatmapLayer = null;
     }
-    // Alte Logik für heatmapContourLayer entfernen, da wir jetzt eine Gruppe haben
 
     AppState.ensembleScenarioCircles = {};
-    // Erstelle die Layer-Gruppe neu, was automatisch alle alten Layer (Polygone, Kreise) entfernt
     AppState.ensembleLayerGroup = L.layerGroup().addTo(AppState.map);
 }
 
@@ -346,89 +342,12 @@ function calculateEnsembleScenarioProfile(scenarioType, sliderIndex) {
             // Wenn keine Werte vorhanden sind, bleiben die Werte null
         });
     }
-    // console.log(`Vollständiges Zeitreihenprofil für ${scenarioType}:`, scenarioHourlyData);
-    return { hourly: scenarioHourlyData }; // Struktur wie eine einzelne API-Modellantwort
+    return { hourly: scenarioHourlyData };
 }
-/**
- * Berechnet die Canopy-Kreise für ein gegebenes Ensemble-Profil oder ein einzelnes Modell aus dem Ensemble.
- * @param {string} profileIdentifier - Name des Modells oder Szenarios (z.B. "icon_global", "min_wind").
- * @param {object} [specificProfileData=null] - Optionale, spezifische Wetterdaten für das Profil.
- * Wenn null, wird versucht, die Daten aus AppState.ensembleModelsData[profileIdentifier] zu verwenden.
- * @returns {object|null} Das Ergebnis von calculateCanopyCircles oder null bei Fehler.
- */
-function calculateCanopyCirclesForEnsemble(profileIdentifier, specificProfileData = null, sliderIndex) {
-    console.log(`Calculating canopy circles for ensemble profile/model: ${profileIdentifier}`);
 
-    let weatherDataForProfile;
-    if (specificProfileData) {
-        weatherDataForProfile = specificProfileData;
-    } else if (AppState.ensembleModelsData && AppState.ensembleModelsData[profileIdentifier]) {
-        weatherDataForProfile = { hourly: AppState.ensembleModelsData[profileIdentifier] };
-    } else {
-        console.warn(`Keine Daten für Profil/Modell ${profileIdentifier} in calculateCanopyCirclesForEnsemble gefunden.`);
-        return null;
-    }
-
-    if (!weatherDataForProfile.hourly || AppState.lastLat == null || AppState.lastLng == null) {
-        console.warn(`Unvollständige Daten für calculateCanopyCirclesForEnsemble: ${profileIdentifier}`);
-        return null;
-    }
-
-    const originalGlobalWeatherData = AppState.weatherData;
-    AppState.weatherData = weatherDataForProfile.hourly;
-
-    // Temporär die Bedingungen für die Berechnung erfüllen
-    const originalShowCanopyArea = Settings.state.userSettings.showCanopyArea;
-    const originalCalculateJump = Settings.state.userSettings.calculateJump;
-    Settings.state.userSettings.showCanopyArea = true;
-    Settings.state.userSettings.calculateJump = true;
-
-    let result = null;
-    try {
-        // KORREKTUR: Auch hier die Interpolation explizit aufrufen
-        const interpStep = getInterpolationStep(); // Wert in der UI-Schicht holen
-        const interpolatedData = weatherManager.interpolateWeatherData(
-            AppState.weatherData, // Das Haupt-Wetterdatenobjekt
-            sliderIndex,
-            interpStep,
-            Math.round(AppState.lastAltitude),
-            heightUnit
-        ); // Und an die Core-Funktion übergeben
-
-        // Und die interpolierten Daten an die Funktion übergeben
-        result = JumpPlanner.calculateCanopyCircles(interpolatedData);
-
-    } catch (error) {
-        console.error(`Fehler in calculateCanopyCircles für Profil ${profileIdentifier}:`, error);
-        result = null;
-    } finally {
-        // Wichtige Einstellungen wiederherstellen
-        AppState.weatherData = originalGlobalWeatherData;
-        Settings.state.userSettings.showCanopyArea = originalShowCanopyArea;
-        Settings.state.userSettings.calculateJump = originalCalculateJump;
-    }
-
-    if (result) {
-        return {
-            centerLat: result.redLat,
-            centerLng: result.redLng,
-            radius: result.radiusFull,
-            meanWindDir: result.meanWindForFullCanopyDir,
-            meanWindSpeedMps: result.meanWindForFullCanopySpeedMps,
-            profileIdentifier: profileIdentifier
-        };
-    }
-    console.warn(`calculateCanopyCircles lieferte null für Profil ${profileIdentifier}`);
-    return null;
-}
 /**
  * Wrapper, der `JumpPlanner.calculateExitCircle` mit den Daten eines spezifischen
  * Ensemble-Modells oder Szenario-Profils aufruft.
- * * HINWEIS FÜR ZUKÜNFTIGES REFACTORING:
- * Diese Funktion manipuliert vorübergehend den globalen `AppState.weatherData`.
- * Eine robustere Lösung wäre, die `jumpPlanner`-Funktionen so zu ändern, dass sie
- * die Wetterdaten als direkten Parameter akzeptieren.
- *
  * @param {string} profileIdentifier - Name des Modells oder Szenarios.
  * @param {number} sliderIndex - Der Index des Zeitpunkts.
  * @param {object} specificProfileData - Das Wetterdatenobjekt für dieses Profil.
@@ -473,7 +392,6 @@ function calculateExitCircleForEnsemble(profileIdentifier, sliderIndex, specific
         Settings.state.userSettings.calculateJump = true;
         Settings.state.userSettings.showExitArea = true;
 
-        // KORREKTUR: Den übergebenen sliderIndex verwenden, anstatt die UI abzufragen
         const interpolatedData = weatherManager.interpolateWeatherData(
             AppState.weatherData, // Das Haupt-Wetterdatenobjekt
             sliderIndex,
@@ -549,7 +467,6 @@ function generateAndDisplayHeatmap(sliderIndex, interpStep) {
     // 3. Alle einzelnen Modell-Kreise berechnen (unverändert)
     const modelCircles = [];
     for (const modelName in AppState.ensembleModelsData) {
-        // ... (diese Schleife bleibt exakt gleich)
         if (Object.hasOwnProperty.call(AppState.ensembleModelsData, modelName)) {
             const modelHourlyData = AppState.ensembleModelsData[modelName];
             const exitResult = calculateExitCircleForEnsemble(modelName, sliderIndex, { hourly: modelHourlyData });
@@ -616,7 +533,6 @@ function generateAndDisplayHeatmap(sliderIndex, interpStep) {
 
     // Helferfunktion für die konvexe Hülle (bleibt unverändert)
     const getConvexHull = points => {
-        // ... (Implementierung von getConvexHull bleibt hier)
         points.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
         const crossProduct = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
         const lower = [];
@@ -638,14 +554,10 @@ function generateAndDisplayHeatmap(sliderIndex, interpStep) {
     };
 
     // 5. Polygone zeichnen und zur Layer-Gruppe hinzufügen
-    AppState.heatmapContourLayers = []; // Array zum Speichern der Layer
-
-    // Funktion zum Zeichnen eines Polygons
     const drawContour = (points, style) => {
         if (points.length > 2) {
             const hull = getConvexHull(points);
-            const polygon = L.polygon(hull, style).addTo(AppState.ensembleLayerGroup);
-            AppState.heatmapContourLayers.push(polygon);
+            L.polygon(hull, style).addTo(AppState.ensembleLayerGroup);
         }
     };
 
