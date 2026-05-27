@@ -10,7 +10,7 @@ export const AppState = {
     // Kernzustand & App-Verwaltung
     // ===================================================================
     isInitialized: false,           // @type {boolean} - True, wenn die App ihre Initialisierung abgeschlossen hat.
-    ismapInitialized: false,        // @type {boolean} - True, wenn speziell die Karte initialisiert wurde. (von mapManager.js)
+    isMapInitialized: false,        // @type {boolean} - True, wenn speziell die Karte initialisiert wurde. (von mapManager.js)
     isCachingCancelled: false,      // @type {boolean} - Flag, um laufende Caching-Prozesse abzubrechen. (von tileCache.js)
     hasTileErrorSwitched: false,    // @type {boolean} - Verhindert wiederholte "Fallback-Basemap"-Meldungen. (von mapManager.js)
 
@@ -37,7 +37,7 @@ export const AppState = {
     // Wetter & Zeit
     // ===================================================================
     weatherData: null,              // @type {object|null} - Das 'hourly' Objekt aus der Open-Meteo API-Antwort.
-    cloudThresholds: [],            // @type {object[]} - NEU: Speichert die berechneten RH-Schwellenwerte für jede Stunde.
+    cloudThresholds: [],            // @type {object[]} - Speichert die berechneten RH-Schwellenwerte für jede Stunde.
     lastModelRun: null,             // @type {string|null} - Zeitstempel des letzten Wettermodell-Laufs.
     customPressureLevels: null,     // @type {number[]|null} - Überschreibt STANDARD_PRESSURE_LEVELS wenn Progtemp-Daten geladen sind.
     landingWindDir: null,           // @type {number|null} - Windrichtung in 10m Höhe für das Landemuster.
@@ -48,8 +48,8 @@ export const AppState = {
     // ===================================================================
     jumpVisualizationLayerGroup: null, // @type {L.LayerGroup|null} - Gruppe für Exit- & Canopy-Kreise.
     landingPatternLayerGroup: null,    // @type {L.LayerGroup|null} - Gruppe für das Landemuster.
-    isLandingDirectionLocked: false,   // @type {boolean} - NEU: True, wenn die Landerichtung manuell gesperrt ist.
-    lockedLandingDirection: null,      // @type {number|null} - NEU: Die gesperrte Landerichtung in Grad.
+    isLandingDirectionLocked: false,   // @type {boolean} - True, wenn die Landerichtung manuell gesperrt ist.
+    lockedLandingDirection: null,      // @type {number|null} - Die gesperrte Landerichtung in Grad.
     jumpRunTrackLayerGroup: null,      // @type {L.LayerGroup|null} - Gruppe für den Jump Run Track.
     lastTrackData: null,               // @type {object|null} - Speichert die letzten JRT-Daten, um Drag&Drop zu ermöglichen.
     isPlacingHarp: false,              // @type {boolean} - True, wenn der Benutzer gerade einen HARP platziert.
@@ -73,12 +73,12 @@ export const AppState = {
     headingUpControl: null,            // @type {L.Control|null} - Das Toggle-Control für den "Heading Up"-Modus.
     accuracyCircle: null,              // @type {L.Circle|null} - Der Genauigkeitskreis um den Live-Marker.
     jumpMasterLine: null,              // @type {L.Polyline|null} - Die Linie vom Live-Marker zum Ziel (DIP/HARP).
-    aircraftMarker: null,              // @type {L.Marker|null} - NEU: Der Marker für das Absetzflugzeug.
-    aircraftTrackLayer: null,          // @type {L.Polyline|null} - NEU: Die Linie für den Flugpfad.
-    adsbTrackPoints: [],               // @type {Array[]} - NEU: Die gesammelten Koordinaten des Pfades.
+    aircraftMarker: null,              // @type {L.Marker|null} - Der Marker für das Absetzflugzeug.
+    aircraftTrackLayer: null,          // @type {L.Polyline|null} - Die Linie für den Flugpfad.
+    adsbTrackPoints: [],               // @type {Array[]} - Die gesammelten Koordinaten des Pfades.
     isArmed: false,                    // @type {boolean} - True, wenn die automatische Sprungerkennung "scharf" ist.
     isAutoRecording: false,            // @type {boolean} - True, wenn ein Sprung automatisch aufgezeichnet wird.
-    altitudeCorrectionPerformed: false, // @type {boolean} - NEU: True, wenn die Höhenkorrektur-Prüfung durchgeführt wurde.
+    altitudeCorrectionPerformed: false, // @type {boolean} - True, wenn die Höhenkorrektur-Prüfung durchgeführt wurde.
     isManualRecording: false,          // @type {boolean} - True, wenn ein Sprung manuell aufgezeichnet wird.
     recordedTrackPoints: [],           // @type {object[]} - Die Punkte des aktuell aufgezeichneten Tracks.
     recordedTrackLayer: null,          // @type {L.Polyline|null} - Der Layer für den live aufgezeichneten Track.

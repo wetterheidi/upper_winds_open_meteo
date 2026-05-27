@@ -49,11 +49,11 @@ export async function initializeMap() {
     return AppState.map;
 }
 async function initMap() {
-    if (AppState.ismapInitialized || AppState.map) {
+    if (AppState.isMapInitialized || AppState.map) {
         console.warn('Map already initialized or init in progress.');
         return;
     }
-    AppState.ismapInitialized = true;
+    AppState.isMapInitialized = true;
     console.log('initMap started...');
 
     const defaultCenter = UI_DEFAULTS.DEFAULT_MAP_CENTER;
