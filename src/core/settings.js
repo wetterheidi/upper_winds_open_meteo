@@ -36,10 +36,10 @@ export const Settings = {
     FEATURE_PASSWORD_DATA: FEATURE_PASSWORD_DATA,
 
     /**
- * Ein Objekt, das alle Standardeinstellungen der Anwendung enthält.
- * Dient als Fallback, falls keine gespeicherten Einstellungen vorhanden sind.
- * @type {object}
- */
+     * Ein Objekt, das alle Standardeinstellungen der Anwendung enthält.
+     * Dient als Fallback, falls keine gespeicherten Einstellungen vorhanden sind.
+     * @type {object}
+     */
     defaultSettings: {
         language: 'en',
         model: 'icon_global',
@@ -119,9 +119,9 @@ export const Settings = {
     },
 
     /**
- * Der aktuelle Zustand der Einstellungen, inklusive der vom Benutzer gespeicherten Werte
- * und dem Status der freigeschalteten Features.
- */
+     * Der aktuelle Zustand der Einstellungen, inklusive der vom Benutzer gespeicherten Werte
+     * und dem Status der freigeschalteten Features.
+     */
     state: {
         userSettings: null,
         unlockedFeatures: {
@@ -141,11 +141,9 @@ export const Settings = {
      * Freischaltungsstatus aus dem Local Storage und validiert sie.
      */
     initialize() {
-        // 1. Hashes für beide Passwörter erstellen
         const plannerPasswordHash = this.FEATURE_PASSWORD_PLANNER.split('').reduce((acc, char) => (char.charCodeAt(0) + ((acc << 5) - acc)), 0);
         const dataPasswordHash = this.FEATURE_PASSWORD_DATA.split('').reduce((acc, char) => (char.charCodeAt(0) + ((acc << 5) - acc)), 0);
 
-        // 2. Gespeicherte Freischaltungen laden
         let features = { planner: false, plannerHash: null, data: false, dataHash: null };
         try {
             const raw = localStorage.getItem('unlockedFeatures');
@@ -156,11 +154,9 @@ export const Settings = {
             this.handleError(error, 'Failed to load unlocked features.');
         }
 
-        // 3. Status basierend auf den geladenen Daten und aktuellen Hashes validieren
         const isPlannerStillUnlocked = features.planner && features.plannerHash === plannerPasswordHash;
         const isDataStillUnlocked = features.data && features.dataHash === dataPasswordHash;
 
-        // 4. Den finalen, bereinigten Zustand direkt im state-Objekt setzen
         this.state.unlockedFeatures = {
             planner: isPlannerStillUnlocked,
             plannerHash: isPlannerStillUnlocked ? plannerPasswordHash : null,
@@ -168,10 +164,8 @@ export const Settings = {
             dataHash: isDataStillUnlocked ? dataPasswordHash : null
         };
 
-        // 5. Den bereinigten Zustand immer zurück in den localStorage schreiben
         this.saveUnlockedFeatures();
 
-        // --- Laden der User-Settings (unverändert) ---
         let storedSettings = {};
         try {
             const settingsRaw = localStorage.getItem('upperWindsSettings');
@@ -204,7 +198,6 @@ export const Settings = {
 
             }
         };
-        // Nicht-persistente Einstellungen zurücksetzen
         this.state.userSettings.isInteractionLocked = false;
         this.state.userSettings.harpLat = null;
         this.state.userSettings.harpLng = null;
@@ -237,12 +230,10 @@ export const Settings = {
      * @returns {boolean} True, wenn das Feature freigeschaltet ist.
      */
     isFeatureUnlocked(feature) {
-        // Wenn der Hauptschalter aus ist, ist alles immer freigeschaltet.
         if (!FEATURE_LOCK_ACTIVE) {
             return true;
         }
 
-        // Der Rest der Funktion wird nur ausgeführt, wenn der Passwortschutz aktiv ist.
         if (feature === 'planner') {
             return this.state.unlockedFeatures.planner;
         }
@@ -276,7 +267,6 @@ export const Settings = {
 
         const featureName = feature.charAt(0).toUpperCase() + feature.slice(1);
         
-        // NEU: Übersetzte Texte verwenden
         header.textContent = I18n.t('modals.restricted_feature');
         message.textContent = I18n.t('messages.feature_locked', { feature: featureName });
         
@@ -291,7 +281,7 @@ export const Settings = {
                 document.dispatchEvent(new CustomEvent('ui:lockStateChanged'));
                 onSuccess();
             } else {
-                error.textContent = I18n.t('messages.password_error'); // NEU: Übersetzte Fehlermeldung
+                error.textContent = I18n.t('messages.password_error');
                 error.style.display = 'block';
             }
         };
@@ -341,12 +331,12 @@ export const Settings = {
     // ===================================================================
 
     /**
-  * Ruft den Wert einer Einstellung ab. Priorisiert den Wert aus dem `userSettings`-Objekt,
-  * versucht aber auch, den Wert direkt aus dem DOM auszulesen (z.B. für Radio-Buttons).
-  * @param {string} name - Der Name der Einstellung.
-  * @param {*} [defaultValue] - Ein optionaler Standardwert, falls nichts gefunden wird.
-  * @returns {*} Der Wert der Einstellung.
-  */
+     * Ruft den Wert einer Einstellung ab. Priorisiert den Wert aus dem `userSettings`-Objekt,
+     * versucht aber auch, den Wert direkt aus dem DOM auszulesen (z.B. für Radio-Buttons).
+     * @param {string} name - Der Name der Einstellung.
+     * @param {*} [defaultValue] - Ein optionaler Standardwert, falls nichts gefunden wird.
+     * @returns {*} Der Wert der Einstellung.
+     */
     getValue(name, type, defaultValue) {
         if (defaultValue === undefined && typeof type !== 'string') {
             defaultValue = type;
