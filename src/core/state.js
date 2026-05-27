@@ -122,6 +122,13 @@ export const AppState = {
     heatmapLayer: null,                // @type {L.HeatLayer|null} - Der Leaflet.heat-Layer für die Heatmap-Darstellung.
 
     // ===================================================================
+    // Geländeanalyse
+    // ===================================================================
+    terrainAnalysisCache: null,         // @type {{key: string, data: object[]}|null} - Cache der letzten Geländeanalyse.
+    terrainAllPoints: null,             // @type {object[]|null} - Alle analysierten Geländepunkte der letzten Analyse.
+    terrainRequiredClearance: null,     // @type {number|null} - Erforderliche Bodenfreiheit der letzten Analyse in Metern.
+
+    // ===================================================================
     // Wetterradar (RainViewer)
     // ===================================================================
     radarLayer: null,                  // @type {L.TileLayer|null} - Der aktuelle Radar-Tile-Layer.

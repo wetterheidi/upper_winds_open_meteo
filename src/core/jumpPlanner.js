@@ -26,7 +26,7 @@ import { I18n } from './i18n.js'; // Import ergänzt
 export function getSeparationFromTAS(ias) {
     const exitAltitudeFt = Settings.state.userSettings.exitAltitude * CONVERSIONS.METERS_TO_FEET;
     const tas = Utils.calculateTAS(ias, exitAltitudeFt);
-    if (tas === 'N/A' || !Number.isFinite(tas) || tas <= 0) {  // NEU: Ergänzung für negative/ungültige TAS
+    if (tas === 'N/A' || !Number.isFinite(tas) || tas <= 0) {
         console.warn('TAS calculation failed or invalid, using default separation');
         return Settings.defaultSettings.jumperSeparation;
     }
@@ -121,12 +121,9 @@ export function jumpRunTrack(interpolatedData, harpAnchor = null) {
     const aircraftSpeedKt = Settings.state.userSettings.aircraftSpeedKt || 90;
     const tasKt = Utils.calculateTAS(aircraftSpeedKt, exitHeightM / 0.3048);
 
-    // --- START DER KORREKTUR ---
-    // Wir initialisieren groundSpeedMps mit einem sinnvollen Fallback-Wert.
     let groundSpeedMps = aircraftSpeedKt * CONVERSIONS.KNOTS_TO_MPS;
 
     if (tasKt !== 'N/A' && Number.isFinite(tasKt)) {
-        // Wenn TAS berechnet werden kann, wird groundSpeedMps mit dem exakten Wert überschrieben.
         const windDirAtExit = Utils.linearInterpolate(heights.map(h => h - elevation), interpolatedData.map(d => d.dir), exitAltitude);
         const windSpeedMpsAtExit = Utils.linearInterpolate(heights.map(h => h - elevation), interpolatedData.map(d => Utils.convertWind(d.spd, 'm/s', 'km/h')), exitAltitude);
         const tasMps = tasKt * CONVERSIONS.KNOTS_TO_MPS;
@@ -138,7 +135,6 @@ export function jumpRunTrack(interpolatedData, harpAnchor = null) {
         const tasV = tasMps * Math.cos(headingRad);
         groundSpeedMps = Math.sqrt(Math.pow(tasU + windU, 2) + Math.pow(tasV + windV, 2));
     }
-    // --- ENDE DER KORREKTUR ---
 
     const trackLength = Math.max(JUMP_RUN_DEFAULTS.MIN_TRACK_LENGTH_M, Math.min(JUMP_RUN_DEFAULTS.MAX_TRACK_LENGTH_M, Math.round((Settings.state.userSettings.numberOfJumpers || 10) * (Settings.state.userSettings.jumperSeparation || 5) * groundSpeedMps)));
     const approachLength = Math.max(JUMP_RUN_DEFAULTS.MIN_APPROACH_LENGTH_M, Math.min(JUMP_RUN_DEFAULTS.MAX_APPROACH_LENGTH_M, Math.round(groundSpeedMps * JUMP_RUN_DEFAULTS.APPROACH_TIME_SECONDS)));
@@ -184,8 +180,6 @@ export function jumpRunTrack(interpolatedData, harpAnchor = null) {
  * @returns {{greenLatFull: number, greenLngFull: number, greenLat: number, greenLng: number, greenRadius: number, darkGreenRadius: number, freeFallDirection: number, freeFallDistance: number, freeFallTime: number}|null} Ein Objekt mit den Koordinaten und Radien für die Visualisierung oder null.
  */
 export function calculateExitCircle(interpolatedData) {
-    // HINWEIS (ToDo): Diese Funktion greift auf viele globale Zustände und UI-Elemente zu.
-    // Zukünftig könnte sie refaktorisiert werden, um alle benötigten Werte als Parameter zu erhalten.
     console.log('Debug calculateExitCircle: Start', {
         showExitArea: Settings.state.userSettings.showExitArea,
         calculateJump: Settings.state.userSettings.calculateJump,
@@ -196,8 +190,6 @@ export function calculateExitCircle(interpolatedData) {
         interpolatedData: !!interpolatedData && interpolatedData.length > 0
     });
 
-    // ÄNDERUNG 1: showExitArea aus der Bedingung entfernt, damit die Warnung auch berechnet wird, 
-    // wenn die Visualisierung ausgeschaltet ist.
     if (!Settings.state.userSettings.calculateJump || !AppState.weatherData || AppState.lastLat == null || AppState.lastLng == null || AppState.lastAltitude === 'N/A') {
         console.log('Debug calculateExitCircle: Frühe Rückgabe wegen Einstellungen');
         return null;
@@ -288,7 +280,6 @@ export function calculateExitCircle(interpolatedData) {
     const meanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, elevation + safetyHeight + legHeightDownwind, elevation + openingAltitude - CANOPY_OPENING_BUFFER_METERS);
     const meanWindFull = Utils.calculateMeanWind(heights, uComponents, vComponents, elevation + safetyHeight, elevation + openingAltitude - CANOPY_OPENING_BUFFER_METERS);
 
-    // --- ÄNDERUNG 2: SAFETY CHECK ---
     let safetyWindWarning = false;
     let windSpeedInSafetyLayer = 0;
 
@@ -358,7 +349,6 @@ export function calculateExitCircle(interpolatedData) {
     console.log(`[calculateExitCircle] meanWind: dir=${meanWind[0].toFixed(1)}°, speed=${meanWind[1].toFixed(2)} m/s`);
     console.log(`[calculateExitCircle] greenCenterFull: lat=${greenCenterFull[0]}, lng=${greenCenterFull[1]}`);
     console.log(`[calculateExitCircle] greenCenter: lat=${greenCenter[0]}, lng=${greenCenter[1]}`);
-    console.log(`[calculateExitCircle] expected downwindStart: lat=52.51657818951595, lng=13.413705547188442`);
 
     const result = {
         greenLatFull: greenCenterFull[0], greenLngFull: greenCenterFull[1],
@@ -368,7 +358,6 @@ export function calculateExitCircle(interpolatedData) {
         freeFallDirection: freeFallResult.directionDeg,
         freeFallDistance: freeFallResult.distance,
         freeFallTime: freeFallResult.time,
-        // ÄNDERUNG 3: Warn-Daten zurückgeben
         safetyWindWarning: safetyWindWarning,
         windSpeedSafety: windSpeedInSafetyLayer,
         canopySpeed: canopySpeedMps
@@ -550,8 +539,8 @@ export function calculateLandingPatternCoords(lat, lng, interpolatedData) {
     };
 
     // Final Leg
-    // src/core/jumpPlanner.js
     const finalMeanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, baseHeight === 0 ? 1 : baseHeight, baseHeight + LEG_HEIGHT_FINAL);
+    if (!finalMeanWind) return null;
     const finalWindDir = finalMeanWind[0];
     const finalWindSpeedKt = finalMeanWind[1];
     const finalCourse = effectiveLandingWindDir;
@@ -565,6 +554,7 @@ export function calculateLandingPatternCoords(lat, lng, interpolatedData) {
 
     // Base Leg
     const baseMeanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, baseHeight + LEG_HEIGHT_FINAL, baseHeight + LEG_HEIGHT_BASE);
+    if (!baseMeanWind) return null;
     const baseWindDir = baseMeanWind[0];
     const baseWindSpeedKt = baseMeanWind[1];
     const baseHeading = (effectiveLandingWindDir + (landingDirectionSetting === 'LL' ? 90 : -90) + 360) % 360;
@@ -582,6 +572,7 @@ export function calculateLandingPatternCoords(lat, lng, interpolatedData) {
 
     // Downwind Leg
     const downwindMeanWind = Utils.calculateMeanWind(heights, uComponents, vComponents, baseHeight + LEG_HEIGHT_BASE, baseHeight + LEG_HEIGHT_DOWNWIND);
+    if (!downwindMeanWind) return null;
     const downwindWindDir = downwindMeanWind[0];
     const downwindWindSpeedKt = downwindMeanWind[1];
     const downwindCourse = (effectiveLandingWindDir + 180) % 360;
