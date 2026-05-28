@@ -8,8 +8,6 @@
 import { FEATURE_PASSWORD_PLANNER, FEATURE_PASSWORD_DATA, FEATURE_LOCK_ACTIVE } from './config.js';
 import { I18n } from './i18n.js';
 
-let IS_MOBILE_APP = false;
-
 /**
  * Hilfsfunktion zum schnellen Abrufen des aktuell im UI ausgewählten Interpolationsschritts.
  * @returns {string} Der Wert des Interpolationsschritts (z.B. "200").
@@ -27,8 +25,7 @@ export const getInterpolationStep = () => {
  * @param {boolean} isMobile - True, wenn es sich um die native App handelt.
  */
 export function setAppContext(isMobile) {
-    IS_MOBILE_APP = isMobile;
-    console.log(`App context set to: ${IS_MOBILE_APP ? 'Mobile' : 'Web'}`);
+    console.log(`App context set to: ${isMobile ? 'Mobile' : 'Web'}`);
 }
 
 export const Settings = {

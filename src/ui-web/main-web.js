@@ -82,7 +82,7 @@ export const getDownloadFormat = () => Settings.getValue('downloadFormat', 'radi
  * basierend auf dem Speicher freigeschaltet sind.
  */
 async function initializeApp() {
-    setAppContext(true);
+    setAppContext(false);
     Settings.initialize();
     // JML ist nur im aktiven Tracking relevant — beim App-Start immer zurücksetzen
     Settings.state.userSettings.showJumpMasterLine = false;
