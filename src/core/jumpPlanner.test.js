@@ -209,6 +209,7 @@ vi.mock('../core/utils.js', () => {
             headwind: windSpeed * Math.cos(windAngle * Math.PI / 180),
         })),
         calculateWCA: vi.fn((crosswind, speed) => Math.asin(crosswind / speed) * 180 / Math.PI),
+        reverseNorthReference: vi.fn((direction) => direction),
         debounce: vi.fn((fn) => fn),
         isValidLatLng: vi.fn((lat, lng) => {
             return (
@@ -565,7 +566,7 @@ describe('jumpPlanner.js', () => {
         it('sollte null zurückgeben, wenn die Exit-Höhe unter der Öffnungshöhe liegt', () => {
             const result = calculateFreeFall(AppState.weatherData, 1000, 1200, interpolateWeatherData(), 52, 13, 38, 180);
             expect(result).toBeNull();
-            expect(Utils.handleError).toHaveBeenCalledWith("calculateFreeFall: Exit-Höhe muss über der Öffnungshöhe liegen.");
+            expect(Utils.handleError).toHaveBeenCalledWith("planner.freefall_exit_altitude_invalid");
         });
 
         it('sollte null zurückgeben, wenn Wetterdaten ungültig sind', () => {
@@ -600,7 +601,7 @@ describe('jumpPlanner.js', () => {
                 270
             );
             expect(result).toBeNull();
-            expect(Utils.handleError).toHaveBeenCalledWith("calculateFreeFall: Ungültige Startkoordinaten oder Geländehöhe.");
+            expect(Utils.handleError).toHaveBeenCalledWith("planner.freefall_invalid_coordinates");
         });
     });
 
@@ -775,7 +776,8 @@ describe('jumpPlanner.js', () => {
             for (const state of ['Open', 'Partially', 'Collapsed']) {
                 Settings.state.userSettings.cutAwayState = state;
                 const result = calculateCutAway(interpolatedData);
-                expect(result.tooltipContent).toContain(`Displacement: 223°, ${Math.round(expectedDistances[state])} m`);
+                expect(result.tooltipContent).toContain('planner.cutaway_displacement');
+                expect(result.tooltipContent).toContain(`${Math.round(expectedDistances[state])} m`);
             }
         });
     });

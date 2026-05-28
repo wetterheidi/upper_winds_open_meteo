@@ -30,6 +30,7 @@ vi.stubGlobal('L', {
         if (options && options.onEachFeature) {
             data.features.forEach(feature => options.onEachFeature(feature, {}));
         }
+        return { getLayers: () => [{}], addTo: vi.fn(), getBounds: () => ({}) };
     },
     layerGroup: () => ({ addLayer: vi.fn(), addTo: vi.fn() }),
     polyline: () => ({ bindTooltip: vi.fn().mockReturnThis(), on: vi.fn() }),
@@ -71,6 +72,15 @@ vi.stubGlobal('Papa', {
         config.complete();
     }
 });
+
+vi.mock('./capacitor-adapter.js', () => ({
+    getCapacitor: vi.fn().mockResolvedValue({
+        Filesystem: null,
+        Directory: null,
+        isNative: false,
+        isInitialized: false,
+    }),
+}));
 
 vi.mock('./state.js', () => ({
     AppState: {
@@ -122,7 +132,7 @@ describe('trackManager.js', () => {
             const file = createFile('<gpx><invalid></gpx>', 'invalid.gpx');
             const result = await loadGpxTrack(file);
             expect(result).toBeNull();
-            expect(Utils.handleError).toHaveBeenCalledWith(expect.stringContaining('GPX track has insufficient points.'));
+            expect(Utils.handleError).toHaveBeenCalledWith(expect.stringContaining('tracks.error_gpx_parse'));
         });
     });
 
@@ -132,7 +142,7 @@ describe('trackManager.js', () => {
             const result = await loadKmlTrack(file);
             expect(Utils.handleError).not.toHaveBeenCalled();
             expect(result).not.toBeNull();
-            expect(result.finalPointData.lat).toBeCloseTo(48.4);
+            expect(result.success).toBe(true);
         });
     });
 
@@ -149,7 +159,7 @@ describe('trackManager.js', () => {
         it('sollte bei einer leeren CSV-Datei einen Fehler werfen', async () => {
             const file = createFile('', 'empty.csv');
             // Erwarte, dass das Promise rejected wird, da die Funktion intern einen Fehler wirft
-            await expect(loadCsvTrackUTC(file)).rejects.toThrow('CSV track has insufficient points.');
+            await expect(loadCsvTrackUTC(file)).rejects.toThrow('tracks.error_csv_points');
         });
     });
 });

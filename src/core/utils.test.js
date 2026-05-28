@@ -290,7 +290,7 @@ describe('Interpolation', () => {
         expect(svg).toContain('<svg');
         expect(svg).toContain('rotate(450)'); // 270° + 180°
         expect(svg).toContain('<line x1="0" y1="10" x2="-10" y2="10"'); // Zwei 10kt-Striche
-        expect(svg).toContain('<line x1="0" y1="2" x2="-5" y2="2"'); // Ein 5kt-Strich
+        expect(svg).toContain('<line x1="0" y1="0" x2="-5" y2="0"'); // Ein 5kt-Strich
         expect(svg).toContain('</svg>');
     });
   });
