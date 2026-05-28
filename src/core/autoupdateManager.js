@@ -1,10 +1,7 @@
-// autoupdateManager.js
-"use strict";
-
 import { AppState } from './state.js';
 import { Settings } from './settings.js';
 import { Utils } from './utils.js';
-import { I18n } from './i18n.js'; // Import hinzugefügt
+import { I18n } from './i18n.js';
 
 /**
  * Startet den Intervall-Timer für die automatische Aktualisierung.
@@ -19,8 +16,7 @@ function startAutoupdate() {
         return;
     }
     if (!navigator.onLine) {
-        // Ersetzt: 'Cannot enable autoupdate while offline.'
-        Utils.handleError(I18n.t('autoupdate.error_offline')); 
+        Utils.handleError(I18n.t('autoupdate.error_offline'));
         const autoupdateCheckbox = document.getElementById('autoupdateCheckbox');
         if (autoupdateCheckbox) autoupdateCheckbox.checked = false;
         Settings.state.userSettings.autoupdate = false;
@@ -36,8 +32,7 @@ function startAutoupdate() {
         document.dispatchEvent(new CustomEvent('autoupdate:tick', { detail: { isInitialTick: false } }));
     }, 60 * 1000);
 
-    // Ersetzt: 'Autoupdate enabled'
-    Utils.handleMessage(I18n.t('autoupdate.enabled')); 
+    Utils.handleMessage(I18n.t('autoupdate.enabled'));
 }
 
 /**
@@ -49,8 +44,7 @@ export function stopAutoupdate() {
         clearInterval(AppState.autoupdateInterval);
         AppState.autoupdateInterval = null;
         console.log('[AutoupdateManager] Stopped autoupdate interval.');
-        // Ersetzt: 'Autoupdate disabled'
-        Utils.handleMessage(I18n.t('autoupdate.disabled')); 
+        Utils.handleMessage(I18n.t('autoupdate.disabled'));
     }
 }
 
