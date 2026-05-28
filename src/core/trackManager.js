@@ -113,7 +113,7 @@ export async function loadGpxTrack(file) {
                 if (!isNaN(lat) && !isNaN(lng)) {
                     dipWaypoint = { lat, lng };
                     console.log(`[trackManager] DIP waypoint found in GPX file at: ${lat}, ${lng}`);
-                    break; // Ersten gefundenen DIP verwenden
+                    break;
                 }
             }
         }
@@ -318,7 +318,6 @@ export async function exportToGpx(sliderIndex, interpStep, heightUnit) {
         return;
     }
 
-    // Höhenreferenzen holen
     const dipLat = AppState.lastLat;
     const dipLng = AppState.lastLng;
     const dipElevation = Math.round(AppState.lastAltitude);
@@ -326,7 +325,6 @@ export async function exportToGpx(sliderIndex, interpStep, heightUnit) {
     let harpElevation = null;
 
     if (harpAnchor) {
-        // Asynchron die Höhe des HARP abrufen
         harpElevation = await Utils.getAltitude(harpAnchor.lat, harpAnchor.lng);
         harpElevation = harpElevation !== 'N/A' ? Math.round(harpElevation) : null;
     }
@@ -351,7 +349,6 @@ export async function exportToGpx(sliderIndex, interpStep, heightUnit) {
     const [jumpRunStartLat, jumpRunStartLng] = trackData.latlngs[0];
     const [jumpRunEndLat, jumpRunEndLng] = trackData.latlngs[1];
 
-    // MSL-Höhe für den Absetzvorgang berechnen
     const exitAltitudeAGL = Settings.getValue('exitAltitude', 3000);
     const exitAltitudeMSL = dipElevation + exitAltitudeAGL;
 
@@ -363,7 +360,6 @@ export async function exportToGpx(sliderIndex, interpStep, heightUnit) {
   </metadata>
 `;
 
-    // Wegpunkte mit korrekten MSL-Höhen einfügen
     gpxContent += `  <wpt lat="${dipLat}" lon="${dipLng}">\n    <name>DIP</name>\n    <ele>${dipElevation}</ele>\n    <sym>Flag, Blue</sym>\n  </wpt>\n`;
     if (harpAnchor && harpElevation !== null) {
         gpxContent += `  <wpt lat="${harpAnchor.lat}" lon="${harpAnchor.lng}">\n    <name>HARP</name>\n    <ele>${harpElevation}</ele>\n    <sym>Flag, Green</sym>\n  </wpt>\n`;
@@ -372,7 +368,6 @@ export async function exportToGpx(sliderIndex, interpStep, heightUnit) {
     gpxContent += `  <wpt lat="${jumpRunStartLat}" lon="${jumpRunStartLng}">\n    <name>First Out ${exitAltitudeAGL} m AGL</name>\n    <ele>${exitAltitudeMSL}</ele>\n    <sym>Airplane</sym>\n  </wpt>\n`;
     gpxContent += `  <wpt lat="${jumpRunEndLat}" lon="${jumpRunEndLng}">\n    <name>Last Out</name>\n    <ele>${exitAltitudeMSL}</ele>\n    <sym>Airplane</sym>\n  </wpt>\n`;
 
-    // Track mit korrekten MSL-Höhen einfügen
     gpxContent += `  <trk>\n    <name>Jump Run and Approach</name>\n    <trkseg>\n`;
     gpxContent += `      <trkpt lat="${approachStartLat}" lon="${approachStartLng}"><ele>${exitAltitudeMSL}</ele></trkpt>\n`;
     gpxContent += `      <trkpt lat="${jumpRunStartLat}" lon="${jumpRunStartLng}"><ele>${exitAltitudeMSL}</ele></trkpt>\n`;
@@ -716,7 +711,7 @@ async function readFileContent(file) {
 }
 
 // ===================================================================
-// 4. Composite GPX Export
+// 5. Composite GPX Export
 // ===================================================================
 
 /**
