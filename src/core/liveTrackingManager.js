@@ -5,8 +5,6 @@
  * Nutzt Capacitor Geolocation für native Plattformen und `navigator.geolocation` als Fallback.
  */
 
-"use strict";
-
 import { UI_DEFAULTS, SMOOTHING_DEFAULTS } from './constants.js';
 import { AppState } from './state.js';
 import { Utils } from './utils.js';
@@ -15,17 +13,11 @@ import { DateTime } from 'luxon';
 import { saveRecordedTrack } from './trackManager.js';
 import { showDisclosureModal } from '../ui-mobile/ui.js';
 import { Settings } from './settings.js';
-import { I18n } from './i18n.js'; // Import ergänzt
+import { I18n } from './i18n.js';
 
-// ===================================================================
-// 1. Öffentliche Hauptfunktionen (API des Moduls)
-// ===================================================================
-
-// Initialisierungs-Flag und Promise
 let isTrackingInitializing = false;
 let trackingInitPromise = null;
 
-// Handle für den App-State-Listener (GPS-Puffer-Verarbeitung beim Wakeup)
 let gpsBufferAppStateListener = null;
 
 /**
@@ -41,19 +33,14 @@ export async function startPositionTracking() {
         trackingInitPromise = (async () => {
             console.log("[LiveTrackingManager] Attempting to start position tracking...");
 
-            // Prüfen, ob der Nutzer den Hinweis bereits bestätigt hat.
             const hasAcknowledged = localStorage.getItem('hasAcknowledgedLocationDisclosure');
 
             const proceedWithTracking = async () => {
-                // FIX 1: Warte, bis Capacitor garantiert bereit ist.
-                // getCapacitor() wartet jetzt intern auf 'deviceready'.
                 const { Geolocation, isNative } = await getCapacitor();
                 console.log("[LiveTrackingManager] Platform:", isNative ? window.Capacitor.getPlatform() : 'Web', "IsNative:", isNative);
 
                 if (isNative && Geolocation) {
-                    // --- Native Logik (iOS/Android) ---
                     try {
-                        // Prüfe und fordere Berechtigungen an
                         const permissions = await checkAndRequestPermissions();
                         console.log("[LiveTrackingManager] Permissions result:", permissions);
                         if (!permissions) {
@@ -119,7 +106,6 @@ export async function startPositionTracking() {
                         stopPositionTracking();
                     }
                 } else {
-                    // --- Web-Fallback-Logik ---
                     console.log("[LiveTrackingManager] Using navigator.geolocation for tracking (Web).");
                     if (!navigator.geolocation) {
                         Utils.handleError(I18n.t('tracking.error_not_supported'));
@@ -144,28 +130,24 @@ export async function startPositionTracking() {
             };
 
             if (!hasAcknowledged) {
-                // Wenn der Hinweis noch nicht gezeigt wurde, zeige das Modal.
                 showDisclosureModal({
-                    title: I18n.t('tracking.disclosure_title'), // Übersetzt
-                    message: I18n.t('tracking.disclosure_message'), // Übersetzt
+                    title: I18n.t('tracking.disclosure_title'),
+                    message: I18n.t('tracking.disclosure_message'),
                     onConfirm: () => {
                         localStorage.setItem('hasAcknowledgedLocationDisclosure', 'true');
-                        proceedWithTracking(); // Fahre mit der Berechtigungsanfrage fort
+                        proceedWithTracking();
                     },
                     onCancel: () => {
-                        // Nutzer hat abgebrochen -> setze die UI zurück
                         const trackCheckbox = document.getElementById('trackPositionCheckbox');
                         if (trackCheckbox) trackCheckbox.checked = false;
                         Settings.state.userSettings.trackPosition = false;
                         Settings.save();
-                        Utils.handleMessage(I18n.t('tracking.access_canceled')); // Übersetzt
+                        Utils.handleMessage(I18n.t('tracking.access_canceled'));
                     }
                 });
             } else {
-                // Hinweis wurde bereits bestätigt, fahre direkt fort.
                 proceedWithTracking();
             }
-            // Am Ende:
             isTrackingInitializing = false;
             trackingInitPromise = null;
         })();
@@ -180,35 +162,31 @@ export function toggleManualRecording() {
     const manualButton = document.getElementById('manual-recording-button');
 
     if (AppState.isManualRecording) {
-        // Aufzeichnung stoppen
         AppState.isManualRecording = false;
         if (manualButton) {
-            manualButton.textContent = I18n.t('tracking.btn_start_recording'); // "Start Recording"
+            manualButton.textContent = I18n.t('tracking.btn_start_recording');
             manualButton.classList.remove('recording');
         }
-        Utils.handleMessage(I18n.t('tracking.recording_stopped')); // Übersetzt
+        Utils.handleMessage(I18n.t('tracking.recording_stopped'));
 
         if (AppState.recordedTrackPoints.length > 1) {
             saveRecordedTrack();
         } else {
-            AppState.recordedTrackPoints = []; // Leeren, wenn nicht genügend Punkte vorhanden sind
+            AppState.recordedTrackPoints = [];
         }
 
-        // Entscheiden, ob das Tracking komplett gestoppt werden soll.
         if (!Settings.state.userSettings.trackPosition) {
             stopPositionTracking();
         }
     } else {
-        // Aufzeichnung starten
         AppState.isManualRecording = true;
-        AppState.recordedTrackPoints = []; // Eine saubere Aufzeichnung starten
+        AppState.recordedTrackPoints = [];
         if (manualButton) {
-            manualButton.textContent = I18n.t('tracking.btn_stop_recording'); // "Stop Recording"
+            manualButton.textContent = I18n.t('tracking.btn_stop_recording');
             manualButton.classList.add('recording');
         }
-        Utils.handleMessage(I18n.t('tracking.recording_started')); // Übersetzt
+        Utils.handleMessage(I18n.t('tracking.recording_started'));
 
-        // Sicherstellen, dass das Live-Tracking aktiv ist
         if (AppState.watchId === null) {
             startPositionTracking();
         }
@@ -245,11 +223,9 @@ export async function stopPositionTracking() {
         AppState.watchId = null;
     }
 
-    // UI-Elemente von der Karte entfernen
     if (AppState.liveMarker) AppState.map.removeLayer(AppState.liveMarker);
     if (AppState.accuracyCircle) AppState.map.removeLayer(AppState.accuracyCircle);
 
-    // Zustand zurücksetzen
     AppState.liveMarker = null;
     AppState.accuracyCircle = null;
     AppState.lastSmoothedHeading = null;
@@ -264,18 +240,13 @@ export async function stopPositionTracking() {
     AppState.lastDeviceAltitude = null;
     AppState.lastAltitudeAccuracy = null;
     AppState.lastAccuracy = null;
-    AppState.altitudeCorrectionPerformed = false; // <-- ZURÜCKSETZEN: Flag für die nächste Sitzung vorbereiten.
+    AppState.altitudeCorrectionPerformed = false;
 
-    // Setzt die Flags zurück, die den Neustart blockiert haben.
     isTrackingInitializing = false;
     trackingInitPromise = null;
 
     document.dispatchEvent(new CustomEvent('tracking:stopped'));
 }
-
-// ===================================================================
-// 2. Zentrale Verarbeitungslogik
-// ===================================================================
 
 /**
  * Verarbeitet die eingehenden Positionsdaten. Diese Funktion wird gedebounced aufgerufen,
@@ -283,10 +254,6 @@ export async function stopPositionTracking() {
  * Sie berechnet Geschwindigkeit, Richtung, Sinkrate, glättet die Werte,
  * aktualisiert den Live-Marker auf der Karte, zeichnet den Track auf und löst ein
  * 'tracking:positionUpdated'-Event aus.
- *
- * HINWEIS (ToDo): Diese Funktion ist sehr umfangreich. Sie könnte in Zukunft in
- * kleinere, spezialisierte Funktionen aufgeteilt werden (z.B. eine für die
- * Höhenkorrektur, eine für die Geschwindigkeitsberechnung, eine für das Event-Dispatching).
  * @param {GeolocationPosition} position - Das Positionsobjekt von der Geolocation-API.
  * @private
  */
@@ -299,7 +266,6 @@ const debouncedPositionUpdate = Utils.debounce(async (position) => {
 
     const { latitude, longitude, accuracy, altitude: deviceAltitude, altitudeAccuracy } = position.coords;
 
-    // Offset-Berechnung wird jetzt nur noch EINMAL pro Sitzung ausgeführt.
     if (!AppState.altitudeCorrectionPerformed && deviceAltitude !== null && AppState.lastAltitude !== 'N/A') {
         // Flag sofort setzen, um wiederholte Ausführung zu blockieren.
         AppState.altitudeCorrectionPerformed = true;
@@ -316,7 +282,6 @@ const debouncedPositionUpdate = Utils.debounce(async (position) => {
         }
     }
 
-    // Wende die Korrektur nur an, wenn ein gültiger Offset berechnet wurde.
     const correctedAltitude = (deviceAltitude !== null && AppState.altitudeCorrectionOffset !== 0)
         ? deviceAltitude - AppState.altitudeCorrectionOffset
         : deviceAltitude;
@@ -332,23 +297,20 @@ const debouncedPositionUpdate = Utils.debounce(async (position) => {
     const currentTime = Date.now();
     let speedMs = 0;
     let direction = 'N/A';
-    let verticalSpeedMps = 0; // NEU: Variable für die Sinkrate
+    let verticalSpeedMps = 0;
 
     if (AppState.prevLat !== null && AppState.prevLng !== null && AppState.prevTime !== null && AppState.prevAltitude !== null) {
         const timeDiff = (currentTime - AppState.prevTime) / 1000;
         if (timeDiff > SMOOTHING_DEFAULTS.MIN_TIME_DIFF_FOR_SPEED_CALC_S) {
-            // Horizontale Geschwindigkeit berechnen
             const distance = AppState.map.distance([AppState.prevLat, AppState.prevLng], [latitude, longitude]);
             speedMs = distance / timeDiff;
             direction = Utils.calculateBearing(AppState.prevLat, AppState.prevLng, latitude, longitude);
 
-            // Vertikale Geschwindigkeit (Sink- oder Steigrate) berechnen
             const altitudeDiff = deviceAltitude - AppState.prevAltitude; // negativ bei Sinken
             verticalSpeedMps = altitudeDiff / timeDiff;
         }
     }
 
-    // Glättung der Werte für eine stabilere Anzeige
     const alphaSpeed = speedMs < SMOOTHING_DEFAULTS.SPEED_SMOOTHING_THRESHOLD ? SMOOTHING_DEFAULTS.SPEED_SMOOTHING_LOW : SMOOTHING_DEFAULTS.SPEED_SMOOTHING_HIGH;
     AppState.lastSmoothedSpeedMs = alphaSpeed * speedMs + (1 - alphaSpeed) * AppState.lastSmoothedSpeedMs;
     const alphaVario = 0.5; // Fester Glättungsfaktor für das Variometer
@@ -370,13 +332,11 @@ const debouncedPositionUpdate = Utils.debounce(async (position) => {
         updateAccuracyCircle(latitude, longitude, accuracy);
     }
 
-    // Vorherige Werte für die nächste Berechnung speichern
     AppState.prevLat = latitude;
     AppState.prevLng = longitude;
     AppState.prevTime = currentTime;
-    AppState.prevAltitude = deviceAltitude; // NEU: Höhe speichern
+    AppState.prevAltitude = deviceAltitude;
 
-    // Event mit den neuen Daten auslösen
     const event = new CustomEvent('tracking:positionUpdated', {
         detail: {
             latitude, longitude,
@@ -409,10 +369,6 @@ const debouncedPositionUpdate = Utils.debounce(async (position) => {
     document.dispatchEvent(event);
 }, 300);
 
-// ===================================================================
-// 3. Interne Hilfsfunktionen
-// ===================================================================
-
 /**
  * Erstellt ein benutzerdefiniertes Leaflet-Icon für den Live-Marker.
  * @param {number|string} direction - Die Bewegungsrichtung in Grad (0-360).
@@ -424,7 +380,6 @@ function createLiveMarkerIcon(direction) {
     const raw = (typeof direction === 'number' && isFinite(direction)) ? direction : 0;
     const rotation = (raw + mapBearing + 360) % 360;
 
-    // Das HTML für das Icon: ein Wrapper für die Rotation, der Punkt und der Pfeil.
     const iconHtml = `
         <div class="live-marker-wrapper" style="transform: rotate(${rotation}deg);">
             <div class="live-marker-dot"></div>
@@ -435,7 +390,7 @@ function createLiveMarkerIcon(direction) {
     return L.divIcon({
         className: 'live-marker-container', // Container-Klasse ohne Standard-Leaflet-Stile
         html: iconHtml,
-        iconSize: [24, 24], // Größe des Icons
+        iconSize: [24, 24],
         iconAnchor: [12, 12],
         pmIgnore: true
     });
