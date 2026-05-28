@@ -1,14 +1,12 @@
-// src/core/adsbManager.js
-
-"use strict";
-
 import { AppState } from './state.js';
 import { Utils } from './utils.js';
 import { Settings } from './settings.js';
-import { I18n } from './i18n.js'; // 1. Import ergänzt
+import { I18n } from './i18n.js';
 
 let adsbInterval = null;
 const ADSB_ATTRIBUTION = 'ADS-B Data provided by <a href="https://www.adsbexchange.com/" target="_blank">ADSBexchange.com</a>';
+const ADSB_SEARCH_RADIUS_NM = 15;
+const ADSB_UPDATE_INTERVAL_MS = 10_000;
 
 const CORS_PROXIES = [
     url => url,                                              // direkt (falls API CORS erlaubt)
@@ -45,20 +43,20 @@ function dispatchAdsbEvent(eventName, detail = {}) {
 export async function findAndSelectJumpShip() {
     if (adsbInterval) {
         stopAircraftTracking();
-        Utils.handleMessage(I18n.t('adsb.tracking_stopped')); // Übersetzt
+        Utils.handleMessage(I18n.t('adsb.tracking_stopped'));
         return;
     }
 
     if (AppState.lastLat == null || AppState.lastLng == null) {
-        Utils.handleError(I18n.t('adsb.error_no_dip')); // Übersetzt
+        Utils.handleError(I18n.t('adsb.error_no_dip'));
         return;
     }
 
-    Utils.handleMessage(I18n.t('adsb.searching')); // Übersetzt
+    Utils.handleMessage(I18n.t('adsb.searching'));
 
     try {
         const pos = { lat: AppState.lastLat, lng: AppState.lastLng };
-        const apiUrl = `https://api.adsb.lol/v2/lat/${pos.lat}/lon/${pos.lng}/dist/15`;
+        const apiUrl = `https://api.adsb.lol/v2/lat/${pos.lat}/lon/${pos.lng}/dist/${ADSB_SEARCH_RADIUS_NM}`;
         const response = await fetchWithFallback(apiUrl);
 
         if (!response.ok) {
@@ -69,7 +67,7 @@ export async function findAndSelectJumpShip() {
         const data = await response.json();
 
         if (!data.ac || data.ac.length === 0) {
-            Utils.handleMessage(I18n.t('adsb.no_aircraft_found')); // Übersetzt
+            Utils.handleMessage(I18n.t('adsb.no_aircraft_found'));
             return;
         }
 
@@ -90,7 +88,7 @@ export async function findAndSelectJumpShip() {
 
     } catch (error) {
         console.error("Fehler bei der ADSB-Abfrage:", error);
-        Utils.handleError(I18n.t('adsb.error_fetch_failed', { error: error.message })); // Übersetzt mit Platzhalter
+        Utils.handleError(I18n.t('adsb.error_fetch_failed', { error: error.message }));
     }
 }
 
@@ -99,11 +97,11 @@ export async function findAndSelectJumpShip() {
  * @param {object} aircraft - Das ausgewählte Flugzeug-Objekt.
  */
 export function startAircraftTracking(aircraft) {
-    Utils.handleMessage(I18n.t('adsb.tracking_started', { callsign: aircraft.callsign })); // Übersetzt
+    Utils.handleMessage(I18n.t('adsb.tracking_started', { callsign: aircraft.callsign }));
 
     const findShipButton = document.getElementById('findJumpShipBtn');
     if (findShipButton) {
-        findShipButton.textContent = I18n.t('adsb.btn_stop'); // Übersetzt
+        findShipButton.textContent = I18n.t('adsb.btn_stop');
         findShipButton.classList.remove('btn-secondary');
         findShipButton.classList.add('btn-danger');
     }
@@ -119,7 +117,7 @@ export function startAircraftTracking(aircraft) {
 
             if (response.status === 404) {
                 stopAircraftTracking();
-                Utils.handleMessage(I18n.t('adsb.aircraft_lost', { callsign: aircraft.callsign })); // Übersetzt
+                Utils.handleMessage(I18n.t('adsb.aircraft_lost', { callsign: aircraft.callsign }));
                 return;
             }
             if (!response.ok) throw new Error(`API Error ${response.status}`);
@@ -146,7 +144,7 @@ export function startAircraftTracking(aircraft) {
     };
 
     updateAircraftPosition();
-    adsbInterval = setInterval(updateAircraftPosition, 10000);
+    adsbInterval = setInterval(updateAircraftPosition, ADSB_UPDATE_INTERVAL_MS);
 }
 
 /**
@@ -164,7 +162,7 @@ export function stopAircraftTracking() {
 
     const findShipButton = document.getElementById('findJumpShipBtn');
     if (findShipButton) {
-        findShipButton.textContent = I18n.t('adsb.btn_find'); // Übersetzt
+        findShipButton.textContent = I18n.t('adsb.btn_find');
         findShipButton.classList.remove('btn-danger');
         findShipButton.classList.add('btn-secondary');
     }
