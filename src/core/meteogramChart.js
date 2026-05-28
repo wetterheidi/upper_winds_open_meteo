@@ -8,17 +8,16 @@ import { Settings } from './settings.js';
 import { Utils } from './utils.js';
 import * as weatherManager from './weatherManager.js';
 import { DateTime } from 'luxon';
-import { I18n } from './i18n.js'; // Import ergänzt
+import { I18n } from './i18n.js';
 
 // Chart.js wird global geladen.
 
-let meteogramUpperInstance = null; // Instanz für Höhenwetter
-let meteogramSurfaceInstance = null; // Instanz für Bodenwetter
+let meteogramUpperInstance = null;
+let meteogramSurfaceInstance = null;
 
 // Cache für Zeitzonen-Abfragen (Key: "lat,lng")
 const _timezoneCache = new Map();
 
-// Hilfsfunktion: Kategorisiert WMO-Wettercodes für Wettermarkierungen
 function getPrecipCategory(code) {
     // Hazard (rot): Gewitter + alle Vereisung (FZ)
     if (code === 95 || code === 96 || code === 99) return 'hazard';
@@ -34,7 +33,6 @@ function getPrecipCategory(code) {
     return null;
 }
 
-// Hilfsfunktion: Gibt die passende Farbe für den Bedeckungsgrad zurück
 function getCloudColor(cloudCoverPercent, style) {
     if (cloudCoverPercent <= 5) return style.getPropertyValue('--cc-clear').trim();
     if (cloudCoverPercent <= 25) return style.getPropertyValue('--cc-few').trim();
@@ -58,7 +56,6 @@ export async function generateMeteogram(sliderIndex) {
 
     destroyCharts();
 
-    // Wenn keine Daten da sind, trotzdem Titel setzen und abbrechen
     if (!AppState.weatherData || !AppState.weatherData.time || sliderIndex < 0) {
         if (upperTitleElement) upperTitleElement.textContent = I18n.t('weather.charts.upper_air');
         if (surfaceTitleElement) surfaceTitleElement.textContent = I18n.t('weather.charts.surface');
@@ -91,7 +88,6 @@ export async function generateMeteogram(sliderIndex) {
     const surfaceWindColor = style.getPropertyValue('--palette-grey-700').trim();
     const surfaceGustColor = style.getPropertyValue('--color-danger').trim();
 
-    // Timezone & Filtering
     let locationTimezone = 'utc';
     if (timeZone.toLowerCase() === 'loc' && AppState.lastLat != null) {
         const cacheKey = `${AppState.lastLat},${AppState.lastLng}`;
@@ -136,7 +132,6 @@ export async function generateMeteogram(sliderIndex) {
             // Nächstgelegenen Datenpunkt zum Slider-Zeitpunkt finden (robust auch an Fenstergrenzen)
             const diff = Math.abs(dt.valueOf() - sliderTime.valueOf());
             if (diff < minSliderDiff) { minSliderDiff = diff; sliderLabelIndex = timeLabels.length - 1; }
-            // Tageswechsel erkennen (außer beim allerersten Datenpunkt im Fenster)
             const currentDay = dt.startOf('day').valueOf();
             if (prevDay !== null && currentDay !== prevDay) {
                 midnightMarkers.push({ labelIndex: timeLabels.length - 1, dateStr: dt.toFormat('MMM dd') });
@@ -159,7 +154,6 @@ export async function generateMeteogram(sliderIndex) {
         const currentLabel = timeLabels[pointsProcessed];
         pointsProcessed++;
 
-        // Surface Data
         const tempC = weatherData.temperature_2m[i];
         surfaceTempData.push(tempUnit === 'F' ? Utils.convertTemperature(tempC, '°F') : tempC);
         const dpC = Utils.calculateDewpoint(tempC, weatherData.relative_humidity_2m[i]);
@@ -169,10 +163,8 @@ export async function generateMeteogram(sliderIndex) {
         surfaceWindGustData.push(parseFloat(Utils.convertWind(weatherData.wind_gusts_10m[i], windUnit, 'km/h').toFixed(1)));
         precipData.push(weatherData.weather_code ? (weatherData.weather_code[i] ?? 0) : 0);
 
-        // Upper Data
         const interpolated = weatherManager.interpolateWeatherData(weatherData, i, 100, baseHeight, 'm');
 
-        // Freezing Level
         let fl_m = null;
         for (let j = 0; j < interpolated.length - 1; j++) {
             if (interpolated[j].temp >= 0 && interpolated[j + 1].temp < 0) {
@@ -182,7 +174,6 @@ export async function generateMeteogram(sliderIndex) {
         }
         freezingLevelData.push(fl_m !== null ? Math.round(Utils.convertHeight(fl_m, heightUnit)) : null);
 
-        // Wind Barbs
         if (pointsProcessed % 2 === 1) {
             windBarbAltitudes.forEach(alt => {
                 const altM = heightUnit === 'ft' ? Utils.convertFeetToMeters(alt) : alt;
@@ -193,7 +184,6 @@ export async function generateMeteogram(sliderIndex) {
             });
         }
 
-        // Clouds
         for (let h = 0; h < upperChartMaxHeightDisplay; h += cloudHeightStep) {
             const midM = heightUnit === 'ft' ? Utils.convertFeetToMeters(h + cloudHeightStep / 2) : h + cloudHeightStep / 2;
             const closest = interpolated.reduce((prev, curr) => Math.abs(curr.height - (baseHeight + midM)) < Math.abs(prev.height - (baseHeight + midM)) ? curr : prev);
@@ -204,7 +194,6 @@ export async function generateMeteogram(sliderIndex) {
     upperTitleElement.textContent = `${I18n.t('weather.charts.upper_air')} - ${displayDateStr}`;
     surfaceTitleElement.textContent = `${I18n.t('weather.charts.surface')} - ${displayDateStr}`;
 
-    // Plugin: Slider-Linie + Tageswechsel-Markierung
     const verticalLinePlugin = {
         id: 'verticalLine',
         afterDraw(chart) {
@@ -212,7 +201,6 @@ export async function generateMeteogram(sliderIndex) {
             if (!xScale) return;
             const { ctx, chartArea } = chart;
 
-            // Tageswechsel-Linien
             const dayLineColor = style.getPropertyValue('--text-secondary').trim() || 'rgba(150,150,150,0.6)';
             for (const marker of midnightMarkers) {
                 const x = xScale.getPixelForValue(timeLabels[marker.labelIndex]);
@@ -224,7 +212,6 @@ export async function generateMeteogram(sliderIndex) {
                 ctx.strokeStyle = dayLineColor;
                 ctx.setLineDash([]);
                 ctx.stroke();
-                // Datums-Label
                 ctx.font = `10px sans-serif`;
                 ctx.fillStyle = dayLineColor;
                 ctx.textAlign = 'left';
@@ -232,7 +219,6 @@ export async function generateMeteogram(sliderIndex) {
                 ctx.restore();
             }
 
-            // Slider-Linie
             if (sliderLabelIndex >= 0) {
                 const x = xScale.getPixelForValue(timeLabels[sliderLabelIndex]);
                 ctx.save();
@@ -294,7 +280,6 @@ export async function generateMeteogram(sliderIndex) {
 
     const scatterData = barbImages.filter(img => img).map(img => ({ x: img.rawData.x, y: img.rawData.y, image: img }));
 
-    // --- Upper Chart ---
     meteogramUpperInstance = new Chart(upperCtx, {
         type: 'bar', // Basis-Typ bleibt Bar für die Wolken
         plugins: [verticalLinePlugin],
@@ -316,21 +301,21 @@ export async function generateMeteogram(sliderIndex) {
                     pointStyle: scatterData.map(d => d.image),
                     pointRadius: 15,
                     order: 1, // Wind nach vorne
-                    xAxisID: 'x', // Explizite Zuweisung
-                    yAxisID: 'y'  // Explizite Zuweisung
+                    xAxisID: 'x',
+                    yAxisID: 'y'
                 },
                 {
                     label: I18n.t('weather.freezing_level'),
-                    type: 'line',                // Explizit als Linie definieren
+                    type: 'line',
                     data: freezingLevelData,
-                    borderColor: freezingLevelColor,        // Deine gewünschte Farbe
+                    borderColor: freezingLevelColor,
                     borderWidth: 2,
-                    borderDash: [5, 5],          // Gestrichelt
+                    borderDash: [5, 5],
                     pointRadius: 0,
                     fill: false,
                     tension: 0.1,
                     yAxisID: 'y',                // Muss exakt mit der ID in scales übereinstimmen
-                    xAxisID: 'x',                // WICHTIG: Muss der X-Achse zugewiesen sein
+                    xAxisID: 'x',                // muss der X-Achse zugewiesen sein
                     order: 0                     // Sorgt dafür, dass die Linie ÜBER den Wolken liegt
                 }
             ]
@@ -347,7 +332,7 @@ export async function generateMeteogram(sliderIndex) {
                     ticks: { color: textColor }
                 },
                 y: {
-                    stacked: false, // ÄNDERUNG: Auf false setzen, da Wolken über Y-Bereich [start, end] definiert sind
+                    stacked: false, // Wolken sind als Y-Bereich [start, end] definiert
                     min: 0,
                     max: upperChartMaxHeightDisplay,
                     title: { display: true, text: `${I18n.t('weather.altitude')} (${heightUnit})`, color: textColor },
@@ -369,7 +354,7 @@ export async function generateMeteogram(sliderIndex) {
                             if (!raw) return '';
                             // String-Vergleich muss exakt mit dem Label oben übereinstimmen
                             if (ctx.dataset.label === I18n.t('weather.wind')) {
-                                return ` ${I18n.t('weather.wind')}: ${raw.direction}° / ${raw.speedKt} ${windUnit}`;
+                                return ` ${I18n.t('weather.wind')}: ${raw.direction}° / ${raw.speedKt} kt`;
                             }
                             if (ctx.dataset.label === I18n.t('weather.cloud_cover')) {
                                 return ` ${I18n.t('weather.cloud_cover')}: ${raw.cover.toFixed(0)}%`;
@@ -382,7 +367,6 @@ export async function generateMeteogram(sliderIndex) {
         }
     });
 
-    // --- Surface Chart ---
     meteogramSurfaceInstance = new Chart(surfaceCtx, {
         type: 'line',
         plugins: [verticalLinePlugin, precipPlugin],
