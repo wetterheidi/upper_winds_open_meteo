@@ -1,6 +1,3 @@
-// rainRadarManager.js
-"use strict";
-
 import { AppState } from './state.js';
 import { I18n } from './i18n.js';
 import { Utils } from './utils.js';
@@ -12,11 +9,9 @@ const ANIMATION_SPEED_MS = 800;
 const DEFAULT_OPACITY = 0.5;
 const RADAR_MAX_NATIVE_ZOOM = 7; // RainViewer tiles natively available up to ~zoom 7 in most regions
 
-// All preloaded L.TileLayer instances (one per radar frame)
 let preloadedLayers = [];
 // The frame metadata from the API ({time, path}[])
 let radarFrames = [];
-// The user-selected display opacity
 let activeOpacity = DEFAULT_OPACITY;
 // True when radar is suppressed because timeslider is in the future
 let isSuppressed = false;
@@ -92,7 +87,6 @@ async function _loadAndPreloadFrames() {
         return layer;
     });
 
-    // Show latest frame
     const lastIndex = preloadedLayers.length - 1;
     preloadedLayers[lastIndex].setOpacity(activeOpacity);
     AppState.radarLayer = preloadedLayers[lastIndex];
@@ -161,7 +155,6 @@ export async function toggleRadar() {
 export function setOpacity(opacity) {
     activeOpacity = Math.max(0, Math.min(1, opacity));
 
-    // Apply to the currently visible layer
     if (AppState.radarLayer) {
         AppState.radarLayer.setOpacity(activeOpacity);
     }
@@ -193,7 +186,6 @@ export function stopAnimation() {
         clearInterval(AppState.radarAnimationTimer);
         AppState.radarAnimationTimer = null;
     }
-    // Jump to latest frame
     if (preloadedLayers.length && AppState.isRadarVisible) {
         _switchToFrame(preloadedLayers.length - 1);
     }
@@ -248,8 +240,6 @@ export function isRadarSuppressed() {
     return isSuppressed;
 }
 
-// --- Private helpers ---
-
 /**
  * Switches visibility: hides all layers, then shows the target frame.
  * @param {number} index - The frame index to display.
@@ -257,12 +247,10 @@ export function isRadarSuppressed() {
 function _switchToFrame(index) {
     if (!preloadedLayers[index]) return;
 
-    // Hide all frames
     for (const layer of preloadedLayers) {
         layer.setOpacity(0);
     }
 
-    // Show the target frame
     preloadedLayers[index].setOpacity(activeOpacity);
     AppState.radarLayer = preloadedLayers[index];
     AppState.radarCurrentIndex = index;
@@ -274,7 +262,6 @@ function _startAutoRefresh() {
     AppState.radarRefreshTimer = setInterval(async () => {
         if (AppState.isRadarVisible && !AppState.radarAnimationTimer) {
             try {
-                // Reload all frames (new data available)
                 _removeAllLayers();
                 await _loadAndPreloadFrames();
                 _updateTimestampDisplay();
