@@ -72,8 +72,7 @@ export function setupAutoupdate() {
             autoupdateCheckbox.checked = false;
             Settings.state.userSettings.autoupdate = false;
             Settings.save();
-            // Ersetzt: 'Autoupdate cannot be enabled with a historical date set.'
-            Utils.handleError(I18n.t('autoupdate.error_historical_date')); 
+            Utils.handleError(I18n.t('autoupdate.error_historical_date'));
             return;
         }
 
