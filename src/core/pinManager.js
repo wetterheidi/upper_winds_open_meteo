@@ -99,8 +99,6 @@ export function getPinCount() {
     return AppState.pinnedJumps.length;
 }
 
-// --- Private Helfer ---
-
 function _getNextPinId() {
     const used = new Set(AppState.pinnedJumps.map(p => p.id));
     for (let i = 1; i <= MAX_PINS; i++) {
