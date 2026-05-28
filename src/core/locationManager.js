@@ -7,14 +7,12 @@
 
 import { Utils } from './utils.js';
 import * as mgrs from 'mgrs';
-import { I18n } from './i18n.js'; // Import ergänzt
+import { I18n } from './i18n.js';
 
 let searchCache = JSON.parse(localStorage.getItem('searchCache')) || {};
 let isAddingFavorite = false;
 
-// ===================================================================
-// 1. Öffentliche API- & Suchfunktionen
-// ===================================================================
+// 1. Öffentliche API
 
 /**
  * Führt eine Suche nach einem Ort durch. Prüft zuerst, ob die Eingabe Koordinaten sind.
@@ -23,12 +21,11 @@ let isAddingFavorite = false;
  * @returns {Promise<object[]>} Ein Array von formatierten Suchergebnissen.
  */
 export async function performSearch(query) {
-    // --- Phase 1: Eingabe prüfen und Cache nutzen (Logik aus der mobilen Version) ---
     if (!query.trim()) {
-        return []; // Leeres Array zurückgeben, wenn die Eingabe leer ist
+        return [];
     }
 
-    const parsedCoords = parseQueryAsCoordinates(query); // Annahme: parse... ist auch hier
+    const parsedCoords = parseQueryAsCoordinates(query);
     if (parsedCoords) {
         return [{
             display_name: `${I18n.t('location.coordinate')}: ${parsedCoords.lat.toFixed(5)}, ${parsedCoords.lng.toFixed(5)}`,
@@ -39,11 +36,10 @@ export async function performSearch(query) {
     }
 
     if (searchCache[query]) {
-        return searchCache[query]; // Ergebnisse aus dem Cache zurückgeben
+        return searchCache[query];
     }
 
     try {
-        // 1. Die URL wird auf die Open-Meteo Geocoding API umgestellt.
         const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=10&language=de&format=json`;
 
         const response = await fetch(url);
@@ -52,13 +48,11 @@ export async function performSearch(query) {
         }
         const data = await response.json();
 
-        // 2. Die Antwort der API wird in das Format umgewandelt, das die UI erwartet.
         if (!data.results) {
-            return []; // Keine Ergebnisse gefunden
+            return [];
         }
 
         const formattedResults = data.results.map(item => {
-            // Wir bauen einen aussagekräftigen Anzeigenamen zusammen.
             const displayNameParts = [
                 item.name,
                 item.admin1, // z.B. Bundesland oder Region
@@ -66,18 +60,16 @@ export async function performSearch(query) {
             ];
 
             return {
-                // Filtern leere Teile heraus und verbinden sie mit Kommas
                 display_name: displayNameParts.filter(Boolean).join(', '),
                 lat: item.latitude,
                 lon: item.longitude
             };
         });
 
-        // Ergebnis im Cache speichern
         searchCache[query] = formattedResults;
         localStorage.setItem('searchCache', JSON.stringify(searchCache));
 
-        return formattedResults; // Die formatierten Ergebnisse zurückgeben
+        return formattedResults;
 
     } catch (error) {
         console.error("Search failed:", error);
@@ -98,7 +90,6 @@ export async function performSearch(query) {
 export async function findParachutingPOIs(minLat, minLon, maxLat, maxLon) {
     console.log('findParachutingPOIs: Searching for POIs in bbox:', { minLat, minLon, maxLat, maxLon });
 
-    // Validate bounding box
     if (isNaN(minLat) || isNaN(minLon) || isNaN(maxLat) || isNaN(maxLon) ||
         minLat < -90 || maxLat > 90 || minLon < -180 || maxLon > 180 ||
         minLat > maxLat || minLon > maxLon) {
@@ -107,7 +98,6 @@ export async function findParachutingPOIs(minLat, minLon, maxLat, maxLon) {
         return [];
     }
 
-    // Cache key based on bounding box
     const cacheKey = `parachutingPOIs_${minLat}_${minLon}_${maxLat}_${maxLon}`;
     if (searchCache[cacheKey]) {
         console.log('findParachutingPOIs: Returning cached results for bbox:', cacheKey);
@@ -115,7 +105,6 @@ export async function findParachutingPOIs(minLat, minLon, maxLat, maxLon) {
     }
 
     try {
-        // Overpass QL query for parachuting-related POIs
         const overpassQuery = `
             [out:json][timeout:50][bbox:${minLat},${minLon},${maxLat},${maxLon}];
             (
@@ -145,18 +134,18 @@ export async function findParachutingPOIs(minLat, minLon, maxLat, maxLon) {
                 tags["addr:state"] || tags.state,
                 tags["addr:country"] || tags.country,
                 tags['sport'] ? `(${tags['sport']})` : null,
-                tags['aeroway'] === 'aerodrome' ? `(${I18n.t('location.poi_airfield')})` : null // Übersetzt
+                tags['aeroway'] === 'aerodrome' ? `(${I18n.t('location.poi_airfield')})` : null
             ].filter(Boolean).join(', ');
 
             return {
-                display_name: displayNameParts || I18n.t('location.poi_unnamed'), // Übersetzt
+                display_name: displayNameParts || I18n.t('location.poi_unnamed'),
                 lat: item.lat || item.center?.lat,
                 lon: item.lon || item.center?.lon,
                 type: tags['sport'] || tags['aeroway'] || tags['leisure'] || 'parachuting'
             };
         });
 
-        // Filter out duplicates based on proximity (within 100m)
+        // Deduplizierung: identische Koordinaten (5 Dezimalstellen ≈ 1 m)
         const uniqueResults = [];
         const seenCoords = new Set();
         for (const result of results) {
@@ -187,8 +176,6 @@ export async function findParachutingPOIs(minLat, minLon, maxLat, maxLon) {
     }
 }
 
-// src/core/locationManager.js
-
 /**
  * Legt einen bestimmten Ort als "Home DZ" fest.
  * @param {number} lat - Breite des Home DZ.
@@ -198,7 +185,6 @@ export function setHomeDZ(lat, lng) {
     let history = getCoordHistory();
     let homeDZLabel = 'Home DZ';
 
-    // Setze alle anderen Einträge zurück
     history.forEach(entry => entry.isHomeDZ = false);
 
     const existingEntry = history.find(entry =>
@@ -215,7 +201,7 @@ export function setHomeDZ(lat, lng) {
 
     saveCoordHistory(history);
     Utils.handleMessage(I18n.t('location.home_dz_set', { name: homeDZLabel }));
-    _dispatchFavoritesUpdate(); // UI neu zeichnen lassen
+    _dispatchFavoritesUpdate();
 }
 
 /**
@@ -237,10 +223,6 @@ export function getHomeDZ() {
     return getCoordHistory().find(entry => entry.isHomeDZ);
 }
 
-// ===================================================================
-// 2. Local Storage Management (Favoriten & Verlauf)
-// ===================================================================
-
 /**
  * Fügt einen Ort zum Suchverlauf hinzu oder aktualisiert einen bestehenden Eintrag.
  * @param {number} lat - Breite.
@@ -258,10 +240,8 @@ export function addCoordToHistory(lat, lng, label, isFavorite = false) {
     const newLat = parseFloat(lat.toFixed(5));
     const newLng = parseFloat(lng.toFixed(5));
 
-    // Entferne alte Einträge mit denselben Koordinaten, um Duplikate zu vermeiden
     history = history.filter(entry => Math.abs(entry.lat - newLat) > 0.001 || Math.abs(entry.lng - newLng) > 0.001);
 
-    // Füge den neuen Eintrag am Anfang hinzu
     history.unshift({ lat: newLat, lng: newLng, label: label, isFavorite: isFavorite, timestamp: Date.now() });
 
     // Begrenze den Verlauf auf 5 Einträge (Favoriten ausgenommen)
@@ -324,7 +304,7 @@ export function addOrUpdateFavorite(lat, lng, name, skipMessage = false) {
  * @param {boolean} isFavorite - Der neue Favoritenstatus.
  */
 export function updateFavoriteStatus(lat, lng, name, isFavorite) {
-    let history = getCoordHistory(); // getCoordHistory() ist bereits hier
+    let history = getCoordHistory();
     const newLat = parseFloat(lat.toFixed(5));
     const newLng = parseFloat(lng.toFixed(5));
 
@@ -335,19 +315,16 @@ export function updateFavoriteStatus(lat, lng, name, isFavorite) {
 
     if (existingEntry) {
         existingEntry.isFavorite = isFavorite;
-        // Aktualisiere den Namen nur, wenn es ein neuer Favorit wird
         if (isFavorite) {
             existingEntry.label = name;
         }
     } else if (isFavorite) {
-        // Füge einen komplett neuen Favoriten hinzu, falls er nicht im Verlauf war
         history.unshift({ lat: newLat, lng: newLng, label: name, isFavorite: true, timestamp: Date.now() });
     }
 
     saveCoordHistory(history);
     _dispatchFavoritesUpdate();
 
-    // Gib eine Erfolgsmeldung zurück
     if (isFavorite) {
         Utils.handleMessage(I18n.t('location.favorite_added', { name }));
     } else {
@@ -376,6 +353,8 @@ export function removeLocationFromHistory(lat, lng) {
     Utils.handleMessage(I18n.t('location.deleted'));
     _dispatchFavoritesUpdate();
 }
+
+// 2. Local Storage Management
 
 /**
  * Ruft den gesamten Verlauf (Favoriten und letzte Suchen) aus dem Local Storage ab.
@@ -408,9 +387,7 @@ export function saveCoordHistory(history) {
     }
 }
 
-// ===================================================================
 // 3. Interne Hilfsfunktionen
-// ===================================================================
 
 /**
  * Versucht, eine Benutzereingabe als Koordinaten (Dezimalgrad oder MGRS) zu parsen.
@@ -441,10 +418,6 @@ export function parseQueryAsCoordinates(query) {
     // Versuch 2: MGRS (z.B. "32UPU6347420615")
     const cleanedForMgrs = trimmedQuery.replace(/\s/g, '').toUpperCase();
     const mgrsRegex = /^[0-9]{1,2}[C-HJ-NP-X][A-HJ-NP-Z]{2}(\d{2}|\d{4}|\d{6}|\d{8}|\d{10})$/;
-    if (typeof mgrs === 'undefined') {
-        console.warn('parseQueryAsCoordinates: MGRS library not loaded');
-        return null;
-    }
     if (mgrsRegex.test(cleanedForMgrs)) {
         try {
             const [lng, lat] = mgrs.toPoint(cleanedForMgrs);
@@ -469,7 +442,6 @@ export function parseQueryAsCoordinates(query) {
  * @private
  */
 export function _dispatchFavoritesUpdate() {
-    console.log('_dispatchFavoritesUpdate: Dispatching event');
     const history = getCoordHistory();
     const favorites = history.filter(item => item.isFavorite);
     const event = new CustomEvent('favorites:updated', {
