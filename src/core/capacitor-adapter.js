@@ -7,13 +7,14 @@ import { Geolocation } from '@capacitor/geolocation';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Browser } from '@capacitor/browser';
 import { Capacitor } from '@capacitor/core';
-import { App } from '@capacitor/app'; // <<< NEUER IMPORT
+import { App } from '@capacitor/app';
 import { StatusBar } from '@capacitor/status-bar';
 import { BackgroundGeolocation } from '@capacitor-community/background-geolocation';
 
+const DEVICE_READY_FALLBACK_MS = 2000;
+
 let capacitorModulesPromise = null;
 let deviceReadyPromise = null;
-let isInitialized = false;
 
 /**
  * Wartet auf das deviceready Event
@@ -21,15 +22,12 @@ let isInitialized = false;
 function waitForDeviceReady() {
     if (!deviceReadyPromise) {
         deviceReadyPromise = new Promise((resolve) => {
-            // **NEU:** Prüfe, ob wir uns überhaupt in einer nativen Umgebung befinden.
-            // Wenn nicht (d.h. im Web), müssen wir nicht auf 'deviceready' warten.
             if (!window.Capacitor || !window.Capacitor.isNativePlatform()) {
                 console.log('Web environment detected, resolving deviceReady immediately.');
                 resolve();
-                return; // Wichtig: Die Funktion hier beenden.
+                return;
             }
 
-            // Die ursprüngliche Logik, die nur noch für native Plattformen ausgeführt wird.
             document.addEventListener('deviceready', () => {
                 console.log('Native device is ready');
                 resolve();
@@ -39,20 +37,10 @@ function waitForDeviceReady() {
             setTimeout(() => {
                 console.log('Fallback: Assuming native device is ready after 2s.');
                 resolve();
-            }, 2000);
+            }, DEVICE_READY_FALLBACK_MS);
         });
     }
     return deviceReadyPromise;
-}
-
-async function initialize() {
-    if (window.Capacitor && window.Capacitor.isNativePlatform()) {
-        document.addEventListener('deviceready', () => {
-            isInitialized = true;
-        }, { once: true });
-    } else {
-        isInitialized = true;
-    }
 }
 
 async function loadModules() {
@@ -73,7 +61,6 @@ async function loadModules() {
                 isNative: true,
                 isInitialized: true
             };
-            isInitialized = true;
             return modules;
         }
     } catch (error) {
@@ -88,6 +75,7 @@ async function loadModules() {
         Capacitor: null,
         App: null,
         StatusBar: null,
+        BackgroundGeolocation: null,
         isNative: false,
         isInitialized: false
     };
@@ -105,6 +93,7 @@ export async function getCapacitor() {
                 Capacitor: null,
                 App: null,
                 StatusBar: null,
+                BackgroundGeolocation: null,
                 isNative: false,
                 isInitialized: false
             };
