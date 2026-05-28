@@ -1787,6 +1787,7 @@ function setupAppEventListeners() {
         console.log('[main-mobile] Event "tracking:positionUpdated" received. Data:', event.detail);
         updateJumpMasterLineAndPanel(event.detail);
         updateDashboardPanel(event.detail);
+        mapManager.updateLiveFollow(event.detail.latitude, event.detail.longitude);
         mapManager.updateHeadingUp(event.detail.gpsHeading, event.detail.directionDeg, event.detail.speedMs);
         if (AppState.isAutoRecording) {
             SensorManager.checkLanding(event.detail.descentRateMps);

@@ -71,6 +71,7 @@ export const AppState = {
     liveMarker: null,                  // @type {L.Marker|null} - Der Marker, der die Live-Position anzeigt.
     livePositionControl: null,         // @type {L.Control|null} - Das Control zur Anzeige der Live-Positionsdaten.
     headingUpControl: null,            // @type {L.Control|null} - Das Toggle-Control für den "Heading Up"-Modus.
+    followControl: null,               // @type {L.Control|null} - Das Re-Center-Control für den Auto-Follow-Modus.
     accuracyCircle: null,              // @type {L.Circle|null} - Der Genauigkeitskreis um den Live-Marker.
     jumpMasterLine: null,              // @type {L.Polyline|null} - Die Linie vom Live-Marker zum Ziel (DIP/HARP).
     aircraftMarker: null,              // @type {L.Marker|null} - Der Marker für das Absetzflugzeug.

@@ -9,6 +9,7 @@
  */
 
 import { AppState } from './state.js';
+import { CONVERSIONS } from './constants.js';
 
 // ===================================================================
 // Konstanten
@@ -27,14 +28,12 @@ const CACHE_TTL_MS = 60 * 60 * 1000; // 1 Stunde
 // Modellpriorität: Index 0 = höchste Auflösung / Präferenz
 const MODEL_PRIORITY = ['ICON-D2', 'ICON-EU', 'ICON-GLOBAL'];
 
-// Mapping Sounding-Modellname → OpenMeteo model-ID für den Oberflächendaten-Request
 const OPENMETEO_MODEL_MAP = {
     'ICON-D2':     'icon_d2',
     'ICON-EU':     'icon_eu',
     'ICON-GLOBAL': 'icon_global',
 };
 
-// Interner Cache für die GitHub-Dateiliste
 let _fileListCache = null;
 let _fileListCacheTime = 0;
 
@@ -88,7 +87,6 @@ export async function fetchSoundingData(lat, lng, targetTime) {
             throw new Error('Ungültiges Sounding-Format');
         }
 
-        // Modell-Run-Zeitstempel für die UI setzen
         const meta = soundingFile[0];
         AppState.lastModelRun = `${meta.run_date.slice(0,4)}-${meta.run_date.slice(4,6)}-${meta.run_date.slice(6,8)} ${meta.run_hour}Z`;
 
@@ -101,7 +99,6 @@ export async function fetchSoundingData(lat, lng, targetTime) {
 
         console.log(`[soundingManager] Verwende ${bestFile.model} Sounding (${bestFile.name})`);
 
-        // Sounding-Daten konvertieren und parallel OpenMeteo-Oberflächendaten laden
         const [weatherData, surfaceData] = await Promise.all([
             Promise.resolve(_convertToWeatherData(soundingFile, terrainElevM)),
             _fetchOpenMeteoSurface(lat, lng, soundingFile, bestFile.model),
@@ -117,7 +114,7 @@ export async function fetchSoundingData(lat, lng, targetTime) {
         return weatherData;
 
     } catch (e) {
-        console.error('[soundingManager] Fehler beim Laden des Progtempss:', e.message);
+        console.error('[soundingManager] Fehler beim Laden des Progtemps:', e.message);
         // Customlevels zurücksetzen, damit der Fallback auf STANDARD_PRESSURE_LEVELS greift
         AppState.customPressureLevels = null;
         throw e; // wird von fetchWeather abgefangen
@@ -138,7 +135,7 @@ async function _fetchFileList() {
     const names = await response.json(); // Array von Dateinamen (Strings)
     _fileListCache = names
         .filter(n => n.startsWith('sounding_ICON-') && n.endsWith('.json'))
-        .map(n => ({ name: n })); // { name } damit der Rest des Codes unverändert bleibt
+        .map(n => ({ name: n }));
     _fileListCacheTime = now;
     return _fileListCache;
 }
@@ -198,7 +195,6 @@ function _selectBestFile(files, locationKey, targetTime) {
 
     const target = new Date(targetTime);
 
-    // Erst bestes Modell suchen, das den Zielzeitpunkt abdeckt
     for (const r of relevant) {
         // Jede Datei deckt step_h 0–24 ab → Zeitfenster [runTime, runTime + 24h]
         const runEnd = new Date(r.runTime.getTime() + 24 * 3600 * 1000);
@@ -240,7 +236,6 @@ async function _fetchOpenMeteoSurface(lat, lng, soundingFile, soundingModel) {
  * Matched per ISO-Zeitstempel; fehlt ein Zeitstempel in OpenMeteo bleibt der Sounding-Wert erhalten.
  */
 function _applySurfaceData(weatherData, surfaceData, soundingTimes, omModel) {
-    // OpenMeteo liefert hourly.time als ISO-Array
     const omTimeIndex = new Map(surfaceData.time.map((t, i) => [t, i]));
 
     for (let ti = 0; ti < soundingTimes.length; ti++) {
@@ -307,10 +302,9 @@ function _closestLevel(levels, targetP_hPa) {
 function _convertToWeatherData(soundingFile, terrainElevM = 0) {
     const n = soundingFile.length;
 
-    // --- Kanonische Drucklevel aus Zeitschritt 0 ableiten ---
     // levels sind absteigend nach level_idx sortiert (höchster Druck / niedrigste Höhe zuerst)
     const refLevels = soundingFile[0].levels;
-    const refPressures = refLevels.map(l => l.p_hPa); // Referenzdrücke für alle Zeitschritte
+    const refPressures = refLevels.map(l => l.p_hPa);
 
     // Integer-Rundung + Deduplikation (falls zwei Level auf denselben Wert runden)
     const pressureKeys = [];
@@ -323,10 +317,8 @@ function _convertToWeatherData(soundingFile, terrainElevM = 0) {
         pressureKeys.push(key);
     }
 
-    // AppState informieren: interpolateWeatherData soll diese Level verwenden
     AppState.customPressureLevels = pressureKeys; // absteigend nach Druck = aufsteigend nach Höhe entspricht dem Sounding-Sort
 
-    // --- Daten-Arrays initialisieren ---
     const time                = new Array(n);
     const surface_pressure    = new Array(n);
     const temperature_2m      = new Array(n);
@@ -340,7 +332,6 @@ function _convertToWeatherData(soundingFile, terrainElevM = 0) {
     const cloud_cover_mid     = new Array(n).fill(0);
     const cloud_cover_high    = new Array(n).fill(0);
 
-    // Pro Drucklevel ein Array für jeden Zeitschritt
     const levelArrays = {};
     for (const key of pressureKeys) {
         levelArrays[`temperature_${key}hPa`]         = new Array(n);
@@ -352,7 +343,6 @@ function _convertToWeatherData(soundingFile, terrainElevM = 0) {
     }
 
 
-    // --- Zeitschritte befüllen ---
     for (let ti = 0; ti < n; ti++) {
         const step   = soundingFile[ti];
         const levels = step.levels;
@@ -368,20 +358,18 @@ function _convertToWeatherData(soundingFile, terrainElevM = 0) {
         const sfc = levels[0];
         temperature_2m[ti]       = sfc.T_C;
         relative_humidity_2m[ti] = _rhFromTd(sfc.T_C, sfc.Td_C);
-        wind_speed_10m[ti]       = sfc.wspd_kn * 1.852; // kn → km/h; wird durch OpenMeteo überschrieben
-        wind_direction_10m[ti]   = sfc.wdir_deg;        // wird durch OpenMeteo überschrieben
-        wind_gusts_10m[ti]       = sfc.wspd_kn * 1.852 * 1.3; // Fallback-Näherung; wird durch OpenMeteo überschrieben
+        wind_speed_10m[ti]       = sfc.wspd_kn * CONVERSIONS.KNOTS_TO_KMH; // kn → km/h; wird durch OpenMeteo überschrieben
+        wind_direction_10m[ti]   = sfc.wdir_deg;                            // wird durch OpenMeteo überschrieben
+        wind_gusts_10m[ti]       = sfc.wspd_kn * CONVERSIONS.KNOTS_TO_KMH * 1.3; // Fallback-Näherung; wird durch OpenMeteo überschrieben
 
-        // Grobe Wolkenbedeckung nach Stockwerken (für Meteogramm)
         let ccLow = 0, ccMid = 0, ccHigh = 0;
 
-        // Pro Drucklevel: Level mit dem zum Referenzdruck nächstgelegenen Druck suchen
         for (let ki = 0; ki < pressureKeys.length; ki++) {
             const key  = pressureKeys[ki];
             const refP = refPressures[ki];
             const lev  = _closestLevel(levels, refP);
 
-            const wspd_kmh = lev.wspd_kn * 1.852;
+            const wspd_kmh = lev.wspd_kn * CONVERSIONS.KNOTS_TO_KMH;
             const rh       = _rhFromTd(lev.T_C, lev.Td_C);
             const cc       = _cloudCoverFromTd(lev.T_C, lev.Td_C);
 
@@ -393,7 +381,6 @@ function _convertToWeatherData(soundingFile, terrainElevM = 0) {
             levelArrays[`geopotential_height_${key}hPa`][ti] = lev.z_m + terrainElevM;
             levelArrays[`cloud_cover_${key}hPa`][ti]         = cc;
 
-            // Stockwerk-Zuordnung nach Höhe für cloud_cover_low/mid/high
             if (lev.z_m < 2000)       { ccLow  = Math.max(ccLow,  cc); }
             else if (lev.z_m < 6000)  { ccMid  = Math.max(ccMid,  cc); }
             else                       { ccHigh = Math.max(ccHigh, cc); }

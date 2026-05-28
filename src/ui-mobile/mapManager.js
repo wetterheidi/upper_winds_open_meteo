@@ -23,6 +23,8 @@ let isRotatingJRT = false;
 let _isAutoRotating = false;
 let _headingUpPaused = false;
 let _headingUpPauseTimeout = null;
+let _mapFollowPaused = false;
+let _mapFollowPauseTimeout = null;
 let initialJrtAngle = 0;
 let initialJrtDirection = 0;
 
@@ -77,6 +79,7 @@ async function initMap() {
     _addStandardMapControls();
     _initializeLivePositionControl();
     _initializeHeadingUpControl();
+    _initializeFollowControl();
     _initializeDefaultMarker(defaultCenter, initialAltitude);
 
     _setupCoreMapEventHandlers();
@@ -1271,6 +1274,50 @@ function _initializeHeadingUpControl() {
         AppState.lastSmoothedHeading = null;
     });
 }
+
+const FollowControl = L.Control.extend({
+    options: { position: 'bottomright' },
+    onAdd: function () {
+        const container = L.DomUtil.create('div', 'leaflet-control-follow leaflet-bar');
+        container.style.display = 'none';
+        const btn = L.DomUtil.create('a', '', container);
+        btn.href = '#';
+        btn.setAttribute('role', 'button');
+        btn.style.cssText = 'font-size:11px;font-weight:bold;min-width:38px;text-align:center;padding:0 4px;line-height:26px;color:#2979ff;';
+        btn.textContent = '⊙ Follow';
+        btn.title = 'Zur Live-Position zurückkehren';
+        L.DomEvent.on(btn, 'click', L.DomEvent.stop);
+        L.DomEvent.on(btn, 'click', () => {
+            _mapFollowPaused = false;
+            clearTimeout(_mapFollowPauseTimeout);
+            this.setVisible(false);
+            if (AppState.liveMarker) {
+                _isAutoRotating = true;
+                AppState.map.panTo(AppState.liveMarker.getLatLng(), { animate: true });
+                _isAutoRotating = false;
+            }
+        });
+        this._container = container;
+        return container;
+    },
+    setVisible: function (visible) {
+        this._container.style.display = visible ? '' : 'none';
+    }
+});
+
+function _initializeFollowControl() {
+    AppState.followControl = new FollowControl().addTo(AppState.map);
+    document.addEventListener('tracking:started', () => {
+        _mapFollowPaused = false;
+        clearTimeout(_mapFollowPauseTimeout);
+        AppState.followControl?.setVisible(false);
+    });
+    document.addEventListener('tracking:stopped', () => {
+        _mapFollowPaused = false;
+        clearTimeout(_mapFollowPauseTimeout);
+        AppState.followControl?.setVisible(false);
+    });
+}
 /**
  * Erstellt einen Marker für das Absetzflugzeug mit Rotationsmöglichkeit.
  * @param {number} lat - Breite.
@@ -2274,6 +2321,16 @@ function _setupCoreMapEventHandlers() {
             AppState.isManualPanning = true;
             console.log('Manual map panning detected.');
         }
+        // Auto-Follow pausieren wenn Nutzer manuell verschiebt
+        if (!_isAutoRotating && AppState.watchId !== null) {
+            _mapFollowPaused = true;
+            clearTimeout(_mapFollowPauseTimeout);
+            _mapFollowPauseTimeout = setTimeout(() => {
+                _mapFollowPaused = false;
+                AppState.followControl?.setVisible(false);
+            }, 30000);
+            AppState.followControl?.setVisible(true);
+        }
     });
 
     let longPressTimeout;
@@ -2685,10 +2742,18 @@ export function updateHeadingUp(gpsHeading, directionDeg, speedMs) {
 
     const prev = AppState.lastSmoothedHeading ?? rawHeading;
     const diff = ((rawHeading - prev + 540) % 360) - 180;
-    AppState.lastSmoothedHeading = (prev + 0.15 * diff + 360) % 360;
+    const alpha = speedMs > 30 ? 0.50 : speedMs > 15 ? 0.30 : 0.15;
+    AppState.lastSmoothedHeading = (prev + alpha * diff + 360) % 360;
 
     _isAutoRotating = true;
     AppState.map.setBearing((360 - AppState.lastSmoothedHeading) % 360, { animate: false });
+    _isAutoRotating = false;
+}
+
+export function updateLiveFollow(lat, lng) {
+    if (_mapFollowPaused || !AppState.map || AppState.watchId === null) return;
+    _isAutoRotating = true;
+    AppState.map.panTo([lat, lng], { animate: false });
     _isAutoRotating = false;
 }
 
