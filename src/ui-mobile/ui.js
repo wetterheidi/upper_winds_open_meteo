@@ -8,9 +8,8 @@
 import { Utils } from '../core/utils.js';
 import { Settings } from '../core/settings.js';
 import { fetchEnsembleWeatherData, processAndVisualizeEnsemble } from '../core/ensembleManager.js';
-import { UI_DEFAULTS, WEATHER_MODELS } from '../core/constants.js';
 import { SOUNDING_MODEL_ID } from '../core/soundingManager.js';
-import { I18n } from '../core/i18n.js'; // <--- NEU
+import { I18n } from '../core/i18n.js';
 
 // ===================================================================
 // 1. Geräte- & Style-Helfer
@@ -21,18 +20,9 @@ import { I18n } from '../core/i18n.js'; // <--- NEU
  * @returns {boolean} True, wenn es sich um ein mobiles Gerät handelt.
  */
 export function isMobileDevice() {
-    /**
-     * Diese Prüfung ist deutlich zuverlässiger als die alte Methode.
-     * Sie prüft auf echte Touch-Fähigkeiten des Browsers.
-     */
     const hasTouchSupport = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-
-    /**
-     * In der nativen App setzt Capacitor eine globale Variable.
-     * Dies ist der sicherste Weg, die App-Umgebung zu erkennen.
-     */
+    // Capacitor sets a global in the native app — more reliable than UA sniffing
     const isCapacitorApp = window.Capacitor && window.Capacitor.isNativePlatform();
-
     return hasTouchSupport || isCapacitorApp;
 }
 
@@ -62,45 +52,28 @@ export function getSliderValue() {
 // 3. Dynamische UI-Updates
 // ===================================================================
 
-/**
- * NEU: Initialisiert den Sprachwähler (Dropdown).
- */
 export function setupLanguageDropdown() {
     const selector = document.getElementById('languageSelect');
     if (!selector) return;
 
-    // 1. Wir klonen das Element zuerst
+    // Clone to remove any stale event listeners before re-wiring
     const newSelector = selector.cloneNode(true);
     selector.parentNode.replaceChild(newSelector, selector);
-
-    // 2. Erst NACH dem Klonen weisen wir den Wert zu!
-    // Wir greifen sicherheitshalber direkt auf die Settings zu
     newSelector.value = Settings.state.userSettings.language || 'en';
 
-    // 3. Event Listener für Änderungen anbinden
     newSelector.addEventListener('change', async (e) => {
         const newLang = e.target.value;
-        
-        // Speichern
         if (Settings.state.userSettings) {
             Settings.state.userSettings.language = newLang;
             Settings.save();
         }
-
-        // Laden
         toggleLoading(true, 'Changing language...');
         await I18n.loadLanguage(newLang);
-        
-        // UI Aktualisieren
         updateTranslations();
-        
         toggleLoading(false);
     });
 }
 
-/**
- * NEU: Aktualisiert alle übersetzbaren Texte auf der Seite.
- */
 export function updateTranslations() {
     document.querySelectorAll('[data-i18n]').forEach(element => {
         const key = element.getAttribute('data-i18n');
@@ -108,6 +81,7 @@ export function updateTranslations() {
             element.textContent = I18n.t(key);
         }
     });
+    // false = only rewrite labels, don't reconvert numeric values
     const currentUnit = Settings.getValue('heightUnit');
     updatePlannerUnits(currentUnit, false);
 }
@@ -147,7 +121,6 @@ export function updateEnsembleModelUI(availableModels) {
     if (!submenu) return;
     submenu.innerHTML = '';
     availableModels.filter(m => m !== SOUNDING_MODEL_ID).forEach(model => {
-        // ... (Code zum Erstellen von li, label, checkbox bleibt gleich)
         const li = document.createElement('li');
         const label = document.createElement('label');
         label.className = 'radio-label';
@@ -163,13 +136,9 @@ export function updateEnsembleModelUI(availableModels) {
             Settings.state.userSettings.selectedEnsembleModels = selected;
             Settings.save();
 
-            // 1. Daten abrufen und auf Erfolg warten
             const success = await fetchEnsembleWeatherData();
-
-            // 2. NUR wenn die Daten erfolgreich waren, die Visualisierung anstoßen
             if (success) {
-                const sliderIndex = getSliderValue(); // Den UI-Zustand HIER abrufen
-                processAndVisualizeEnsemble(sliderIndex); // Und an die Core-Funktion übergeben
+                processAndVisualizeEnsemble(getSliderValue());
             }
         });
 
@@ -189,8 +158,6 @@ export function updatePlannerUnits(unit, convertValues = true) {
     const suffix = isFeet ? '(ft AGL):' : '(m AGL):';
     const suffixSimple = isFeet ? '(ft):' : '(m):';
 
-    // Definition der Felder: ID des Labels => ID des Inputs
-    // NEU: 'i18nKey' statt 'text'
     const fields = [
         { labelId: 'labelExitAltitude', inputId: 'exitAltitude', min: 500, max: 15000, step: 100, i18nKey: 'planner.exit_altitude' },
         { labelId: 'labelOpeningAltitude', inputId: 'openingAltitude', min: 500, max: 10000, step: 100, i18nKey: 'planner.opening_altitude' },
@@ -209,40 +176,30 @@ export function updatePlannerUnits(unit, convertValues = true) {
         const inputEl = document.getElementById(field.inputId);
 
         if (labelEl && inputEl) {
-            // 1. Übersetzten Text holen
-            let translatedText = I18n.t(field.i18nKey);
-            
-            // Trick: Da die Übersetzung im JSON bereits Einheiten enthalten kann (z.B. " (m AGL):"),
-            // entfernen wir alles ab der ersten Klammer, um die neue Einheit sauber anzuhängen.
-            const cleanText = translatedText.replace(/\s*\(.*\).*$/, '');
-
+            // Strip any existing unit suffix from the i18n string (e.g. " (m AGL):") before appending the new one
+            const cleanText = I18n.t(field.i18nKey).replace(/\s*\(.*\).*$/, '');
             const textSuffix = field.simpleSuffix ? suffixSimple : suffix;
-            
             const spanEl = labelEl.querySelector('span[data-i18n]');
             if (spanEl) {
                 spanEl.textContent = `${cleanText} ${textSuffix} `;
             }
 
-            // 2. Limits (min/max/step) anpassen
             if (isFeet) {
                 inputEl.min = Math.round(field.min * 3.28084);
                 inputEl.max = Math.round(field.max * 3.28084);
-                inputEl.step = field.step * 5; 
+                inputEl.step = field.step * 5;
             } else {
                 inputEl.min = field.min;
                 inputEl.max = field.max;
                 inputEl.step = field.step;
             }
 
-            // 3. Werte umrechnen
             if (convertValues) {
                 const currentValue = parseFloat(inputEl.value);
                 if (!isNaN(currentValue)) {
-                    if (isFeet) {
-                        inputEl.value = Math.round(currentValue * 3.28084);
-                    } else {
-                        inputEl.value = Math.round(currentValue / 3.28084);
-                    }
+                    inputEl.value = isFeet
+                        ? Math.round(currentValue * 3.28084)
+                        : Math.round(currentValue / 3.28084);
                 }
             }
         }
@@ -304,13 +261,12 @@ function showSnackbar(message, type = 'default') {
     }
 
     snackbar.textContent = message;
-    // Setze die Klassen basierend auf dem Typ
-    snackbar.className = 'show'; // Startet immer mit 'show'
+    snackbar.className = 'show';
     if (type === 'success') {
         snackbar.classList.add('success');
     } else if (type === 'error') {
         snackbar.classList.add('error');
-    } else if (type === 'warning') { // NEUE Bedingung
+    } else if (type === 'warning') {
         snackbar.classList.add('warning');
     }
 
@@ -318,22 +274,21 @@ function showSnackbar(message, type = 'default') {
         clearTimeout(window.snackbarTimeout);
     }
 
+    const duration = type === 'error' ? 6000 : 3000;
     window.snackbarTimeout = setTimeout(() => {
         snackbar.className = snackbar.className.replace('show', '');
-    }, 3000);
+    }, duration);
 }
 
 /** Zeigt eine Erfolgsmeldung an. */
 export function displayMessage(message) {
     console.log('displayMessage called with:', message);
-    // Die neue Funktion mit dem Typ 'success' aufrufen
     showSnackbar(message, 'success');
 }
 
 /** Zeigt eine Fehlermeldung an. */
 export function displayError(message) {
     console.log('displayError called with:', message);
-    // Die neue Funktion mit dem Typ 'error' aufrufen
     showSnackbar(message, 'error');
 }
 
@@ -353,7 +308,6 @@ export function displayWarning(message) {
 export function displayProgress(current, total, cancelCallback) {
     let progressSnackbar = document.getElementById('progress-snackbar');
 
-    // Erstellt die Snackbar, falls sie noch nicht existiert
     if (!progressSnackbar) {
         progressSnackbar = document.createElement('div');
         progressSnackbar.id = 'progress-snackbar';
@@ -378,7 +332,7 @@ export function displayProgress(current, total, cancelCallback) {
         cancelButton.textContent = 'Cancel';
         cancelButton.onclick = () => {
             if (cancelCallback) cancelCallback();
-            hideProgress(); // Versteckt die Snackbar beim Abbrechen
+            hideProgress();
         };
 
         progressSnackbar.appendChild(content);
@@ -386,12 +340,10 @@ export function displayProgress(current, total, cancelCallback) {
         document.body.appendChild(progressSnackbar);
     }
 
-    // Aktualisiert den Inhalt der Snackbar
     const percentage = total > 0 ? Math.round((current / total) * 100) : 0;
     progressSnackbar.querySelector('.progress-snackbar-text').textContent = `Caching (${current}/${total})... ${percentage}%`;
     progressSnackbar.querySelector('.progress-bar').style.width = `${percentage}%`;
 
-    // Zeigt die Snackbar an (löst die CSS-Animation aus)
     if (!progressSnackbar.classList.contains('show')) {
         progressSnackbar.classList.add('show');
     }
@@ -412,16 +364,14 @@ export function updateOfflineIndicator() {
     console.log('updateOfflineIndicator called, navigator.onLine:', navigator.onLine);
     let offlineIndicator = document.getElementById('offline-indicator');
     
-    // Erstellt den Indikator, falls er noch nicht existiert
     if (!offlineIndicator) {
         offlineIndicator = document.createElement('div');
         offlineIndicator.id = 'offline-indicator';
-        offlineIndicator.textContent = 'Offline Mode'; // Text muss nur einmal gesetzt werden
+        offlineIndicator.textContent = 'Offline Mode';
         document.body.appendChild(offlineIndicator);
         console.log('Offline indicator created and appended');
     }
 
-    // Steuert die Sichtbarkeit über die CSS-Klasse 'show'
     if (navigator.onLine) {
         offlineIndicator.classList.remove('show');
     } else {
