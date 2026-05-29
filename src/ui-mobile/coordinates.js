@@ -4,8 +4,6 @@
  * in der mobilen Ansicht (Tab-Panel).
  */
 
-"use strict";
-
 import { Utils } from '../core/utils.js';
 import { AppState } from '../core/state.js';
 import * as LocationManager from '../core/locationManager.js';
@@ -32,14 +30,12 @@ export function initializeLocationSearch() {
 
     const debouncedSearch = Utils.debounce(performSearch, 300);
 
-    // Event-Handler für die Suchleiste
     searchInput.addEventListener('input', () => {
         debouncedSearch(searchInput.value);
         if (clearButton) clearButton.style.display = searchInput.value.trim() ? 'block' : 'none';
         if (!searchPanel.classList.contains('hidden')) resultsList.style.display = 'block';
     });
 
-    // Event-Handler für den "Löschen"-Button
     if (clearButton) {
         clearButton.addEventListener('click', () => {
             searchInput.value = '';
@@ -50,7 +46,6 @@ export function initializeLocationSearch() {
         });
     }
 
-    // Event-Handler für den "Als Favorit speichern"-Button
     if (saveFavoriteBtn) {
         saveFavoriteBtn.addEventListener('click', () => {
             if (AppState.lastLat === null || AppState.lastLng === null) {
@@ -70,7 +65,6 @@ export function initializeLocationSearch() {
         });
     }
 
-    // Event-Handler für das Favoriten-Modal
     if (submitFavoriteName && cancelFavoriteName) {
         submitFavoriteName.addEventListener('click', () => {
             if (currentFavoriteData) {
@@ -88,7 +82,6 @@ export function initializeLocationSearch() {
         });
     }
 
-    // Beobachtet, wann das Such-Panel sichtbar wird, um die Liste anzuzeigen
     const observer = new MutationObserver((mutations) => {
         mutations.forEach((mutation) => {
             if (mutation.attributeName === 'class' && !searchPanel.classList.contains('hidden')) {
@@ -111,7 +104,6 @@ export function initializeLocationSearch() {
  * @param {object[]} [searchResults=[]] - Ein optionales Array mit Suchergebnissen.
  */
 function renderResultsList(searchResults = []) {
-    // Diese Funktion ist jetzt identisch mit der in der Web-Version
     const resultsList = document.getElementById('locationResults');
     if (!resultsList) return;
     resultsList.innerHTML = '';
@@ -158,11 +150,9 @@ function _createListItem(item) {
     textContainer.className = 'search-item-text';
     textContainer.innerHTML = `<span class="name">${item.display_name || item.label}</span>`;
 
-    // Klick auf den Text-Container wählt den Ort aus
     textContainer.addEventListener('click', () => {
         document.dispatchEvent(new CustomEvent('location:selected', { detail: { lat, lng, source: 'search' }, bubbles: true }));
         LocationManager.addCoordToHistory(lat, lng, item.display_name || item.label, item.isFavorite);
-        // Wechselt zurück zur Kartenansicht
         document.querySelector('.tab-button[data-panel="map"]').click();
     });
     li.appendChild(textContainer);
@@ -170,12 +160,10 @@ function _createListItem(item) {
     const actionsDiv = document.createElement('div');
     actionsDiv.className = 'search-item-actions';
 
-    // --- HOME DZ BUTTON ---
     if (item.isFavorite) {
         const homeBtn = document.createElement('button');
         homeBtn.innerHTML = '🏠';
         homeBtn.title = I18n.t('location.set_home_dz');
-        // Die CSS-Klasse wird basierend auf dem 'isHomeDZ'-Flag gesetzt
         homeBtn.className = `home-toggle ${item.isHomeDZ ? 'is-home' : ''}`;
 
         homeBtn.addEventListener('click', (e) => {
@@ -185,14 +173,11 @@ function _createListItem(item) {
             } else {
                 LocationManager.setHomeDZ(lat, lng);
             }
-            // **DER ENTSCHEIDENDE FIX:**
-            // Zeichne die gesamte Liste sofort neu, um die Änderung sichtbar zu machen.
             renderResultsList();
         });
         actionsDiv.appendChild(homeBtn);
     }
 
-    // --- FAVORITEN-STERN ---
     const favToggle = document.createElement('button');
     favToggle.className = `favorite-toggle ${item.isFavorite ? 'is-favorite' : ''}`;
     favToggle.innerHTML = '★';
@@ -203,7 +188,6 @@ function _createListItem(item) {
     });
     actionsDiv.appendChild(favToggle);
 
-    // --- LÖSCHEN-BUTTON ---
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'delete-btn';
     deleteBtn.textContent = '×';
@@ -227,35 +211,19 @@ function _createListItem(item) {
  * @param {number} lng - Länge.
  * @param {string} defaultName - Der Standardname, falls der Nutzer keinen eingibt.
  */
-function toggleFavorite(lat, lng, defaultName, onFinish) {
+function toggleFavorite(lat, lng, defaultName) {
     const entry = LocationManager.getCoordHistory().find(e => Math.abs(e.lat - lat) < 0.0001 && Math.abs(e.lng - lng) < 0.0001);
     const isCurrentlyFavorite = entry && entry.isFavorite;
 
     if (isCurrentlyFavorite) {
         LocationManager.updateFavoriteStatus(lat, lng, defaultName, false);
-        if (onFinish) onFinish(); // Führe den Callback sofort aus
     } else {
         currentFavoriteData = { lat, lng, defaultName };
         const favoriteModal = document.getElementById('favoriteModal');
         const favoriteNameInput = document.getElementById('favoriteNameInput');
         favoriteNameInput.value = defaultName;
-
-        // Sorge dafür, dass nach dem Schließen des Modals (egal wie) neu gezeichnet wird
-        const modalConfirm = () => {
-            const name = favoriteNameInput.value.trim() || currentFavoriteData.defaultName;
-            LocationManager.addOrUpdateFavorite(lat, lng, name);
-            if (onFinish) onFinish();
-            favoriteModal.style.display = 'none';
-        };
-        const modalCancel = () => {
-            if (onFinish) onFinish();
-            favoriteModal.style.display = 'none';
-        };
-
-        // Event-Listener im Modal neu zuweisen
         document.getElementById('submitFavoriteName').textContent = I18n.t('common.save');
         document.getElementById('cancelFavoriteName').textContent = I18n.t('common.cancel');
-
         favoriteModal.style.display = 'block';
     }
 }
@@ -265,7 +233,6 @@ function toggleFavorite(lat, lng, defaultName, onFinish) {
  * @param {string} query - Die Eingabe des Benutzers.
  */
 async function performSearch(query) {
-    // Diese Funktion ist jetzt identisch mit der in der Web-Version
     if (!query.trim()) {
         renderResultsList();
         return;
