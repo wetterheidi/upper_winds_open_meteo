@@ -5,7 +5,7 @@ import { readFileSync } from 'fs'
 
 const pkg = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf-8'))
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   root: 'src/ui-mobile',
   publicDir: resolve(__dirname, 'public'),
   base: '/',
@@ -19,9 +19,11 @@ export default defineConfig({
     outDir: resolve(__dirname, 'dist/mobile'),
     emptyOutDir: true,
     rollupOptions: {
-      // Entfernen Sie alle 'external' Einträge für @capacitor/* hier
       external: []
     }
+  },
+  esbuild: {
+    drop: command === 'build' ? ['console', 'debugger'] : [],
   },
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
@@ -30,4 +32,4 @@ export default defineConfig({
   plugins: [
     commonjs(),
   ],
-})
+}))
