@@ -1715,17 +1715,11 @@ button.btn {
 
 /* === ALERT STILE === */
 #map-alert-icon {
-    position: absolute;
-    top: 15px;
-    left: 15px;
-    z-index: 1000;
-    font-size: 28px;
-    padding: 5px;
-    background-color: rgba(var(--background-white), 0.7);
-    ;
-    border-radius: 50%;
+    display: inline-block;
+    font-size: 20px;
+    margin-left: 4px;
     cursor: pointer;
-    text-shadow: var(--shadow);
+    vertical-align: middle;
     animation: pulse-alert 2s infinite ease-in-out;
 }
 
