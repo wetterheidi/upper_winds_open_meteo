@@ -62,8 +62,6 @@ export const AppState = {
     cutAwayLat: null,                  // @type {number|null} - Breite des Abtrennpunkts.
     cutAwayLng: null,                  // @type {number|null} - Länge des Abtrennpunkts.
     cutAwayCircle: null,               // @type {L.Circle|null} - Der Unsicherheitskreis für den Cut-Away.
-    isJumperSeparationManual: false,   // @type {boolean} - *HINWEIS: Scheint nicht verwendet zu werden, könnte ein Relikt sein.*
-
     // ===================================================================
     // Live Tracking & Aufzeichnung
     // ===================================================================
@@ -91,19 +89,13 @@ export const AppState = {
     prevLat: null,                     // @type {number|null} - Letzte Breite für Geschwindigkeitsberechnung.
     prevLng: null,                     // @type {number|null} - Letzte Länge für Geschwindigkeitsberechnung.
     prevAltitude: null,                // @type {number|null} - Letzte Gerätehöhe für Variometerberechnung.
-    lastLatitude: null,                // @type {number|null} - *HINWEIS: Wird von `prevLat` abgedeckt, könnte redundant sein.*
-    lastLongitude: null,               // @type {number|null} - *HINWEIS: Wird von `prevLng` abgedeckt, könnte redundant sein.*
     lastDeviceAltitude: null,          // @type {number|null} - Letzte Gerätehöhe (unbearbeitet).
     lastAltitudeAccuracy: null,        // @type {number|null} - Genauigkeit der Gerätehöhe.
     lastAccuracy: null,                // @type {number|null} - Horizontale Genauigkeit der Position.
-    lastSpeed: 'N/A',                  // @type {number|string} - *HINWEIS: Wird von `lastSmoothedSpeedMs` abgedeckt, könnte redundant sein.*
     lastSmoothedSpeedMs: 0,            // @type {number} - Geglättete Geschwindigkeit in m/s.
     lastSmoothedRateOfClimbMps: 0,     // @type {number} - Geglättete Sink-/Steigrate in m/s (Variometer).
     lastSmoothedHeading: null,         // @type {number|null} - Geglättetes Heading für "Heading Up"-Modus in Grad.
     lastDirection: 'N/A',              // @type {number|string} - Geglättete Richtung in Grad.
-    lastTerrainAltitude: 'N/A',        // @type {number|string} - *HINWEIS: Wird von `lastAltitude` abgedeckt, könnte redundant sein.*
-    lastEffectiveWindUnit: 'kt',       // @type {string} - *HINWEIS: Gehört eher in `Settings`, da es eine Benutzereinstellung ist.*
-
     // ===================================================================
     // Geladene Tracks & POIs (GPX, KML, CSV)
     // ===================================================================

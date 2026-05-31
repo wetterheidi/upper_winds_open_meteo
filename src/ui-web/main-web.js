@@ -1057,8 +1057,8 @@ export function updateJumpMasterLineAndPanel(positionData = null) {
         livePos = AppState.liveMarker ? AppState.liveMarker.getLatLng() : null;
 
         dataForDashboard = positionData || { // Nimm neue Daten oder die zuletzt bekannten
-            latitude: livePos ? livePos.lat : AppState.lastLatitude,
-            longitude: livePos ? livePos.lng : AppState.lastLongitude,
+            latitude: livePos ? livePos.lat : null,
+            longitude: livePos ? livePos.lng : null,
             speedMs: AppState.lastSmoothedSpeedMs,
             direction: AppState.lastDirection,
             deviceAltitude: AppState.lastDeviceAltitude,

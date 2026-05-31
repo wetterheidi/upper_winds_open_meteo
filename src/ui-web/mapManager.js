@@ -490,10 +490,11 @@ export function clearHarpMarker() {
         }
         Settings.save();
         if (AppState.liveMarker && AppState.currentMarker && AppState.lastLat !== null && AppState.lastLng !== null) {
+            const liveLatLng = AppState.liveMarker.getLatLng();
             debouncedPositionUpdate({
                 coords: {
-                    latitude: AppState.lastLatitude,
-                    longitude: AppState.lastLongitude,
+                    latitude: liveLatLng.lat,
+                    longitude: liveLatLng.lng,
                     accuracy: AppState.lastAccuracy,
                     altitude: AppState.lastDeviceAltitude,
                     altitudeAccuracy: AppState.lastAltitudeAccuracy
