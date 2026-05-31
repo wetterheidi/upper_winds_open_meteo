@@ -10,7 +10,7 @@ import { Utils } from '../core/utils.js';
 import { getSliderValue, displayWarning } from './ui.js';
 import * as mapManager from './mapManager.js';
 import * as weatherManager from '../core/weatherManager.js';
-import { UI_DEFAULTS, WIND_THRESHOLDS } from '../core/constants.js'; // UI_DEFAULTS für LANDING_PATTERN_MIN_ZOOM
+import { UI_DEFAULTS, WIND_THRESHOLDS } from '../core/constants.js';
 import * as JumpPlanner from '../core/jumpPlanner.js';
 import { getCoordinateFormat, getHeightUnit, getTemperatureUnit, getWindSpeedUnit } from './main-mobile.js';
 import { generateWindspinne } from '../core/windchart.js';
@@ -35,7 +35,6 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
     const tableContainer = document.getElementById(tableContainerId);
     const timeContainer = document.getElementById(timeContainerId);
 
-    // Sicherheitsprüfung: Stellen sicher, dass die Container existieren
     if (!tableContainer || !timeContainer) {
         console.error('Target container(s) for weather display not found!', { tableContainerId, timeContainerId });
         return;
@@ -50,7 +49,6 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
         return;
     }
 
-    // START: NEUER CODEBLOCK FÜR KONSOLENAUSGABE
     const visibility = AppState.weatherData.visibility?.[index];
     const weatherCode = AppState.weatherData.weather_code?.[index];
 
@@ -58,7 +56,6 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
     console.log(`Sichtweite (Visibility): ${visibility ?? 'N/A'} m`);
     console.log(`Wetter-Code (WMO 4677): ${weatherCode ?? 'N/A'}`);
     console.log(`---------------------------------`);
-    // ENDE: NEUER CODEBLOCK
 
     AppState.landingWindDir = AppState.weatherData.wind_direction_10m[index] || null;
     console.log('landingWindDir updated to:', AppState.landingWindDir);
@@ -83,7 +80,6 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
     const heightUnit = getHeightUnit();
     const windSpeedUnit = getWindSpeedUnit();
     const temperatureUnit = getTemperatureUnit();
-    // Pass lat and lng to getDisplayTime
     const timeZone = Settings.getValue('timeZone', 'Z');
     const time = await Utils.getDisplayTime(AppState.weatherData.time[index], AppState.lastLat, AppState.lastLng, timeZone);
     const interpStep = getInterpolationStep();
@@ -98,21 +94,16 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
     const style = getComputedStyle(document.body);
     const barbColor = style.getPropertyValue('--text-primary').trim();
 
-    // NEU: Das obere Limit aus dem UI-Element auslesen
     const upperLimit = parseInt(document.getElementById('upperLimit')?.value) || 3000;
-
-    // NEU: Die interpolierten Daten basierend auf dem Limit filtern
     const filteredData = interpolatedData.filter(data => data.displayHeight <= upperLimit);
 
     if (!Settings.state.userSettings.showTable) {
-        tableContainer.innerHTML = ''; // Leert den Tabellen-Container
+        tableContainer.innerHTML = '';
         timeContainer.innerHTML = `${I18n.t('common.selected_time')} ${time}`;
         return;
     }
 
-    // NEU: Zuerst alle Zeilen als HTML-Strings generieren
     const tableRowsHtml = filteredData.map(data => {
-        // ... (Die gesamte Logik zur Berechnung von windClass, humidityClass, displayHeight, etc. bleibt hier drin) ...
         const spd = parseFloat(data.spd);
         let windClass = '';
         if (windSpeedUnit === 'bft') {
@@ -161,7 +152,6 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
                 const spdValue = windSpeedUnit === 'bft' ? Math.round(convertedSpd) : convertedSpd.toFixed(0);
                 let gustValue = windSpeedUnit === 'bft' ? Math.round(convertedGust) : convertedGust.toFixed(0);
 
-                // KORRIGIERTE LOGIK: Prüft die Böe unabhängig und wendet die Klasse nur auf den Wert an
                 if (gustInKt > WIND_THRESHOLDS.GUST_WARNING_KT) {
                     gustValue = `<span class="gust-exceeds-threshold">${gustValue}</span>`;
                 }
@@ -178,7 +168,6 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
         const speedKt = Math.round(Utils.convertWind(spd, 'kt', 'km/h') / 5) * 5;
         const windBarbSvg = data.dir === 'N/A' || isNaN(speedKt) ? 'N/A' : Utils.generateWindBarb(data.dir, speedKt, null, barbColor);
 
-        // Gibt den fertigen HTML-String für eine Zeile zurück
         return `<tr class="${windClass} ${cloudCoverClass}">
                     <td>${Math.round(displayHeight)}</td>
                     <td>${Utils.roundToTens(data.dir)}</td>
@@ -186,9 +175,8 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
                     <td>${windBarbSvg}</td>
                     <td>${formattedTemp}</td>
                 </tr>`;
-    }).join(''); // .join('') fügt alle Zeilen zu einem einzigen String zusammen
+    }).join('');
 
-    // NEU: Die gesamte Tabelle in einer einzigen, lesbaren Vorlage erstellen
     const output = `
         <table id="weatherTable">
             <thead>
@@ -205,7 +193,7 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
             </tbody>
         </table>`;
 
-    tableContainer.innerHTML = output; // <-- Nutzt den Parameter
+    tableContainer.innerHTML = output;
     timeContainer.innerHTML = `${I18n.t('common.selected_time')} ${time}`;
     if (interpolatedData.length > 0) {
         const userMaxHoehe = parseInt(document.getElementById('upperLimit')?.value) || 3000;
@@ -246,7 +234,6 @@ export async function refreshMarkerPopup(expanded = false, open = false) {
         }
     }
 
-    // Ersetzung von "Alt:" durch den i18n-Key
     const altitudeContent = `<br>${I18n.t('map.marker_popup.alt')}: ${displayAltitude} ${displayUnit}<br>QFE: ${qfeText}`;
     let popupContent = '';
 
@@ -278,7 +265,6 @@ export async function refreshMarkerPopup(expanded = false, open = false) {
         const formatDMS = (dms) => `${dms.deg}°${dms.min}'${dms.sec.toFixed(0)}" ${dms.dir}`;
         let coordDisplay = '';
 
-        // Hier werden "Lat:" und "Lng:" durch "Latitude" und "Longitude" oder entsprechende Kürzel aus i18n ersetzt
         if (coordFormat === 'MGRS') {
             coordDisplay = `MGRS: ${coords.lat}`;
         } else if (coordFormat === 'DMS') {
@@ -310,10 +296,7 @@ export function updateModelInfoPopup() {
     const model = modelSelect.value;
     const modelRun = AppState.lastModelRun || "N/A";
 
-    // "Model:" und "Run:" werden durch I18n.t ersetzt
     const titleContent = `${I18n.t('common.forecast_model')}: ${model.replace(/_/g, ' ').toUpperCase()}\n${I18n.t('weather.model_run')} ${modelRun}`;
-
-    // Ersetzt Zeilenumbrüche durch <br> für die HTML-Anzeige
     modelInfoPopup.innerHTML = titleContent.replace(/\n/g, '<br>');
 }
 
@@ -347,7 +330,6 @@ export async function updateSliderLabels() {
     }
 
     let lastDay = null;
-    const now = DateTime.now().setZone(locationTimezone).startOf('day');
 
     for (let index = 0; index < timeArray.length; index++) {
         const timeStr = timeArray[index];
@@ -374,8 +356,7 @@ export async function updateSliderLabels() {
                 const label = document.createElement('div');
                 label.className = 'slider-label';
 
-                // Nutzt Luxon-Lokalisierung für ein einheitliches Datumsformat (z.B. "Okt 24" / "Oct 24")
-                // I18n.getCurrentLanguage() stellt sicher, dass die Sprache aus deinem i18n-Modul verwendet wird.
+                // setLocale ensures the month abbreviation matches the app language
                 label.textContent = dt.setLocale(I18n.getCurrentLanguage() || 'en').toFormat('MMM dd');
 
                 const positionPercent = (bestIndexForNewDay / totalSteps) * 100;
@@ -454,18 +435,16 @@ export function checkSafetyHeightWindWarning() {
 
     const calcResult = JumpPlanner.calculateExitCircle(interpolatedData);
 
-    // Nutzt die Fehlermeldung direkt aus der Berechnungslogik
     if (calcResult && calcResult.error) {
         displayWarning(calcResult.error);
         return;
     }
 
-    // Lokalisierte Warnung für die Windgeschwindigkeit
     if (calcResult && calcResult.safetyWindWarning) {
         const msg = I18n.t('weather.safety_warning_msg')
             .replace('{height}', safetyHeightAGL)
             .replace('{unit}', heightUnit)
-            .replace('{limit}', downwindStart); // Nutzt vorhandene Logik-Variablen für Platzhalter
+            .replace('{limit}', downwindStart);
 
         displayWarning(msg);
     }
@@ -483,7 +462,6 @@ export function checkSafetyHeightWindWarning() {
  * @returns {void}
  */
 export function updateLandingPatternDisplay() {
-    // Schritt 1: Alle Vorbedingungen prüfen (unverändert)
     if (!AppState.currentMarker || typeof AppState.currentMarker.getLatLng !== 'function') return;
 
     const markerLatLng = AppState.currentMarker.getLatLng();
@@ -494,7 +472,6 @@ export function updateLandingPatternDisplay() {
         return;
     }
 
-    // Schritt 2: Daten für die Berechnung sammeln (unverändert)
     const sliderIndex = parseInt(document.getElementById('timeSlider').value) || 0;
     const interpStep = getInterpolationStep();
     const heightUnit = Settings.getValue('heightUnit', 'm');
@@ -510,7 +487,6 @@ export function updateLandingPatternDisplay() {
         return;
     }
 
-    // Schritt 3: Zentrale Funktion für die Bein-Koordinaten aufrufen (unverändert)
     const patternCoords = JumpPlanner.calculateLandingPatternCoords(markerLatLng.lat, markerLatLng.lng, interpolatedData);
 
     if (!patternCoords) {
@@ -520,7 +496,6 @@ export function updateLandingPatternDisplay() {
 
     const { downwindStart, baseStart, finalStart, landingPoint } = patternCoords;
 
-    // ================== Logik für Windpfeile (Berechnung unverändert) ==================
     const heights = interpolatedData.map(d => d.height);
     const uComponents = interpolatedData.map(d => -Utils.convertWind(d.spd, 'kt', 'km/h') * Math.sin(d.dir * Math.PI / 180));
     const vComponents = interpolatedData.map(d => -Utils.convertWind(d.spd, 'kt', 'km/h') * Math.cos(d.dir * Math.PI / 180));
@@ -567,8 +542,6 @@ export function updateLandingPatternDisplay() {
                 position: [(landingPoint[0] + finalStart[0]) / 2, (landingPoint[1] + finalStart[1]) / 2],
                 bearing: (finalMeanWind[0] - 90 + 180) % 360,
                 color: getArrowColor(finalMeanWind[1]),
-                // Tooltip-Inhalt bleibt technisch gleich (Werte + Einheiten), 
-                // da Symbole wie "°" und Einheitenkürzel international sind.
                 tooltipText: `${Math.round(finalMeanWind[0])}° ${formatWindSpeed(finalMeanWind[1])} ${windUnit}`
             },
             {
@@ -616,7 +589,6 @@ export function updateJumpRunTrackDisplay() {
         return;
     }
 
-    // Prüfe alle Bedingungen, ob der Track angezeigt werden soll.
     const shouldShow =
         Settings.state.userSettings.showJumpRunTrack &&
         AppState.weatherData &&
@@ -658,8 +630,6 @@ export function updateJumpRunTrackDisplay() {
             directionInput.value = Math.round(Utils.applyNorthReference(trackData.direction, AppState.lastLat, AppState.lastLng));
         }
 
-        // --- LOKALISIERUNG DER TOOLTIPS ---
-        // Nutzt Platzhalter für Richtung und Distanz
         const displayDir = Utils.formatDirectionOutput(trackData.direction, AppState.lastLat, AppState.lastLng, false);
         const jumpRunTooltip = I18n.t('planner.jump_run_tooltip')
             .replace('{dir}', displayDir)
@@ -673,13 +643,13 @@ export function updateJumpRunTrackDisplay() {
             path: {
                 latlngs: trackData.latlngs,
                 options: { color: 'orange', weight: 5, opacity: 0.8 },
-                tooltipText: jumpRunTooltip, // Ersetzt: `Jump Run: ${trackData.direction}°, ${trackData.trackLength} m`
+                tooltipText: jumpRunTooltip,
                 originalLatLngs: AppState.lastTrackData?.latlngs?.length === 2 ? AppState.lastTrackData.latlngs : trackData.latlngs
             },
             approachPath: trackData.approachLatLngs?.length === 2 && trackData.approachLatLngs.every(ll => Number.isFinite(ll[0]) && Number.isFinite(ll[1])) ? {
                 latlngs: trackData.approachLatLngs,
                 options: { color: 'orange', weight: 5, opacity: 0.8, dashArray: '5, 10' },
-                tooltipText: approachTooltip, // Ersetzt: `Approach: ${trackData.direction}°, ${trackData.approachLength} m`
+                tooltipText: approachTooltip,
                 originalLatLngs: AppState.lastTrackData?.approachLatLngs?.length === 2 ? AppState.lastTrackData.approachLatLngs : trackData.approachLatLngs
             } : null,
             trackLength: trackData.trackLength,
