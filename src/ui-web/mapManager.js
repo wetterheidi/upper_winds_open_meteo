@@ -1,5 +1,4 @@
 // mapManager.js
-"use strict";
 
 import { AppState } from '../core/state.js';
 import { Settings } from '../core/settings.js';
@@ -674,10 +673,6 @@ export function updateCutAwayMarkerPopup(marker, lat, lng, open = false) {
     updatePopupContent(marker, popupContent, open);
 }
 
-export function moveMarker(lat, lng) {
-    // ... Logik zum Bewegen des Markers ...
-}
-
 export async function createOrUpdateMarker(lat, lng) {
     console.log("MapManager: Befehl erhalten, Marker zu erstellen/bewegen bei", lat, lng);
     if (typeof lat !== 'number' || typeof lng !== 'number' || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
@@ -1109,22 +1104,15 @@ function _addStandardMapControls() {
         rotateMode: false
     });
 
-    // ============================================================
-    // NEU: Dynamische Spracheinstellung für Geoman
-    // ============================================================
-
-    // 1. Sprache beim Start setzen
     const currentLang = Settings.getValue('language') || 'en';
     AppState.map.pm.setLang(currentLang);
 
-    // 2. Auf Sprachwechsel hören (Live-Update ohne Neuladen)
     document.addEventListener('i18n:loaded', (e) => {
         if (AppState.map && AppState.map.pm) {
             console.log(`Updating Geoman language to: ${e.detail.lang}`);
             AppState.map.pm.setLang(e.detail.lang);
         }
     });
-    // ============================================================
 
     AppState.map.pm.setGlobalOptions({
         tooltips: false,
@@ -1336,7 +1324,7 @@ async function _initializeTileCacheLogic() {
         const size = await TileCache.getCacheSize();
         if (size > 500) {
             const result = await TileCache.clearOldTiles(3);
-            Utils.handleMessage(I18n.t('map.cache.cleared_success')); // NEU: I18n
+            Utils.handleMessage(I18n.t('map.cache.cleared_success'));
         } else {
             await TileCache.clearOldTiles();
         }
@@ -2105,11 +2093,6 @@ function _setupCoreMapEventHandlers() {
         lastTapTime = currentTime;
     }, { passive: false });
 
-    AppState.map.on('click', (e) => {
-    });
-    AppState.map.on('mousedown', (e) => {
-    });
-
     _setupGeomanMeasurementHandlers();
     console.log('All core map event handlers have been set up.');
 }
@@ -2225,7 +2208,6 @@ async function _geolocationSuccessCallback(position, defaultZoom) {
     AppState.lastLat = latitude;
     AppState.lastLng = longitude;
     AppState.lastAltitude = await Utils.getAltitude(latitude, longitude);
-    moveMarker(latitude, longitude);
     AppState.map.setView([latitude, longitude], defaultZoom);
 
     const mapSelectEvent = new CustomEvent('location:selected', {

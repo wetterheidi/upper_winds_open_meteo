@@ -1,5 +1,4 @@
 // mapManager.js
-"use strict";
 
 import { AppState } from '../core/state.js';
 import { Settings } from '../core/settings.js';
@@ -11,7 +10,7 @@ import { UI_DEFAULTS, ICON_URLS, ENSEMBLE_VISUALIZATION } from '../core/constant
 import { getCapacitor } from '../core/capacitor-adapter.js';
 import * as LocationManager from '../core/locationManager.js';
 import * as liveTrackingManager from '../core/liveTrackingManager.js';
-import { I18n } from '../core/i18n.js'; // <--- NEU: Importiert
+import { I18n } from '../core/i18n.js';
 import * as PinManager from '../core/pinManager.js';
 import * as RainRadar from '../core/rainRadarManager.js';
 import 'leaflet-rotate';
@@ -112,7 +111,6 @@ async function initMap() {
  * @returns {void}
  */
 export function drawJumpVisualization(jumpData) {
-    // 1. Immer alles sauber machen.
     clearJumpVisualization();
 
     // Entferne den alten Zoom-Listener, bevor neue Labels gezeichnet werden.
@@ -140,7 +138,6 @@ export function drawJumpVisualization(jumpData) {
                 pmIgnore: true
             }).addTo(AppState.jumpVisualizationLayerGroup);
 
-            // NEU: Wenn eine Tooltip-Information vorhanden ist, binde sie.
             if (circleInfo.tooltip) {
                 circleLayer.bindTooltip(circleInfo.tooltip, {
                     direction: 'top',
@@ -228,15 +225,12 @@ export function drawJumpVisualization(jumpData) {
  * @returns {void}
  */
 export function drawLandingPattern(patternData) {
-    // 1. Immer zuerst alles sauber machen.
     clearLandingPattern();
 
-    // 2. Wenn es keine Anleitung gibt, sind wir fertig.
     if (!patternData) {
         return;
     }
 
-    // 3. Zeichne die Linien des Musters.
     patternData.legs.forEach(leg => {
         L.polyline(leg.path, {
             color: 'red',
@@ -244,13 +238,11 @@ export function drawLandingPattern(patternData) {
             opacity: 0.8,
             dashArray: '5, 10',
             pmIgnore: true
-        }).addTo(AppState.landingPatternLayerGroup); // Fügt es zur LayerGroup hinzu
+        }).addTo(AppState.landingPatternLayerGroup);
     });
 
-    // 4. Zeichne die Pfeile.
     AppState.patternArrowMarkers = [];
     patternData.arrows.forEach(arrow => {
-        // Die Funktion createArrowIcon muss auch hier im mapManager sein.
         const arrowIcon = createArrowIcon(arrow.position[0], arrow.position[1], arrow.bearing, arrow.color, AppState.map ? AppState.map.getBearing() : 0);
 
         const arrowMarker = L.marker(arrow.position, { icon: arrowIcon, pmIgnore: true })
@@ -318,13 +310,11 @@ export function drawJumpRunTrack(trackData) {
         zIndexOffset: 2000,
         pmIgnore: true
     })
-        .bindTooltip(I18n.t('map.drag_to_move_track')) // NEU: I18n
-        .addTo(AppState.jumpRunTrackLayerGroup);
+        .bindTooltip(I18n.t('map.drag_to_move_track'))        .addTo(AppState.jumpRunTrackLayerGroup);
 
     airplaneMarker.on('mousedown', () => {
         if (Settings.state.userSettings.isInteractionLocked) {
-            displayWarning(I18n.t('map.interaction_locked')); // NEU: I18n
-        }
+            displayWarning(I18n.t('map.interaction_locked'));        }
         AppState.map.dragging.disable();
     });
     airplaneMarker.on('mouseup', () => AppState.map.dragging.enable());
@@ -365,8 +355,7 @@ export function drawJumpRunTrack(trackData) {
     airplaneMarker.on('dragstart', (e) => {
         if (Settings.state.userSettings.isInteractionLocked) {
             e.target.dragging.disable();
-            displayWarning(I18n.t('map.interaction_locked')); // NEU: I18n
-        }
+            displayWarning(I18n.t('map.interaction_locked'));        }
     });
 
     airplaneMarker.on('dragend', (e) => {
@@ -600,8 +589,7 @@ export function clearAllPinMarkers() {
 export function clearHarpMarker() {
     if (!AppState.map) {
         console.warn('Map not initialized, cannot clear HARP marker');
-        Utils.handleMessage(I18n.t('messages.map_not_init')); // NEU: I18n
-        return;
+        Utils.handleMessage(I18n.t('messages.map_not_init'));        return;
     }
 
     // Alle Pins löschen wenn HARP entfernt wird
@@ -651,8 +639,7 @@ export function clearHarpMarker() {
             });
         }
     }
-    Utils.handleMessage(I18n.t('messages.harp_cleared')); // NEU: I18n
-}
+    Utils.handleMessage(I18n.t('messages.harp_cleared'));}
 /**
  * Entfernt die Track-Linie von der Karte.
  */
@@ -756,8 +743,7 @@ export function createCutAwayMarker(lat, lng) {
 export function attachCutAwayMarkerDragend(marker) {
     marker.on('mousedown', () => {
         if (Settings.state.userSettings.isInteractionLocked) {
-            displayWarning(I18n.t('map.interaction_locked')); // NEU: I18n
-        }
+            displayWarning(I18n.t('map.interaction_locked'));        }
     });
     marker.on('dragend', (e) => {
         const position = marker.getLatLng();
@@ -786,9 +772,6 @@ export function updateCutAwayMarkerPopup(marker, lat, lng, open = false) {
     }
     // Ruft die zentrale Funktion zum Aktualisieren von Popups auf
     updatePopupContent(marker, popupContent, open);
-}
-export function moveMarker(lat, lng) {
-    // ... Logik zum Bewegen des Markers ...
 }
 /**
  * Erstellt einen neuen Hauptmarker (DIP) oder aktualisiert die Position eines bestehenden Markers.
@@ -857,8 +840,7 @@ export function createCustomMarker(lat, lng) {
 export function attachMarkerDragend(marker) {
     marker.on('mousedown', () => {
         if (Settings.state.userSettings.isInteractionLocked) {
-            displayWarning(I18n.t('map.interaction_locked')); // NEU: I18n
-        }
+            displayWarning(I18n.t('map.interaction_locked'));        }
     });
     marker.on('dragend', (e) => {
         const position = marker.getLatLng();
@@ -933,8 +915,7 @@ export function updateFavoriteMarkers(favorites) {
 }
 export function handleHarpPlacement(e) {
     if (Settings.state.userSettings.isInteractionLocked) {
-        displayWarning(I18n.t('map.interaction_locked')); // NEU: I18n
-        AppState.isPlacingHarp = false;
+        displayWarning(I18n.t('map.interaction_locked'));        AppState.isPlacingHarp = false;
         AppState.map.off('click', handleHarpPlacement);
         return;
     }
@@ -945,7 +926,6 @@ export function handleHarpPlacement(e) {
     } else {
         AppState.harpMarker = createHarpMarker(lat, lng).addTo(AppState.map);
     }
-    // NEU: Ruft die Popup-Aktualisierung sofort auf und öffnet es
     updateHarpMarkerPopup(AppState.harpMarker, lat, lng, true);
 
     Settings.state.userSettings.harpLat = lat;
@@ -1031,8 +1011,7 @@ export async function updateHarpMarkerPopup(marker, lat, lng, open = false, expa
     }
 
     // Ein wiederverwendbarer Block für Höhe und QFE
-    const altitudeContent = `<br>${I18n.t('map.alt')}: ${displayAltitude} ${displayUnit}<br>${I18n.t('map.qfe')}: ${qfeText}`; // NEU: I18n
-
+    const altitudeContent = `<br>${I18n.t('map.alt')}: ${displayAltitude} ${displayUnit}<br>${I18n.t('map.qfe')}: ${qfeText}`;
     // --- Schritt 2: Den Popup-Inhalt basierend auf dem 'expanded'-Status erstellen ---
     let popupContent = `<b>HARP</b><br>`;
 
@@ -1451,22 +1430,15 @@ function _addStandardMapControls() {
         rotateMode: false
     });
 
-    // ============================================================
-    // NEU: Dynamische Spracheinstellung für Geoman
-    // ============================================================
-    
-    // 1. Sprache beim Start setzen
     const currentLang = Settings.getValue('language') || 'en';
     AppState.map.pm.setLang(currentLang);
 
-    // 2. Auf Sprachwechsel hören (Live-Update ohne Neuladen)
     document.addEventListener('i18n:loaded', (e) => {
         if (AppState.map && AppState.map.pm) {
             console.log(`Updating Geoman language to: ${e.detail.lang}`);
             AppState.map.pm.setLang(e.detail.lang);
         }
     });
-    // ============================================================
 
     AppState.map.pm.setGlobalOptions({
         tooltips: false,
@@ -1550,8 +1522,7 @@ async function _initializeTileCacheLogic() {
         const size = await TileCache.getCacheSize();
         if (size > 500) {
             const result = await TileCache.clearOldTiles(3);
-            Utils.handleMessage(I18n.t('map.cache.cleared_success')); // NEU: I18n
-        } else {
+            Utils.handleMessage(I18n.t('map.cache.cleared_success'));        } else {
             await TileCache.clearOldTiles();
         }
     } catch (error) {
@@ -1572,8 +1543,7 @@ function _initializeCoordsControlAndHandlers() {
 
     AppState.map.on('mouseout', function () {
         if (AppState.coordsControl && AppState.coordsControl.getContainer()) {
-            AppState.coordsControl.getContainer().innerHTML = I18n.t('map.move_mouse_over'); // NEU: I18n
-        }
+            AppState.coordsControl.getContainer().innerHTML = I18n.t('map.move_mouse_over');        }
     });
     console.log('Mousemove and mouseout handlers set up.');
 }
@@ -1662,7 +1632,6 @@ function _setupBaseLayersAndHandling() {
                 maxZoom: 19,
                 attribution: '© Esri, USGS'
             }),
-            // DIESE ZEILE IST GEÄNDERT: .cached wurde entfernt
             L.tileLayer('https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png', {
                 maxZoom: 18,
                 attribution: ' © <a href="http://www.openseamap.org">OpenSeaMap</a> contributors',
@@ -1692,8 +1661,7 @@ function _setupBaseLayersAndHandling() {
             if (!navigator.onLine) {
                 if (!AppState.hasTileErrorSwitched) {
                     console.warn(`${selectedBaseMapName} tiles unavailable offline. Zoom restricted.`);
-                    Utils.handleMessage(I18n.t('messages.offline_zoom_restricted')); // NEU: I18n
-                    AppState.hasTileErrorSwitched = true;
+                    Utils.handleMessage(I18n.t('messages.offline_zoom_restricted'));                    AppState.hasTileErrorSwitched = true;
                 }
                 return;
             }
@@ -1704,8 +1672,7 @@ function _setupBaseLayersAndHandling() {
                 AppState.baseMaps[fallbackBaseMapName].addTo(AppState.map);
                 Settings.state.userSettings.baseMaps = fallbackBaseMapName;
                 Settings.save();
-                Utils.handleMessage(I18n.t('messages.tiles_unavailable_switched', { current: selectedBaseMapName, fallback: fallbackBaseMapName })); // NEU: I18n
-                AppState.hasTileErrorSwitched = true;
+                Utils.handleMessage(I18n.t('messages.tiles_unavailable_switched', { current: selectedBaseMapName, fallback: fallbackBaseMapName }));                AppState.hasTileErrorSwitched = true;
             } else if (!AppState.hasTileErrorSwitched) {
                 console.warn(`Tile error in ${selectedBaseMapName}, attempting to continue.`);
             }
@@ -1950,7 +1917,6 @@ function _setupGeomanMeasurementHandlers() {
                         }
                         liveMeasureLabel.innerHTML = I18n.t('map.geoman.tap_first_point');
 
-                        // --- NEU: Reset-Position ebenfalls oben ---
                         const currentSliderContainer = document.getElementById('slider-container');
                         const currentTopOffset = currentSliderContainer ? currentSliderContainer.offsetHeight + 20 : 80;
                         const currentMapSize = map.getSize();
@@ -2188,10 +2154,8 @@ function _setupCoreMapEventHandlers() {
         return;
     }
 
-    // A. Das Control wird jetzt immer hier erstellt, egal für welchen Modus.
     if (!AppState.coordsControl) {
-        // WICHTIG: Deaktivieren der Standard-Handler des Plugins.
-        // Wir steuern die Updates jetzt zu 100% selbst.
+        // Disable the plugin's built-in input updates — we control all coordinate updates ourselves.
         const coordOptions = {
             enableUserInput: false
         };
@@ -2199,14 +2163,12 @@ function _setupCoreMapEventHandlers() {
         AppState.coordsControl.addTo(AppState.map);
     }
 
-    // B. Die zentrale Entscheidung: Fadenkreuz oder Maus?
     if (isMobileDevice()) {
         _setupCrosshairCoordinateHandler(AppState.map);
     } else {
         _setupMouseCoordinateHandler(AppState.map);
     }
 
-    // Die restlichen Event-Handler bleiben für beide Plattformen aktiv.
 
     // Touch-Rotation: _project() für alle Canvas-Vektorlayer aufrufen bevor
     // renderer._update() zeichnet, damit _parts mit dem neuen _pixelOrigin
@@ -2267,8 +2229,7 @@ function _setupCoreMapEventHandlers() {
             if (targetZoom < 11) {
                 e.target._zoom = 11;
                 AppState.map.setZoom(11);
-                Utils.handleMessage(I18n.t('messages.offline_zoom_restricted')); // NEU: I18n
-            } else if (targetZoom > 14) {
+                Utils.handleMessage(I18n.t('messages.offline_zoom_restricted'));            } else if (targetZoom > 14) {
                 e.target._zoom = 14;
                 AppState.map.setZoom(14);
                 Utils.handleMessage(I18n.t('messages.offline_zoom_restricted'));
@@ -2278,9 +2239,6 @@ function _setupCoreMapEventHandlers() {
     AppState.map.on('zoomend', () => {
         const currentZoom = AppState.map.getZoom();
 
-        // HIER IST DIE ÄNDERUNG:
-        // Der Manager ruft KEINE Anwendungslogik mehr auf.
-        // Stattdessen sendet er ein Event und meldet, dass der Zoom sich geändert hat.
         const zoomEvent = new CustomEvent('map:zoomend', {
             detail: { zoom: currentZoom },
             bubbles: true,
@@ -2339,8 +2297,7 @@ function _setupCoreMapEventHandlers() {
     AppState.map.on('contextmenu', (e) => {
 
         if (Settings.state.userSettings.isInteractionLocked) {
-            displayWarning(I18n.t('map.interaction_locked')); // NEU: I18n
-            return; // Aktion unterbinden
+            displayWarning(I18n.t('map.interaction_locked'));            return; // Aktion unterbinden
         }
 
         const { lat, lng } = e.latlng;
@@ -2366,14 +2323,13 @@ function _setupCoreMapEventHandlers() {
         longPressTimeout = setTimeout(() => {
 
             if (Settings.state.userSettings.isInteractionLocked) {
-                displayWarning(I18n.t('map.interaction_locked')); // NEU: I18n
-                return; // Aktion unterbinden
+                displayWarning(I18n.t('map.interaction_locked'));                return; // Aktion unterbinden
             }
 
             // Verhindere das Auslösen des normalen "click"-Events
             e.preventDefault();
 
-            // KORREKTUR: Hole die Koordinaten relativ zum Karten-Container
+            // Coordinates relative to the map container
             const rect = mapContainer.getBoundingClientRect();
             const touch = e.touches[0];
             const x = touch.clientX - rect.left;
@@ -2532,8 +2488,7 @@ function _setupMouseCoordinateHandler(map) {
     map.on('mousemove', _handleMapMouseMove);
     map.on('mouseout', function () {
         if (AppState.coordsControl && AppState.coordsControl.getContainer()) {
-            AppState.coordsControl.getContainer().innerHTML = I18n.t('map.move_mouse_over'); // NEU: I18n
-        }
+            AppState.coordsControl.getContainer().innerHTML = I18n.t('map.move_mouse_over');        }
     });
     console.log('Mouse coordinate handler initialized.');
 }
@@ -2544,34 +2499,25 @@ async function _geolocationSuccessCallback(position, defaultZoom) {
     const { latitude, longitude } = position.coords;
     console.log('MapManager: Geolocation erfolgreich. Sende Event.');
 
-    // 1. Aktualisiere die Marker-Position (das ist eine UI-Aufgabe des Managers)
-    // Dieser Teil kann hier bleiben.
     AppState.lastLat = latitude;
     AppState.lastLng = longitude;
     AppState.lastAltitude = await Utils.getAltitude(latitude, longitude);
-    moveMarker(latitude, longitude); // Einfach den Namen der Funktion aufrufen.
     AppState.map.setView([latitude, longitude], defaultZoom);
 
-    // 2. Erstelle und sende das Event.
     const mapSelectEvent = new CustomEvent('location:selected', {
         detail: {
             lat: latitude,
             lng: longitude,
-            source: 'geolocation' // Wichtige Info über die Herkunft
+            source: 'geolocation'
         },
         bubbles: true,
         cancelable: true
     });
     AppState.map.getContainer().dispatchEvent(mapSelectEvent);
-
-    // 3. ALLE Anwendungslogik-Aufrufe wie calculateJump() und LocationManager.addCoordToHistory() werden hier GELÖSCHT.
 }
 async function _geolocationErrorCallback(error, defaultCenter, defaultZoom) {
     console.warn(`Geolocation error: ${error.message}`);
 
-    // =================================================================
-    // ==== HIER KOMMT DIE FEHLENDE LOGIK HIN                       ====
-    // =================================================================
     // Prüfe auf Home DZ, bevor der Default verwendet wird
     const homeDZ = LocationManager.getHomeDZ();
     let startLat, startLng, source, message;
@@ -2580,13 +2526,11 @@ async function _geolocationErrorCallback(error, defaultCenter, defaultZoom) {
         startLat = homeDZ.lat;
         startLng = homeDZ.lng;
         source = 'home_dz_fallback';
-        message = I18n.t('messages.home_dz_fallback', { name: homeDZ.label }); // NEU: I18n
-    } else {
+        message = I18n.t('messages.home_dz_fallback', { name: homeDZ.label });    } else {
         startLat = defaultCenter[0];
         startLng = defaultCenter[1];
         source = 'geolocation_fallback';
-        message = I18n.t('messages.geolocation_fallback'); // NEU: I18n
-    }
+        message = I18n.t('messages.geolocation_fallback');    }
 
     Utils.handleMessage(message);
 
@@ -2663,7 +2607,7 @@ export function toggleGeoManControls(locked) {
         // Toolbar sofort ausblenden, um weitere Klicks zu verhindern
         if (toolbar) toolbar.style.display = 'none';
 
-        // WICHTIG: Nur die Modi deaktivieren, die auch wirklich aktiv sind.
+        // Only disable modes that are currently active.
         if (AppState.map.pm.globalDrawModeEnabled()) {
             AppState.map.pm.disableDraw();
         }
@@ -2699,8 +2643,7 @@ function _handleMapMouseMove(e) {
 }
 function _handleMapDblClick(e) {
     if (Settings.state.userSettings.isInteractionLocked) {
-        displayWarning(I18n.t('map.interaction_locked')); // NEU: I18n
-        return;
+        displayWarning(I18n.t('map.interaction_locked'));        return;
     }
     if (!Settings.state.userSettings.showCutAwayFinder) {
         return;
