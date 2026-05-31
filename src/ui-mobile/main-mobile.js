@@ -30,7 +30,6 @@ import { I18n } from '../core/i18n.js';
 import * as PinManager from '../core/pinManager.js';
 import * as RainRadar from '../core/rainRadarManager.js';
 
-"use strict";
 
 // Eine debounced-Version von generateMeteogram
 const debouncedGenerateMeteogram = Utils.debounce(generateMeteogram, 250); // 250ms delay
@@ -182,7 +181,6 @@ function initializeUIElements() {
     const directionSpan = document.getElementById('jumpRunTrackDirection');
     if (directionSpan) directionSpan.textContent = '-';
 
-    // NEU: Suchfeld-Placeholder beim App-Start übersetzen
     const searchInput = document.getElementById('locationSearchInput');
     if (searchInput) {
         searchInput.placeholder = I18n.t('search.placeholder');
@@ -297,9 +295,6 @@ export function calculateJump() {
         heightUnit
     );
 
-    // NEU: Hier rufen wir den Safety Check auf!
-    // Er prüft unabhängig von den Visualisierungs-Einstellungen (Exit/Canopy Area an/aus),
-    // ob der Wind in der Safety Height kritisch ist.
     displayManager.checkSafetyHeightWindWarning();
 
     const visualizationData = {
@@ -606,7 +601,6 @@ export async function downloadTableAsAscii(format) {
         return;
     }
 
-    // --- Datenvorbereitung (unverändert) ---
     const index = document.getElementById('timeSlider').value || 0;
     const model = document.getElementById('modelSelect').value.toUpperCase();
     const time = Utils.formatTime(AppState.weatherData.time[index]).replace(' ', '_');
@@ -637,7 +631,6 @@ export async function downloadTableAsAscii(format) {
 
     let content = '';
     let header = '';
-    // --- Header-Erstellung (unverändert) ---
     switch (format) {
         case 'ATAK':
             header = `Alt\tDir\tSpd\n${exportSettings.heightUnit}${exportSettings.refLevel}\tdeg\tkts\n`;
@@ -651,7 +644,6 @@ export async function downloadTableAsAscii(format) {
             break;
     }
     content += header;
-    // --- Inhalts-Erstellung (unverändert) ---
     interpolatedData.forEach(data => {
         const displayHeight = Math.round(data.displayHeight);
         const displayDir = Math.round(data.dir);
@@ -710,7 +702,6 @@ async function downloadSurfaceDataAsAscii() {
         return;
     }
 
-    // Datenvorbereitung (unverändert)
     const { time, wind_direction_10m, wind_speed_10m, wind_gusts_10m, visibility, weather_code, temperature_2m } = AppState.weatherData;
     const windUnit = getWindSpeedUnit();
     const tempUnit = getTemperatureUnit();
@@ -783,7 +774,6 @@ async function exportComprehensiveReportAsHtml() {
         return;
     }
 
-    // --- Schritt 1: HTML-Inhalt generieren (Dieser Teil bleibt exakt gleich) ---
     const lat = AppState.lastLat;
     const lng = AppState.lastLng;
     const model = document.getElementById('modelSelect').value.toUpperCase();
@@ -816,9 +806,7 @@ async function exportComprehensiveReportAsHtml() {
         .container { width: 100%; margin: 0 auto; padding: 0; }
         h1, h2, h3 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; margin-top: 20px; }
         
-        /* *** START DER ÄNDERUNGEN *** */
-
-        .table-wrapper { 
+        .table-wrapper {
             overflow-x: auto; 
             -webkit-overflow-scrolling: touch; /* Flüssiges Scrollen auf iOS */
             border: 1px solid #ddd;
@@ -837,8 +825,6 @@ async function exportComprehensiveReportAsHtml() {
             white-space: nowrap; /* Verhindert Zeilenumbrüche in Zellen */
         }
 
-        /* *** ENDE DER ÄNDERUNGEN *** */
-        
         th { background-color: #f2f2f2; font-weight: bold; }
         tr:nth-child(even) { background-color: #f9f9f9; }
         .header-info { background-color: #ecf0f1; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
@@ -856,7 +842,7 @@ async function exportComprehensiveReportAsHtml() {
                 padding: 3px 4px; /* Kompakteres Padding */
             }
 
-            h1, h2, h3 { padding-bottom: 3 px; margin-top: 10px; font-size: 13px;}
+            h1, h2, h3 { padding-bottom: 3px; margin-top: 10px; font-size: 13px;}
 
             .header-info { padding: 8px; margin-bottom: 10px; font-size: 10px;}
 
@@ -973,7 +959,6 @@ async function exportComprehensiveReportAsHtml() {
     html += `</div></div></body></html>`;
 
 
-    // --- Schritt 2: HTML-Inhalt als Datei speichern (Dieser Teil ist NEU) ---
     try {
         // Hole die Capacitor-Module über den Adapter
         const { Filesystem, Directory, Browser, Capacitor, isNative } = await getCapacitor();
@@ -1003,8 +988,6 @@ async function exportComprehensiveReportAsHtml() {
                 recursive: true
             });
 
-            // *** START DER NEUEN LOGIK ***
-            // Konvertiere den nativen Pfad in eine vom lokalen Webserver lesbare URL
             const serverUrl = Capacitor.convertFileSrc(writeResult.uri);
 
             // Finde das Modal und das Iframe und zeige sie an
@@ -1018,10 +1001,8 @@ async function exportComprehensiveReportAsHtml() {
                 // Fallback, falls die UI-Elemente nicht gefunden werden
                 throw new Error("HTML report modal components not found in the DOM.");
             }
-            // *** ENDE DER NEUEN LOGIK ***
 
         } else {
-            // Web-Fallback (bleibt unverändert)
             const newTab = window.open();
             newTab.document.open();
             newTab.document.write(html);
@@ -1178,10 +1159,7 @@ export function updateUIState() {
  * @param {object|null} [positionData=null] - Die neuesten Positionsdaten vom GPS.
  */
 export function updateJumpMasterLineAndPanel(positionData = null) {
-    console.log('[main-mobile] Event "tracking:positionUpdated" received. Data:', event.detail);
-
-    // 1. Grundvoraussetzung: Ist Live-Tracking überhaupt aktiv?
-    // Wenn kein Live-Marker da ist, ist Tracking aus -> alles aufräumen und beenden.
+    console.log('[main-mobile] Event "tracking:positionUpdated" received. Data:', positionData);
     if (!AppState.liveMarker) {
         mapManager.clearJumpMasterLine();
         mapManager.hideLivePositionControl();
@@ -1189,9 +1167,8 @@ export function updateJumpMasterLineAndPanel(positionData = null) {
         return;
     }
 
-    // 2. Basis-Positionsdaten zusammenstellen
     const livePos = AppState.liveMarker.getLatLng();
-    if (!livePos) return; // Sicherheitsabfrage
+    if (!livePos) return;
 
     const dataForUpdate = positionData || {
         latitude: livePos.lat,
@@ -1203,9 +1180,8 @@ export function updateJumpMasterLineAndPanel(positionData = null) {
         accuracy: AppState.lastAccuracy
     };
 
-    // 3. Jump-Master-Line-Daten NUR berechnen, wenn die Checkbox aktiv ist
     const showJML = Settings.state.userSettings.showJumpMasterLine;
-    let jumpMasterLineData = null; // Standardmäßig leer
+    let jumpMasterLineData = null;
 
     if (showJML) {
         let targetPos = null;
@@ -1272,7 +1248,6 @@ function updateJumpMasterDashboard(data) {
         return;
     }
 
-    // --- Block 1: Haupt-Dashboard ---
     const mainElements = {
         coordsEl: document.getElementById('dashboard-jm-coords-mobile'),
         altitudeEl: document.getElementById('dashboard-jm-altitude-mobile'),
@@ -1333,7 +1308,6 @@ function updateJumpMasterDashboard(data) {
         mainElements.varioEl.textContent = `${displayVario} ${varioUnit}`;
     }
 
-    // --- Block 2: JML Toggle ---
     const dipBtn = document.getElementById('jml-target-dip-btn');
     const harpBtn = document.getElementById('jml-target-harp-btn');
     if (dipBtn && harpBtn) {
@@ -1342,7 +1316,6 @@ function updateJumpMasterDashboard(data) {
         harpBtn.style.opacity = AppState.harpMarker ? 1 : 0.5;
     }
 
-    // --- Block 3: JML Detailansicht ---
     const jmlDetails = document.getElementById('jumpmaster-line-details-mobile');
     if (jmlDetails) {
         jmlDetails.classList.toggle('hidden', !showJumpMasterLine);
@@ -1404,7 +1377,6 @@ function updateDashboardPanel(data) {
             let displayRange;
             let displayUnit;
 
-            // KORREKTUR: Berücksichtigt jetzt 'ft' und 'mi'
             if (heightUnit === 'ft') {
                 const rangeFeet = Utils.convertHeight(rangeMeters, 'ft');
                 if (rangeFeet > 5280) { // Wenn über eine Meile
@@ -1459,7 +1431,6 @@ function updateDashboardPanel(data) {
         let displayDistance;
         let displayDistUnit;
 
-        // KORREKTUR: Berücksichtigt jetzt 'ft' und 'mi' für die Distanz
         if (heightUnit === 'ft') {
             const distanceFeet = Utils.convertHeight(distanceMeters, 'ft');
             if (distanceFeet > 5280) { // Wenn über eine Meile
@@ -1486,7 +1457,6 @@ function updateDashboardPanel(data) {
         bearingEl.textContent = Utils.formatDirectionOutput(bearing, latitude, longitude, false);
     }
 
-    // ... (Der restliche Teil der Funktion für Gleitverhältnisse bleibt unverändert)
     const glideRequiredEl = document.getElementById('dashboard-glide-required');
     const glideCurrentEl = document.getElementById('dashboard-glide-current');
     let requiredRatio = null;
@@ -1544,7 +1514,6 @@ function setupAppEventListeners() {
     document.addEventListener('i18n:loaded', async () => {
         console.log("[main-web] Language changed, updating dynamic UI components.");
 
-        // NEU: Suchfeld-Placeholder beim Sprachwechsel übersetzen
         const searchInput = document.getElementById('locationSearchInput');
         if (searchInput) {
             searchInput.placeholder = I18n.t('search.placeholder');
@@ -1606,7 +1575,6 @@ function setupAppEventListeners() {
             if (currentZoom < UI_DEFAULTS.MIN_ZOOM || currentZoom > UI_DEFAULTS.MAX_ZOOM) {
                 mapManager.drawJumpRunTrack(null); // JRT ausblenden
             } else {
-                // NEU: Wenn der Zoom wieder im gültigen Bereich ist, den JRT neu zeichnen.
                 displayManager.updateJumpRunTrackDisplay();
             }
         }
@@ -1718,23 +1686,19 @@ function setupAppEventListeners() {
                 Utils.handleMessage(I18n.t('autoupdate.historical_track_loaded_warning'));
             }
 
-            // Schritt 1: Marker auf der Karte erstellen ODER aktualisieren.
-            // Diese Funktion setzt auch die Geländehöhe (lastAltitude), worauf wir warten.
+            // createOrUpdateMarker also sets lastAltitude (terrain elevation), which we await here
             await mapManager.createOrUpdateMarker(lat, lng);
 
-            // Schritt 2: Wetterdaten für den spezifischen Zeitstempel des Tracks abrufen.
             const newWeatherData = await weatherManager.fetchWeatherForLocation(lat, lng, timestamp);
 
             if (newWeatherData) {
                 AppState.weatherData = newWeatherData;
 
-                // Schritt 3: Den korrekten Index für den Slider finden.
                 const slider = document.getElementById('timeSlider');
                 if (slider && AppState.weatherData.time && timestamp) {
                     slider.max = AppState.weatherData.time.length - 1;
                     slider.disabled = slider.max <= 0;
 
-                    // Finde den Index, der am besten zum Track-Zeitstempel passt
                     const targetTimestamp = new Date(timestamp).getTime();
                     let bestIndex = 0;
                     let minDiff = Infinity;
@@ -1749,7 +1713,6 @@ function setupAppEventListeners() {
                 }
             }
             console.log("Performing specific updates after track load...");
-            // Schritt 4: Alle UI-Elemente mit den neuen, zeitlich korrekten Daten aktualisieren.
             await displayManager.updateWeatherDisplay(getSliderValue(), 'weather-table-container', 'selectedTime');
             await displayManager.refreshMarkerPopup();
             if (AppState.lastAltitude !== 'N/A') {
@@ -1801,7 +1764,6 @@ function setupAppEventListeners() {
     document.addEventListener('harp:updated', () => {
         console.log('[App] HARP has been updated, resetting offsets and triggering JRT recalculation.');
 
-        // NEU: Setzt die sichtbaren Input-Felder auf 0 zurück.
         setInputValueSilently('jumpRunTrackOffset', 0);
         setInputValueSilently('jumpRunTrackForwardOffset', 0);
         updateOffsetNmHints();
@@ -2181,7 +2143,7 @@ function setupAppEventListeners() {
         const downloadFormat = selectElement ? selectElement.value : getDownloadFormat();
         if (downloadFormat === 'SurfaceData') {
             downloadSurfaceDataAsAscii();
-        } else if (downloadFormat === 'ComprehensiveReport') { // NEUER FALL
+        } else if (downloadFormat === 'ComprehensiveReport') {
             exportComprehensiveReportAsHtml();
         } else {
             downloadTableAsAscii(downloadFormat);
@@ -2475,24 +2437,21 @@ function setupAppEventListeners() {
     });
 
     document.addEventListener('ui:recalculateAlerts', () => {
-        console.log('[Main] Received ui:recalculateAlerts event.'); // NEU
-        if (AppState.weatherData) {
+        console.log('[Main] Received ui:recalculateAlerts event.');        if (AppState.weatherData) {
             const alertResults = weatherManager.checkWeatherAlerts(AppState.weatherData); // Ergebnis in Variable speichern
-            console.log('[Main] checkWeatherAlerts result:', alertResults); // NEU: Ergebnis loggen
+            console.log('[Main] checkWeatherAlerts result:', alertResults);
             const { highWinds, highGusts, thunderstorms, cloudAlerts } = alertResults;
             const alertIndices = [...new Set([...highWinds, ...highGusts, ...thunderstorms, ...cloudAlerts])];
-            console.log('[Main] Combined alert indices:', alertIndices); // NEU: Kombinierte Indizes loggen
+            console.log('[Main] Combined alert indices:', alertIndices);
 
             displayManager.updateAlertSliderBackground(alertIndices);
 
             const alertIcon = document.getElementById('map-alert-icon');
             if (alertIcon) {
                 alertIcon.classList.toggle('hidden', alertIndices.length === 0);
-                console.log('[Main] Alert icon visibility updated:', alertIndices.length === 0 ? 'hidden' : 'visible'); // NEU
-            }
+                console.log('[Main] Alert icon visibility updated:', alertIndices.length === 0 ? 'hidden' : 'visible');            }
         } else {
-            console.log('[Main] No weather data available to recalculate alerts.'); // NEU
-        }
+            console.log('[Main] No weather data available to recalculate alerts.');        }
     });
 
     // Listener für Orientierungsänderung
@@ -2579,21 +2538,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     const versionEl = document.getElementById('appVersion');
     if (versionEl) versionEl.textContent = 'v' + __APP_VERSION__;
 
-    // --- NEU: Status Bar Konfiguration EINFÜGEN START ---
     const configureStatusBar = async () => {
         try {
             const { StatusBar, isNative } = await getCapacitor();
             if (isNative && StatusBar) {
                 console.log('[App] Configuring Native Status Bar (Aggressive)');
-
-                // 1. App unter die Leiste schieben
                 await StatusBar.setOverlaysWebView({ overlay: true });
-
-                // 2. Hintergrund transparent machen (für Android wichtig!)
-                // '#00000000' ist komplett transparent
+                // '#00000000' is fully transparent (required on Android)
                 await StatusBar.setBackgroundColor({ color: '#00000000' });
-
-                // 3. Optional: Leiste komplett ausblenden
                 await StatusBar.hide();
 
                 // Event Listener: Falls sie versehentlich wieder auftaucht (z.B. durch Keyboard)
@@ -2604,9 +2556,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     };
 
-    // Direkt ausführen
     configureStatusBar();
-    // --- NEU: Status Bar Konfiguration EINFÜGEN ENDE ---
 
     await initializeApp();
     setupLanguageDropdown();
@@ -2628,18 +2578,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 const lowerCaseUrl = fileUrl ? fileUrl.toLowerCase() : '';
                 const isGpxFileExtension = lowerCaseUrl.endsWith('.gpx');
-                const isKmlFileExtension = lowerCaseUrl.endsWith('.kml'); // NEU
-                // Prüfe auch auf MIME-Typen, die in der URL vorkommen könnten (Android)
+                const isKmlFileExtension = lowerCaseUrl.endsWith('.kml');                // Prüfe auch auf MIME-Typen, die in der URL vorkommen könnten (Android)
                 const isGpxMime = lowerCaseUrl.includes(encodeURIComponent('application/gpx+xml'));
-                const isKmlMime = lowerCaseUrl.includes(encodeURIComponent('application/vnd.google-earth.kml+xml')); // NEU
-                const isXmlMime = lowerCaseUrl.includes(encodeURIComponent('application/xml')) || lowerCaseUrl.includes(encodeURIComponent('text/xml')); // Fallback
+                const isKmlMime = lowerCaseUrl.includes(encodeURIComponent('application/vnd.google-earth.kml+xml'));                const isXmlMime = lowerCaseUrl.includes(encodeURIComponent('application/xml')) || lowerCaseUrl.includes(encodeURIComponent('text/xml')); // Fallback
                 const isAndroidContentUri = fileUrl && fileUrl.startsWith('content://');
 
                 let fileType = null;
                 if (isGpxFileExtension || isGpxMime) {
                     fileType = 'gpx';
-                } else if (isKmlFileExtension || isKmlMime) { // NEU
-                    fileType = 'kml';
+                } else if (isKmlFileExtension || isKmlMime) {                    fileType = 'kml';
                 } else if (isAndroidContentUri && isXmlMime) {
                     // Bei content URI mit XML-Typ wissen wir es nicht sicher,
                     // wir übergeben den Typ an handleOpenFileUrl zur weiteren Prüfung
@@ -2657,7 +2604,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 } else {
                     console.log('Opened URL is not a recognized track file (GPX/KML) or content URI, ignoring.');
                 }
-                // === ENDE ÄNDERUNG ===
             });
             console.log('appUrlOpen listener added successfully.');
         } else if (!isNative) {
@@ -2775,7 +2721,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.log(`[App] Initialized timeSlider to current time index: ${currentIndex}`);
     }
 
-    // KORREKTUR: Der Event-Listener wird hier registriert, BEVOR das Event ausgelöst wird.
     document.addEventListener('location:selected', async (event) => {
         const { lat, lng, source } = event.detail;
         console.log(`App: Event 'location:selected' empfangen. Quelle: ${source}, Koordinaten: ${lat}, ${lng}`);

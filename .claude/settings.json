@@ -22,7 +22,11 @@
       "Bash(sed -n '127,137p' /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/ui-mobile/mapManager.js)",
       "Bash(sed -n '115,125p' /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/ui-mobile/mapManager.js)",
       "Bash(sed -n '1063,1065p' /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/ui-web/mapManager.js)",
-      "Bash(sed -n '50,55p' /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/ui-web/mapManager.js)"
+      "Bash(sed -n '50,55p' /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/ui-web/mapManager.js)",
+      "Bash(awk -F: '{print $1\": \"$2}')",
+      "Bash(awk 'NR==1{p=$0; next} {print p; p=$0} END{print p}')",
+      "Bash(grep -n \"// NEU$\\\\b\" /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/ui-web/main-web.js)",
+      "Bash(grep -n \"// NEU:\\\\|// NEU$\\\\| // NEU\\\\|ÄNDERUNG\\\\|KORREKTUR:\\\\|unverändert\\\\|bleibt unverändert\\\\|START DER\\\\|ENDE DER\\\\|NEUER FALL\\\\|NEU: Ergebnis\\\\|NEU: Kombinierte\\\\|NEU: Status\\\\|NEU: Suchfeld\\\\|NEU: Wenn\\\\|NEU: Setzt\\\\|NEU: Hier\" /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/ui-mobile/main-mobile.js)"
     ]
   }
 }

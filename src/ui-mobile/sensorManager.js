@@ -4,10 +4,9 @@
  * Erkennung eines Fallschirmsprungs (Freifall) und der Landung.
  */
 
-"use strict";
-
 import { AppState } from '../core/state.js';
 import { Utils } from '../core/utils.js';
+import { I18n } from '../core/i18n.js';
 
 // ===================================================================
 // 1. Modul-Konstanten & Zustand

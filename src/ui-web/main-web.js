@@ -8,7 +8,7 @@ import { Utils } from '../core/utils.js';
 import { Settings, getInterpolationStep, setAppContext } from '../core/settings.js';
 import { UI_DEFAULTS } from '../core/constants.js';
 import * as EventManager from './eventManager.js';
-import * as Coordinates from '../ui-web/coordinates.js';
+import * as Coordinates from './coordinates.js';
 import * as JumpPlanner from '../core/jumpPlanner.js';
 import * as mapManager from './mapManager.js';
 import * as weatherManager from '../core/weatherManager.js';
@@ -26,8 +26,6 @@ import { generateMeteogram } from '../core/meteogramChart.js';
 import { DateTime } from 'luxon';
 import { I18n } from '../core/i18n.js';
 import * as RainRadar from '../core/rainRadarManager.js';
-
-"use strict";
 
 // Eine debounced-Version von generateMeteogram
 const debouncedGenerateMeteogram = Utils.debounce(generateMeteogram, 250); // 250ms delay
@@ -193,7 +191,6 @@ function initializeUIElements() {
     if (directionSpan) directionSpan.textContent = '-'; // Initial placeholder
     updateUIState();
 
-    // NEU: Suchfeld-Placeholder beim App-Start übersetzen
     const searchInput = document.getElementById('locationSearchInput');
     if (searchInput) {
         searchInput.placeholder = I18n.t('search.placeholder');
@@ -273,9 +270,6 @@ export function calculateJump() {
         heightUnit
     );
 
-    // NEU: Hier rufen wir den Safety Check auf!
-    // Er prüft unabhängig von den Visualisierungs-Einstellungen (Exit/Canopy Area an/aus),
-    // ob der Wind in der Safety Height kritisch ist.
     displayManager.checkSafetyHeightWindWarning();
 
     const visualizationData = {
@@ -415,7 +409,7 @@ export function validateLegHeights(final, base, downwind) {
 export function calculateMeanWind() {
     console.log('Calculating mean wind with model:', document.getElementById('modelSelect').value, 'weatherData:', AppState.weatherData);
 
-    const refLevel = document.getElementById('refLevel')?.value || 'AGL'; // KORREKTUR: Liest das Dropdown-Menü aus
+    const refLevel = document.getElementById('refLevel')?.value || 'AGL';
     const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
     const windSpeedUnit = Settings.getValue('windUnit', 'radio', 'kt');
 
@@ -505,16 +499,9 @@ export function calculateMeanWind() {
     const displayUpper = Math.round(Utils.convertHeight(upperLimitInput, heightUnit));
     const displaySpd = Utils.convertWind(spd, windSpeedUnit, 'kt');
     const formattedSpd = Number.isFinite(spd) ? (windSpeedUnit === 'bft' ? Math.round(spd) : spd.toFixed(1)) : 'N/A';
-    // 1. Nur das Wort übersetzen
     const translatedLabel = I18n.t('weather.mean_wind_result');
-
-    // 2. HTML zusammensetzen (mit explizit erzwungenem Styling für das span)
     const resultHTML = `<span data-i18n="weather.mean_wind_result" style="font-weight: bold; font-size: 16px;">${translatedLabel}</span> (${displayLower}-${displayUpper} ${heightUnit} ${refLevel}): ${roundedDir}° ${formattedSpd} ${windSpeedUnit}`;
-
-    // 3. Ins HTML einfügen
     document.getElementById('meanWindResult').innerHTML = resultHTML;
-
-    // 4. In der Konsole ausgeben (ohne den HTML-Code, damit es übersichtlich bleibt)
     console.log('Calculated Mean Wind:', roundedDir + '°', formattedSpd + ' ' + windSpeedUnit);
 }
 
@@ -557,8 +544,7 @@ export async function updateToCurrentHour() {
         slider.value = currentHour;
         console.log(`Set slider to current time index: ${currentHour}`);
 
-        await displayManager.updateWeatherDisplay(currentHour, 'weather-table-container', 'selectedTime'); // NEU
-        if (AppState.lastAltitude !== 'N/A') {
+        await displayManager.updateWeatherDisplay(currentHour, 'weather-table-container', 'selectedTime');        if (AppState.lastAltitude !== 'N/A') {
             calculateMeanWind();
         }
         if (Settings.state.userSettings.calculateJump && Settings.state.isCalculateJumpUnlocked) {
@@ -701,7 +687,6 @@ async function downloadSurfaceDataAsAscii() {
         const temp = Utils.convertTemperature(temperature_2m[i], tempUnit);
         const formattedTemp = (typeof temp === 'number') ? temp.toFixed(1) : 'N/A';
 
-        // HIER IST DIE ÄNDERUNG:
         const visibilityStr = Utils.formatVisibility(visibility?.[i]);
         const weatherStr = Utils.translateWmoCodeToTaf(weather_code?.[i]);
 
@@ -824,8 +809,7 @@ async function exportComprehensiveReportAsHtml() {
         );
         const cloudLayerString = Utils.getCloudLayersForMetar(interpolatedDataForHour, heightUnit);
 
-        const windDirectionFormatted = Utils.formatWindDirection(wind_direction_10m[i]); // NEU
-        const visibilityStr = Utils.formatVisibility(visibility?.[i]);
+        const windDirectionFormatted = Utils.formatWindDirection(wind_direction_10m[i]);        const visibilityStr = Utils.formatVisibility(visibility?.[i]);
 
         html += `<tr>
             <td>${date}</td>
@@ -872,8 +856,7 @@ async function exportComprehensiveReportAsHtml() {
                 const temp = Utils.convertTemperature(data.temp, tempUnit);
                 const dew = Utils.convertTemperature(data.dew, tempUnit);
                 const spd = Utils.convertWind(data.spd, windUnit, 'km/h');
-                const dirFormatted = Utils.formatWindDirection(data.dir); // NEU
-
+                const dirFormatted = Utils.formatWindDirection(data.dir);
                 html += `<tr>
                     <td>${data.displayHeight}</td>
                     <td>${(typeof data.pressure === 'number' ? data.pressure.toFixed(1) : 'N/A')}</td>
@@ -902,18 +885,15 @@ async function exportComprehensiveReportAsHtml() {
  * @param {boolean} [triggerUpdate=true] - Wenn true, wird der Track sofort neu gezeichnet.
  */
 export function resetJumpRunDirection(triggerUpdate = true) {
-    // 1. Gespeicherten Wert in den Settings löschen
     Settings.state.userSettings.customJumpRunDirection = null;
     Settings.save();
     console.log('Persisted custom JRT direction has been reset.');
 
-    // 2. Eingabefeld in der UI leeren
     const directionInput = document.getElementById('jumpRunTrackDirection');
     if (directionInput) {
         directionInput.value = '';
     }
 
-    // 3. Optional die Anzeige aktualisieren (nur wenn der Track noch sichtbar ist)
     if (triggerUpdate && Settings.state.userSettings.showJumpRunTrack && AppState.weatherData) {
         displayManager.updateJumpRunTrackDisplay();
     }
@@ -1168,7 +1148,6 @@ function updateJumpMasterDashboard(data) {
     } else if (settings.coordFormat === 'DDM') {
         coordText = `${formatDDM(coords.lat)}, ${formatDDM(coords.lng)}`;
     } else {
-        // KORREKTUR: Verwende die Original-Koordinaten direkt, wie in der mobilen Version.
         coordText = `${data.latitude.toFixed(5)}, ${data.longitude.toFixed(5)}`;
     }
 
@@ -1213,10 +1192,8 @@ function updateJumpMasterDashboard(data) {
     const jmlDetails = document.getElementById('jumpmaster-line-details');
     const showJML = data.showJumpMasterLine;
 
-    // Schritt 1: Blende den Detail-Container basierend auf der Checkbox ein oder aus.
     jmlDetails.classList.toggle('hidden', !showJML);
 
-    // Schritt 1b: Toggle-Buttons synchronisieren
     const dipBtn = document.getElementById('jml-target-dip-btn');
     const harpBtn = document.getElementById('jml-target-harp-btn');
     if (dipBtn && harpBtn) {
@@ -1225,7 +1202,6 @@ function updateJumpMasterDashboard(data) {
         harpBtn.style.opacity = AppState.harpMarker ? 1 : 0.5;
     }
 
-    // Schritt 2: Wenn der Container sichtbar ist, fülle ihn.
     if (showJML) {
         const targetLabel = document.getElementById('dashboard-jm-target-label');
         const bearingEl = document.getElementById('dashboard-jm-bearing');
@@ -1236,7 +1212,6 @@ function updateJumpMasterDashboard(data) {
         if (data.jumpMasterLineData) {
             const settings = { heightUnit: getHeightUnit() }; // Holen der Einheit für die Distanz
 
-            // NEU: Übersetzten Text mit dem Ziel (HARP/DIP) setzen
             targetLabel.textContent = I18n.t('jumpmaster.jml_to', { target: data.jumpMasterLineData.target });
 
             bearingEl.textContent = Utils.formatDirectionOutput(data.jumpMasterLineData.bearing, data.latitude, data.longitude, false);
@@ -1245,7 +1220,6 @@ function updateJumpMasterDashboard(data) {
         }
         // ...oder mit Platzhaltern, falls noch keine Daten da sind.
         else {
-            // NEU: Übersetzten Text mit Platzhalter "--" setzen
             targetLabel.textContent = I18n.t('jumpmaster.jml_to', { target: '--' });
 
             bearingEl.textContent = '--';
@@ -1274,7 +1248,6 @@ function setupAppEventListeners() {
     document.addEventListener('i18n:loaded', async () => {
         console.log("[main-web] Language changed, updating dynamic UI components.");
 
-        // NEU: Suchfeld-Placeholder beim Sprachwechsel übersetzen
         const searchInput = document.getElementById('locationSearchInput');
         if (searchInput) {
             searchInput.placeholder = I18n.t('search.placeholder');
@@ -1339,7 +1312,6 @@ function setupAppEventListeners() {
             if (currentZoom < UI_DEFAULTS.MIN_ZOOM || currentZoom > UI_DEFAULTS.MAX_ZOOM) {
                 mapManager.drawJumpRunTrack(null); // Blendet JRT aus
             } else {
-                // NEU: Zeichnet den JRT neu, wenn der Zoom wieder im gültigen Bereich ist
                 displayManager.updateJumpRunTrackDisplay();
             }
         }
@@ -1357,7 +1329,6 @@ function setupAppEventListeners() {
             }
         }
 
-        // Das Caching bei Kartenbewegung bleibt unverändert
         cacheVisibleTiles({
             map: AppState.map,
             baseMaps: AppState.baseMaps,
@@ -1510,22 +1481,19 @@ function setupAppEventListeners() {
                 Utils.handleMessage(I18n.t('autoupdate.historical_track_loaded_warning'));
             }
 
-            // Schritt 1: Marker auf der Karte erstellen oder aktualisieren.
             await mapManager.createOrUpdateMarker(lat, lng);
 
-            // Schritt 2: Wetterdaten für den spezifischen Zeitstempel des Tracks abrufen.
             const newWeatherData = await weatherManager.fetchWeatherForLocation(lat, lng, timestamp);
 
             if (newWeatherData) {
-                AppState.weatherData = newWeatherData; // Daten im globalen Zustand speichern.
+                AppState.weatherData = newWeatherData;
 
-                // Schritt 3: Den korrekten Index für den Slider finden.
                 const slider = document.getElementById('timeSlider');
                 if (slider && AppState.weatherData.time) {
                     slider.max = AppState.weatherData.time.length - 1;
                     slider.disabled = slider.max <= 0;
 
-                    if (timestamp) { // <--- DIESE PRÜFUNG WURDE HINZUGEFÜGT
+                    if (timestamp) {
                         const targetTimestamp = new Date(timestamp).getTime();
                         let bestIndex = 0;
                         let minDiff = Infinity;
@@ -1536,13 +1504,11 @@ function setupAppEventListeners() {
                                 bestIndex = idx;
                             }
                         });
-                        // Setze den Slider genau auf diesen Zeitpunkt!
                         slider.value = bestIndex;
                     }
                 }
             }
 
-            // Schritt 4: Alle UI-Elemente mit den neuen, zeitlich korrekten Daten aktualisieren.
             await displayManager.updateWeatherDisplay(getSliderValue(), 'weather-table-container', 'selectedTime');
             await displayManager.refreshMarkerPopup();
             if (AppState.lastAltitude !== 'N/A') {
@@ -1613,8 +1579,7 @@ function setupAppEventListeners() {
 
             if (AppState.weatherData && AppState.lastLat && AppState.lastLng) {
                 // 1. Die Haupt-Wettertabelle anzeigen lassen
-                await displayManager.updateWeatherDisplay(sliderIndex, 'weather-table-container', 'selectedTime'); // NEU
-                debouncedGenerateMeteogram(sliderIndex);
+                await displayManager.updateWeatherDisplay(sliderIndex, 'weather-table-container', 'selectedTime');                debouncedGenerateMeteogram(sliderIndex);
                 // 2. Das Popup des Markers aktualisieren lassen
                 await displayManager.refreshMarkerPopup();
                 // 3. Die Mittelwind-Berechnung UND Anzeige durchführen
@@ -1655,10 +1620,8 @@ function setupAppEventListeners() {
         const { value } = e.detail;
         console.log(`[main-web] Setting '${key}' changed to '${value}'. Performing updates.`);
 
-        // 1. Zentral den Slider-Wert holen (löst das "not defined" Problem)
         const sliderIndex = getSliderValue();
 
-        // 2. Spezifische Logik für Einheiten-Labels
         if (key === 'heightUnit') {
             updatePlannerUnits(value);
 
@@ -1682,8 +1645,6 @@ function setupAppEventListeners() {
             }
         }
 
-        // 3. Großes Update für alle visualisierungs-relevanten Änderungen
-        // (Ersetzt den alten Switch-Block für heightUnit, windUnit etc.)
         const settingsThatTriggerFullUpdate = [
             'refLevel', 'heightUnit', 'windUnit', 'temperatureUnit', 'timeZone', 'coordFormat'
         ];
@@ -1716,7 +1677,6 @@ function setupAppEventListeners() {
             }
         }
 
-        // 4. North Reference geändert: Suffixes und Input-Werte aktualisieren
         if (key === 'northReference') {
             Utils.updateNorthReferenceSuffixes();
             // Input-Werte aus gespeicherten true-Werten neu befüllen
@@ -1744,7 +1704,6 @@ function setupAppEventListeners() {
             displayManager.updateLandingPatternDisplay();
         }
 
-        // 5. Spezifische Logik für Landing Direction (war früher im Switch)
         if (key === 'landingDirection') {
             updateUIState();
             displayManager.updateLandingPatternDisplay();
@@ -1922,10 +1881,6 @@ function setupAppEventListeners() {
         AdsbManager.findAndSelectJumpShip();
     });
 
-    document.addEventListener('ui:showJumpMasterLineChanged', () => {
-        updateJumpMasterLineAndPanel();
-    });
-
     document.addEventListener('ui:modelChanged', async (e) => {
         console.log(`[main-web] Model changed to ${e.detail.model}. Fetching new data.`);
 
@@ -2045,7 +2000,7 @@ function setupAppEventListeners() {
         const downloadFormat = selectElement ? selectElement.value : getDownloadFormat();
         if (downloadFormat === 'SurfaceData') {
             downloadSurfaceDataAsAscii();
-        } else if (downloadFormat === 'ComprehensiveReport') { // NEUER FALL
+        } else if (downloadFormat === 'ComprehensiveReport') {
             exportComprehensiveReportAsHtml();
         } else {
             downloadTableAsAscii(downloadFormat);
@@ -2173,24 +2128,21 @@ function setupAppEventListeners() {
     });
 
     document.addEventListener('ui:recalculateAlerts', () => {
-        console.log('[Main] Received ui:recalculateAlerts event.'); // NEU
-        if (AppState.weatherData) {
+        console.log('[Main] Received ui:recalculateAlerts event.');        if (AppState.weatherData) {
             const alertResults = weatherManager.checkWeatherAlerts(AppState.weatherData); // Ergebnis in Variable speichern
-            console.log('[Main] checkWeatherAlerts result:', alertResults); // NEU: Ergebnis loggen
+            console.log('[Main] checkWeatherAlerts result:', alertResults);
             const { highWinds, highGusts, thunderstorms, cloudAlerts } = alertResults;
             const alertIndices = [...new Set([...highWinds, ...highGusts, ...thunderstorms, ...cloudAlerts])];
-            console.log('[Main] Combined alert indices:', alertIndices); // NEU: Kombinierte Indizes loggen
+            console.log('[Main] Combined alert indices:', alertIndices);
 
             displayManager.updateAlertSliderBackground(alertIndices);
 
             const alertIcon = document.getElementById('map-alert-icon');
             if (alertIcon) {
                 alertIcon.classList.toggle('hidden', alertIndices.length === 0);
-                console.log('[Main] Alert icon visibility updated:', alertIndices.length === 0 ? 'hidden' : 'visible'); // NEU
-            }
+                console.log('[Main] Alert icon visibility updated:', alertIndices.length === 0 ? 'hidden' : 'visible');            }
         } else {
-            console.log('[Main] No weather data available to recalculate alerts.'); // NEU
-        }
+            console.log('[Main] No weather data available to recalculate alerts.');        }
     });
 
     // Listener, um veraltete Daten beim Reaktivieren der App zu aktualisieren
@@ -2297,11 +2249,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const { newPosition, originalTrackData } = event.detail;
 
-        // Schritt 1: Den korrekten Ankerpunkt bestimmen (HARP oder DIP)
         let anchorPosition;
         const harpAnchor = AppState.harpMarker ? AppState.harpMarker.getLatLng() : null;
 
-        // Wenn ein HARP-Marker existiert, ist er IMMER der Anker
+        // HARP always takes precedence as anchor when present
         if (harpAnchor) {
             anchorPosition = harpAnchor;
             console.log("JRT-Ankerpunkt ist HARP.");
@@ -2312,30 +2263,26 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const trackLength = originalTrackData.trackLength;
         const trackDirection = originalTrackData.airplane.bearing;
-        const newEndPoint = newPosition; // Die neue Position des Flugzeugs
+        const newEndPoint = newPosition;
 
-        // Schritt 2: Den NEUEN STARTPUNKT des Tracks berechnen, indem wir vom neuen Endpunkt zurückgehen.
         const [newStartLat, newStartLng] = Utils.calculateNewCenter(
             newEndPoint.lat,
             newEndPoint.lng,
-            trackLength, // Die GESAMTE Länge des Tracks
-            (trackDirection + 180) % 360 // Entgegen der Flugrichtung
+            trackLength,
+            (trackDirection + 180) % 360 // opposite of flight direction
         );
         const newStartPoint = L.latLng(newStartLat, newStartLng);
 
-        // Schritt 3: Den Verschiebungs-Vektor vom Ankerpunkt zum NEUEN STARTPUNKT berechnen.
         const totalDistance = AppState.map.distance(anchorPosition, newStartPoint);
         const bearingFromAnchorToStart = Utils.calculateBearing(anchorPosition.lat, anchorPosition.lng, newStartPoint.lat, newStartPoint.lng);
 
-        // Schritt 4: Den Vektor in Vorwärts- und Quer-Offsets zerlegen.
         let angleDifference = bearingFromAnchorToStart - trackDirection;
-        angleDifference = (angleDifference + 180) % 360 - 180; // Winkel normalisieren
+        angleDifference = (angleDifference + 180) % 360 - 180; // normalize angle
 
         const angleRad = angleDifference * (Math.PI / 180);
         const forwardOffset = Math.round(totalDistance * Math.cos(angleRad));
         const lateralOffset = Math.round(totalDistance * Math.sin(angleRad));
 
-        // Schritt 5: Settings und UI aktualisieren.
         Settings.state.userSettings.jumpRunTrackOffset = lateralOffset;
         Settings.state.userSettings.jumpRunTrackForwardOffset = forwardOffset;
         Settings.save();
@@ -2344,15 +2291,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         setInputValueSilently('jumpRunTrackForwardOffset', forwardOffset);
         updateOffsetNmHints();
 
-        // Schritt 6: Den Track neu zeichnen lassen. Die `jumpPlanner` Funktion verwendet
-        // jetzt den Anker + die neuen Offsets und kommt zum korrekten Ergebnis.
         displayManager.updateJumpRunTrackDisplay();
     });
 
     document.addEventListener('harp:updated', () => {
         console.log('[App] HARP has been updated, resetting offsets and triggering JRT recalculation.');
 
-        // NEU: Setzt die sichtbaren Input-Felder auf 0 zurück.
         setInputValueSilently('jumpRunTrackOffset', 0);
         setInputValueSilently('jumpRunTrackForwardOffset', 0);
         updateOffsetNmHints();
