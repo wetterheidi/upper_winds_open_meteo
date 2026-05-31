@@ -9,7 +9,12 @@
       "Bash(xargs '-I{}' sh -c 'hash=$\\(echo \"{}\" | cut -d\" \" -f1\\); result=$\\(git show $hash -- src/ui-web/mapManager.js 2>/dev/null | grep -l \"exitCircle\" 2>/dev/null\\); if [ -n \"$result\" ]; then echo \"$hash: changed\"; fi')",
       "Bash(python3 -c ' *)",
       "Bash(npx vitest *)",
-      "Bash(node --input-type=module)"
+      "Bash(node --input-type=module)",
+      "Bash(sed -n '190,194p' /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/ui-mobile/eventManager.js)",
+      "Bash(sed -n '830,834p' /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/ui-mobile/eventManager.js)",
+      "Bash(sed -n '1026,1030p' /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/ui-mobile/eventManager.js)",
+      "Bash(sed -n '2065,2069p' /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/ui-mobile/eventManager.js)",
+      "Bash(sed -n '722,726p' /Users/wetterheidi/Documents/Git/upper_winds_open_meteo/src/ui-web/eventManager.js)"
     ]
   }
 }

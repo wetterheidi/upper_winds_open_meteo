@@ -1,12 +1,10 @@
-"use strict";
-
 import { AppState } from '../core/state.js';
 import { Settings, getInterpolationStep } from '../core/settings.js';
 import { Utils } from '../core/utils.js';
 import * as JumpPlanner from '../core/jumpPlanner.js';
 import * as displayManager from './displayManager.js';
 import * as mapManager from './mapManager.js';
-import * as Coordinates from '../ui-web/coordinates.js';
+import * as Coordinates from './coordinates.js';
 import { TileCache, cacheTilesForDIP, cacheVisibleTiles } from '../core/tileCache.js';
 import { loadKmlTrack, loadGpxTrack, loadCsvTrackUTC, exportToGpx, exportLandingPatternToGpx, exportCompositeJumpGpx } from '../core/trackManager.js';
 import { fetchEnsembleWeatherData, processAndVisualizeEnsemble, clearEnsembleVisualizations } from '../core/ensembleManager.js';
@@ -15,8 +13,8 @@ import { updateModelSelectUI, cleanupSelectedEnsembleModels } from './ui.js';
 import 'leaflet-gpx';
 import * as LocationManager from '../core/locationManager.js';
 import * as AdsbManager from '../core/adsbManager.js';
-import * as weatherManager from '../core/weatherManager.js'; // NEUER IMPORT
-import { DateTime } from 'luxon';                         // NEUER IMPORT
+import * as weatherManager from '../core/weatherManager.js';
+import { DateTime } from 'luxon';
 import { generateMeteogram } from '../core/meteogramChart.js';
 import { CANOPY_OPENING_BUFFER_METERS, CONVERSIONS } from '../core/constants.js';
 import { I18n } from '../core/i18n.js';
@@ -85,7 +83,6 @@ function setupRadioGroup(name, callback) {
             if (name === 'landingDirection') {
                 const customLL = document.getElementById('customLandingDirectionLL');
                 const customRR = document.getElementById('customLandingDirectionRR');
-                // NEU: Container für die Checkboxen holen
                 const lockContainerLL = document.getElementById('lock-container-LL');
                 const lockContainerRR = document.getElementById('lock-container-RR');
 
@@ -100,11 +97,9 @@ function setupRadioGroup(name, callback) {
                     if (customLL) customLL.disabled = newValue !== 'LL';
                     if (customRR) customRR.disabled = newValue !== 'RR';
 
-                    // NEU: Sichtbarkeit der Lock-Boxen steuern
                     if (lockContainerLL) lockContainerLL.classList.toggle('hidden', newValue !== 'LL');
                     if (lockContainerRR) lockContainerRR.classList.toggle('hidden', newValue !== 'RR');
 
-                    // Auto-Fill-Logik (bleibt gleich)
                     if (newValue === 'LL' && customLL && !customLL.value && Settings.state.userSettings.customLandingDirectionLL === '') {
                         const trueDir = Math.round(AppState.landingWindDir || 0);
                         customLL.value = Math.round(Utils.applyNorthReference(trueDir, AppState.lastLat, AppState.lastLng));
@@ -196,7 +191,6 @@ function setupSidebarEvents() {
                 return; // Klick-Verarbeitung hier stoppen
             }
 
-            // Der Rest der Logik zum Öffnen und Schließen der Panels bleibt unverändert
             const isAlreadyActive = mainLayout.classList.contains('sidebar-expanded') && activePanelId === panelIdRaw;
 
             mainLayout.classList.remove('sidebar-expanded', 'data-panel-visible');
@@ -472,12 +466,11 @@ function setupJumpRunTrackEvents() {
             const parsed = parseFloat(savedJRT);
             directionInput.value = Number.isFinite(parsed)
                 ? Math.round(Utils.applyNorthReference(parsed, AppState.lastLat, AppState.lastLng))
-                : savedJRT; // "IN", "CR+", "CR-" unverändert
+                : savedJRT; // pass through non-numeric values like "IN", "CR+", "CR-"
         } else {
             directionInput.value = '';
         }
 
-        // ÄNDERUNG: Zurück zum 'change' Event, kein Debounce nötig
         directionInput.addEventListener('change', () => {
             const value = directionInput.value.trim();
 
@@ -492,7 +485,6 @@ function setupJumpRunTrackEvents() {
             console.log('Manuelle JRT-Richtungsänderung: Offsets auf 0 zurückgesetzt.');
 
             // Speichern: numerische Werte von display → true konvertieren
-            // Textuelle Eingaben ("IN", "CR+", "CR-") bleiben unverändert
             let saveValue = value || null;
             if (saveValue) {
                 const parsed = parseFloat(saveValue);
@@ -729,7 +721,7 @@ function _setTerrainButtonState(btn, state) {
     }
 }
 /**
- * NEUE HILFSFUNKTION: Verarbeitet die Logik, wenn eine der "Lock Landing Direction" Checkboxen
+ * Verarbeitet die Logik, wenn eine der "Lock Landing Direction" Checkboxen
  * (entweder LL oder RR) geändert wird.
  * @param {HTMLInputElement} checkbox - Die Checkbox, die das Event ausgelöst hat.
  * @param {'LL'|'RR'} type - Der Typ der Checkbox (LL oder RR).
@@ -829,7 +821,7 @@ function setupTrackEvents() {
                     await loadGpxTrack(file); // Ruft die importierte Funktion auf
                 } else if (extension === 'csv') {
                     await loadCsvTrackUTC(file); // Ruft die importierte Funktion auf
-                } else if (extension === 'kml') { // NEUE BEDINGUNG
+                } else if (extension === 'kml') {
                     await loadKmlTrack(file);
                 } else {
                     Utils.handleError(I18n.t('tracks.error_unsupported_format'));
@@ -879,7 +871,6 @@ function setupGpxExportEvent() {
                 includeExitCircles: document.getElementById('exportExitCircles')?.checked || false,
                 includeCanopyCircles: document.getElementById('exportCanopyCircles')?.checked || false,
 
-                // NEU: Merge Option
                 mergeTracks: document.getElementById('mergeTracksCheckbox')?.checked || false
             };
 
@@ -1005,9 +996,6 @@ function setupCheckboxEvents() {
             });
         }
 
-        // --- NEUER, KORRIGIERTER CODEBLOCK ---
-        // Aktualisiert den Draggable-Status für die anderen Marker
-
         // DIP Marker (Hauptmarker)
         if (AppState.currentMarker) {
             if (isLocked) {
@@ -1036,9 +1024,6 @@ function setupCheckboxEvents() {
                 AppState.cutAwayMarker.dragging.enable();
             }
         }
-        // --- ENDE DES NEUEN CODEBLOCKS ---
-
-
         if (isLocked) {
             Utils.handleMessage(I18n.t('messages.interaction_locked'));
         } else {
@@ -1054,7 +1039,6 @@ function setupCheckboxEvents() {
             AppState.map.on('click', mapManager.handleHarpPlacement);
             Utils.handleMessage(I18n.t('messages.place_harp_click'));
 
-            // NEUE LOGIK: Sidebar schließen und Karte anpassen
             const mainLayout = document.querySelector('.main-layout');
             if (mainLayout) {
                 mainLayout.classList.remove('sidebar-expanded', 'data-panel-visible');
@@ -1276,17 +1260,6 @@ function setupClearHistoricalDate() {
         });
     }
 }
-function setupAlertSelectEvents() {
-    const cloudCoverSelect = document.getElementById('alertCloudCover');
-    if (cloudCoverSelect) {
-        cloudCoverSelect.addEventListener('change', () => {
-            Settings.state.userSettings.alerts.clouds.cover = cloudCoverSelect.value;
-            Settings.save();
-            document.dispatchEvent(new CustomEvent('ui:recalculateAlerts'));
-        });
-    }
-}
-
 /**
  * Richtet den Klick-Event-Listener für das Wetter-Alarm-Icon auf der Karte ein.
  * @private
@@ -1365,7 +1338,7 @@ function setupAlertEventListeners() {
     setupCheckbox('alertWindEnabled', 'alerts.wind.enabled', (checkbox) => {
         Settings.state.userSettings.alerts.wind.enabled = checkbox.checked;
         Settings.save();
-        console.log('[EventManager] Alert setting changed:', 'alertWindEnabled', checkbox.checked, '- Dispatching ui:recalculateAlerts'); // NEU
+        console.log('[EventManager] Alert setting changed:', 'alertWindEnabled', checkbox.checked, '- Dispatching ui:recalculateAlerts');
         document.dispatchEvent(new CustomEvent('ui:recalculateAlerts'));
     });
 
@@ -1393,12 +1366,11 @@ function setupAlertEventListeners() {
         cloudCoverSelect.addEventListener('change', () => {
             Settings.state.userSettings.alerts.clouds.cover = cloudCoverSelect.value;
             Settings.save();
-            console.log('[EventManager] Alert setting changed:', 'alertCloudCover', cloudCoverSelect.value, '- Dispatching ui:recalculateAlerts'); // NEU
+            console.log('[EventManager] Alert setting changed:', 'alertCloudCover', cloudCoverSelect.value, '- Dispatching ui:recalculateAlerts');
             document.dispatchEvent(new CustomEvent('ui:recalculateAlerts'));
         });
     }
 
-    // --- KORREKTUR DER INPUT-FELDER ---
     const setupAlertInput = (id, settingPath) => {
         const input = document.getElementById(id);
         if (input) {
@@ -1414,7 +1386,7 @@ function setupAlertEventListeners() {
                     current[keys[keys.length - 1]] = value;
 
                     Settings.save();
-                    console.log('[EventManager] Alert setting changed:', id, value, '- Dispatching ui:recalculateAlerts'); // NEU
+                    console.log('[EventManager] Alert setting changed:', id, value, '- Dispatching ui:recalculateAlerts');
                     document.dispatchEvent(new CustomEvent('ui:recalculateAlerts'));
                 }
             }, 300));
@@ -1442,15 +1414,12 @@ function setupCacheManagement() {
     // --- Reset Settings Button ---
     const resetButton = document.createElement('button');
     resetButton.id = 'resetButton';
-    // NEU: Attribut für den automatischen Sprachwechsel setzen
     resetButton.setAttribute('data-i18n', 'settings.reset_settings');
-    // NEU: Initialen Text und Tooltip übersetzen
     resetButton.textContent = I18n.t('settings.reset_settings');
     resetButton.title = I18n.t('settings.reset_settings_title');
     resetButton.className = 'btn btn-danger';
 
     resetButton.addEventListener('click', () => {
-        // NEU: Confirm-Dialog übersetzen
         if (confirm(I18n.t('settings.reset_confirm'))) {
             localStorage.removeItem('unlockedFeatures');
             localStorage.removeItem('upperWindsSettings');
@@ -1458,16 +1427,13 @@ function setupCacheManagement() {
         }
     });
 
-    // Grid-Layout-Logik beibehalten
     buttonWrapper.appendChild(document.createElement('label'));
     buttonWrapper.appendChild(resetButton);
 
     // --- Clear Tile Cache Button ---
     const clearCacheButton = document.createElement('button');
     clearCacheButton.id = 'clearCacheButton';
-    // NEU: Attribut für den automatischen Sprachwechsel setzen
     clearCacheButton.setAttribute('data-i18n', 'settings.clear_cache');
-    // NEU: Initialen Text und Tooltip übersetzen
     clearCacheButton.textContent = I18n.t('settings.clear_cache');
     clearCacheButton.title = I18n.t('settings.clear_cache_title');
     clearCacheButton.className = 'btn btn-danger';
@@ -1482,7 +1448,6 @@ function setupCacheManagement() {
         }
     });
 
-    // Grid-Layout-Logik beibehalten
     buttonWrapper.appendChild(document.createElement('label'));
     buttonWrapper.appendChild(clearCacheButton);
 
@@ -1602,7 +1567,6 @@ function setupThemeToggle() {
     const toggleButton = document.getElementById('theme-toggle');
     const body = document.body;
 
-    // Gespeichertes Theme beim Laden anwenden (unverändert)
     const currentTheme = localStorage.getItem('theme');
     if (currentTheme) {
         body.setAttribute('data-theme', currentTheme);
@@ -1815,6 +1779,7 @@ function setupAdsbEvents() {
         if (AppState.aircraftMarker && aircraft.lat && aircraft.lon) {
             AppState.aircraftMarker.setLatLng([aircraft.lat, aircraft.lon]);
             if (aircraft.track) {
+                // This plugin's setRotation() expects radians, unlike mobile's setRotationAngle() which takes degrees
                 AppState.aircraftMarker.setRotation(aircraft.track * Math.PI / 180);
             }
             updateAircraftTooltip(aircraft);
@@ -1851,8 +1816,6 @@ function setupAdsbEvents() {
             ? `${speedUnit === 'bft' ? Math.round(speed) : speed.toFixed(0)} ${speedUnit}`
             : 'N/A';
 
-        // HIER STARTEN DIE ÄNDERUNGEN:
-        // 1. "Level" übersetzen
         let verticalRateText = I18n.t('adsb.level');
         if (aircraftData.vertical_rate) {
             const rateFPM = aircraftData.vertical_rate;
@@ -1932,7 +1895,6 @@ function setupPoiSearchButton() {
         }
 
         try {
-            // KORREKTUR: Rufe toggleLoading mit dem spezifischen Text auf
             toggleLoading(true, 'Searching for Dropzones...');
 
             const bounds = AppState.map.getBounds();
@@ -1945,7 +1907,6 @@ function setupPoiSearchButton() {
 
             mapManager.updatePoiMarkers(poiResults);
 
-            // Der dynamische Import für renderResultsList bleibt unverändert
             const coordinatesModule = await import('./coordinates.js');
             if (coordinatesModule && typeof coordinatesModule.renderResultsList === 'function') {
                 coordinatesModule.renderResultsList(poiResults);
@@ -1954,7 +1915,6 @@ function setupPoiSearchButton() {
             console.error("Error during POI search:", error);
             Utils.handleError(I18n.t('messages.poi_search_error'));
         } finally {
-            // KORREKTUR: Schalte den Spinner über die Funktion wieder aus
             toggleLoading(false);
         }
     });
@@ -1994,7 +1954,6 @@ export function initializeEventListeners() {
     setupInputEvents();
     setupDownloadEvents();
     setupClearHistoricalDate();
-    setupAlertSelectEvents();
     setupAlertIconEvents();
     setupAlertEventListeners();
 
