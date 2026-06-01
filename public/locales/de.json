@@ -174,7 +174,12 @@
         "bearing": "Peilung",
         "distance": "Distanz",
         "time_to_target": "Zeit zum Ziel",
-        "jml_to": "JML zum {target}"
+        "jml_to": "JML zum {target}",
+        "jml_to_dip": "JML zum DIP",
+        "jml_to_harp": "JML zum HARP",
+        "live_position": "Live Position",
+        "abv_dip": "über DIP",
+        "tot": "TOT"
     },
     "dashboard": {
         "jumper": "SPRINGER",

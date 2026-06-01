@@ -1286,6 +1286,7 @@ function _addRadarOptionsPanel() {
                 </div>
             `;
 
+            const opacityLabel = container.querySelector('label');
             const opacitySlider = container.querySelector('#radarOpacitySlider');
             const animateBtn = container.querySelector('#radarAnimateBtn');
 
@@ -1301,6 +1302,13 @@ function _addRadarOptionsPanel() {
                     RainRadar.startAnimation();
                     animateBtn.textContent = I18n.t('map.radar.stop');
                 }
+            });
+
+            document.addEventListener('i18n:loaded', () => {
+                opacityLabel.textContent = `${I18n.t('map.radar.opacity')}:`;
+                animateBtn.textContent = RainRadar.isAnimating()
+                    ? I18n.t('map.radar.stop')
+                    : I18n.t('map.radar.animate');
             });
 
             return container;

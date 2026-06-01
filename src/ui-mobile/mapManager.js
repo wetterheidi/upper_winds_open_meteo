@@ -1153,28 +1153,30 @@ const LivePositionControl = L.Control.extend({
             coordString = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
         }
 
-        let altitudeText = "<br>Altitude: N/A<br>";
+        const altLabel = I18n.t('jumpmaster.altitude');
+        let altitudeText = `<br>${altLabel}: N/A<br>`;
         if (deviceAltitude !== null) {
             let displayAltitude = (refLevel === 'AGL' && AppState.lastAltitude) ? deviceAltitude - parseFloat(AppState.lastAltitude) : deviceAltitude;
-            let displayRefLevel = (refLevel === 'AGL' && AppState.lastAltitude) ? 'abv DIP' : refLevel;
+            let displayRefLevel = (refLevel === 'AGL' && AppState.lastAltitude) ? I18n.t('jumpmaster.abv_dip') : refLevel;
             const convertedAlt = Math.round(Utils.convertHeight(displayAltitude, heightUnit));
             const convertedAcc = Math.round(Utils.convertHeight(altitudeAccuracy, heightUnit));
-            altitudeText = `<br>Altitude: ${convertedAlt} ${heightUnit} ${displayRefLevel} (±${convertedAcc || 'N/A'} ${heightUnit})<br>`;
+            altitudeText = `<br>${altLabel}: ${convertedAlt} ${heightUnit} ${displayRefLevel} (±${convertedAcc || 'N/A'} ${heightUnit})<br>`;
         }
 
-        const accuracyText = `Accuracy: ${Math.round(Utils.convertHeight(accuracy, heightUnit))} ${heightUnit}<br>`;
-        const speedText = `Speed: ${Utils.convertWind(speedMs, effectiveWindUnit, 'm/s').toFixed(1)} ${effectiveWindUnit}<br>`;
-        const directionText = `Direction: ${direction}°`;
+        const accuracyText = `${I18n.t('jumpmaster.accuracy')}: ${Math.round(Utils.convertHeight(accuracy, heightUnit))} ${heightUnit}<br>`;
+        const speedText = `${I18n.t('jumpmaster.speed')}: ${Utils.convertWind(speedMs, effectiveWindUnit, 'm/s').toFixed(1)} ${effectiveWindUnit}<br>`;
+        const directionText = `${I18n.t('jumpmaster.direction')}: ${direction}°`;
 
-        let content = `<span style="font-weight: bold;">Live Position</span><br>${coordString}${altitudeText}${accuracyText}${speedText}${directionText}`;
+        let content = `<span style="font-weight: bold;">${I18n.t('jumpmaster.live_position')}</span><br>${coordString}${altitudeText}${accuracyText}${speedText}${directionText}`;
 
         if (showJumpMasterLine && jumpMasterLineData) {
             const distText = Math.round(Utils.convertHeight(jumpMasterLineData.distance, heightUnit));
-            const totText = jumpMasterLineData.tot !== 'N/A' && jumpMasterLineData.tot < 1200 ? `TOT: X - ${jumpMasterLineData.tot} s` : 'TOT: N/A';
+            const tot = I18n.t('jumpmaster.tot');
+            const totText = jumpMasterLineData.tot !== 'N/A' && jumpMasterLineData.tot < 1200 ? `${tot}: X - ${jumpMasterLineData.tot} s` : `${tot}: N/A`;
 
-            content += `<br><br><span style="font-weight: bold;">Jump Master Line to ${jumpMasterLineData.target}</span><br>`;
-            content += `Bearing: ${jumpMasterLineData.bearing}°<br>`;
-            content += `Distance: ${distText} ${heightUnit}<br>`;
+            content += `<br><br><span style="font-weight: bold;">${I18n.t('jumpmaster.jml_to', { target: jumpMasterLineData.target })}</span><br>`;
+            content += `${I18n.t('jumpmaster.bearing')}: ${jumpMasterLineData.bearing}°<br>`;
+            content += `${I18n.t('jumpmaster.distance')}: ${distText} ${heightUnit}<br>`;
             content += totText;
         }
 
@@ -1480,6 +1482,7 @@ function _addRadarOptionsPanel() {
                 </div>
             `;
 
+            const opacityLabel = container.querySelector('label');
             const opacitySlider = container.querySelector('#radarOpacitySlider');
             const animateBtn = container.querySelector('#radarAnimateBtn');
 
@@ -1495,6 +1498,13 @@ function _addRadarOptionsPanel() {
                     RainRadar.startAnimation();
                     animateBtn.textContent = I18n.t('map.radar.stop');
                 }
+            });
+
+            document.addEventListener('i18n:loaded', () => {
+                opacityLabel.textContent = `${I18n.t('map.radar.opacity')}:`;
+                animateBtn.textContent = RainRadar.isAnimating()
+                    ? I18n.t('map.radar.stop')
+                    : I18n.t('map.radar.animate');
             });
 
             return container;

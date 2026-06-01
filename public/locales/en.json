@@ -174,7 +174,12 @@
         "bearing": "Bearing",
         "distance": "Distance",
         "time_to_target": "Time to Target",
-        "jml_to": "JML to {target}"
+        "jml_to": "JML to {target}",
+        "jml_to_dip": "JML to DIP",
+        "jml_to_harp": "JML to HARP",
+        "live_position": "Live Position",
+        "abv_dip": "abv DIP",
+        "tot": "TOT"
     },
     "dashboard": {
         "jumper": "JUMPER",

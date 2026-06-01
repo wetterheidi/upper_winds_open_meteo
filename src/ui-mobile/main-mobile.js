@@ -1338,7 +1338,7 @@ function updateJumpMasterDashboard(data) {
             }
 
             if (allDetailsFound) {
-                detailElements.targetLabel.textContent = `JML to ${jumpMasterLineData.target}`;
+                detailElements.targetLabel.textContent = I18n.t('jumpmaster.jml_to', { target: jumpMasterLineData.target });
                 detailElements.bearingEl.textContent = Utils.formatDirectionOutput(jumpMasterLineData.bearing, latitude, longitude, false);
                 detailElements.distanceEl.textContent = `${Math.round(Utils.convertHeight(jumpMasterLineData.distance, heightUnit))} ${heightUnit}`;
                 detailElements.totEl.textContent = jumpMasterLineData.tot < 1200 ? `X - ${jumpMasterLineData.tot} s` : 'N/A';
