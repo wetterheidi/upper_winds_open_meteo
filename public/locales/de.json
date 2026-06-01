@@ -179,7 +179,8 @@
         "jml_to_harp": "JML zum HARP",
         "live_position": "Live Position",
         "abv_dip": "über DIP",
-        "tot": "TOT"
+        "tot": "TOT",
+        "follow_btn_title": "Zur Live-Position zurückkehren"
     },
     "dashboard": {
         "jumper": "SPRINGER",

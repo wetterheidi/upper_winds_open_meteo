@@ -1197,7 +1197,8 @@ const FollowControl = L.Control.extend({
         btn.setAttribute('role', 'button');
         btn.style.cssText = 'font-size:11px;font-weight:bold;min-width:38px;text-align:center;padding:0 4px;line-height:26px;color:#2979ff;';
         btn.textContent = '⊙ Follow';
-        btn.title = 'Zur Live-Position zurückkehren';
+        btn.title = I18n.t('jumpmaster.follow_btn_title');
+        document.addEventListener('i18n:loaded', () => { btn.title = I18n.t('jumpmaster.follow_btn_title'); });
         L.DomEvent.on(btn, 'click', L.DomEvent.stop);
         L.DomEvent.on(btn, 'click', () => {
             _mapFollowPaused = false;
