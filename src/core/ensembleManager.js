@@ -376,9 +376,9 @@ function calculateExitCircleForEnsemble(profileIdentifier, sliderIndex, specific
     let result = null;
     let meanWindResult = { meanWindDir: 'N/A', meanWindSpeedMps: 'N/A' };
 
+    const originalCalculateJump = Settings.state.userSettings.calculateJump;
+    const originalShowExitArea = Settings.state.userSettings.showExitArea;
     try {
-        const originalCalculateJump = Settings.state.userSettings.calculateJump;
-        const originalShowExitArea = Settings.state.userSettings.showExitArea;
         Settings.state.userSettings.calculateJump = true;
         Settings.state.userSettings.showExitArea = true;
 
@@ -392,6 +392,9 @@ function calculateExitCircleForEnsemble(profileIdentifier, sliderIndex, specific
 
         if (interpolatedData && interpolatedData.length > 0) {
             result = JumpPlanner.calculateExitCircle(interpolatedData);
+            if (result && result.error) {
+                result = null;
+            }
 
             const heights = interpolatedData.map(d => d.height);
             const uComponents = interpolatedData.map(d => -Utils.convertWind(d.spd, 'm/s', 'km/h') * Math.sin(d.dir * Math.PI / 180));
@@ -409,14 +412,13 @@ function calculateExitCircleForEnsemble(profileIdentifier, sliderIndex, specific
             }
         }
 
-        Settings.state.userSettings.calculateJump = originalCalculateJump;
-        Settings.state.userSettings.showExitArea = originalShowExitArea;
-
     } catch (error) {
         console.error(`Error in calculateExitCircle for profile ${profileIdentifier}:`, error);
         result = null;
     } finally {
         AppState.weatherData = originalGlobalWeatherData;
+        Settings.state.userSettings.calculateJump = originalCalculateJump;
+        Settings.state.userSettings.showExitArea = originalShowExitArea;
     }
 
     if (result) {

@@ -319,6 +319,10 @@ export function calculateExitCircle(interpolatedData) {
     console.log('Debug calculateExitCircle: Vor calculateLandingPatternCoords');
     const landingPatternCoords = calculateLandingPatternCoords(AppState.lastLat, AppState.lastLng, interpolatedData);
     console.log('Debug calculateExitCircle: Nach calculateLandingPatternCoords', landingPatternCoords);
+    if (!landingPatternCoords) {
+        console.warn('calculateExitCircle: calculateLandingPatternCoords returned null, aborting.');
+        return null;
+    }
     let [blueLat, blueLng] = landingPatternCoords.downwindStart;
     if (!Number.isFinite(blueLat)) {
         console.log('Debug calculateExitCircle: Fallback zu lastLat/lastLng');
