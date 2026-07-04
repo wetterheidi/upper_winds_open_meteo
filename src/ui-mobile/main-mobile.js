@@ -9,7 +9,6 @@ import { Settings, getInterpolationStep, setAppContext } from '../core/settings.
 import { UI_DEFAULTS } from '../core/constants.js';
 import { SensorManager } from './sensorManager.js';
 import * as EventManager from './eventManager.js';
-import * as Coordinates from './coordinates.js';
 import * as JumpPlanner from '../core/jumpPlanner.js';
 import * as mapManager from './mapManager.js';
 import * as trackManager from '../core/trackManager.js';
@@ -2840,8 +2839,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Alle anderen Listener können sicher nach der Karteninitialisierung eingerichtet werden.
     setupAppEventListeners();
     AutoupdateManager.setupAutoupdate();
+    // Initialisiert über setupCoordinateEvents() auch die Ortssuche
     EventManager.initializeEventListeners();
-    Coordinates.initializeLocationSearch();
 
     // Initiales Zeichnen der Favoriten-Marker beim Start
     const initialFavorites = LocationManager.getCoordHistory().filter(item => item.isFavorite);

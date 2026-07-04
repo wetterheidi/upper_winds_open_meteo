@@ -11,11 +11,19 @@ import * as FavoritesIO from '../core/favoritesIO.js';
 import { I18n } from '../core/i18n.js';
 
 let currentFavoriteData = null; // Speichert temporär die Daten für das Favoriten-Modal
+let isLocationSearchInitialized = false; // Guard gegen doppelte Listener-Registrierung
 
 /**
  * Initialisiert alle Event-Listener für das Such-Panel in der Web-UI.
+ * Darf nur einmal aufgerufen werden; weitere Aufrufe werden ignoriert.
  */
 export function initializeLocationSearch() {
+    if (isLocationSearchInitialized) {
+        console.warn('initializeLocationSearch: Bereits initialisiert, zweiter Aufruf wird ignoriert.');
+        return;
+    }
+    isLocationSearchInitialized = true;
+
     const searchInput = document.getElementById('locationSearchInput');
     const resultsList = document.getElementById('locationResults');
     const clearButton = document.getElementById('clearSearchInput');
@@ -99,6 +107,12 @@ function initializeFavoritesImportExport() {
     const cancelExport = document.getElementById('cancelExportFavorites');
 
     if (!exportBtn || !importBtn || !fileInput || !exportModal) return;
+
+    // initializeLocationSearch() wird beim App-Start mehrfach aufgerufen (eventManager
+    // und main-web); ohne Guard würden die Listener doppelt registriert und der
+    // Dateidialog zweimal geöffnet.
+    if (exportBtn.dataset.ioInitialized) return;
+    exportBtn.dataset.ioInitialized = 'true';
 
     exportBtn.addEventListener('click', () => {
         exportNameInput.value = FavoritesIO.getDefaultFavoritesFileName();

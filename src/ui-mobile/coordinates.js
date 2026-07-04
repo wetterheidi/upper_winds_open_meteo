@@ -12,12 +12,20 @@ import { I18n } from '../core/i18n.js';
 import { FilePicker } from '@capawesome/capacitor-file-picker';
 
 let currentFavoriteData = null; // Speichert temporär die Daten für das Favoriten-Modal
+let isLocationSearchInitialized = false; // Guard gegen doppelte Listener-Registrierung
 
 /**
  * Initialisiert alle Event-Listener für das Such-Panel in der mobilen UI.
  * Enthält spezifische Logik zum Ein- und Ausblenden der Ergebnisliste.
+ * Darf nur einmal aufgerufen werden; weitere Aufrufe werden ignoriert.
  */
 export function initializeLocationSearch() {
+    if (isLocationSearchInitialized) {
+        console.warn('initializeLocationSearch: Bereits initialisiert, zweiter Aufruf wird ignoriert.');
+        return;
+    }
+    isLocationSearchInitialized = true;
+
     const searchInput = document.getElementById('locationSearchInput');
     const resultsList = document.getElementById('locationResults');
     const searchPanel = document.getElementById('panel-search');
@@ -118,6 +126,12 @@ function initializeFavoritesImportExport() {
     const cancelExport = document.getElementById('cancelExportFavorites');
 
     if (!exportBtn || !importBtn || !exportModal) return;
+
+    // initializeLocationSearch() wird beim App-Start mehrfach aufgerufen (eventManager
+    // und main-mobile); ohne Guard würden die Listener doppelt registriert und
+    // Export/Import doppelt ausgeführt.
+    if (exportBtn.dataset.ioInitialized) return;
+    exportBtn.dataset.ioInitialized = 'true';
 
     exportBtn.addEventListener('click', () => {
         exportNameInput.value = FavoritesIO.getDefaultFavoritesFileName();

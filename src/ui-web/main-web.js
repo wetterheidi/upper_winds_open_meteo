@@ -8,7 +8,6 @@ import { Utils } from '../core/utils.js';
 import { Settings, getInterpolationStep, setAppContext } from '../core/settings.js';
 import { UI_DEFAULTS } from '../core/constants.js';
 import * as EventManager from './eventManager.js';
-import * as Coordinates from './coordinates.js';
 import * as JumpPlanner from '../core/jumpPlanner.js';
 import * as mapManager from './mapManager.js';
 import * as weatherManager from '../core/weatherManager.js';
@@ -2230,9 +2229,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     AutoupdateManager.setupAutoupdate();
 
     // EINZIGER AUFRUF FÜR ALLE EVENT LISTENER
+    // (initialisiert über setupCoordinateEvents() auch die Ortssuche)
     EventManager.initializeEventListeners();
 
-    Coordinates.initializeLocationSearch();
     // Initiales Zeichnen der Favoriten-Marker beim Start
     const initialFavorites = LocationManager.getCoordHistory().filter(item => item.isFavorite);
     if (initialFavorites.length > 0) {
