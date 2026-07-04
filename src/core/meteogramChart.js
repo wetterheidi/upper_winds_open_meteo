@@ -15,6 +15,11 @@ import { I18n } from './i18n.js';
 let meteogramUpperInstance = null;
 let meteogramSurfaceInstance = null;
 
+// Laufende Nummer des jüngsten generateMeteogram-Aufrufs. Ältere, noch in einem
+// await hängende Aufrufe erkennen daran, dass sie überholt wurden, und brechen ab,
+// bevor sie ein zweites Chart auf demselben Canvas erzeugen ("Canvas is already in use").
+let meteogramRunId = 0;
+
 // Cache für Zeitzonen-Abfragen (Key: "lat,lng")
 const _timezoneCache = new Map();
 
@@ -45,6 +50,7 @@ function getCloudColor(cloudCoverPercent, style) {
  * Generiert und zeigt die Skydiver-Meteogramme (Boden & Höhe) an.
  */
 export async function generateMeteogram(sliderIndex) {
+    const runId = ++meteogramRunId;
     const tempUnit = Settings.getValue('temperatureUnit', 'C');
 
     const upperCanvas = document.getElementById('meteogramUpperChart');
@@ -99,6 +105,7 @@ export async function generateMeteogram(sliderIndex) {
             _timezoneCache.set(cacheKey, locationTimezone);
         }
     }
+    if (runId !== meteogramRunId) return; // von einem neueren Aufruf überholt
 
     const sliderTime = DateTime.fromISO(weatherData.time[sliderIndex], { zone: 'utc' }).setZone(locationTimezone);
 
@@ -279,6 +286,8 @@ export async function generateMeteogram(sliderIndex) {
     })));
 
     const scatterData = barbImages.filter(img => img).map(img => ({ x: img.rawData.x, y: img.rawData.y, image: img }));
+
+    if (runId !== meteogramRunId) return; // von einem neueren Aufruf überholt
 
     meteogramUpperInstance = new Chart(upperCtx, {
         type: 'bar', // Basis-Typ bleibt Bar für die Wolken

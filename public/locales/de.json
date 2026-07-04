@@ -208,7 +208,7 @@
         "select_language": "Sprache:",
         "units": "Einheiten",
         "ref_level": "Referenzhöhe",
-        "show_ft_amsl": "Zusätzlich ft AMSL anzeigen:",
+        "show_ft_amsl": "Windtabelle: Höhen zusätzlich in ft AMSL:",
         "height_unit": "Höheneinheit:",
         "temp_unit": "Temperatureinheit:",
         "speed_unit": "Geschwindigkeitseinheit:",
