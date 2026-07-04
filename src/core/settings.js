@@ -94,6 +94,8 @@ export const Settings = {
         enableWindAlert: true,
         northReference: 'true',
         headingUp: false,
+        lockNorthUp: false,
+        liveAutoFollow: true,
 
         alerts: {
             wind: {

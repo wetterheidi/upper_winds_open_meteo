@@ -967,6 +967,26 @@ body {
 }
 
 
+/* --- Map Settings (Karteneinstellungen) --- */
+#map-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+#map-settings label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-align: left;
+    font-weight: 500;
+}
+
+#map-settings input[type="checkbox"] {
+    flex-shrink: 0;
+    margin: 0;
+}
+
 /* --- Settings Grid & Form Elements --- */
 .settings-grid {
     display: grid;

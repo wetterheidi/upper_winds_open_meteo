@@ -1676,6 +1676,27 @@ function setupCacheManagement() {
     });
 }
 
+function setupMapSettings() {
+    const lockNorthUpCheckbox = document.getElementById('lockNorthUpCheckbox');
+    if (lockNorthUpCheckbox) {
+        lockNorthUpCheckbox.checked = Settings.getValue('lockNorthUp') === true;
+        lockNorthUpCheckbox.addEventListener('change', () => {
+            Settings.state.userSettings.lockNorthUp = lockNorthUpCheckbox.checked;
+            Settings.save();
+            mapManager.applyNorthLock(lockNorthUpCheckbox.checked);
+        });
+    }
+
+    const liveAutoFollowCheckbox = document.getElementById('liveAutoFollowCheckbox');
+    if (liveAutoFollowCheckbox) {
+        liveAutoFollowCheckbox.checked = Settings.getValue('liveAutoFollow') !== false;
+        liveAutoFollowCheckbox.addEventListener('change', () => {
+            Settings.state.userSettings.liveAutoFollow = liveAutoFollowCheckbox.checked;
+            Settings.save();
+        });
+    }
+}
+
 function setupCacheSettings() {
     const cacheRadiusInput = document.getElementById('cacheRadiusSelect');
     if (cacheRadiusInput) {
@@ -2224,6 +2245,7 @@ export function initializeEventListeners() {
     setupDashboardToggleEvents();
     setupJmlTargetToggleEvents();
     setupCacheManagement();
+    setupMapSettings();
     setupCacheSettings();
     setupThemeToggle();
     setupKofiButton();

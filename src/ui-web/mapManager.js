@@ -59,6 +59,7 @@ async function initMap() {
     _setupCustomPanes();
     _initializeHeadingUpControl();
     _initializeFollowControl();
+    applyNorthLock(Settings.getValue('lockNorthUp') === true);
     _initializeDefaultMarker(defaultCenter, initialAltitude);
 
     _setupCoreMapEventHandlers();
@@ -1174,7 +1175,7 @@ function _initializeHeadingUpControl() {
     AppState.headingUpControl = new HeadingUpControl().addTo(AppState.map);
 
     document.addEventListener('tracking:started', () => {
-        AppState.headingUpControl?.setVisible(true);
+        AppState.headingUpControl?.setVisible(!Settings.getValue('lockNorthUp'));
         AppState.headingUpControl?._updateStyle();
     });
     document.addEventListener('tracking:stopped', () => {
@@ -1239,6 +1240,7 @@ function _initializeFollowControl() {
  * @param {number} speedMs - Aktuelle geglättete Geschwindigkeit in m/s
  */
 export function updateHeadingUp(gpsHeading, directionDeg, speedMs) {
+    if (Settings.getValue('lockNorthUp')) return;
     if (!Settings.getValue('headingUp') || _headingUpPaused) return;
     if (speedMs < 2.5) return;
 
@@ -1258,10 +1260,36 @@ export function updateHeadingUp(gpsHeading, directionDeg, speedMs) {
 }
 
 export function updateLiveFollow(lat, lng) {
+    if (Settings.getValue('liveAutoFollow') === false) return;
     if (_mapFollowPaused || !AppState.map || AppState.watchId === null) return;
     _isAutoRotating = true;
     AppState.map.panTo([lat, lng], { animate: false });
     _isAutoRotating = false;
+}
+
+/**
+ * Fixiert die Karte auf Norden: deaktiviert Rotation und Heading-Up
+ * und setzt das Bearing zurück. Beim Aufheben wird die Rotation wieder erlaubt.
+ * @param {boolean} locked - true = Norden oben fixieren
+ */
+export function applyNorthLock(locked) {
+    if (!AppState.map) return;
+    if (locked) {
+        AppState.map.touchRotate?.disable();
+        AppState.map.shiftKeyRotate?.disable();
+        _headingUpPaused = false;
+        clearTimeout(_headingUpPauseTimeout);
+        AppState.lastSmoothedHeading = null;
+        AppState.map.setBearing(0);
+        AppState.headingUpControl?.setVisible(false);
+    } else {
+        AppState.map.touchRotate?.enable();
+        AppState.map.shiftKeyRotate?.enable();
+        if (AppState.watchId !== null) {
+            AppState.headingUpControl?.setVisible(true);
+            AppState.headingUpControl?._updateStyle();
+        }
+    }
 }
 
 function _addRadarOptionsPanel() {
@@ -2051,7 +2079,7 @@ function _setupCoreMapEventHandlers() {
             console.log('Manual map panning detected.');
         }
         // Auto-Follow pausieren wenn Nutzer manuell verschiebt
-        if (!_isAutoRotating && AppState.watchId !== null) {
+        if (!_isAutoRotating && AppState.watchId !== null && Settings.getValue('liveAutoFollow') !== false) {
             _mapFollowPaused = true;
             clearTimeout(_mapFollowPauseTimeout);
             _mapFollowPauseTimeout = setTimeout(() => {
