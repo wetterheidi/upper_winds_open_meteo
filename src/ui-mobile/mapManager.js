@@ -1710,7 +1710,10 @@ function _setupBaseLayersAndHandling() {
     console.log('Base layers and online/offline handlers set up.');
 }
 function _setupCustomPanes() {
-    AppState.map.createPane('gpxTrackPane');
+    // gpxTrackPane muss im rotatePane liegen: Nur dort erhält sein Canvas-Renderer
+    // beim Pinch-Zoom und bei Rotation dieselben CSS-Transforms wie das overlayPane,
+    // sonst löst sich der Track während der Geste von der Karte.
+    AppState.map.createPane('gpxTrackPane', AppState.map._rotatePane);
     AppState.map.getPane('gpxTrackPane').style.zIndex = 650;
     AppState.map.getPane('tooltipPane').style.zIndex = 700;
     AppState.map.getPane('popupPane').style.zIndex = 700;
@@ -2189,13 +2192,17 @@ function _setupCoreMapEventHandlers() {
     const _updateCanvasPaths = () => {
         const map = AppState.map;
         if (!map?._rotate || map._animatingZoom) return;
-        const renderer = map._renderer;
-        if (!renderer) return;
         map._pixelOrigin = map._getNewPixelOrigin(map.getCenter(), map.getZoom());
-        for (const id in renderer._layers) {
-            renderer._layers[id]._project?.();
+        // Neben map._renderer auch die Renderer eigener Panes (z.B. gpxTrackPane)
+        // behandeln, sonst zeichnen diese während der Geste mit veralteten Projektionen.
+        const renderers = [map._renderer, ...Object.values(map._paneRenderers || {})];
+        for (const renderer of renderers) {
+            if (!renderer) continue;
+            for (const id in renderer._layers) {
+                renderer._layers[id]._project?.();
+            }
+            renderer._update();
         }
-        renderer._update();
     };
     AppState.map.on('rotate', _updateCanvasPaths);
     AppState.map.on('move', _updateCanvasPaths);

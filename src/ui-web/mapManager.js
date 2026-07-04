@@ -1541,7 +1541,10 @@ function _setupBaseLayersAndHandling() {
 }
 
 function _setupCustomPanes() {
-    AppState.map.createPane('gpxTrackPane');
+    // gpxTrackPane muss im rotatePane liegen: Nur dort erhält sein Canvas-Renderer
+    // beim Pinch-Zoom und bei Rotation dieselben CSS-Transforms wie das overlayPane,
+    // sonst löst sich der Track während der Geste von der Karte.
+    AppState.map.createPane('gpxTrackPane', AppState.map._rotatePane);
     AppState.map.getPane('gpxTrackPane').style.zIndex = 650;
     AppState.map.getPane('tooltipPane').style.zIndex = 700;
     AppState.map.getPane('popupPane').style.zIndex = 700;
