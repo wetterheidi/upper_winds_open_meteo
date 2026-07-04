@@ -7,7 +7,9 @@
 import { Utils } from '../core/utils.js';
 import { AppState } from '../core/state.js';
 import * as LocationManager from '../core/locationManager.js';
+import * as FavoritesIO from '../core/favoritesIO.js';
 import { I18n } from '../core/i18n.js';
+import { FilePicker } from '@capawesome/capacitor-file-picker';
 
 let currentFavoriteData = null; // Speichert temporär die Daten für das Favoriten-Modal
 
@@ -82,6 +84,8 @@ export function initializeLocationSearch() {
         });
     }
 
+    initializeFavoritesImportExport();
+
     const observer = new MutationObserver((mutations) => {
         mutations.forEach((mutation) => {
             if (mutation.attributeName === 'class' && !searchPanel.classList.contains('hidden')) {
@@ -96,6 +100,60 @@ export function initializeLocationSearch() {
     document.addEventListener('favorites:updated', () => {
         console.log('[Coordinates] Received favorites:updated event. Rerendering list.');
         renderResultsList();
+    });
+}
+
+/**
+ * Initialisiert die Event-Listener für den Export und Import von Favoriten.
+ * Export: Modal zur Eingabe des Dateinamens, dann Speichern nach Documents/DZMaster.
+ * Import: Dateiauswahl über den nativen FilePicker.
+ * @private
+ */
+function initializeFavoritesImportExport() {
+    const exportBtn = document.getElementById('exportFavoritesBtn');
+    const importBtn = document.getElementById('importFavoritesBtn');
+    const exportModal = document.getElementById('exportFavoritesModal');
+    const exportNameInput = document.getElementById('exportFavoritesNameInput');
+    const submitExport = document.getElementById('submitExportFavorites');
+    const cancelExport = document.getElementById('cancelExportFavorites');
+
+    if (!exportBtn || !importBtn || !exportModal) return;
+
+    exportBtn.addEventListener('click', () => {
+        exportNameInput.value = FavoritesIO.getDefaultFavoritesFileName();
+        exportModal.style.display = 'block';
+        exportNameInput.focus();
+        exportNameInput.select();
+    });
+
+    submitExport.addEventListener('click', async () => {
+        exportModal.style.display = 'none';
+        await FavoritesIO.exportFavorites(exportNameInput.value);
+    });
+
+    cancelExport.addEventListener('click', () => {
+        exportModal.style.display = 'none';
+    });
+
+    importBtn.addEventListener('click', async () => {
+        try {
+            const result = await FilePicker.pickFiles({
+                types: [
+                    'application/json',
+                    'public.json',              // JSON-Typ für iOS
+                    'application/octet-stream', // Erlaubt generische Binärdateien
+                    'public.content',           // Generischer Inhaltstyp für iOS
+                    'public.data'               // Generischer Datentyp für iOS
+                ],
+                readData: false
+            });
+            const file = result.files[0];
+            if (!file) return;
+            await FavoritesIO.importFavoritesFromFile(file);
+        } catch (error) {
+            // z.B. wenn der Nutzer die Auswahl abbricht
+            console.log('Favorites file picker was cancelled or failed.', error);
+        }
     });
 }
 

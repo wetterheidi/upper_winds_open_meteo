@@ -556,6 +556,25 @@
                         location as Favorite</button>
                     <button id="findPoisInViewBtn" class="btn btn-secondary" data-i18n="search.find_dropzones">Search
                         for Dropzones in this Area</button>
+                    <div class="favorites-io-actions">
+                        <button id="exportFavoritesBtn" class="btn btn-secondary"
+                            data-i18n="search.export_favorites">Export Favorites</button>
+                        <button id="importFavoritesBtn" class="btn btn-secondary"
+                            data-i18n="search.import_favorites">Import Favorites</button>
+                        <input type="file" id="favoritesFileInput" accept=".json,application/json" class="hidden">
+                    </div>
+                    <div id="exportFavoritesModal" class="favorite-modal" style="display: none;">
+                        <div class="favorite-modal-content">
+                            <h3 data-i18n="search.export_favorites_title">Export Favorites</h3>
+                            <input id="exportFavoritesNameInput" type="text" placeholder="Fav_USA">
+                            <div class="favorite-modal-actions">
+                                <button id="submitExportFavorites" class="modal-btn"
+                                    data-i18n="common.save">Save</button>
+                                <button id="cancelExportFavorites" class="modal-btn cancel"
+                                    data-i18n="common.cancel">Cancel</button>
+                            </div>
+                        </div>
+                    </div>
                     <div id="favoriteModal" class="favorite-modal" style="display: none;">
                         <div class="favorite-modal-content">
                             <h3 data-i18n="search.save_favorite_title">Save Favorite</h3>

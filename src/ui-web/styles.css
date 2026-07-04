@@ -854,6 +854,17 @@ button.btn {
     background-color: var(--color-secondary-hover);
 }
 
+/* Export/Import von Favoriten: zwei Buttons nebeneinander */
+.favorites-io-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.favorites-io-actions .btn {
+    flex: 1;
+    min-width: 0;
+}
+
 .btn-success {
     background-color: var(--color-success);
 }

@@ -7,6 +7,7 @@
 import { Utils } from '../core/utils.js';
 import { AppState } from '../core/state.js';
 import * as LocationManager from '../core/locationManager.js';
+import * as FavoritesIO from '../core/favoritesIO.js';
 import { I18n } from '../core/i18n.js';
 
 let currentFavoriteData = null; // Speichert temporär die Daten für das Favoriten-Modal
@@ -72,11 +73,59 @@ export function initializeLocationSearch() {
         currentFavoriteData = null;
     });
 
+    initializeFavoritesImportExport();
+
     renderResultsList();
 
     document.addEventListener('favorites:updated', () => {
         console.log('[Coordinates] Received favorites:updated event. Rerendering list.');
         renderResultsList();
+    });
+}
+
+/**
+ * Initialisiert die Event-Listener für den Export und Import von Favoriten.
+ * Export: Modal zur Eingabe des Dateinamens, dann Download als JSON.
+ * Import: Dateiauswahl über verstecktes File-Input.
+ * @private
+ */
+function initializeFavoritesImportExport() {
+    const exportBtn = document.getElementById('exportFavoritesBtn');
+    const importBtn = document.getElementById('importFavoritesBtn');
+    const fileInput = document.getElementById('favoritesFileInput');
+    const exportModal = document.getElementById('exportFavoritesModal');
+    const exportNameInput = document.getElementById('exportFavoritesNameInput');
+    const submitExport = document.getElementById('submitExportFavorites');
+    const cancelExport = document.getElementById('cancelExportFavorites');
+
+    if (!exportBtn || !importBtn || !fileInput || !exportModal) return;
+
+    exportBtn.addEventListener('click', () => {
+        exportNameInput.value = FavoritesIO.getDefaultFavoritesFileName();
+        exportModal.style.display = 'flex';
+        exportNameInput.focus();
+        exportNameInput.select();
+    });
+
+    submitExport.addEventListener('click', async () => {
+        exportModal.style.display = 'none';
+        await FavoritesIO.exportFavorites(exportNameInput.value);
+    });
+
+    cancelExport.addEventListener('click', () => {
+        exportModal.style.display = 'none';
+    });
+
+    importBtn.addEventListener('click', () => {
+        fileInput.click();
+    });
+
+    fileInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            await FavoritesIO.importFavoritesFromFile(file);
+        }
+        fileInput.value = ''; // Input zurücksetzen, damit dieselbe Datei erneut wählbar ist
     });
 }
 

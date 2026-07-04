@@ -201,7 +201,10 @@
         "favorites": "Favoriten",
         "recents": "Letzte Suchanfragen",
         "results": "Ergebnisse",
-        "placeholder": "Stadt oder Koordinaten suchen..."
+        "placeholder": "Stadt oder Koordinaten suchen...",
+        "export_favorites": "Favoriten exportieren",
+        "import_favorites": "Favoriten importieren",
+        "export_favorites_title": "Favoriten exportieren"
     },
     "settings": {
         "language": "Sprache",
@@ -488,7 +491,14 @@
         "delete_confirm": "\"{name}\" löschen?",
         "default_favorite_name": "DIP auf {lat}, {lng}",
         "error_select_first": "Zuerst einen Ort auf der Karte auswählen.",
-        "warning_zoom_poi": "Bitte zoomen Sie auf Level {zoom} oder näher heran, um nach Dropzones zu suchen."
+        "warning_zoom_poi": "Bitte zoomen Sie auf Level {zoom} oder näher heran, um nach Dropzones zu suchen.",
+        "error_no_favorites_export": "Keine Favoriten zum Exportieren vorhanden.",
+        "favorites_exported": "{count} Favorit(en) als \"{name}\" exportiert.",
+        "favorites_exported_docs": "{count} Favorit(en) als \"{name}\" in Dokumente/DZMaster gespeichert.",
+        "favorites_imported": "{count} Favorit(en) importiert.",
+        "error_favorites_invalid_file": "Ungültige Favoriten-Datei.",
+        "error_favorites_import_failed": "Favoriten konnten nicht importiert werden.",
+        "error_favorites_export_failed": "Favoriten konnten nicht exportiert werden."
     },
     "tracks": {
         "error_map_init": "Karte nicht initialisiert.",
