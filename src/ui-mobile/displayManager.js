@@ -94,6 +94,12 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
     const style = getComputedStyle(document.body);
     const barbColor = style.getPropertyValue('--text-primary').trim();
 
+    // Zusatzspalte "ft AMSL": nur anbieten, wenn die Hauptspalte nicht ohnehin ft AMSL
+    // zeigt und die Geländehöhe bekannt ist (ohne sie ist AMSL nicht berechenbar).
+    const terrainMeters = AppState.lastAltitude !== 'N/A' ? Math.round(AppState.lastAltitude) : null;
+    const canToggleFtAmsl = terrainMeters !== null && !(heightUnit === 'ft' && refLevel === 'AMSL');
+    const showFtAmsl = canToggleFtAmsl && Settings.state.userSettings.showFtAmsl === true;
+
     const upperLimit = parseInt(document.getElementById('upperLimit')?.value) || 3000;
     const filteredData = interpolatedData.filter(data => data.displayHeight <= upperLimit);
 
@@ -168,8 +174,17 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
         const speedKt = Math.round(Utils.convertWind(spd, 'kt', 'km/h') / 5) * 5;
         const windBarbSvg = data.dir === 'N/A' || isNaN(speedKt) ? 'N/A' : Utils.generateWindBarb(data.dir, speedKt, null, barbColor);
 
+        // data.displayHeight ist AGL in heightUnit; auf volle 100 ft gerundet (Pilotenpraxis)
+        let ftAmslCell = '';
+        if (showFtAmsl) {
+            const aglMeters = heightUnit === 'ft' ? data.displayHeight / 3.28084 : data.displayHeight;
+            const ftAmsl = Math.round((aglMeters + terrainMeters) * 3.28084 / 100) * 100;
+            ftAmslCell = `<td class="ft-amsl-col">${ftAmsl}</td>`;
+        }
+
         return `<tr class="${windClass} ${cloudCoverClass}">
                     <td>${Math.round(displayHeight)}</td>
+                    ${ftAmslCell}
                     <td>${Utils.roundToTens(data.dir)}</td>
                     <td class="${groundWindExceedsThreshold ? 'wind-speed-exceeds-threshold' : ''}">${formattedWind}</td>
                     <td>${windBarbSvg}</td>
@@ -177,11 +192,15 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
                 </tr>`;
     }).join('');
 
+    const altitudeHeaderHtml = canToggleFtAmsl
+        ? `<th class="ft-amsl-toggle" title="${I18n.t('weather.toggle_ft_amsl')}">${I18n.t('weather.altitude')} (${heightUnit} ${refLevel})${showFtAmsl ? '' : ' <span class="ft-amsl-badge">+ft</span>'}</th>${showFtAmsl ? `<th class="ft-amsl-toggle ft-amsl-col" title="${I18n.t('weather.toggle_ft_amsl')}">ft AMSL</th>` : ''}`
+        : `<th>${I18n.t('weather.altitude')} (${heightUnit} ${refLevel})</th>`;
+
     const output = `
         <table id="weatherTable">
             <thead>
                 <tr>
-                    <th>${I18n.t('weather.altitude')} (${heightUnit} ${refLevel})</th>
+                    ${altitudeHeaderHtml}
                     <th>${I18n.t('weather.table.direction')}</th>
                     <th>${I18n.t('weather.wind_speed')} (${windSpeedUnit})</th>
                     <th>${I18n.t('weather.wind')}</th>
@@ -194,6 +213,18 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
         </table>`;
 
     tableContainer.innerHTML = output;
+
+    // Tap/Klick auf den Höhen-Spaltenkopf blendet die ft-AMSL-Spalte ein/aus
+    tableContainer.querySelectorAll('.ft-amsl-toggle').forEach(th => {
+        th.addEventListener('click', () => {
+            Settings.state.userSettings.showFtAmsl = !Settings.state.userSettings.showFtAmsl;
+            Settings.save();
+            const checkbox = document.getElementById('showFtAmslCheckbox');
+            if (checkbox) checkbox.checked = Settings.state.userSettings.showFtAmsl;
+            updateWeatherDisplay(index, tableContainerId, timeContainerId, originalTime);
+        });
+    });
+
     timeContainer.innerHTML = `${I18n.t('common.selected_time')} ${time}`;
     if (interpolatedData.length > 0) {
         const userMaxHoehe = parseInt(document.getElementById('upperLimit')?.value) || 3000;

@@ -42,6 +42,7 @@ export const Settings = {
         model: 'icon_global',
         refLevel: 'AGL',
         heightUnit: 'm',
+        showFtAmsl: false,
         temperatureUnit: 'C',
         windUnit: 'kt',
         timeZone: 'Z',

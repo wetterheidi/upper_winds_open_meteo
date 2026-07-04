@@ -1291,6 +1291,19 @@ input[type="checkbox"][style*="opacity: 1"] {
     vertical-align: middle;
 }
 
+#weather-table-container th.ft-amsl-toggle {
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+#weather-table-container .ft-amsl-badge {
+    opacity: 0.6;
+    font-size: 0.85em;
+    font-weight: normal;
+    white-space: nowrap;
+}
+
 #weather-table-container tr:nth-child(even),
 #weather-table-container tr:nth-child(odd),
 #weather-table-container tr:hover {

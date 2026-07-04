@@ -1231,6 +1231,19 @@ button.btn {
     text-align: center;
 }
 
+#weather-table-container th.ft-amsl-toggle {
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+#weather-table-container .ft-amsl-badge {
+    opacity: 0.6;
+    font-size: 0.85em;
+    font-weight: normal;
+    white-space: nowrap;
+}
+
 #weather-table-container tr.cloud-cover-clear {
     /* 0-10% */
     background: var(--cc-clear) !important;

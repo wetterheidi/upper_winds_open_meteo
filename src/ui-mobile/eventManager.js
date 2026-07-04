@@ -1056,6 +1056,13 @@ function setupSettingsPanels() {
 
     // Units Panel
     setupSelectControl('refLevel', 'refLevel');
+    setupCheckbox('showFtAmslCheckbox', 'showFtAmsl', (checkbox) => {
+        Settings.state.userSettings.showFtAmsl = checkbox.checked;
+        Settings.save();
+        document.dispatchEvent(new CustomEvent('setting:changed', {
+            detail: { key: 'showFtAmsl', value: checkbox.checked }
+        }));
+    });
     setupSelectControl('heightUnit', 'heightUnit');
     setupSelectControl('temperatureUnit', 'temperatureUnit');
     setupSelectControl('windUnit', 'windUnit');

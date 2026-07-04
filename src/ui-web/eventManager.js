@@ -1132,6 +1132,14 @@ function setupSelectEvents() {
             console.warn(`Select element with id '${id}' not found.`);
         }
     });
+
+    setupCheckbox('showFtAmslCheckbox', 'showFtAmsl', (checkbox) => {
+        Settings.state.userSettings.showFtAmsl = checkbox.checked;
+        Settings.save();
+        document.dispatchEvent(new CustomEvent('ui:settingChanged', {
+            detail: { name: 'showFtAmsl', value: checkbox.checked }
+        }));
+    });
 }
 function setupInputEvents() {
     // Helfer-Funktion, die den Event-Listener für die legHeight erstellt

@@ -130,6 +130,7 @@ function initializeUIElements() {
     applySettingToInput('jumpRunTrackOffset', Settings.state.userSettings.jumpRunTrackOffset);
     applySettingToInput('numberOfJumpers', Settings.state.userSettings.numberOfJumpers);
     applySettingToCheckbox('showTableCheckbox', Settings.state.userSettings.showTable);
+    applySettingToCheckbox('showFtAmslCheckbox', Settings.state.userSettings.showFtAmsl);
     applySettingToCheckbox('showJumpRunTrack', Settings.state.userSettings.showJumpRunTrack);
     applySettingToCheckbox('showCanopyAreaCheckbox', Settings.state.userSettings.showCanopyArea);
     applySettingToCheckbox('showExitAreaCheckbox', Settings.state.userSettings.showExitArea);
@@ -2281,6 +2282,10 @@ function setupAppEventListeners() {
 
         if (key === 'timeZone') {
             await displayManager.updateSliderLabels();
+        }
+
+        if (key === 'showFtAmsl') {
+            await displayManager.updateWeatherDisplay(getSliderValue(), 'weather-table-container', 'selectedTime');
         }
 
         if (key === 'heightUnit') {
