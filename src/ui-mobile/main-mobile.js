@@ -1355,7 +1355,9 @@ function updateJumpMasterDashboard(data) {
 function updateDashboardPanel(data) {
     if (!data) return;
 
-    const { latitude, longitude, deviceAltitude, speedMs, descentRateMps, direction } = data;
+    const { latitude, longitude, deviceAltitude, speedMs, rateOfClimbMps, direction } = data;
+    // rateOfClimbMps ist negativ beim Sinken; Reichweite/Gleitzahl brauchen eine positive Sinkrate.
+    const descentRateMps = typeof rateOfClimbMps === 'number' ? -rateOfClimbMps : 0;
 
     // --- Altitude & Range ---
     const altitudeEl = document.getElementById('dashboard-altitude');
@@ -1753,7 +1755,7 @@ function setupAppEventListeners() {
         mapManager.updateLiveFollow(event.detail.latitude, event.detail.longitude);
         mapManager.updateHeadingUp(event.detail.gpsHeading, event.detail.directionDeg, event.detail.speedMs);
         if (AppState.isAutoRecording) {
-            SensorManager.checkLanding(event.detail.descentRateMps);
+            SensorManager.checkLanding(event.detail.rateOfClimbMps);
         }
     });
 
