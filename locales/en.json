@@ -38,6 +38,7 @@
         },
         "no_data": "No weather data loaded.",
         "altitude": "Altitude",
+        "toggle_ft_amsl": "Show/hide ft AMSL column",
         "temp": "Temperature",
         "dew_point": "Dew Point",
         "wind": "Wind",
@@ -200,13 +201,17 @@
         "favorites": "Favorites",
         "recents": "Recent Searches",
         "results": "Results",
-        "placeholder": "Look up city or coordinates..."
+        "placeholder": "Look up city or coordinates...",
+        "export_favorites": "Export Favorites",
+        "import_favorites": "Import Favorites",
+        "export_favorites_title": "Export Favorites"
     },
     "settings": {
         "language": "Language",
         "select_language": "Language:",
         "units": "Units",
         "ref_level": "Reference Level",
+        "show_ft_amsl": "Wind table: also show heights in ft AMSL:",
         "height_unit": "Height Unit:",
         "temp_unit": "Temperature Unit:",
         "speed_unit": "Speed Unit:",
@@ -225,6 +230,9 @@
         "canopy_range": "Canopy Range (Red/Blue)",
         "merge_tracks": "Merge for Devices (Single Color)",
         "export_gpx": "Export GPX",
+        "map_settings": "Map Settings",
+        "lock_north_up": "Keep map fixed to North Up",
+        "auto_follow": "Auto-follow during live tracking",
         "cache_settings": "Cache Settings",
         "cache_radius": "Cache Radius (km):",
         "zoom_levels": "Zoom Levels:",
@@ -483,7 +491,14 @@
         "delete_confirm": "Delete \"{name}\"?",
         "default_favorite_name": "DIP at {lat}, {lng}",
         "error_select_first": "Please select a location on the map first.",
-        "warning_zoom_poi": "Please zoom in to Level {zoom}+ to search for dropzones."
+        "warning_zoom_poi": "Please zoom in to Level {zoom}+ to search for dropzones.",
+        "error_no_favorites_export": "No favorites to export.",
+        "favorites_exported": "{count} favorite(s) exported as \"{name}\".",
+        "favorites_exported_docs": "{count} favorite(s) saved as \"{name}\" in Documents/DZMaster.",
+        "favorites_imported": "{count} favorite(s) imported.",
+        "error_favorites_invalid_file": "Invalid favorites file.",
+        "error_favorites_import_failed": "Could not import favorites.",
+        "error_favorites_export_failed": "Could not export favorites."
     },
     "tracks": {
         "error_map_init": "Map not initialized.",

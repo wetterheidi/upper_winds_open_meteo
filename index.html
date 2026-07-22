@@ -21,8 +21,8 @@
     <script src="https://unpkg.com/@tmcw/togeojson@4.7.0/dist/togeojson.umd.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/geomag/dist/geomag.min.js" defer></script>
-  <script type="module" crossorigin src="/upper_winds_open_meteo/assets/index-C8OVrrl0.js"></script>
-  <link rel="stylesheet" crossorigin href="/upper_winds_open_meteo/assets/index-i3_bILjI.css">
+  <script type="module" crossorigin src="/upper_winds_open_meteo/assets/index-DQjWuMYW.js"></script>
+  <link rel="stylesheet" crossorigin href="/upper_winds_open_meteo/assets/index-CDYFSGvq.css">
 </head>
 
 <body>
@@ -557,6 +557,25 @@
                         location as Favorite</button>
                     <button id="findPoisInViewBtn" class="btn btn-secondary" data-i18n="search.find_dropzones">Search
                         for Dropzones in this Area</button>
+                    <div class="favorites-io-actions">
+                        <button id="exportFavoritesBtn" class="btn btn-secondary"
+                            data-i18n="search.export_favorites">Export Favorites</button>
+                        <button id="importFavoritesBtn" class="btn btn-secondary"
+                            data-i18n="search.import_favorites">Import Favorites</button>
+                        <input type="file" id="favoritesFileInput" accept=".json,application/json" class="hidden">
+                    </div>
+                    <div id="exportFavoritesModal" class="favorite-modal" style="display: none;">
+                        <div class="favorite-modal-content">
+                            <h3 data-i18n="search.export_favorites_title">Export Favorites</h3>
+                            <input id="exportFavoritesNameInput" type="text" placeholder="Fav_USA">
+                            <div class="favorite-modal-actions">
+                                <button id="submitExportFavorites" class="modal-btn"
+                                    data-i18n="common.save">Save</button>
+                                <button id="cancelExportFavorites" class="modal-btn cancel"
+                                    data-i18n="common.cancel">Cancel</button>
+                            </div>
+                        </div>
+                    </div>
                     <div id="favoriteModal" class="favorite-modal" style="display: none;">
                         <div class="favorite-modal-content">
                             <h3 data-i18n="search.save_favorite_title">Save Favorite</h3>
@@ -597,6 +616,8 @@
                                     <option value="AGL">AGL</option>
                                     <option value="AMSL">AMSL</option>
                                 </select>
+                                <label for="showFtAmslCheckbox" data-i18n="settings.show_ft_amsl">Wind table: also show heights in ft AMSL</label>
+                                <input type="checkbox" id="showFtAmslCheckbox">
                                 <label for="heightUnit" data-i18n="settings.height_unit">Height Unit:</label>
                                 <select id="heightUnit">
                                     <option value="m">Meter</option>
@@ -703,8 +724,20 @@
                     </div>
 
                     <div class="accordion-item">
-                        <button class="accordion-header" data-i18n="settings.cache_settings">Cache Settings</button>
+                        <button class="accordion-header" data-i18n="settings.map_settings">Map Settings</button>
                         <div class="accordion-content">
+                            <div id="map-settings">
+                                <label class="radio-label">
+                                    <input type="checkbox" id="lockNorthUpCheckbox"> <span
+                                        data-i18n="settings.lock_north_up">Keep map fixed to North Up</span>
+                                </label>
+                                <label class="radio-label">
+                                    <input type="checkbox" id="liveAutoFollowCheckbox" checked> <span
+                                        data-i18n="settings.auto_follow">Auto-follow during live tracking</span>
+                                </label>
+                            </div>
+                            <div style="margin: 10px 0 6px; padding-top: 10px; border-top: 1px solid var(--border-color, #444); font-weight: bold;"
+                                data-i18n="settings.cache_settings">Cache Settings</div>
                             <div id="cache-settings" class="settings-grid">
                                 <label for="cacheRadiusSelect" data-i18n="settings.cache_radius">Cache Radius
                                     (km):</label>
