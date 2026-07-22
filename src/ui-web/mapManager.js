@@ -884,7 +884,11 @@ export async function updateHarpMarkerPopup(marker, lat, lng, open = false, expa
         const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
         const surfacePressure = AppState.weatherData.surface_pressure[sliderIndex];
         const temperature = AppState.weatherData.temperature_2m?.[sliderIndex] || 15;
-        const qfe = Utils.calculateQFE(surfacePressure, altitude, altitude, temperature);
+        // surface_pressure gilt für die DIP-Geländehöhe (lastAltitude). QFE am HARP muss
+        // barometrisch von der DIP-Referenzhöhe auf die HARP-Höhe umgerechnet werden,
+        // sonst wird fälschlich der DIP-Druck übernommen.
+        const referenceElevation = AppState.lastAltitude !== 'N/A' ? AppState.lastAltitude : 0;
+        const qfe = Utils.calculateQFE(surfacePressure, altitude, referenceElevation, temperature);
         if (qfe !== 'N/A') {
             qfeText = `${qfe} hPa`;
         }
