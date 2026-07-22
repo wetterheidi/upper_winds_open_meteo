@@ -77,9 +77,12 @@ export function analyzeCloudLayers(weatherData) {
  * @param {number} lat - Die geographische Breite des Standorts.
  * @param {number} lng - Die geographische Länge des Standorts.
  * @param {string|null} [currentTime=null] - Ein optionaler ISO-Zeitstempel für historische Daten.
+ * @param {string|null} [historicalDateOverride=null] - Erzwingt den Abruf historischer Daten für dieses
+ *        Datum ('yyyy-MM-dd'), unabhängig davon, ob es heute oder in der Vergangenheit liegt. Wird von der
+ *        Track-Ladefunktion genutzt, damit auch Tracks vom selben Tag historische Daten laden.
  * @returns {Promise<object|null>} Ein Promise, das zum 'hourly' Wetterdatenobjekt auflöst, oder null bei einem Fehler.
  */
-export async function fetchWeatherForLocation(lat, lng, currentTime = null) {
+export async function fetchWeatherForLocation(lat, lng, currentTime = null, historicalDateOverride = null) {
     console.log('[weatherManager] Starting full weather fetch for location:', { lat, lng });
 
     // 1. Prüfen, welche Modelle verfügbar sind (Open-Meteo + Progtemp parallel)
@@ -99,7 +102,7 @@ export async function fetchWeatherForLocation(lat, lng, currentTime = null) {
     }));
 
     // 3. Die eigentlichen Wetterdaten für das aktuell ausgewählte Modell abrufen
-    const weatherData = await fetchWeather(lat, lng, currentTime);
+    const weatherData = await fetchWeather(lat, lng, currentTime, historicalDateOverride);
     return weatherData;
 }
 
@@ -419,7 +422,7 @@ export function interpolateWeatherData(weatherData, sliderIndex, interpStep, bas
  * @returns {Promise<object|null>} Das 'hourly' Objekt aus der API-Antwort oder null bei einem Fehler.
  * @private
  */
-async function fetchWeather(lat, lon, currentTime = null) {
+async function fetchWeather(lat, lon, currentTime = null, historicalDateOverride = null) {
     // Sende ein Event, damit die UI den Lade-Spinner anzeigen kann
     // Nachricht ist nun übersetzt
     document.dispatchEvent(new CustomEvent('loading:start', { detail: { message: I18n.t('common.fetching_weather') } }));
@@ -447,7 +450,16 @@ async function fetchWeather(lat, lon, currentTime = null) {
         const today = DateTime.utc().startOf('day');
         let targetDateForAPI = null;
 
-        if (currentTime) {
+        if (historicalDateOverride) {
+            // Track-Fall: Für das Track-Datum werden immer historische Daten geladen – auch wenn der
+            // Track vom selben Tag stammt. Die historical-forecast-API liefert für heute bereits den
+            // vollen Tag (Analyse + Kurzfrist), daher ist das auch für taggleiche Sprünge korrekt.
+            const overrideDate = DateTime.fromISO(historicalDateOverride, { zone: 'utc' }).startOf('day');
+            if (overrideDate.isValid && overrideDate <= today) {
+                isHistorical = true;
+                targetDateForAPI = overrideDate;
+            }
+        } else if (currentTime) {
             let parsedTime = DateTime.fromISO(currentTime, { zone: 'utc' });
             if (parsedTime.isValid) {
                 targetDateForAPI = parsedTime.startOf('day');

@@ -575,7 +575,10 @@ async function renderTrack(points, fileName, dipWaypoint = null) {
                 const today = DateTime.utc().startOf('day');
                 const trackDateLuxon = initialTimestamp.startOf('day');
 
-                if (trackDateLuxon < today) {
+                // Auch Tracks vom selben Tag (<= heute) werden historisch geladen – nur zukünftige
+                // (z. B. geplante Routen) bleiben im Forecast-Modus. Die historical-forecast-API
+                // liefert für heute bereits den vollen Tag.
+                if (trackDateLuxon <= today) {
                     trackMetaData.historicalDateString = trackDateLuxon.toFormat('yyyy-MM-dd');
                 }
 

@@ -1,7 +1,7 @@
 {
     "name": "upper_winds_open_meteo",
-    "version": "1.5",
-    "description": "DZMAster skydiving tool",
+    "version": "1.5.4",
+    "description": "DZMaster skydiving tool",
     "type": "module",
     "scripts": {
         "start": "vite",

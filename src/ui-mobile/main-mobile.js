@@ -567,7 +567,7 @@ export async function updateToCurrentHour() {
     }
 
     try {
-        await weatherManager.fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, null, false);
+        await weatherManager.fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, null);
         console.log('Weather data fetched for current hour');
 
         const currentHour = weatherManager.findCurrentTimeIndex(AppState.weatherData);
@@ -1691,28 +1691,26 @@ function setupAppEventListeners() {
             // createOrUpdateMarker also sets lastAltitude (terrain elevation), which we await here
             await mapManager.createOrUpdateMarker(lat, lng);
 
-            const newWeatherData = await weatherManager.fetchWeatherForLocation(lat, lng, timestamp);
+            // historicalDate erzwingt historische Daten für das Track-Datum – auch bei Tracks vom selben Tag.
+            const newWeatherData = await weatherManager.fetchWeatherForLocation(lat, lng, timestamp, historicalDate);
 
-            if (newWeatherData) {
-                AppState.weatherData = newWeatherData;
+            // Ohne neue Wetterdaten wären die alten (Forecast-)Daten weiterhin aktiv.
+            // Das würde einen historischen Track vortäuschen (Slider bliebe auf dem aktuellen
+            // Datum, Picker/Warnung wären aber gesetzt). Daher hier abbrechen und Fehler zeigen.
+            if (!newWeatherData) {
+                Utils.handleError(I18n.t('messages.weather_fetch_error'));
+                return;
+            }
 
-                const slider = document.getElementById('timeSlider');
-                if (slider && AppState.weatherData.time && timestamp) {
-                    slider.max = AppState.weatherData.time.length - 1;
-                    slider.disabled = slider.max <= 0;
+            AppState.weatherData = newWeatherData;
 
-                    const targetTimestamp = new Date(timestamp).getTime();
-                    let bestIndex = 0;
-                    let minDiff = Infinity;
-                    AppState.weatherData.time.forEach((time, idx) => {
-                        const diff = Math.abs(new Date(time).getTime() - targetTimestamp);
-                        if (diff < minDiff) {
-                            minDiff = diff;
-                            bestIndex = idx;
-                        }
-                    });
-                    slider.value = bestIndex;
-                }
+            const slider = document.getElementById('timeSlider');
+            if (slider && AppState.weatherData.time && timestamp) {
+                slider.max = AppState.weatherData.time.length - 1;
+                slider.disabled = slider.max <= 0;
+                // findTimeIndex vergleicht auf "YYYY-MM-DDTHH"-Ebene und ist damit unabhängig
+                // davon, ob die API-Zeiten ein "Z"-Suffix tragen (UTC-sicher, kein new Date()-Drift).
+                slider.value = weatherManager.findTimeIndex(AppState.weatherData, timestamp);
             }
             console.log("Performing specific updates after track load...");
             await displayManager.updateWeatherDisplay(getSliderValue(), 'weather-table-container', 'selectedTime');
