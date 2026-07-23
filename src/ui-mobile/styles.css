@@ -1696,6 +1696,12 @@ input[type="checkbox"][style*="opacity: 1"] {
     opacity: 0.8;
 }
 
+.card-unit.status-hint {
+    color: var(--color-warning) !important;
+    opacity: 1;
+    font-weight: 600;
+}
+
 .dashboard-row-split {
     display: grid;
     grid-template-columns: 1fr 1fr;

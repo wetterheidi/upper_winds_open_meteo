@@ -1348,6 +1348,18 @@ function updateJumpMasterDashboard(data) {
 }
 
 /**
+ * Classifies the descent-rate quality used by the Range and Glide-Ratio(Ist) tiles.
+ * Pure function — no DOM/AppState access — so it is unit-testable in isolation.
+ * @param {number} descentRateMps - positive when descending, computed as -rateOfClimbMps.
+ * @returns {'ok'|'climbing'|'below_threshold'}
+ */
+export function getDescentRateStatus(descentRateMps) {
+    if (descentRateMps <= 0) return 'climbing';
+    if (descentRateMps <= 0.1) return 'below_threshold';
+    return 'ok';
+}
+
+/**
  * Updates the dashboard panel with the latest live tracking data,
  * including glide ratios.
  * @param {object} data - The position data from the tracking event.
@@ -1372,36 +1384,46 @@ function updateDashboardPanel(data) {
         altitudeEl.textContent = displayAltitude;
         altitudeUnitEl.textContent = `${heightUnit} abv DIP`;
 
-        if (rangeEl && rangeUnitEl && descentRateMps > 0.1) {
-            const timeToGround = altitudeAGL / descentRateMps;
-            const rangeMeters = speedMs * timeToGround;
+        if (rangeEl && rangeUnitEl) {
+            const rangeStatus = getDescentRateStatus(descentRateMps);
+            if (rangeStatus === 'ok') {
+                const timeToGround = altitudeAGL / descentRateMps;
+                const rangeMeters = speedMs * timeToGround;
 
-            let displayRange;
-            let displayUnit;
+                let displayRange;
+                let displayUnit;
 
-            if (heightUnit === 'ft') {
-                const rangeFeet = Utils.convertHeight(rangeMeters, 'ft');
-                if (rangeFeet > 5280) { // Wenn über eine Meile
-                    displayRange = (rangeFeet / 5280).toFixed(1);
-                    displayUnit = 'mi';
-                } else {
-                    displayRange = Math.round(rangeFeet);
-                    displayUnit = 'ft';
+                if (heightUnit === 'ft') {
+                    const rangeFeet = Utils.convertHeight(rangeMeters, 'ft');
+                    if (rangeFeet > 5280) { // Wenn über eine Meile
+                        displayRange = (rangeFeet / 5280).toFixed(1);
+                        displayUnit = 'mi';
+                    } else {
+                        displayRange = Math.round(rangeFeet);
+                        displayUnit = 'ft';
+                    }
+                } else { // Standard 'm'
+                    if (rangeMeters > 1000) {
+                        displayRange = (rangeMeters / 1000).toFixed(1);
+                        displayUnit = 'km';
+                    } else {
+                        displayRange = Math.round(rangeMeters);
+                        displayUnit = 'm';
+                    }
                 }
-            } else { // Standard 'm'
-                if (rangeMeters > 1000) {
-                    displayRange = (rangeMeters / 1000).toFixed(1);
-                    displayUnit = 'km';
-                } else {
-                    displayRange = Math.round(rangeMeters);
-                    displayUnit = 'm';
-                }
+                rangeEl.textContent = displayRange;
+                rangeUnitEl.textContent = displayUnit;
+                rangeUnitEl.classList.remove('status-hint');
+            } else {
+                rangeEl.textContent = "---";
+                rangeUnitEl.textContent = I18n.t('dashboard.status_' + rangeStatus);
+                rangeUnitEl.classList.add('status-hint');
             }
-            rangeEl.textContent = displayRange;
-            rangeUnitEl.textContent = displayUnit;
-        } else if (rangeEl) {
-            rangeEl.textContent = "---";
         }
+    } else if (rangeEl && rangeUnitEl) {
+        rangeEl.textContent = "---";
+        rangeUnitEl.textContent = I18n.t('dashboard.status_no_altitude');
+        rangeUnitEl.classList.add('status-hint');
     }
 
     // --- Speed, Direction, Bearing, Distance, Glide Ratios ---
@@ -1461,6 +1483,7 @@ function updateDashboardPanel(data) {
 
     const glideRequiredEl = document.getElementById('dashboard-glide-required');
     const glideCurrentEl = document.getElementById('dashboard-glide-current');
+    const glideCurrentStatusEl = document.getElementById('dashboard-glide-current-status');
     let requiredRatio = null;
     let currentRatio = null;
 
@@ -1475,11 +1498,28 @@ function updateDashboardPanel(data) {
         }
     }
 
-    if (glideCurrentEl && speedMs > 0 && descentRateMps > 0.1) {
-        currentRatio = speedMs / descentRateMps;
-        glideCurrentEl.textContent = currentRatio.toFixed(1);
-    } else {
+    if (glideCurrentEl && speedMs <= 0) {
         glideCurrentEl.textContent = "---";
+        if (glideCurrentStatusEl) {
+            glideCurrentStatusEl.textContent = I18n.t('dashboard.status_no_speed');
+            glideCurrentStatusEl.classList.add('status-hint');
+        }
+    } else if (glideCurrentEl) {
+        const glideStatus = getDescentRateStatus(descentRateMps);
+        if (glideStatus === 'ok') {
+            currentRatio = speedMs / descentRateMps;
+            glideCurrentEl.textContent = currentRatio.toFixed(1);
+            if (glideCurrentStatusEl) {
+                glideCurrentStatusEl.textContent = '';
+                glideCurrentStatusEl.classList.remove('status-hint');
+            }
+        } else {
+            glideCurrentEl.textContent = "---";
+            if (glideCurrentStatusEl) {
+                glideCurrentStatusEl.textContent = I18n.t('dashboard.status_' + glideStatus);
+                glideCurrentStatusEl.classList.add('status-hint');
+            }
+        }
     }
 
     if (glideCurrentEl && requiredRatio !== null && currentRatio !== null) {
