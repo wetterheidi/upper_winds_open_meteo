@@ -472,10 +472,14 @@ export function checkSafetyHeightWindWarning() {
     }
 
     if (calcResult && calcResult.safetyWindWarning) {
+        const limitKt = Utils.convertWind(calcResult.canopySpeed, 'kt', 'm/s');
+        const currentKt = Utils.convertWind(calcResult.windSpeedSafety, 'kt', 'm/s');
+
         const msg = I18n.t('weather.safety_warning_msg')
             .replace('{height}', safetyHeightAGL)
             .replace('{unit}', heightUnit)
-            .replace('{limit}', downwindStart);
+            .replace('{limit}', limitKt.toFixed(0))
+            .replace('{current}', currentKt.toFixed(0));
 
         displayWarning(msg);
     }
