@@ -192,7 +192,11 @@
         "bearing_dip": "Bearing to DIP",
         "distance_dip": "Distance to DIP",
         "arm_recording": "Arm Recording",
-        "start_recording": "Start Recording"
+        "start_recording": "Start Recording",
+        "status_no_altitude": "no GPS altitude",
+        "status_climbing": "climbing",
+        "status_below_threshold": "descent rate too low",
+        "status_no_speed": "no ground speed"
     },
     "search": {
         "save_favorite": "Save current location as Favorite",

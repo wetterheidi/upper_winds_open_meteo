@@ -192,7 +192,11 @@
         "bearing_dip": "Peilung zum DIP",
         "distance_dip": "Distanz zum DIP",
         "arm_recording": "Aufnahme aktivieren",
-        "start_recording": "Aufnahme starten"
+        "start_recording": "Aufnahme starten",
+        "status_no_altitude": "kein Höhensignal",
+        "status_climbing": "Steigflug",
+        "status_below_threshold": "Sinkrate zu gering",
+        "status_no_speed": "keine Geschwindigkeit"
     },
     "search": {
         "save_favorite": "Aktuellen Ort als Favorit speichern",
