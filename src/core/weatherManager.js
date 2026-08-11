@@ -85,6 +85,10 @@ export function analyzeCloudLayers(weatherData) {
 export async function fetchWeatherForLocation(lat, lng, currentTime = null, historicalDateOverride = null) {
     console.log('[weatherManager] Starting full weather fetch for location:', { lat, lng });
 
+    // Ein neuer Wetterdaten-Abruf entwertet einen zuvor gesetzten manuellen QFE-Kalibrierungs-Offset
+    // (der bezog sich auf den zuvor geladenen Modelllauf/Standort).
+    Utils.clearQfeCalibration();
+
     // 1. Prüfen, welche Modelle verfügbar sind (Open-Meteo + Progtemp parallel)
     const [availableModels, soundingAvailable] = await Promise.all([
         checkAvailableModels(lat, lng),

@@ -7,7 +7,7 @@
 import { DateTime } from 'luxon';
 import * as mgrs from 'mgrs';
 import { AppState } from './state.js';
-import { CONVERSIONS, ISA_CONSTANTS, DEWPOINT_COEFFICIENTS, EARTH_RADIUS_METERS, PHYSICAL_CONSTANTS, BEAUFORT, ENSEMBLE_VISUALIZATION } from './constants.js';
+import { CONVERSIONS, ISA_CONSTANTS, DEWPOINT_COEFFICIENTS, EARTH_RADIUS_METERS, BEAUFORT, ENSEMBLE_VISUALIZATION, QFE_ACCURACY } from './constants.js';
 import { Settings } from "./settings.js";
 import { I18n } from './i18n.js';
 
@@ -264,33 +264,155 @@ export class Utils {
     }
 
     /**
-     * Berechnet den QFE-Druck (Druck auf einer bestimmten Höhe) mithilfe der barometrischen Höhenformel.
-     * @param {number} surfacePressure - Der Referenzdruck in hPa (z.B. QNH).
+     * Berechnet den QFE-Druck (Druck auf einer bestimmten Höhe) mittels des WMO/ICAO-Verfahrens
+     * zur Druckreduktion (mittlere Schichttemperatur zwischen Referenz- und Zielniveau).
+     * Identisch zum an Bergstationen/Hochgebirgsflughäfen etablierten Verfahren für QFE↔QNH.
+     * @param {number} surfacePressure - Der Referenzdruck in hPa auf `referenceElevation`.
      * @param {number} elevation - Die Zielhöhe in Metern.
      * @param {number} referenceElevation - Die Höhe in Metern, auf die sich `surfacePressure` bezieht.
-     * @param {number} [temperature=15] - Die Temperatur in Grad Celsius.
+     * @param {number} [temperature=15] - Die Temperatur auf `referenceElevation` in Grad Celsius.
      * @returns {number|string} Der berechnete QFE-Druck in hPa oder 'N/A'.
      */
     static calculateQFE(surfacePressure, elevation, referenceElevation, temperature = 15) {
         if (!surfacePressure || elevation === 'N/A' || referenceElevation === 'N/A' || isNaN(surfacePressure) || isNaN(elevation) || isNaN(referenceElevation)) {
             return 'N/A';
         }
-        // Constants for barometric formula
-        const g = ISA_CONSTANTS.GRAVITY; // Gravitational acceleration (m/s²)
-        const M = PHYSICAL_CONSTANTS.MOLAR_MASS_AIR; // Molar mass of air (kg/mol)
-        const R = PHYSICAL_CONSTANTS.UNIVERSAL_GAS_CONSTANT; // Universal gas constant (J/(mol·K))
-        const T = temperature + CONVERSIONS.CELSIUS_TO_KELVIN; // Temperature in Kelvin
-        const L = ISA_CONSTANTS.LAPSE_RATE; // Standard temperature lapse rate (K/m)
+        const g = ISA_CONSTANTS.GRAVITY; // Erdbeschleunigung (m/s²)
+        const R = ISA_CONSTANTS.GAS_CONSTANT_AIR; // spezifische Gaskonstante trockener Luft (J/(kg·K))
+        const L = ISA_CONSTANTS.LAPSE_RATE; // ISA-Standard-Temperaturgradient (K/m)
+        const T0 = temperature + CONVERSIONS.CELSIUS_TO_KELVIN; // Temperatur am Referenzniveau (K)
+        const h = elevation - referenceElevation; // Höhendifferenz zum Zielniveau (m)
 
-        // Calculate pressure at target elevation relative to reference elevation
-        const P0 = surfacePressure * 100; // Convert hPa to Pa
-        const h = elevation - referenceElevation; // Elevation difference in meters
-        const exponent = (g * M) / (R * L);
-        const qfePa = P0 * Math.pow(1 - (L * h) / T, exponent);
+        const Th = T0 - L * h; // fiktive Temperatur am Zielniveau (ISA-Gradient)
+        const Tm = (T0 + Th) / 2; // mittlere Schichttemperatur
+        const qfePa = surfacePressure * 100 * Math.exp(-(g * h) / (R * Tm));
 
-        // Convert back to hPa and round to nearest integer
         const qfe = Math.round(qfePa / 100);
         return isNaN(qfe) ? 'N/A' : qfe;
+    }
+
+    /**
+     * Prüft, wie stark das Gelände im Umkreis einer Koordinate strukturiert ist, und schreibt
+     * das Ergebnis nach `AppState.qfeTerrainRugged`. Dient als Indikator dafür, dass ein grob
+     * aufgelöstes Wettermodell (z.B. ICON global) die reale Geländehöhe an diesem Punkt
+     * schlechter abbilden kann, wodurch der daraus abgeleitete QFE-Wert ungenauer werden kann.
+     * Ergebnis wird pro Koordinate gecacht (`AppState.terrainRuggednessCache`).
+     * @param {number} lat - Breite des zu prüfenden Punkts (z.B. DIP).
+     * @param {number} lng - Länge des zu prüfenden Punkts.
+     * @returns {Promise<boolean>} True, wenn das Gelände als stark strukturiert gilt.
+     */
+    static async assessTerrainRuggedness(lat, lng) {
+        const cacheKey = `${lat.toFixed(3)},${lng.toFixed(3)}`;
+        if (AppState.terrainRuggednessCache?.key === cacheKey) {
+            AppState.qfeTerrainRugged = AppState.terrainRuggednessCache.isRugged;
+            return AppState.qfeTerrainRugged;
+        }
+        try {
+            const centerElevation = await Utils.getAltitude(lat, lng);
+            const samplePoints = [0, 90, 180, 270].map(bearing => {
+                const [sampleLat, sampleLng] = Utils.calculateNewCenter(lat, lng, QFE_ACCURACY.TERRAIN_SAMPLE_RADIUS_M, bearing);
+                return { lat: sampleLat, lng: sampleLng };
+            });
+            const sampleElevations = await Utils.getMultipleAltitudes(samplePoints);
+            const elevations = [centerElevation, ...sampleElevations].filter(e => e !== 'N/A' && !isNaN(e));
+
+            const isRugged = elevations.length > 1 &&
+                (Math.max(...elevations) - Math.min(...elevations)) >= QFE_ACCURACY.TERRAIN_RUGGED_THRESHOLD_M;
+
+            AppState.terrainRuggednessCache = { key: cacheKey, isRugged };
+            AppState.qfeTerrainRugged = isRugged;
+            return isRugged;
+        } catch (error) {
+            console.warn('Failed to assess terrain ruggedness:', error);
+            AppState.qfeTerrainRugged = false;
+            return false;
+        }
+    }
+
+    /**
+     * Liefert den für QFE-Berechnungen wirksamen Bodendruck: den rohen Modellwert aus
+     * `AppState.weatherData.surface_pressure`, zuzüglich eines aktiven manuellen
+     * Kalibrierungs-Offsets (siehe `setQfeCalibration`).
+     * @param {number} sliderIndex - Index in den stündlichen Wetterdaten.
+     * @returns {number|'N/A'} Der wirksame Bodendruck in hPa.
+     */
+    static getEffectiveSurfacePressure(sliderIndex) {
+        const raw = AppState.weatherData?.surface_pressure?.[sliderIndex];
+        if (raw === undefined || raw === null || isNaN(raw)) return 'N/A';
+        return Utils.isQfeCalibrationActive() ? raw + AppState.qfeCalibrationOffset : raw;
+    }
+
+    /**
+     * Prüft, ob aktuell ein manueller QFE-Kalibrierungs-Offset aktiv ist, und räumt ihn
+     * automatisch ab, sobald seine Gültigkeitsdauer abgelaufen ist.
+     * @returns {boolean}
+     */
+    static isQfeCalibrationActive() {
+        if (AppState.qfeCalibrationOffset === null || AppState.qfeCalibrationOffset === undefined) return false;
+        if (!AppState.qfeCalibrationExpiresAt || Date.now() > AppState.qfeCalibrationExpiresAt) {
+            Utils.clearQfeCalibration();
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Setzt einen manuellen QFE-Kalibrierungs-Offset (nur im Speicher, siehe `AppState`).
+     * @param {number} offsetHpa - Differenz zwischen gemessenem und angezeigtem QFE in hPa.
+     */
+    static setQfeCalibration(offsetHpa) {
+        AppState.qfeCalibrationOffset = offsetHpa;
+        AppState.qfeCalibrationExpiresAt = Date.now() + QFE_ACCURACY.CALIBRATION_VALIDITY_MS;
+    }
+
+    /** Verwirft einen aktiven manuellen QFE-Kalibrierungs-Offset. */
+    static clearQfeCalibration() {
+        AppState.qfeCalibrationOffset = null;
+        AppState.qfeCalibrationExpiresAt = null;
+    }
+
+    /**
+     * Berechnet aus einem am DIP gemessenen QFE-Wert den nötigen Kalibrierungs-Offset
+     * (Differenz zum aktuell modellierten QFE am DIP) und aktiviert ihn.
+     * @param {number} measuredQfe - Das vor Ort gemessene QFE in hPa.
+     * @param {number} sliderIndex - Index in den stündlichen Wetterdaten.
+     * @returns {boolean} True, wenn die Kalibrierung angewendet werden konnte.
+     */
+    static calibrateQfeFromMeasurement(measuredQfe, sliderIndex) {
+        if (isNaN(measuredQfe) || AppState.lastAltitude === 'N/A' || AppState.lastAltitude === null || AppState.lastAltitude === undefined) {
+            return false;
+        }
+        const rawSurfacePressure = AppState.weatherData?.surface_pressure?.[sliderIndex];
+        if (rawSurfacePressure === undefined) return false;
+        const temperature = AppState.weatherData.temperature_2m?.[sliderIndex] ?? 15;
+        const currentRawQfe = Utils.calculateQFE(rawSurfacePressure, AppState.lastAltitude, AppState.lastAltitude, temperature);
+        if (currentRawQfe === 'N/A') return false;
+
+        Utils.setQfeCalibration(measuredQfe - currentRawQfe);
+        return true;
+    }
+
+    /**
+     * Rendert einen QFE-Wert als HTML-Fragment inkl. Terrain-Warnfarbe und
+     * Kalibrierungs-Badge, konsistent an jeder Stelle, an der QFE angezeigt wird.
+     * @param {number|'N/A'} qfe - Der berechnete QFE-Wert in hPa.
+     * @returns {string} HTML-Fragment für die Popup-/Label-Anzeige.
+     */
+    static formatQfeDisplay(qfe) {
+        if (qfe === 'N/A') return 'N/A';
+
+        const valueClasses = AppState.qfeTerrainRugged ? 'qfe-value qfe-uncertain' : 'qfe-value';
+        const valueTitle = AppState.qfeTerrainRugged ? ` title="${I18n.t('map.qfe_terrain_warning_title')}"` : '';
+        let html = `<span class="${valueClasses}"${valueTitle}>${qfe} hPa</span>`;
+
+        if (Utils.isQfeCalibrationActive()) {
+            const offset = AppState.qfeCalibrationOffset;
+            const sign = offset >= 0 ? '+' : '';
+            const expiryStr = new Date(AppState.qfeCalibrationExpiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const badgeTitle = I18n.t('map.qfe_calibrated_title', { offset: `${sign}${offset}`, time: expiryStr });
+            html += ` <span class="qfe-calibrated-badge" title="${badgeTitle}">⚙</span>`;
+        }
+        return html;
     }
 
     /**

@@ -34,6 +34,14 @@ export const AppState = {
     lastAltitude: null,             // @type {number|string|null} - Die Geländehöhe am DIP in Metern oder 'N/A'.
 
     // ===================================================================
+    // QFE-Genauigkeit
+    // ===================================================================
+    terrainRuggednessCache: null,   // @type {{key: string, isRugged: boolean}|null} - Cache der letzten Terrain-Struktur-Prüfung um den DIP.
+    qfeTerrainRugged: false,        // @type {boolean} - True, wenn das Gelände um den DIP stark strukturiert ist (QFE ggf. ungenauer).
+    qfeCalibrationOffset: null,     // @type {number|null} - Manueller QFE-Korrekturoffset in hPa (nur im Speicher, nicht persistiert).
+    qfeCalibrationExpiresAt: null,  // @type {number|null} - Zeitstempel (ms), bis zu dem der Kalibrierungs-Offset gültig ist.
+
+    // ===================================================================
     // Wetter & Zeit
     // ===================================================================
     weatherData: null,              // @type {object|null} - Das 'hourly' Objekt aus der Open-Meteo API-Antwort.

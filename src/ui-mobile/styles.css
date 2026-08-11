@@ -2174,6 +2174,33 @@ input[type="checkbox"][style*="opacity: 1"] {
     font-weight: bold;
 }
 
+/* QFE-Genauigkeit: Terrain-Warnung & manuelle Kalibrierung */
+.qfe-value.qfe-uncertain {
+    color: var(--color-warning);
+    font-weight: bold;
+    border-bottom: 1px dashed var(--color-warning);
+    cursor: help;
+}
+
+.qfe-calibrated-badge {
+    color: var(--color-warning);
+    cursor: help;
+}
+
+a.qfe-calibrate-trigger {
+    color: inherit;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+a.qfe-calibrate-trigger:hover {
+    text-decoration: underline;
+}
+
+#qfe-calibrate-input {
+    font-size: 12px;
+}
+
 .leaflet-tooltip {
     z-index: 800 !important;
     background-color: var(--background-surface);

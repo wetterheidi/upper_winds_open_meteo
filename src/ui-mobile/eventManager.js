@@ -517,6 +517,41 @@ function setupPopupFormatToggle() {
             document.dispatchEvent(new CustomEvent('pin:clearAll'));
             return;
         }
+        // QFE-Kalibrierung im DIP-Popup: Wert antippen öffnet die Eingabe
+        if (e.target.closest('.qfe-calibrate-trigger')) {
+            e.preventDefault();
+            const isExpanded = e.target.closest('.leaflet-popup-content')
+                ?.querySelector('.toggle-coords-format')?.dataset.expanded === 'true';
+            displayManager.refreshMarkerPopup(isExpanded, true, true);
+            return;
+        }
+        // QFE-Kalibrierung bestätigen
+        if (e.target.closest('.qfe-calibrate-confirm')) {
+            e.preventDefault();
+            const popupContent = e.target.closest('.leaflet-popup-content');
+            const isExpanded = popupContent?.querySelector('.toggle-coords-format')?.dataset.expanded === 'true';
+            const input = popupContent?.querySelector('#qfe-calibrate-input');
+            const measuredQfe = input ? parseFloat(input.value) : NaN;
+
+            if (!isNaN(measuredQfe) && Utils.calibrateQfeFromMeasurement(measuredQfe, getSliderValue())) {
+                if (AppState.harpMarker) {
+                    const harpPos = AppState.harpMarker.getLatLng();
+                    mapManager.updateHarpMarkerPopup(AppState.harpMarker, harpPos.lat, harpPos.lng);
+                }
+            } else {
+                displayWarning(I18n.t('map.qfe_calibrate_invalid'));
+            }
+            displayManager.refreshMarkerPopup(isExpanded, true, false);
+            return;
+        }
+        // QFE-Kalibrierung abbrechen
+        if (e.target.closest('.qfe-calibrate-cancel')) {
+            e.preventDefault();
+            const isExpanded = e.target.closest('.leaflet-popup-content')
+                ?.querySelector('.toggle-coords-format')?.dataset.expanded === 'true';
+            displayManager.refreshMarkerPopup(isExpanded, true, false);
+            return;
+        }
         // Prüfen, ob auf einen unserer Links geklickt wurde
         if (e.target.classList.contains('toggle-coords-format')) {
             e.preventDefault(); // Verhindert, dass der Link die Seite neu lädt

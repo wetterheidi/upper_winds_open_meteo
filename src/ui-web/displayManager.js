@@ -238,7 +238,7 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
  * und rendert den Inhalt neu. Forciert das Öffnen des Popups.
  * @returns {Promise<void>}
  */
-export async function refreshMarkerPopup(expanded = false, open = false) {
+export async function refreshMarkerPopup(expanded = false, open = false, calibrating = false) {
     if (!AppState.currentMarker || AppState.lastLat === null) {
         return;
     }
@@ -249,7 +249,7 @@ export async function refreshMarkerPopup(expanded = false, open = false) {
     const heightUnit = Settings.getValue('heightUnit', 'radio', 'm');
     let displayAltitude = 'N/A';
     let displayUnit = heightUnit;
-    let qfeText = 'N/A';
+    let qfe = 'N/A';
 
     if (altitude !== 'N/A') {
         displayAltitude = Math.round(Utils.convertHeight(altitude, heightUnit));
@@ -257,15 +257,21 @@ export async function refreshMarkerPopup(expanded = false, open = false) {
 
     if (altitude !== 'N/A' && AppState.weatherData && AppState.weatherData.surface_pressure) {
         const sliderIndex = getSliderValue();
-        const surfacePressure = AppState.weatherData.surface_pressure[sliderIndex];
+        const surfacePressure = Utils.getEffectiveSurfacePressure(sliderIndex);
         const temperature = AppState.weatherData.temperature_2m?.[sliderIndex] || 15;
-        const qfe = Utils.calculateQFE(surfacePressure, altitude, altitude, temperature);
-        if (qfe !== 'N/A') {
-            qfeText = `${qfe} hPa`;
-        }
+        qfe = Utils.calculateQFE(surfacePressure, altitude, altitude, temperature);
     }
 
-    const altitudeContent = `<br>${I18n.t('map.marker_popup.alt')}: ${displayAltitude} ${displayUnit}<br>QFE: ${qfeText}`;
+    let qfeLine;
+    if (calibrating && qfe !== 'N/A') {
+        qfeLine = `QFE: <input type="number" id="qfe-calibrate-input" value="${qfe}" step="1" style="width:55px;">`
+            + ` hPa <a href="#" class="qfe-calibrate-confirm" title="${I18n.t('map.qfe_calibrate_confirm')}">✓</a>`
+            + ` <a href="#" class="qfe-calibrate-cancel" title="${I18n.t('map.qfe_calibrate_cancel')}">✗</a>`;
+    } else {
+        qfeLine = `QFE: <a href="#" class="qfe-calibrate-trigger" title="${I18n.t('map.qfe_calibrate_hint')}">${Utils.formatQfeDisplay(qfe)}</a>`;
+    }
+
+    const altitudeContent = `<br>${I18n.t('map.marker_popup.alt')}: ${displayAltitude} ${displayUnit}<br>${qfeLine}`;
     let popupContent = '';
 
     if (expanded) {

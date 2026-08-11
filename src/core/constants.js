@@ -167,6 +167,13 @@ export const ISA_CONSTANTS = { // International Standard Atmosphere
     GAS_CONSTANT_AIR: 287.05,      // J/(kg·K), spezifische Gaskonstante für trockene Luft
 };
 
+/** Konstanten für die Genauigkeitseinschätzung und manuelle Kalibrierung des QFE-Werts. */
+export const QFE_ACCURACY = {
+    TERRAIN_RUGGED_THRESHOLD_M: 150,     // Höhenspannweite (m) im Modellgitter-Umkreis, ab der die Umgebung als "strukturiert" gilt
+    TERRAIN_SAMPLE_RADIUS_M: 6500,       // Abtastradius (m) um den DIP, ~halbe ICON-global-Gitterweite
+    CALIBRATION_VALIDITY_MS: 6 * 60 * 60 * 1000, // Gültigkeitsdauer eines manuellen Kalibrierungs-Offsets (6h)
+};
+
 /** Koeffizienten für die Magnus-Formel zur Taupunktberechnung. */
 export const DEWPOINT_COEFFICIENTS = {
     A_LIQUID: 17.27,

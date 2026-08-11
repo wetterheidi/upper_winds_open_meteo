@@ -239,20 +239,25 @@ describe('Interpolation', () => {
   });
   
   describe('Pressure Calculations', () => {
-    it('sollte den QFE-Druck korrekt berechnen', () => {
+    it('sollte den QFE-Druck korrekt berechnen (WMO/ICAO-Verfahren, mittlere Schichttemperatur)', () => {
       // Standardatmosphäre: Druck sinkt um ca. 1 hPa pro 8 Meter
       const surfacePressure = 1013; // hPa
       const referenceElevation = 100; // m
       const targetElevation = 500; // m
       const temperature = 15; // °C
-      
+
       const qfe = Utils.calculateQFE(surfacePressure, targetElevation, referenceElevation, temperature);
-      
+
       // Erwarteter Wert ist ungefähr 1013 - (400/8) = 963 hPa. Die exakte Formel ist genauer.
       expect(qfe).toBeCloseTo(966, 0); // Ergebnis auf ganze Zahl gerundet
     });
 
-    
+    it('sollte bei größeren Höhendifferenzen konsistent mit dem WMO/ICAO-Verfahren bleiben', () => {
+      // Regressionstest gegen die per Open-Meteo-API verifizierte WMO/ICAO-Formel
+      // (mittlere Schichttemperatur), z.B. relevant für DIP->HARP-Transfers in Gebirgslagen.
+      const qfe = Utils.calculateQFE(835.4, 1872, 1672, 14.8);
+      expect(qfe).toBeCloseTo(816, 0);
+    });
   });
 
   describe('Validation', () => {

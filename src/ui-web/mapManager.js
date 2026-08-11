@@ -713,6 +713,22 @@ export async function createOrUpdateMarker(lat, lng) {
     AppState.lastLng = lng;
     AppState.lastAltitude = altitude;
     AppState.map.invalidateSize();
+
+    // Ein Standortwechsel entwertet einen zuvor gesetzten manuellen QFE-Kalibrierungs-Offset
+    // (der bezog sich auf den vorherigen DIP).
+    Utils.clearQfeCalibration();
+
+    // Läuft im Hintergrund weiter (nicht awaited), damit die Markerplatzierung nicht blockiert.
+    // Aktualisiert die Popups erneut, sobald das Ergebnis vorliegt.
+    Utils.assessTerrainRuggedness(lat, lng).then(() => {
+        import('../ui-web/displayManager.js').then(displayManager => {
+            displayManager.refreshMarkerPopup();
+        });
+        if (AppState.harpMarker) {
+            const harpPos = AppState.harpMarker.getLatLng();
+            updateHarpMarkerPopup(AppState.harpMarker, harpPos.lat, harpPos.lng);
+        }
+    });
 }
 
 export function createCustomMarker(lat, lng) {
@@ -882,16 +898,14 @@ export async function updateHarpMarkerPopup(marker, lat, lng, open = false, expa
     let qfeText = 'N/A';
     if (altitude !== 'N/A' && AppState.weatherData && AppState.weatherData.surface_pressure) {
         const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
-        const surfacePressure = AppState.weatherData.surface_pressure[sliderIndex];
+        const surfacePressure = Utils.getEffectiveSurfacePressure(sliderIndex);
         const temperature = AppState.weatherData.temperature_2m?.[sliderIndex] || 15;
         // surface_pressure gilt für die DIP-Geländehöhe (lastAltitude). QFE am HARP muss
         // barometrisch von der DIP-Referenzhöhe auf die HARP-Höhe umgerechnet werden,
         // sonst wird fälschlich der DIP-Druck übernommen.
         const referenceElevation = AppState.lastAltitude !== 'N/A' ? AppState.lastAltitude : 0;
         const qfe = Utils.calculateQFE(surfacePressure, altitude, referenceElevation, temperature);
-        if (qfe !== 'N/A') {
-            qfeText = `${qfe} hPa`;
-        }
+        qfeText = Utils.formatQfeDisplay(qfe);
     }
 
     // I18n Keys nutzen
@@ -2177,11 +2191,11 @@ function _setupCrosshairCoordinateHandler(map) {
             let qfeString = 'N/A';
             if (elevation !== 'N/A' && AppState.weatherData && AppState.weatherData.surface_pressure) {
                 const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
-                const surfacePressure = AppState.weatherData.surface_pressure[sliderIndex];
+                const surfacePressure = Utils.getEffectiveSurfacePressure(sliderIndex);
                 const temperature = AppState.weatherData.temperature_2m?.[sliderIndex] || 15;
                 const referenceElevation = AppState.lastAltitude !== 'N/A' ? AppState.lastAltitude : 0;
                 const qfe = Utils.calculateQFE(surfacePressure, elevation, referenceElevation, temperature);
-                qfeString = qfe !== 'N/A' ? `${qfe} hPa` : 'N/A';
+                qfeString = Utils.formatQfeDisplay(qfe);
             }
             lastQfeString = qfeString;
 
@@ -2381,11 +2395,11 @@ function _handleMapMouseMove(e) {
             let qfeText = 'N/A';
             if (elevation !== 'N/A' && AppState.weatherData && AppState.weatherData.surface_pressure) {
                 const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
-                const surfacePressure = AppState.weatherData.surface_pressure[sliderIndex];
+                const surfacePressure = Utils.getEffectiveSurfacePressure(sliderIndex);
                 const temperature = AppState.weatherData.temperature_2m?.[sliderIndex] || 15;
                 const referenceElevation = AppState.lastAltitude !== 'N/A' ? AppState.lastAltitude : 0;
                 const qfe = Utils.calculateQFE(surfacePressure, elevation, referenceElevation, temperature);
-                qfeText = qfe !== 'N/A' ? `${qfe} hPa` : 'N/A';
+                qfeText = Utils.formatQfeDisplay(qfe);
             }
 
             AppState.coordsControl.update(`${coordText}<br>${I18n.t('map.alt')}: ${displayElevation} ${displayElevation === 'N/A' ? '' : heightUnit}<br>${I18n.t('map.qfe')}: ${qfeText}`);

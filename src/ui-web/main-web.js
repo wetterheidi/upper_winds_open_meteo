@@ -1378,11 +1378,11 @@ function setupAppEventListeners() {
                     let qfeText = 'N/A';
                     if (elevation !== 'N/A' && AppState.weatherData && AppState.weatherData.surface_pressure) {
                         const sliderIndex = parseInt(document.getElementById('timeSlider')?.value) || 0;
-                        const surfacePressure = AppState.weatherData.surface_pressure[sliderIndex];
+                        const surfacePressure = Utils.getEffectiveSurfacePressure(sliderIndex);
                         const temperature = AppState.weatherData.temperature_2m?.[sliderIndex] || 15;
                         const referenceElevation = AppState.lastAltitude !== 'N/A' ? AppState.lastAltitude : 0;
                         const qfe = Utils.calculateQFE(surfacePressure, elevation, referenceElevation, temperature);
-                        qfeText = qfe !== 'N/A' ? `${qfe} hPa` : 'N/A';
+                        qfeText = Utils.formatQfeDisplay(qfe);
                     }
 
                     AppState.coordsControl.update(`${coordText}<br>Elevation: ${displayElevation} ${displayElevation === 'N/A' ? '' : heightUnit}<br>QFE: ${qfeText}`);

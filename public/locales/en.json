@@ -362,6 +362,12 @@
         "lng": "Lng",
         "alt": "Elevation",
         "qfe": "QFE",
+        "qfe_terrain_warning_title": "Terrain around this point is highly structured: the weather model may represent the ground elevation here inaccurately, so QFE can deviate noticeably from the actual measured value. Verify against a real measurement before jump operations.",
+        "qfe_calibrate_hint": "Tap to calibrate QFE against a measured value",
+        "qfe_calibrate_confirm": "Apply calibration",
+        "qfe_calibrate_cancel": "Cancel",
+        "qfe_calibrate_invalid": "Please enter a valid QFE value.",
+        "qfe_calibrated_title": "Manually calibrated: {offset} hPa vs. model value, valid until {time}",
         "mgrs": "MGRS",
         "geoman": {
             "tap_first_point": "Tap to set first point.",
