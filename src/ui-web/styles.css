@@ -75,6 +75,9 @@
     --color-danger-hover: var(--palette-red-700);
     --color-success: var(--palette-green-500);
     --color-warning: var(--palette-yellow-500);
+    /* Eigener, kontraststarker Ton für Warn-TEXT (--color-warning ist als Hintergrundfarbe
+       kalibriert und als Textfarbe auf hellem Grund kaum lesbar). */
+    --color-warning-text: #d1620d;
 
     /* 3. Textfarben */
     --text-primary: var(--palette-grey-900);
@@ -136,6 +139,7 @@
         --color-danger-hover: #ff8787;
         --color-success: #28a745;
         --color-warning: #f3d131;
+        --color-warning-text: #ffb347;
 
         /* Textfarben */
         --text-primary: #E0E0E0;
@@ -1958,14 +1962,14 @@ button.btn {
 
 /* QFE-Genauigkeit: Terrain-Warnung & manuelle Kalibrierung */
 .qfe-value.qfe-uncertain {
-    color: var(--color-warning);
+    color: var(--color-warning-text);
     font-weight: bold;
-    border-bottom: 1px dashed var(--color-warning);
+    border-bottom: 1px dashed var(--color-warning-text);
     cursor: help;
 }
 
 .qfe-calibrated-badge {
-    color: var(--color-warning);
+    color: var(--color-warning-text);
     cursor: help;
 }
 
