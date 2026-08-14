@@ -1039,7 +1039,8 @@ function _initializeBasicMapInstance(defaultCenter, defaultZoom) {
         shiftKeyRotate: true,
         rotateControl: false,
         preferCanvas: true,
-        zoomAnimation: false
+        zoomAnimation: false,
+        wheelPxPerZoomLevel: 200
     });
     console.log('Map instance created.');
 }
