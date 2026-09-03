@@ -1658,7 +1658,7 @@ function setupThemeToggle() {
                 localStorage.setItem('theme', 'dark');
                 toggleButton.textContent = 'Switch to Light Mode';
                 newTheme = 'dark';
-                newBaseMapName = 'CARTO Dark Matter'; // Deine neue dunkle Karte
+                newBaseMapName = 'Esri Dark Gray'; // Deine neue dunkle Karte
             }
 
             if (AppState.map && AppState.baseMaps[newBaseMapName]) {
