@@ -414,6 +414,9 @@
         "map_init_failed": "Failed to initialize map. Using default position.",
         "invalid_position": "Invalid position selected. Using default position.",
         "select_position": "Please select a position on the map first.",
+        "airspace": {
+            "toggle": "US Airspace (FAA)"
+        },
         "radar": {
             "title": "Weather Radar",
             "toggle": "Radar",
