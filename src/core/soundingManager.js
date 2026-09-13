@@ -266,17 +266,6 @@ function _rhFromTd(T_C, Td_C) {
 }
 
 /**
- * Schätzt die Bedeckung (%) aus dem Taupunktdefizit.
- * T - Td < 2°C → gesättigt (100%), > 15°C → trocken (0%).
- */
-function _cloudCoverFromTd(T_C, Td_C) {
-    const spread = T_C - Td_C;
-    if (spread <= 2) return 100;
-    if (spread >= 15) return 0;
-    return Math.round(100 * (15 - spread) / 13);
-}
-
-/**
  * Findet das Level mit der nächstgelegenen Druckfläche zu targetP_hPa.
  */
 function _closestLevel(levels, targetP_hPa) {
@@ -371,7 +360,9 @@ function _convertToWeatherData(soundingFile, terrainElevM = 0) {
 
             const wspd_kmh = lev.wspd_kn * CONVERSIONS.KNOTS_TO_KMH;
             const rh       = _rhFromTd(lev.T_C, lev.Td_C);
-            const cc       = _cloudCoverFromTd(lev.T_C, lev.Td_C);
+            // clc_pct ist die native ICON-D2-Bedeckungsdiagnostik des Levels (0–100 %) —
+            // dieselbe Größe, die auch in den Pressure-Level-Daten und im TlogpViewer verwendet wird.
+            const cc       = Math.round(lev.clc_pct ?? 0);
 
             levelArrays[`temperature_${key}hPa`][ti]         = lev.T_C;
             levelArrays[`relative_humidity_${key}hPa`][ti]   = rh;
