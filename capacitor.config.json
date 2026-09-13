@@ -31,7 +31,9 @@
       "overpass-api.de",
       "*.tile.openstreetmap.org",
       "*.tile.opentopomap.org",
-      "server.arcgisonline.com"
+      "server.arcgisonline.com",
+      "services6.arcgis.com",
+      "airspace.wetterheidi.de"
     ]
   }
 }

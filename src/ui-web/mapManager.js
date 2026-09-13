@@ -10,6 +10,8 @@ import * as LocationManager from '../core/locationManager.js';
 import * as PinManager from '../core/pinManager.js';
 import { I18n } from '../core/i18n.js';
 import * as RainRadar from '../core/rainRadarManager.js';
+import * as Airspace from '../core/airspaceManager.js';
+import { createAirspaceOverlay } from 'meteokit/airspace';
 import 'leaflet-rotate';
 
 let lastTapTime = 0;
@@ -1052,7 +1054,13 @@ function _addStandardMapControls() {
     }
 
     const radarOverlayGroup = L.layerGroup();
-    const overlays = { [I18n.t('map.radar.toggle')]: radarOverlayGroup };
+    const faaAirspaceLayer = Airspace.createFaaAirspaceLayer();
+    const worldAirspace = createAirspaceOverlay(L);
+    const overlays = {
+        [I18n.t('map.radar.toggle')]: radarOverlayGroup,
+        [I18n.t('map.airspace.toggle')]: faaAirspaceLayer,
+        [I18n.t('map.airspace.openaip_toggle')]: worldAirspace.group
+    };
     L.control.layers(AppState.baseMaps, overlays, { position: 'topright' }).addTo(AppState.map);
 
     AppState.map.on('baselayerchange', function (e) {
@@ -1067,6 +1075,10 @@ function _addStandardMapControls() {
     });
 
     AppState.map.on('overlayadd', async (e) => {
+        if (e.layer === worldAirspace.group) {
+            worldAirspace.attach(AppState.map);
+            return;
+        }
         if (e.layer !== radarOverlayGroup) return;
         if (!AppState.isRadarVisible) await RainRadar.toggleRadar();
         const panel = AppState.radarOptionsControl?.getContainer();
@@ -1084,6 +1096,10 @@ function _addStandardMapControls() {
     });
 
     AppState.map.on('overlayremove', (e) => {
+        if (e.layer === worldAirspace.group) {
+            worldAirspace.detach(AppState.map);
+            return;
+        }
         if (e.layer !== radarOverlayGroup) return;
         if (AppState.isRadarVisible) RainRadar.toggleRadar();
         if (RainRadar.isAnimating()) {
