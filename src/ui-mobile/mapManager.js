@@ -1373,9 +1373,58 @@ function _initializeBasicMapInstance(defaultCenter, defaultZoom) {
         rotateControl: false,
         preferCanvas: true,
         zoomAnimation: false,
-        wheelPxPerZoomLevel: 200
+        // Leaflets eingebauter Wheel-Zoom skaliert mit der rohen Scroll-Pixelmenge,
+        // die Trackpads (Momentum-Scroll) je nach OS/Browser sehr unterschiedlich
+        // und oft sehr hoch liefern - das lässt sich nicht zuverlässig durch
+        // wheelPxPerZoomLevel/wheelDebounceTime einfangen. Stattdessen fester,
+        // ratenbegrenzter Custom-Handler, siehe _setupSmoothWheelZoom().
+        scrollWheelZoom: false,
+        zoomSnap: 0.25
     });
     console.log('Map instance created.');
+}
+
+// Maximal erlaubte Zoomgeschwindigkeit übers Mausrad/Trackpad, unabhängig von
+// Eingabegerät/Browser: pro WHEEL_ZOOM_INTERVAL_MS höchstens ein Schritt von
+// WHEEL_ZOOM_STEP Zoomstufen. Bei Bedarf hier feinjustieren.
+const WHEEL_ZOOM_STEP = 0.25;
+const WHEEL_ZOOM_INTERVAL_MS = 120;
+
+function _setupSmoothWheelZoom(map) {
+    let throttleTimer = null;
+    let trailingPending = false;
+    let lastDirection = 0;
+    let lastPos = null;
+
+    function applyStep(direction, pos) {
+        const targetZoom = map._limitZoom(map.getZoom() + direction * WHEEL_ZOOM_STEP);
+        map.setZoomAround(pos, targetZoom);
+    }
+
+    function scheduleStep(direction, pos) {
+        lastDirection = direction;
+        lastPos = pos;
+        if (throttleTimer) {
+            trailingPending = true;
+            return;
+        }
+        applyStep(direction, pos);
+        throttleTimer = setTimeout(() => {
+            throttleTimer = null;
+            if (trailingPending) {
+                trailingPending = false;
+                scheduleStep(lastDirection, lastPos);
+            }
+        }, WHEEL_ZOOM_INTERVAL_MS);
+    }
+
+    map.getContainer().addEventListener('wheel', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!e.deltaY) return;
+        const direction = e.deltaY > 0 ? -1 : 1;
+        scheduleStep(direction, map.mouseEventToContainerPoint(e));
+    }, { passive: false });
 }
 function _addStandardMapControls() {
     if (!AppState.map) {
@@ -2282,6 +2331,8 @@ function _setupCoreMapEventHandlers() {
     });
 
     AppState.map.on('dblclick', _handleMapDblClick);
+
+    _setupSmoothWheelZoom(AppState.map);
 
     // Zoom Events
     AppState.map.on('zoomstart', (e) => {
