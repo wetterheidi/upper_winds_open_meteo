@@ -415,7 +415,8 @@
         "invalid_position": "Invalid position selected. Using default position.",
         "select_position": "Please select a position on the map first.",
         "airspace": {
-            "toggle": "US Airspace (FAA)"
+            "toggle": "US Airspace (FAA)",
+            "openaip_toggle": "Worldwide Airspace (openAIP)"
         },
         "radar": {
             "title": "Weather Radar",

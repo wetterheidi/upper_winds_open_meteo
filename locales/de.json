@@ -424,7 +424,8 @@
             "suppressed": "Radar ausgeblendet (zukünftiger Zeitpunkt gewählt)"
         },
         "airspace": {
-            "toggle": "Lufträume USA (FAA)"
+            "toggle": "Lufträume USA (FAA)",
+            "openaip_toggle": "Lufträume weltweit (openAIP)"
         }
     },
     "adsb": {
