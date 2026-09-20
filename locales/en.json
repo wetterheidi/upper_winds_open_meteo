@@ -69,6 +69,8 @@
             "cloud_base": "Warning: Low cloud base ({altitude} {unit})"
         },
         "model_run": "Model Run",
+        "data_source_model_level": "Model-level data (high resolution)",
+        "data_source_pressure_level": "Pressure-level data (standard)",
         "elevation": "Elevation",
         "surface_data": "Surface Data",
         "no_alerts": "No weather alerts for the selected period.",
@@ -418,9 +420,15 @@
             "toggle": "US Airspace (FAA)",
             "openaip_toggle": "Worldwide Airspace (openAIP)"
         },
+        "openflightmap": {
+            "toggle": "Open Flight Map"
+        },
+        "seamarks": {
+            "toggle": "Seamarks (OpenSeaMap)"
+        },
         "radar": {
             "title": "Weather Radar",
-            "toggle": "Radar",
+            "toggle": "Weather Radar",
             "opacity": "Opacity",
             "animate": "Play",
             "stop": "Stop",
