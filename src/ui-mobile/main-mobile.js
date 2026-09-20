@@ -2582,25 +2582,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const versionEl = document.getElementById('appVersion');
     if (versionEl) versionEl.textContent = 'v' + __APP_VERSION__;
 
-    const configureStatusBar = async () => {
-        try {
-            const { StatusBar, isNative } = await getCapacitor();
-            if (isNative && StatusBar) {
-                console.log('[App] Configuring Native Status Bar (Aggressive)');
-                await StatusBar.setOverlaysWebView({ overlay: true });
-                // '#00000000' is fully transparent (required on Android)
-                await StatusBar.setBackgroundColor({ color: '#00000000' });
-                await StatusBar.hide();
-
-                // Event Listener: Falls sie versehentlich wieder auftaucht (z.B. durch Keyboard)
-                // window.addEventListener('resize', () => StatusBar.hide());
-            }
-        } catch (err) {
-            console.warn('[App] Error configuring status bar:', err);
-        }
-    };
-
-    configureStatusBar();
+    // Die Statusleiste wird nativ ausgeblendet (Android: MainActivity.java via
+    // WindowInsetsControllerCompat, iOS: Info.plist UIStatusBarHidden) statt über
+    // das @capacitor/status-bar-Plugin, dessen Android-Implementierung auch bei
+    // targetSdk 36 noch deprecated Edge-to-edge-APIs (Window.setStatusBarColor,
+    // View.setSystemUiVisibility) aufruft und von der Play Console beanstandet wurde.
 
     await initializeApp();
     setupLanguageDropdown();

@@ -13,6 +13,9 @@ import android.os.Bundle;
 import android.os.PowerManager;
 import android.provider.Settings;
 import android.webkit.WebView;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 import com.getcapacitor.BridgeActivity;
 import org.json.JSONObject;
@@ -40,6 +43,19 @@ public class MainActivity extends BridgeActivity {
                 WebView.RENDERER_PRIORITY_IMPORTANT, false
             );
         }
+
+        // Statusleiste dauerhaft ausblenden (Vollbild). Ersetzt das
+        // @capacitor/status-bar-Plugin, dessen Android-Implementierung auch bei
+        // targetSdk 36 noch deprecated Edge-to-edge-APIs (setStatusBarColor,
+        // setSystemUiVisibility) aufruft und von der Play Console beanstandet wurde.
+        // WindowInsetsControllerCompat.hide() nutzt ausschließlich moderne APIs.
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+        WindowInsetsControllerCompat insetsController =
+            WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
+        insetsController.hide(WindowInsetsCompat.Type.statusBars());
+        insetsController.setSystemBarsBehavior(
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        );
 
         requestBatteryOptimizationExemption();
 

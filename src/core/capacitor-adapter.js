@@ -8,7 +8,6 @@ import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Browser } from '@capacitor/browser';
 import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';
-import { StatusBar } from '@capacitor/status-bar';
 import { BackgroundGeolocation } from '@capacitor-community/background-geolocation';
 
 const DEVICE_READY_FALLBACK_MS = 2000;
@@ -56,7 +55,6 @@ async function loadModules() {
                 Browser,
                 Capacitor,
                 App,
-                StatusBar,
                 BackgroundGeolocation,
                 isNative: true,
                 isInitialized: true
@@ -66,7 +64,7 @@ async function loadModules() {
     } catch (error) {
         console.error('Error loading Capacitor modules:', error);
     }
-    
+
     return {
         Geolocation: null,
         Filesystem: null,
@@ -74,7 +72,6 @@ async function loadModules() {
         Browser: null,
         Capacitor: null,
         App: null,
-        StatusBar: null,
         BackgroundGeolocation: null,
         isNative: false,
         isInitialized: false
@@ -92,7 +89,6 @@ export async function getCapacitor() {
                 Browser: null,
                 Capacitor: null,
                 App: null,
-                StatusBar: null,
                 BackgroundGeolocation: null,
                 isNative: false,
                 isInitialized: false
