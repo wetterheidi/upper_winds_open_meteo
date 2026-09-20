@@ -1105,10 +1105,28 @@ function _addStandardMapControls() {
     const radarOverlayGroup = L.layerGroup();
     const faaAirspaceLayer = Airspace.createFaaAirspaceLayer();
     const worldAirspace = createAirspaceOverlay(L);
+    const openFlightMapOverlay = L.tileLayer.cached('https://nwy-tiles-api.prod.newaydata.com/tiles/{z}/{x}/{y}.png?path=latest/aero/latest', {
+        maxZoom: 19,
+        attribution: '© <a href="https://www.openflightmaps.org">openflightmaps.org</a>',
+        opacity: 0.8,
+        transparent: true,
+        zIndex: 2,
+        updateWhenIdle: true,
+        keepBuffer: 2,
+        subdomains: ['a', 'b', 'c']
+    });
+    const seamarksOverlay = L.tileLayer('https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png', {
+        maxZoom: 18,
+        attribution: ' © <a href="http://www.openseamap.org">OpenSeaMap</a> contributors',
+        transparent: true,
+        zIndex: 3
+    });
     const overlays = {
         [I18n.t('map.radar.toggle')]: radarOverlayGroup,
         [I18n.t('map.airspace.toggle')]: faaAirspaceLayer,
-        [I18n.t('map.airspace.openaip_toggle')]: worldAirspace.group
+        [I18n.t('map.airspace.openaip_toggle')]: worldAirspace.group,
+        [I18n.t('map.openflightmap.toggle')]: openFlightMapOverlay,
+        [I18n.t('map.seamarks.toggle')]: seamarksOverlay
     };
     L.control.layers(AppState.baseMaps, overlays, { position: 'topright' }).addTo(AppState.map);
 
@@ -1529,41 +1547,10 @@ function _setupBaseLayersAndHandling() {
         ], {
             attribution: '© Esri, USDA, USGS | © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         }),
-        "OpenTopoMap + Airspaces": L.layerGroup([
-            L.tileLayer.cached('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-                maxZoom: 19,
-                attribution: '© <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)',
-                subdomains: ['a', 'b', 'c']
-            }),
-            L.tileLayer.cached('https://nwy-tiles-api.prod.newaydata.com/tiles/{z}/{x}/{y}.png?path=latest/aero/latest', {
-                maxZoom: 19,
-                attribution: '© <a href="https://www.openflightmaps.org">openflightmaps.org</a>',
-                opacity: 0.8,
-                transparent: true,
-                zIndex: 2,
-                updateWhenIdle: true,
-                keepBuffer: 2,
-                subdomains: ['a', 'b', 'c']
-            })
-        ], {
-            attribution: '© Esri, USDA, USGS | © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        }),
         "Open Flight Map": L.tileLayer.cached('https://nwy-tiles-api.prod.newaydata.com/tiles/{z}/{x}/{y}.png?path=latest/aero/latest', {
             maxZoom: 19,
             attribution: '© <a href="https://www.openflightmaps.org">openflightmaps.org</a>'
         }),
-        "Esri Topo + SeaMarks": L.layerGroup([
-            L.tileLayer.cached('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
-                maxZoom: 19,
-                attribution: '© Esri, USGS'
-            }),
-            L.tileLayer('https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png', {
-                maxZoom: 18,
-                attribution: ' © <a href="http://www.openseamap.org">OpenSeaMap</a> contributors',
-                transparent: true,
-                zIndex: 3
-            })
-        ]),
         "Esri Dark Gray": L.layerGroup([
             L.tileLayer.cached('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
                 maxZoom: 16,

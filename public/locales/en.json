@@ -420,9 +420,15 @@
             "toggle": "US Airspace (FAA)",
             "openaip_toggle": "Worldwide Airspace (openAIP)"
         },
+        "openflightmap": {
+            "toggle": "Open Flight Map"
+        },
+        "seamarks": {
+            "toggle": "Seamarks (OpenSeaMap)"
+        },
         "radar": {
             "title": "Weather Radar",
-            "toggle": "Radar",
+            "toggle": "Weather Radar",
             "opacity": "Opacity",
             "animate": "Play",
             "stop": "Stop",
