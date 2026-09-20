@@ -12,6 +12,7 @@ import { WEATHER_MODELS, API_URLS, STANDARD_PRESSURE_LEVELS, THUNDERSTORM_CODES,
 import { DateTime } from 'luxon';
 import { I18n } from './i18n.js';
 import { SOUNDING_MODEL_ID, checkSoundingAvailability, fetchSoundingData } from './soundingManager.js';
+import { MODEL_LEVEL_ELIGIBLE, fetchModelLevelData } from './modelLevelManager.js';
 
 // ===================================================================
 // 1. Öffentliche Hauptfunktionen (API des Moduls)
@@ -440,6 +441,7 @@ async function fetchWeather(lat, lon, currentTime = null, historicalDateOverride
 
         // Progtemp-Modell abfangen: Sounding-Daten statt Open-Meteo laden
         if (selectedModelValue === SOUNDING_MODEL_ID) {
+            AppState.lastDataSource = null;
             return await fetchSoundingData(lat, lon, currentTime);
         }
 
@@ -517,6 +519,29 @@ async function fetchWeather(lat, lon, currentTime = null, historicalDateOverride
 
             endDateStr = forecastStart.plus({ days: forecastDays - 1 }).toFormat('yyyy-MM-dd');
         }
+
+        // Für ICON-D2/EU/GLOBAL zuerst hochaufgelöste native Modelllevel-Daten von Michaels
+        // Servern versuchen (mehr vertikale Auflösung als die 13 Standard-Drucklevel unten).
+        // Nur für Forecast-Anfragen (Michaels Server bieten kein historisches Pendant).
+        // Bei jedem Fehler (Netzwerk, Standort außerhalb der Server-Bbox, ...) automatischer
+        // Fallback auf die bestehende Pressure-Level-Logik weiter unten.
+        if (!isHistorical && MODEL_LEVEL_ELIGIBLE.includes(selectedModelValue)) {
+            try {
+                // ICON-Global liefert Modelllevel-Daten nur für ~36h; Fenster entsprechend begrenzen
+                // (analog zur bestehenden 2-Tage-Sonderregel für icon_d2 oben).
+                const levelEndDateStr = selectedModelValue === 'icon_global'
+                    ? DateTime.fromFormat(startDateStr, 'yyyy-MM-dd', { zone: 'utc' }).plus({ days: 1 }).toFormat('yyyy-MM-dd')
+                    : endDateStr;
+
+                const levelData = await fetchModelLevelData(lat, lon, selectedModelValue, startDateStr, levelEndDateStr);
+                AppState.lastDataSource = 'model-level';
+                return levelData;
+            } catch (e) {
+                console.warn(`[weatherManager] Modelllevel-Daten für ${selectedModelValue} nicht verfügbar, Fallback auf Pressure-Level:`, e.message);
+                AppState.customPressureLevels = null;
+            }
+        }
+        AppState.lastDataSource = 'pressure-level';
 
         const hourlyParams = "surface_pressure,temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,visibility,weather_code,cloud_cover_low,cloud_cover_mid,cloud_cover_high,temperature_1000hPa,relative_humidity_1000hPa,wind_speed_1000hPa,wind_direction_1000hPa,geopotential_height_1000hPa,cloud_cover_1000hPa,temperature_950hPa,relative_humidity_950hPa,wind_speed_950hPa,wind_direction_950hPa,geopotential_height_950hPa,cloud_cover_950hPa,temperature_925hPa,relative_humidity_925hPa,wind_speed_925hPa,wind_direction_925hPa,geopotential_height_925hPa,cloud_cover_925hPa,temperature_900hPa,relative_humidity_900hPa,wind_speed_900hPa,wind_direction_900hPa,geopotential_height_900hPa,cloud_cover_900hPa,temperature_850hPa,relative_humidity_850hPa,wind_speed_850hPa,wind_direction_850hPa,geopotential_height_850hPa,cloud_cover_850hPa,temperature_800hPa,relative_humidity_800hPa,wind_speed_800hPa,wind_direction_800hPa,geopotential_height_800hPa,cloud_cover_800hPa,temperature_700hPa,relative_humidity_700hPa,wind_speed_700hPa,wind_direction_700hPa,geopotential_height_700hPa,cloud_cover_700hPa,temperature_600hPa,relative_humidity_600hPa,wind_speed_600hPa,wind_direction_600hPa,geopotential_height_600hPa,cloud_cover_600hPa,temperature_500hPa,relative_humidity_500hPa,wind_speed_500hPa,wind_direction_500hPa,geopotential_height_500hPa,cloud_cover_500hPa,temperature_400hPa,relative_humidity_400hPa,wind_speed_400hPa,wind_direction_400hPa,geopotential_height_400hPa,cloud_cover_400hPa,temperature_300hPa,relative_humidity_300hPa,wind_speed_300hPa,wind_direction_300hPa,geopotential_height_300hPa,cloud_cover_300hPa,temperature_250hPa,relative_humidity_250hPa,wind_speed_250hPa,wind_direction_250hPa,geopotential_height_250hPa,cloud_cover_250hPa,temperature_200hPa,relative_humidity_200hPa,wind_speed_200hPa,wind_direction_200hPa,geopotential_height_200hPa,cloud_cover_200hPa";
         const url = `${baseUrl}?latitude=${lat}&longitude=${lon}&hourly=${hourlyParams}&models=${selectedModelValue}&start_date=${startDateStr}&end_date=${endDateStr}`;

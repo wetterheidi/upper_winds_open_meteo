@@ -333,7 +333,12 @@ export function updateModelInfoPopup() {
     const model = modelSelect.value;
     const modelRun = AppState.lastModelRun || "N/A";
 
-    const titleContent = `${I18n.t('common.forecast_model')}: ${model.replace(/_/g, ' ').toUpperCase()}\n${I18n.t('weather.model_run')} ${modelRun}`;
+    let titleContent = `${I18n.t('common.forecast_model')}: ${model.replace(/_/g, ' ').toUpperCase()}\n${I18n.t('weather.model_run')} ${modelRun}`;
+    if (AppState.lastDataSource === 'model-level') {
+        titleContent += `\n${I18n.t('weather.data_source_model_level')}`;
+    } else if (AppState.lastDataSource === 'pressure-level') {
+        titleContent += `\n${I18n.t('weather.data_source_pressure_level')}`;
+    }
     modelInfoPopup.innerHTML = titleContent.replace(/\n/g, '<br>');
 }
 

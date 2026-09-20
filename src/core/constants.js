@@ -149,6 +149,7 @@ export const CONVERSIONS = {
     METERS_TO_NM: 1 / 1852,
     KNOTS_TO_KMH: 1.852,
     MPH_TO_KMH: 1.60934,
+    MPS_TO_KMH: 3.6,
     CELSIUS_TO_KELVIN: 273.15,
 };
 

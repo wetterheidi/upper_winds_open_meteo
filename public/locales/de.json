@@ -69,6 +69,8 @@
             "cloud_base": "Warnung: Niedrige Wolkenuntergrenze ({altitude} {unit})"
         },
         "model_run": "Modell-Lauf",
+        "data_source_model_level": "Modelllevel-Daten (hochauflösend)",
+        "data_source_pressure_level": "Pressure-Level-Daten (Standard)",
         "elevation": "Geländehöhe",
         "surface_data": "Bodendaten",
         "no_alerts": "Keine Wetterwarnungen für den gewählten Zeitraum.",
