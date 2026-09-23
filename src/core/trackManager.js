@@ -12,6 +12,7 @@ import { interpolateWeatherData } from './weatherManager.js';
 import { getCapacitor } from './capacitor-adapter.js';
 import { Settings } from './settings.js';
 import { I18n } from './i18n.js';
+import { TRACK_REFERENCE_DEFAULTS } from './constants.js';
 
 // ===================================================================
 // 1. Öffentliche Lade- & Speicherfunktionen
@@ -105,16 +106,21 @@ export async function loadGpxTrack(file) {
 
         const waypoints = xml.getElementsByTagName('wpt');
         let dipWaypoint = null;
+        let landingWaypoint = null;
         for (let i = 0; i < waypoints.length; i++) {
-            const name = waypoints[i].getElementsByTagName('name')[0]?.textContent;
-            if (name && name.toUpperCase() === 'DIP') {
-                const lat = parseFloat(waypoints[i].getAttribute('lat'));
-                const lng = parseFloat(waypoints[i].getAttribute('lon'));
-                if (!isNaN(lat) && !isNaN(lng)) {
-                    dipWaypoint = { lat, lng };
-                    console.log(`[trackManager] DIP waypoint found in GPX file at: ${lat}, ${lng}`);
-                    break;
-                }
+            const name = waypoints[i].getElementsByTagName('name')[0]?.textContent?.trim().toUpperCase();
+            if (name !== 'DIP' && name !== 'LANDING') continue;
+            const lat = parseFloat(waypoints[i].getAttribute('lat'));
+            const lng = parseFloat(waypoints[i].getAttribute('lon'));
+            if (isNaN(lat) || isNaN(lng)) continue;
+            const ele = parseFloat(waypoints[i].getElementsByTagName('ele')[0]?.textContent);
+            const waypoint = { lat, lng, ele: isNaN(ele) ? null : ele };
+            if (name === 'DIP' && !dipWaypoint) {
+                dipWaypoint = waypoint;
+                console.log(`[trackManager] DIP waypoint found in GPX file at: ${lat}, ${lng}`);
+            } else if (name === 'LANDING' && !landingWaypoint) {
+                landingWaypoint = waypoint;
+                console.log(`[trackManager] LANDING waypoint found in GPX file at: ${lat}, ${lng}`);
             }
         }
 
@@ -143,7 +149,7 @@ export async function loadGpxTrack(file) {
         }
         if (points.length < 2) throw new Error(I18n.t('tracks.error_gpx_points'));
 
-        const trackMetaData = await renderTrack(points, file.name, dipWaypoint);
+        const trackMetaData = await renderTrack(points, file.name, dipWaypoint, landingWaypoint);
         return trackMetaData;
 
     } catch (error) {
@@ -231,6 +237,9 @@ export async function saveRecordedTrack() {
         return;
     }
 
+    // Snapshot, damit eine während des Speicherns neu gestartete Aufzeichnung nicht verloren geht.
+    const recordedPoints = AppState.recordedTrackPoints;
+
     try {
         let dipWaypoint = '';
         if (AppState.lastLat !== null && AppState.lastLng !== null) {
@@ -238,14 +247,27 @@ export async function saveRecordedTrack() {
             dipWaypoint = `  <wpt lat="${AppState.lastLat}" lon="${AppState.lastLng}">\n    <name>DIP</name>\n    <ele>${dipElevation}</ele>\n    <sym>Flag, Blue</sym>\n  </wpt>\n`;
         }
 
+        // Tatsächlicher Landepunkt mit Geländehöhe, damit beim Laden gegen den DIP geprüft werden kann.
+        let landingWaypoint = '';
+        const lastPoint = recordedPoints[recordedPoints.length - 1];
+        if (lastPoint && typeof lastPoint.lat === 'number' && typeof lastPoint.lng === 'number') {
+            const terrainElevation = await Utils.getAltitude(lastPoint.lat, lastPoint.lng);
+            const landingElevation = typeof terrainElevation === 'number'
+                ? terrainElevation
+                : (typeof lastPoint.ele === 'number' ? lastPoint.ele : null);
+            if (landingElevation !== null) {
+                landingWaypoint = `  <wpt lat="${lastPoint.lat}" lon="${lastPoint.lng}">\n    <name>LANDING</name>\n    <ele>${landingElevation.toFixed(2)}</ele>\n    <sym>Flag, Red</sym>\n  </wpt>\n`;
+            }
+        }
+
         const header = `<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="DZMaster" xmlns="http://www.topografix.com/GPX/1/1">
 <metadata><name>Skydive Track - ${new Date().toLocaleString()}</name></metadata>
-${dipWaypoint}<trk><name>Recorded Skydive</name><trkseg>`;
+${dipWaypoint}${landingWaypoint}<trk><name>Recorded Skydive</name><trkseg>`;
 
         const footer = `</trkseg></trk></gpx>`;
 
-        const trackpointStrings = AppState.recordedTrackPoints.map((p, index) => {
+        const trackpointStrings = recordedPoints.map((p, index) => {
             if (p && typeof p.lat === 'number' && typeof p.lng === 'number' && p.time) {
                 const ele = (typeof p.ele === 'number') ? p.ele.toFixed(2) : '0';
                 const time = p.time.toISO();
@@ -292,7 +314,9 @@ ${dipWaypoint}<trk><name>Recorded Skydive</name><trkseg>`;
         console.error("Error in saveRecordedTrack:", error);
         Utils.handleError(I18n.t('tracks.error_save_failed'));
     } finally {
-        AppState.recordedTrackPoints = [];
+        if (AppState.recordedTrackPoints === recordedPoints) {
+            AppState.recordedTrackPoints = [];
+        }
     }
 }
 
@@ -521,15 +545,125 @@ export async function exportLandingPatternToGpx() {
 // ===================================================================
 
 /**
+ * Bestimmt die Bodenreferenz (DIP) für einen geladenen Track.
+ * Weicht ein DIP-Wegpunkt zu stark vom tatsächlichen Landepunkt ab (Distanz oder Höhe),
+ * entscheidet der Nutzer, welcher der beiden als Referenz dient.
+ * @param {object[]} points - Die Trackpunkte.
+ * @param {object|null} dipWaypoint - DIP-Wegpunkt aus der Datei ({lat, lng, ele}).
+ * @param {object|null} landingWaypoint - LANDING-Wegpunkt aus der Datei ({lat, lng, ele}).
+ * @returns {Promise<{lat: number, lng: number, altitude: number|string}>}
+ * @private
+ */
+async function resolveTrackReference(points, dipWaypoint, landingWaypoint) {
+    const finalPoint = points[points.length - 1];
+    const landing = { lat: finalPoint.lat, lng: finalPoint.lng, altitude: 'N/A' };
+    if (landingWaypoint) {
+        landing.lat = landingWaypoint.lat;
+        landing.lng = landingWaypoint.lng;
+        landing.altitude = landingWaypoint.ele ?? 'N/A';
+    }
+    if (landing.altitude === 'N/A') {
+        landing.altitude = await Utils.getAltitude(landing.lat, landing.lng);
+    }
+
+    if (!dipWaypoint) {
+        console.log("[trackManager] No DIP waypoint in file. Using the landing point as reference.");
+        return landing;
+    }
+
+    const dip = { lat: dipWaypoint.lat, lng: dipWaypoint.lng, altitude: await Utils.getAltitude(dipWaypoint.lat, dipWaypoint.lng) };
+    if (dip.altitude === 'N/A' && dipWaypoint.ele !== null) {
+        dip.altitude = dipWaypoint.ele;
+    }
+
+    const distanceM = AppState.map.distance([dip.lat, dip.lng], [landing.lat, landing.lng]);
+    const heightDiffM = (typeof dip.altitude === 'number' && typeof landing.altitude === 'number')
+        ? dip.altitude - landing.altitude
+        : null;
+    const isPlausible = distanceM <= TRACK_REFERENCE_DEFAULTS.MAX_DIP_LANDING_DISTANCE_M
+        && (heightDiffM === null || Math.abs(heightDiffM) <= TRACK_REFERENCE_DEFAULTS.MAX_DIP_LANDING_HEIGHT_DIFF_M);
+
+    if (isPlausible) {
+        console.log("[trackManager] DIP waypoint is consistent with the landing point. Using DIP as reference.");
+        return dip;
+    }
+
+    console.warn(`[trackManager] DIP deviates from landing point (${distanceM.toFixed(0)} m, height diff ${heightDiffM?.toFixed(0) ?? 'N/A'} m). Asking user.`);
+    const choice = await showTrackReferenceDialog(dip, landing, distanceM, heightDiffM);
+    return choice === 'dip' ? dip : landing;
+}
+
+/**
+ * Zeigt einen Dialog, in dem der Nutzer zwischen DIP und Landepunkt als Bodenreferenz wählt.
+ * @param {object} dip - DIP mit {altitude}.
+ * @param {object} landing - Landepunkt mit {altitude}.
+ * @param {number} distanceM - Distanz zwischen DIP und Landepunkt in Metern.
+ * @param {number|null} heightDiffM - Höhendifferenz DIP − Landepunkt in Metern.
+ * @returns {Promise<'dip'|'landing'>}
+ * @private
+ */
+function showTrackReferenceDialog(dip, landing, distanceM, heightDiffM) {
+    return new Promise((resolve) => {
+        const heightUnit = Settings.getValue('heightUnit', 'm');
+        const formatHeight = (m) => typeof m === 'number' ? `${Math.round(Utils.convertHeight(m, heightUnit))} ${heightUnit}` : 'N/A';
+
+        let message = I18n.t('tracks.reference_mismatch_distance', { distance: Utils.formatDistance(distanceM) });
+        if (heightDiffM !== null) {
+            message += ' ' + I18n.t('tracks.reference_mismatch_height', { height: formatHeight(Math.abs(heightDiffM)) });
+        }
+
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        const content = document.createElement('div');
+        content.className = 'modal-content';
+        const title = document.createElement('h3');
+        title.textContent = I18n.t('tracks.reference_mismatch_title');
+        const text = document.createElement('p');
+        text.style.textAlign = 'left';
+        text.style.lineHeight = '1.6';
+        text.textContent = message;
+        const question = document.createElement('p');
+        question.style.textAlign = 'left';
+        question.textContent = I18n.t('tracks.reference_mismatch_question');
+        const buttons = document.createElement('div');
+        buttons.className = 'modal-buttons';
+
+        // Der Lade-Spinner liegt über Modals und würde den Dialog verdecken.
+        const loadingElement = document.getElementById('loading');
+        const loadingDisplay = loadingElement?.style.display;
+        if (loadingElement) loadingElement.style.display = 'none';
+
+        const addButton = (label, value) => {
+            const button = document.createElement('button');
+            button.className = 'modal-btn';
+            button.textContent = label;
+            button.onclick = () => {
+                modal.remove();
+                if (loadingElement) loadingElement.style.display = loadingDisplay;
+                resolve(value);
+            };
+            buttons.appendChild(button);
+        };
+        addButton(I18n.t('tracks.reference_use_landing', { height: formatHeight(landing.altitude) }), 'landing');
+        addButton(I18n.t('tracks.reference_use_dip', { height: formatHeight(dip.altitude) }), 'dip');
+
+        content.append(title, text, question, buttons);
+        modal.appendChild(content);
+        document.body.appendChild(modal);
+    });
+}
+
+/**
  * Rendert einen gegebenen Satz von Trackpunkten auf der Karte als farbkodierte Linie.
  * Löst nach dem Rendern ein 'track:loaded'-Event aus.
  * @param {object[]} points - Ein Array von Punkt-Objekten, die den Track definieren.
  * @param {string} fileName - Der Name der geladenen Datei.
  * @param {object|null} [dipWaypoint=null] - Ein optionaler DIP-Wegpunkt aus einer GPX-Datei.
+ * @param {object|null} [landingWaypoint=null] - Ein optionaler LANDING-Wegpunkt aus einer GPX-Datei.
  * @returns {Promise<object|null>} Ein Promise, das zu den Metadaten des Tracks auflöst.
  * @private
  */
-async function renderTrack(points, fileName, dipWaypoint = null) {
+async function renderTrack(points, fileName, dipWaypoint = null, landingWaypoint = null) {
     try {
         console.log(`[trackManager] renderTrack called for ${fileName} with ${points.length} points.`);
         if (!AppState.map) {
@@ -555,18 +689,10 @@ async function renderTrack(points, fileName, dipWaypoint = null) {
 
         if (points.length > 0) {
 
-            if (dipWaypoint) {
-                console.log("[trackManager] DIP waypoint found in GPX. Setting DIP to waypoint position.");
-                AppState.lastLat = dipWaypoint.lat;
-                AppState.lastLng = dipWaypoint.lng;
-                AppState.lastAltitude = await Utils.getAltitude(AppState.lastLat, AppState.lastLng);
-            } else {
-                console.log("[trackManager] No DIP waypoint in file. Setting DIP to the last point of the track.");
-                const finalPoint = points[points.length - 1];
-                AppState.lastLat = finalPoint.lat;
-                AppState.lastLng = finalPoint.lng;
-                AppState.lastAltitude = await Utils.getAltitude(AppState.lastLat, AppState.lastLng);
-            }
+            const reference = await resolveTrackReference(points, dipWaypoint, landingWaypoint);
+            AppState.lastLat = reference.lat;
+            AppState.lastLng = reference.lng;
+            AppState.lastAltitude = reference.altitude;
 
             trackMetaData.finalPointData = { lat: AppState.lastLat, lng: AppState.lastLng, altitude: AppState.lastAltitude };
 

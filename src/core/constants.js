@@ -221,6 +221,12 @@ export const SMOOTHING_DEFAULTS = {
     SPEED_SMOOTHING_THRESHOLD: 25, // m/s, Schwelle, ab der die stärkere Glättung greift
 };
 
+/** Plausibilitätsprüfung zwischen DIP und Landepunkt beim Laden aufgezeichneter Tracks. */
+export const TRACK_REFERENCE_DEFAULTS = {
+    MAX_DIP_LANDING_DISTANCE_M: 3000,     // Ab dieser Distanz DIP ↔ Landepunkt wird nachgefragt
+    MAX_DIP_LANDING_HEIGHT_DIFF_M: 50     // Ab dieser Höhendifferenz DIP ↔ Landepunkt wird nachgefragt
+};
+
 /** Konfiguration für das Caching von Kartenkacheln. */
 export const CACHE_DEFAULTS = {
     TILE_MAX_AGE_DAYS: 7,
