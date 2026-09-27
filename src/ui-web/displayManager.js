@@ -339,6 +339,26 @@ export function updateModelInfoPopup() {
     } else if (AppState.lastDataSource === 'pressure-level') {
         titleContent += `\n${I18n.t('weather.data_source_pressure_level')}`;
     }
+    // Tatsächlich liefernder Server (Primär oder Fallback), s. modelLevelManager.js
+    const server = AppState.lastDataServer;
+    if (server) {
+        titleContent += `\n${I18n.t(server.fallback ? 'weather.data_server_fallback' : 'weather.data_server', { host: server.host })}`;
+        if (server.surfaceHost && server.surfaceHost !== server.host) {
+            titleContent += `\n${I18n.t(server.surfaceFallback ? 'weather.surface_server_fallback' : 'weather.surface_server', { host: server.surfaceHost })}`;
+        }
+    }
+    // Modelllevel sind geländefolgend (s. modelLevelManager.js): eine große Differenz
+    // Modell-Orographie vs. DEM90 heißt, das Gelände ist vom Modellgitter nicht aufgelöst.
+    // Schwelle wie dronecast (TERRAIN_MISMATCH_WARN_M, grobe Faustregel).
+    const oro = AppState.lastOrography;
+    if (oro && Number.isFinite(oro.modelM) && Number.isFinite(oro.demM)) {
+        const delta = Math.round(oro.modelM - oro.demM);
+        const warn = Math.abs(delta) >= 100;
+        titleContent += `\n${warn ? '⚠ ' : ''}${I18n.t('weather.orography', {
+            model: Math.round(oro.modelM), dem: Math.round(oro.demM), delta: `${delta >= 0 ? '+' : '−'}${Math.abs(delta)}`,
+        })}`;
+        if (warn) titleContent += `\n${I18n.t('weather.orography_warning')}`;
+    }
     modelInfoPopup.innerHTML = titleContent.replace(/\n/g, '<br>');
 }
 

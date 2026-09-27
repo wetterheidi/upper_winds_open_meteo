@@ -10,6 +10,7 @@ import { AppState } from './state.js';
 import { CONVERSIONS, ISA_CONSTANTS, DEWPOINT_COEFFICIENTS, EARTH_RADIUS_METERS, BEAUFORT, ENSEMBLE_VISUALIZATION, QFE_ACCURACY } from './constants.js';
 import { Settings } from "./settings.js";
 import { I18n } from './i18n.js';
+import { OM_PRIMARY, OM_LEGACY, fetchJsonFromServers, fetchDemElevation } from './openMeteoServers.js';
 
 // Private Variablen für das Handler-System
 let customErrorHandler = console.error;
@@ -1201,6 +1202,12 @@ export class Utils {
             return Utils.locationCache.get(cacheKey);
         }
 
+        // Geländehöhe: DEM90 über die Server-Kette (open-meteo.wetterheidi.de zuerst,
+        // s. openMeteoServers.js), parallel zur Zeitzonen-Abfrage. Die Zeitzone kommt
+        // weiter von api.open-meteo.com -- `timezone=auto` bringt open-meteo.wetterheidi.de
+        // derzeit zum Absturz. Deren `elevation` (dort DEM90) dient als Rückfall.
+        const demPromise = fetchDemElevation(lat, lng);
+
         const maxRetries = 3;
         for (let attempt = 0; attempt < maxRetries; attempt++) {
             try {
@@ -1217,20 +1224,23 @@ export class Utils {
                     throw new Error(`Open-Meteo fetch failed: ${response.status}`);
                 }
                 const data = await response.json();
+                const dem = await demPromise;
                 const locationData = {
                     timezone: data.timezone || 'GMT',
                     timezone_abbreviation: data.timezone_abbreviation || 'GMT',
-                    elevation: data.elevation !== undefined ? data.elevation : 'N/A'
+                    elevation: Number.isFinite(dem) ? dem : (data.elevation !== undefined ? data.elevation : 'N/A')
                 };
                 Utils.locationCache.set(cacheKey, locationData);
                 return locationData;
             } catch (error) {
                 if (attempt < maxRetries - 1) continue;
                 console.error('Error fetching location data:', error.message);
-                return { timezone: 'UTC', elevation: 'N/A' };
+                const dem = await demPromise;
+                return { timezone: 'UTC', elevation: Number.isFinite(dem) ? dem : 'N/A' };
             }
         }
-        return { timezone: 'UTC', elevation: 'N/A' };
+        const dem = await demPromise;
+        return { timezone: 'UTC', elevation: Number.isFinite(dem) ? dem : 'N/A' };
     }
 
     /**
@@ -1257,6 +1267,10 @@ export class Utils {
      * @returns {Promise<number|string>} Die Höhe in Metern oder 'N/A'.
      */
     static async getAltitude(lat, lng) {
+        // DEM90 direkt über die Server-Kette; nur wenn die scheitert, der Umweg über
+        // getLocationData (öffentliche Instanz).
+        const dem = await fetchDemElevation(lat, lng);
+        if (Number.isFinite(dem)) return dem;
         const { elevation } = await Utils.getLocationData(lat, lng);
         //console.log('Fetched elevation from Open-Meteo:', elevation);
         return elevation !== 'N/A' ? elevation : 'N/A';
@@ -1274,6 +1288,18 @@ export class Utils {
 
         const latitudes = points.map(p => p.lat.toFixed(4)).join(',');
         const longitudes = points.map(p => p.lng.toFixed(4)).join(',');
+
+        // Zuerst die ratenlimitfreien Server (open-meteo.wetterheidi.de, dann Michaels);
+        // die öffentliche Instanz mit 429-Behandlung unten bleibt der Rückfall.
+        try {
+            const { data } = await fetchJsonFromServers([OM_PRIMARY, OM_LEGACY],
+                `/v1/elevation?latitude=${latitudes}&longitude=${longitudes}`, {
+                    timeoutMs: 20000,
+                    validate: (d) => Array.isArray(d.elevation) && d.elevation.length === points.length
+                        && d.elevation.every(Number.isFinite),
+                });
+            return data.elevation;
+        } catch { /* öffentliche Instanz unten */ }
 
         const maxRetries = 3;
         for (let attempt = 0; attempt < maxRetries; attempt++) {

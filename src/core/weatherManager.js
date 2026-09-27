@@ -12,7 +12,8 @@ import { WEATHER_MODELS, API_URLS, STANDARD_PRESSURE_LEVELS, THUNDERSTORM_CODES,
 import { DateTime } from 'luxon';
 import { I18n } from './i18n.js';
 import { SOUNDING_MODEL_ID, checkSoundingAvailability, fetchSoundingData } from './soundingManager.js';
-import { MODEL_LEVEL_ELIGIBLE, fetchModelLevelData } from './modelLevelManager.js';
+import { MODEL_LEVEL_ELIGIBLE, fetchModelLevelData, fetchIconRunMeta } from './modelLevelManager.js';
+import { OM_PUBLIC, hostOf, fetchJsonFromServers } from './openMeteoServers.js';
 
 // ===================================================================
 // 1. Öffentliche Hauptfunktionen (API des Moduls)
@@ -70,6 +71,20 @@ export function analyzeCloudLayers(weatherData) {
 
     console.log('[WeatherManager] Cloud layer thresholds analyzed for all timesteps.');
     return thresholds;
+}
+
+const _fmtRun = (initSec) => new Date(initSec * 1000).toISOString().replace('T', ' ').substring(0, 16) + 'Z';
+
+/**
+ * Setzt AppState.lastModelRun auf den Lauf von `dataServer`, falls die Laufinfo bisher
+ * von einem anderen Server stammt. Fehler sind unkritisch (Anzeige bleibt dann stehen).
+ */
+async function _syncRunInfo(dataServer, metaServer, dataset) {
+    if (!metaServer || hostOf(dataServer) === hostOf(metaServer)) return;
+    try {
+        const { data } = await fetchJsonFromServers([dataServer], `/data/${dataset}/static/meta.json`, { timeoutMs: 10000 });
+        if (Number.isFinite(data.last_run_initialisation_time)) AppState.lastModelRun = _fmtRun(data.last_run_initialisation_time);
+    } catch { /* Laufinfo bleibt beim bisherigen Wert */ }
 }
 
 /**
@@ -246,8 +261,11 @@ export function interpolateWeatherData(weatherData, sliderIndex, interpStep, bas
         }
     }
 
-    // Füge Bodendaten hinzu, um die Interpolation nach unten hin zu verbessern
-    const surfacePressure = weatherData.surface_pressure[sliderIndex];
+    // Füge Bodendaten hinzu, um die Interpolation nach unten hin zu verbessern.
+    // Modelllevel-Daten sind geländefolgend (s. modelLevelManager.js): das untere Ende der
+    // Säule ist der Modellgrund, dazu passt der Modell-Bodendruck. surface_pressure gilt
+    // dagegen für die DEM-Höhe (QFE am DIP) und bleibt der Fallback.
+    const surfacePressure = weatherData.surface_pressure_model?.[sliderIndex] ?? weatherData.surface_pressure[sliderIndex];
     if (surfacePressure === null || surfacePressure === undefined) {
         console.warn('Surface pressure missing');
         return [];
@@ -442,6 +460,8 @@ async function fetchWeather(lat, lon, currentTime = null, historicalDateOverride
         // Progtemp-Modell abfangen: Sounding-Daten statt Open-Meteo laden
         if (selectedModelValue === SOUNDING_MODEL_ID) {
             AppState.lastDataSource = null;
+            AppState.lastDataServer = null;
+            AppState.lastOrography = null;
             return await fetchSoundingData(lat, lon, currentTime);
         }
 
@@ -453,6 +473,7 @@ async function fetchWeather(lat, lon, currentTime = null, historicalDateOverride
 
         let isHistorical = false;
         let startDateStr, endDateStr;
+        let metaServer = null; // Server, von dem AppState.lastModelRun stammt
         const today = DateTime.utc().startOf('day');
         let targetDateForAPI = null;
 
@@ -491,11 +512,19 @@ async function fetchWeather(lat, lon, currentTime = null, historicalDateOverride
             // Normale Forecast-Logik zur Bestimmung des Zeitfensters
             let runDate;
             try {
-                const metaUrl = `https://api.open-meteo.com/data/${modelApiIdentifierForMeta}/static/meta.json`;
-                const metaResponse = await fetch(metaUrl);
-                const metaData = await metaResponse.json();
+                // ICON-Modelle: meta.json bevorzugt von den ICON-Servern (open-meteo.wetterheidi.de
+                // zuerst), sonst und für alle anderen Modelle von der öffentlichen Instanz.
+                let metaData = null;
+                if (MODEL_LEVEL_ELIGIBLE.includes(selectedModelValue)) {
+                    try {
+                        ({ meta: metaData, server: metaServer } = await fetchIconRunMeta(selectedModelValue, modelApiIdentifierForMeta));
+                    } catch { /* öffentliche Instanz unten */ }
+                }
+                if (!metaData) {
+                    ({ data: metaData, server: metaServer } = await fetchJsonFromServers([OM_PUBLIC], `/data/${modelApiIdentifierForMeta}/static/meta.json`));
+                }
                 runDate = new Date(metaData.last_run_initialisation_time * 1000);
-                AppState.lastModelRun = runDate.toISOString().replace('T', ' ').substring(0, 16) + 'Z';
+                AppState.lastModelRun = _fmtRun(metaData.last_run_initialisation_time);
             } catch (e) {
                 runDate = DateTime.utc().toJSDate();
                 AppState.lastModelRun = "N/A";
@@ -520,9 +549,9 @@ async function fetchWeather(lat, lon, currentTime = null, historicalDateOverride
             endDateStr = forecastStart.plus({ days: forecastDays - 1 }).toFormat('yyyy-MM-dd');
         }
 
-        // Für ICON-D2/EU/GLOBAL zuerst hochaufgelöste native Modelllevel-Daten von Michaels
-        // Servern versuchen (mehr vertikale Auflösung als die 13 Standard-Drucklevel unten).
-        // Nur für Forecast-Anfragen (Michaels Server bieten kein historisches Pendant).
+        // Für ICON-D2/EU/GLOBAL zuerst hochaufgelöste native Modelllevel-Daten von den
+        // Modelllevel-Servern versuchen (primär open-meteo.wetterheidi.de, s. modelLevelManager) (mehr vertikale Auflösung als die 13 Standard-Drucklevel unten).
+        // Nur für Forecast-Anfragen (die Modelllevel-Server bieten kein historisches Pendant).
         // Bei jedem Fehler (Netzwerk, Standort außerhalb der Server-Bbox, ...) automatischer
         // Fallback auf die bestehende Pressure-Level-Logik weiter unten.
         if (!isHistorical && MODEL_LEVEL_ELIGIBLE.includes(selectedModelValue)) {
@@ -535,6 +564,9 @@ async function fetchWeather(lat, lon, currentTime = null, historicalDateOverride
 
                 const levelData = await fetchModelLevelData(lat, lon, selectedModelValue, startDateStr, levelEndDateStr);
                 AppState.lastDataSource = 'model-level';
+                // Modelllauf vom tatsächlich liefernden Server anzeigen (ein Fallback-Server
+                // kann einen anderen Lauf geladen haben).
+                await _syncRunInfo(`https://${AppState.lastDataServer.host}`, metaServer, modelApiIdentifierForMeta);
                 return levelData;
             } catch (e) {
                 console.warn(`[weatherManager] Modelllevel-Daten für ${selectedModelValue} nicht verfügbar, Fallback auf Pressure-Level:`, e.message);
@@ -542,6 +574,10 @@ async function fetchWeather(lat, lon, currentTime = null, historicalDateOverride
             }
         }
         AppState.lastDataSource = 'pressure-level';
+        AppState.lastDataServer = { host: new URL(baseUrl).host, fallback: false };
+        AppState.lastOrography = null;
+        // Druckflächen kommen von der öffentlichen Instanz -- Modelllauf ggf. von dort nachziehen.
+        if (!isHistorical) await _syncRunInfo(OM_PUBLIC, metaServer, modelApiIdentifierForMeta);
 
         const hourlyParams = "surface_pressure,temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,visibility,weather_code,cloud_cover_low,cloud_cover_mid,cloud_cover_high,temperature_1000hPa,relative_humidity_1000hPa,wind_speed_1000hPa,wind_direction_1000hPa,geopotential_height_1000hPa,cloud_cover_1000hPa,temperature_950hPa,relative_humidity_950hPa,wind_speed_950hPa,wind_direction_950hPa,geopotential_height_950hPa,cloud_cover_950hPa,temperature_925hPa,relative_humidity_925hPa,wind_speed_925hPa,wind_direction_925hPa,geopotential_height_925hPa,cloud_cover_925hPa,temperature_900hPa,relative_humidity_900hPa,wind_speed_900hPa,wind_direction_900hPa,geopotential_height_900hPa,cloud_cover_900hPa,temperature_850hPa,relative_humidity_850hPa,wind_speed_850hPa,wind_direction_850hPa,geopotential_height_850hPa,cloud_cover_850hPa,temperature_800hPa,relative_humidity_800hPa,wind_speed_800hPa,wind_direction_800hPa,geopotential_height_800hPa,cloud_cover_800hPa,temperature_700hPa,relative_humidity_700hPa,wind_speed_700hPa,wind_direction_700hPa,geopotential_height_700hPa,cloud_cover_700hPa,temperature_600hPa,relative_humidity_600hPa,wind_speed_600hPa,wind_direction_600hPa,geopotential_height_600hPa,cloud_cover_600hPa,temperature_500hPa,relative_humidity_500hPa,wind_speed_500hPa,wind_direction_500hPa,geopotential_height_500hPa,cloud_cover_500hPa,temperature_400hPa,relative_humidity_400hPa,wind_speed_400hPa,wind_direction_400hPa,geopotential_height_400hPa,cloud_cover_400hPa,temperature_300hPa,relative_humidity_300hPa,wind_speed_300hPa,wind_direction_300hPa,geopotential_height_300hPa,cloud_cover_300hPa,temperature_250hPa,relative_humidity_250hPa,wind_speed_250hPa,wind_direction_250hPa,geopotential_height_250hPa,cloud_cover_250hPa,temperature_200hPa,relative_humidity_200hPa,wind_speed_200hPa,wind_direction_200hPa,geopotential_height_200hPa,cloud_cover_200hPa";
         const url = `${baseUrl}?latitude=${lat}&longitude=${lon}&hourly=${hourlyParams}&models=${selectedModelValue}&start_date=${startDateStr}&end_date=${endDateStr}`;
