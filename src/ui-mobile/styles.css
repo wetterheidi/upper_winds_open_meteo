@@ -3897,3 +3897,22 @@ body[data-active-panel="dashboard"] .leaflet-control-live-position {
     color: var(--palette-grey-700);
     font-variant-numeric: tabular-nums;
 }
+/* Modell-Info-Popup: per JS (core/floatingPopup.js) im Viewport positioniert,
+   damit bei viel Inhalt nichts abgeschnitten wird. */
+.info-popup.floating-popup {
+    position: fixed;
+    bottom: auto;
+    transform: none;
+    width: max-content;
+    max-width: min(320px, calc(100vw - 16px));
+    min-height: 0;
+    box-sizing: border-box;
+    overflow-y: auto;
+    overflow-wrap: anywhere;
+    z-index: 5000;
+}
+
+/* Pfeil entfällt: er läge außerhalb des Scrollbereichs und würde abgeschnitten */
+.info-popup.floating-popup::after {
+    display: none;
+}

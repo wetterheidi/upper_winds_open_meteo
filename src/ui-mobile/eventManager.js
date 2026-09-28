@@ -20,6 +20,7 @@ import * as weatherManager from '../core/weatherManager.js';
 import { DateTime } from 'luxon';
 import { generateMeteogram } from '../core/meteogramChart.js';
 import { I18n } from '../core/i18n.js';
+import { keepFloatingPopupAnchored } from '../core/floatingPopup.js';
 import { SOUNDING_MODEL_ID } from '../core/soundingManager.js';
 
 
@@ -444,10 +445,13 @@ function setupModelInfoButtonEvents() {
 
     if (!modelInfoButton || !modelInfoPopup) return;
 
+    const reposition = keepFloatingPopupAnchored(modelInfoPopup, modelInfoButton);
+
     modelInfoButton.addEventListener('click', (event) => {
         event.stopPropagation(); // Verhindert, dass der Klick das Document-Event auslöst
         const isVisible = modelInfoPopup.style.display === 'block';
         modelInfoPopup.style.display = isVisible ? 'none' : 'block';
+        if (!isVisible) reposition();
     });
 
     // Schließt das Popup, wenn irgendwo anders hingeklickt wird

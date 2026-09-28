@@ -5,6 +5,7 @@
  * UI-Panels (z.B. Wettertabelle) und auf der Karte (z.B. Landemuster, JRT).
  */
 import { AppState } from '../core/state.js';
+import { positionFloatingPopup } from '../core/floatingPopup.js';
 import { Settings, getInterpolationStep } from '../core/settings.js';
 import { Utils } from '../core/utils.js';
 import { getSliderValue, displayWarning } from './ui.js';
@@ -360,6 +361,10 @@ export function updateModelInfoPopup() {
         if (warn) titleContent += `\n${I18n.t('weather.orography_warning')}`;
     }
     modelInfoPopup.innerHTML = titleContent.replace(/\n/g, '<br>');
+    // Inhalt kann wachsen, während das Popup offen ist
+    if (modelInfoPopup.style.display === 'block') {
+        positionFloatingPopup(modelInfoPopup, document.getElementById('modelInfoButton'));
+    }
 }
 
 /**
