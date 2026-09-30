@@ -1397,6 +1397,11 @@ input[type="checkbox"][style*="opacity: 1"] {
     color: var(--text-inverted) !important;
 }
 
+#weather-table-container tr.cloud-cover-na {
+    /* Keine Bewölkungsdaten: dezente Schraffur statt weißer Zeile */
+    background: repeating-linear-gradient(135deg, transparent 0 6px, var(--border-color) 6px 7px) !important;
+}
+
 #weather-table-container tr.wind-low td {
     border: 2px solid var(--border-wind-light) !important;
 }

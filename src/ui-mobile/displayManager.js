@@ -136,6 +136,8 @@ export async function updateWeatherDisplay(index, tableContainerId, timeContaine
             else if (cloudCover <= 50) cloudCoverClass = 'cloud-cover-scattered';
             else if (cloudCover <= 87) cloudCoverClass = 'cloud-cover-broken';
             else cloudCoverClass = 'cloud-cover-overcast';
+        } else {
+            cloudCoverClass = 'cloud-cover-na';
         }
         const displayHeight = refLevel === 'AMSL' ? data.displayHeight + (heightUnit === 'ft' ? Math.round(surfaceHeight * 3.28084) : surfaceHeight) : data.displayHeight;
         const displayTemp = Utils.convertTemperature(data.temp, temperatureUnit === 'C' ? '°C' : '°F');

@@ -359,7 +359,14 @@ export function interpolateWeatherData(weatherData, sliderIndex, interpStep, bas
 
         if (heightAGLInMeters === 0) {
             const lowestAltitudePressureLevel = Math.max(...validPressureLevels);
-            const surfaceCloudCover = weatherData[`cloud_cover_${lowestAltitudePressureLevel}hPa`]?.[sliderIndex] ?? 'N/A';
+            let surfaceCloudCover = weatherData[`cloud_cover_${lowestAltitudePressureLevel}hPa`]?.[sliderIndex] ?? 'N/A';
+            // ICON-Modelllevel liefern am Boden keine Bewölkung: Wert des untersten
+            // Levels mit Bewölkung übernehmen (liegt nur ~10–20 m über Grund).
+            if (!Number.isFinite(surfaceCloudCover) && ccHeightData.length > 0) {
+                const lowestCcIndex = ccHeightData.indexOf(Math.min(...ccHeightData));
+                const lowestCc = ccValueData[lowestCcIndex];
+                if (Number.isFinite(lowestCc)) surfaceCloudCover = Number(lowestCc.toFixed(0));
+            }
 
             dataPoint = {
                 height: heightASLInMeters,
