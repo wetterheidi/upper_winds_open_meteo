@@ -37,6 +37,29 @@ export const ELEVATION_SERVERS = [OM_PRIMARY, OM_LEGACY, OM_PUBLIC];
 export const hostOf = (base) => new URL(base).host;
 
 /**
+ * Höchstalter eines Modelllaufs (meta.json), bevor ein Server als eingefroren gilt.
+ * ICON läuft alle 3-6 h; ein Lauf älter als 24 h heißt: Ingestion steht (so geschehen
+ * auf open-meteo-temp.mah.priv.at, Stand 17.09.2026).
+ */
+export const MAX_RUN_AGE_SECONDS = 24 * 3600;
+
+/** true, wenn meta.json einen Lauf meldet, der nicht älter als MAX_RUN_AGE_SECONDS ist. */
+export const isFreshRunMeta = (meta) => Number.isFinite(meta?.last_run_initialisation_time)
+    && Date.now() / 1000 - meta.last_run_initialisation_time <= MAX_RUN_AGE_SECONDS;
+
+/**
+ * true, wenn `hourly[field]` ab der aktuellen Stunde mindestens einen echten Wert hat.
+ * Ein eingefrorener Server liefert sonst für Vergangenheitsfenster "gültige" Daten.
+ * Zeitstempel sind GMT (Open-Meteo-Default ohne `timezone`).
+ */
+export function hasValuesFromNow(hourly, field) {
+    const nowHour = Math.floor(Date.now() / 3600000) * 3600000;
+    const times = hourly?.time || [];
+    const values = hourly?.[field] || [];
+    return times.some((t, i) => Date.parse(`${t}Z`) >= nowHour && Number.isFinite(values[i]));
+}
+
+/**
  * Holt JSON vom ersten Server, der eine brauchbare Antwort liefert. Weiter zum
  * nächsten Server bei Netzwerkfehler, Timeout, HTTP ≠ 2xx, ungültigem JSON (z. B.
  * `{"elevation":[nan]}`), `error`-Feld oder wenn `validate(data)` false liefert.

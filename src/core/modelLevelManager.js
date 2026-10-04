@@ -24,6 +24,7 @@ import { Utils } from './utils.js';
 import { CONVERSIONS } from './constants.js';
 import {
     ICON_SERVERS, OM_PUBLIC, hostOf, fetchJsonFromServers, fetchDemElevation,
+    isFreshRunMeta, hasValuesFromNow,
 } from './openMeteoServers.js';
 
 // ===================================================================
@@ -49,14 +50,15 @@ export const MODEL_LEVEL_ELIGIBLE = Object.keys(MODEL_LEVEL_NLEVELS);
 
 /**
  * Aktueller Modelllauf (meta.json) für ein ICON-Modell von den ICON-Servern
- * (bevorzugter zuerst).
+ * (bevorzugter zuerst). Ein Server mit veraltetem Lauf (> 24 h) gilt als gescheitert --
+ * sonst legt weatherManager das Abfragefenster in die Vergangenheit.
  * @param {string} modelKey - 'icon_d2' | 'icon_eu' | 'icon_global'
  * @param {string} dataset - z. B. 'dwd_icon_d2'
  * @returns {Promise<{meta: object, server: string}>}
  */
 export async function fetchIconRunMeta(modelKey, dataset) {
     const { data, server } = await fetchJsonFromServers(ICON_SERVERS[modelKey], `/data/${dataset}/static/meta.json`, {
-        timeoutMs: 15000, validate: (d) => Number.isFinite(d.last_run_initialisation_time),
+        timeoutMs: 15000, validate: isFreshRunMeta,
     });
     return { meta: data, server };
 }
@@ -131,7 +133,7 @@ export async function fetchModelLevelData(lat, lon, modelKey, startDateStr, endD
                     throw new Error(`Modelllevel-Server ${host} (${modelKey}): leere Antwort`);
                 }
                 if (!_hasWindData(levelJson.hourly, nLevels)) {
-                    throw new Error(`Modelllevel-Server ${host} (${modelKey}): keine Winddaten (nur null)`);
+                    throw new Error(`Modelllevel-Server ${host} (${modelKey}): keine Winddaten ab jetzt (nur null)`);
                 }
                 // Ohne DEM (alle Höhen-Server ausgefallen): auf die Modell-Geländehöhe
                 // beziehen -- dann entspricht "über Grund" "über Modellgrund".
@@ -173,9 +175,9 @@ export async function fetchModelLevelData(lat, lon, modelKey, startDateStr, endD
 // Private Hilfsfunktionen – Oberflächendaten
 // ===================================================================
 
-/** true, wenn am bodennächsten Level mindestens ein echter Windwert vorliegt. */
+/** true, wenn am bodennächsten Level ab der aktuellen Stunde mindestens ein echter Windwert vorliegt. */
 function _hasWindData(hourly, nLevels) {
-    return (hourly[`wind_u_component_level${nLevels}`] || []).some(Number.isFinite);
+    return hasValuesFromNow(hourly, `wind_u_component_level${nLevels}`);
 }
 
 /**
@@ -193,7 +195,7 @@ async function _fetchSurfaceData(lat, lon, modelKey, startDateStr, endDateStr, d
     const servers = [...ICON_SERVERS[modelKey], OM_PUBLIC];
     const { data, server } = await fetchJsonFromServers(servers, build(SURFACE_FIELDS), {
         timeoutMs: 15000,
-        validate: (d) => (d.hourly?.temperature_2m || []).some(Number.isFinite),
+        validate: (d) => hasValuesFromNow(d.hourly, 'temperature_2m'),
     });
     const hourly = data.hourly;
 
