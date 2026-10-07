@@ -262,6 +262,32 @@ function setupSliderEvents() {
             cancelable: true
         }));
     });
+
+    // Pfeiltasten links/rechts steuern den Slider global, ohne dass er vorher
+    // per Klick fokussiert sein muss. Capture-Phase, damit Leaflet die Tasten
+    // nicht zum Kartenverschieben verwendet (hoch/runter bleibt der Karte).
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+        if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+        if (slider.disabled) return;
+
+        const target = e.target;
+        if (target === slider) return; // natives Verhalten des fokussierten Sliders
+        if (target instanceof HTMLElement &&
+            (target.isContentEditable || target.closest('input, textarea, select'))) {
+            return; // Cursor in Eingabefeldern nicht kapern
+        }
+
+        const step = e.key === 'ArrowRight' ? 1 : -1;
+        const newValue = Math.min(Math.max(Number(slider.value) + step, Number(slider.min)), Number(slider.max));
+        e.preventDefault();
+        e.stopPropagation();
+        if (newValue === Number(slider.value)) return;
+
+        slider.value = newValue;
+        slider.dispatchEvent(new Event('input', { bubbles: true }));
+        slider.dispatchEvent(new Event('change', { bubbles: true }));
+    }, true);
 }
 function setupModelSelectEvents() {
     const modelSelect = document.getElementById('modelSelect');
