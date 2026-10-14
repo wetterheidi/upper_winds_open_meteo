@@ -374,7 +374,8 @@ export class Utils {
 
     /**
      * Berechnet aus einem am DIP gemessenen QFE-Wert den nötigen Kalibrierungs-Offset
-     * (Differenz zum aktuell modellierten QFE am DIP) und aktiviert ihn.
+     * (Differenz zum aktuell modellierten QFE am DIP) und aktiviert ihn. Ein Offset von 0
+     * (Eingabe = Modellwert) setzt die Kalibrierung zurück.
      * @param {number} measuredQfe - Das vor Ort gemessene QFE in hPa.
      * @param {number} sliderIndex - Index in den stündlichen Wetterdaten.
      * @returns {boolean} True, wenn die Kalibrierung angewendet werden konnte.
@@ -389,7 +390,14 @@ export class Utils {
         const currentRawQfe = Utils.calculateQFE(rawSurfacePressure, AppState.lastAltitude, AppState.lastAltitude, temperature);
         if (currentRawQfe === 'N/A') return false;
 
-        Utils.setQfeCalibration(measuredQfe - currentRawQfe);
+        // Entspricht die Eingabe wieder dem Modellwert, gibt es nichts zu kalibrieren:
+        // Offset verwerfen statt einen 0-Offset (samt Badge) aktiv zu halten.
+        const offset = measuredQfe - currentRawQfe;
+        if (Math.abs(offset) < 0.05) {
+            Utils.clearQfeCalibration();
+        } else {
+            Utils.setQfeCalibration(offset);
+        }
         return true;
     }
 
