@@ -1877,7 +1877,7 @@ input[type="checkbox"][style*="opacity: 1"] {
 
 .dashboard-grid-jm {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 15px;
 }
 
@@ -1903,6 +1903,8 @@ input[type="checkbox"][style*="opacity: 1"] {
     font-size: 18px;
     font-weight: bold;
     color: var(--text-primary);
+    /* Lange Werte (MGRS, große Distanzen) umbrechen statt die Spalte zu verbreitern */
+    overflow-wrap: anywhere;
 }
 
 .dashboard-grid-jm .accuracy-item .dashboard-value {
@@ -3327,7 +3329,7 @@ a.qfe-calibrate-trigger:hover {
     /* 1. Hauptcontainer in zwei Hälften teilen */
     #jumpmaster-view-mobile {
         display: grid;
-        grid-template-columns: 1fr 1fr; /* Links: Flugdaten, Rechts: JML */
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); /* Links: Flugdaten, Rechts: JML */
         gap: 10px;
         height: 100%;
         overflow: hidden; /* Scrollen innerhalb der Spalten erlauben, nicht body */
@@ -3335,7 +3337,7 @@ a.qfe-calibrate-trigger:hover {
 
     /* 2. Linke Seite: Flugdaten (Kompaktes Grid) */
     #jumpmaster-view-mobile > .dashboard-grid-jm {
-        grid-template-columns: 1fr 1fr !important; /* 2 Spalten intern */
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important; /* 2 Spalten intern */
         align-content: start; /* Oben beginnen */
         gap: 8px !important;
     }
@@ -3372,7 +3374,7 @@ a.qfe-calibrate-trigger:hover {
     /* Das innere Grid der JML-Daten (Rechte Seite) */
     #jumpmaster-line-details-mobile .dashboard-grid-jm {
         display: grid;
-        grid-template-columns: 1fr 1fr !important; /* 2 Spalten für die Werte */
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important; /* 2 Spalten für die Werte */
         grid-auto-rows: min-content; /* So hoch wie nötig */
         gap: 8px !important;
         flex-grow: 1; /* Den Rest der Höhe nutzen */

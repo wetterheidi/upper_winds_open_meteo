@@ -1775,7 +1775,8 @@ function setupAppEventListeners() {
                 // Geplanter Sprung (HEIDIS): HARP, Absetzstrecke und Höhen übernehmen.
                 if (jumpPlan) {
                     trackManager.applyImportedJumpPlan(jumpPlan);
-                    mapManager.placeHarpMarker(jumpPlan.harp.lat, jumpPlan.harp.lng);
+                    // Beim Import ist meist das Track-Panel offen (Karte ausgeblendet) – Popup daher nicht öffnen.
+                    mapManager.placeHarpMarker(jumpPlan.harp.lat, jumpPlan.harp.lng, false);
                     // Geplante Punkte vor versehentlichem Verschieben schützen ("Punkte sperren").
                     const lockCheckbox = document.getElementById('lockInteractionCheckbox');
                     if (lockCheckbox && !lockCheckbox.checked) {

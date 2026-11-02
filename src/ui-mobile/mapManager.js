@@ -948,14 +948,16 @@ export function handleHarpPlacement(e) {
  * Setzt (oder verschiebt) den HARP-Marker, setzt die JRT-Offsets zurück und stößt die Neuberechnung an.
  * @param {number} lat - Breite des HARP.
  * @param {number} lng - Länge des HARP.
+ * @param {boolean} [openPopup=true] - Popup öffnen. Nur bei sichtbarer Karte sinnvoll, sonst misst
+ *        Leaflet die Popup-Breite an der ausgeblendeten Karte und das Popup bleibt viel zu schmal.
  */
-export function placeHarpMarker(lat, lng) {
+export function placeHarpMarker(lat, lng, openPopup = true) {
     if (AppState.harpMarker) {
         AppState.harpMarker.setLatLng([lat, lng]);
     } else {
         AppState.harpMarker = createHarpMarker(lat, lng).addTo(AppState.map);
     }
-    updateHarpMarkerPopup(AppState.harpMarker, lat, lng, true);
+    updateHarpMarkerPopup(AppState.harpMarker, lat, lng, openPopup);
 
     Settings.state.userSettings.harpLat = lat;
     Settings.state.userSettings.harpLng = lng;
