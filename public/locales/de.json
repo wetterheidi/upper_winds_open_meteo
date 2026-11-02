@@ -534,6 +534,7 @@
         "error_kml_no_geometry": "KML-Datei enthält keine gültigen Geometrien zur Anzeige.",
         "error_kml_parse": "Fehler beim Parsen der KML-Datei: {message}",
         "error_gpx_points": "GPX-Track enthält zu wenige Punkte.",
+        "jump_plan_applied": "Geplanter Sprung erkannt: HARP, Absetzstrecke sowie Absprung- und Öffnungshöhe wurden übernommen, Punkte sind gesperrt.",
         "error_gpx_parse": "Fehler beim Parsen der GPX-Datei: {message}",
         "error_csv_points": "CSV-Track enthält zu wenige Punkte.",
         "error_csv_parse": "Fehler beim Lesen oder Parsen der CSV-Datei: {message}",

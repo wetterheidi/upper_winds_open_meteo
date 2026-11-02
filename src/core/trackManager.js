@@ -107,7 +107,15 @@ export async function loadGpxTrack(file) {
         const waypoints = xml.getElementsByTagName('wpt');
         let dipWaypoint = null;
         let landingWaypoint = null;
+        const symbolWaypoints = [];
         for (let i = 0; i < waypoints.length; i++) {
+            const sym = waypoints[i].getElementsByTagName('sym')[0]?.textContent?.trim().toUpperCase();
+            if (sym) {
+                const lat = parseFloat(waypoints[i].getAttribute('lat'));
+                const lng = parseFloat(waypoints[i].getAttribute('lon'));
+                const ele = parseFloat(waypoints[i].getElementsByTagName('ele')[0]?.textContent);
+                if (!isNaN(lat) && !isNaN(lng)) symbolWaypoints.push({ sym, lat, lng, ele: isNaN(ele) ? null : ele });
+            }
             const name = waypoints[i].getElementsByTagName('name')[0]?.textContent?.trim().toUpperCase();
             if (name !== 'DIP' && name !== 'LANDING') continue;
             const lat = parseFloat(waypoints[i].getAttribute('lat'));
@@ -149,7 +157,10 @@ export async function loadGpxTrack(file) {
         }
         if (points.length < 2) throw new Error(I18n.t('tracks.error_gpx_points'));
 
-        const trackMetaData = await renderTrack(points, file.name, dipWaypoint, landingWaypoint);
+        const jumpPlan = parseJumpPlanWaypoints(symbolWaypoints);
+        if (jumpPlan) console.log('[trackManager] Planned jump (HEIDIS) detected:', jumpPlan);
+
+        const trackMetaData = await renderTrack(points, file.name, dipWaypoint, landingWaypoint, jumpPlan);
         return trackMetaData;
 
     } catch (error) {
@@ -541,6 +552,96 @@ export async function exportLandingPatternToGpx() {
 }
 
 // ===================================================================
+// 2b. Geplante Sprünge (HEIDIS-GPX)
+// ===================================================================
+
+/** Symbole der Anflugpunkte in HEIDIS-Dateien, vom frühesten zum spätesten. */
+const HEIDIS_APPROACH_SYMBOLS = ['X-3M', 'X-1M', 'X-15S'];
+
+/**
+ * Erkennt einen mit HEIDIS geplanten Sprung anhand der Wegpunkt-Symbole und leitet
+ * daraus HARP, Absetzrichtung, Länge der Absetzstrecke und die Höhen ab.
+ * Erkennungsmerkmal: Wegpunkte mit den Symbolen HARP und RD (Ende Absetzen) sowie
+ * mindestens ein Anflugpunkt (X-3M, X-1M, X-15S).
+ * @param {{sym: string, lat: number, lng: number, ele: number|null}[]} waypoints - Wegpunkte mit Symbol (Großschreibung).
+ * @returns {{harp: {lat: number, lng: number}, direction: number, trackLength: number, exitAltitudeMSL: number|null, openingAltitudeMSL: number|null}|null}
+ *          Der geplante Sprung oder null, wenn es keine HEIDIS-Planung ist.
+ */
+export function parseJumpPlanWaypoints(waypoints) {
+    const bySym = (sym) => waypoints.find(w => w.sym === sym) || null;
+    const harp = bySym('HARP');
+    const releaseEnd = bySym('RD');
+    const approachPoint = HEIDIS_APPROACH_SYMBOLS.map(bySym).find(Boolean);
+    if (!harp || !releaseEnd || !approachPoint) return null;
+
+    // Richtung aus dem Anflug (frühester x-Punkt → HARP), Länge der Absetzstrecke HARP → RD.
+    const direction = Utils.calculateBearing(approachPoint.lat, approachPoint.lng, harp.lat, harp.lng);
+    const trackLength = Utils.calculateDistance(harp.lat, harp.lng, releaseEnd.lat, releaseEnd.lng);
+    const freefallEnd = bySym('EFF');
+
+    return {
+        harp: { lat: harp.lat, lng: harp.lng },
+        direction,
+        trackLength,
+        exitAltitudeMSL: harp.ele ?? bySym('GD')?.ele ?? null,
+        openingAltitudeMSL: freefallEnd?.ele ?? null
+    };
+}
+
+/**
+ * Übernimmt Absetzrichtung, Absetzstrecke und Höhen eines geplanten Sprungs in die
+ * Einstellungen und Eingabefelder. Den HARP-Marker setzt anschließend die UI.
+ * Muss nach dem Setzen des DIP aufgerufen werden, da die Höhen auf AppState.lastAltitude bezogen werden.
+ * @param {object} plan - Ergebnis von parseJumpPlanWaypoints.
+ */
+export function applyImportedJumpPlan(plan) {
+    const userSettings = Settings.state.userSettings;
+    const setInput = (id, value) => {
+        const input = document.getElementById(id);
+        if (input) input.value = value;
+    };
+
+    AppState.importedJumpRun = {
+        harpLat: plan.harp.lat,
+        harpLng: plan.harp.lng,
+        direction: plan.direction,
+        trackLength: plan.trackLength
+    };
+
+    // Absetzstrecke beginnt genau am HARP.
+    userSettings.customJumpRunDirection = Math.round(plan.direction);
+    userSettings.jumpRunTrackOffset = 0;
+    userSettings.jumpRunTrackForwardOffset = 0;
+    setInput('jumpRunTrackDirection', Math.round(Utils.applyNorthReference(Math.round(plan.direction), AppState.lastLat, AppState.lastLng)));
+    setInput('jumpRunTrackOffset', 0);
+    setInput('jumpRunTrackForwardOffset', 0);
+
+    userSettings.showJumpRunTrack = true;
+    const showTrackCheckbox = document.getElementById('showJumpRunTrack');
+    if (showTrackCheckbox) showTrackCheckbox.checked = true;
+
+    // Höhen aus der Datei sind MSL; DZMaster rechnet AGL in der eingestellten Höheneinheit.
+    const groundAltitude = parseFloat(AppState.lastAltitude);
+    if (!isNaN(groundAltitude)) {
+        const heightUnit = Settings.getValue('heightUnit', 'm');
+        const toDisplayAgl = (msl) => Math.round(Utils.convertHeight(msl - groundAltitude, heightUnit));
+        const exitAgl = plan.exitAltitudeMSL !== null ? toDisplayAgl(plan.exitAltitudeMSL) : null;
+        const openingAgl = plan.openingAltitudeMSL !== null ? toDisplayAgl(plan.openingAltitudeMSL) : null;
+        if (exitAgl !== null && exitAgl > 0) {
+            userSettings.exitAltitude = exitAgl;
+            setInput('exitAltitude', exitAgl);
+        }
+        if (openingAgl !== null && openingAgl > 0 && (exitAgl === null || openingAgl < exitAgl)) {
+            userSettings.openingAltitude = openingAgl;
+            setInput('openingAltitude', openingAgl);
+        }
+    }
+
+    Settings.save();
+    console.log('[trackManager] Planned jump applied:', AppState.importedJumpRun);
+}
+
+// ===================================================================
 // 3. Zentrale Rendering-Funktion
 // ===================================================================
 
@@ -660,10 +761,11 @@ function showTrackReferenceDialog(dip, landing, distanceM, heightDiffM) {
  * @param {string} fileName - Der Name der geladenen Datei.
  * @param {object|null} [dipWaypoint=null] - Ein optionaler DIP-Wegpunkt aus einer GPX-Datei.
  * @param {object|null} [landingWaypoint=null] - Ein optionaler LANDING-Wegpunkt aus einer GPX-Datei.
+ * @param {object|null} [jumpPlan=null] - Ein optionaler geplanter Sprung (siehe parseJumpPlanWaypoints), wird im Event mitgegeben.
  * @returns {Promise<object|null>} Ein Promise, das zu den Metadaten des Tracks auflöst.
  * @private
  */
-async function renderTrack(points, fileName, dipWaypoint = null, landingWaypoint = null) {
+async function renderTrack(points, fileName, dipWaypoint = null, landingWaypoint = null, jumpPlan = null) {
     try {
         console.log(`[trackManager] renderTrack called for ${fileName} with ${points.length} points.`);
         if (!AppState.map) {
@@ -728,6 +830,7 @@ async function renderTrack(points, fileName, dipWaypoint = null, landingWaypoint
                     altitude: AppState.lastAltitude,
                     timestamp: trackMetaData.timestampToUseForWeather,
                     historicalDate: trackMetaData.historicalDateString,
+                    jumpPlan,
                     summary: `<br><strong>Track:</strong> ` + I18n.t('tracks.summary')
                         .replace('{distance}', distance)
                         .replace('{min}', elevationMin)

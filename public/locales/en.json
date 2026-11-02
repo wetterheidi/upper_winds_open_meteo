@@ -534,6 +534,7 @@
         "error_kml_no_geometry": "KML file contains no valid geometries to display.",
         "error_kml_parse": "Error parsing KML file: {message}",
         "error_gpx_points": "GPX track has insufficient points.",
+        "jump_plan_applied": "Planned jump detected: HARP, jump run, exit and opening altitude have been applied, points are locked.",
         "error_gpx_parse": "Error parsing GPX file: {message}",
         "error_csv_points": "CSV track has insufficient points.",
         "error_csv_parse": "Error reading or parsing CSV file: {message}",

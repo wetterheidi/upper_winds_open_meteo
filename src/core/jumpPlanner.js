@@ -136,7 +136,17 @@ export function jumpRunTrack(interpolatedData, harpAnchor = null) {
         groundSpeedMps = Math.sqrt(Math.pow(tasU + windU, 2) + Math.pow(tasV + windV, 2));
     }
 
-    const trackLength = Math.max(JUMP_RUN_DEFAULTS.MIN_TRACK_LENGTH_M, Math.min(JUMP_RUN_DEFAULTS.MAX_TRACK_LENGTH_M, Math.round((Settings.state.userSettings.numberOfJumpers || 10) * (Settings.state.userSettings.jumperSeparation || 5) * groundSpeedMps)));
+    let trackLength = Math.max(JUMP_RUN_DEFAULTS.MIN_TRACK_LENGTH_M, Math.min(JUMP_RUN_DEFAULTS.MAX_TRACK_LENGTH_M, Math.round((Settings.state.userSettings.numberOfJumpers || 10) * (Settings.state.userSettings.jumperSeparation || 5) * groundSpeedMps)));
+
+    // Aus einer Planungsdatei (HEIDIS) übernommene Absetzstrecke: Länge fest übernehmen,
+    // solange HARP und Richtung noch denen aus der Datei entsprechen.
+    const imported = AppState.importedJumpRun;
+    if (imported && harpAnchor
+        && Math.abs(harpAnchor.lat - imported.harpLat) < 1e-7
+        && Math.abs(harpAnchor.lng - imported.harpLng) < 1e-7
+        && Math.round(imported.direction) === jumpRunTrackDirection) {
+        trackLength = Math.round(imported.trackLength);
+    }
     const approachLength = Math.max(JUMP_RUN_DEFAULTS.MIN_APPROACH_LENGTH_M, Math.min(JUMP_RUN_DEFAULTS.MAX_APPROACH_LENGTH_M, Math.round(groundSpeedMps * JUMP_RUN_DEFAULTS.APPROACH_TIME_SECONDS)));
 
     let lateralOffsetRaw = parseInt(document.getElementById('jumpRunTrackOffset')?.value) || 0;

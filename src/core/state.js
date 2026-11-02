@@ -65,6 +65,7 @@ export const AppState = {
     lastTrackData: null,               // @type {object|null} - Speichert die letzten JRT-Daten, um Drag&Drop zu ermöglichen.
     isPlacingHarp: false,              // @type {boolean} - True, wenn der Benutzer gerade einen HARP platziert.
     harpMarker: null,                  // @type {L.Marker|null} - Der HARP-Marker.
+    importedJumpRun: null,             // @type {{harpLat: number, harpLng: number, direction: number, trackLength: number}|null} - Aus einer Planungsdatei (HEIDIS) übernommener JRT; gilt nur, solange HARP und Richtung unverändert sind.
     pinnedJumps: [],                   // @type {object[]} - Array von bis zu 4 gepinnten Sprung-Snapshots.
     activePinId: null,                 // @type {number|null} - ID des aktiven Pins (1-4) oder null.
     pinLayerGroup: null,               // @type {L.LayerGroup|null} - Gruppe für Pin-Marker auf der Karte.

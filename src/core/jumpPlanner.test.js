@@ -858,6 +858,32 @@ describe('jumpPlanner.js', () => {
             // Überprüfen Sie, dass der Startpunkt nicht die Originalkoordinaten hat
             expect(result.latlngs[0]).not.toEqual([AppState.lastLat, AppState.lastLng]);
         });
+
+        describe('übernommene Absetzstrecke (HEIDIS)', () => {
+            const harp = { lat: 29.6958, lng: 35.1793 };
+
+            beforeEach(() => {
+                Settings.state.userSettings.customJumpRunDirection = 298;
+                AppState.importedJumpRun = { harpLat: harp.lat, harpLng: harp.lng, direction: 298.04, trackLength: 1468.4 };
+            });
+
+            it('sollte die Länge aus der Datei verwenden, solange HARP und Richtung passen', () => {
+                const result = jumpRunTrack(weatherManager.interpolateWeatherData(), harp);
+                expect(result.direction).toBe(298);
+                expect(result.trackLength).toBe(1468);
+            });
+
+            it('sollte wieder selbst rechnen, wenn der HARP verschoben wurde', () => {
+                const result = jumpRunTrack(weatherManager.interpolateWeatherData(), { lat: harp.lat + 0.01, lng: harp.lng });
+                expect(result.trackLength).not.toBe(1468);
+            });
+
+            it('sollte wieder selbst rechnen, wenn die Richtung geändert wurde', () => {
+                Settings.state.userSettings.customJumpRunDirection = 280;
+                const result = jumpRunTrack(weatherManager.interpolateWeatherData(), harp);
+                expect(result.trackLength).not.toBe(1468);
+            });
+        });
     });
 
     describe('calculateLandingPatternCoords', () => {

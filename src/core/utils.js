@@ -1198,6 +1198,23 @@ export class Utils {
     }
 
     /**
+     * Berechnet die Großkreisdistanz (Haversine) zwischen zwei Punkten.
+     * @param {number} lat1 - Breite von Punkt 1.
+     * @param {number} lng1 - Länge von Punkt 1.
+     * @param {number} lat2 - Breite von Punkt 2.
+     * @param {number} lng2 - Länge von Punkt 2.
+     * @returns {number} Die Distanz in Metern.
+     */
+    static calculateDistance(lat1, lng1, lat2, lng2) {
+        const toRad = deg => deg * Math.PI / 180;
+        const dLat = toRad(lat2 - lat1);
+        const dLon = toRad(lng2 - lng1);
+        const a = Math.sin(dLat / 2) ** 2 +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+        return 2 * EARTH_RADIUS_METERS * Math.asin(Math.sqrt(a));
+    }
+
+    /**
      * Ruft Zeitzone und Geländehöhe für einen gegebenen Koordinatenpunkt von der Open-Meteo API ab.
      * Die Ergebnisse werden zwischengespeichert (in-memory), um wiederholte API-Anfragen für denselben Ort zu vermeiden.
      * @param {number} lat - Die geographische Breite.

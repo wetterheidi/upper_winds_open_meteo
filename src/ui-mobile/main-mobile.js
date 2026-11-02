@@ -1711,7 +1711,7 @@ function setupAppEventListeners() {
                 return;
             }
 
-            const { lat, lng, timestamp, historicalDate, summary } = event.detail;
+            const { lat, lng, timestamp, historicalDate, jumpPlan, summary } = event.detail;
             console.log('[main-mobile] Event "track:loaded" empfangen, starte Aktionen.');
 
             if (historicalDate) {
@@ -1757,6 +1757,18 @@ function setupAppEventListeners() {
             await displayManager.refreshMarkerPopup();
             if (AppState.lastAltitude !== 'N/A') {
                 calculateMeanWind();
+                // Geplanter Sprung (HEIDIS): HARP, Absetzstrecke und Höhen übernehmen.
+                if (jumpPlan) {
+                    trackManager.applyImportedJumpPlan(jumpPlan);
+                    mapManager.placeHarpMarker(jumpPlan.harp.lat, jumpPlan.harp.lng);
+                    // Geplante Punkte vor versehentlichem Verschieben schützen ("Punkte sperren").
+                    const lockCheckbox = document.getElementById('lockInteractionCheckbox');
+                    if (lockCheckbox && !lockCheckbox.checked) {
+                        lockCheckbox.checked = true;
+                        lockCheckbox.dispatchEvent(new Event('change'));
+                    }
+                    Utils.handleMessage(I18n.t('tracks.jump_plan_applied'));
+                }
                 if (Settings.state.userSettings.calculateJump) {
                     calculateJump();
                 }

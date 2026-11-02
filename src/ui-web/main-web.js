@@ -21,6 +21,7 @@ import * as EnsembleManager from '../core/ensembleManager.js';
 import * as LocationManager from '../core/locationManager.js';
 import * as AdsbManager from '../core/adsbManager.js';
 import * as PinManager from '../core/pinManager.js';
+import { applyImportedJumpPlan } from '../core/trackManager.js';
 import { generateMeteogram } from '../core/meteogramChart.js';
 import { DateTime } from 'luxon';
 import { I18n } from '../core/i18n.js';
@@ -1466,7 +1467,7 @@ function setupAppEventListeners() {
                 return;
             }
 
-            const { lat, lng, timestamp, historicalDate, summary } = event.detail;
+            const { lat, lng, timestamp, historicalDate, jumpPlan, summary } = event.detail;
             console.log('[main-web] Event "track:loaded" empfangen, starte korrigierte Aktionen.');
 
             // Deaktiviere Autoupdate, wenn ein historischer Track geladen wird.
@@ -1512,6 +1513,18 @@ function setupAppEventListeners() {
             await displayManager.refreshMarkerPopup();
             if (AppState.lastAltitude !== 'N/A') {
                 calculateMeanWind();
+            }
+            // Geplanter Sprung (HEIDIS): HARP, Absetzstrecke und Höhen übernehmen.
+            if (jumpPlan) {
+                applyImportedJumpPlan(jumpPlan);
+                mapManager.placeHarpMarker(jumpPlan.harp.lat, jumpPlan.harp.lng);
+                // Geplante Punkte vor versehentlichem Verschieben schützen ("Punkte sperren").
+                const lockCheckbox = document.getElementById('lockInteractionCheckbox');
+                if (lockCheckbox && !lockCheckbox.checked) {
+                    lockCheckbox.checked = true;
+                    lockCheckbox.dispatchEvent(new Event('change'));
+                }
+                Utils.handleMessage(I18n.t('tracks.jump_plan_applied'));
             }
             if (Settings.state.userSettings.calculateJump) {
                 calculateJump();

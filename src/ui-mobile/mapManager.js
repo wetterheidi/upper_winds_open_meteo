@@ -941,6 +941,15 @@ export function handleHarpPlacement(e) {
     }
     if (!AppState.isPlacingHarp) return;
     const { lat, lng } = e.latlng;
+    placeHarpMarker(lat, lng);
+}
+
+/**
+ * Setzt (oder verschiebt) den HARP-Marker, setzt die JRT-Offsets zurück und stößt die Neuberechnung an.
+ * @param {number} lat - Breite des HARP.
+ * @param {number} lng - Länge des HARP.
+ */
+export function placeHarpMarker(lat, lng) {
     if (AppState.harpMarker) {
         AppState.harpMarker.setLatLng([lat, lng]);
     } else {

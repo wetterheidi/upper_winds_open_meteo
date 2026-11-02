@@ -37,6 +37,7 @@ A web and mobile application for visualizing upper-level winds and atmospheric d
 - **Cut-Away Finder:** Visualizes the potential landing spot after a main canopy cut-away, considering different malfunction scenarios (open, partial, collapsed).
 - **Terrain Analysis:** Analyzes potential ground clearance within the canopy flight area based on user-defined minimum clearance.
 - **Track Upload & Management:** Import and visualize GPX, KML, and FlySight CSV files. Tracks are color-coded by AGL altitude. Files can be opened directly from the OS in the mobile app.
+- **Planned Jumps from HEIDIS:** GPX files containing waypoints with the symbols `HARP`, `RD` (end of release) and at least one approach point (`X-3M`, `X-1M`, `X-15S`) are recognized as planned jumps. On load, the HARP is placed, the jump run direction is taken from the approach points, the jump run starts exactly at the HARP with the HARP→RD length from the file, and exit/opening altitude (`EFF`) are converted to AGL. "Lock points" is switched on automatically so the plan is not moved by accident. The fixed length stays active until the HARP or the direction is changed.
 - **GPX Export:** Export calculated Jump Run Tracks and Landing Patterns as GPX files.
 - **Data Download & Reports:** Download weather data tables in various formats (HEIDIS, ATAK, Windwatch, Custom ASCII) or generate a comprehensive HTML weather briefing.
 
