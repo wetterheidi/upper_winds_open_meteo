@@ -89,6 +89,8 @@ vi.mock('./utils.js', () => ({
         interpolateColor: vi.fn(() => '#ff0000'),
         formatDistance: vi.fn((m) => `${m} m`),
         convertHeight: vi.fn((v) => v),
+        calculateBearing: vi.fn(() => 298),
+        calculateDistance: vi.fn(() => 1468),
     }
 }));
 
@@ -175,5 +177,48 @@ describe('Bodenreferenz beim Laden aufgezeichneter Tracks', () => {
         expect(openDialogs.length).toBe(0);
         expect(AppState.lastLat).toBe(LANDING.lat);
         expect(AppState.lastAltitude).toBe(640);
+    });
+});
+
+describe('Geplante Sprünge (HEIDIS) beim Laden', () => {
+    const HEIDIS_GPX = `<gpx creator="HEIDIS V3.0.0.0">
+<wpt lat="29.6338" lon="35.3134"><ele>4267</ele><name>x-3 min</name><sym>X-3M</sym></wpt>
+<wpt lat="29.6958" lon="35.1793"><ele>4267</ele><name>HARP</name><sym>HARP</sym></wpt>
+<wpt lat="29.7020" lon="35.1659"><ele>4267</ele><name>Ende Absetzen</name><sym>RD</sym></wpt>
+<wpt lat="29.7815" lon="35.2228"><ele>1073</ele><name>Landeplatz</name><sym>DIP</sym></wpt>
+<trk><trkseg>
+<trkpt lat="29.6989" lon="35.1726"><ele>4267</ele><time>2026-10-09T18:00:00Z</time></trkpt>
+<trkpt lat="29.7815" lon="35.2228"><ele>1073</ele><time>2026-10-09T18:09:23Z</time></trkpt>
+</trkseg></trk></gpx>`;
+    const heidisFile = () => new File([new Blob([HEIDIS_GPX])], 'heidis.gpx');
+
+    let dispatched;
+    beforeEach(() => {
+        vi.clearAllMocks();
+        openDialogs = [];
+        dispatched = [];
+        AppState.map.getContainer.mockReturnValue({ dispatchEvent: (e) => dispatched.push(e) });
+        vi.stubGlobal('CustomEvent', class { constructor(type, init) { this.type = type; this.detail = init?.detail; } });
+        // Offline: Geländeabfrage liefert nichts.
+        Utils.getAltitude.mockResolvedValue('N/A');
+    });
+
+    it('fragt nach Wetterdaten und gibt "behalten" samt Bodenhöhe aus der Datei weiter', async () => {
+        const loading = loadGpxTrack(heidisFile());
+        await clickDialogButton('jump_plan_weather_keep');
+        await loading;
+
+        const detail = dispatched.find(e => e.type === 'track:loaded').detail;
+        expect(detail.jumpPlan.loadWeather).toBe(false);
+        expect(detail.altitude).toBe(1073);
+        expect(AppState.lastAltitude).toBe(1073);
+    });
+
+    it('gibt "Wetterdaten laden" weiter', async () => {
+        const loading = loadGpxTrack(heidisFile());
+        await clickDialogButton('jump_plan_weather_load');
+        await loading;
+
+        expect(dispatched.find(e => e.type === 'track:loaded').detail.jumpPlan.loadWeather).toBe(true);
     });
 });

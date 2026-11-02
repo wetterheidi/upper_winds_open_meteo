@@ -158,7 +158,12 @@ export async function loadGpxTrack(file) {
         if (points.length < 2) throw new Error(I18n.t('tracks.error_gpx_points'));
 
         const jumpPlan = parseJumpPlanWaypoints(symbolWaypoints);
-        if (jumpPlan) console.log('[trackManager] Planned jump (HEIDIS) detected:', jumpPlan);
+        if (jumpPlan) {
+            console.log('[trackManager] Planned jump (HEIDIS) detected:', jumpPlan);
+            jumpPlan.loadWeather = await askLoadWeatherForJumpPlan();
+            // Der Landeplatz der Planung liefert die Bodenhöhe auch ohne Internet.
+            landingWaypoint ??= jumpPlan.landing;
+        }
 
         const trackMetaData = await renderTrack(points, file.name, dipWaypoint, landingWaypoint, jumpPlan);
         return trackMetaData;
@@ -564,7 +569,7 @@ const HEIDIS_APPROACH_SYMBOLS = ['X-3M', 'X-1M', 'X-15S'];
  * Erkennungsmerkmal: Wegpunkte mit den Symbolen HARP und RD (Ende Absetzen) sowie
  * mindestens ein Anflugpunkt (X-3M, X-1M, X-15S).
  * @param {{sym: string, lat: number, lng: number, ele: number|null}[]} waypoints - Wegpunkte mit Symbol (Großschreibung).
- * @returns {{harp: {lat: number, lng: number}, direction: number, trackLength: number, exitAltitudeMSL: number|null, openingAltitudeMSL: number|null}|null}
+ * @returns {{harp: {lat: number, lng: number}, landing: {lat: number, lng: number, ele: number|null}|null, direction: number, trackLength: number, exitAltitudeMSL: number|null, openingAltitudeMSL: number|null}|null}
  *          Der geplante Sprung oder null, wenn es keine HEIDIS-Planung ist.
  */
 export function parseJumpPlanWaypoints(waypoints) {
@@ -578,9 +583,11 @@ export function parseJumpPlanWaypoints(waypoints) {
     const direction = Utils.calculateBearing(approachPoint.lat, approachPoint.lng, harp.lat, harp.lng);
     const trackLength = Utils.calculateDistance(harp.lat, harp.lng, releaseEnd.lat, releaseEnd.lng);
     const freefallEnd = bySym('EFF');
+    const landing = bySym('DIP');
 
     return {
         harp: { lat: harp.lat, lng: harp.lng },
+        landing: landing ? { lat: landing.lat, lng: landing.lng, ele: landing.ele } : null,
         direction,
         trackLength,
         exitAltitudeMSL: harp.ele ?? bySym('GD')?.ele ?? null,
@@ -704,28 +711,57 @@ async function resolveTrackReference(points, dipWaypoint, landingWaypoint) {
  * @private
  */
 function showTrackReferenceDialog(dip, landing, distanceM, heightDiffM) {
+    const heightUnit = Settings.getValue('heightUnit', 'm');
+    const formatHeight = (m) => typeof m === 'number' ? `${Math.round(Utils.convertHeight(m, heightUnit))} ${heightUnit}` : 'N/A';
+
+    let message = I18n.t('tracks.reference_mismatch_distance', { distance: Utils.formatDistance(distanceM) });
+    if (heightDiffM !== null) {
+        message += ' ' + I18n.t('tracks.reference_mismatch_height', { height: formatHeight(Math.abs(heightDiffM)) });
+    }
+
+    return showChoiceDialog(I18n.t('tracks.reference_mismatch_title'), [message, I18n.t('tracks.reference_mismatch_question')], [
+        { label: I18n.t('tracks.reference_use_landing', { height: formatHeight(landing.altitude) }), value: 'landing' },
+        { label: I18n.t('tracks.reference_use_dip', { height: formatHeight(dip.altitude) }), value: 'dip' }
+    ]);
+}
+
+/**
+ * Fragt beim Laden eines geplanten Sprungs, ob passende Wetterdaten geladen werden sollen.
+ * Ohne Internet (z. B. im Flieger) behält DZMaster stattdessen die vorhandenen Wetterdaten.
+ * @returns {Promise<boolean>} True, wenn Wetterdaten geladen werden sollen.
+ * @private
+ */
+async function askLoadWeatherForJumpPlan() {
+    const choice = await showChoiceDialog(I18n.t('tracks.jump_plan_weather_title'), [I18n.t('tracks.jump_plan_weather_question')], [
+        { label: I18n.t('tracks.jump_plan_weather_load'), value: 'load' },
+        { label: I18n.t('tracks.jump_plan_weather_keep'), value: 'keep' }
+    ]);
+    return choice === 'load';
+}
+
+/**
+ * Zeigt einen modalen Auswahldialog mit Titel, Textabsätzen und Buttons.
+ * @param {string} titleText - Der Titel des Dialogs.
+ * @param {string[]} paragraphs - Die Textabsätze.
+ * @param {{label: string, value: string}[]} choices - Die Buttons und ihre Rückgabewerte.
+ * @returns {Promise<string>} Der Wert des gewählten Buttons.
+ * @private
+ */
+function showChoiceDialog(titleText, paragraphs, choices) {
     return new Promise((resolve) => {
-        const heightUnit = Settings.getValue('heightUnit', 'm');
-        const formatHeight = (m) => typeof m === 'number' ? `${Math.round(Utils.convertHeight(m, heightUnit))} ${heightUnit}` : 'N/A';
-
-        let message = I18n.t('tracks.reference_mismatch_distance', { distance: Utils.formatDistance(distanceM) });
-        if (heightDiffM !== null) {
-            message += ' ' + I18n.t('tracks.reference_mismatch_height', { height: formatHeight(Math.abs(heightDiffM)) });
-        }
-
         const modal = document.createElement('div');
         modal.className = 'modal';
         const content = document.createElement('div');
         content.className = 'modal-content';
         const title = document.createElement('h3');
-        title.textContent = I18n.t('tracks.reference_mismatch_title');
-        const text = document.createElement('p');
-        text.style.textAlign = 'left';
-        text.style.lineHeight = '1.6';
-        text.textContent = message;
-        const question = document.createElement('p');
-        question.style.textAlign = 'left';
-        question.textContent = I18n.t('tracks.reference_mismatch_question');
+        title.textContent = titleText;
+        const texts = paragraphs.map((paragraph, i) => {
+            const text = document.createElement('p');
+            text.style.textAlign = 'left';
+            if (i === 0) text.style.lineHeight = '1.6';
+            text.textContent = paragraph;
+            return text;
+        });
         const buttons = document.createElement('div');
         buttons.className = 'modal-buttons';
 
@@ -734,7 +770,7 @@ function showTrackReferenceDialog(dip, landing, distanceM, heightDiffM) {
         const loadingDisplay = loadingElement?.style.display;
         if (loadingElement) loadingElement.style.display = 'none';
 
-        const addButton = (label, value) => {
+        choices.forEach(({ label, value }) => {
             const button = document.createElement('button');
             button.className = 'modal-btn';
             button.textContent = label;
@@ -744,11 +780,9 @@ function showTrackReferenceDialog(dip, landing, distanceM, heightDiffM) {
                 resolve(value);
             };
             buttons.appendChild(button);
-        };
-        addButton(I18n.t('tracks.reference_use_landing', { height: formatHeight(landing.altitude) }), 'landing');
-        addButton(I18n.t('tracks.reference_use_dip', { height: formatHeight(dip.altitude) }), 'dip');
+        });
 
-        content.append(title, text, question, buttons);
+        content.append(title, ...texts, buttons);
         modal.appendChild(content);
         document.body.appendChild(modal);
     });

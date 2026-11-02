@@ -1467,11 +1467,15 @@ function setupAppEventListeners() {
                 return;
             }
 
-            const { lat, lng, timestamp, historicalDate, jumpPlan, summary } = event.detail;
+            const { lat, lng, altitude, timestamp, historicalDate, jumpPlan, summary } = event.detail;
             console.log('[main-web] Event "track:loaded" empfangen, starte korrigierte Aktionen.');
 
+            // Bei geplanten Sprüngen (HEIDIS) hat der Nutzer entschieden, ob Wetterdaten geladen werden
+            // (ohne Internet im Flieger bleiben die vorhandenen Wetterdaten aktiv).
+            const loadWeather = !jumpPlan || jumpPlan.loadWeather;
+
             // Deaktiviere Autoupdate, wenn ein historischer Track geladen wird.
-            if (historicalDate) {
+            if (historicalDate && loadWeather) {
                 const autoupdateCheckbox = document.getElementById('autoupdateCheckbox');
                 if (autoupdateCheckbox) {
                     autoupdateCheckbox.checked = false;
@@ -1483,33 +1487,44 @@ function setupAppEventListeners() {
             }
 
             await mapManager.createOrUpdateMarker(lat, lng);
-
-            // historicalDate erzwingt historische Daten für das Track-Datum – auch bei Tracks vom selben Tag.
-            const newWeatherData = await weatherManager.fetchWeatherForLocation(lat, lng, timestamp, historicalDate);
-
-            // Ohne neue Wetterdaten wären die alten (Forecast-)Daten weiterhin aktiv.
-            // Das würde einen historischen Track vortäuschen (Slider bliebe auf dem aktuellen
-            // Datum, Picker/Warnung wären aber gesetzt). Daher hier abbrechen und Fehler zeigen.
-            if (!newWeatherData) {
-                Utils.handleError(I18n.t('messages.weather_fetch_error'));
-                return;
+            // Ohne Internet liefert die Geländeabfrage nichts – dann die Bodenhöhe aus dem Track behalten.
+            if (AppState.lastAltitude === 'N/A' && typeof altitude === 'number') {
+                AppState.lastAltitude = altitude;
             }
 
-            AppState.weatherData = newWeatherData;
+            let weatherLoaded = false;
+            if (loadWeather) {
+                // historicalDate erzwingt historische Daten für das Track-Datum – auch bei Tracks vom selben Tag.
+                const newWeatherData = await weatherManager.fetchWeatherForLocation(lat, lng, timestamp, historicalDate);
 
-            const slider = document.getElementById('timeSlider');
-            if (slider && AppState.weatherData.time) {
-                slider.max = AppState.weatherData.time.length - 1;
-                slider.disabled = slider.max <= 0;
+                // Ohne neue Wetterdaten wären die alten (Forecast-)Daten weiterhin aktiv.
+                // Das würde einen historischen Track vortäuschen (Slider bliebe auf dem aktuellen
+                // Datum, Picker/Warnung wären aber gesetzt). Daher hier abbrechen und Fehler zeigen.
+                // Einen geplanten Sprung trotzdem mit den vorhandenen Wetterdaten übernehmen.
+                if (!newWeatherData) {
+                    Utils.handleError(I18n.t('messages.weather_fetch_error'));
+                    if (!jumpPlan) return;
+                } else {
+                    AppState.weatherData = newWeatherData;
+                    weatherLoaded = true;
 
-                if (timestamp) {
-                    // findTimeIndex vergleicht auf "YYYY-MM-DDTHH"-Ebene und ist damit unabhängig
-                    // davon, ob die API-Zeiten ein "Z"-Suffix tragen (UTC-sicher, kein new Date()-Drift).
-                    slider.value = weatherManager.findTimeIndex(AppState.weatherData, timestamp);
+                    const slider = document.getElementById('timeSlider');
+                    if (slider && AppState.weatherData.time) {
+                        slider.max = AppState.weatherData.time.length - 1;
+                        slider.disabled = slider.max <= 0;
+
+                        if (timestamp) {
+                            // findTimeIndex vergleicht auf "YYYY-MM-DDTHH"-Ebene und ist damit unabhängig
+                            // davon, ob die API-Zeiten ein "Z"-Suffix tragen (UTC-sicher, kein new Date()-Drift).
+                            slider.value = weatherManager.findTimeIndex(AppState.weatherData, timestamp);
+                        }
+                    }
                 }
             }
 
-            await displayManager.updateWeatherDisplay(getSliderValue(), 'weather-table-container', 'selectedTime');
+            if (AppState.weatherData) {
+                await displayManager.updateWeatherDisplay(getSliderValue(), 'weather-table-container', 'selectedTime');
+            }
             await displayManager.refreshMarkerPopup();
             if (AppState.lastAltitude !== 'N/A') {
                 calculateMeanWind();
@@ -1539,7 +1554,7 @@ function setupAppEventListeners() {
                 infoEl.innerHTML = summary + (modelInfoMatch ? modelInfoMatch[0] : '');
             }
 
-            if (historicalDate) {
+            if (historicalDate && weatherLoaded) {
                 const historicalDatePicker = document.getElementById('historicalDatePicker');
                 if (historicalDatePicker) historicalDatePicker.value = historicalDate;
             }
