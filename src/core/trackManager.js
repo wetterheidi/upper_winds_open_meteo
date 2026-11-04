@@ -648,6 +648,47 @@ export function applyImportedJumpPlan(plan) {
     console.log('[trackManager] Planned jump applied:', AppState.importedJumpRun);
 }
 
+/**
+ * Startet für einen geplanten Sprung das Live-Tracking und richtet die Jump Master Line auf den HARP aus.
+ * Die JML lässt sich erst nach 'tracking:started' einschalten, da das Tracking asynchron startet.
+ * Muss nach dem Setzen des HARP-Markers aufgerufen werden.
+ */
+export function startJumpPlanLiveTracking() {
+    Settings.state.userSettings.jumpMasterLineTarget = 'HARP';
+    Settings.save();
+    const harpRadio = document.querySelector('input[name="jumpMasterLineTarget"][value="HARP"]');
+    if (harpRadio) {
+        harpRadio.disabled = false;
+        harpRadio.checked = true;
+    }
+    document.dispatchEvent(new CustomEvent('ui:jumpMasterLineTargetChanged'));
+
+    const showJumpMasterLine = () => {
+        document.removeEventListener('tracking:stopped', cancel);
+        const jmlCheckbox = document.getElementById('showJumpMasterLine');
+        if (jmlCheckbox && !jmlCheckbox.checked) {
+            jmlCheckbox.checked = true;
+            jmlCheckbox.dispatchEvent(new Event('change'));
+        }
+    };
+    // Scheitert der Start (z. B. keine Standortfreigabe), die JML nicht später unerwartet einschalten.
+    const cancel = () => document.removeEventListener('tracking:started', showJumpMasterLine);
+
+    if (AppState.watchId !== null && AppState.watchId !== undefined) {
+        showJumpMasterLine();
+        return;
+    }
+    document.addEventListener('tracking:started', showJumpMasterLine, { once: true });
+    document.addEventListener('tracking:stopped', cancel, { once: true });
+
+    // Auch bei bereits angehakter Checkbox ohne laufenden Watcher den Start auslösen.
+    const trackCheckbox = document.getElementById('trackPositionCheckbox');
+    if (trackCheckbox) {
+        trackCheckbox.checked = true;
+        trackCheckbox.dispatchEvent(new Event('change'));
+    }
+}
+
 // ===================================================================
 // 3. Zentrale Rendering-Funktion
 // ===================================================================

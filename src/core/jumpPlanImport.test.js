@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AppState } from './state.js';
 import { Settings } from './settings.js';
-import { parseJumpPlanWaypoints, applyImportedJumpPlan } from './trackManager.js';
+import { parseJumpPlanWaypoints, applyImportedJumpPlan, startJumpPlanLiveTracking } from './trackManager.js';
 
 // ===================================================================
 // MOCKS & TEST-SETUP
@@ -11,10 +11,27 @@ import { parseJumpPlanWaypoints, applyImportedJumpPlan } from './trackManager.js
 vi.stubGlobal('window', {});
 
 const inputs = {};
+const docListeners = [];
+const changeEvents = [];
+const harpRadio = { disabled: true, checked: false };
+const makeInput = (id) => ({ id, value: '', checked: false, dispatchEvent: (e) => changeEvents.push(`${id}:${e.type}`) });
 vi.stubGlobal('document', {
-    getElementById: (id) => (inputs[id] ??= { value: '', checked: false }),
-    querySelector: () => null,
+    getElementById: (id) => (inputs[id] ??= makeInput(id)),
+    querySelector: () => harpRadio,
+    addEventListener: (type, fn, opts) => docListeners.push({ type, fn, once: opts?.once }),
+    removeEventListener: (type, fn) => {
+        const i = docListeners.findIndex(l => l.type === type && l.fn === fn);
+        if (i >= 0) docListeners.splice(i, 1);
+    },
+    dispatchEvent: (e) => {
+        docListeners.filter(l => l.type === e.type).forEach(l => {
+            if (l.once) docListeners.splice(docListeners.indexOf(l), 1);
+            l.fn(e);
+        });
+    },
 });
+vi.stubGlobal('CustomEvent', class { constructor(type, init) { this.type = type; this.detail = init?.detail; } });
+vi.stubGlobal('Event', class { constructor(type) { this.type = type; } });
 
 vi.mock('./capacitor-adapter.js', () => ({
     getCapacitor: vi.fn().mockResolvedValue({ isNative: false }),
@@ -98,5 +115,44 @@ describe('applyImportedJumpPlan', () => {
         applyImportedJumpPlan(parseJumpPlanWaypoints(HEIDIS_WAYPOINTS));
         expect(Settings.state.userSettings.exitAltitude).toBe(3000);
         expect(Settings.state.userSettings.customJumpRunDirection).toBe(298);
+    });
+});
+
+describe('startJumpPlanLiveTracking', () => {
+    beforeEach(() => {
+        Settings.state.userSettings = { jumpMasterLineTarget: 'DIP' };
+        AppState.watchId = null;
+        docListeners.length = 0;
+        changeEvents.length = 0;
+        Object.keys(inputs).forEach(k => delete inputs[k]);
+        harpRadio.disabled = true;
+        harpRadio.checked = false;
+    });
+
+    it('setzt JML auf HARP, startet das Tracking und schaltet die JML erst nach dem Start ein', () => {
+        startJumpPlanLiveTracking();
+
+        expect(Settings.state.userSettings.jumpMasterLineTarget).toBe('HARP');
+        expect(harpRadio).toEqual({ disabled: false, checked: true });
+        expect(changeEvents).toEqual(['trackPositionCheckbox:change']);
+        expect(inputs.showJumpMasterLine?.checked).toBeFalsy();
+
+        document.dispatchEvent(new CustomEvent('tracking:started'));
+        expect(inputs.showJumpMasterLine.checked).toBe(true);
+        expect(changeEvents).toEqual(['trackPositionCheckbox:change', 'showJumpMasterLine:change']);
+    });
+
+    it('schaltet die JML sofort ein, wenn das Tracking schon läuft', () => {
+        AppState.watchId = 42;
+        startJumpPlanLiveTracking();
+        expect(changeEvents).toEqual(['showJumpMasterLine:change']);
+    });
+
+    it('schaltet die JML nicht später ein, wenn der Tracking-Start scheitert', () => {
+        startJumpPlanLiveTracking();
+        document.dispatchEvent(new CustomEvent('tracking:stopped'));
+        document.dispatchEvent(new CustomEvent('tracking:started'));
+        expect(inputs.showJumpMasterLine?.checked).toBeFalsy();
+        expect(docListeners).toHaveLength(0);
     });
 });

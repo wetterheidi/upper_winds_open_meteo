@@ -21,7 +21,7 @@ import * as EnsembleManager from '../core/ensembleManager.js';
 import * as LocationManager from '../core/locationManager.js';
 import * as AdsbManager from '../core/adsbManager.js';
 import * as PinManager from '../core/pinManager.js';
-import { applyImportedJumpPlan } from '../core/trackManager.js';
+import { applyImportedJumpPlan, startJumpPlanLiveTracking } from '../core/trackManager.js';
 import { generateMeteogram } from '../core/meteogramChart.js';
 import { DateTime } from 'luxon';
 import { I18n } from '../core/i18n.js';
@@ -1539,6 +1539,8 @@ function setupAppEventListeners() {
                     lockCheckbox.checked = true;
                     lockCheckbox.dispatchEvent(new Event('change'));
                 }
+                // Live-Tracking starten und JML auf den HARP richten.
+                startJumpPlanLiveTracking();
                 Utils.handleMessage(I18n.t('tracks.jump_plan_applied'));
             }
             if (Settings.state.userSettings.calculateJump) {

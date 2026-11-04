@@ -534,7 +534,7 @@
         "error_kml_no_geometry": "KML file contains no valid geometries to display.",
         "error_kml_parse": "Error parsing KML file: {message}",
         "error_gpx_points": "GPX track has insufficient points.",
-        "jump_plan_applied": "Planned jump detected: HARP, jump run, exit and opening altitude have been applied, points are locked.",
+        "jump_plan_applied": "Planned jump detected: HARP, jump run, exit and opening altitude have been applied, points are locked, live tracking with JML to HARP is active.",
         "jump_plan_weather_title": "Planned jump detected",
         "jump_plan_weather_question": "Load matching weather data for the location and time of the jump? Without an internet connection (e.g. in the aircraft), keep the current weather data.",
         "jump_plan_weather_load": "Load weather data",

@@ -534,7 +534,7 @@
         "error_kml_no_geometry": "KML-Datei enthält keine gültigen Geometrien zur Anzeige.",
         "error_kml_parse": "Fehler beim Parsen der KML-Datei: {message}",
         "error_gpx_points": "GPX-Track enthält zu wenige Punkte.",
-        "jump_plan_applied": "Geplanter Sprung erkannt: HARP, Absetzstrecke sowie Absprung- und Öffnungshöhe wurden übernommen, Punkte sind gesperrt.",
+        "jump_plan_applied": "Geplanter Sprung erkannt: HARP, Absetzstrecke sowie Absprung- und Öffnungshöhe wurden übernommen, Punkte sind gesperrt, Live-Tracking mit JML zum HARP ist aktiv.",
         "jump_plan_weather_title": "Geplanter Sprung erkannt",
         "jump_plan_weather_question": "Sollen passende Wetterdaten für Ort und Zeitpunkt des Sprungs geladen werden? Ohne Internetverbindung (z. B. im Flugzeug) die vorhandenen Wetterdaten behalten.",
         "jump_plan_weather_load": "Wetterdaten laden",

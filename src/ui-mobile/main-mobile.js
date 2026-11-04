@@ -1783,6 +1783,8 @@ function setupAppEventListeners() {
                         lockCheckbox.checked = true;
                         lockCheckbox.dispatchEvent(new Event('change'));
                     }
+                    // Live-Tracking starten und JML auf den HARP richten.
+                    trackManager.startJumpPlanLiveTracking();
                     Utils.handleMessage(I18n.t('tracks.jump_plan_applied'));
                 }
                 if (Settings.state.userSettings.calculateJump) {
