@@ -1392,41 +1392,6 @@ function setupAppEventListeners() {
         });
     });
 
-    document.addEventListener('map:location_selected', async (event) => {
-        const { lat, lng, source } = event.detail;
-        console.log(`App: Event 'map:location_selected' von '${source}' empfangen.`);
-
-        // 1. Marker-Position im AppState und UI aktualisieren
-        AppState.lastLat = lat;
-        AppState.lastLng = lng;
-        AppState.lastAltitude = await Utils.getAltitude(lat, lng);
-
-        // Informiere das Coordinates-Modul über die neue Position
-        LocationManager.addCoordToHistory(lat, lng);
-
-        // Bewege den Marker (falls die Aktion nicht schon vom Marker selbst kam)
-        if (source !== 'marker_drag') {
-            // Annahme: Sie haben eine moveMarker-Funktion im mapManager
-            mapManager.moveMarker(lat, lng);
-        }
-
-        // 2. Kernlogik ausführen
-        resetJumpRunDirection(true);
-        await weatherManager.fetchWeatherForLocation(lat, lng);
-
-        if (Settings.state.userSettings.calculateJump) {
-            calculateJump();
-            JumpPlanner.calculateCutAway();
-        }
-
-        mapManager.recenterMap(true);
-        AppState.isManualPanning = false;
-
-        // 3. UI-Updates anstoßen, die von den neuen Daten abhängen
-        displayManager.updateJumpRunTrackDisplay();
-        displayManager.updateLandingPatternDisplay();
-    });
-
     document.addEventListener('favorites:updated', (event) => {
         const { favorites } = event.detail;
         console.log('[App] Favorites updated, redrawing markers on map.');
