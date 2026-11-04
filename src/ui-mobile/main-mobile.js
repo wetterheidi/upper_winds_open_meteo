@@ -2627,6 +2627,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     Settings.state.userSettings.showTable = true;
     applyDeviceSpecificStyles();
 
+    // Per "Öffnen mit" übergebene Dateien erst verarbeiten, wenn der App-Start abgeschlossen ist
+    // (Listener eingerichtet, erster Standort samt Wetter geladen). Sonst laufen Import und
+    // Start-Initialisierung parallel (Live-Tracking startet mitten in die Standortabfrage, der
+    // Start-Standort überschreibt den importierten DIP).
+    let resolveAppReady;
+    const appReady = new Promise(resolve => { resolveAppReady = resolve; });
+    let initialLocationLoad = Promise.resolve();
+
     // === START: Code für GPX-Öffnen ===
     try {
         const { App, Filesystem, isNative } = await getCapacitor(); // Hole Plugins über den Adapter
@@ -2675,8 +2683,30 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error('Error setting up appUrlOpen listener:', error);
     }
 
+    // Wartet, bis die App im Vordergrund ist (beim Öffnen aus einer anderen App kommt die URL
+    // ggf. noch während des Wechsels; Standortfreigabe und Tracking-Start brauchen den Vordergrund).
+    async function waitUntilAppActive() {
+        const { App } = await getCapacitor();
+        if (!App?.getState) return;
+        const { isActive } = await App.getState();
+        if (isActive) return;
+        await new Promise(resolve => {
+            let handle = null;
+            let done = false;
+            App.addListener('appStateChange', (state) => {
+                if (!state.isActive || done) return;
+                done = true;
+                handle?.remove();
+                resolve();
+            }).then(h => { handle = h; if (done) h.remove(); });
+        });
+    }
+
     // Hilfsfunktion zum Verarbeiten der geöffneten Datei       
     async function handleOpenFileUrl(fileUrl, detectedType) { // Behalte detectedType für den ersten Hinweis
+        await appReady;
+        await initialLocationLoad;
+        await waitUntilAppActive();
         const loadingElement = document.getElementById('loading');
         if (loadingElement) loadingElement.style.display = 'block'; //
         Utils.handleMessage(I18n.t('tracks.opening_track_file')); //
@@ -2781,7 +2811,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.log(`[App] Initialized timeSlider to current time index: ${currentIndex}`);
     }
 
-    document.addEventListener('location:selected', async (event) => {
+    document.addEventListener('location:selected', (event) => {
+        const loading = handleLocationSelected(event);
+        if (['geolocation', 'geolocation_fallback', 'geolocation_retry'].includes(event.detail.source)) {
+            initialLocationLoad = loading.catch(() => { });
+        }
+    });
+
+    async function handleLocationSelected(event) {
         const { lat, lng, source } = event.detail;
         console.log(`App: Event 'location:selected' empfangen. Quelle: ${source}, Koordinaten: ${lat}, ${lng}`);
         mapManager.clearTerrainWarning();
@@ -2848,7 +2885,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } finally {
             if (loadingElement) loadingElement.style.display = 'none';
         }
-    });
+    }
 
     // Initialisiert die Karte und prüft, ob Wetterdaten geladen wurden
     try {
@@ -2897,6 +2934,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     AutoupdateManager.setupAutoupdate();
     // Initialisiert über setupCoordinateEvents() auch die Ortssuche
     EventManager.initializeEventListeners();
+    resolveAppReady();
 
     // Initiales Zeichnen der Favoriten-Marker beim Start
     const initialFavorites = LocationManager.getCoordHistory().filter(item => item.isFavorite);
