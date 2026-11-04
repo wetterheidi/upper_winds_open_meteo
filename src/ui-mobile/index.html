@@ -873,6 +873,31 @@
             </div>
 
             <div class="accordion-item">
+                <button class="accordion-header" data-i18n="custom_profile.section">Own Profile</button>
+                <div class="accordion-content">
+                    <div id="custom-profile-upload" class="settings-grid">
+
+                        <div style="position: relative; display: flex; align-items: center; justify-content: flex-end;">
+                            <span class="info-icon info-button-shared">i</span>
+                            <div id="customProfileInfoPopup" class="info-popup" data-i18n="custom_profile.info">
+                                Radiosonde (Windsond) or NinJo TEMP as text file</div>
+                        </div>
+
+                        <div>
+                            <button type="button" id="uploadCustomProfileButton" class="btn btn-primary"
+                                data-i18n="settings.choose_file">Choose File...</button>
+                            <label data-i18n="settings.selected_file">Selected File</label>
+                            <span id="customProfileFileName" class="file-name-display"
+                                data-i18n="settings.no_file_chosen">No file chosen</span>
+                        </div>
+
+                        <button id="clearCustomProfile" class="btn btn-secondary"
+                            data-i18n="custom_profile.remove">Remove Profile</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="accordion-item">
                 <button class="accordion-header" data-i18n="settings.app_management">App Management</button>
                 <div class="accordion-content" id="app-management-settings">
                     <button id="theme-toggle" class="btn btn-secondary" data-i18n="settings.dark_mode">Switch to Dark

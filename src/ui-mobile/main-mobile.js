@@ -2080,7 +2080,11 @@ function setupAppEventListeners() {
 
         if (AppState.lastLat && AppState.lastLng) {
             const timeIndexToPreserve = getSliderValue();
-            const currentTime = AppState.weatherData?.time?.[timeIndexToPreserve] || null;
+            // Der Zeitpunkt eines Eigenen Profils (oft Jahre alt) darf beim Wechsel zurück zu
+            // Modelldaten nicht übernommen werden – sonst würden historische Daten geladen.
+            const currentTime = AppState.lastDataSource === 'custom-profile'
+                ? null
+                : AppState.weatherData?.time?.[timeIndexToPreserve] || null;
 
             const newWeatherData = await weatherManager.fetchWeatherForLocation(AppState.lastLat, AppState.lastLng, currentTime);
             if (newWeatherData) {

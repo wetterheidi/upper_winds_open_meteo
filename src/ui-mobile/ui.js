@@ -9,6 +9,7 @@ import { Utils } from '../core/utils.js';
 import { Settings } from '../core/settings.js';
 import { fetchEnsembleWeatherData, processAndVisualizeEnsemble } from '../core/ensembleManager.js';
 import { SOUNDING_MODEL_ID } from '../core/soundingManager.js';
+import { CUSTOM_PROFILE_MODEL_ID } from '../core/customProfileImport.js';
 import { I18n } from '../core/i18n.js';
 
 // ===================================================================
@@ -100,10 +101,15 @@ export function updateModelSelectUI(availableModels) {
         option.value = model;
         option.textContent = model === 'dwd_icon_d2_sounding'
             ? '★ ICON-D2 Progtemp (DWD)'
-            : model.replace(/_/g, ' ').toUpperCase();
+            : model === CUSTOM_PROFILE_MODEL_ID
+                ? `★ ${I18n.t('custom_profile.model_label')}`
+                : model.replace(/_/g, ' ').toUpperCase();
         modelSelect.appendChild(option);
     });
-    if (availableModels.includes(Settings.state.userSettings.model)) {
+    // Ein ausgewähltes Eigenes Profil bleibt ausgewählt (es wird nie in den Settings gespeichert)
+    if (currentSelected === CUSTOM_PROFILE_MODEL_ID && availableModels.includes(CUSTOM_PROFILE_MODEL_ID)) {
+        modelSelect.value = CUSTOM_PROFILE_MODEL_ID;
+    } else if (availableModels.includes(Settings.state.userSettings.model)) {
         modelSelect.value = Settings.state.userSettings.model;
     } else if (availableModels.includes(currentSelected)) {
         modelSelect.value = currentSelected;
@@ -120,7 +126,7 @@ export function updateEnsembleModelUI(availableModels) {
     const submenu = document.getElementById('ensembleModelsSubmenu');
     if (!submenu) return;
     submenu.innerHTML = '';
-    availableModels.filter(m => m !== SOUNDING_MODEL_ID).forEach(model => {
+    availableModels.filter(m => m !== SOUNDING_MODEL_ID && m !== CUSTOM_PROFILE_MODEL_ID).forEach(model => {
         const li = document.createElement('li');
         const label = document.createElement('label');
         label.className = 'radio-label';

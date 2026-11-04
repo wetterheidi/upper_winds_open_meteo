@@ -646,6 +646,7 @@
         "error_surface_wind": "Bitte Richtung und Stärke des Bodenwinds angeben.",
         "error_too_few_levels": "Die Datei enthält zu wenige auswertbare Messpunkte – passt das Format?",
         "error_profile_below_ground": "Das Profil beginnt unterhalb der angegebenen Starthöhe.",
-        "error_parse": "Profil konnte nicht gelesen werden ({message})"
+        "error_parse": "Profil konnte nicht gelesen werden ({message})",
+        "error_file_too_large": "Die Datei ist zu groß für ein Profil (max. 5 MB)."
     }
 }

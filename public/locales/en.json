@@ -646,6 +646,7 @@
         "error_surface_wind": "Please enter surface wind direction and speed.",
         "error_too_few_levels": "The file contains too few usable levels – is the format right?",
         "error_profile_below_ground": "The profile starts below the given launch elevation.",
-        "error_parse": "Profile could not be read ({message})"
+        "error_parse": "Profile could not be read ({message})",
+        "error_file_too_large": "The file is too large for a profile (max. 5 MB)."
     }
 }
