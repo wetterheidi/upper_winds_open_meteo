@@ -14,6 +14,7 @@ import { I18n } from './i18n.js';
 import { SOUNDING_MODEL_ID, checkSoundingAvailability, fetchSoundingData } from './soundingManager.js';
 import { MODEL_LEVEL_ELIGIBLE, fetchModelLevelData, fetchIconRunMeta } from './modelLevelManager.js';
 import { OM_PUBLIC, hostOf, fetchJsonFromServers } from './openMeteoServers.js';
+import { CUSTOM_PROFILE_MODEL_ID, hasCustomProfile, getCustomProfileWeatherData } from './customProfileManager.js';
 
 // ===================================================================
 // 1. Öffentliche Hauptfunktionen (API des Moduls)
@@ -114,6 +115,10 @@ export async function fetchWeatherForLocation(lat, lng, currentTime = null, hist
     // Progtemp-Option am Ende der Liste eintragen, wenn ein Standort im 20-km-Umkreis liegt
     if (soundingAvailable) {
         availableModels.push(SOUNDING_MODEL_ID);
+    }
+    // Ein importiertes Eigenes Profil bleibt wählbar, solange es geladen ist
+    if (hasCustomProfile()) {
+        availableModels.push(CUSTOM_PROFILE_MODEL_ID);
     }
 
     // 2. Ein Event auslösen, damit die UI sich aktualisieren kann
@@ -462,6 +467,11 @@ async function fetchWeather(lat, lon, currentTime = null, historicalDateOverride
 
         if (!selectedModelValue) {
             throw new Error(I18n.t('messages.no_model_selected'));
+        }
+
+        // Eigenes Profil abfangen: importierte Daten statt Modelldaten (nichts wird gemischt)
+        if (selectedModelValue === CUSTOM_PROFILE_MODEL_ID) {
+            return getCustomProfileWeatherData();
         }
 
         // Progtemp-Modell abfangen: Sounding-Daten statt Open-Meteo laden

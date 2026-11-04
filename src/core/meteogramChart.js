@@ -62,6 +62,12 @@ export async function generateMeteogram(sliderIndex) {
 
     destroyCharts();
 
+    // Ein Eigenes Profil hat nur einen Zeitpunkt (und keine Böen/Wettercodes):
+    // ein Meteogramm wäre sinnlos, daher ausblenden.
+    const isCustomProfile = AppState.lastDataSource === 'custom-profile';
+    document.getElementById('meteogram-container')?.classList.toggle('hidden', isCustomProfile);
+    if (isCustomProfile) return;
+
     if (!AppState.weatherData || !AppState.weatherData.time || sliderIndex < 0) {
         if (upperTitleElement) upperTitleElement.textContent = I18n.t('weather.charts.upper_air');
         if (surfaceTitleElement) surfaceTitleElement.textContent = I18n.t('weather.charts.surface');

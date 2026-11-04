@@ -50,7 +50,9 @@ export const AppState = {
     customPressureLevels: null,     // @type {number[]|null} - Überschreibt STANDARD_PRESSURE_LEVELS wenn Progtemp- oder Modelllevel-Daten geladen sind.
     lastDataServer: null,           // @type {{host: string, fallback: boolean}|null} - Server, der die zuletzt geladenen Profildaten tatsächlich geliefert hat.
     lastOrography: null,            // @type {{modelM: number|null, demM: number|null}|null} - Modell- vs. DEM90-Geländehöhe bei Modelllevel-Daten.
-    lastDataSource: null,           // @type {'model-level'|'pressure-level'|null} - Herkunft der zuletzt geladenen vertikalen Profildaten.
+    lastDataSource: null,           // @type {'model-level'|'pressure-level'|'custom-profile'|null} - Herkunft der zuletzt geladenen vertikalen Profildaten.
+    customProfile: null,            // @type {object|null} - Importiertes "Eigenes Profil" (s. customProfileManager.js); nur bis zum Neuladen der Seite.
+    lastProfileGround: null,        // @type {{profileM: number, demM: number|null}|null} - Bodenhöhe des Eigenen Profils vs. Geländehöhe am DIP.
     landingWindDir: null,           // @type {number|null} - Windrichtung in 10m Höhe für das Landemuster.
     autoupdateInterval: null,       // @type {number|null} - Die ID des Intervall-Timers für das Auto-Update.
 

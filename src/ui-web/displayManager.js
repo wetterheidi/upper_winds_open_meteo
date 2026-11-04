@@ -17,6 +17,7 @@ import * as JumpPlanner from '../core/jumpPlanner.js';
 import { generateWindspinne } from '../core/windchart.js';
 import { DateTime } from 'luxon';
 import { I18n } from '../core/i18n.js';
+import { getProfileHeightDelta, PROFILE_HEIGHT_MISMATCH_WARN_M } from '../core/customProfileManager.js';
 
 // ===================================================================
 // 1. Wetter- und Info-Anzeigen
@@ -335,6 +336,30 @@ export function updateModelInfoPopup() {
 
     const model = modelSelect.value;
     const modelRun = AppState.lastModelRun || "N/A";
+
+    // Eigenes Profil: Datei, Format, Zeitpunkt und Bodenhöhen statt Modelllauf/Server
+    if (AppState.lastDataSource === 'custom-profile' && AppState.customProfile) {
+        const prof = AppState.customProfile;
+        let content = `${I18n.t('custom_profile.model_label')}: ${prof.filename}`
+            + `\n${I18n.t('custom_profile.format')}: ${prof.presetLabel}`
+            + `\n${I18n.t('custom_profile.valid_time')}: ${modelRun}`;
+        const g = AppState.lastProfileGround;
+        const delta = getProfileHeightDelta();
+        if (g && delta !== null) {
+            const warn = Math.abs(delta) >= PROFILE_HEIGHT_MISMATCH_WARN_M;
+            content += `\n${warn ? '⚠ ' : ''}${I18n.t('custom_profile.ground_compare', {
+                profile: Math.round(g.profileM), dem: Math.round(g.demM), delta: `${delta >= 0 ? '+' : '−'}${Math.abs(delta)}`,
+            })}`;
+            if (warn) content += `\n${I18n.t('custom_profile.ground_warning')}`;
+        }
+        // Dateiname stammt vom Nutzer -> escapen, bevor er in innerHTML landet
+        const esc = (str) => str.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        modelInfoPopup.innerHTML = esc(content).replace(/\n/g, '<br>');
+        if (modelInfoPopup.style.display === 'block') {
+            positionFloatingPopup(modelInfoPopup, document.getElementById('modelInfoButton'));
+        }
+        return;
+    }
 
     let titleContent = `${I18n.t('common.forecast_model')}: ${model.replace(/_/g, ' ').toUpperCase()}\n${I18n.t('weather.model_run')} ${modelRun}`;
     if (AppState.lastDataSource === 'model-level') {

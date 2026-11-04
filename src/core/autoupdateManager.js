@@ -2,6 +2,7 @@ import { AppState } from './state.js';
 import { Settings } from './settings.js';
 import { Utils } from './utils.js';
 import { I18n } from './i18n.js';
+import { isCustomProfileSelected } from './customProfileManager.js';
 
 /**
  * Startet den Intervall-Timer für die automatische Aktualisierung.
@@ -28,6 +29,8 @@ function startAutoupdate() {
     document.dispatchEvent(new CustomEvent('autoupdate:tick', { detail: { isInitialTick: true } }));
 
     AppState.autoupdateInterval = setInterval(() => {
+        // Ein Eigenes Profil ist ein fester Zeitpunkt: nichts zu aktualisieren
+        if (isCustomProfileSelected()) return;
         console.log('[AutoupdateManager] Tick...');
         document.dispatchEvent(new CustomEvent('autoupdate:tick', { detail: { isInitialTick: false } }));
     }, 60 * 1000);
@@ -66,6 +69,14 @@ export function setupAutoupdate() {
     autoupdateCheckbox.addEventListener('change', () => {
         Settings.state.userSettings.autoupdate = autoupdateCheckbox.checked;
         Settings.save();
+
+        if (autoupdateCheckbox.checked && isCustomProfileSelected()) {
+            autoupdateCheckbox.checked = false;
+            Settings.state.userSettings.autoupdate = false;
+            Settings.save();
+            Utils.handleError(I18n.t('custom_profile.autoupdate_blocked'));
+            return;
+        }
 
         const historicalDatePicker = document.getElementById('historicalDatePicker');
         if (autoupdateCheckbox.checked && historicalDatePicker?.value) {

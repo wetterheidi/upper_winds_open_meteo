@@ -20,6 +20,10 @@ import { CANOPY_OPENING_BUFFER_METERS, CONVERSIONS } from '../core/constants.js'
 import { I18n } from '../core/i18n.js';
 import { keepFloatingPopupAnchored } from '../core/floatingPopup.js';
 import { SOUNDING_MODEL_ID } from '../core/soundingManager.js';
+import { CUSTOM_PROFILE_MODEL_ID, decodeProfileBytes } from '../core/customProfileImport.js';
+import { setCustomProfile, clearCustomProfile, hasCustomProfile } from '../core/customProfileManager.js';
+import { openCustomProfileDialog } from '../core/customProfileDialog.js';
+import { stopAutoupdate } from '../core/autoupdateManager.js';
 
 // =================================================================
 // 1. Globale Variablen & Zustand
@@ -297,8 +301,12 @@ function setupModelSelectEvents() {
         const newModel = modelSelect.value;
         console.log('Model select changed to:', newModel);
 
-        Settings.state.userSettings.model = newModel;
-        Settings.save();
+        // Das Eigene Profil lebt nur bis zum Neuladen: nie als Modell speichern,
+        // sonst stünde nach einem Reload ein Modell ohne Daten in den Settings.
+        if (newModel !== CUSTOM_PROFILE_MODEL_ID) {
+            Settings.state.userSettings.model = newModel;
+            Settings.save();
+        }
 
         // Event auslösen, anstatt die Logik hier auszuführen
         document.dispatchEvent(new CustomEvent('ui:modelChanged', {
@@ -923,6 +931,93 @@ function setupTrackEvents() {
         } else {
             Utils.handleMessage(I18n.t('tracks.no_track_to_clear'));
         }
+    });
+}
+// --- Eigenes Profil (Radiosonde / NinJo-TEMP) ---
+function setupCustomProfileEvents() {
+    const uploadButton = document.getElementById('uploadCustomProfileButton');
+    const fileInput = document.getElementById('customProfileFileInput');
+    const fileNameDisplay = document.getElementById('customProfileFileName');
+    const clearButton = document.getElementById('clearCustomProfile');
+    const modelSelect = document.getElementById('modelSelect');
+    if (!uploadButton || !fileInput || !fileNameDisplay || !clearButton || !modelSelect) return;
+
+    const resetFileName = () => {
+        fileInput.value = '';
+        fileNameDisplay.setAttribute('data-i18n', 'settings.no_file_chosen');
+        fileNameDisplay.textContent = I18n.t('settings.no_file_chosen');
+        fileNameDisplay.style.fontStyle = 'italic';
+    };
+
+    const selectModel = (value) => {
+        modelSelect.value = value;
+        modelSelect.dispatchEvent(new Event('change'));
+    };
+
+    uploadButton.addEventListener('click', () => {
+        // Das Profil wird am DIP verankert -> ohne Position nichts zu rechnen
+        if (AppState.lastLat == null || AppState.lastLng == null) {
+            Utils.handleError(I18n.t('map.select_position'));
+            return;
+        }
+        fileInput.click();
+    });
+
+    fileInput.addEventListener('change', async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        try {
+            const text = decodeProfileBytes(await file.arrayBuffer());
+            const profile = await openCustomProfileDialog({
+                filename: file.name,
+                text,
+                defaultGroundM: Number.isFinite(AppState.lastAltitude) ? AppState.lastAltitude : undefined,
+            });
+            if (!profile) { fileInput.value = ''; return; }
+
+            setCustomProfile(profile);
+            fileNameDisplay.removeAttribute('data-i18n');
+            fileNameDisplay.textContent = file.name;
+            fileNameDisplay.style.fontStyle = 'normal';
+
+            // Ein fester Zeitpunkt lässt sich nicht automatisch aktualisieren
+            const autoupdateCheckbox = document.getElementById('autoupdateCheckbox');
+            if (autoupdateCheckbox?.checked) {
+                autoupdateCheckbox.checked = false;
+                Settings.state.userSettings.autoupdate = false;
+                Settings.save();
+                stopAutoupdate();
+            }
+
+            if (![...modelSelect.options].some(o => o.value === CUSTOM_PROFILE_MODEL_ID)) {
+                modelSelect.appendChild(new Option(`★ ${I18n.t('custom_profile.model_label')}`, CUSTOM_PROFILE_MODEL_ID));
+            }
+            selectModel(CUSTOM_PROFILE_MODEL_ID);
+            Utils.handleMessage(I18n.t('custom_profile.loaded', { file: file.name, levels: profile.levelCount }));
+        } catch (error) {
+            console.error('[customProfile] Import fehlgeschlagen:', error);
+            Utils.handleError(I18n.t('custom_profile.error_parse', { message: error.message }));
+            fileInput.value = '';
+        }
+    });
+
+    clearButton.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!hasCustomProfile()) {
+            Utils.handleMessage(I18n.t('custom_profile.none_loaded'));
+            return;
+        }
+        const wasSelected = modelSelect.value === CUSTOM_PROFILE_MODEL_ID;
+        clearCustomProfile();
+        resetFileName();
+        [...modelSelect.options].filter(o => o.value === CUSTOM_PROFILE_MODEL_ID).forEach(o => o.remove());
+        if (wasSelected) {
+            // Zurück zum zuletzt gespeicherten Modell (das Profil wurde nie gespeichert)
+            const saved = Settings.state.userSettings.model;
+            const fallback = [...modelSelect.options].some(o => o.value === saved) ? saved : modelSelect.options[0]?.value;
+            if (fallback) selectModel(fallback);
+        }
+        Utils.handleMessage(I18n.t('custom_profile.removed'));
     });
 }
 function setupGpxExportEvent() {
@@ -1933,7 +2028,7 @@ export function updateEnsembleModelUI(availableModels) {
     const submenu = document.getElementById('ensembleModelsSubmenu');
     if (!submenu) return;
     submenu.innerHTML = '';
-    availableModels.filter(m => m !== SOUNDING_MODEL_ID).forEach(model => {
+    availableModels.filter(m => m !== SOUNDING_MODEL_ID && m !== CUSTOM_PROFILE_MODEL_ID).forEach(model => {
         const li = document.createElement('li');
         const label = document.createElement('label');
         label.className = 'radio-label';
@@ -2061,6 +2156,7 @@ export function initializeEventListeners() {
 
     // 5. Datei- & Track-Management
     setupTrackEvents();
+    setupCustomProfileEvents();
     setupGpxExportEvent();
 
     // 6. App-Management & Cache

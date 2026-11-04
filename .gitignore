@@ -30,3 +30,6 @@ npm-debug.log*
 # Android keystore files
 android/keystore.properties
 android/release-key.keystore
+
+# Beispieldateien für Profil-Import-Tests (nur lokal)
+/src/core/testdata/

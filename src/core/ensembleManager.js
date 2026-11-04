@@ -14,6 +14,7 @@ import { DateTime } from 'luxon';
 import { ENSEMBLE_VISUALIZATION, API_URLS } from './constants.js';
 import { I18n } from './i18n.js';
 import { SOUNDING_MODEL_ID } from './soundingManager.js';
+import { CUSTOM_PROFILE_MODEL_ID } from './customProfileImport.js';
 
 const METERS_PER_DEGREE_LAT = 111_320;
 
@@ -44,7 +45,7 @@ export async function fetchEnsembleWeatherData() {
     try {
         const lat = AppState.lastLat;
         const lon = AppState.lastLng;
-        const modelsToFetch = Settings.state.userSettings.selectedEnsembleModels.filter(m => m !== SOUNDING_MODEL_ID);
+        const modelsToFetch = Settings.state.userSettings.selectedEnsembleModels.filter(m => m !== SOUNDING_MODEL_ID && m !== CUSTOM_PROFILE_MODEL_ID);
         if (modelsToFetch.length === 0) {
             AppState.ensembleModelsData = null;
             clearEnsembleVisualizations();
