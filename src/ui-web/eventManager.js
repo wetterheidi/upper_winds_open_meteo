@@ -18,7 +18,7 @@ import { DateTime } from 'luxon';
 import { generateMeteogram } from '../core/meteogramChart.js';
 import { CANOPY_OPENING_BUFFER_METERS, CONVERSIONS } from '../core/constants.js';
 import { I18n } from '../core/i18n.js';
-import { keepFloatingPopupAnchored } from '../core/floatingPopup.js';
+import { keepFloatingPopupAnchored, positionFloatingPopup } from '../core/floatingPopup.js';
 import { SOUNDING_MODEL_ID } from '../core/soundingManager.js';
 import { CUSTOM_PROFILE_MODEL_ID, decodeProfileBytes } from '../core/customProfileImport.js';
 import { setCustomProfile, clearCustomProfile, hasCustomProfile } from '../core/customProfileManager.js';
@@ -408,7 +408,10 @@ function setupInfoIcons() {
                 // Zeige oder verstecke das aktuelle Popup
                 const isVisible = popup.style.display === 'block';
                 popup.style.display = isVisible ? 'none' : 'block';
+                // Im Viewport halten, sonst verschwindet das Popup hinter der Sidebar
+                if (!isVisible) positionFloatingPopup(popup, icon);
             });
+            keepFloatingPopupAnchored(popup, icon);
         }
     });
 
