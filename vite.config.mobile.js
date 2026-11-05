@@ -40,7 +40,8 @@ export default defineConfig(({ command }) => ({
     }
   },
   esbuild: {
-    drop: command === 'build' ? ['console', 'debugger'] : [],
+    // KEEP_CONSOLE=1 behält console-Ausgaben im Build (Diagnose auf dem Gerät über die Xcode-Konsole).
+    drop: command === 'build' && !process.env.KEEP_CONSOLE ? ['console', 'debugger'] : [],
   },
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),

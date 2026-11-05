@@ -2691,7 +2691,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 throw new Error('Could not read file data.'); //
             }
 
-            const fileContent = atob(result.data); //
+            // Base64 → Bytes → UTF-8-Text. atob() allein liefert ein Byte pro Zeichen; daraus ein Blob
+            // gebaut, würden BOM (z. B. HEIDIS-Dateien) und Umlaute doppelt kodiert und das XML unlesbar.
+            const binary = atob(result.data);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+            const fileContent = new TextDecoder('utf-8').decode(bytes); // entfernt ein führendes BOM
             console.log(`File content read successfully (length: ${fileContent.length}). First 100 chars: ${fileContent.substring(0, 100)}`);
 
             // --- Finale Typ-Entscheidung basierend auf INHALT (robustere Prüfung) ---
@@ -2737,23 +2742,25 @@ document.addEventListener('DOMContentLoaded', async () => {
             let blob;
             let fileToLoad;
             let successMessage;
+            let loaded = null;
 
             if (finalFileType === 'kml') {
                 blob = new Blob([fileContent], { type: 'application/vnd.google-earth.kml+xml' }); //
                 fileToLoad = new File([blob], fileName, { type: blob.type }); //
                 console.log('Creating KML File object:', fileToLoad.name, fileToLoad.size); //
-                await trackManager.loadKmlTrack(fileToLoad); //
+                loaded = await trackManager.loadKmlTrack(fileToLoad); //
                 successMessage = I18n.t('tracks.kml_loaded'); // <<< Korrekte Nachricht
 
             } else { // Annahme: GPX
                 blob = new Blob([fileContent], { type: 'application/gpx+xml' }); //
                 fileToLoad = new File([blob], fileName, { type: blob.type }); //
                 console.log('Creating GPX File object:', fileToLoad.name, fileToLoad.size); //
-                await trackManager.loadGpxTrack(fileToLoad); //
+                loaded = await trackManager.loadGpxTrack(fileToLoad); //
                 successMessage = "GPX file loaded successfully."; // <<< Korrekte Nachricht
             }
 
-            Utils.handleMessage(successMessage); //
+            // Bei Fehlern hat der Trackmanager schon eine Meldung gezeigt – nicht mit "Erfolg" überschreiben.
+            if (loaded) Utils.handleMessage(successMessage); //
 
         } catch (error) {
             console.error('Error handling opened file:', error); //
