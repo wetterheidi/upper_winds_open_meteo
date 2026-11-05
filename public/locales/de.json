@@ -252,7 +252,8 @@
         "historical_date": "Historisches Datum",
         "select_date": "Datum wählen:",
         "clear": "Löschen",
-        "track_upload": "Track hochladen",
+        "import": "Import",
+        "import_track": "Track laden",
         "choose_file": "Datei wählen...",
         "selected_file": "Ausgewählte Datei",
         "clear_track": "Track löschen",
@@ -615,7 +616,7 @@
         "briefing_saved": "Briefing in Documents/DZMaster gespeichert"
     },
     "custom_profile": {
-        "section": "Eigenes Profil",
+        "section": "Profil laden",
         "info": "Radiosonde (Windsond) oder NinJo-TEMP als Textdatei. Das Profil ersetzt die Modelldaten vollständig, gilt für den aktuellen DIP und bleibt bis zum Neuladen der Seite.",
         "remove": "Profil entfernen",
         "model_label": "Eigenes Profil",

@@ -1926,17 +1926,56 @@ input[type="checkbox"][style*="opacity: 1"] {
     margin-top: 15px;
 }
 
-/* --- Track Upload --- */
-#track-upload>div:first-child {
+/* --- Import (Track & Profil) --- */
+#track-upload>div:first-child,
+#custom-profile-upload>div:first-child {
     position: relative;
     margin: 5px 10px 0 10px;
 }
 
-#track-upload .btn {
+#track-upload .btn,
+#custom-profile-upload .btn {
     width: auto;
     /* Verhindert, dass die Buttons die volle Spaltenbreite einnehmen */
     justify-self: start;
     /* Richtet die Buttons links in ihrer Grid-Spalte aus */
+}
+
+/* Beide Import-Gruppen gleich einrücken; Beschriftung in eigener Zeile unter dem Button */
+#track-upload,
+#custom-profile-upload {
+    grid-template-columns: 40px 1fr;
+}
+
+#track-upload>button,
+#custom-profile-upload>button {
+    grid-column: 1 / -1;
+}
+
+#track-upload label,
+#custom-profile-upload label {
+    display: block;
+    margin-top: 6px;
+    text-align: left;
+}
+
+/* Geöffnete Akkordeon-Inhalte sind Flex-Zeilen: mit Zwischenüberschriften untereinander stapeln */
+.accordion-item.active .accordion-content:has(.settings-subheading) {
+    flex-direction: column;
+}
+
+/* Zwischenüberschrift innerhalb eines Einstellungs-Abschnitts (z. B. Import) */
+.settings-subheading {
+    margin: 12px 0 6px 0;
+    padding-bottom: 4px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.settings-subheading:first-child {
+    margin-top: 0;
 }
 
 .info-icon {

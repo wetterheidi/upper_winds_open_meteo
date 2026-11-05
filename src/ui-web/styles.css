@@ -804,9 +804,24 @@ input[type="checkbox"][style*="opacity: 0.5"] {
 
 /* --- Info Buttons & Popups --- */
 #model-row,
-#track-upload>div:first-child {
+#track-upload>div:first-child,
+#custom-profile-upload>div:first-child {
     position: relative;
     padding: 10px 0;
+}
+
+/* Zwischenüberschrift innerhalb eines Einstellungs-Abschnitts (z. B. Import) */
+.settings-subheading {
+    margin: 12px 0 6px 0;
+    padding-bottom: 4px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.settings-subheading:first-child {
+    margin-top: 0;
 }
 
 .info-button-shared {
