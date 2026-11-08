@@ -15,7 +15,7 @@ A web and mobile application for visualizing upper-level winds and atmospheric d
 - **Dark Mode:** Includes a theme toggle for switching between light and dark modes, automatically adjusting base maps.
 
 ### Weather Data & Visualization
-- **Comprehensive Data:** Hourly upper-level data from Open-Meteo, including wind, temperature, humidity, cloud cover, visibility, weather codes, and geopotential height up to 200 hPa.
+- **Comprehensive Data:** Hourly upper-level data from Open-Meteo, including wind, temperature, humidity, cloud cover, visibility, weather codes, and geopotential height up to 200 hPa. For ICON-D2/EU/Global (native model levels), visibility is computed from the lowest model levels with `meteokit/visibility`, because DWD stops publishing ICON VIS after 30 Nov 2026 (see `meteokit/docs/SICHTWEITE.md`).
 - **Model Selection:** Choose between various global and regional weather models (e.g., ICON, GFS, ECMWF). The latest model run time is displayed.
 - **Timeline Slider:** Browse through the hourly forecast (up to 7 days, configurable). Slider background highlights hours with active weather alerts. Date labels adjust to selected timezone.
 - **Historical Data:** Fetch past weather data using a date picker.

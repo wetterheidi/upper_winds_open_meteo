@@ -17,6 +17,13 @@
  * für den QFE am DIP. Für das untere Ende der Säule nutzt die Interpolation dagegen
  * den Modell-Bodendruck (`surface_pressure_model`), der zum geländefolgenden Profil
  * passt.
+ *
+ * Sichtweite (seit 2026-11-08): Der DWD liefert VIS für ICON nach dem 30.11.2026
+ * nicht mehr. Für die Modelllevel-Daten rechnet DZMaster die Sicht deshalb selbst
+ * aus den untersten Modellflächen (meteokit/visibility, Verfahren und Güte:
+ * meteokit/docs/SICHTWEITE.md) und fragt `visibility` nicht mehr an -- ohne
+ * Rückfall auf das DWD-Feld. Scheitert dieser Abruf, bleibt die Sicht leer, die
+ * übrigen Daten sind davon unberührt.
  */
 
 import { AppState } from './state.js';
@@ -26,6 +33,7 @@ import {
     ICON_SERVERS, OM_PUBLIC, hostOf, fetchJsonFromServers, fetchDemElevation,
     isFreshRunMeta, hasValuesFromNow,
 } from './openMeteoServers.js';
+import { visibilityRequestVars, columnFromHourly, visibilitySeries } from 'meteokit/visibility';
 
 // ===================================================================
 // Konstanten
@@ -38,7 +46,7 @@ const MODEL_LEVEL_NLEVELS = {
 };
 
 const SURFACE_FIELDS = ['surface_pressure', 'temperature_2m', 'relative_humidity_2m', 'wind_speed_10m',
-    'wind_direction_10m', 'wind_gusts_10m', 'visibility', 'weather_code',
+    'wind_direction_10m', 'wind_gusts_10m', 'weather_code',
     'cloud_cover_low', 'cloud_cover_mid', 'cloud_cover_high'];
 
 /** Modell-Keys, für die Modelllevel-Daten priorisiert versucht werden. */
@@ -117,6 +125,12 @@ export async function fetchModelLevelData(lat, lon, modelKey, startDateStr, endD
         // Oberflächendaten parallel zu den Level-Versuchen holen.
         const surfacePromise = _fetchSurfaceData(lat, lon, modelKey, startDateStr, endDateStr, dem);
         surfacePromise.catch(() => {}); // Fehler wird unten beim await geworfen
+        // Sicht aus Modellflächen, ebenfalls parallel; Fehler -> Sicht leer (s. Kopf).
+        const visPromise = _fetchLevelVisibility(lat, lon, modelKey, startDateStr, endDateStr, nLevels)
+            .catch((e) => {
+                console.warn(`[modelLevelManager] Sichtweite für ${modelKey} nicht berechenbar:`, e.message);
+                return null;
+            });
 
         let lastError = null;
         for (const serverBase of servers) {
@@ -147,6 +161,8 @@ export async function fetchModelLevelData(lat, lon, modelKey, startDateStr, endD
 
             const surface = await surfacePromise;
             _applySurfaceData(weatherData, surface.hourly);
+            const vis = await visPromise;
+            weatherData.visibility = weatherData.time.map((t) => vis?.get(t) ?? null);
             weatherData.surface_pressure_model = levelJson.hourly.surface_pressure_model
                 ?? new Array(weatherData.time.length).fill(null);
 
@@ -211,6 +227,26 @@ async function _fetchSurfaceData(lat, lon, modelKey, startDateStr, endDateStr, d
         } catch { /* Ergänzung ist optional -- Felder bleiben dann leer */ }
     }
     return { hourly, server };
+}
+
+/**
+ * Sicht (m) je Zeitstempel aus den untersten Modellflächen plus gitterskaligem
+ * Regen/Schnee am Boden, gerechnet mit meteokit/visibility. Eigener Abruf über die
+ * ICON-Server-Kette, weil die Level-Abfrage oben Wind in m/s holt, die
+ * meteokit-Säule aber km/h erwartet. `elevation=nan`: Modellhöhe, passend zu den
+ * geländefolgenden Flächen (die Sichtdiagnose gilt für den Modellgrund).
+ * @returns {Promise<Map<string, number|null>>} ISO-Zeit -> Sicht in m (null, wo Eingänge fehlen)
+ */
+async function _fetchLevelVisibility(lat, lon, modelKey, startDateStr, endDateStr, nLevels) {
+    const vars = [...visibilityRequestVars(nLevels), 'rain', 'snowfall'];
+    const query = `/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=${vars.join(',')}&models=${modelKey}&start_date=${startDateStr}&end_date=${endDateStr}&cell_selection=nearest&elevation=nan`;
+    const { data } = await fetchJsonFromServers(ICON_SERVERS[modelKey], query, {
+        timeoutMs: 30000,
+        validate: (d) => hasValuesFromNow(d.hourly, `temperature_level${nLevels}`),
+    });
+    const hourly = data.hourly;
+    const { vis } = visibilitySeries(columnFromHourly(hourly, nLevels), hourly, { lat, lon });
+    return new Map(hourly.time.map((t, i) => [t, Number.isFinite(vis[i]) ? Math.round(vis[i]) : null]));
 }
 
 /**
