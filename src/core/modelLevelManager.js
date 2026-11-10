@@ -33,7 +33,7 @@ import {
     ICON_SERVERS, OM_PUBLIC, hostOf, fetchJsonFromServers, fetchDemElevation,
     isFreshRunMeta, hasValuesFromNow,
 } from './openMeteoServers.js';
-import { visibilityRequestVars, columnFromHourly, visibilitySeries } from 'meteokit/visibility';
+import { visibilityRequestVars, precipLevelVars, columnFromHourly, visibilitySeries } from 'meteokit/visibility';
 
 // ===================================================================
 // Konstanten
@@ -231,19 +231,27 @@ async function _fetchSurfaceData(lat, lon, modelKey, startDateStr, endDateStr, d
 
 /**
  * Sicht (m) je Zeitstempel aus den untersten Modellflächen plus gitterskaligem
- * Regen/Schnee am Boden, gerechnet mit meteokit/visibility. Eigener Abruf über die
+ * Regen/Schnee am Boden (für ICON-D2 Regen-/Schnee-/Graupelgehalt der
+ * Flächen, seit 2026-11-10), gerechnet mit meteokit/visibility. Eigener Abruf über die
  * ICON-Server-Kette, weil die Level-Abfrage oben Wind in m/s holt, die
  * meteokit-Säule aber km/h erwartet. `elevation=nan`: Modellhöhe, passend zu den
  * geländefolgenden Flächen (die Sichtdiagnose gilt für den Modellgrund).
  * @returns {Promise<Map<string, number|null>>} ISO-Zeit -> Sicht in m (null, wo Eingänge fehlen)
  */
 async function _fetchLevelVisibility(lat, lon, modelKey, startDateStr, endDateStr, nLevels) {
-    const vars = [...visibilityRequestVars(nLevels), 'rain', 'snowfall'];
-    const query = `/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=${vars.join(',')}&models=${modelKey}&start_date=${startDateStr}&end_date=${endDateStr}&cell_selection=nearest&elevation=nan`;
-    const { data } = await fetchJsonFromServers(ICON_SERVERS[modelKey], query, {
+    const base = [...visibilityRequestVars(nLevels), 'rain', 'snowfall'];
+    // ICON-D2: Regen-/Schnee-/Graupelgehalt der untersten drei Flächen; führt
+    // kein Server sie, ohne sie (meteokit schätzt dann aus den Bodenraten).
+    const extra = precipLevelVars(nLevels, modelKey);
+    const query = (vars) => `/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=${vars.join(',')}&models=${modelKey}&start_date=${startDateStr}&end_date=${endDateStr}&cell_selection=nearest&elevation=nan`;
+    const opts = {
         timeoutMs: 30000,
         validate: (d) => hasValuesFromNow(d.hourly, `temperature_level${nLevels}`),
-    });
+    };
+    const { data } = extra.length
+        ? await fetchJsonFromServers(ICON_SERVERS[modelKey], query([...base, ...extra]), opts)
+            .catch(() => fetchJsonFromServers(ICON_SERVERS[modelKey], query(base), opts))
+        : await fetchJsonFromServers(ICON_SERVERS[modelKey], query(base), opts);
     const hourly = data.hourly;
     const { vis } = visibilitySeries(columnFromHourly(hourly, nLevels), hourly, { lat, lon });
     return new Map(hourly.time.map((t, i) => [t, Number.isFinite(vis[i]) ? Math.round(vis[i]) : null]));
