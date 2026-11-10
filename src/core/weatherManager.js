@@ -15,6 +15,7 @@ import { SOUNDING_MODEL_ID, checkSoundingAvailability, fetchSoundingData } from 
 import { MODEL_LEVEL_ELIGIBLE, fetchModelLevelData, fetchIconRunMeta } from './modelLevelManager.js';
 import { OM_PUBLIC, hostOf, fetchJsonFromServers } from './openMeteoServers.js';
 import { CUSTOM_PROFILE_MODEL_ID, hasCustomProfile, getCustomProfileWeatherData } from './customProfileManager.js';
+import { getModelMaxForecastDays, trimTrailingEmptyHours } from './forecastLength.js';
 
 // ===================================================================
 // 1. Öffentliche Hauptfunktionen (API des Moduls)
@@ -551,7 +552,7 @@ async function fetchWeather(lat, lon, currentTime = null, historicalDateOverride
             startDateStr = forecastStart.toFormat('yyyy-MM-dd');
 
             // Geänderte Logik für das Enddatum
-            const modelMaxDays = selectedModelValue.includes('_d2') ? 2 : 7;
+            const modelMaxDays = getModelMaxForecastDays(selectedModelValue);
             const userMaxForecast = Settings.getValue('maxForecastTime', 'Maximum');
             let forecastDays = modelMaxDays;
 
@@ -611,8 +612,10 @@ async function fetchWeather(lat, lon, currentTime = null, historicalDateOverride
             throw new Error(I18n.t('messages.api_http_error', { status: response.status }) + errorDetail);
         }
         const data = await response.json();
-        if (!data.hourly || !data.hourly.time || !data.hourly.time.length) throw new Error(I18n.t('messages.hourly_data_missing'));
-        return data.hourly;
+        // Leere Stunden am Ende (Modell liefert kürzer als end_date) abschneiden
+        const hourly = trimTrailingEmptyHours(data.hourly);
+        if (!hourly || !hourly.time || !hourly.time.length) throw new Error(I18n.t('messages.hourly_data_missing'));
+        return hourly;
 
     } catch (error) {
         console.error("[fetchWeather] Error:", error);

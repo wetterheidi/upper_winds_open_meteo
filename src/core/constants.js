@@ -107,7 +107,12 @@ export const WEATHER_MODELS = {
         'gfs_seamless',
         'gfs_global',
         'gfs_hrrr',
-        'gfs_graphcast025',
+        // NOAA RRFS löst HRRR ab Ende November 2026 ab; bis dahin laufen beide parallel.
+        // Danach 'gfs_hrrr' hier, in API_MAP und MAX_FORECAST_DAYS entfernen.
+        // RRFS CONUS (3 km) ist der direkte HRRR-Nachfolger, RRFS North America (13 km)
+        // deckt zusätzlich Kanada, Alaska und Mexiko ab.
+        'ncep_rrfs_conus',
+        'ncep_rrfs_north_america',
         'arome_france',
         'gem_hrdps_continental',
         'gem_regional'
@@ -122,11 +127,29 @@ export const WEATHER_MODELS = {
         'gfs_seamless': 'ncep_gfs013',
         'gfs_global': 'ncep_gfs025',
         'gfs_hrrr': 'ncep_hrrr_conus',
+        'ncep_rrfs_conus': 'ncep_rrfs_conus',
+        'ncep_rrfs_north_america': 'ncep_rrfs_north_america',
         'arome_france': 'meteofrance_arome_france0025',
-        'gfs_graphcast025' : 'ncep_gfs_graphcast025',
         'gem_hrdps_continental': 'cmc_gem_hrdps',
         'gem_regional': 'cmc_gem_rdps'
-    }
+    },
+    /**
+     * Höchstzahl der Kalendertage, die je Modell angefragt werden (start_date..end_date).
+     * Aufgerundet auf ganze Tage ab dem Startdatum; was das Modell darüber hinaus nicht
+     * liefert, wird nach dem Abruf abgeschnitten (trimTrailingEmptyHours).
+     * Nicht aufgeführte Modelle: DEFAULT_MAX_FORECAST_DAYS.
+     */
+    MAX_FORECAST_DAYS: {
+        'icon_eu': 5,                  // 120 h
+        'icon_d2': 2,                  // 48 h
+        'gfs_hrrr': 2,                 // 48 h (00/06/12/18 UTC), sonst 18 h
+        'ncep_rrfs_conus': 4,          // 84 h
+        'ncep_rrfs_north_america': 4,  // 84 h
+        'arome_france': 2,             // 2 Tage
+        'gem_hrdps_continental': 2,    // 48 h
+        'gem_regional': 4              // 84 h
+    },
+    DEFAULT_MAX_FORECAST_DAYS: 7
 };
 
 /**
