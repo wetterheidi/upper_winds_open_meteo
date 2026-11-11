@@ -617,7 +617,7 @@
     },
     "custom_profile": {
         "section": "Profil laden",
-        "info": "Radiosonde (Windsond) oder NinJo-TEMP als Textdatei. Das Profil ersetzt die Modelldaten vollständig, gilt für den aktuellen DIP und bleibt bis zum Neuladen der Seite.",
+        "info": "Radiosonde (Windsond, Grawsonde) oder NinJo-TEMP als Textdatei. Das Profil ersetzt die Modelldaten vollständig, gilt für den aktuellen DIP und bleibt bis zum Neuladen der Seite.",
         "remove": "Profil entfernen",
         "model_label": "Eigenes Profil",
         "dialog_title": "Eigenes Profil laden",
