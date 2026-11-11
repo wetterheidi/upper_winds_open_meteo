@@ -11,7 +11,7 @@ import { interpolateWeatherData, analyzeCloudLayers } from './weatherManager.js'
 import {
     PROFILE_PRESETS, SURFACE_WIND_MAX_GAP_M, ProfileImportError,
     decodeProfileBytes, detectProfilePreset, parseProfileFilename, parseProfileNumber,
-    parseProfileText, cleanProfile, buildCustomProfileWeatherData,
+    parseProfileText, cleanProfile, buildCustomProfileWeatherData, repairLeadingHeights,
 } from './customProfileImport.js';
 
 // Die Beispieldateien liegen bewusst nicht im Repo (src/core/testdata/ ist in .gitignore).
@@ -190,5 +190,90 @@ describeWithData('Verankerung am DIP (geländefolgend)', () => {
         const r = atAgl(rows, 800);
         expect(angleDiff(r.dir, 108)).toBeLessThan(5);
         expect(rows[0].height).toBe(500);
+    });
+});
+
+describe('Grawsonde (synthetisch)', () => {
+    // Spalten: 1 Zeit, 2 Druck, 3 T, 4 Feuchte, 5 Windgeschw. (m/s), 6 Windrichtung, 7 Höhe (m AGL)
+    const rows = [
+        [0, 1013.2, 15.0, 70, 3.0, 240, 0],
+        [10, 1007.3, 14.6, 72, 4.0, 245, 50],
+        [20, 1001.4, 14.2, 74, 5.0, 250, 100],
+        [60, 978.0, 12.6, 96, 8.0, 260, 300],
+    ];
+    const header = 'Time [sec]\tP [hPa]\tT [°C]\tHu [%]\tWs [m/s]\tWd [°]\tAlt [m]';
+
+    it('erkennt die Varianten am Kopf (m/s bzw. kn)', () => {
+        expect(detectProfilePreset(`${header}\n0\t1013\t15\t70\t3\t240\t0`)).toBe('graw');
+        expect(detectProfilePreset("Zeit [sec]\tP [h Pa]\tT [°C]\tU [%]\tWsp [kn]\tWdir [°]\tGeo Pot [m']")).toBe('graw_kn');
+    });
+
+    it('liest Tab- und Leerzeichen-getrennte Spalten, Feuchte direkt aus der Datei', () => {
+        for (const sep of ['\t', '   ']) {
+            const text = [header.replace(/\t/g, sep), ...rows.map(r => r.join(sep))].join('\n');
+            const parsed = parseProfileText(text, PROFILE_PRESETS.graw_kn);
+            expect(parsed.levels).toHaveLength(4);
+            expect(parsed.skippedRows).toBe(1);
+            const l = parsed.levels[2];
+            expect(l).toMatchObject({ pressure: 1001.4, height: 100, temperature: 14.2, humidity: 74, windDirection: 250 });
+            expect(l.windSpeedKmh).toBeCloseTo(5 * 1.852, 5);
+        }
+    });
+
+    it('lässt konsistente Höhen in Ruhe', () => {
+        const levels = rows.map(r => ({ pressure: r[1], temperature: r[2], height: r[6] }));
+        expect(repairLeadingHeights(levels)).toBe(0);
+        expect(levels.map(l => l.height)).toEqual([0, 50, 100, 300]);
+    });
+
+    it('liest kompakte Datumsangaben im Dateinamen', () => {
+        expect(parseProfileFilename('Graw513_200922_0836_Profildaten.txt')).toEqual({ date: '2020-09-22', time: '08:36', timezoneHint: null });
+        expect(parseProfileFilename('FIN_20250331_1035.txt')).toMatchObject({ date: '2025-03-31', time: '10:35' });
+    });
+});
+
+const GRAW513_FILE = 'Graw513_200922_0836_Profildaten.txt';
+const GRAW509_FILE = 'Graw509_2018-07-27_0700.txt';
+const HAS_GRAW = existsSync(dataPath(GRAW513_FILE)) && existsSync(dataPath(GRAW509_FILE));
+
+describe.skipIf(!HAS_GRAW)('Grawsonde (Beispieldateien)', () => {
+    it('Graw513: Höhen über Meer, kaputte Startzeilen werden über den Druck repariert', () => {
+        const text = load(GRAW513_FILE);
+        expect(detectProfilePreset(text)).toBe('graw');
+        const parsed = parseProfileText(text, PROFILE_PRESETS.graw);
+        expect(parsed.heightRef).toBe('AMSL');
+        // Boden 924,8 hPa stand mit 0 m in der Datei, die nächste Zeile mit 479 m
+        expect(parsed.levels[0].height).toBeGreaterThan(740);
+        expect(parsed.levels[0].height).toBeLessThan(780);
+        expect(parsed.levels[1].height).toBeGreaterThan(parsed.levels[0].height + 40);
+        expect(parsed.levels[2].height).toBe(881);
+
+        const result = buildCustomProfileWeatherData(parsed, { timeUtc: '2020-09-22T08:36' });
+        expect(result.surfaceWindSource).toBe('profile');
+        expect(result.weatherData.wind_direction_10m[0]).toBe(290);
+        expect(result.weatherData.wind_speed_10m[0]).toBeCloseTo(3.6, 5);
+
+        const rows = interpolate(result);
+        expect(rows[0].height).toBeCloseTo(result.groundElevationM, 0);
+        // 850 hPa: 1473 m MSL in der Datei
+        expect(result.weatherData['geopotential_height_850hPa'][0]).toBeCloseTo(1473, 0);
+    });
+
+    it('Graw509: Knoten, Höhen über Grund, fehlender Druck wird ergänzt', () => {
+        const text = load(GRAW509_FILE);
+        expect(detectProfilePreset(text)).toBe('graw_kn');
+        const parsed = parseProfileText(text, PROFILE_PRESETS.graw_kn);
+        expect(parsed.heightRef).toBe('AGL');
+        expect(parsed.levels[0]).toMatchObject({ pressure: 930.8, height: 0, windDirection: 215 });
+        expect(parsed.levels[0].windSpeedKmh).toBeCloseTo(2 * 1.852, 5);
+        // Ab ~4,2 km fehlt der Druck in der Datei ("-----") -> trotzdem bis zum Ende nutzbar
+        const top = parsed.levels.at(-1);
+        expect(top.height).toBeGreaterThan(6000);
+        expect(top.pressure).toBeGreaterThan(300);
+        expect(top.pressure).toBeLessThan(500);
+
+        const result = buildCustomProfileWeatherData(parsed, { timeUtc: '2018-07-27T07:00', groundElevationM: 600 });
+        expect(result.levelCount).toBeGreaterThan(300);
+        expect(interpolate(result)[0].height).toBe(600);
     });
 });

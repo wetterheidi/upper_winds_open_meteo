@@ -617,7 +617,7 @@
     },
     "custom_profile": {
         "section": "Load Profile",
-        "info": "Radiosonde (Windsond) or NinJo TEMP as text file. The profile fully replaces the model data, applies to the current DIP and stays until the page is reloaded.",
+        "info": "Radiosonde (Windsond, Grawsonde) or NinJo TEMP as text file. The profile fully replaces the model data, applies to the current DIP and stays until the page is reloaded.",
         "remove": "Remove Profile",
         "model_label": "Own Profile",
         "dialog_title": "Load Own Profile",

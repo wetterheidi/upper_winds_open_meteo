@@ -1,7 +1,7 @@
 /**
  * @file customProfileImport.js
  * @description Import eigener Vertikalprofile ("Eigenes Profil") aus Textdateien:
- * Radiosonden (z. B. Windsond) oder Modell-TEMPs aus NinJo. Das Profil ersetzt die
+ * Radiosonden (z. B. Windsond, Grawsonde) oder Modell-TEMPs aus NinJo. Das Profil ersetzt die
  * Modelldaten vollständig (keine Vermischung, auch die Bodenwerte stammen aus dem Profil).
  *
  * Ablauf: Bytes dekodieren -> Format erkennen -> Zeilen anhand einer Spaltenzuordnung
@@ -28,7 +28,8 @@ export const CLOUD_RH_THRESHOLD = 95;
 
 /**
  * Format-Vorlagen. Spaltennummern 1-basiert (wie in der Desktop-Vorlage), null = nicht vorhanden.
- * delimiter: 'tab' | 'whitespace' | 'semicolon' | 'comma'
+ * delimiter: 'auto' | 'tab' | 'whitespace' | 'semicolon' | 'comma' ('auto': Tab, wenn die Datei
+ *            Tabs enthält, sonst Leerraum)
  * decimal:   'auto' | 'point' | 'comma'
  * units.height: 'm' | 'ft'; units.heightRef: 'AMSL' | 'AGL'; units.windSpeed: 'kn' | 'm/s' | 'km/h'
  */
@@ -50,6 +51,33 @@ export const PROFILE_PRESETS = Object.freeze({
         decimal: 'point',
         columns: { pressure: 2, height: 1, temperature: 3, dewpoint: 4, humidity: null, windDirection: 5, windSpeed: 6 },
         units: { height: 'm', heightRef: 'AGL', windSpeed: 'm/s' },
+    }),
+    // GRAWMET-Export (z. B. Graw513): "Zeit [sec] P [hPa] T Hu Ws [m/s] Wd Alt [m] Geopot [m] Rs".
+    // Alt ist Höhe über Meer; die ersten Zeilen sind oft unbrauchbar (Boden mit 0 m, dann ein
+    // Sprung) und werden über Druck/Temperatur repariert. Kein Taupunkt -> Feuchte aus Spalte 4.
+    graw: Object.freeze({
+        id: 'graw',
+        label: 'Grawsonde (m/s)',
+        headerLines: 0,
+        delimiter: 'auto',
+        decimal: 'auto',
+        columns: { pressure: 2, height: 7, temperature: 3, dewpoint: null, humidity: 4, windDirection: 6, windSpeed: 5 },
+        units: { height: 'm', heightRef: 'AMSL', windSpeed: 'm/s' },
+        repairLeadingHeights: true,
+        fillMissingPressure: true,
+    }),
+    // Älterer GRAW-Export (z. B. Graw509): "Zeit [sec] P [h Pa] T U Wsp [kn] Wdir Geo Pot [m']".
+    // Höhe über Grund, Wind in Knoten; Druck fehlt teils ("-----") und wird aus Höhe/T ergänzt.
+    graw_kn: Object.freeze({
+        id: 'graw_kn',
+        label: 'Grawsonde (kn)',
+        headerLines: 0,
+        delimiter: 'auto',
+        decimal: 'auto',
+        columns: { pressure: 2, height: 7, temperature: 3, dewpoint: null, humidity: 4, windDirection: 6, windSpeed: 5 },
+        units: { height: 'm', heightRef: 'AGL', windSpeed: 'kn' },
+        repairLeadingHeights: true,
+        fillMissingPressure: true,
     }),
 });
 
@@ -94,6 +122,9 @@ export function detectProfilePreset(text) {
     const lines = _lines(text);
     if (lines.length === 0) return null;
     if (/^\s*Height\[m\]\s+Pressure\[hPa\]/i.test(lines[0])) return 'windsond';
+    if (/^\s*(Zeit|Time)\s*\[sec\]\s+P\s*\[h\s?Pa\]/i.test(lines[0])) {
+        return /\[(kn|kt)\]/i.test(lines[0]) ? 'graw_kn' : 'graw';
+    }
 
     const sample = lines.slice(0, 10);
     const looksNinjo = sample.every(l => {
@@ -110,11 +141,16 @@ export function detectProfilePreset(text) {
  * @returns {{date: string, time: string, timezoneHint: 'UTC'|null}|null}
  */
 export function parseProfileFilename(filename) {
-    const m = /(\d{4})-(\d{2})-(\d{2})[_-](\d{2})(\d{2})/.exec(filename || '');
+    const name = filename || '';
+    // "2020-07-07_1340" (Windsond, NinJo) oder kompakt "20250331_1035" / "200922_0836" (Graw)
+    const m = /(\d{4})-(\d{2})-(\d{2})[_-](\d{2})(\d{2})/.exec(name)
+        || /(?:^|[_-])(\d{4}|\d{2})(\d{2})(\d{2})[_-](\d{2})(\d{2})(?!\d)/.exec(name);
     if (!m) return null;
-    const [, y, mo, d, h, mi] = m;
+    let [, y, mo, d, h, mi] = m;
+    if (y.length === 2) y = `20${y}`;
+    if (+mo < 1 || +mo > 12 || +d < 1 || +d > 31 || +h > 23 || +mi > 59) return null;
     // Ein Modelllauf-Kürzel wie "06Z" deutet auf UTC hin (NinJo)
-    const timezoneHint = /_\d{2}Z\b/i.test(filename) ? 'UTC' : null;
+    const timezoneHint = /_\d{2}Z\b/i.test(name) ? 'UTC' : null;
     return { date: `${y}-${mo}-${d}`, time: `${h}:${mi}`, timezoneHint };
 }
 
@@ -176,9 +212,13 @@ function _toKmh(value, unit) {
  * @returns {{levels: object[], heightRef: 'AMSL'|'AGL', decimal: string, skippedRows: number}}
  */
 export function parseProfileText(text, preset) {
-    const rows = _lines(text).slice(preset.headerLines || 0).map(l => _split(l, preset.delimiter));
+    const lines = _lines(text).slice(preset.headerLines || 0);
+    const delimiter = preset.delimiter === 'auto'
+        ? (lines.some(l => l.includes('\t')) ? 'tab' : 'whitespace')
+        : preset.delimiter;
+    const rows = lines.map(l => _split(l, delimiter));
     const decimal = preset.decimal === 'auto'
-        ? (preset.delimiter === 'comma' ? 'point' : _detectDecimal(rows))
+        ? (delimiter === 'comma' ? 'point' : _detectDecimal(rows))
         : preset.decimal;
 
     const col = preset.columns;
@@ -189,7 +229,8 @@ export function parseProfileText(text, preset) {
     for (const fields of rows) {
         const pressure = get(fields, col.pressure);
         let height = get(fields, col.height);
-        if (pressure == null || height == null || pressure <= 0) { skippedRows++; continue; }
+        const pressureOk = pressure != null && pressure > 0;
+        if (height == null || (!pressureOk && !preset.fillMissingPressure)) { skippedRows++; continue; }
         if (preset.units.height === 'ft') height *= CONVERSIONS.FEET_TO_METERS;
 
         const temperature = get(fields, col.temperature);
@@ -200,8 +241,14 @@ export function parseProfileText(text, preset) {
         let windSpeedKmh = _toKmh(get(fields, col.windSpeed), preset.units.windSpeed);
         if (windDirection == null || windSpeedKmh == null) { windDirection = null; windSpeedKmh = null; }
 
-        levels.push({ pressure, height, temperature, dewpoint, humidity, windDirection, windSpeedKmh });
+        levels.push({ pressure: pressureOk ? pressure : null, height, temperature, dewpoint, humidity, windDirection, windSpeedKmh });
     }
+
+    if (preset.repairLeadingHeights) repairLeadingHeights(levels);
+    if (preset.fillMissingPressure) fillMissingPressure(levels);
+    const before = levels.length;
+    for (let i = levels.length - 1; i >= 0; i--) if (levels[i].pressure == null) levels.splice(i, 1);
+    skippedRows += before - levels.length;
 
     if (levels.length < 2) {
         throw new ProfileImportError('TOO_FEW_LEVELS', 'Die Datei enthält zu wenige auswertbare Zeilen.');
@@ -212,6 +259,55 @@ export function parseProfileText(text, preset) {
 // ===================================================================
 // Säubern
 // ===================================================================
+
+const RD = 287.05;  // J/(kg K)
+const G0 = 9.80665; // m/s²
+const _tK = (a, b) => ((Number.isFinite(a) ? a : 15) + (Number.isFinite(b) ? b : (Number.isFinite(a) ? a : 15))) / 2 + 273.15;
+
+/** Schichtdicke (m) zwischen zwei Messpunkten aus Druck und mittlerer Temperatur. */
+function _hypsoThickness(lower, upper) {
+    return RD * _tK(lower.temperature, upper.temperature) / G0 * Math.log(lower.pressure / upper.pressure);
+}
+
+/**
+ * Ergänzt fehlenden Druck (in Dateireihenfolge) hypsometrisch aus Höhe und Temperatur des
+ * vorigen Punkts mit Druck. Punkte vor dem ersten Druckwert bleiben ohne Druck.
+ * @param {object[]} levels - wird verändert
+ */
+export function fillMissingPressure(levels) {
+    let prev = null;
+    for (const lev of levels) {
+        if (lev.pressure != null) { prev = lev; continue; }
+        if (!prev) continue;
+        lev.pressure = prev.pressure * Math.exp(-G0 * (lev.height - prev.height) / (RD * _tK(prev.temperature, lev.temperature)));
+        prev = lev;
+    }
+}
+
+/**
+ * Repariert unbrauchbare Höhen am Profilanfang (GRAW: Bodenzeile mit 0 m über Meer, danach
+ * ein Sprung). Gesucht wird das erste Paar aufeinanderfolgender Punkte, dessen Höhendifferenz
+ * zur hypsometrischen Schichtdicke passt, gefolgt von einem weiteren passenden Paar; die Punkte
+ * davor werden von dort aus über Druck und Temperatur nach unten neu berechnet.
+ * @param {object[]} levels - in Dateireihenfolge, wird verändert
+ * @returns {number} Anzahl neu berechneter Höhen
+ */
+export function repairLeadingHeights(levels) {
+    const fits = (a, b) => {
+        if (!(a.pressure > b.pressure)) return false;
+        const dzHyp = _hypsoThickness(a, b);
+        return Math.abs((b.height - a.height) - dzHyp) <= Math.max(10, 0.1 * dzHyp);
+    };
+    const maxStart = Math.min(levels.length - 2, 20);
+    for (let a = 0; a < maxStart; a++) {
+        if (!fits(levels[a], levels[a + 1]) || !fits(levels[a + 1], levels[a + 2])) continue;
+        for (let j = a - 1; j >= 0 && levels[j].pressure > 0; j--) {
+            levels[j].height = levels[j + 1].height - _hypsoThickness(levels[j], levels[j + 1]);
+        }
+        return a;
+    }
+    return 0;
+}
 
 /**
  * Sortiert nach Höhe und behält nur Punkte, deren gerundeter Druck streng abnimmt.
