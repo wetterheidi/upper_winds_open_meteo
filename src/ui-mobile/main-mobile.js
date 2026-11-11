@@ -3,6 +3,7 @@
 // =================================================================
 // Beschreibung: Alle Abhängigkeiten von anderen Modulen werden hier zentral geladen.
 
+import '../core/polyfills.js'; // muss zuerst geladen werden (iOS 15)
 import { AppState } from '../core/state.js';
 import { Utils } from '../core/utils.js';
 import { Settings, getInterpolationStep, setAppContext } from '../core/settings.js';
