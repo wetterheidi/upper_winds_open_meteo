@@ -38,7 +38,7 @@ A web and mobile application for visualizing upper-level winds and atmospheric d
 - **Cut-Away Finder:** Visualizes the potential landing spot after a main canopy cut-away, considering different malfunction scenarios (open, partial, collapsed).
 - **Terrain Analysis:** Analyzes potential ground clearance within the canopy flight area based on user-defined minimum clearance.
 - **Track Upload & Management:** Import and visualize GPX, KML, and FlySight CSV files. Tracks are color-coded by AGL altitude. Files can be opened directly from the OS in the mobile app.
-- **GPX Export:** Export calculated Jump Run Tracks and Landing Patterns as GPX files.
+- **GPX Export:** Export calculated Jump Run Tracks, Landing Patterns, exit/canopy areas and the elements drawn on the map (lines, circles, markers, text labels) as GPX files. Drawn elements can be exported without weather data and carry no elevation.
 - **Data Download & Reports:** Download weather data tables in various formats (HEIDIS, ATAK, Windwatch, Custom ASCII) or generate a comprehensive HTML weather briefing.
 
 ### Live Tracking & Native Features (Mobile App)

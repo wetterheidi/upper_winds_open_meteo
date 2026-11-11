@@ -1023,26 +1023,115 @@ async function readFileContent(file) {
 
 /**
  * Generiert NUR die Trackpoints für einen Kreis (ohne <trk>-Wrapper).
+ * elevation = null → kein <ele> (z. B. für gezeichnete Elemente ohne Höhe).
  */
 function getCircleTrackPoints(centerLat, centerLng, radiusMeters, elevation = 0) {
     if (radiusMeters <= 0) return '';
     const steps = 72;
     let points = '';
+    const eleTag = elevation == null ? '' : `<ele>${elevation.toFixed(1)}</ele>`;
 
     for (let i = 0; i <= steps; i++) {
         const bearing = i * (360 / steps);
         const [lat, lng] = Utils.calculateNewCenter(centerLat, centerLng, radiusMeters, bearing);
-        points += `      <trkpt lat="${lat}" lon="${lng}"><ele>${elevation.toFixed(1)}</ele></trkpt>\n`;
+        points += `      <trkpt lat="${lat}" lon="${lng}">${eleTag}</trkpt>\n`;
     }
     return points;
 }
 
+// Kurze Distanzangabe für GPX-Namen (Geräte zeigen Namen oft gekürzt an)
+function formatShortDistance(meters) {
+    return meters < 1000 ? `${meters.toFixed(0)} m` : `${(meters / 1000).toFixed(2)} km`;
+}
+
+function escapeXml(text) {
+    return String(text)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+}
+
+/**
+ * Liefert die mit Leaflet-Geoman gezeichneten Elemente (Linien, Kreise, Marker,
+ * ggf. Texte) als exportfertige Beschreibungen. Die Mess-Beschriftungen der App
+ * (pmIgnore-Labels) sind nicht enthalten, weil Geoman sie nicht als Zeichnung führt.
+ * Die Beschriftung (Kurs/Strecke/Radius) wird wie in den Karten-Labels aus der
+ * Geometrie berechnet.
+ */
+function collectGeomanDrawings(map) {
+    if (!map?.pm) return [];
+    const layers = typeof map.pm.getGeomanDrawLayers === 'function'
+        ? map.pm.getGeomanDrawLayers()
+        : [];
+
+    const counters = { line: 0, circle: 0, marker: 0 };
+    const items = [];
+
+    layers.forEach(layer => {
+        // Reihenfolge wichtig: L.Circle erbt nicht von L.Marker, L.Polygon aber von L.Polyline
+        if (layer instanceof L.Circle) {
+            const c = layer.getLatLng();
+            const radius = layer.getRadius();
+            items.push({
+                kind: 'track',
+                name: `Circle ${++counters.circle} (r ${formatShortDistance(radius)})`,
+                desc: `${I18n.t('map.geoman.radius')}: ${Utils.formatDistance(radius)}`,
+                points: getCircleTrackPoints(c.lat, c.lng, radius, null)
+            });
+        } else if (layer instanceof L.Polyline) {
+            const latlngs = layer.getLatLngs().flat(Infinity);
+            if (layer instanceof L.Polygon && latlngs.length > 2) latlngs.push(latlngs[0]);
+            if (latlngs.length < 2) return;
+
+            let total = 0;
+            const legs = [];
+            for (let i = 1; i < latlngs.length; i++) {
+                const a = latlngs[i - 1], b = latlngs[i];
+                const dist = a.distanceTo(b);
+                total += dist;
+                const bearing = Utils.calculateBearing(a.lat, a.lng, b.lat, b.lng);
+                legs.push(`${i}: ${bearing.toFixed(0)}° / ${Utils.formatDistance(dist)}`);
+            }
+            const points = latlngs
+                .map(p => `      <trkpt lat="${p.lat}" lon="${p.lng}"></trkpt>\n`)
+                .join('');
+            items.push({
+                kind: 'track',
+                name: `Line ${++counters.line} (∑ ${formatShortDistance(total)})`,
+                desc: legs.join(' | '),
+                points
+            });
+        } else if (layer instanceof L.Marker) {
+            const p = layer.getLatLng();
+            // Geoman-Textelemente (drawText) tragen ihren Text als Namen
+            const text = layer.options?.textMarker && typeof layer.pm?.getText === 'function'
+                ? layer.pm.getText()?.trim()
+                : '';
+            items.push({
+                kind: 'waypoint',
+                name: text || `Marker ${++counters.marker}`,
+                lat: p.lat,
+                lng: p.lng
+            });
+        }
+    });
+    return items;
+}
+
 export async function exportCompositeJumpGpx(options) {
-    const { includeJumpRun, includePattern, includeExitCircles, includeCanopyCircles, mergeTracks } = options;
+    const { includeJumpRun, includePattern, includeExitCircles, includeCanopyCircles, includeDrawings, mergeTracks } = options;
     console.log("--- Starting Composite GPX Export ---", options);
 
-    if (!AppState.weatherData || AppState.lastLat == null) {
+    // Nur die Sprung-Elemente brauchen Wetter und Position; gezeichnete Elemente nicht.
+    const needsWeather = includeJumpRun || includePattern || includeExitCircles || includeCanopyCircles;
+
+    if (needsWeather && (!AppState.weatherData || AppState.lastLat == null)) {
         Utils.handleError(I18n.t('tracks.error_no_location_weather'));
+        return;
+    }
+
+    const drawings = includeDrawings ? collectGeomanDrawings(AppState.map) : [];
+    if (includeDrawings && drawings.length === 0 && !needsWeather) {
+        Utils.handleError(I18n.t('tracks.error_no_drawings'));
         return;
     }
 
@@ -1067,11 +1156,11 @@ export async function exportCompositeJumpGpx(options) {
         const openingAltitudeAGL = Settings.getValue('openingAltitude', 1200);
         const buffer = 200;
 
-        const interpolatedData = interpolateWeatherData(
-            AppState.weatherData, sliderIndex, interpStep, safeBaseHeight, heightUnit
-        );
+        const interpolatedData = needsWeather
+            ? interpolateWeatherData(AppState.weatherData, sliderIndex, interpStep, safeBaseHeight, heightUnit)
+            : null;
 
-        if (!interpolatedData || interpolatedData.length === 0) {
+        if (needsWeather && (!interpolatedData || interpolatedData.length === 0)) {
             Utils.handleError(I18n.t('tracks.error_calc_no_data'));
             return;
         }
@@ -1083,20 +1172,20 @@ export async function exportCompositeJumpGpx(options) {
     xmlns:gpxx="http://www.garmin.com/xmlschemas/GpxExtensions/v3"
     xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
   <metadata>
-    <name>Skydive Plan - ${new Date().toLocaleString()}</name>
+    <name>${needsWeather ? 'Skydive Plan' : 'Map Drawings'} - ${new Date().toLocaleString()}</name>
   </metadata>
 `;
 
         let mergedSegments = "";
 
-        const addTrack = (name, color, pointsString) => {
+        const addTrack = (name, color, pointsString, desc = '') => {
             if (mergeTracks) {
                 // Im Merge-Modus werden Name und Farbe verworfen — GPX unterstützt keine Segment-Farben
                 mergedSegments += `    <trkseg>\n${pointsString}    </trkseg>\n`;
             } else {
                 gpxContent += `
   <trk>
-    <name>${name}</name>
+    <name>${escapeXml(name)}</name>${desc ? `\n    <desc>${escapeXml(desc)}</desc>` : ''}
     <extensions><gpxx:TrackExtension><gpxx:DisplayColor>${color}</gpxx:DisplayColor></gpxx:TrackExtension></extensions>
     <trkseg>
 ${pointsString}    </trkseg>
@@ -1185,6 +1274,15 @@ ${pointsString}    </trkseg>
             }
         }
 
+        // Mit Geoman gezeichnete Elemente – ohne <ele>, da sie keine Höhe haben
+        drawings.forEach(item => {
+            if (item.kind === 'waypoint') {
+                gpxContent += `  <wpt lat="${item.lat}" lon="${item.lng}"><name>${escapeXml(item.name)}</name><sym>Pin, Yellow</sym></wpt>\n`;
+            } else {
+                addTrack(item.name, 'Yellow', item.points, item.desc);
+            }
+        });
+
         if (mergeTracks && mergedSegments.length > 0) {
             gpxContent += `
   <trk>
@@ -1196,8 +1294,11 @@ ${pointsString}    </trkseg>
 
         gpxContent += `</gpx>`;
 
-        const time = Utils.formatTime(AppState.weatherData.time[sliderIndex]).replace(/ /g, '_').replace(/:/g, '');
-        const filename = `Jump_Plan_${time}.gpx`;
+        const forecastTime = AppState.weatherData?.time?.[sliderIndex];
+        const time = forecastTime
+            ? Utils.formatTime(forecastTime).replace(/ /g, '_').replace(/:/g, '')
+            : DateTime.now().toFormat('yyyy-MM-dd_HHmm');
+        const filename = needsWeather ? `Jump_Plan_${time}.gpx` : `Map_Drawings_${time}.gpx`;
 
         const { Filesystem, Directory, isNative } = await getCapacitor();
         if (isNative && Filesystem) {

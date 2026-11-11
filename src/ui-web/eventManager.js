@@ -1033,6 +1033,7 @@ function setupGpxExportEvent() {
                 includePattern: document.getElementById('exportLandingPattern')?.checked || false,
                 includeExitCircles: document.getElementById('exportExitCircles')?.checked || false,
                 includeCanopyCircles: document.getElementById('exportCanopyCircles')?.checked || false,
+                includeDrawings: document.getElementById('exportDrawings')?.checked || false,
 
                 mergeTracks: document.getElementById('mergeTracksCheckbox')?.checked || false
             };
