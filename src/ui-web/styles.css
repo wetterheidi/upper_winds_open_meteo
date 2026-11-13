@@ -2486,6 +2486,18 @@ a.qfe-calibrate-trigger:hover {
     /* Stellt sicher, dass sie über anderen Elementen liegt */
 }
 
+/* "Punkte sperren": alle Geoman-Toolbars ausblenden (siehe toggleGeoManControls) */
+.geoman-locked .leaflet-pm-toolbar {
+    display: none !important;
+}
+
+/* Track-Canvas (gpxTrackPane) liegt über den Geoman-Zeichnungen; während eines
+   Geoman-Modus Klicks durchlassen, damit Zeichnungen bearbeitet/gelöscht werden können */
+.geoman-mode-active .leaflet-gpxTrack-pane,
+.geoman-mode-active .leaflet-gpxTrack-pane canvas {
+    pointer-events: none !important;
+}
+
 .pm-textarea {
     text-align: center !important;
     padding-left: 0 !important;

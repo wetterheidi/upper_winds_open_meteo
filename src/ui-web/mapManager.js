@@ -1647,17 +1647,30 @@ function _setupGeomanMeasurementHandlers() {
 
     console.log('Leaflet-Geoman Version:', L.PM.version);
 
-    const geomanToolbar = document.querySelector('.leaflet-pm-toolbar');
-    if (geomanToolbar) {
-        const eventsToStop = ['click', 'dblclick', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'pointerdown', 'pointerup', 'contextmenu'];
-
+    // Geoman legt mehrere Toolbars an (Zeichnen sowie Bearbeiten/Verschieben/Entfernen).
+    const eventsToStop = ['click', 'dblclick', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'pointerdown', 'pointerup', 'contextmenu'];
+    document.querySelectorAll('.leaflet-pm-toolbar').forEach(geomanToolbar => {
         eventsToStop.forEach(eventType => {
             geomanToolbar.addEventListener(eventType, (e) => {
                 L.DomEvent.stopPropagation(e);
-                console.log(`Stopped '${e.type}' event on Geoman toolbar.`);
             });
         });
-    }
+    });
+
+    // Ein geladener Track liegt in einem eigenen Canvas (gpxTrackPane, z-Index 650) über der
+    // ganzen Karte und fängt dort alle Klicks ab. Solange ein Geoman-Modus aktiv ist, lässt
+    // er Klicks durch (CSS: .geoman-mode-active), damit eigene Zeichnungen erreichbar bleiben.
+    const updateGeomanModeClass = () => {
+        const pm = map.pm;
+        const active = pm.globalDrawModeEnabled() || pm.globalEditModeEnabled() ||
+            !!pm.globalDragModeEnabled?.() || pm.globalRemovalModeEnabled();
+        map.getContainer().classList.toggle('geoman-mode-active', active);
+    };
+    ['pm:globaldrawmodetoggled', 'pm:globaleditmodetoggled', 'pm:globaldragmodetoggled', 'pm:globalremovalmodetoggled']
+        .forEach(eventName => map.on(eventName, updateGeomanModeClass));
+
+    // Gespeicherte Sperre ("Punkte sperren") schon beim Start auf die Toolbars anwenden.
+    toggleGeoManControls(Settings.state.userSettings.isInteractionLocked);
     const liveMeasureLabel = L.DomUtil.create('div', 'leaflet-measure-label', map.getContainer());
     const geomanHintBar = L.DomUtil.create('div', 'geoman-hint-bar', map.getContainer());
     const persistentLabelsGroup = L.layerGroup().addTo(map);
@@ -2402,24 +2415,23 @@ async function _handleGeolocation(defaultCenter, defaultZoom) {
     }
 }
 
+/**
+ * Blendet die Geoman-Toolbars bei "Punkte sperren" aus und beendet aktive Geoman-Modi.
+ * Gesperrt lassen sich damit auch eigene Zeichnungen weder bearbeiten noch löschen.
+ * Ausgeblendet wird per Klasse am Kartencontainer (CSS: .geoman-locked), weil Geoman
+ * mehrere Toolbars anlegt und die display-!important-Regel in styles.css Inline-Styles überstimmt.
+ * @param {boolean} locked - true = gesperrt
+ */
 export function toggleGeoManControls(locked) {
     if (!AppState.map || !AppState.map.pm) return;
-    const toolbar = document.querySelector('.leaflet-pm-toolbar');
+    const pm = AppState.map.pm;
+    AppState.map.getContainer().classList.toggle('geoman-locked', !!locked);
 
     if (locked) {
-        if (toolbar) toolbar.style.display = 'none';
-
-        if (AppState.map.pm.globalDrawModeEnabled()) {
-            AppState.map.pm.disableDraw();
-        }
-        if (AppState.map.pm.globalEditModeEnabled()) {
-            AppState.map.pm.disableGlobalEditMode();
-        }
-        if (AppState.map.pm.globalRemovalModeEnabled()) {
-            AppState.map.pm.disableGlobalRemovalMode();
-        }
-    } else {
-        if (toolbar) toolbar.style.display = 'block';
+        if (pm.globalDrawModeEnabled()) pm.disableDraw();
+        if (pm.globalEditModeEnabled()) pm.disableGlobalEditMode();
+        if (pm.globalDragModeEnabled?.()) pm.disableGlobalDragMode();
+        if (pm.globalRemovalModeEnabled()) pm.disableGlobalRemovalMode();
     }
 }
 
