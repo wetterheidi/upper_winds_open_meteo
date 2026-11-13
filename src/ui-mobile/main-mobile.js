@@ -1243,7 +1243,9 @@ function updateJumpMasterDashboard(data) {
     const dashboard = document.getElementById('jumpmaster-view-mobile');
     if (!dashboard) return;
 
-    if (!data) {
+    // Direkt nach dem Start des Live-Trackings (z. B. beim HEIDIS-Import) gibt es noch keine
+    // Position; bis zum ersten GPS-Fix nichts berechnen statt mit null-Koordinaten zu rechnen.
+    if (!data || data.latitude == null || data.longitude == null) {
         const jmlDetails = document.getElementById('jumpmaster-line-details-mobile');
         if (jmlDetails) jmlDetails.classList.add('hidden');
         return;

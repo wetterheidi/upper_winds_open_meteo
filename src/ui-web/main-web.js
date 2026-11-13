@@ -1115,7 +1115,9 @@ function updateJumpMasterDashboard(data) {
     if (!dashboard) return;
 
     // Dashboard sichtbar machen, wenn Daten vorhanden sind, sonst verstecken.
-    if (!data) {
+    // Direkt nach dem Start des Live-Trackings (z. B. beim HEIDIS-Import) gibt es noch keine
+    // Position; dann bis zum ersten GPS-Fix verstecken statt mit null-Koordinaten zu rechnen.
+    if (!data || data.latitude == null || data.longitude == null) {
         dashboard.classList.add('hidden');
         return;
     }
