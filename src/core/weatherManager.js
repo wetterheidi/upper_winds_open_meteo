@@ -633,39 +633,63 @@ async function fetchWeather(lat, lon, currentTime = null, historicalDateOverride
     }
 }
 
+/** Timeout je Testanfrage in checkAvailableModels. Hängt api.open-meteo.com, soll der Start nicht minutenlang blockieren. */
+const MODEL_CHECK_TIMEOUT_MS = 8000;
+/** Bis zu dieser Entfernung (m) darf bei einem Totalausfall die zuletzt ermittelte Modellliste weiterverwendet werden. */
+const MODEL_CHECK_REUSE_RADIUS_M = 100000;
+/** Zuletzt erfolgreich ermittelte Modellliste samt Ort: { lat, lon, models }. */
+let lastModelCheck = null;
+
 /**
  * Überprüft dynamisch, welche der vordefinierten Wettermodelle für die gegebenen
  * Koordinaten verfügbar sind, indem es für jedes Modell eine Testanfrage sendet.
- * Aktualisiert anschließend die Benutzeroberfläche (die Modell-Auswahlliste).
+ * Die Anfragen laufen parallel und mit Timeout. Ist api.open-meteo.com nicht
+ * erreichbar (keine einzige Anfrage beantwortet), wird die zuletzt ermittelte Liste
+ * für einen nahen Ort weiterverwendet, sonst zumindest das aktuell gewählte Modell.
  * @param {number} lat - Die geographische Breite.
  * @param {number} lon - Die geographische Länge.
- * @returns {Promise<string[]>} Ein Array mit den Namen der verfügbaren Modelle.
+ * @returns {Promise<string[]>} Ein Array mit den Namen der verfügbaren Modelle (Reihenfolge wie WEATHER_MODELS.LIST).
  */
 async function checkAvailableModels(lat, lon) {
-    const modelList = WEATHER_MODELS.LIST;
-    let availableModels = [];
-    for (const model of modelList) {
+    const results = await Promise.all(WEATHER_MODELS.LIST.map(async (model) => {
         try {
-            const response = await fetch(`${API_URLS.FORECAST}?latitude=${lat}&longitude=${lon}&hourly=temperature_2m&models=${model}`);
+            const response = await fetch(
+                `${API_URLS.FORECAST}?latitude=${lat}&longitude=${lon}&hourly=temperature_2m&models=${model}`,
+                { signal: AbortSignal.timeout(MODEL_CHECK_TIMEOUT_MS) }
+            );
             if (response.ok) {
                 const data = await response.json();
-                if (data.hourly && data.hourly.temperature_2m && data.hourly.temperature_2m.some(t => t !== null)) {
-                    availableModels.push(model);
-                }
-            } else {
-                if (response.status === 429) {
-                    // Spezifische Warnung für diesen Fall in der Konsole (bleibt meist englisch für Devs)
-                    console.warn(`API-Limit beim Prüfen von Modell '${model}' erreicht.`);
-                } else {
-                    console.warn(`Modell '${model}' ist nicht verfügbar (Server-Antwort: ${response.status})`);
-                }
+                const available = !!(data.hourly && data.hourly.temperature_2m && data.hourly.temperature_2m.some(t => t !== null));
+                return { model, answered: true, available };
             }
+            if (response.status === 429) {
+                // Spezifische Warnung für diesen Fall in der Konsole (bleibt meist englisch für Devs)
+                console.warn(`API-Limit beim Prüfen von Modell '${model}' erreicht.`);
+                // Rate-Limit zählt nicht als Antwort zur Verfügbarkeit
+                return { model, answered: false, available: false };
+            }
+            console.warn(`Modell '${model}' ist nicht verfügbar (Server-Antwort: ${response.status})`);
+            return { model, answered: true, available: false };
         } catch (e) {
-            // Dieser Block wird nur noch bei reinen Netzwerkfehlern ausgeführt.
+            // Netzwerkfehler oder Timeout
             console.error(`Netzwerkfehler beim Abruf von Modell '${model}':`, e);
+            return { model, answered: false, available: false };
         }
+    }));
+
+    if (results.some(r => r.answered)) {
+        const availableModels = results.filter(r => r.available).map(r => r.model);
+        lastModelCheck = { lat, lon, models: availableModels };
+        return availableModels;
     }
-    return availableModels;
+
+    // Totalausfall: keine Liste aus dem Nichts erfinden, aber auch nicht alles leeren.
+    console.warn('[checkAvailableModels] api.open-meteo.com nicht erreichbar, verwende Ersatzliste.');
+    if (lastModelCheck && Utils.calculateDistance(lat, lon, lastModelCheck.lat, lastModelCheck.lon) <= MODEL_CHECK_REUSE_RADIUS_M) {
+        return [...lastModelCheck.models];
+    }
+    const currentModel = Settings.state.userSettings.model;
+    return WEATHER_MODELS.LIST.includes(currentModel) ? [currentModel] : [];
 }
 
 /**
