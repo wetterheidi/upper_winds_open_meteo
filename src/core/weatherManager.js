@@ -574,13 +574,9 @@ async function fetchWeather(lat, lon, currentTime = null, historicalDateOverride
         // Fallback auf die bestehende Pressure-Level-Logik weiter unten.
         if (!isHistorical && MODEL_LEVEL_ELIGIBLE.includes(selectedModelValue)) {
             try {
-                // ICON-Global liefert Modelllevel-Daten nur für ~36h; Fenster entsprechend begrenzen
-                // (analog zur bestehenden 2-Tage-Sonderregel für icon_d2 oben).
-                const levelEndDateStr = selectedModelValue === 'icon_global'
-                    ? DateTime.fromFormat(startDateStr, 'yyyy-MM-dd', { zone: 'utc' }).plus({ days: 1 }).toFormat('yyyy-MM-dd')
-                    : endDateStr;
-
-                const levelData = await fetchModelLevelData(lat, lon, selectedModelValue, startDateStr, levelEndDateStr);
+                // Volles Modellfenster anfragen; liefert ein Server kürzer (z. B. der alte
+                // ICON-Global-Sonderserver nur ~36 h), schneidet fetchModelLevelData das leere Ende ab.
+                const levelData = await fetchModelLevelData(lat, lon, selectedModelValue, startDateStr, endDateStr);
                 AppState.lastDataSource = 'model-level';
                 // Modelllauf vom tatsächlich liefernden Server anzeigen (ein Fallback-Server
                 // kann einen anderen Lauf geladen haben).

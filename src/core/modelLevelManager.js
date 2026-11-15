@@ -28,6 +28,7 @@
 
 import { AppState } from './state.js';
 import { Utils } from './utils.js';
+import { trimTrailingEmptyHours } from './forecastLength.js';
 import { CONVERSIONS } from './constants.js';
 import {
     ICON_SERVERS, OM_PUBLIC, hostOf, fetchJsonFromServers, fetchDemElevation,
@@ -149,6 +150,8 @@ export async function fetchModelLevelData(lat, lon, modelKey, startDateStr, endD
                 if (!_hasWindData(levelJson.hourly, nLevels)) {
                     throw new Error(`Modelllevel-Server ${host} (${modelKey}): keine Winddaten ab jetzt (nur null)`);
                 }
+                // Stunden am Ende ohne Level-Wind abschneiden (Server liefert kürzer als end_date).
+                levelJson.hourly = trimTrailingEmptyHours(levelJson.hourly, [`wind_u_component_level${nLevels}`]);
                 // Ohne DEM (alle Höhen-Server ausgefallen): auf die Modell-Geländehöhe
                 // beziehen -- dann entspricht "über Grund" "über Modellgrund".
                 const baseElevation = Number.isFinite(dem) ? dem : levelJson.elevation;

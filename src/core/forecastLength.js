@@ -17,13 +17,14 @@ const REQUIRED_FIELDS = ['temperature_2m', 'wind_speed_10m'];
  * (Open-Meteo füllt bis end_date mit null auf). Alle Arrays werden gleich gekürzt.
  * Lücken mittendrin bleiben unangetastet.
  * @param {object} hourly - Das `hourly`-Objekt der Open-Meteo-Antwort.
+ * @param {string[]} [requiredFields] - Felder, die eine Stunde haben muss (Default: T2m + Wind 10 m).
  * @returns {object} Ein neues `hourly`-Objekt (oder das unveränderte, wenn nichts zu kürzen ist).
  */
-export function trimTrailingEmptyHours(hourly) {
+export function trimTrailingEmptyHours(hourly, requiredFields = REQUIRED_FIELDS) {
     const times = hourly?.time;
     if (!Array.isArray(times) || times.length === 0) return hourly;
 
-    const fields = REQUIRED_FIELDS.filter(f => Array.isArray(hourly[f]));
+    const fields = requiredFields.filter(f => Array.isArray(hourly[f]));
     if (fields.length === 0) return hourly;
 
     let last = times.length - 1;
