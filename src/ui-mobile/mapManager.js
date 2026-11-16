@@ -28,6 +28,8 @@ let _mapFollowPaused = false;
 let _mapFollowPauseTimeout = null;
 let initialJrtAngle = 0;
 let initialJrtDirection = 0;
+// Erste Standortabfrage beim App-Start (läuft parallel zur Karteninitialisierung)
+let initialGeolocation = Promise.resolve();
 
 // ===================================================================
 // 1. Initialisierung
@@ -50,6 +52,16 @@ export async function initializeMap() {
 
     // Gib die fertige Karte zurück, als Bestätigung, dass alles bereit ist.
     return AppState.map;
+}
+
+/**
+ * Wartet, bis die erste Standortabfrage beim App-Start abgeschlossen ist, also das
+ * 'location:selected'-Event mit dem Start-Standort (GPS, Home DZ oder Default) ausgelöst wurde.
+ * initializeMap() wartet darauf bewusst nicht, damit die Karte sofort erscheint.
+ * @returns {Promise<void>}
+ */
+export function whenInitialGeolocationSettled() {
+    return initialGeolocation;
 }
 async function initMap() {
     if (AppState.isMapInitialized || AppState.map) {
@@ -87,9 +99,11 @@ async function initMap() {
     _setupCoreMapEventHandlers();
 
     // Kachel-Caching und Geolocation parallel
+    initialGeolocation = _handleGeolocation(defaultCenter, defaultZoom)
+        .catch(error => console.error('[MapManager] Initial geolocation failed:', error));
     Promise.all([
         _initializeTileCacheLogic(),
-        _handleGeolocation(defaultCenter, defaultZoom)
+        initialGeolocation
     ]).then(() => {
         if (AppState.lastLat && AppState.lastLng) {
             // cacheTilesForDIP wird bereits in den Geolocation-Callbacks aufgerufen

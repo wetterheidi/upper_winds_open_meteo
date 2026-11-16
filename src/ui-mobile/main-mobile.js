@@ -1707,6 +1707,25 @@ function setupAppEventListeners() {
                 AppState.lastAltitude = altitude;
             }
 
+            // Geplanter Sprung (HEIDIS): HARP, Absetzstrecke und Höhen sofort übernehmen – noch vor der
+            // Wetterabfrage. Sie hängen nur vom DIP und seiner Bodenhöhe ab, und so steht der Plan auch
+            // bei langsamem Wetterserver oder ohne Internet im Flieger gleich bereit. Absetzstrecke und
+            // Sprungberechnung werden nach dem Laden der Wetterdaten unten neu gerechnet.
+            if (jumpPlan) {
+                trackManager.applyImportedJumpPlan(jumpPlan);
+                // Beim Import ist meist das Track-Panel offen (Karte ausgeblendet) – Popup daher nicht öffnen.
+                mapManager.placeHarpMarker(jumpPlan.harp.lat, jumpPlan.harp.lng, false);
+                // Geplante Punkte vor versehentlichem Verschieben schützen ("Punkte sperren").
+                const lockCheckbox = document.getElementById('lockInteractionCheckbox');
+                if (lockCheckbox && !lockCheckbox.checked) {
+                    lockCheckbox.checked = true;
+                    lockCheckbox.dispatchEvent(new Event('change'));
+                }
+                // Live-Tracking starten und JML auf den HARP richten.
+                trackManager.startJumpPlanLiveTracking();
+                Utils.handleMessage(I18n.t('tracks.jump_plan_applied'));
+            }
+
             let weatherLoaded = false;
             if (loadWeather) {
                 // historicalDate erzwingt historische Daten für das Track-Datum – auch bei Tracks vom selben Tag.
@@ -1740,25 +1759,15 @@ function setupAppEventListeners() {
             await displayManager.refreshMarkerPopup();
             if (AppState.lastAltitude !== 'N/A') {
                 calculateMeanWind();
-                // Geplanter Sprung (HEIDIS): HARP, Absetzstrecke und Höhen übernehmen.
-                if (jumpPlan) {
-                    trackManager.applyImportedJumpPlan(jumpPlan);
-                    // Beim Import ist meist das Track-Panel offen (Karte ausgeblendet) – Popup daher nicht öffnen.
-                    mapManager.placeHarpMarker(jumpPlan.harp.lat, jumpPlan.harp.lng, false);
-                    // Geplante Punkte vor versehentlichem Verschieben schützen ("Punkte sperren").
-                    const lockCheckbox = document.getElementById('lockInteractionCheckbox');
-                    if (lockCheckbox && !lockCheckbox.checked) {
-                        lockCheckbox.checked = true;
-                        lockCheckbox.dispatchEvent(new Event('change'));
-                    }
-                    // Live-Tracking starten und JML auf den HARP richten.
-                    trackManager.startJumpPlanLiveTracking();
-                    Utils.handleMessage(I18n.t('tracks.jump_plan_applied'));
-                }
                 if (Settings.state.userSettings.calculateJump) {
                     calculateJump();
                 }
                 displayManager.updateLandingPatternDisplay();
+            }
+            // Die Absetzstrecke des geplanten Sprungs wurde schon vor der Wetterabfrage gezeichnet;
+            // mit den neuen Winddaten neu zeichnen (Anfluglänge hängt von der Grundgeschwindigkeit ab).
+            if (jumpPlan && weatherLoaded) {
+                displayManager.updateJumpRunTrackDisplay();
             }
             //            updateJumpMasterLineAndPanel();
 
@@ -2677,6 +2686,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Hilfsfunktion zum Verarbeiten der geöffneten Datei       
     async function handleOpenFileUrl(fileUrl, detectedType) { // Behalte detectedType für den ersten Hinweis
         await appReady;
+        // Die erste GPS-Abfrage läuft unabhängig vom App-Start weiter; erst nach ihr steht fest,
+        // welche Start-Standorte (samt Wetterabfrage) noch abgeschlossen werden müssen.
+        await mapManager.whenInitialGeolocationSettled();
         await initialLocationLoad;
         await waitUntilAppActive();
         const loadingElement = document.getElementById('loading');
@@ -2792,8 +2804,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.addEventListener('location:selected', (event) => {
         const loading = handleLocationSelected(event);
-        if (['geolocation', 'geolocation_fallback', 'geolocation_retry'].includes(event.detail.source)) {
-            initialLocationLoad = loading.catch(() => { });
+        // Alle Start-Standorte sammeln (beim Start laufen z. B. 'geolocation_retry' und 'geolocation'
+        // nacheinander) – ein importierter Track darf erst danach kommen, sonst überschreiben sie den DIP.
+        if (['geolocation', 'geolocation_fallback', 'geolocation_retry', 'home_dz_fallback'].includes(event.detail.source)) {
+            initialLocationLoad = Promise.all([initialLocationLoad, loading.catch(() => { })]);
         }
     });
 

@@ -1460,6 +1460,24 @@ function setupAppEventListeners() {
                 AppState.lastAltitude = altitude;
             }
 
+            // Geplanter Sprung (HEIDIS): HARP, Absetzstrecke und Höhen sofort übernehmen – noch vor der
+            // Wetterabfrage. Sie hängen nur vom DIP und seiner Bodenhöhe ab, und so steht der Plan auch
+            // bei langsamem Wetterserver oder ohne Internet gleich bereit. Absetzstrecke und
+            // Sprungberechnung werden nach dem Laden der Wetterdaten unten neu gerechnet.
+            if (jumpPlan) {
+                applyImportedJumpPlan(jumpPlan);
+                mapManager.placeHarpMarker(jumpPlan.harp.lat, jumpPlan.harp.lng);
+                // Geplante Punkte vor versehentlichem Verschieben schützen ("Punkte sperren").
+                const lockCheckbox = document.getElementById('lockInteractionCheckbox');
+                if (lockCheckbox && !lockCheckbox.checked) {
+                    lockCheckbox.checked = true;
+                    lockCheckbox.dispatchEvent(new Event('change'));
+                }
+                // Live-Tracking starten und JML auf den HARP richten.
+                startJumpPlanLiveTracking();
+                Utils.handleMessage(I18n.t('tracks.jump_plan_applied'));
+            }
+
             let weatherLoaded = false;
             if (loadWeather) {
                 // historicalDate erzwingt historische Daten für das Track-Datum – auch bei Tracks vom selben Tag.
@@ -1497,22 +1515,13 @@ function setupAppEventListeners() {
             if (AppState.lastAltitude !== 'N/A') {
                 calculateMeanWind();
             }
-            // Geplanter Sprung (HEIDIS): HARP, Absetzstrecke und Höhen übernehmen.
-            if (jumpPlan) {
-                applyImportedJumpPlan(jumpPlan);
-                mapManager.placeHarpMarker(jumpPlan.harp.lat, jumpPlan.harp.lng);
-                // Geplante Punkte vor versehentlichem Verschieben schützen ("Punkte sperren").
-                const lockCheckbox = document.getElementById('lockInteractionCheckbox');
-                if (lockCheckbox && !lockCheckbox.checked) {
-                    lockCheckbox.checked = true;
-                    lockCheckbox.dispatchEvent(new Event('change'));
-                }
-                // Live-Tracking starten und JML auf den HARP richten.
-                startJumpPlanLiveTracking();
-                Utils.handleMessage(I18n.t('tracks.jump_plan_applied'));
-            }
             if (Settings.state.userSettings.calculateJump) {
                 calculateJump();
+            }
+            // Die Absetzstrecke des geplanten Sprungs wurde schon vor der Wetterabfrage gezeichnet;
+            // mit den neuen Winddaten neu zeichnen (Anfluglänge hängt von der Grundgeschwindigkeit ab).
+            if (jumpPlan && weatherLoaded) {
+                displayManager.updateJumpRunTrackDisplay();
             }
             displayManager.updateLandingPatternDisplay();
 
