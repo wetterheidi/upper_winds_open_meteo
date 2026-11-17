@@ -10,7 +10,7 @@ import { AppState } from './state.js';
 import { CONVERSIONS, ISA_CONSTANTS, DEWPOINT_COEFFICIENTS, EARTH_RADIUS_METERS, BEAUFORT, ENSEMBLE_VISUALIZATION, QFE_ACCURACY } from './constants.js';
 import { Settings } from "./settings.js";
 import { I18n } from './i18n.js';
-import { OM_PRIMARY, OM_LEGACY, fetchJsonFromServers, fetchDemElevation } from './openMeteoServers.js';
+import { OM_PRIMARY, OM_LEGACY, OM_PUBLIC, fetchJsonFromServers, fetchDemElevation } from './openMeteoServers.js';
 
 // Private Variablen für das Handler-System
 let customErrorHandler = console.error;
@@ -1233,22 +1233,15 @@ export class Utils {
         // derzeit zum Absturz. Deren `elevation` (dort DEM90) dient als Rückfall.
         const demPromise = fetchDemElevation(lat, lng);
 
+        // Kurzer Timeout und keine Wiederholung bei Netzfehlern: Zeitanzeige, Slider-Labels
+        // und Tabelle warten (bei Zeitzone "Ortszeit") auf diese Abfrage. Hängt
+        // api.open-meteo.com, überspringt fetchJsonFromServers sie per Ausfall-Merker sofort;
+        // dann gilt UTC (nicht gecacht, damit nach der Erholung wieder Ortszeit kommt).
         const maxRetries = 3;
         for (let attempt = 0; attempt < maxRetries; attempt++) {
             try {
-                const response = await fetch(
-                    `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&timezone=auto`
-                );
-                if (response.status === 429) {
-                    const waitTime = Math.pow(2, attempt + 1) * 1000; // 2s, 4s, 8s
-                    console.warn(`Location API rate limit (429). Retry ${attempt + 1}/${maxRetries} in ${waitTime / 1000}s...`);
-                    await new Promise(resolve => setTimeout(resolve, waitTime));
-                    continue;
-                }
-                if (!response.ok) {
-                    throw new Error(`Open-Meteo fetch failed: ${response.status}`);
-                }
-                const data = await response.json();
+                const { data } = await fetchJsonFromServers([OM_PUBLIC],
+                    `/v1/forecast?latitude=${lat}&longitude=${lng}&timezone=auto`, { timeoutMs: 8000 });
                 const dem = await demPromise;
                 const locationData = {
                     timezone: data.timezone || 'GMT',
@@ -1258,14 +1251,18 @@ export class Utils {
                 Utils.locationCache.set(cacheKey, locationData);
                 return locationData;
             } catch (error) {
-                if (attempt < maxRetries - 1) continue;
-                console.error('Error fetching location data:', error.message);
-                const dem = await demPromise;
-                return { timezone: 'UTC', elevation: Number.isFinite(dem) ? dem : 'N/A' };
+                if (/^HTTP 429/.test(error.message) && attempt < maxRetries - 1) {
+                    const waitTime = Math.pow(2, attempt + 1) * 1000; // 2s, 4s
+                    console.warn(`Location API rate limit (429). Retry ${attempt + 1}/${maxRetries} in ${waitTime / 1000}s...`);
+                    await new Promise(resolve => setTimeout(resolve, waitTime));
+                    continue;
+                }
+                console.warn('Zeitzone nicht abrufbar, verwende UTC:', error.message);
+                break;
             }
         }
         const dem = await demPromise;
-        return { timezone: 'UTC', elevation: Number.isFinite(dem) ? dem : 'N/A' };
+        return { timezone: 'UTC', timezone_abbreviation: 'UTC', elevation: Number.isFinite(dem) ? dem : 'N/A' };
     }
 
     /**
