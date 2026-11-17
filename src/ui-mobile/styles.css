@@ -1045,7 +1045,10 @@ body {
 /* --- Settings Grid & Form Elements --- */
 .settings-grid {
     display: grid;
-    grid-template-columns: auto 1fr;
+    /* Beschriftung höchstens so breit wie nötig, darf aber umbrechen; die Bedienelemente
+       behalten eine Mindestbreite (sonst schneidet ein langes Label wie "Wind table: also
+       show heights in ft AMSL" die Dropdowns ab, z. B. "Met" statt "Meter"). */
+    grid-template-columns: minmax(0, max-content) minmax(12rem, 1fr);
     gap: 16px 10px;
     align-items: center;
 }
