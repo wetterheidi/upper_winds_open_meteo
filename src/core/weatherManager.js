@@ -13,7 +13,10 @@ import { DateTime } from 'luxon';
 import { I18n } from './i18n.js';
 import { SOUNDING_MODEL_ID, checkSoundingAvailability, fetchSoundingData } from './soundingManager.js';
 import { MODEL_LEVEL_ELIGIBLE, fetchModelLevelData, fetchIconRunMeta } from './modelLevelManager.js';
-import { OM_PUBLIC, hostOf, fetchJsonFromServers } from './openMeteoServers.js';
+import {
+    OM_PUBLIC, ICON_SERVERS, hostOf, fetchJsonFromServers, hasValuesFromNow,
+    isPublicUnreachable, markPublicUnreachable, markPublicReachable, isNetworkError,
+} from './openMeteoServers.js';
 import { CUSTOM_PROFILE_MODEL_ID, hasCustomProfile, getCustomProfileWeatherData } from './customProfileManager.js';
 import { getModelMaxForecastDays, trimTrailingEmptyHours } from './forecastLength.js';
 
@@ -90,6 +93,126 @@ async function _syncRunInfo(dataServer, metaServer, dataset) {
 }
 
 /**
+ * Abfragefenster (start/end_date) für einen Forecast ab dem gegebenen Modelllauf:
+ * Start = Lauf + 6 h, höchstens jetzt; Länge = Modellmaximum bzw. Nutzer-Limit.
+ * @param {string} model
+ * @param {number|null} runInitSec - last_run_initialisation_time, null = unbekannt (jetzt)
+ * @param {boolean} [notifyLimit=false] - Hinweis zeigen, wenn das Nutzer-Limit über dem Modellmaximum liegt
+ */
+function _forecastWindow(model, runInitSec, notifyLimit = false) {
+    const runDate = Number.isFinite(runInitSec) ? new Date(runInitSec * 1000) : DateTime.utc().toJSDate();
+    let forecastStart = DateTime.fromJSDate(runDate).setZone('utc').plus({ hours: 6 });
+    if (forecastStart > DateTime.utc()) forecastStart = DateTime.utc();
+
+    const modelMaxDays = getModelMaxForecastDays(model);
+    const userMaxForecast = Settings.getValue('maxForecastTime', 'Maximum');
+    let forecastDays = modelMaxDays;
+    if (userMaxForecast !== 'Maximum') {
+        const userMaxDays = parseInt(userMaxForecast, 10);
+        if (notifyLimit && userMaxDays > modelMaxDays) {
+            Utils.handleMessage(I18n.t('messages.model_days_limit', { model, days: modelMaxDays }));
+        }
+        forecastDays = Math.min(modelMaxDays, userMaxDays);
+    }
+    return {
+        startDateStr: forecastStart.toFormat('yyyy-MM-dd'),
+        endDateStr: forecastStart.plus({ days: forecastDays - 1 }).toFormat('yyyy-MM-dd'),
+    };
+}
+
+// ===================================================================
+// Ausweichen auf ICON vom eigenen Server, wenn api.open-meteo.com ausfällt
+// ===================================================================
+
+/** ICON-Modelle in Ausweich-Reihenfolge: das feinste, das den Ort abdeckt, zuerst. */
+const ICON_FALLBACK_ORDER = ['icon_d2', 'icon_eu', 'icon_global'];
+/** Letzte Abdeckungsprüfung { key, at, promise } -- spart doppelte Prüfungen im selben Ladevorgang. */
+let iconCoverageCache = null;
+const ICON_COVERAGE_CACHE_MS = 10 * 60 * 1000;
+
+/**
+ * Welche ICON-Modelle liefern am Ort Daten von den ICON-Servern (eigener Server zuerst)?
+ * D2/EU antworten außerhalb ihres Gebiets sofort mit HTTP 400.
+ * @returns {Promise<string[]>} Teilmenge von ICON_FALLBACK_ORDER in dieser Reihenfolge.
+ */
+function probeIconCoverage(lat, lon) {
+    const key = `${Number(lat).toFixed(3)},${Number(lon).toFixed(3)}`;
+    if (iconCoverageCache?.key === key && Date.now() - iconCoverageCache.at < ICON_COVERAGE_CACHE_MS) {
+        return iconCoverageCache.promise;
+    }
+    const promise = Promise.all(ICON_FALLBACK_ORDER.map(async (model) => {
+        try {
+            await fetchJsonFromServers(
+                ICON_SERVERS[model],
+                `/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m&models=${model}&forecast_days=2`,
+                { timeoutMs: MODEL_CHECK_TIMEOUT_MS, validate: (d) => hasValuesFromNow(d.hourly, 'temperature_2m') }
+            );
+            return model;
+        } catch {
+            return null;
+        }
+    })).then((r) => r.filter(Boolean));
+    iconCoverageCache = { key, at: Date.now(), promise };
+    promise.then((models) => { if (!models.length && iconCoverageCache?.promise === promise) iconCoverageCache = null; });
+    return promise;
+}
+
+const _modelLabel = (model) => model.replace(/_/g, ' ').toUpperCase();
+
+/**
+ * Zeigt das Ausweichmodell in der Modellauswahl an (ohne 'change'-Event: die
+ * gespeicherte Einstellung bleibt, sodass nach der Erholung von api.open-meteo.com
+ * wieder das gewünschte Modell geladen wird) und meldet den Wechsel.
+ */
+function _announceIconFallback(fromModel, toModel) {
+    const select = document.getElementById('modelSelect');
+    if (select) {
+        if (![...select.options].some((o) => o.value === toModel)) {
+            const option = document.createElement('option');
+            option.value = toModel;
+            option.textContent = _modelLabel(toModel);
+            select.appendChild(option);
+        }
+        select.value = toModel;
+    }
+    AppState.modelFallbackFrom = fromModel;
+    Utils.handleMessage(I18n.t('messages.public_api_icon_fallback', { from: _modelLabel(fromModel), to: _modelLabel(toModel) }));
+}
+
+/**
+ * Lädt statt `failedModel` das feinste ICON-Modell, das den Ort abdeckt, als
+ * Modelllevel-Daten von den ICON-Servern. Nur für Forecasts (kein historisches Pendant).
+ * @returns {Promise<object>} weatherData
+ * @throws {Error} name 'TimeoutError', wenn auch kein ICON-Modell lieferbar ist.
+ */
+async function _loadIconFallback(lat, lon, failedModel) {
+    const candidates = (await probeIconCoverage(lat, lon)).filter((m) => m !== failedModel);
+    for (const model of candidates) {
+        try {
+            const dataset = WEATHER_MODELS.API_MAP[model] || model;
+            let runInit = null;
+            let metaServer = null;
+            try {
+                const { meta, server } = await fetchIconRunMeta(model, dataset);
+                runInit = meta.last_run_initialisation_time;
+                metaServer = server;
+            } catch { /* Fenster ab jetzt */ }
+            const { startDateStr, endDateStr } = _forecastWindow(model, runInit);
+            const data = await fetchModelLevelData(lat, lon, model, startDateStr, endDateStr);
+            AppState.lastModelRun = Number.isFinite(runInit) ? _fmtRun(runInit) : 'N/A';
+            AppState.lastDataSource = 'model-level';
+            await _syncRunInfo(`https://${AppState.lastDataServer.host}`, metaServer, dataset);
+            console.warn(`[weatherManager] ${failedModel} nicht ladbar (api.open-meteo.com), stattdessen ${model} vom ICON-Server.`);
+            _announceIconFallback(failedModel, model);
+            return data;
+        } catch (e) {
+            console.warn(`[weatherManager] ICON-Ausweichmodell ${model} nicht ladbar:`, e.message);
+        }
+    }
+    throw Object.assign(new Error('api.open-meteo.com nicht erreichbar, kein ICON-Ausweichmodell verfügbar'), { name: 'TimeoutError' });
+}
+
+/**
  * Zentraler Einstiegspunkt zum Abrufen von Wetterdaten für einen Standort.
  * Orchestriert die Prüfung verfügbarer Modelle und den eigentlichen Datenabruf.
  * @param {number} lat - Die geographische Breite des Standorts.
@@ -106,9 +229,13 @@ export async function fetchWeatherForLocation(lat, lng, currentTime = null, hist
     // Ein neuer Wetterdaten-Abruf entwertet einen zuvor gesetzten manuellen QFE-Kalibrierungs-Offset
     // (der bezog sich auf den zuvor geladenen Modelllauf/Standort).
     Utils.clearQfeCalibration();
+    AppState.modelFallbackFrom = null;
+
+    // Gewünschtes Modell vor dem Neuaufbau der Auswahl merken (für den ICON-Ausweichfall)
+    const wantedModel = document.getElementById('modelSelect')?.value || Settings.state.userSettings.model;
 
     // 1. Prüfen, welche Modelle verfügbar sind (Open-Meteo + Progtemp parallel)
-    const [availableModels, soundingAvailable] = await Promise.all([
+    const [{ models: availableModels, degraded }, soundingAvailable] = await Promise.all([
         checkAvailableModels(lat, lng),
         checkSoundingAvailability(lat, lng)
     ]);
@@ -123,9 +250,18 @@ export async function fetchWeatherForLocation(lat, lng, currentTime = null, hist
     }
 
     // 2. Ein Event auslösen, damit die UI sich aktualisieren kann
+    // degraded: Liste ist ein Notbehelf (api.open-meteo.com ausgefallen) -- die UI darf
+    // daraus keine gespeicherten Einstellungen (Ensemble-Auswahl) bereinigen.
     document.dispatchEvent(new CustomEvent('models:available', {
-        detail: { availableModels }
+        detail: { availableModels, degraded }
     }));
+
+    // api.open-meteo.com ausgefallen und das gewünschte Modell gibt es nur dort:
+    // sichtbar auf das feinste ICON-Modell vom eigenen Server wechseln.
+    if (degraded && WEATHER_MODELS.LIST.includes(wantedModel) && !availableModels.includes(wantedModel)) {
+        const iconModel = ICON_FALLBACK_ORDER.find((m) => availableModels.includes(m));
+        if (iconModel) _announceIconFallback(wantedModel, iconModel);
+    }
 
     // 3. Die eigentlichen Wetterdaten für das aktuell ausgewählte Modell abrufen
     const weatherData = await fetchWeather(lat, lng, currentTime, historicalDateOverride);
@@ -528,10 +664,12 @@ async function fetchWeather(lat, lon, currentTime = null, historicalDateOverride
             AppState.lastModelRun = I18n.t('messages.historical_data_label');
         } else {
             // Normale Forecast-Logik zur Bestimmung des Zeitfensters
-            let runDate;
+            let runInit = null;
             try {
                 // ICON-Modelle: meta.json bevorzugt von den ICON-Servern (open-meteo.wetterheidi.de
                 // zuerst), sonst und für alle anderen Modelle von der öffentlichen Instanz.
+                // Kurzer Timeout: hängt die öffentliche Instanz, merkt fetchJsonFromServers sie als
+                // ausgefallen vor, und unten wird ohne weiteres Warten auf ICON ausgewichen.
                 let metaData = null;
                 if (MODEL_LEVEL_ELIGIBLE.includes(selectedModelValue)) {
                     try {
@@ -539,32 +677,14 @@ async function fetchWeather(lat, lon, currentTime = null, historicalDateOverride
                     } catch { /* öffentliche Instanz unten */ }
                 }
                 if (!metaData) {
-                    ({ data: metaData, server: metaServer } = await fetchJsonFromServers([OM_PUBLIC], `/data/${modelApiIdentifierForMeta}/static/meta.json`));
+                    ({ data: metaData, server: metaServer } = await fetchJsonFromServers([OM_PUBLIC], `/data/${modelApiIdentifierForMeta}/static/meta.json`, { timeoutMs: 10000 }));
                 }
-                runDate = new Date(metaData.last_run_initialisation_time * 1000);
-                AppState.lastModelRun = _fmtRun(metaData.last_run_initialisation_time);
+                runInit = metaData.last_run_initialisation_time;
+                AppState.lastModelRun = _fmtRun(runInit);
             } catch (e) {
-                runDate = DateTime.utc().toJSDate();
                 AppState.lastModelRun = "N/A";
             }
-            let forecastStart = DateTime.fromJSDate(runDate).setZone('utc').plus({ hours: 6 });
-            if (forecastStart > DateTime.utc()) forecastStart = DateTime.utc();
-            startDateStr = forecastStart.toFormat('yyyy-MM-dd');
-
-            // Geänderte Logik für das Enddatum
-            const modelMaxDays = getModelMaxForecastDays(selectedModelValue);
-            const userMaxForecast = Settings.getValue('maxForecastTime', 'Maximum');
-            let forecastDays = modelMaxDays;
-
-            if (userMaxForecast !== 'Maximum') {
-                const userMaxDays = parseInt(userMaxForecast, 10);
-                if (userMaxDays > modelMaxDays) {
-                    Utils.handleMessage(I18n.t('messages.model_days_limit', { model: selectedModelValue, days: modelMaxDays }));
-                }
-                forecastDays = Math.min(modelMaxDays, userMaxDays);
-            }
-
-            endDateStr = forecastStart.plus({ days: forecastDays - 1 }).toFormat('yyyy-MM-dd');
+            ({ startDateStr, endDateStr } = _forecastWindow(selectedModelValue, runInit, true));
         }
 
         // Für ICON-D2/EU/GLOBAL zuerst hochaufgelöste native Modelllevel-Daten von den
@@ -587,6 +707,13 @@ async function fetchWeather(lat, lon, currentTime = null, historicalDateOverride
                 AppState.customPressureLevels = null;
             }
         }
+
+        // Druckflächen gibt es nur von der öffentlichen Instanz. Ist sie als ausgefallen
+        // vorgemerkt, gar nicht erst anfragen, sondern auf ICON vom eigenen Server ausweichen.
+        if (!isHistorical && isPublicUnreachable()) {
+            return await _loadIconFallback(lat, lon, selectedModelValue);
+        }
+
         AppState.lastDataSource = 'pressure-level';
         AppState.lastDataServer = { host: new URL(baseUrl).host, fallback: false };
         AppState.lastOrography = null;
@@ -595,8 +722,25 @@ async function fetchWeather(lat, lon, currentTime = null, historicalDateOverride
 
         const hourlyParams = "surface_pressure,temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,visibility,weather_code,cloud_cover_low,cloud_cover_mid,cloud_cover_high,temperature_1000hPa,relative_humidity_1000hPa,wind_speed_1000hPa,wind_direction_1000hPa,geopotential_height_1000hPa,cloud_cover_1000hPa,temperature_950hPa,relative_humidity_950hPa,wind_speed_950hPa,wind_direction_950hPa,geopotential_height_950hPa,cloud_cover_950hPa,temperature_925hPa,relative_humidity_925hPa,wind_speed_925hPa,wind_direction_925hPa,geopotential_height_925hPa,cloud_cover_925hPa,temperature_900hPa,relative_humidity_900hPa,wind_speed_900hPa,wind_direction_900hPa,geopotential_height_900hPa,cloud_cover_900hPa,temperature_850hPa,relative_humidity_850hPa,wind_speed_850hPa,wind_direction_850hPa,geopotential_height_850hPa,cloud_cover_850hPa,temperature_800hPa,relative_humidity_800hPa,wind_speed_800hPa,wind_direction_800hPa,geopotential_height_800hPa,cloud_cover_800hPa,temperature_700hPa,relative_humidity_700hPa,wind_speed_700hPa,wind_direction_700hPa,geopotential_height_700hPa,cloud_cover_700hPa,temperature_600hPa,relative_humidity_600hPa,wind_speed_600hPa,wind_direction_600hPa,geopotential_height_600hPa,cloud_cover_600hPa,temperature_500hPa,relative_humidity_500hPa,wind_speed_500hPa,wind_direction_500hPa,geopotential_height_500hPa,cloud_cover_500hPa,temperature_400hPa,relative_humidity_400hPa,wind_speed_400hPa,wind_direction_400hPa,geopotential_height_400hPa,cloud_cover_400hPa,temperature_300hPa,relative_humidity_300hPa,wind_speed_300hPa,wind_direction_300hPa,geopotential_height_300hPa,cloud_cover_300hPa,temperature_250hPa,relative_humidity_250hPa,wind_speed_250hPa,wind_direction_250hPa,geopotential_height_250hPa,cloud_cover_250hPa,temperature_200hPa,relative_humidity_200hPa,wind_speed_200hPa,wind_direction_200hPa,geopotential_height_200hPa,cloud_cover_200hPa";
         const url = `${baseUrl}?latitude=${lat}&longitude=${lon}&hourly=${hourlyParams}&models=${selectedModelValue}&start_date=${startDateStr}&end_date=${endDateStr}`;
-        const response = await fetch(url, { signal: AbortSignal.timeout(30000) });
+        let response;
+        try {
+            response = await fetch(url, { signal: AbortSignal.timeout(30000) });
+        } catch (e) {
+            // Hängt/fehlt die öffentliche Instanz: vormerken und auf ICON ausweichen
+            if (!isHistorical && isNetworkError(e)) {
+                markPublicUnreachable();
+                return await _loadIconFallback(lat, lon, selectedModelValue);
+            }
+            throw e;
+        }
+        if (!isHistorical) markPublicReachable();
         if (!response.ok) {
+            // Überlastet (5xx) oder Rate-Limit (429): ICON vom eigenen Server ist davon unberührt
+            if (!isHistorical && (response.status === 429 || response.status >= 500)) {
+                try {
+                    return await _loadIconFallback(lat, lon, selectedModelValue);
+                } catch { /* ursprünglichen Fehler unten melden */ }
+            }
             if (response.status === 429) {
                 throw new Error(I18n.t('messages.api_limit_reached'));
             }
@@ -631,22 +775,23 @@ async function fetchWeather(lat, lon, currentTime = null, historicalDateOverride
 
 /** Timeout je Testanfrage in checkAvailableModels. Hängt api.open-meteo.com, soll der Start nicht minutenlang blockieren. */
 const MODEL_CHECK_TIMEOUT_MS = 8000;
-/** Bis zu dieser Entfernung (m) darf bei einem Totalausfall die zuletzt ermittelte Modellliste weiterverwendet werden. */
-const MODEL_CHECK_REUSE_RADIUS_M = 100000;
-/** Zuletzt erfolgreich ermittelte Modellliste samt Ort: { lat, lon, models }. */
-let lastModelCheck = null;
 
 /**
  * Überprüft dynamisch, welche der vordefinierten Wettermodelle für die gegebenen
  * Koordinaten verfügbar sind, indem es für jedes Modell eine Testanfrage sendet.
  * Die Anfragen laufen parallel und mit Timeout. Ist api.open-meteo.com nicht
- * erreichbar (keine einzige Anfrage beantwortet), wird die zuletzt ermittelte Liste
- * für einen nahen Ort weiterverwendet, sonst zumindest das aktuell gewählte Modell.
+ * erreichbar (keine einzige Anfrage beantwortet, oder als ausgefallen vorgemerkt),
+ * werden stattdessen die ICON-Modelle angeboten, die der eigene ICON-Server für den
+ * Ort liefert (degraded = true); liefert auch der nichts, zumindest das aktuell
+ * gewählte Modell.
  * @param {number} lat - Die geographische Breite.
  * @param {number} lon - Die geographische Länge.
- * @returns {Promise<string[]>} Ein Array mit den Namen der verfügbaren Modelle (Reihenfolge wie WEATHER_MODELS.LIST).
+ * @returns {Promise<{models: string[], degraded: boolean}>} Verfügbare Modelle (Reihenfolge wie WEATHER_MODELS.LIST).
  */
 async function checkAvailableModels(lat, lon) {
+    // Als ausgefallen vorgemerkt: nicht erneut 15 hängende Anfragen abwarten
+    if (isPublicUnreachable()) return _degradedModelList(lat, lon);
+
     const results = await Promise.all(WEATHER_MODELS.LIST.map(async (model) => {
         try {
             const response = await fetch(
@@ -669,23 +814,28 @@ async function checkAvailableModels(lat, lon) {
         } catch (e) {
             // Netzwerkfehler oder Timeout
             console.error(`Netzwerkfehler beim Abruf von Modell '${model}':`, e);
-            return { model, answered: false, available: false };
+            return { model, answered: false, available: false, networkError: true };
         }
     }));
 
     if (results.some(r => r.answered)) {
-        const availableModels = results.filter(r => r.available).map(r => r.model);
-        lastModelCheck = { lat, lon, models: availableModels };
-        return availableModels;
+        markPublicReachable();
+        return { models: results.filter(r => r.available).map(r => r.model), degraded: false };
     }
+    if (results.some(r => r.networkError)) markPublicUnreachable();
+    return _degradedModelList(lat, lon);
+}
 
-    // Totalausfall: keine Liste aus dem Nichts erfinden, aber auch nicht alles leeren.
-    console.warn('[checkAvailableModels] api.open-meteo.com nicht erreichbar, verwende Ersatzliste.');
-    if (lastModelCheck && Utils.calculateDistance(lat, lon, lastModelCheck.lat, lastModelCheck.lon) <= MODEL_CHECK_REUSE_RADIUS_M) {
-        return [...lastModelCheck.models];
+/** Modellliste bei ausgefallener öffentlicher Instanz: ICON-Modelle vom eigenen Server. */
+async function _degradedModelList(lat, lon) {
+    const iconModels = await probeIconCoverage(lat, lon);
+    console.warn(`[checkAvailableModels] api.open-meteo.com nicht erreichbar, biete ICON vom eigenen Server an: ${iconModels.join(', ') || '–'}`);
+    if (iconModels.length) {
+        return { models: WEATHER_MODELS.LIST.filter(m => iconModels.includes(m)), degraded: true };
     }
+    // Auch der ICON-Server liefert nichts (z. B. offline): Auswahl nicht leeren.
     const currentModel = Settings.state.userSettings.model;
-    return WEATHER_MODELS.LIST.includes(currentModel) ? [currentModel] : [];
+    return { models: WEATHER_MODELS.LIST.includes(currentModel) ? [currentModel] : [], degraded: true };
 }
 
 /**

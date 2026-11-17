@@ -59,10 +59,44 @@ export function hasValuesFromNow(hourly, field) {
     return times.some((t, i) => Date.parse(`${t}Z`) >= nowHour && Number.isFinite(values[i]));
 }
 
+// ===================================================================
+// Ausfall-Merker für die öffentliche Instanz (api.open-meteo.com)
+// ===================================================================
+// Hängt api.open-meteo.com (seit 2026-11 häufig: Anfragen laufen ohne Antwort in den
+// Timeout), soll nicht jede weitere Anfrage erneut 10-30 s warten. Nach dem ersten
+// Timeout/Netzfehler gilt die Instanz PUBLIC_DOWN_HOLD_MS lang als ausgefallen:
+// fetchJsonFromServers überspringt sie, weatherManager weicht auf ICON vom eigenen
+// Server aus. Danach wird sie wieder normal versucht.
+
+/** Wie lange api.open-meteo.com nach einem Timeout/Netzfehler übersprungen wird. */
+export const PUBLIC_DOWN_HOLD_MS = 5 * 60 * 1000;
+let publicDownUntil = 0;
+
+/** Merkt api.open-meteo.com für PUBLIC_DOWN_HOLD_MS als nicht erreichbar vor. */
+export function markPublicUnreachable() {
+    if (!isPublicUnreachable()) console.warn(`[openMeteoServers] ${hostOf(OM_PUBLIC)} nicht erreichbar -- wird ${PUBLIC_DOWN_HOLD_MS / 60000} min übersprungen.`);
+    publicDownUntil = Date.now() + PUBLIC_DOWN_HOLD_MS;
+}
+
+/** Hebt den Ausfall-Vermerk auf (api.open-meteo.com hat geantwortet). */
+export function markPublicReachable() {
+    publicDownUntil = 0;
+}
+
+/** true, solange api.open-meteo.com als ausgefallen vorgemerkt ist. */
+export function isPublicUnreachable() {
+    return Date.now() < publicDownUntil;
+}
+
+/** true für Fehler, die auf einen hängenden/unerreichbaren Server deuten (Timeout, Netzfehler). */
+export const isNetworkError = (e) => e?.name === 'TimeoutError' || e?.name === 'AbortError' || e instanceof TypeError;
+
 /**
  * Holt JSON vom ersten Server, der eine brauchbare Antwort liefert. Weiter zum
  * nächsten Server bei Netzwerkfehler, Timeout, HTTP ≠ 2xx, ungültigem JSON (z. B.
  * `{"elevation":[nan]}`), `error`-Feld oder wenn `validate(data)` false liefert.
+ * Die öffentliche Instanz wird übersprungen, solange sie als ausgefallen vorgemerkt
+ * ist (s. markPublicUnreachable); ein Timeout/Netzfehler dort setzt den Vermerk.
  * @param {string[]} servers - Basis-URLs, bevorzugte zuerst.
  * @param {string} pathAndQuery - z. B. '/v1/forecast?latitude=…'
  * @param {object} [opts]
@@ -73,8 +107,20 @@ export function hasValuesFromNow(hourly, field) {
 export async function fetchJsonFromServers(servers, pathAndQuery, { timeoutMs = 30000, validate } = {}) {
     let lastError = null;
     for (const server of servers) {
+        const isPublic = server === OM_PUBLIC;
+        if (isPublic && isPublicUnreachable()) {
+            lastError = Object.assign(new Error(`${hostOf(server)} derzeit nicht erreichbar (übersprungen)`), { name: 'TimeoutError' });
+            continue;
+        }
         try {
-            const response = await fetch(`${server}${pathAndQuery}`, { signal: AbortSignal.timeout(timeoutMs) });
+            let response;
+            try {
+                response = await fetch(`${server}${pathAndQuery}`, { signal: AbortSignal.timeout(timeoutMs) });
+            } catch (e) {
+                if (isPublic && isNetworkError(e)) markPublicUnreachable();
+                throw e;
+            }
+            if (isPublic) markPublicReachable();
             const text = await response.text();
             let data;
             try {

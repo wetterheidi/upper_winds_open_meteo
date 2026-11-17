@@ -316,10 +316,11 @@ function setupModelSelectEvents() {
 
     // Der Listener für 'models:available' ist in Ordnung, da er nur die UI aktualisiert
     document.addEventListener('models:available', (event) => {
-        const { availableModels } = event.detail;
+        const { availableModels, degraded } = event.detail;
         updateModelSelectUI(availableModels);
         updateEnsembleModelUI(availableModels);
-        cleanupSelectedEnsembleModels(availableModels);
+        // Notbehelfsliste bei Ausfall von api.open-meteo.com: gespeicherte Auswahl nicht beschneiden
+        if (!degraded) cleanupSelectedEnsembleModels(availableModels);
     });
 }
 function setupCoordinateEvents() {

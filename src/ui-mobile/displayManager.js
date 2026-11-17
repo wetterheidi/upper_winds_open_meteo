@@ -362,6 +362,10 @@ export function updateModelInfoPopup() {
     }
 
     let titleContent = `${I18n.t('common.forecast_model')}: ${model.replace(/_/g, ' ').toUpperCase()}\n${I18n.t('weather.model_run')} ${modelRun}`;
+    // Ersatzweise ICON geladen, weil api.open-meteo.com ausgefallen war (s. weatherManager.js)
+    if (AppState.modelFallbackFrom) {
+        titleContent += `\n⚠ ${I18n.t('weather.model_fallback_from', { model: AppState.modelFallbackFrom.replace(/_/g, ' ').toUpperCase() })}`;
+    }
     if (AppState.lastDataSource === 'model-level') {
         titleContent += `\n${I18n.t('weather.data_source_model_level')}`;
     } else if (AppState.lastDataSource === 'pressure-level') {
