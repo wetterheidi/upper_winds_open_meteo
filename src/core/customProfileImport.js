@@ -1,7 +1,7 @@
 /**
  * @file customProfileImport.js
  * @description Import eigener Vertikalprofile ("Eigenes Profil") aus Textdateien:
- * Radiosonden (z. B. Windsond, Grawsonde) oder Modell-TEMPs aus NinJo. Das Profil ersetzt die
+ * Radiosonden (z. B. Windsond als TXT oder CSV, Grawsonde) oder Modell-TEMPs aus NinJo. Das Profil ersetzt die
  * Modelldaten vollständig (keine Vermischung, auch die Bodenwerte stammen aus dem Profil).
  *
  * Ablauf: Bytes dekodieren -> Format erkennen -> Zeilen anhand einer Spaltenzuordnung
@@ -28,6 +28,7 @@ export const CLOUD_RH_THRESHOLD = 95;
 
 /**
  * Format-Vorlagen. Spaltennummern 1-basiert (wie in der Desktop-Vorlage), null = nicht vorhanden.
+ * commentPrefix: optional; Zeilen, die damit beginnen, werden vor allem anderen verworfen
  * delimiter: 'auto' | 'tab' | 'whitespace' | 'semicolon' | 'comma' ('auto': Tab, wenn die Datei
  *            Tabs enthält, sonst Leerraum)
  * decimal:   'auto' | 'point' | 'comma'
@@ -50,6 +51,19 @@ export const PROFILE_PRESETS = Object.freeze({
         delimiter: 'whitespace',
         decimal: 'point',
         columns: { pressure: 2, height: 1, temperature: 3, dewpoint: 4, humidity: null, windDirection: 5, windSpeed: 6 },
+        units: { height: 'm', heightRef: 'AGL', windSpeed: 'm/s' },
+    }),
+    // Windsond-CSV-Export (*.sounding.csv): optionale Kommentarzeilen mit '#'
+    // (z. B. "# Radiation correction S2H3 v1.0"), dann
+    // "Height (m AGL), Pressure (mb), Temperature (C), Relative humidity (%), Wind speed (m/s), Wind direction (true deg)".
+    windsond_csv: Object.freeze({
+        id: 'windsond_csv',
+        label: 'Windsond (CSV)',
+        commentPrefix: '#',
+        headerLines: 1,
+        delimiter: 'comma',
+        decimal: 'point',
+        columns: { pressure: 2, height: 1, temperature: 3, dewpoint: null, humidity: 4, windDirection: 6, windSpeed: 5 },
         units: { height: 'm', heightRef: 'AGL', windSpeed: 'm/s' },
     }),
     // GRAWMET-Export (z. B. Graw513): "Zeit [sec] P [hPa] T Hu Ws [m/s] Wd Alt [m] Geopot [m] Rs".
@@ -122,6 +136,10 @@ export function detectProfilePreset(text) {
     const lines = _lines(text);
     if (lines.length === 0) return null;
     if (/^\s*Height\[m\]\s+Pressure\[hPa\]/i.test(lines[0])) return 'windsond';
+    const firstData = lines.find(l => !l.trimStart().startsWith('#'));
+    if (firstData && /^\s*Height\s*\(m AGL\)\s*,\s*Pressure\s*\((mb|hPa)\)\s*,\s*Temperature\s*\(C\)\s*,\s*Relative humidity\s*\(%\)\s*,\s*Wind speed\s*\(m\/s\)\s*,\s*Wind direction/i.test(firstData)) {
+        return 'windsond_csv';
+    }
     if (/^\s*(Zeit|Time)\s*\[sec\]\s+P\s*\[h\s?Pa\]/i.test(lines[0])) {
         return /\[(kn|kt)\]/i.test(lines[0]) ? 'graw_kn' : 'graw';
     }
@@ -212,7 +230,10 @@ function _toKmh(value, unit) {
  * @returns {{levels: object[], heightRef: 'AMSL'|'AGL', decimal: string, skippedRows: number}}
  */
 export function parseProfileText(text, preset) {
-    const lines = _lines(text).slice(preset.headerLines || 0);
+    const prefix = preset.commentPrefix;
+    const lines = _lines(text)
+        .filter(l => !(prefix && l.trimStart().startsWith(prefix)))
+        .slice(preset.headerLines || 0);
     const delimiter = preset.delimiter === 'auto'
         ? (lines.some(l => l.includes('\t')) ? 'tab' : 'whitespace')
         : preset.delimiter;

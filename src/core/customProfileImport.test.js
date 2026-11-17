@@ -277,3 +277,47 @@ describe.skipIf(!HAS_GRAW)('Grawsonde (Beispieldateien)', () => {
         expect(interpolate(result)[0].height).toBe(600);
     });
 });
+
+describe('Windsond-CSV-Export', () => {
+    const csv = [
+        '# Radiation correction S2H3 v1.0',
+        'Height (m AGL), Pressure (mb), Temperature (C), Relative humidity (%), Wind speed (m/s), Wind direction (true deg)',
+        '20, 965.43, 18.78, 75.4, 4.70, 146.3',
+        '40, 963.19, 18.66, 75.9, 4.87, 143.6',
+        '60, 960.95, 18.54, 76.4, 5.00, 141.9',
+        '1000, 860.11, 11.19, 88.2, 12.00, 210.9',
+        '2000, 761.87, 3.73, 93.6, 17.32, 215.6',
+        '',
+    ].join('\r\n');
+
+    it('wird am Kopf erkannt (auch hinter Kommentarzeilen)', () => {
+        expect(detectProfilePreset(csv)).toBe('windsond_csv');
+        expect(detectProfilePreset(csv.split('\r\n').slice(1).join('\n'))).toBe('windsond_csv');
+    });
+
+    it('liest Spalten, Einheiten und Höhenbezug richtig', () => {
+        const parsed = parseProfileText(csv, PROFILE_PRESETS.windsond_csv);
+        expect(parsed.heightRef).toBe('AGL');
+        expect(parsed.skippedRows).toBe(0);
+        expect(parsed.levels).toHaveLength(5);
+        const first = parsed.levels[0];
+        expect(first.height).toBe(20);
+        expect(first.pressure).toBeCloseTo(965.43);
+        expect(first.temperature).toBeCloseTo(18.78);
+        expect(first.humidity).toBeCloseTo(75.4);
+        expect(first.windDirection).toBeCloseTo(146.3);
+        expect(first.windSpeedKmh).toBeCloseTo(4.70 * 3.6, 1);
+    });
+
+    it('liefert weatherData mit Bodenwind aus dem Profil', () => {
+        const parsed = parseProfileText(csv, PROFILE_PRESETS.windsond_csv);
+        const r = buildCustomProfileWeatherData(parsed, { timeUtc: '2026-11-17T17:58', groundElevationM: 400 });
+        expect(r.surfaceWindSource).toBe('profile');
+        expect(r.weatherData.wind_direction_10m[0]).toBeCloseTo(146.3);
+        expect(r.weatherData.surface_pressure[0]).toBeGreaterThan(965.43);
+    });
+
+    it('Dateiname liefert Datum und Uhrzeit', () => {
+        expect(parseProfileFilename('2026-11-17_1858.sounding.csv')).toEqual({ date: '2026-11-17', time: '18:58', timezoneHint: null });
+    });
+});
