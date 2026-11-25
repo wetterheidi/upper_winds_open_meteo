@@ -94,6 +94,8 @@
         "show_landing_pattern": "Landeanflug anzeigen",
         "lock": "Sperren",
         "pattern_shape": "Form:",
+        "pattern_left": "Links",
+        "pattern_right": "Rechts",
         "leg_downwind": "Start Rückenwindteil (m AGL):",
         "leg_upwind": "Start Gegenwindteil (m AGL):",
         "leg_base": "Start Basisteil (m AGL):",

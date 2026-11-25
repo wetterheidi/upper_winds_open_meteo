@@ -94,6 +94,8 @@
         "show_landing_pattern": "Show Landing Pattern",
         "lock": "Lock",
         "pattern_shape": "Pattern Shape:",
+        "pattern_left": "Left",
+        "pattern_right": "Right",
         "leg_downwind": "Start Downwind Leg (m AGL):",
         "leg_upwind": "Start Upwind Leg (m AGL):",
         "leg_base": "Start Base Leg (m AGL):",
