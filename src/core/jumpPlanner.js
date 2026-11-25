@@ -589,7 +589,14 @@ export function calculateLandingPatternCoords(lat, lng, interpolatedData) {
     if (!downwindMeanWind) return null;
     const downwindWindDir = downwindMeanWind[0];
     const downwindWindSpeedKt = downwindMeanWind[1];
-    const downwindCourse = (effectiveLandingWindDir + 180) % 360;
+    // U-Pattern: erstes Leg gegenläufig zum Final (Downwind).
+    // Z-Pattern: erstes Leg in Landerichtung (Upwind), Base und Final bleiben gleich.
+    // Bei Gegenwind > Schirmfahrt wird die Grundgeschwindigkeit negativ; der Startpunkt
+    // liegt dann folgerichtig vor dem Base-Punkt (man wird rückwärts dorthin versetzt).
+    const patternShape = Settings.state?.userSettings?.patternShape === 'Z' ? 'Z' : 'U';
+    const downwindCourse = patternShape === 'Z'
+        ? effectiveLandingWindDir % 360
+        : (effectiveLandingWindDir + 180) % 360;
     const downwindWindAngle = Utils.calculateWindAngle(downwindCourse, downwindWindDir);
     const { crosswind: downwindCrosswind, headwind: downwindHeadwind } = Utils.calculateWindComponents(downwindWindSpeedKt, downwindWindAngle);
     const downwindWca = Utils.calculateWCA(downwindCrosswind, CANOPY_SPEED_KT) * (downwindCrosswind >= 0 ? 1 : -1);
@@ -602,7 +609,7 @@ export function calculateLandingPatternCoords(lat, lng, interpolatedData) {
     console.log(`[Pattern] Landing Pattern Updated:
         Final Leg: Wind: ${finalWindDir.toFixed(1)}° @ ${finalWindSpeedKt.toFixed(1)}kt, Course: ${finalCourse.toFixed(1)}°, WCA: ${finalWca.toFixed(1)}°, GS: ${finalGroundSpeedKt.toFixed(1)}kt, HW: ${finalHeadwind.toFixed(1)}kt, Length: ${finalLength.toFixed(1)}m
         Base Leg: Wind: ${baseWindDir.toFixed(1)}° @ ${baseWindSpeedKt.toFixed(1)}kt, Course: ${baseCourse.toFixed(1)}°, WCA: ${baseWca.toFixed(1)}°, GS: ${baseGroundSpeedKt.toFixed(1)}kt, HW: ${baseHeadwind.toFixed(1)}kt, Length: ${baseLength.toFixed(1)}m
-        Downwind Leg: Wind: ${downwindWindDir.toFixed(1)}° @ ${downwindWindSpeedKt.toFixed(1)}kt, Course: ${downwindCourse.toFixed(1)}°, WCA: ${downwindWca.toFixed(1)}°, GS: ${downwindGroundSpeedKt.toFixed(1)}kt, HW: ${downwindHeadwind.toFixed(1)}kt, Length: ${downwindLength.toFixed(1)}m`);
+        ${patternShape === 'Z' ? 'Upwind' : 'Downwind'} Leg: Wind: ${downwindWindDir.toFixed(1)}° @ ${downwindWindSpeedKt.toFixed(1)}kt, Course: ${downwindCourse.toFixed(1)}°, WCA: ${downwindWca.toFixed(1)}°, GS: ${downwindGroundSpeedKt.toFixed(1)}kt, HW: ${downwindHeadwind.toFixed(1)}kt, Length: ${downwindLength.toFixed(1)}m`);
 
     // Koordinaten-Logs (korrigiert für baseStart)
     console.log('[Pattern] Coordinates DIP: ', lat, lng, 'Altitude DIP:', baseHeight);

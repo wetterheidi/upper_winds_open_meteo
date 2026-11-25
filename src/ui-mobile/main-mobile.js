@@ -148,6 +148,7 @@ function initializeUIElements() {
         applySettingToInput('alertCloudBase', Settings.state.userSettings.alerts.clouds.base);
     }
 
+    applySettingToRadio('patternShape', Settings.state.userSettings.patternShape || 'U');
     updatePlannerUnits(Settings.state.userSettings.heightUnit, false);
 
     Settings.state.userSettings.isCustomJumpRunDirection = Settings.state.userSettings.isCustomJumpRunDirection || false;
@@ -1964,6 +1965,13 @@ function setupAppEventListeners() {
                 displayManager.updateLandingPatternDisplay();
                 calculateJump(); // Auch die Exit-Kreise und die blauen Kreise müssen neu berechnet werden
                 if (AppState.map) { AppState.map.invalidateSize(); }
+                break;
+
+            case 'patternShape':
+                // Label des ersten Legs (Downwind ↔ Upwind) anpassen, Muster und Exit-Kreise neu berechnen
+                updatePlannerUnits(Settings.state.userSettings.heightUnit, false);
+                displayManager.updateLandingPatternDisplay();
+                calculateJump();
                 break;
 
             // Für 'temperatureUnit', 'timeZone', 'downloadFormat' ist keine zusätzliche Aktion nötig,

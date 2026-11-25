@@ -121,6 +121,7 @@ function initializeUIElements() {
     applySettingToSelect('northReference', Settings.state.userSettings.northReference);
     Utils.updateNorthReferenceSuffixes();
     applySettingToRadio('landingDirection', Settings.state.userSettings.landingDirection);
+    applySettingToRadio('patternShape', Settings.state.userSettings.patternShape || 'U');
     applySettingToInput('canopySpeed', Settings.state.userSettings.canopySpeed);
     applySettingToInput('descentRate', Settings.state.userSettings.descentRate);
     applySettingToInput('legHeightDownwind', Settings.state.userSettings.legHeightDownwind);
@@ -1784,6 +1785,13 @@ function setupAppEventListeners() {
                 updateUIState();
                 displayManager.updateLandingPatternDisplay();
                 calculateJump(); // Exit und blaue Kreise müssen neu berechnet werden
+                break;
+
+            case 'patternShape':
+                // Label des ersten Legs (Downwind ↔ Upwind) anpassen, Muster und Exit-Kreise neu berechnen
+                updatePlannerUnits(Settings.state.userSettings.heightUnit, false);
+                displayManager.updateLandingPatternDisplay();
+                calculateJump();
                 break;
         }
     });

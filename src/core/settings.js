@@ -54,6 +54,7 @@ export const Settings = {
         descentRate: 3.5,
         showLandingPattern: false,
         landingDirection: 'LL',
+        patternShape: 'U',
         customLandingDirectionLL: '',
         customLandingDirectionRR: '',
         legHeightDownwind: 300,

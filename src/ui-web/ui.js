@@ -168,7 +168,7 @@ export function updatePlannerUnits(unit, convertValues = true) {
         { labelId: 'labelExitAltitude', inputId: 'exitAltitude', min: 500, max: 15000, step: 100, i18nKey: 'planner.exit_altitude' },
         { labelId: 'labelOpeningAltitude', inputId: 'openingAltitude', min: 500, max: 10000, step: 100, i18nKey: 'planner.opening_altitude' },
         { labelId: 'labelSafetyHeight', inputId: 'safetyHeight', min: 0, max: 1000, step: 10, i18nKey: 'planner.safety_height', simpleSuffix: true },
-        { labelId: 'labelLegHeightDownwind', inputId: 'legHeightDownwind', min: 50, max: 1000, step: 50, i18nKey: 'planner.leg_downwind' },
+        { labelId: 'labelLegHeightDownwind', inputId: 'legHeightDownwind', min: 50, max: 1000, step: 50, i18nKey: Settings.state.userSettings.patternShape === 'Z' ? 'planner.leg_upwind' : 'planner.leg_downwind' },
         { labelId: 'labelLegHeightBase', inputId: 'legHeightBase', min: 50, max: 1000, step: 50, i18nKey: 'planner.leg_base' },
         { labelId: 'labelLegHeightFinal', inputId: 'legHeightFinal', min: 50, max: 1000, step: 50, i18nKey: 'planner.leg_final' },
         { labelId: 'labelCutAwayAltitude', inputId: 'cutAwayAltitude', min: 0, max: 10000, step: 10, i18nKey: 'planner.cut_away_altitude', simpleSuffix: true },
@@ -187,6 +187,8 @@ export function updatePlannerUnits(unit, convertValues = true) {
             const textSuffix = field.simpleSuffix ? suffixSimple : suffix;
             const spanEl = labelEl.querySelector('span[data-i18n]');
             if (spanEl) {
+                // Key mitführen, damit ein Sprachwechsel den passenden Text (z.B. Upwind statt Downwind) setzt
+                spanEl.setAttribute('data-i18n', field.i18nKey);
                 spanEl.textContent = `${cleanText} ${textSuffix} `;
             }
 

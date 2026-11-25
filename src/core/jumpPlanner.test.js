@@ -1049,5 +1049,125 @@ describe('jumpPlanner.js', () => {
             consoleSpy.mockRestore();
         });
 
+        it('sollte beim Z-Pattern Base und Final beibehalten und das erste Leg in Landerichtung legen', () => {
+            // Schritt 1: Setze die Benutzereinstellungen korrekt
+            Settings.state.userSettings.landingDirection = 'LL';
+            Settings.state.userSettings.patternShape = 'Z';
+            Settings.state.userSettings.customLandingDirectionLL = 270; // Benutzerdefinierte Landerichtung
+            AppState.landingWindDir = 177; // Fallback-Wert, sollte nicht verwendet werden
+
+            // Schritt 2: Mock für document.getElementById sicherstellen
+            // (Der bestehende Mock sollte funktionieren, aber wir überprüfen ihn)
+            vi.stubGlobal('document', {
+                getElementById: vi.fn((id) => {
+                    const settings = Settings.state.userSettings;
+                    const map = {
+                        exitAltitude: settings.exitAltitude.toString(),
+                        openingAltitude: settings.openingAltitude.toString(),
+                        legHeightDownwind: settings.legHeightDownwind.toString(),
+                        legHeightBase: settings.legHeightBase.toString(),
+                        legHeightFinal: settings.legHeightFinal.toString(),
+                        canopySpeed: settings.canopySpeed.toString(),
+                        descentRate: settings.descentRate.toString(),
+                        cutAwayAltitude: settings.cutAwayAltitude.toString(),
+                        customLandingDirectionLL: settings.customLandingDirectionLL.toString(),
+                        customLandingDirectionRR: settings.customLandingDirectionRR.toString(),
+                    };
+                    return { value: map[id] || '' };
+                }),
+                querySelector: vi.fn((selector) => {
+                    if (selector === 'input[name="landingDirection"]:checked') {
+                        return { value: Settings.state.userSettings.landingDirection };
+                    }
+                    return null;
+                }),
+            });
+
+            // Schritt 3: Mock für calculateMeanWind (angepasst an die erwarteten Windwerte)
+            Utils.calculateMeanWind.mockImplementation((heights, u, v, minHeight, maxHeight) => {
+                const heightRange = `${Math.round(minHeight)}-${Math.round(maxHeight)}`;
+                if (heightRange === '38-138') return [188.1, 6.6, 0, 0]; // Final Leg Wind
+                if (heightRange === '138-238') return [201.4, 10.5, 0, 0]; // Base Leg Wind
+                if (heightRange === '238-338') return [213.6, 13.3, 0, 0]; // Downwind Leg Wind
+                return [0, 0, 0, 0];
+            });
+
+            // Schritt 4: Mock für calculateFlightParameters (angepasst an die Kurse: 270°, 7.3°, 90°)
+            Utils.calculateFlightParameters.mockImplementation((course, windDir, windSpeedKt, airspeedKt) => {
+                if (Math.round(course) === 270) {
+                    return { crosswind: -3.8, headwind: 6.0, wca: -10.8, groundSpeed: 19.1 };
+                }
+                if (Math.round(course) === 7) {
+                    return { crosswind: -9.8, headwind: -10.2, wca: -7.3, groundSpeed: 30.0 };
+                }
+                if (Math.round(course) === 90) {
+                    return { crosswind: 11.5, headwind: 7.4, wca: 33.7, groundSpeed: 27.4 };
+                }
+                return { crosswind: 0, headwind: 0, wca: 0, groundSpeed: 0 };
+            });
+
+            // Schritt 5: Mock für calculateCourseFromHeading (Base Leg Heading = 0° -> trueCourse = 7.3°)
+            Utils.calculateCourseFromHeading.mockImplementation((heading, windDir, windSpeedKt, airspeedKt) => {
+                if (Math.round(heading) === 0) {
+                    return { trueCourse: 7.3, groundSpeed: 30.0 };
+                }
+                return { trueCourse: 0, groundSpeed: 0 };
+            });
+
+            // Schritt 6: Mock für calculateWindComponents und calculateWCA (sicherstellen, dass sie konsistent sind)
+            Utils.calculateWindComponents.mockImplementation((windSpeed, windAngle) => ({
+                crosswind: windSpeed * Math.sin(windAngle * Math.PI / 180),
+                headwind: windSpeed * Math.cos(windAngle * Math.PI / 180),
+            }));
+            Utils.calculateWCA.mockImplementation((crosswind, speed) => Math.asin(crosswind / speed) * 180 / Math.PI);
+
+            // Schritt 7: Mock für calculateNewCenter (für Koordinatenberechnungen)
+            Utils.calculateNewCenter.mockImplementation((lat, lng, dist, bearing) => {
+                const R = 6371000; // Erdradius in Metern
+                const lat1 = lat * Math.PI / 180;
+                const lng1 = lng * Math.PI / 180;
+                const bearingRad = bearing * Math.PI / 180;
+                const delta = dist / R;
+                const lat2 = Math.asin(Math.sin(lat1) * Math.cos(delta) + Math.cos(lat1) * Math.sin(delta) * Math.cos(bearingRad));
+                const lng2 = lng1 + Math.atan2(Math.sin(bearingRad) * Math.sin(delta) * Math.cos(lat1), Math.cos(delta) - Math.sin(lat1) * Math.sin(lat2));
+                const newLat = lat2 * 180 / Math.PI;
+                const newLng = lng2 * 180 / Math.PI;
+                const normalizedLng = ((newLng + 540) % 360) - 180;
+                return [newLat, normalizedLng];
+            });
+
+            // Schritt 8: Test ausführen
+            const interpolatedData = weatherManager.interpolateWeatherData();
+            const consoleSpy = vi.spyOn(console, 'log');
+
+            const result = calculateLandingPatternCoords(
+                52.52,
+                13.41,
+                interpolatedData
+            );
+
+            // Schritt 9: Überprüfen der Ergebnisse
+            expect(result).not.toBeNull();
+            expect(result.landingPoint).toEqual([52.52, 13.41]);
+
+            const logs = consoleSpy.mock.calls.map(call => call[0]);
+            const upwindLog = logs.find(log => typeof log === 'string' && log.includes('Upwind Leg:'));
+            // Erstes Leg fliegt in Landerichtung (270°) statt gegenläufig (90°)
+            expect(upwindLog).toContain('Course: 270.0°');
+
+            // Base und Final identisch zum U-Pattern
+            expect(result.finalStart[0]).toBeCloseTo(52.51999992775671, 4);
+            expect(result.finalStart[1]).toBeCloseTo(13.414140557971336, 4);
+            expect(result.baseStart[0]).toBeCloseTo(52.516067975271994, 4);
+            expect(result.baseStart[1]).toBeCloseTo(13.413310554436407, 4);
+
+            // Start des Upwind-Legs liegt östlich des Base-Punkts (man fliegt nach Westen darauf zu),
+            // beim U-Pattern dagegen westlich (13.4074)
+            expect(result.downwindStart[0]).toBeCloseTo(result.baseStart[0], 4);
+            expect(result.downwindStart[1]).toBeGreaterThan(result.baseStart[1] + 0.003);
+
+            consoleSpy.mockRestore();
+        });
+
     });
 });

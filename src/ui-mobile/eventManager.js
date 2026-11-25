@@ -1445,6 +1445,7 @@ function setupRadioEvents() {
     setupRadioGroup('downloadFormat', () => { }); // Löst nur das Event aus
 
     setupRadioGroup('landingDirection', () => { });
+    setupRadioGroup('patternShape', () => { });
     setupRadioGroup('jumpMasterLineTarget', () => {
         document.dispatchEvent(new CustomEvent('ui:jumpMasterLineTargetChanged'));
     });

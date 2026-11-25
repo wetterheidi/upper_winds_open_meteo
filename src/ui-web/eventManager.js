@@ -1230,6 +1230,7 @@ function setupCheckboxEvents() {
 }
 function setupRadioEvents() {
     setupRadioGroup('landingDirection', () => { });
+    setupRadioGroup('patternShape', () => { });
     setupRadioGroup('jumpMasterLineTarget', () => {
         document.dispatchEvent(new CustomEvent('ui:jumpMasterLineTargetChanged'));
     });

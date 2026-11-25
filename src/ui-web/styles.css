@@ -1553,6 +1553,20 @@ button.btn {
     white-space: nowrap;
 }
 
+/* Umschalter Pattern-Form (U / Z) */
+.pattern-shape-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.pattern-shape-row > label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+}
+
 /* Stile für die neue Landing-Direction-Zeile */
 .landing-direction-row {
     display: flex;

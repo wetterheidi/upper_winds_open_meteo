@@ -505,7 +505,7 @@ export async function exportLandingPatternToGpx() {
   </metadata>
 `;
 
-    gpxContent += `  <wpt lat="${downwindStart[0]}" lon="${downwindStart[1]}"><name>Downwind ${legHeightDownwind} m AGL</name><ele>${eleDownwind}</ele></wpt>\n`;
+    gpxContent += `  <wpt lat="${downwindStart[0]}" lon="${downwindStart[1]}"><name>${Settings.state.userSettings.patternShape === 'Z' ? 'Upwind' : 'Downwind'} ${legHeightDownwind} m AGL</name><ele>${eleDownwind}</ele></wpt>\n`;
     gpxContent += `  <wpt lat="${baseStart[0]}" lon="${baseStart[1]}"><name>Base ${legHeightBase} m AGL</name><ele>${eleBase}</ele></wpt>\n`;
     gpxContent += `  <wpt lat="${finalStart[0]}" lon="${finalStart[1]}"><name>Final ${legHeightFinal} m AGL</name><ele>${eleFinal}</ele></wpt>\n`;
     gpxContent += `  <wpt lat="${landingPoint[0]}" lon="${landingPoint[1]}"><name>DIP</name><ele>${baseHeight}</ele></wpt>\n`;
