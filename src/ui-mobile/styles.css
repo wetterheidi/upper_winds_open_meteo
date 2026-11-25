@@ -2058,6 +2058,13 @@ input[type="checkbox"][style*="opacity: 1"] {
     align-items: center;
 }
 
+/* Links/Rechts-Beschriftung: feste Breite, damit die Richtungsfelder untereinander stehen */
+.pattern-side-label {
+    display: inline-block;
+    min-width: 4.2em;
+    margin-left: 4px;
+}
+
 /* Container für die Lock-Checkbox */
 .lock-landing-container {
     display: inline-flex;

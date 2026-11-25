@@ -29,7 +29,7 @@ A web and mobile application for visualizing upper-level winds and atmospheric d
 - **Weather Alerts:** Configurable alerts for high winds, gusts, thunderstorms, and low cloud bases. Active alerts are indicated on the map and slider.
 
 ### Skydiving & Flight Planning
-- **Landing Pattern Visualization:** Displays a configurable landing pattern (downwind, base, final) with wind details for each leg. Left-hand (LL) or right-hand (RR), as a classic U pattern or as a Z pattern, where an upwind leg in landing direction replaces the downwind leg. Parameters like canopy speed, descent rate, and leg altitudes are adjustable.
+- **Landing Pattern Visualization:** Displays a configurable landing pattern (downwind, base, final) with wind details for each leg. Left or right (the side of the turn from base into final), as a classic U pattern or as a Z pattern, where an upwind leg in landing direction replaces the downwind leg. Parameters like canopy speed, descent rate, and leg altitudes are adjustable.
 - **Jump Trajectory Calculation:** Visualizes the entire jump from exit to landing.
   - **Exit Area (Green Circles):** Probable area to reach the DIP or landing pattern entry after freefall. Tooltip shows calculated drift and freefall time.
   - **Canopy Area (Blue Circles):** Reachable area under canopy, including isolines for different altitudes.
