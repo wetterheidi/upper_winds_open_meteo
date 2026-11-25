@@ -148,6 +148,7 @@ function initializeUIElements() {
         applySettingToInput('alertCloudBase', Settings.state.userSettings.alerts.clouds.base);
     }
 
+    applySettingToRadio('landingDirection', Settings.state.userSettings.landingDirection || 'LL');
     applySettingToRadio('patternShape', Settings.state.userSettings.patternShape || 'U');
     updatePlannerUnits(Settings.state.userSettings.heightUnit, false);
 
